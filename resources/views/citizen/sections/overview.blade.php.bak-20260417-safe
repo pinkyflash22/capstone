@@ -1,0 +1,567 @@
+<div id="section-overview" class="content-section active">
+    <!-- Welcome Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Welcome back, <?php echo e(Auth::user()->name); ?></h1>
+        <p class="text-sm text-gray-500 mt-1 sm:mt-0">
+            <i class="fa-regular fa-map mr-1"></i> 
+            Your home: <?php echo e(Auth::user()->userInfo->address ?? '2230 Pine Rd · zone 7'); ?>
+
+        </p>
+    </div>
+
+    <!-- Community Alert -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded-r-lg flex items-start gap-3">
+        <i class="fa-solid fa-circle-info text-blue-400 mt-1"></i>
+        <div class="text-sm text-blue-800">
+            <span class="font-bold">Community preparedness:</span> Free smoke alarm installation this Saturday at the community center. 
+            <a href="#" class="underline font-medium">Sign up</a>.
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow p-5 border-l-4 border-orange-500 stat-card">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-gray-500 text-sm">active near you</p>
+                    <p class="text-3xl font-bold text-gray-800"><?php echo e($incidents->count()); ?></p>
+                </div>
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
+                    <i class="fa-solid fa-fire"></i>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">0.8 miles · brush fire</p>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow p-5 border-l-4 border-yellow-500 stat-card">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-gray-500 text-sm">Your Reports</p>
+                    <p class="text-3xl font-bold text-gray-800"><?php echo e($userReports); ?></p>
+                </div>
+                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
+                    <i class="fa-solid fa-address-book"></i>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">2 fire, 2 medical</p>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow p-5 border-l-4 border-green-500 stat-card">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-gray-500 text-sm">your zone risk</p>
+                    <p class="text-3xl font-bold text-gray-800"><?php echo e($riskLevel ?? 'moderate'); ?></p>
+                </div>
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">red flag until 8pm</p>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow p-5 border-l-4 border-purple-500 stat-card">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-gray-500 text-sm">next drill</p>
+                    <p class="text-3xl font-bold text-gray-800"><?php echo e($nextDrill ?? 'sat'); ?></p>
+                </div>
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
+                    <i class="fa-solid fa-calendar"></i>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">9am @ station 7</p>
+        </div>
+    </div>
+  <!-- Main Grid: Map + Alerts -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Map Card -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow" style="padding: 20px 0px 20px 0px;">
+            <div class="flex items-center justify-between mb-4">
+                <div style="padding: 5px 20px 5px 20px;">
+                    <h2 class="font-bold text-gray-800">
+                    <i class="fa-solid fa-map-pin text-orange-600 mr-2"></i> Incidents & safety near you
+                </h2>
+                </div>
+                <div  style="padding: 5px 20px 5px 20px;">
+                <span class="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">live · 2mi radius</span>
+                </div>
+            </div>
+            
+            <div id="userMap" class="bg-gray-200 rounded-lg relative" style="height: 300px;"></div>
+            
+         
+            <!-- User Actions -->
+            <div class="flex gap-3 mt-4 text-sm flex-wrap justify-end">
+                <div  style="padding: 5px 20px 5px 20px;">
+                <button class="border border-gray-300 px-4 py-2 rounded-lg text-xs hover:bg-gray-50">
+                    <i class="fa-regular fa-circle-check mr-1"></i> Mark myself safe
+                </button>
+                <button class="bg-orange-600 text-white px-4 py-2 rounded-lg text-xs hover:bg-orange-700" onclick="" id="reportFire">
+                    <i class="fa-regular fa-flag mr-1"></i> Report Incident
+                </button>
+            </div>
+            </div>
+        </div>
+       
+        <!-- Recent Alerts -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <h2 class="font-bold text-gray-800 mb-4">
+                <i class="fa-solid fa-bell text-orange-600 mr-2"></i> alerts for your area
+            </h2>
+            <ul class="space-y-3 max-h-80 overflow-y-auto">
+                <?php $__currentLoopData = $incidents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $incident): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <li class="flex gap-2 items-start p-2 hover:bg-gray-50 rounded-lg transition">
+                        <span class="w-2 h-2 bg-red-500 rounded-full mt-1.5"></span>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium">🔥<?php echo e($incident->incidentType->type); ?></p>
+                            <p class="text-xs text-gray-500"><?php echo e($incident->created_at->diffForHumans()); ?> · 
+                                <span class="
+                                    <?php if($incident->incidentStatus && $incident->incidentStatus->status && strtolower($incident->incidentStatus->status) == 'reported'): ?> text-yellow-600
+                                    <?php elseif($incident->incidentStatus && $incident->incidentStatus->status && strtolower($incident->incidentStatus->status) == 'responding'): ?> text-blue-600
+                                    <?php elseif($incident->incidentStatus && $incident->incidentStatus->status && strtolower($incident->incidentStatus->status) == 'on scene'): ?> text-purple-600
+                                    <?php elseif($incident->incidentStatus && $incident->incidentStatus->status && strtolower($incident->incidentStatus->status) == 'controlled'): ?> text-green-600
+                                    <?php else: ?> text-gray-600 <?php endif; ?>
+                                ">
+                                    <?php echo e(ucfirst($incident->incidentStatus->status )); ?>
+
+                                </span>
+                            </p>
+                        </div>
+                    </li>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </ul>
+            <hr class="my-3">
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <button class="bg-gray-100 hover:bg-gray-200 p-2 rounded-lg text-xs">
+                    <i class="fa-regular fa-bell-slash mr-1"></i> pause alerts
+                </button>
+                <button class="bg-gray-100 hover:bg-gray-200 p-2 rounded-lg text-xs">
+                    <i class="fa-regular fa-phone mr-1"></i> test call
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- CHARTS SECTION - NEW -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Incident Trends Chart -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-orange-600"></i> Incident Trends (Last 7 Days)
+                </h3>
+                <div class="flex gap-2">
+                    <button class="chart-period-btn active px-3 py-1 text-xs rounded-full bg-orange-600 text-white" data-period="week">Week</button>
+                    <button class="chart-period-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600" data-period="month">Month</button>
+                    <button class="chart-period-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600" data-period="year">Year</button>
+                </div>
+            </div>
+            <div class="h-64 relative">
+                <canvas id="incidentTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Incident Types Distribution -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-orange-600"></i> Incidents by Type
+                </h3>
+                <span class="text-xs text-gray-500">Total: <?php echo e($incidents->count()); ?></span>
+            </div>
+            <div class="h-64 relative">
+                <canvas id="incidentTypeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Status Distribution -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-green-600"></i> Incident Status
+            </h3>
+            <div class="h-48 relative">
+                <canvas id="incidentStatusChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Hourly Distribution -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-clock text-blue-600"></i> Peak Hours
+            </h3>
+            <div class="h-48 relative">
+                <canvas id="hourlyDistributionChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Risk Level Meter -->
+        <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl shadow p-5">
+            <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-orange-600"></i> Current Risk Level
+            </h3>
+            <div class="text-center">
+                <div class="relative inline-block">
+                    <svg class="w-32 h-32">
+                        <circle class="text-gray-200" stroke-width="10" stroke="currentColor" fill="transparent" r="56" cx="64" cy="64"/>
+                        <circle class="text-orange-600" stroke-width="10" stroke="currentColor" fill="transparent" r="56" cx="64" cy="64" stroke-dasharray="352" stroke-dashoffset="<?php echo e(352 - (352 * ($riskPercentage ?? 65) / 100)); ?>" stroke-linecap="round"/>
+                    </svg>
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                        <span class="text-3xl font-bold text-gray-800"><?php echo e($riskPercentage ?? 65); ?>%</span>
+                        <span class="text-xs text-gray-500 block">risk index</span>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
+                        <?php if(($riskLevel ?? 'moderate') == 'low'): ?> bg-green-100 text-green-800
+                        <?php elseif(($riskLevel ?? 'moderate') == 'moderate'): ?> bg-yellow-100 text-yellow-800
+                        <?php else: ?> bg-red-100 text-red-800 <?php endif; ?>">
+                        <?php echo e(ucfirst($riskLevel ?? 'moderate')); ?> risk
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+  <!-- Route Information Card (hidden until route is calculated) -->
+        <div id="routeInfoCard" class="route-info-card" style="display: none;">
+            <div class="flex justify-between items-center">
+                <h3 class="font-semibold">
+                    <i class="fa-solid fa-route text-blue-600"></i>
+                    Active Route
+                </h3>
+                <button id="stopTracking" class="text-sm text-red-600 hover:text-red-700">
+                    <i class="fa-solid fa-stop"></i> Stop Tracking
+                </button>
+            </div>
+            <div class="route-stats">
+                <div class="route-stat">
+                    <div class="route-stat-label">Distance</div>
+                    <div class="route-stat-value" id="routeDistance">-- km</div>
+                </div>
+                <div class="route-stat">
+                    <div class="route-stat-label">Duration</div>
+                    <div class="route-stat-value" id="routeDuration">-- min</div>
+                </div>
+                <div class="route-stat">
+                    <div class="route-stat-label">ETA</div>
+                    <div class="route-stat-value" id="routeETA">--:--</div>
+                </div>
+            </div>
+            <div class="travel-mode-buttons">
+                <button class="travel-mode-btn active" data-mode="driving">
+                    <i class="fa-solid fa-car"></i> Driving
+                </button>
+                <button class="travel-mode-btn" data-mode="walking">
+                    <i class="fa-solid fa-person-walking"></i> Walking
+                </button>
+                <button class="travel-mode-btn" data-mode="cycling">
+                    <i class="fa-solid fa-bicycle"></i> Cycling
+                </button>
+            </div>
+        </div>
+  
+
+    <!-- Bottom Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Safety Checklist -->
+        <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-list text-orange-600"></i> your safety checklist
+            </h3>
+            <div class="mt-4 space-y-2">
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-square-check text-green-600"></i>
+                    <span class="text-sm">Smoke alarms tested (Feb 15)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-square text-gray-400"></i>
+                    <span class="text-sm">Go-bag ready</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-square text-gray-400"></i>
+                    <span class="text-sm">Family meeting point discussed</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-regular fa-square-check text-green-600"></i>
+                    <span class="text-sm">Emergency contacts saved</span>
+                </div>
+                <button class="text-orange-600 text-sm mt-2 inline-block">
+                    <i class="fa-regular fa-plus mr-1"></i> add task
+                </button>
+            </div>
+        </div>
+
+        <!-- Community Pulse -->
+        <div class="bg-gradient-to-r from-orange-700 to-amber-700 text-white rounded-xl shadow p-5 relative">
+            <div class="relative z-10">
+                <h3 class="font-semibold mb-3">🏘️ district 4 pulse</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white/10 backdrop-blur rounded-lg p-3">
+                        <div class="text-2xl font-bold"><?php echo e($neighborsReady ?? 156); ?></div>
+                        <div class="text-xs text-white/80">neighbors ready</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-lg p-3">
+                        <div class="text-2xl font-bold"><?php echo e($activeDrills ?? 3); ?></div>
+                        <div class="text-xs text-white/80">active drills</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-lg p-3">
+                        <div class="text-2xl font-bold"><?php echo e($safetyTips ?? 5); ?></div>
+                        <div class="text-xs text-white/80">safety tips today</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-lg p-3">
+                        <div class="text-2xl font-bold"><?php echo e($volunteersNeeded ?? 12); ?></div>
+                        <div class="text-xs text-white/80">volunteers needed</div>
+                    </div>
+                </div>
+                <p class="text-xs text-white/70 mt-3 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> your zone is well prepared
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get incidents data from Laravel
+    const incidents = <?php echo json_encode($incidents, 15, 512) ?>;
+    
+    // Process data for charts
+    function processIncidentData() {
+        // Incident types distribution
+        const typeCounts = {};
+        const statusCounts = {};
+        const hourlyCounts = Array(24).fill(0);
+        const dailyCounts = Array(7).fill(0);
+        console.log('incidents:', incidents);
+        incidents.forEach(incident => {
+            // Count by type
+            const type = incident.incident_type.type || 'unknown';
+            typeCounts[type] = (typeCounts[type] || 0) + 1;
+            
+            // Count by status
+            const status = incident.incident_status.status || 'unknown';
+            statusCounts[status] = (statusCounts[status] || 0) + 1;
+            
+            // Count by hour
+            if (incident.created_at) {
+                const date = new Date(incident.created_at);
+                const hour = date.getHours();
+                hourlyCounts[hour]++;
+                
+                // Count by day of week
+                const day = date.getDay();
+                dailyCounts[day]++;
+            }
+        });
+        
+        return { typeCounts, statusCounts, hourlyCounts, dailyCounts };
+    }
+    
+    const { typeCounts, statusCounts, hourlyCounts, dailyCounts } = processIncidentData();
+    
+    // Colors for charts
+    const colors = [
+        '#f97316', '#3b82f6', '#22c55e', '#ef4444', '#8b5cf6', 
+        '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'
+    ];
+    
+    // 1. Incident Trend Chart
+    const trendCtx = document.getElementById('incidentTrendChart')?.getContext('2d');
+    if (trendCtx) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'Number of Incidents',
+                    data: dailyCounts,
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#f97316',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { 
+                        backgroundColor: '#1f2937',
+                        titleColor: '#fff',
+                        bodyColor: '#d1d5db'
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+    
+    // 2. Incident Type Pie Chart
+    console.log('typeCounts:', typeCounts);
+    const typeCtx = document.getElementById('incidentTypeChart')?.getContext('2d');
+    if (typeCtx) {
+        new Chart(typeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(typeCounts),
+                datasets: [{
+                    data: Object.values(typeCounts),
+                    backgroundColor: colors.slice(0, Object.keys(typeCounts).length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        position: 'bottom',
+                        labels: { usePointStyle: true, boxWidth: 8 }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+    
+    // 3. Incident Status Chart
+    const statusCtx = document.getElementById('incidentStatusChart')?.getContext('2d');
+    if (statusCtx) {
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(statusCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+                datasets: [{
+                    data: Object.values(statusCounts),
+                    backgroundColor: ['#f97316', '#3b82f6', '#22c55e', '#ef4444'],
+                    borderRadius: 6,
+                    barPercentage: 0.7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+    
+    // 4. Hourly Distribution Chart
+    const hourlyCtx = document.getElementById('hourlyDistributionChart')?.getContext('2d');
+    if (hourlyCtx) {
+        const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + ':00');
+        new Chart(hourlyCtx, {
+            type: 'line',
+            data: {
+                labels: hours.filter((_, i) => i % 3 === 0), // Show every 3 hours
+                datasets: [{
+                    label: 'Incidents by Hour',
+                    data: hourlyCounts,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#3b82f6'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#e5e7eb' }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Chart period switching
+    document.querySelectorAll('.chart-period-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.chart-period-btn').forEach(b => {
+                b.classList.remove('active', 'bg-orange-600', 'text-white');
+                b.classList.add('bg-gray-100', 'text-gray-600');
+            });
+            this.classList.add('active', 'bg-orange-600', 'text-white');
+            this.classList.remove('bg-gray-100', 'text-gray-600');
+            
+            // Here you would fetch new data based on the period
+            const period = this.dataset.period;
+            console.log('Switching to', period, 'view');
+            // You can make an AJAX call to get new data for the selected period
+        });
+    });
+});
+</script>
+
+<style>
+.chart-period-btn {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.chart-period-btn:hover:not(.active) {
+    background-color: #e5e7eb !important;
+}
+
+/* Animation for stats cards */
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Custom scrollbar for alerts */
+.max-h-80::-webkit-scrollbar {
+    width: 6px;
+}
+
+.max-h-80::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.max-h-80::-webkit-scrollbar-thumb {
+    background: #f97316;
+    border-radius: 10px;
+}
+
+.max-h-80::-webkit-scrollbar-thumb:hover {
+    background: #ea580c;
+}
+</style><?php /**PATH C:\Users\Aaron A. Aquino\capstone-project\resources\views\citizen\sections\overview.blade.php ENDPATH**/ ?>

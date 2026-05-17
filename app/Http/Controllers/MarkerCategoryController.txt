@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\MarkerCategory; // Use the correct model
+use Illuminate\Http\Request;
+
+class MarkerCategoryController extends Controller
+{
+    public function index()
+    {
+        return response()->json(MarkerCategory::all());
+        
+    }
+    
+    public function store(Request $request)
+    {
+        $request->validate([
+            'marker_category' => 'required|string',
+            // 'marker_category' => 'required|string|unique:marker_categories,marker_category',
+        ]);
+
+        $category = MarkerCategory::create([
+            'marker_category' => $request->input('marker_category'),
+        ]);
+        // if($category){  return response()->json([
+        //     'success' => true,
+        //     'category' => $category
+        // ]);
+        // }else{
+        //       return response()->json([
+        //     'success' => false,
+        //     'message' => 'this category already exist'
+        // ]);
+        // }
+        
+      return response()->json([
+            'success' => true,
+            'category' => $category
+        ]);
+    }
+}

@@ -1,0 +1,141 @@
+{
+  "dataset_path": "station_barangay_monthly_demo.json",
+  "model_path": "fire_model.pkl",
+  "dataset_kind": "station_barangay_monthly",
+  "target_column": "target_high_risk_barangay_month",
+  "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
+  "records_used": 720,
+  "feature_columns": [
+    "station_id",
+    "barangay_id",
+    "year",
+    "average_temperature",
+    "water_access_flag",
+    "month_sin",
+    "month_cos",
+    "is_dry_season",
+    "high_density_flag",
+    "barangay_pressure_signal",
+    "barangay_name",
+    "season",
+    "density",
+    "materials",
+    "peak_hours",
+    "accesibility",
+    "type_incident",
+    "occupancy"
+  ],
+  "global_feature_importance": [
+    {
+      "feature": "barangay_pressure_signal",
+      "importance": 0.384
+    },
+    {
+      "feature": "season",
+      "importance": 0.0975
+    },
+    {
+      "feature": "average_temperature",
+      "importance": 0.0778
+    },
+    {
+      "feature": "density",
+      "importance": 0.0755
+    },
+    {
+      "feature": "high_density_flag",
+      "importance": 0.049
+    },
+    {
+      "feature": "month_sin",
+      "importance": 0.0458
+    },
+    {
+      "feature": "is_dry_season",
+      "importance": 0.0453
+    },
+    {
+      "feature": "barangay_name",
+      "importance": 0.0429
+    },
+    {
+      "feature": "water_access_flag",
+      "importance": 0.0354
+    },
+    {
+      "feature": "type_incident",
+      "importance": 0.0251
+    }
+  ],
+  "reference_profile": {
+    "station_id": 2.0,
+    "barangay_id": 202.5,
+    "year": 2023.0,
+    "average_temperature": 30.57,
+    "water_access_flag": 0.5,
+    "month_sin": -0.0,
+    "month_cos": -0.0,
+    "is_dry_season": 0.5,
+    "high_density_flag": 0.0,
+    "barangay_pressure_signal": 19.4352,
+    "barangay_name": "Barangay Anonas",
+    "season": "dry",
+    "density": "high",
+    "materials": "concrete",
+    "peak_hours": "afternoon",
+    "accesibility": "difficult access",
+    "type_incident": "electrical fire",
+    "occupancy": "industrial"
+  },
+  "metrics": {
+    "train_rows": 540,
+    "test_rows": 180,
+    "accuracy": 0.95,
+    "roc_auc": 0.9908,
+    "precision": 0.9595,
+    "recall": 0.9221,
+    "f1_score": 0.9404,
+    "brier_score": 0.0346,
+    "cross_val_roc_auc_mean": 0.9857,
+    "cross_val_roc_auc_scores": [
+      0.9939,
+      0.9825,
+      0.9799,
+      0.9744,
+      0.9978
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.9433962264150944,
+        "recall": 0.970873786407767,
+        "f1-score": 0.9569377990430622,
+        "support": 103.0
+      },
+      "1": {
+        "precision": 0.9594594594594594,
+        "recall": 0.922077922077922,
+        "f1-score": 0.9403973509933775,
+        "support": 77.0
+      },
+      "accuracy": 0.95,
+      "macro avg": {
+        "precision": 0.9514278429372769,
+        "recall": 0.9464758542428445,
+        "f1-score": 0.9486675750182199,
+        "support": 180.0
+      },
+      "weighted avg": {
+        "precision": 0.9502677205507395,
+        "recall": 0.95,
+        "f1-score": 0.9498621629329194,
+        "support": 180.0
+      }
+    }
+  },
+  "notes": [
+    "This is a JSON-first baseline designed for later API integration.",
+    "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",
+    "Deep learning is not recommended until the project has substantially more historical data.",
+    "Use the prediction output drivers and ai_context fields when prompting a language model for recommendations."
+  ]
+}

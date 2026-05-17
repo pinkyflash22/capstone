@@ -1,0 +1,32 @@
+{
+  "station_id": 1,
+  "incident_month": "April",
+  "incident_year": 2025,
+  "incident_status": "resolved",
+  "marker_category": "incident",
+  "marker_lat": 15.8995,
+  "marker_lng": 120.5836,
+  "spot_estimated_damage": 95000,
+  "spot_occupancy": "commercial",
+  "estimated_area": 160,
+  "fire_origin": "Kitchen",
+  "fire_cause": "electrical fire",
+  "historical_incident_count": 19,
+  "historical_risk_level": "high",
+  "historical_average_temperature": 35.2,
+  "historical_season": "dry",
+  "historical_near_water": 1,
+  "historical_density": "high",
+  "historical_materials": "mixed",
+  "historical_peak_hours": "evening",
+  "historical_accesibility": "moderate access",
+  "historical_type_incident": "electrical fire",
+  "historical_occupancy": "commercial",
+  "weather_context": {
+    "condition": "hot and dry",
+    "temperature_c": 35.0,
+    "humidity": 61,
+    "wind_kph": 18,
+    "rainfall_mm": 0
+  }
+}

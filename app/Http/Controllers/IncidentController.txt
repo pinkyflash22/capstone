@@ -1,0 +1,646 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Incident;
+use App\Models\Account;
+use App\Models\Station;
+use App\Models\MarkerCategory;
+use App\Models\Marker;
+use App\Models\Personnel;
+
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+
+class IncidentController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index()
+    {
+        // Your existing index method
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        return view('citizen.sections.overview');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'marker_id' => 'required|exists:markers,marker_id',
+            'station_id' => 'nullable|exists:stations,station_id',
+            'status' => 'required|in:reported,responding,responded',
+            'alarmdatetime' => 'required',
+            'reported_by' => 'required|exists:accounts,account_id',
+            'incident_type' => 'required|in:fire,drown,treefall,special',
+        ]);
+        
+        $accountId = Auth::user()->account->account_id;
+        // $personnels = Personnel::where();
+
+        $incident = Incident::create([
+            'marker_id' => $request->marker_id,
+            'station_id' => $request->station_id,
+            'status' => $request->status,
+            'alarmdatetime' => Carbon::now(),
+            'reported_by' => $accountId,
+            'incident_type' => $request->incident_type,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'incident' => $incident
+        ]);
+
+        return redirect('/citizen/dashboard');
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        //
+    }
+
+public function incidents(Request $request)
+{
+    $period = $request->get('period', 'week');
+
+    if ($period === 'week') {
+        $start = now()->subDays(6);
+        $format = 'D'; // Mon, Tue
+    } elseif ($period === 'month') {
+        $start = now()->subDays(29);
+        $format = 'M d'; // Aug 01
+    } elseif ($period === 'year') {
+        $start = now()->subMonths(11);
+        $format = 'M'; // Jan, Feb
+    }
+
+    $incidents = Incident::where('created_at', '>=', $start)->get();
+
+    // Group based on created_at
+    $grouped = $incidents->groupBy(function ($item) use ($format) {
+        return Carbon::parse($item->created_at)->format($format);
+    });
+
+    return response()->json([
+        'labels' => $grouped->keys()->values(),
+        'values' => $grouped->map(function ($group) {
+            return count($group);
+        })->values()
+    ]);
+
+//     $labels = [];
+// $values = [];
+
+// $days = $period === 'week' ? 7 : ($period === 'month' ? 30 : 12);
+
+// for ($i = $days - 1; $i >= 0; $i--) {
+//     if ($period === 'year') {
+//         $date = now()->subMonths($i);
+//         $label = $date->format('M');
+//         $count = Incident::whereYear('created_at', $date->year)
+//             ->whereMonth('created_at', $date->month)
+//             ->count();
+//     } else {
+//         $date = now()->subDays($i);
+//         $label = $date->format($format);
+//         $count = Incident::whereDate('created_at', $date)->count();
+//     }
+
+//     $labels[] = $label;
+//     $values[] = $count;
+// }
+
+// return response()->json([
+//     'labels' => $labels,
+//     'values' => $values
+// ]);
+}
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id) 
+    {
+        $incident = Incident::findOrFail($id);
+
+        $validated = $request->validate([
+            'station_id' => 'required|exists:stations,station_id',
+            'status' => 'required|in:reported,responding,responded',
+        ]);
+
+        $incident->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'incident' => $incident
+        ]);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        //
+    }
+    
+    /**
+     * Get latest incidents with markers
+     */
+    public function latest()
+    {
+        $coord = \App\Models\Incident::with(['marker'])
+                ->latest()
+                ->get();
+        return response()->json($coord);
+    }
+
+    /**
+     * Display the admin dashboard with incident statistics and charts
+     */
+    public function dashboard(Request $request)
+    {
+        // Get date range from request or default to 7 days
+        $days = $request->get('days', 7);
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        
+        // Get all incidents
+        $incidents = Incident::with('marker')->get();
+        
+        // Get stations
+        $stations = Station::all();
+        
+        // Get alerts (incidents with status 'reported') - using Incident model only
+        $alerts = Incident::with('marker')
+            ->where('status', 'reported')
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+        
+        // Get categories for modals
+        $categories = MarkerCategory::all();
+        
+        // Get map markers
+        $mapmarker = Marker::with(['coordinate.image', 'category'])
+            ->whereHas('coordinate')
+            ->get();
+        
+        // Prepare chart data based on selected range
+        $chartData = $this->getIncidentChartData($days, $startDate, $endDate);
+        
+        return view('admin.dashboard', compact(
+            'incidents', 
+            'stations', 
+            'alerts', 
+            'categories', 
+            'mapmarker',
+            'chartData'
+        ));
+    }
+    
+    /**
+     * Get incident chart data with flexible date range
+     */
+    private function getIncidentChartData($days = 7, $startDate = null, $endDate = null)
+    {
+        $chartLabels = [];
+        $chartValues = [];
+        
+        // Case 1: Custom date range provided
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->endOfDay();
+            $interval = $start->diffInDays($end);
+            
+            // If range is more than 30 days, group by weeks
+            if ($interval > 30) {
+                return $this->getWeeklyChartData($start, $end);
+            }
+            
+            // Otherwise group by days
+            $current = clone $start;
+            while ($current <= $end) {
+                $chartLabels[] = $current->format('M d');
+                $chartValues[] = Incident::whereDate('created_at', $current)->count();
+                $current->addDay();
+            }
+        }
+        // Case 2: Predefined days (7, 30, 90, etc.)
+        else {
+            $days = (int) $days;
+            
+            // If more than 30 days, group by weeks
+            if ($days > 30) {
+                return $this->getWeeklyChartData(Carbon::now()->subDays($days), Carbon::now());
+            }
+            
+            // Group by days
+            for ($i = $days - 1; $i >= 0; $i--) {
+                $date = Carbon::now()->subDays($i);
+                $chartLabels[] = $date->format('D');
+                $chartValues[] = Incident::whereDate('created_at', $date)->count();
+            }
+        }
+        
+        return [
+            'labels' => $chartLabels,
+            'values' => $chartValues,
+            'type' => 'daily'
+        ];
+    }
+    
+    /**
+     * Get weekly grouped chart data for longer periods
+     */
+    private function getWeeklyChartData($startDate, $endDate)
+    {
+        $chartLabels = [];
+        $chartValues = [];
+        
+        $current = clone $startDate;
+        $weekNumber = 1;
+        
+        while ($current <= $endDate) {
+            $weekEnd = (clone $current)->addDays(6);
+            if ($weekEnd > $endDate) {
+                $weekEnd = clone $endDate;
+            }
+            
+            $chartLabels[] = 'Week ' . $weekNumber . ' (' . $current->format('M d') . ' - ' . $weekEnd->format('M d') . ')';
+            $chartValues[] = Incident::whereBetween('created_at', [$current, $weekEnd])->count();
+            
+            $current->addDays(7);
+            $weekNumber++;
+        }
+        
+        return [
+            'labels' => $chartLabels,
+            'values' => $chartValues,
+            'type' => 'weekly'
+        ];
+    }
+    
+    /**
+     * API endpoint to get chart data (for AJAX requests)
+     */
+    public function getChartData(Request $request)
+    {
+        $period = $request->get('period', 'week'); // day, week, month, year, custom
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $customDays = $request->get('days');
+        
+        switch ($period) {
+            case 'day':
+                return response()->json($this->getHourlyChartData());
+                
+            case 'week':
+                return response()->json($this->getIncidentChartData(7));
+                
+            case 'month':
+                return response()->json($this->getIncidentChartData(30));
+                
+            case 'quarter':
+                return response()->json($this->getIncidentChartData(90));
+                
+            case 'year':
+                return response()->json($this->getMonthlyChartData());
+                
+            case 'custom':
+                if ($customDays) {
+                    return response()->json($this->getIncidentChartData($customDays));
+                }
+                return response()->json($this->getIncidentChartData(30, $startDate, $endDate));
+                
+            default:
+                return response()->json($this->getIncidentChartData(7));
+        }
+    }
+    
+    /**
+     * Get hourly chart data for today
+     */
+    private function getHourlyChartData()
+    {
+        $labels = [];
+        $values = [];
+        
+        for ($hour = 0; $hour < 24; $hour++) {
+            $labels[] = sprintf('%02d:00', $hour);
+            $values[] = Incident::whereDate('created_at', Carbon::today())
+                ->whereTime('created_at', '>=', sprintf('%02d:00:00', $hour))
+                ->whereTime('created_at', '<', sprintf('%02d:00:00', ($hour + 1) % 24))
+                ->count();
+        }
+        
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'type' => 'hourly'
+        ];
+    }
+    
+    /**
+     * Get monthly chart data for the year
+     */
+    private function getMonthlyChartData()
+    {
+        $labels = [];
+        $values = [];
+        
+        for ($month = 1; $month <= 12; $month++) {
+            $labels[] = Carbon::create()->month($month)->format('M');
+            $values[] = Incident::whereMonth('created_at', $month)
+                ->whereYear('created_at', Carbon::now()->year)
+                ->count();
+        }
+        
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'type' => 'monthly'
+        ];
+    }
+    
+    /**
+     * Get comparative statistics
+     */
+    public function getStatistics()
+    {
+        $today = Incident::whereDate('created_at', Carbon::today())->count();
+        $yesterday = Incident::whereDate('created_at', Carbon::yesterday())->count();
+        $thisWeek = Incident::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()])->count();
+        $lastWeek = Incident::whereBetween('created_at', [Carbon::now()->subWeek()->startOfWeek(), Carbon::now()->subWeek()->endOfWeek()])->count();
+        $thisMonth = Incident::whereMonth('created_at', Carbon::now()->month)->count();
+        $lastMonth = Incident::whereMonth('created_at', Carbon::now()->subMonth()->month)->count();
+        
+        $byStatus = [
+            'reported' => Incident::where('status', 'reported')->count(),
+            'responding' => Incident::where('status', 'responding')->count(),
+            'completed' => Incident::where('status', 'completed')->count(),
+        ];
+        
+        $bySeverity = [
+            'low' => Incident::where('severity', 'low')->count(),
+            'medium' => Incident::where('severity', 'medium')->count(),
+            'high' => Incident::where('severity', 'high')->count(),
+            'critical' => Incident::where('severity', 'critical')->count(),
+        ];
+        
+        return response()->json([
+            'today' => $today,
+            'yesterday' => $yesterday,
+            'change_today' => $this->calculatePercentageChange($today, $yesterday),
+            'this_week' => $thisWeek,
+            'last_week' => $lastWeek,
+            'change_week' => $this->calculatePercentageChange($thisWeek, $lastWeek),
+            'this_month' => $thisMonth,
+            'last_month' => $lastMonth,
+            'change_month' => $this->calculatePercentageChange($thisMonth, $lastMonth),
+            'by_status' => $byStatus,
+            'by_severity' => $bySeverity,
+        ]);
+    }
+    
+    /**
+     * Calculate percentage change between two values
+     */
+    private function calculatePercentageChange($current, $previous)
+    {
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0;
+        }
+        return round((($current - $previous) / $previous) * 100, 1);
+    }
+    
+    /**
+     * Get incidents filtered by various criteria
+     */
+    public function getFilteredIncidents(Request $request)
+    {
+        $query = Incident::with('marker');
+        
+        // Filter by date range
+        if ($request->has('start_date') && $request->has('end_date')) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($request->start_date)->startOfDay(),
+                Carbon::parse($request->end_date)->endOfDay()
+            ]);
+        }
+        
+        // Filter by status
+        if ($request->has('status') && $request->status != 'all') {
+            $query->where('status', $request->status);
+        }
+        
+        // Filter by incident type
+        if ($request->has('incident_type') && $request->incident_type != 'all') {
+            $query->where('incident_type', $request->incident_type);
+        }
+        
+        // Filter by station
+        if ($request->has('station_id') && $request->station_id != 'all') {
+            $query->where('station_id', $request->station_id);
+        }
+        
+        $incidents = $query->orderBy('created_at', 'desc')->get();
+        
+        return response()->json($incidents);
+    }
+    
+    /**
+     * Export incident data
+     */
+    public function exportData(Request $request)
+    {
+        $format = $request->get('format', 'csv');
+        $startDate = $request->get('start_date', Carbon::now()->subDays(30));
+        $endDate = $request->get('end_date', Carbon::now());
+        
+        $incidents = Incident::with('marker', 'station')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        if ($format == 'csv') {
+            $filename = 'incidents_' . Carbon::now()->format('Y-m-d') . '.csv';
+            $handle = fopen('php://output', 'w');
+            
+            header('Content-Type: text/csv');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            
+            // Add headers
+            fputcsv($handle, ['ID', 'Title', 'Location', 'Status', 'Type', 'Date', 'Station']);
+            
+            // Add data
+            foreach ($incidents as $incident) {
+                fputcsv($handle, [
+                    $incident->incident_id,
+                    $incident->marker->title ?? 'N/A',
+                    ($incident->marker->lat ?? 'N/A') . ', ' . ($incident->marker->lng ?? 'N/A'),
+                    $incident->status,
+                    $incident->incident_type,
+                    $incident->created_at->format('Y-m-d H:i'),
+                    $incident->station->station_name ?? 'N/A'
+                ]);
+            }
+            
+            fclose($handle);
+            exit;
+        }
+        
+        return response()->json($incidents);
+    }
+}
+// namespace App\Http\Controllers;
+
+// use Illuminate\Http\Request;
+// use App\Models\Incident;
+// use App\Models\Account;
+
+// // use Illuminate\Http\RedirectResponse;
+// use Illuminate\Support\Facades\Auth;
+// use Carbon\Carbon;
+
+// class IncidentController extends Controller
+// {
+//     /**
+//      * Display a listing of the resource.
+//      */
+//     public function index()
+//     {
+//         // $useracc = auth()->user();
+//         // $accountId = Auth::user()->account?->account_id;
+//     //      $incidents = Incident::all();
+//     //    $userReports = Incident::where('reported_by',Auth::user()->account?->account_id )->count();//count only
+//     //     return view ('citizen.dashboard', compact('incidents', 'userReports'));
+//         // $userAccountId = optional(Auth::user()->account)->account_id;
+
+//         // $userReports = 0;
+//         // if ($userAccountId) {
+//         //     $userReports = Incident::where('reported_by', $userAccountId)->count();
+//         // }
+//     // $userReports = Incident::where('reported_by', Auth::id())->get();
+//     //     $incidents = Incident::all();
+//     //     dd($userReports);
+//     //     return view('citizen.dashboard', compact('incidents', 'userReports'));
+    
+//     }
+
+//     /**
+//      * Show the form for creating a new resource.
+//      */
+//     public function create()
+//     {
+//         return view('citizen.sections.overview');
+        
+//     }
+
+//     /**
+//      * Store a newly created resource in storage.
+//      */
+//   public function store(Request $request)//: RedirectResponse
+//     {
+        
+//         $request->validate([
+//             'marker_id' => 'required|exists:markers,marker_id',
+//             'station_id' => 'nullable|exists:stations,station_id',
+//             'status' => 'required|in:reported,responding,responded',
+//             'alarmdatetime' => 'required',
+//             // 'reported_by' => 'nullable|exists:accounts,account_id',
+//             'reported_by' => 'required|exists:accounts,account_id',
+
+//             'incident_type' => 'required|in:fire,drown,treefall,special',
+//         ]);
+//         $accountId = Auth::user()->account->account_id;
+
+//         $incident = Incident::create([
+//             'marker_id' => $request->marker_id,
+//             'station_id' => $request->station_id,
+//             'status' => $request->status,
+//             'alarmdatetime' => Carbon::now(),
+//             'reported_by' => $accountId,
+//             'incident_type' => $request->incident_type,
+//         ]);
+
+//         return response()->json([
+//             'success' => true,
+//             'incident' => $incident
+//         ]);
+
+//         return redirect('/citizen/dashboard');
+//     }
+
+//     /**
+//      * Display the specified resource.
+//      */
+//     public function show(string $id)
+//     {
+//         //
+//     }
+
+//     /**
+//      * Show the form for editing the specified resource.
+//      */
+//     public function edit(string $id) : RedirectResponse
+//     {
+//         //
+//     }
+
+//     /**
+//      * Update the specified resource in storage.
+//      */
+//     public function update(Request $request, string $id) 
+//     {
+//          $incident = Incident::findOrFail($id);
+
+//         $validated = $request->validate([
+//             'station_id' => 'required|exists:stations,station_id',
+//             'status' => 'required|in:reported,responding,responded',
+//         ]);
+
+//         $incident->update($validated);
+
+//         return response()->json([
+//             'success' => true,
+//             'incident' => $incident
+//         ]);
+//     }
+
+//     /**
+//      * Remove the specified resource from storage.
+//      */
+//     public function destroy(string $id)
+//     {
+//         //
+//     }
+//     public function latest(){
+
+//         $coord = \App\Models\Incident::with(['marker'])
+//                 ->latest()
+//                 ->get();
+//         return response()->json($coord);
+//     }
+// }

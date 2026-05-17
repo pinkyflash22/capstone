@@ -1,0 +1,16 @@
+{
+  "station_id": 1,
+  "barangay_id": 103,
+  "barangay_name": "Barangay Mabini",
+  "month": "April",
+  "year": 2026,
+  "average_temperature": 35.4,
+  "season": "dry",
+  "near_water": 0,
+  "density": "high",
+  "materials": "mixed",
+  "peak_hours": "evening",
+  "accesibility": "moderate access",
+  "type_incident": "electrical fire",
+  "occupancy": "commercial"
+}

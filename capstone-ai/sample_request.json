@@ -1,0 +1,14 @@
+{
+  "station_id": 1,
+  "month": "April",
+  "year": 2026,
+  "average_temperature": 35.4,
+  "season": "dry",
+  "near_water": 1,
+  "density": "high",
+  "materials": "mixed",
+  "peak_hours": "evening",
+  "accesibility": "moderate access",
+  "type_incident": "electrical fire",
+  "occupancy": "commercial"
+}

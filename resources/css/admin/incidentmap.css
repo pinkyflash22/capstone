@@ -1,0 +1,488 @@
+/* resources/css/admin/incidentmap.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import 'announcements.css';
+
+/* Map specific styles */
+.map-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Page Header */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.page-header h1 i {
+    color: #dc2626;
+    margin-right: 8px;
+}
+
+.page-header .date {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+/* Alert Banner */
+.alert-banner {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.alert-banner i {
+    color: #f59e0b;
+    font-size: 20px;
+    margin-top: 2px;
+}
+
+.alert-banner .content {
+    flex: 1;
+    color: #92400e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.alert-banner .content strong {
+    font-weight: 600;
+    color: #b45309;
+}
+
+/* Map Card */
+.map-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 24px;
+}
+
+.map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.map-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.map-header h2 i {
+    color: #dc2626;
+}
+
+.map-badge {
+    background: #fee2e2;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 20px;
+}
+
+#incidentMap {
+    height: 500px;
+    width: 100%;
+    border-radius: 12px;
+    z-index: 1;
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+}
+
+/* Map Controls */
+.map-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    gap: 8px;
+    background: #f9fafb;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.control-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+}
+
+.control-btn:hover {
+    background: white;
+    color: #374151;
+}
+
+.control-btn.active {
+    background: #dc2626;
+    color: white;
+}
+
+.control-btn i {
+    font-size: 14px;
+}
+
+/* Map Legend */
+.map-legend {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    margin-top: 16px;
+}
+
+.legend-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #4b5563;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.legend-color.station { background: #dc2626; }
+.legend-color.hydrant { background: #3b82f6; }
+.legend-color.incident { background: #f97316; }
+.legend-color.user { background: #8b5cf6; }
+
+/* Map Actions */
+.map-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.map-actions .btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.map-actions .btn-primary {
+    background: #dc2626;
+    color: white;
+}
+
+.map-actions .btn-primary:hover {
+    background: #b91c1c;
+}
+
+.map-actions .btn-outline {
+    background: white;
+    border: 1px solid #e5e7eb;
+    color: #4b5563;
+}
+
+.map-actions .btn-outline:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+/* Info Cards Grid */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-top: 24px;
+}
+
+/* Stations Card */
+.stations-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+}
+
+.stations-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.stations-header i {
+    color: #dc2626;
+}
+
+.stations-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.stations-list {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.stations-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.stations-list::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+}
+
+.stations-list::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+}
+
+.station-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.station-list-item:last-child {
+    border-bottom: none;
+}
+
+.station-list-item:hover {
+    background: #f9fafb;
+}
+
+.station-list-icon {
+    width: 40px;
+    height: 40px;
+    background: #fee2e2;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #dc2626;
+    flex-shrink: 0;
+}
+
+.station-list-info {
+    flex: 1;
+}
+
+.station-list-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.station-list-address {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.station-list-distance {
+    font-size: 11px;
+    color: #f97316;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* Hydrants Card */
+.hydrants-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+}
+
+.hydrants-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.hydrants-header i {
+    color: #3b82f6;
+}
+
+.hydrants-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.hydrants-list {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.hydrants-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.hydrants-list::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+}
+
+.hydrants-list::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+}
+
+.hydrant-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.hydrant-list-item:last-child {
+    border-bottom: none;
+}
+
+.hydrant-list-item:hover {
+    background: #f9fafb;
+}
+
+.hydrant-list-icon {
+    width: 40px;
+    height: 40px;
+    background: #eff6ff;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    flex-shrink: 0;
+}
+
+.hydrant-list-info {
+    flex: 1;
+}
+
+.hydrant-list-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.hydrant-list-address {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.hydrant-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-operational {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-maintenance {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .map-controls {
+        flex-direction: column;
+    }
+    
+    .control-group {
+        width: 100%;
+    }
+    
+    .map-actions {
+        flex-direction: column;
+    }
+    
+    .legend-items {
+        flex-direction: column;
+        gap: 8px;
+    }
+}

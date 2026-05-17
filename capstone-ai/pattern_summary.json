@@ -1,0 +1,190 @@
+{
+  "dataset_rows": 37,
+  "overall_fire_probability": 0.4595,
+  "monthly_pattern": [
+    {
+      "month": 1,
+      "records": 1,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 2,
+      "records": 3,
+      "fires": 2,
+      "probability": 0.6666666666666666
+    },
+    {
+      "month": 3,
+      "records": 5,
+      "fires": 5,
+      "probability": 1.0
+    },
+    {
+      "month": 4,
+      "records": 8,
+      "fires": 8,
+      "probability": 1.0
+    },
+    {
+      "month": 5,
+      "records": 4,
+      "fires": 2,
+      "probability": 0.5
+    },
+    {
+      "month": 6,
+      "records": 3,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 7,
+      "records": 3,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 8,
+      "records": 3,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 9,
+      "records": 2,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 10,
+      "records": 2,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 11,
+      "records": 2,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "month": 12,
+      "records": 1,
+      "fires": 0,
+      "probability": 0.0
+    }
+  ],
+  "density_pattern": [
+    {
+      "density": 1,
+      "records": 13,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "density": 2,
+      "records": 12,
+      "fires": 5,
+      "probability": 0.4166666666666667
+    },
+    {
+      "density": 3,
+      "records": 12,
+      "fires": 12,
+      "probability": 1.0
+    }
+  ],
+  "temperature_pattern": [
+    {
+      "temp_band": "cool",
+      "records": 9,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "temp_band": "warm",
+      "records": 10,
+      "fires": 0,
+      "probability": 0.0
+    },
+    {
+      "temp_band": "hot",
+      "records": 13,
+      "fires": 12,
+      "probability": 0.9230769230769231
+    },
+    {
+      "temp_band": "extreme",
+      "records": 5,
+      "fires": 5,
+      "probability": 1.0
+    }
+  ],
+  "top_risk_samples": [
+    {
+      "avg_temp": 37,
+      "density": 3,
+      "month": 4,
+      "humidity": 53,
+      "wind_kph": 23,
+      "rainfall_mm": 0,
+      "past_7_day_incidents": 5,
+      "past_30_day_incidents": 9,
+      "barangay_risk_score": 96,
+      "fire_occurred": 1
+    },
+    {
+      "avg_temp": 36,
+      "density": 3,
+      "month": 3,
+      "humidity": 54,
+      "wind_kph": 22,
+      "rainfall_mm": 0,
+      "past_7_day_incidents": 4,
+      "past_30_day_incidents": 8,
+      "barangay_risk_score": 94,
+      "fire_occurred": 1
+    },
+    {
+      "avg_temp": 36,
+      "density": 3,
+      "month": 4,
+      "humidity": 56,
+      "wind_kph": 20,
+      "rainfall_mm": 0,
+      "past_7_day_incidents": 4,
+      "past_30_day_incidents": 9,
+      "barangay_risk_score": 93,
+      "fire_occurred": 1
+    },
+    {
+      "avg_temp": 37,
+      "density": 3,
+      "month": 4,
+      "humidity": 55,
+      "wind_kph": 21,
+      "rainfall_mm": 0,
+      "past_7_day_incidents": 4,
+      "past_30_day_incidents": 8,
+      "barangay_risk_score": 91,
+      "fire_occurred": 1
+    },
+    {
+      "avg_temp": 35,
+      "density": 3,
+      "month": 2,
+      "humidity": 57,
+      "wind_kph": 19,
+      "rainfall_mm": 1,
+      "past_7_day_incidents": 3,
+      "past_30_day_incidents": 8,
+      "barangay_risk_score": 88,
+      "fire_occurred": 1
+    }
+  ],
+  "generated_charts": [
+    "monthly_fire_probability.png",
+    "temp_vs_risk_score.png"
+  ]
+}

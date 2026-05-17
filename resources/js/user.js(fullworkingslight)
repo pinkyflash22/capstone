@@ -1,0 +1,578 @@
+// import './functions.js';
+// import './map.js';
+
+// import { getRoute, userLocation } from './functions.js';
+import { saveIncident, userLocation } from './functions.js';
+import { setName } from './functions.js';
+
+// import {}
+window.setThisName = setName;
+window.saveIncident = saveIncident;
+window.userLocation = userLocation;
+window.thisOfficers = window.stationOfficer || {};
+// window.userCoords = {
+//     currentLatitude: null,
+//     currentLongitude: null,
+//     ready: false
+// };
+const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+// Flag to prevent multiple marker loads
+let markersLoaded = false;
+
+// Global layer groups for different marker types
+let stationLayerGroup;
+let incidentLayerGroup;
+let hydrantLayerGroup;
+let otherLayerGroup;
+
+document.addEventListener('DOMContentLoaded', function(){
+    console.log('officers in users: ', window.thisOfficers);
+    // Initialize map only once
+    if (!window.usermap || !window.usermap._container) {
+        window.usermap = L.map('userMap').setView([15.8222, 120.3297], 13);
+
+        var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(window.usermap);
+        
+        var satellite = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {
+                maxZoom: 18,
+                attribution: 'Tiles © Esri'
+            }
+        );
+        
+        // Initialize layer groups
+        stationLayerGroup = L.layerGroup().addTo(window.usermap);
+        incidentLayerGroup = L.layerGroup().addTo(window.usermap);
+        hydrantLayerGroup = L.layerGroup().addTo(window.usermap);
+        otherLayerGroup = L.layerGroup().addTo(window.usermap);
+        
+        // Create layer control with all groups
+        const overlayControl = L.control.layers(null, {
+            "🚒 Fire Stations": stationLayerGroup,
+            "🔥 Incidents": incidentLayerGroup,
+            "💧 Fire Hydrants": hydrantLayerGroup,
+            "📍 Other Markers": otherLayerGroup
+        }, {
+            collapsed: false,
+            position: 'topright'
+        }).addTo(window.usermap);
+        
+        // Set all layers visible by default
+        stationLayerGroup.addTo(window.usermap);
+        incidentLayerGroup.addTo(window.usermap);
+        hydrantLayerGroup.addTo(window.usermap);
+        otherLayerGroup.addTo(window.usermap);
+        
+        console.log("Map initialized successfully with layer controls");
+        
+        // Load markers after a short delay
+        setTimeout(() => {
+            if (!markersLoaded) {
+                loadMarkers();
+                markersLoaded = true;
+            }
+        }, 500);
+    } else {
+        console.log("Map already exists, skipping initialization");
+        // Load markers if not loaded
+        if (!markersLoaded) {
+            loadMarkers();
+            markersLoaded = true;
+        }
+    }
+
+    // Function to get current location
+    window.currentLoc = function(lat, lng) {
+        if (!window.usermap) {
+            console.error("Map not initialized");
+            return;
+        }
+        
+        // Create a larger, more visible custom icon for user location
+        const customIcon = L.divIcon({
+            className: 'user-location-icon',
+            html: `
+                <div style="position: relative; width: 40px; height: 40px;">
+                    <div style="position: absolute; inset: 0; background: #f97316; border-radius: 50%; opacity: 0.3; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+                    <div style="position: absolute; inset: 4px; background: #f97316; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px rgba(0,0,0,0.2);"></div>
+                    <div style="position: absolute; inset: 12px; background: white; border-radius: 50%;"></div>
+                </div>
+            `,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20]
+        });
+        
+        const userMarker = L.marker([lat, lng], { icon: customIcon })
+            .addTo(window.usermap)
+            .bindPopup('<strong>You are here!</strong><br>Your current location')
+            .openPopup();
+        
+        // Center map on user location with zoom level 15
+        window.usermap.setView([lat, lng], 15);
+        
+        // Add a circle around user location
+        L.circle([lat, lng], {
+            color: '#f97316',
+            fillColor: '#f97316',
+            fillOpacity: 0.1,
+            radius: 100,
+            weight: 2
+        }).addTo(window.usermap);
+        
+        console.log('Current location called:', lat, lng);
+    };
+});
+
+function getCurrentLocation(){
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // Set view to user location
+            map.setView([lat, lng], 15);
+
+            // Add marker
+            L.marker([lat, lng])
+                .addTo(map)
+                .bindPopup('📍 You are here')
+                .openPopup();
+
+            // Optional: accuracy circle
+            L.circle([lat, lng], {
+                radius: position.coords.accuracy,
+            }).addTo(map);
+
+            console.log('User location:', lat, lng);
+        },
+        (error) => {
+            console.error('Error getting location:', error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000
+        }
+    );
+}
+
+// Get incident type name by ID
+function getIncidentTypeName(typeId) {
+    const incidentTypes = {
+        1: 'Fire',
+        2: 'Medical Emergency',
+        3: 'Natural Disaster',
+        4: 'Accident',
+        5: 'Other'
+    };
+    return incidentTypes[typeId] || 'Incident';
+}
+
+// Get icon color based on incident type
+function getIncidentColor(incidentTypeId) {
+    const colors = {
+        1: '#ef4444', // Fire - Red
+        2: '#10b981', // Medical - Green
+        3: '#f59e0b', // Natural Disaster - Orange
+        4: '#8b5cf6', // Accident - Purple
+        5: '#6b7280'  // Other - Gray
+    };
+    return colors[incidentTypeId] || '#ef4444';
+}
+
+// Get icon based on incident type
+function getIncidentIcon(incidentTypeId) {
+    const icons = {
+        1: 'fa-fire',           // Fire
+        2: 'fa-ambulance',      // Medical
+        3: 'fa-tornado',        // Natural Disaster
+        4: 'fa-car-crash',      // Accident
+        5: 'fa-exclamation-triangle' // Other
+    };
+    
+    const iconClass = icons[incidentTypeId] || 'fa-fire';
+    const bgColor = getIncidentColor(incidentTypeId);
+    
+    return L.divIcon({
+        className: 'custom-incident-icon',
+        html: `
+            <div style="
+                width: 32px;
+                height: 32px;
+                background-color: ${bgColor};
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                border: 3px solid white;
+                animation: pulse 1.5s infinite;
+                cursor: pointer;
+            ">
+                <i class="fas ${iconClass}" style="color: white; font-size: 16px;"></i>
+            </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+    });
+}
+
+// Get station icon
+function getStationIcon() {
+    return L.divIcon({
+        className: 'station-icon',
+        html: `
+            <div style="
+                width: 28px;
+                height: 28px;
+                background-color: #3b82f6;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                border: 2px solid white;
+                cursor: pointer;
+            ">
+                <i class="fas fa-fire-extinguisher" style="color: white; font-size: 14px;"></i>
+            </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+    });
+}
+
+// Get hydrant icon
+function getHydrantIcon() {
+    return L.divIcon({
+        className: 'hydrant-icon',
+        html: `
+            <div style="
+                width: 28px;
+                height: 28px;
+                background-color: #dc2626;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                border: 2px solid white;
+                cursor: pointer;
+            ">
+                <i class="fas fa-fire-extinguisher" style="color: white; font-size: 14px;"></i>
+            </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+    });
+}
+
+// Get default marker icon
+function getDefaultIcon() {
+    return L.divIcon({
+        className: 'default-icon',
+        html: `
+            <div style="
+                width: 24px;
+                height: 24px;
+                background-color: #6b7280;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                border: 2px solid white;
+                cursor: pointer;
+            ">
+                <i class="fas fa-map-marker-alt" style="color: white; font-size: 12px;"></i>
+            </div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+    });
+}
+
+export async function loadMarkers() {
+    // Check if map exists
+    if (!window.usermap) {
+        console.error('Map not initialized, cannot load markers');
+        return;
+    }
+    
+    const usermarkermap = window.mapData.usermark || [];
+    const incidentsData = window.incidentsData || [];
+    
+    console.log('Loading markers:', usermarkermap.length);
+    console.log('Incidents data:', incidentsData.length);
+
+    // Clear existing markers from all layers
+    if (stationLayerGroup) stationLayerGroup.clearLayers();
+    if (incidentLayerGroup) incidentLayerGroup.clearLayers();
+    if (hydrantLayerGroup) hydrantLayerGroup.clearLayers();
+    if (otherLayerGroup) otherLayerGroup.clearLayers();
+
+    // Create a map to quickly find incident by marker_id
+    const incidentByMarkerId = {};
+    incidentsData.forEach(incident => {
+        if (incident.marker_id) {
+            incidentByMarkerId[incident.marker_id] = incident;
+        }
+    });
+
+    let bounds = L.latLngBounds(); // To auto-fit map to markers
+    let markerCount = 0;
+    
+    usermarkermap.forEach(function(usermark) {
+        if (usermark.lat && usermark.lng) {
+            markerCount++;
+            console.log(`Adding marker: ${usermark.title || 'Marker'} at ${usermark.lat}, ${usermark.lng} - Type: ${usermark.markerCategory_id}`);
+            
+            // Extend bounds to include this marker
+            bounds.extend([usermark.lat, usermark.lng]);
+            
+            // Check if this marker is an incident
+            const incident = incidentByMarkerId[usermark.marker_id];
+            
+            // Determine icon and layer based on marker type
+            let icon;
+            let targetLayer;
+            
+            if (usermark.markerCategory_id == 1) {
+                // Fire Station
+                icon = getStationIcon();
+                targetLayer = stationLayerGroup;
+            } 
+            else if (usermark.markerCategory_id == 4) {
+                // Fire Hydrant
+                icon = getHydrantIcon();
+                targetLayer = hydrantLayerGroup;
+            }
+            else if (usermark.markerCategory_id == 2 || incident) {
+                // Incident
+                const incidentTypeId = incident ? (incident.incident_type_id || 1) : 1;
+                icon = getIncidentIcon(incidentTypeId);
+                targetLayer = incidentLayerGroup;
+            }
+            else {
+                // Other markers
+                icon = getDefaultIcon();
+                targetLayer = otherLayerGroup;
+            }
+            
+            // Create popup content
+            let popupContent = `
+                <div class="flex flex-col gap-2 w-64 max-w-xs">
+                    <div class="flex items-center gap-2 border-b pb-2">
+                        <i class="fas ${usermark.markerCategory_id == 1 ? 'fa-fire-extinguisher' : (usermark.markerCategory_id == 2 ? 'fa-fire-extinguisher' : (incident ? 'fa-exclamation-triangle' : 'fa-map-marker-alt'))} text-lg" style="color: ${usermark.markerCategory_id == 1 ? '#3b82f6' : (usermark.markerCategory_id == 2 ? '#dc2626' : '#f97316')}"></i>
+                        <strong class="text-base font-bold">${usermark.title || 'Marker ' + usermark.marker_id}</strong>
+                    </div>
+                    <p class="text-sm text-gray-600">${usermark.description || 'No description'}</p>
+            `;
+            
+            // Add incident-specific information if this is an incident
+            if (incident) {
+                const incidentTypeName = getIncidentTypeName(incident.incident_type_id);
+                const statusColors = {
+                    'reported': 'bg-yellow-100 text-yellow-800',
+                    'responding': 'bg-blue-100 text-blue-800',
+                    'resolved': 'bg-green-100 text-green-800',
+                    'closed': 'bg-gray-100 text-gray-800'
+                };
+                const statusColor = statusColors[incident.status] || 'bg-gray-100 text-gray-800';
+                
+                popupContent += `
+                    <div class="bg-red-50 p-3 rounded-lg mt-1">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <span class="text-xs font-semibold text-gray-500">Type:</span>
+                                <p class="text-sm font-bold text-red-600">${incidentTypeName}</p>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-gray-500">Status:</span>
+                                <p class="text-sm"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor}">${incident.status || 'Reported'}</span></p>
+                            </div>
+                        </div>
+                        ${incident.alarmdatetime ? `
+                        <div class="mt-2">
+                            <span class="text-xs font-semibold text-gray-500">Reported:</span>
+                            <p class="text-xs">${new Date(incident.alarmdatetime).toLocaleString()}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            // Add image if exists
+            if (usermark.image) {
+                popupContent += `
+                    <div class="w-full h-32 bg-gray-100 flex items-center justify-center border rounded overflow-hidden">
+                        <img src="${usermark.image}" class="object-cover w-full h-full" />
+                    </div>
+                `;
+            } else {
+                popupContent += `
+                    <div class="w-full h-24 bg-gray-100 flex items-center justify-center border rounded">
+                        <i class="fas fa-image text-gray-400 text-2xl"></i>
+                        <span class="text-gray-400 text-xs ml-2">No image</span>
+                    </div>
+                `;
+            }
+            
+            // Add action buttons based on marker type
+            if (incident && incident.status !== 'resolved') {
+                popupContent += `
+                    <button id="viewIncident${usermark.marker_id}" 
+                        class="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-lg transition-colors w-full flex items-center justify-center gap-2">
+                        <i class="fas fa-info-circle"></i>
+                        View Incident Details
+                    </button>
+                `;
+            } else if (usermark.markerCategory_id == 1) {
+                popupContent += `
+                    <button id="callStation${usermark.marker_id}" 
+                        class="mt-2 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded-lg transition-colors w-full flex items-center justify-center gap-2">
+                        <i class="fas fa-phone"></i>
+                        Call Station
+                    </button>
+                `;
+            } else {
+                popupContent += `
+                    <button id="viewDetails${usermark.marker_id}" 
+                        class="mt-2 bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-2 rounded-lg transition-colors w-full flex items-center justify-center gap-2">
+                        <i class="fas fa-info-circle"></i>
+                        View Details
+                    </button>
+                `;
+            }
+            
+            popupContent += `</div>`;
+            
+            // Create marker and add to appropriate layer group
+            const marker = L.marker([usermark.lat, usermark.lng], { icon: icon })
+                .bindPopup(popupContent, {
+                    minWidth: 250,
+                    maxWidth: 300,
+                    className: 'custom-popup'
+                });
+            
+            targetLayer.addLayer(marker);
+            
+            // Add popup event listeners
+            marker.on('popupopen', function () {
+                setTimeout(() => {
+                    const viewBtn = document.getElementById('viewDetails' + usermark.marker_id);
+                    const incidentBtn = document.getElementById('viewIncident' + usermark.marker_id);
+                    const callBtn = document.getElementById('callStation' + usermark.marker_id);
+                    
+                    if (viewBtn) {
+                        viewBtn.addEventListener('click', function () {
+                            showMarkerDetails(usermark, incident);
+                        });
+                    }
+                    
+                    if (incidentBtn) {
+                        incidentBtn.addEventListener('click', function () {
+                            showIncidentDetails(incident);
+                        });
+                    }
+                    
+                    if (callBtn) {
+                        callBtn.addEventListener('click', function () {
+                            window.location.href = `tel:${usermark.contact_number || '911'}`;
+                        });
+                    }
+                }, 100);
+            });
+        }
+    });
+    
+    // Fit map to show all markers if there are markers
+    if (markerCount > 0 && bounds.isValid()) {
+        window.usermap.fitBounds(bounds, { padding: [50, 50] });
+        console.log(`Map fitted to ${markerCount} markers`);
+    } else {
+        // Default view if no markers
+        window.usermap.setView([15.8222, 120.3297], 13);
+    }
+    
+    console.log(`Total markers loaded: ${markerCount}`);
+}
+
+// Function to show marker details
+function showMarkerDetails(marker, incident) {
+    const details = {
+        title: marker.title || 'Marker',
+        description: marker.description || 'No description',
+        type: marker.markerCategory_id == 1 ? '🚒 Fire Station' : 
+               marker.markerCategory_id == 2 ? '💧 Fire Hydrant' :
+               marker.markerCategory_id == 3 ? '🔥 Incident' : '📍 Marker',
+        coordinates: `${marker.lat}, ${marker.lng}`,
+        incident_type: incident ? getIncidentTypeName(incident.incident_type_id) : null,
+        status: incident ? incident.status : null
+    };
+    
+    let message = `📍 ${details.title}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `Type: ${details.type}\n`;
+    message += `Description: ${details.description}\n`;
+    if (details.incident_type) {
+        message += `Incident Type: ${details.incident_type}\n`;
+        message += `Status: ${details.status}\n`;
+    }
+    message += `Location: ${details.coordinates}`;
+    
+    alert(message);
+}
+
+// Function to show incident details
+function showIncidentDetails(incident) {
+    const incidentTypeName = getIncidentTypeName(incident.incident_type_id);
+    const date = incident.alarmdatetime ? new Date(incident.alarmdatetime).toLocaleString() : 'Unknown';
+    
+    let message = `🔥 INCIDENT DETAILS\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `Type: ${incidentTypeName}\n`;
+    message += `Status: ${incident.status || 'Reported'}\n`;
+    message += `Reported: ${date}\n`;
+    if (incident.marker && incident.marker.description) {
+        message += `Description: ${incident.marker.description}\n`;
+    }
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `If you see this incident, stay safe and follow instructions from authorities.`;
+    
+    alert(message);
+}
+
+// Add CSS animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes ping {
+        75%, 100% {
+            transform: scale(2);
+            opacity: 0;
+        }
+    }
+    
+    .custom-popup .leaflet-popup-content-wrapper {
+        border-radius: 12px;
+        padding: 0;
+    }
+    
+    .custom-popup .leaflet-popup-content {
+        margin: 12px;
+    }
+`;
+document.head.appendChild(style);

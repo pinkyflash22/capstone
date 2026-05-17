@@ -1,0 +1,64 @@
+<?php
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\MarkerController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\PublicController;
+use App\Http\Controllers\MapController;
+use App\Http\Controllers\IconController;
+use App\Http\Controllers\MarkerCategoryController;
+use App\Http\Controllers\Auth\RegisterController;
+
+
+
+use Illuminate\Support\Facades\Route;
+//note kailangan ko pang import ung controller para magamit ko yung mga functions nila sa routes
+Route::get('/', [PublicController::class, 'homepage'])->name('home');
+// Route::get('/', [PublicController::class, 'index'])->name('home');
+
+
+
+Route::prefix('admin')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
+    Route::get('/maps', [AdminController::class, 'maps'])->name('admin.maps');
+    // Route::post('/markers', [AdminController::class, 'store'])->name('admin.markers.store');
+    Route::get('/marker-categories', [MarkerCategoryController::class, 'index']);
+    Route::get('/geticons', [IconController::class, 'getIcons'])->name('geticon');
+});
+
+Route::prefix('user')->group(function(){
+   Route::get('/dashboard', [PublicController::class, 'index'])->name('citizen.dashboard');
+});
+
+// Route::get('/map', [MarkerController::class, 'index']) ->name('map');
+// Route::post('/markers', [MarkerController::class, 'store'])->name('markers.store');
+// Route::put('/markers/{marker}', [MarkerController::class, 'update'])->name('markers.update');
+// Route::delete('/markers/{marker}', [MarkerController::class, 'destroy'])->name('markers.destroy');
+
+
+
+
+
+Route::get('/register', [RegisterController::class,'show'])->name('register');
+Route::post('/register', [RegisterController::class,'register'])->name('register.store');
+Route::get('/login',[LoginController::class, 'index'])->name('auth.login');
+Route::post('/auth', [LoginController::class, 'authenticate'])->name('auth.authenticate');
+// Route::get('/register',[LoginController::class, 'register'])->name('auth.register');
+//register infos
+
+// Route::get('/maps', [MapController::class, 'index'])->name('maps.show');
+Route::middleware(['auth', 'role:ADMIN'])
+    ->get('/admin/dashboard', function () {
+        return view('admin.dashboard');
+    });
+Route::middleware(['auth', 'role:FIREFIGHTER'])
+    ->get('/firefighter/dashboard', function () {
+        return view('firefighter.dashboard');
+    });
+Route::middleware(['auth','role:CITIZEN'])
+    ->get('/citizen/dashboard', function () {
+        return view('citizen.dashboard');
+    });
+Route::middleware(['auth','role:ADMIN,STATION ADMIN'])
+    ->get('/management', function () {
+        return view('management.dashboard');
+    });

@@ -1,0 +1,205 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
+use App\Models\UserInfo;
+use App\Models\Account;
+
+
+class LoginController extends Controller
+{
+    public function index()
+    {
+        if (Auth::check()) {
+        $user = Auth::user();
+        $userRole = $user->userInfo?->role?->role;
+        
+        switch ($userRole) {
+            case 'ADMIN':
+                return redirect()->route('admin.dashboard');
+            case 'FIREFIGHTER':
+                return redirect()->route('firefighter.dashboard');
+            case 'CITIZEN':
+                return redirect()->route('citizen.dashboard');
+            default:
+                return redirect()->route('login');
+        }
+    }
+    
+    return view('auth.login');
+        // return view('auth.login');
+    }
+public function authenticate(Request $request) : RedirectResponse
+{
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required'
+    ]);
+
+    if (Auth::attempt($credentials)) {
+        $request->session()->regenerate();
+        
+        // Add cache control headers to the response
+        $response = redirect()->intended($this->redirectBasedOnRole());
+        
+        return $response->withHeaders([
+            'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+        ]);
+    }
+
+    return back()->withErrors([
+        'email' => 'The provided credentials do not match our records.',
+    ])->onlyInput('email');
+}
+
+private function redirectBasedOnRole()
+{
+    $user = Auth::user();
+    $userRole = $user->userInfo?->role?->role;
+    
+    switch ($userRole) {
+        case 'ADMIN':
+            return route('admin.dashboard');
+        case 'FIREFIGHTER':
+            return route('firefighter.dashboard');
+        case 'CITIZEN':
+            return route('citizen.dashboard');
+        default:
+            return route('citizen.dashboard');
+    }
+}
+    // public function authenticate(Request $request)
+    // {
+    //     $credentials = $request->validate([
+    //         'email' => 'required|email',
+    //         'password' => 'required'
+    //     ]);
+
+    //     if (Auth::attempt($credentials)) {
+    //         $request->session()->regenerate();
+            
+    //         // Get the authenticated user
+    //         $user = Auth::user();
+            
+    //         // Get user's role
+    //         $role = $this->getUserRole($user);
+            
+    //         // Redirect based on role
+    //         return $this->redirectBasedOnRole($role);
+    //     }
+
+    //     return back()->withErrors([
+    //         'email' => 'The provided credentials do not match our records.',
+    //     ])->onlyInput('email');
+    // }
+
+// public function logout(Request $request)
+// {
+//     Auth::logout();
+    
+//     $request->session()->invalidate();
+//     $request->session()->regenerateToken();
+    
+//     // Redirect with cache control headers
+//     return redirect('/')
+//         ->withHeaders([
+//             'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+//             'Pragma' => 'no-cache',
+//             'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+//         ]);
+// }
+public function logout(Request $request): RedirectResponse
+{
+    Auth::logout();
+    
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+    
+    // Clear all session data
+    $request->session()->flush();
+    
+    // Redirect with cache control headers
+    return redirect('/')
+        ->withHeaders([
+            'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Fri, 01 Jan 1990 00:00:00 GMT',
+        ]);
+}
+    /**
+     * Get user role from the relationship
+     */
+    private function getUserRole($user)
+    {
+        // Method 1: If you have the relationships set up
+        if ($user->account && $user->account->info && $user->account->info->role) {
+            return $user->account->info->role->role;
+        }
+        
+        // Method 2: Direct query if relationships aren't set up
+        $account = Account::where('user_id', $user->id)->first();
+        if ($account) {
+            $userInfo = UserInfo::where('user_id', $account->info_id)->first();
+            if ($userInfo) {
+                // You might need to get the actual role name from roles table
+                // This depends on your exact database structure
+                return $userInfo->role_id; // or get role name from roles table
+            }
+        }
+        
+        // Default role if nothing found
+        return 'CITIZEN';
+    }
+
+    /**
+     * Redirect user based on role
+     */
+    // private function redirectBasedOnRole($role)
+    // {
+    //     // Convert role ID to name if needed
+    //     $roleName = is_numeric($role) ? $this->getRoleNameFromId($role) : $role;
+        
+    //     switch ($roleName) {
+    //         case 'ADMIN':
+    //             return redirect()->route('admin.dashboard');
+            
+    //         case 'FIREFIGHTER':
+    //             return redirect()->route('firefighter.dashboard');
+            
+    //         case 'CITIZEN':
+    //             return redirect()->route('citizen.dashboard');
+            
+    //         case 'STATION ADMIN':
+    //             return redirect()->route('management.dashboard');
+            
+    //         default:
+    //             return redirect()->route('citizen.dashboard');
+    //     }
+    // }
+
+    // /**
+    //  * Helper to get role name from ID
+    //  */
+    
+    // private function getRoleNameFromId($roleId)
+    // {
+    //     $roles = [
+    //         1 => 'STATION ADMIN', // or 'CAPTAIN'
+    //         2 => 'FIREFIGHTER',
+    //         3 => 'STATION',
+    //         4 => 'ADMIN',
+    //         5 => 'CITIZEN',
+    //         6 => 'BUSINESS',
+    //         7 => 'SCHOOL',
+    //     ];
+        
+    //     return $roles[$roleId] ?? 'CITIZEN';
+    // }
+}

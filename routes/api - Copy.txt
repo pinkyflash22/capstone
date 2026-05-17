@@ -1,0 +1,30 @@
+<?php
+use App\Http\Controllers\Api\RoutingController;
+use App\Http\Controllers\Api\MarkerController;
+use App\Http\Controllers\MarkerCategoryController;
+
+use App\Http\Controllers\IconController;
+
+
+Route::post('/route', [RoutingController::class, 'route']);
+Route::post('/reverse', [RoutingController::class, 'reverse']);
+Route::post('/marker-categories', [MarkerCategoryController::class, 'store'])->name('admin.marker-category.store');
+
+
+
+Route::get('/markers', [MarkerController::class, 'index']);
+Route::post('/markers', [MarkerController::class, 'store']);
+Route::delete('/markers/{id}', [MarkerController::class, 'destroy']);
+Route::get('/markers/latest', [MarkerController::class, 'latest']); //latest markers 
+
+Route::post('/icons', [IconController::class, 'store'])->name('admin.icon.store');
+Route::get('/icons', [IconController::class, 'index']);
+
+
+
+// Route::get('/icons', [DashboardController::class, 'index']);
+// Route::post('/icons', [DashboardController::class, 'store']);
+
+Route::get('/test', function() {
+        return ['message' => 'API is working'];
+    });
