@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
+use App\Models\OtpRequest;
 use App\Models\User;
 use App\Models\UserLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
@@ -90,15 +93,36 @@ class LoginController extends Controller
 
             // Get user and role
             $user = Auth::user();
+
+            if (! $user?->is_verified) {
+                Auth::logout();
+
+                if ($user?->google_id && $user?->email) {
+                    try {
+                        $this->sendGoogleVerificationOtp($user, $request);
+                    } catch (ValidationException $e) {
+                        throw $e;
+                    } catch (\Throwable $e) {
+                        report($e);
+
+                        throw ValidationException::withMessages([
+                            'email' => 'Unable to send a verification code right now. Please try again.',
+                        ]);
+                    }
+
+                    return redirect()->route('auth.google.verify')
+                        ->with('success', 'Verification code sent to your email. Please complete verification to continue.');
+                }
+
+                throw ValidationException::withMessages([
+                    'email' => 'Your account is not verified yet. Please complete OTP verification first.',
+                ]);
+            }
+
             $this->storeUserLog($user?->user_id, 'logged in', $request);
             $role = strtolower($user->role->role ?? '');
 
-            if ($postLoginAction === 'quick-report' && $role === 'citizen') {
-                session([
-                    'open_section' => 'overview',
-                    'open_incident_modal' => true,
-                ]);
-            }
+            $this->applyPostLoginAction($postLoginAction, $role);
 
             return $this->redirectBasedOnRole($role);
         }
@@ -118,13 +142,16 @@ class LoginController extends Controller
      */
     public function redirectToGoogle(Request $request)
     {
+        $postLoginAction = $request->input('post_login_action');
+
         if ($request->filled('post_login_action')) {
-            $request->session()->put('post_login_action', $request->input('post_login_action'));
+            $request->session()->put('post_login_action', $postLoginAction);
         }
 
         return Socialite::driver('google')
             ->scopes(['openid', 'profile', 'email'])
-            ->redirect();
+            ->redirect()
+            ->cookie($this->makePostLoginActionCookie($postLoginAction));
     }
 
     /**
@@ -176,16 +203,33 @@ class LoginController extends Controller
                 'contact_number' => $this->generatePlaceholderContactNumber(),
                 'email' => $email,
                 'google_id' => $googleUser->getId(),
-                'email_verified_at' => now(),
+                'email_verified_at' => null,
+                'is_verified' => false,
                 'password' => Hash::make($this->generateRandomPassword()),
                 'image' => $googleUser->getAvatar(),
             ]);
         } else {
             $user->forceFill([
                 'google_id' => $user->google_id ?: $googleUser->getId(),
-                'email_verified_at' => $user->email_verified_at ?: now(),
                 'image' => $googleUser->getAvatar() ?: $user->image,
             ])->save();
+        }
+
+        if (! $user->is_verified) {
+            try {
+                $this->sendGoogleVerificationOtp($user, $request);
+            } catch (ValidationException $e) {
+                return redirect()->route('auth.login')->withErrors($e->errors());
+            } catch (\Throwable $e) {
+                report($e);
+
+                return redirect()->route('auth.login')->withErrors([
+                    'email' => 'Unable to send a verification code right now. Please try again.',
+                ]);
+            }
+
+            return redirect()->route('auth.google.verify')
+                ->with('success', 'Verification code sent to your email. Please complete verification to continue.');
         }
 
         Auth::login($user, true);
@@ -193,17 +237,131 @@ class LoginController extends Controller
 
         $this->storeUserLog($user->user_id, 'logged in with Google', $request);
 
-        $postLoginAction = $request->session()->pull('post_login_action');
+        $postLoginAction = $this->consumePostLoginAction($request);
         $role = strtolower($user->role->role ?? '');
 
-        if ($postLoginAction === 'quick-report' && $role === 'citizen') {
-            session([
-                'open_section' => 'overview',
-                'open_incident_modal' => true,
+        $this->applyPostLoginAction($postLoginAction, $role);
+
+        return $this->redirectBasedOnRole($role)
+            ->withCookie($this->forgetPostLoginActionCookie());
+    }
+
+    public function showGoogleVerificationForm(Request $request)
+    {
+        $pending = $request->session()->get('pending_google_verification');
+
+        if (! $pending || empty($pending['email'])) {
+            return redirect()->route('auth.login');
+        }
+
+        return view('auth.google-verify', [
+            'email' => $pending['email'],
+        ]);
+    }
+
+    public function verifyGoogleOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'otp_code' => 'required|string|size:6',
+        ]);
+
+        $pending = $request->session()->get('pending_google_verification');
+
+        if (! $pending) {
+            return redirect()->route('auth.login')->withErrors([
+                'email' => 'Verification session expired. Please sign in with Google again.',
             ]);
         }
 
-        return $this->redirectBasedOnRole($role);
+        $otpRequest = OtpRequest::find($pending['otp_request_id'] ?? null);
+        $user = User::find($pending['user_id'] ?? null);
+
+        if (! $otpRequest || ! $user || $user->email !== ($pending['email'] ?? null)) {
+            $request->session()->forget('pending_google_verification');
+
+            return redirect()->route('auth.login')->withErrors([
+                'email' => 'Verification session is invalid. Please sign in with Google again.',
+            ]);
+        }
+
+        if ($otpRequest->isExpired()) {
+            return back()->withErrors([
+                'otp_code' => 'The verification code has expired. Please request a new code.',
+            ]);
+        }
+
+        if ($otpRequest->is_verified) {
+            return back()->withErrors([
+                'otp_code' => 'This verification code has already been used.',
+            ]);
+        }
+
+        if (! hash_equals((string) $otpRequest->otp_code, (string) $validated['otp_code'])) {
+            return back()->withErrors([
+                'otp_code' => 'Invalid verification code.',
+            ]);
+        }
+
+        $otpRequest->update([
+            'user_id' => $user->user_id,
+            'is_verified' => true,
+            'verified_at' => now(),
+            'otp_code' => null,
+        ]);
+
+        $user->forceFill([
+            'is_verified' => true,
+            'email_verified_at' => $user->email_verified_at ?: now(),
+        ])->save();
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        $postLoginAction = $pending['post_login_action'] ?? $this->readPostLoginActionCookie($request);
+        $role = strtolower($user->role->role ?? '');
+
+        $request->session()->forget('pending_google_verification');
+
+        $this->storeUserLog($user->user_id, 'completed Google OTP verification', $request);
+        $this->applyPostLoginAction($postLoginAction, $role);
+
+        return $this->redirectBasedOnRole($role)
+            ->withCookie($this->forgetPostLoginActionCookie());
+    }
+
+    public function resendGoogleOtp(Request $request)
+    {
+        $pending = $request->session()->get('pending_google_verification');
+
+        if (! $pending) {
+            return redirect()->route('auth.login')->withErrors([
+                'email' => 'Verification session expired. Please sign in with Google again.',
+            ]);
+        }
+
+        $user = User::find($pending['user_id'] ?? null);
+
+        if (! $user || ! $user->email) {
+            $request->session()->forget('pending_google_verification');
+
+            return redirect()->route('auth.login')->withErrors([
+                'email' => 'Unable to resend verification code. Please sign in with Google again.',
+            ]);
+        }
+
+        try {
+            $this->sendGoogleVerificationOtp($user, $request);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors([
+                'otp_code' => 'Unable to resend the verification code right now. Please try again.',
+            ]);
+        }
+
+        return back()->with('success', 'A new verification code has been sent to your email.');
     }
 
     /**
@@ -291,6 +449,10 @@ class LoginController extends Controller
             'barangay captain' => 'barangay.dashboard',
             'dispatcher' => 'dispatcher.dashboard',
         ];
+
+        if ($role === 'citizen' && session()->pull('redirect_to_citizen_mobile_hub', false)) {
+            return redirect()->route('citizen.mobile-hub')->with('success', $messages[$role]);
+        }
 
         if (isset($routes[$role])) {
             return redirect()->route($routes[$role])->with('success', $messages[$role]);
@@ -473,5 +635,115 @@ class LoginController extends Controller
     private function generateRandomPassword(): string
     {
         return 'GoogleAuth!' . random_int(100000, 999999);
+    }
+
+    private function applyPostLoginAction(?string $postLoginAction, string $role): void
+    {
+        if ($postLoginAction === 'citizen-mobile-hub' && $role === 'citizen') {
+            session([
+                'redirect_to_citizen_mobile_hub' => true,
+            ]);
+
+            return;
+        }
+
+        if ($postLoginAction === 'quick-report' && $role === 'citizen') {
+            session([
+                'open_section' => 'overview',
+                'open_incident_modal' => true,
+            ]);
+        }
+    }
+
+    private function consumePostLoginAction(Request $request): ?string
+    {
+        $fromSession = $request->session()->pull('post_login_action');
+        if (! empty($fromSession)) {
+            return $fromSession;
+        }
+
+        return $this->readPostLoginActionCookie($request);
+    }
+
+    private function readPostLoginActionCookie(Request $request): ?string
+    {
+        $value = $request->cookie('post_login_action');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function makePostLoginActionCookie(?string $postLoginAction)
+    {
+        return cookie(
+            'post_login_action',
+            (string) ($postLoginAction ?? ''),
+            15,
+            null,
+            null,
+            false,
+            false,
+            false,
+            'lax'
+        );
+    }
+
+    private function forgetPostLoginActionCookie()
+    {
+        return Cookie::forget('post_login_action');
+    }
+
+    private function sendGoogleVerificationOtp(User $user, Request $request): OtpRequest
+    {
+        $recentRequests = OtpRequest::where('email', $user->email)
+            ->where('created_at', '>=', now()->subMinute())
+            ->count();
+
+        if ($recentRequests >= 3) {
+            throw ValidationException::withMessages([
+                'email' => 'Too many verification requests. Please wait a minute before trying again.',
+            ]);
+        }
+
+        $otpCode = $this->generateOtpCode();
+        $requestId = 'google-email-otp-' . uniqid();
+
+        Mail::raw(
+            "Your PyroSense verification code is {$otpCode}. This code will expire in 10 minutes.",
+            function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('PyroSense Google Sign-In Verification Code');
+            }
+        );
+
+        $otp = OtpRequest::create([
+            'user_id' => $user->user_id,
+            'phone' => (string) ($user->contact_number ?? 'N/A'),
+            'email' => $user->email,
+            'request_id' => $requestId,
+            'otp_code' => $otpCode,
+            'expires_at' => now()->addMinutes(10),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        $postLoginAction = $request->session()->get('post_login_action') ?: $this->readPostLoginActionCookie($request);
+
+        if (! empty($postLoginAction)) {
+            $request->session()->put('post_login_action', $postLoginAction);
+        }
+
+        $request->session()->put('pending_google_verification', [
+            'user_id' => $user->user_id,
+            'otp_request_id' => $otp->id,
+            'email' => $user->email,
+            'post_login_action' => $postLoginAction,
+        ]);
+
+        return $otp;
+    }
+
+    private function generateOtpCode(): string
+    {
+        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 }

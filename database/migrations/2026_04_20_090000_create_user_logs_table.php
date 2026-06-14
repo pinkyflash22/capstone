@@ -15,11 +15,13 @@ return new class extends Migration
         Schema::create('user_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users', 'user_id')->cascadeOnDelete();
-            $table->string('actions', 50);
+            $table->string('action', 50);
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'created_at']);
-            $table->index('actions');
+            $table->index('action');
         });
     }
 

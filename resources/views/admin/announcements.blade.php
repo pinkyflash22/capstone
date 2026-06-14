@@ -18,11 +18,13 @@
 }
 
     </style>
+    @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/admin/announcements.css'])
 </head>
-<body>
+<body class="chief-dashboard-page">
     <!-- Side Navigation -->
-    <aside class="sidebar">
+    @include('admin.partials.sidebar', ['active' => 'announcements'])
+    {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
                 <div class="logo-area">
@@ -138,10 +140,28 @@
                 </button>
             </form>
         </div>
-    </aside>
+    </aside> --}}
 
     <!-- Main Content -->
     <main class="main-content">
+        @include('admin.partials.topbar', ['title' => 'Announcements', 'subtitle' => 'Command updates and public coordination. ' . now()->format('l, F j')])
+        <div class="dashboard-container chief-dashboard-container">
+        <div class="chief-dashboard-welcome bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-8 mb-8 flex items-start justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-amber-900 mb-2">Command Announcements</h1>
+                <p class="text-amber-700 font-medium">Post updates, announcements, and engage with your team.</p>
+            </div>
+            <div class="hidden md:flex items-center gap-4 bg-white/50 p-2 rounded-xl border border-amber-100">
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Broadcast Status</p>
+                    <p class="text-xs font-bold text-green-600">READY</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
+                    <i class="fa-solid fa-bullhorn"></i>
+                </div>
+            </div>
+        </div>
+
         <div class="top-bar">
             <div class="page-title">
                 <h1>Announcements</h1>
@@ -208,6 +228,7 @@
 
         <!-- Loading Spinner -->     
         <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+        </div>
     </main>
 
     <!-- Right Sidebar -->

@@ -117,42 +117,50 @@
         <div class="divide-y divide-gray-200 max-h-96 overflow-y-auto" id="alertsList">
             @forelse($activeIncidents as $incident)
             @php
-                $incidentTypeName = '';
+                $normalizedIncidentType = strtolower(trim((string) ($incident['incident_type'] ?? $incident['incident_type_name'] ?? 'fire')));
+                $normalizedIncidentStatus = strtolower(trim((string) ($incident['incident_status'] ?? $incident['status'] ?? 'reported')));
+                $incidentTypeName = 'Fire';
                 $incidentIcon = '⚠️';
-                $incidentColor = 'bg-yellow-500';
+                $incidentColor = 'bg-red-500';
                 
-                if(($incident['incident_type_id'] ?? null) == 1) {
+                if(($incident['incident_type_id'] ?? null) == 1 || $normalizedIncidentType === 'fire') {
                     $incidentTypeName = 'Fire';
                     $incidentIcon = '🔥';
                     $incidentColor = 'bg-red-500';
-                } elseif(($incident['incident_type_id'] ?? null) == 2) {
+                } elseif(($incident['incident_type_id'] ?? null) == 2 || str_contains($normalizedIncidentType, 'medical')) {
                     $incidentTypeName = 'Medical Emergency';
                     $incidentIcon = '🚑';
                     $incidentColor = 'bg-blue-500';
-                } elseif(($incident['incident_type_id'] ?? null) == 3) {
+                } elseif(($incident['incident_type_id'] ?? null) == 3 || str_contains($normalizedIncidentType, 'rescue')) {
                     $incidentTypeName = 'Rescue';
                     $incidentIcon = '🆘';
                     $incidentColor = 'bg-green-500';
                 } else {
-                    $incidentTypeName = 'Other';
+                    $incidentTypeName = 'Fire';
                     $incidentIcon = '⚠️';
-                    $incidentColor = 'bg-yellow-500';
+                    $incidentColor = 'bg-red-500';
                 }
                 
                 $statusName = '';
                 $statusColor = '';
-                if(strtolower($incident['incident_status'] ?? '') == 'reported') {
+                if($normalizedIncidentStatus === 'reported') {
                     $statusName = 'Reported';
                     $statusColor = 'bg-red-100 text-red-700';
-                } elseif(strtolower($incident['incident_status'] ?? '') == 'responding') {
+                } elseif(in_array($normalizedIncidentStatus, ['responding', 'en-route', 'en route'], true)) {
                     $statusName = 'Responding';
                     $statusColor = 'bg-yellow-100 text-yellow-700';
-                } elseif(strtolower($incident['incident_status'] ?? '') == 'on scene') {
+                } elseif(in_array($normalizedIncidentStatus, ['on scene', 'on-scene'], true)) {
                     $statusName = 'On Scene';
                     $statusColor = 'bg-purple-100 text-purple-700';
-                } else {
-                    $statusName = 'Unknown';
+                } elseif(in_array($normalizedIncidentStatus, ['controlled', 'completed'], true)) {
+                    $statusName = 'Controlled';
+                    $statusColor = 'bg-blue-100 text-blue-700';
+                } elseif($normalizedIncidentStatus === 'closed') {
+                    $statusName = 'Closed';
                     $statusColor = 'bg-gray-100 text-gray-700';
+                } else {
+                    $statusName = 'Reported';
+                    $statusColor = 'bg-red-100 text-red-700';
                 }
             @endphp
             <div class="p-5 hover:bg-gray-50 transition alert-item" data-type="{{ $incident['incident_type_id'] ?? '' }}" data-date="{{ $incident['created_at'] ?? '' }}" data-id="{{ $incident['incident_id'] ?? '' }}" data-lat="{{ $incident['lat'] ?? '' }}" data-lng="{{ $incident['lng'] ?? '' }}">
@@ -184,9 +192,11 @@
                                 @endif
                             </span>
                             <span><i class="fa-regular fa-flag mr-1"></i> 
-                                @if(strtolower($incident['incident_status'] ?? '') == 'reported') Awaiting response
-                                @elseif(strtolower($incident['incident_status'] ?? '') == 'responding') Crews dispatched
-                                @elseif(strtolower($incident['incident_status'] ?? '') == 'on scene') Crews on scene
+                                @if($normalizedIncidentStatus === 'reported') Awaiting response
+                                @elseif(in_array($normalizedIncidentStatus, ['responding', 'en-route', 'en route'], true)) Crews dispatched
+                                @elseif(in_array($normalizedIncidentStatus, ['on scene', 'on-scene'], true)) Crews on scene
+                                @elseif(in_array($normalizedIncidentStatus, ['controlled', 'completed'], true)) Incident under control
+                                @elseif($normalizedIncidentStatus === 'closed') Incident closed
                                 @else {{ $statusName }}
                                 @endif
                             </span>
@@ -265,7 +275,6 @@
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
                             <th class="px-6 py-3">Date</th>
-                            <th class="px-6 py-3">Incident Type</th>
                             <th class="px-6 py-3">Location</th>
                             <th class="px-6 py-3">Status</th>
                             <th class="px-6 py-3">Actions</th>
@@ -274,7 +283,7 @@
                     <tbody id="citizenReportsTableBody">
                         @foreach($userReportedIncidents as $report)
                         @php
-                            $reportTypeName = '';
+                            $normalizedReportStatus = strtolower(trim((string) ($report->status ?? 'reported')));
                             $reportIcon = '⚠️';
                             if($report->incident_type_id == 1) {
                                 $reportTypeName = 'Fire';
@@ -286,41 +295,36 @@
                                 $reportTypeName = 'Rescue';
                                 $reportIcon = '🆘';
                             } else {
-                                $reportTypeName = 'Other';
+                                $reportTypeName = 'Fire';
                                 $reportIcon = '⚠️';
                             }
                             
                             $reportStatusName = '';
                             $reportStatusClass = '';
-                            if($report->incident_status_id == 1) {
+                            if($normalizedReportStatus === 'reported') {
                                 $reportStatusName = 'Reported';
                                 $reportStatusClass = 'bg-red-100 text-red-700';
-                            } elseif($report->incident_status_id == 2) {
+                            } elseif(in_array($normalizedReportStatus, ['responding', 'en-route', 'en route'], true)) {
                                 $reportStatusName = 'Responding';
                                 $reportStatusClass = 'bg-yellow-100 text-yellow-700';
-                            } elseif($report->incident_status_id == 3) {
+                            } elseif(in_array($normalizedReportStatus, ['on scene', 'on-scene'], true)) {
                                 $reportStatusName = 'On Scene';
                                 $reportStatusClass = 'bg-purple-100 text-purple-700';
-                            } elseif($report->incident_status_id == 4) {
+                            } elseif(in_array($normalizedReportStatus, ['controlled', 'completed'], true)) {
                                 $reportStatusName = 'Controlled';
                                 $reportStatusClass = 'bg-blue-100 text-blue-700';
-                            } elseif($report->incident_status_id == 5) {
+                            } elseif($normalizedReportStatus === 'closed') {
                                 $reportStatusName = 'Closed';
                                 $reportStatusClass = 'bg-gray-100 text-gray-700';
                             } else {
-                                $reportStatusName = 'Unknown';
-                                $reportStatusClass = 'bg-gray-100 text-gray-700';
+                                $reportStatusName = 'Reported';
+                                $reportStatusClass = 'bg-red-100 text-red-700';
                             }
                         @endphp
-                        <tr id="report-row-{{ $report->incident_id }}" class="bg-white border-b hover:bg-gray-50 transition" data-incident-id="{{ $report->incident_id }}" data-status-id="{{ $report->incident_status_id }}">
+                        <tr id="report-row-{{ $report->incident_id }}" class="bg-white border-b hover:bg-gray-50 transition" data-incident-id="{{ $report->incident_id }}" data-status-id="{{ $report->incident_status_id ?? 1 }}">
                             <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                                 {{ $report->created_at->format('M d, Y') }}
                                 <span class="text-xs text-gray-400 block">{{ $report->created_at->format('h:i A') }}</span>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span class="flex items-center gap-1 report-type-label">
-                                    {{ $reportIcon }} {{ $reportTypeName }}
-                                </span>
                             </td>
                             <td class="px-6 py-4">
                                 @if($report->marker && $report->marker->lat && $report->marker->lng)
@@ -337,7 +341,7 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 report-actions-cell">
-                                @if($report->incident_status_id == 1)
+                                @if($normalizedReportStatus === 'reported')
                                 <button type="button" class="text-orange-600 hover:text-orange-700 font-medium text-xs mr-2" onclick="showReportEditModal({{ $report->incident_id }})">
                                     <i class="fa-regular fa-pen-to-square mr-1"></i> Edit
                                 </button>
@@ -826,7 +830,7 @@ function canEditCitizenReport(incident) {
 }
 
 function getIncidentTypeName(typeId) {
-    return incidentTypesData.find((type) => Number(type.incident_type_id) === Number(typeId))?.type || 'Other';
+    return incidentTypesData.find((type) => Number(type.incident_type_id) === Number(typeId))?.type || 'Fire';
 }
 
 function getIncidentStatusId(incident = {}) {
@@ -843,11 +847,16 @@ function getIncidentStatusId(incident = {}) {
 }
 
 function getIncidentTypeDisplayName(incident = {}) {
+    const markerCategory = String(incident?.marker?.category || incident?.category || '').trim().toLowerCase();
+    if (markerCategory === 'fire') {
+        return 'Fire';
+    }
+
     return incident?.incident_type_name
         || incident?.incident_type
         || incident?.incidentType?.type
         || getIncidentTypeName(incident?.incident_type_id)
-        || 'Incident';
+        || 'Fire';
 }
 
 function getReportStatusMeta(statusId) {
@@ -856,7 +865,7 @@ function getReportStatusMeta(statusId) {
     if (Number(statusId) === 3) return { label: 'On Scene', badge: 'bg-purple-100 text-purple-700' };
     if (Number(statusId) === 4) return { label: 'Controlled', badge: 'bg-blue-100 text-blue-700' };
     if (Number(statusId) === 5) return { label: 'Closed', badge: 'bg-gray-100 text-gray-700' };
-    return { label: 'Unknown', badge: 'bg-gray-100 text-gray-700' };
+    return { label: 'Reported', badge: 'bg-red-100 text-red-700' };
 }
 
 function formatCoord(coord) {
@@ -1436,8 +1445,9 @@ async function showIncidentDetailsModal(incidentId) {
             throw new Error('Incident data missing');
         }
 
-        const typeInfo = incidentTypeMap[incident.incident_type_id] || { name: incident.incidentType?.type || 'Other', icon: '⚠️', color: 'gray' };
-        const statusInfo = statusMap[incident.incident_status_id] || { name: incident.incidentStatus?.status || 'Unknown', class: 'bg-gray-100 text-gray-700', canCancel: false };
+        const resolvedTypeName = getIncidentTypeDisplayName(incident);
+        const typeInfo = incidentTypeMap[incident.incident_type_id] || { name: resolvedTypeName || incident.incidentType?.type || 'Fire', icon: '🔥', color: 'red' };
+        const statusInfo = getReportStatusMeta(getIncidentStatusId(incident));
         const lat = incident.marker?.lat ? formatCoord(incident.marker.lat) : 'N/A';
         const lng = incident.marker?.lng ? formatCoord(incident.marker.lng) : 'N/A';
         const locationText = (lat !== 'N/A' && lng !== 'N/A') ? `${lat}, ${lng}` : 'Pending';
@@ -1452,7 +1462,7 @@ async function showIncidentDetailsModal(incidentId) {
                         <span class="text-2xl">${typeInfo.icon}</span>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-lg">${escapeHtml(incident.incidentType?.type || typeInfo.name)} Incident</h3>
+                        <h3 class="font-semibold text-lg">${escapeHtml(resolvedTypeName || incident.incidentType?.type || typeInfo.name)} Incident</h3>
                         <p class="text-sm text-gray-500">ID: #${incident.incident_id}</p>
                     </div>
                 </div>
@@ -1460,7 +1470,7 @@ async function showIncidentDetailsModal(incidentId) {
                     <div>
                         <p class="text-xs text-gray-500 mb-1">Status</p>
                         <p class="font-medium">
-                            <span class="px-3 py-1 rounded-full text-xs ${statusInfo.class}">${escapeHtml(incident.incidentStatus?.status || statusInfo.name)}</span>
+                            <span class="px-3 py-1 rounded-full text-xs ${statusInfo.badge}">${escapeHtml(incident.incident_status || incident.incidentStatus?.status || statusInfo.label)}</span>
                         </p>
                     </div>
                     <div>
@@ -1512,14 +1522,14 @@ function showReportEditModal(incidentId) {
     console.log('current: ', currentEditIncident);
     if (!currentEditIncident) return;
     if (!canEditCitizenReport(currentEditIncident)) {
-        const statusMeta = getReportStatusMeta(currentEditIncident.incident_status_id);
+        const statusMeta = getReportStatusMeta(getIncidentStatusId(currentEditIncident));
         window.showCitizenToast?.(`Only reported incidents can be edited. Current status: ${statusMeta.label}.`, true);
         return;
     }
 
     window.logCitizenUserAction?.('opened incident editor');
     
-    const typeInfo = incidentTypeMap[currentEditIncident.incident_type_id] || { name: 'Other', icon: '⚠️', color: 'gray' };
+    const typeInfo = incidentTypeMap[currentEditIncident.incident_type_id] || { name: 'Fire', icon: '🔥', color: 'red' };
     const typeOptions = incidentTypesData.map((type) => `
         <option value="${type.incident_type_id}" ${Number(currentEditIncident.incident_type_id) === Number(type.incident_type_id) ? 'selected' : ''}>
             ${escapeHtml(type.type)}
@@ -1816,17 +1826,17 @@ function getNearbyAlertTypeMeta(incidentTypeId, incidentTypeName = '') {
     if (Number(incidentTypeId) === 1) return { name: 'Fire', icon: '🔥', color: 'bg-red-500' };
     if (Number(incidentTypeId) === 2) return { name: 'Medical Emergency', icon: '🚑', color: 'bg-blue-500' };
     if (Number(incidentTypeId) === 3) return { name: 'Rescue', icon: '🆘', color: 'bg-green-500' };
-    return { name: incidentTypeName || 'Other', icon: '⚠️', color: 'bg-yellow-500' };
+    return { name: incidentTypeName || 'Fire', icon: '🔥', color: 'bg-red-500' };
 }
 
 function getNearbyAlertStatusMeta(statusValue = '') {
     const normalized = String(statusValue).trim().toLowerCase();
     if (normalized === 'reported') return { label: 'Reported', badge: 'bg-red-100 text-red-700', summary: 'Awaiting response' };
-    if (normalized === 'responding' || normalized === 'en-route') return { label: 'Responding', badge: 'bg-yellow-100 text-yellow-700', summary: 'Crews dispatched' };
+    if (normalized === 'responding' || normalized === 'en-route' || normalized === 'en route') return { label: 'Responding', badge: 'bg-yellow-100 text-yellow-700', summary: 'Crews dispatched' };
     if (normalized === 'on scene' || normalized === 'on-scene') return { label: 'On Scene', badge: 'bg-purple-100 text-purple-700', summary: 'Crews on scene' };
     if (normalized === 'completed' || normalized === 'controlled') return { label: 'Controlled', badge: 'bg-blue-100 text-blue-700', summary: 'Incident under control' };
     if (normalized === 'closed') return { label: 'Closed', badge: 'bg-gray-100 text-gray-700', summary: 'Incident closed' };
-    return { label: 'Unknown', badge: 'bg-gray-100 text-gray-700', summary: 'Status unavailable' };
+    return { label: 'Reported', badge: 'bg-red-100 text-red-700', summary: 'Awaiting response' };
 }
 
 function getNearbyAlertTypeMetaResolved(incident = {}) {
@@ -1834,7 +1844,7 @@ function getNearbyAlertTypeMetaResolved(incident = {}) {
     if (normalizedName === 'fire') return { name: 'Fire', icon: '🔥', color: 'bg-red-500' };
     if (normalizedName.includes('medical')) return { name: 'Medical Emergency', icon: '🚑', color: 'bg-blue-500' };
     if (normalizedName.includes('rescue')) return { name: 'Rescue', icon: '🆘', color: 'bg-green-500' };
-    return { name: getIncidentTypeDisplayName(incident) || 'Other', icon: '⚠️', color: 'bg-yellow-500' };
+    return { name: getIncidentTypeDisplayName(incident) || 'Fire', icon: '🔥', color: 'bg-red-500' };
 }
 
 function renderCitizenAlertsList() {

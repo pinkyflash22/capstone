@@ -1936,6 +1936,34 @@
     <script>
             window.stationOfficer = @json($allStationOfficer);
             window.citizenUserLogs = [];
+            window.citizenDashboardBaseUrl = @json(route('citizen.dashboard'));
+            window.initialCitizenSection = @json($initialSection ?? 'overview');
+
+            function buildCitizenSectionUrl(sectionId) {
+                const baseUrl = (window.citizenDashboardBaseUrl || '').replace(/\/$/, '');
+
+                if (!baseUrl) {
+                    return sectionId === 'overview' ? '/citizen/dashboard' : `/citizen/dashboard/${sectionId}`;
+                }
+
+                return sectionId === 'overview' ? baseUrl : `${baseUrl}/${sectionId}`;
+            }
+
+            function getCitizenSectionFromPath() {
+                const currentPath = window.location.pathname.replace(/\/$/, '');
+                const basePath = new URL(window.citizenDashboardBaseUrl || '/citizen/dashboard', window.location.origin).pathname.replace(/\/$/, '');
+
+                if (currentPath === basePath) {
+                    return 'overview';
+                }
+
+                if (currentPath.startsWith(`${basePath}/`)) {
+                    return currentPath.slice(basePath.length + 1) || 'overview';
+                }
+
+                return window.initialCitizenSection || 'overview';
+            }
+
             window.logCitizenUserAction = async function(action) {
                 if (!action) {
                     return;
@@ -2166,6 +2194,8 @@ if (navigator.geolocation) {
 
         // Section Switching
         function switchSection(sectionId, options = {}) {
+            const { updateHistory = true } = options;
+
             // Hide all sections
             document.querySelectorAll('.content-section').forEach(section => {
                 section.classList.remove('active');
@@ -2185,12 +2215,22 @@ if (navigator.geolocation) {
             document.querySelectorAll(`[data-section="${sectionId}"], [data-citizen-dock-item="${sectionId}"]`).forEach(item => {
                 item.classList.add('active');
             });
-            
-            // Update URL hash without page reload
-            window.location.hash = sectionId;
+
+            if (updateHistory) {
+                const targetUrl = buildCitizenSectionUrl(sectionId);
+
+                if (window.location.pathname !== new URL(targetUrl, window.location.origin).pathname) {
+                    window.history.pushState({ section: sectionId }, '', targetUrl);
+                }
+            }
         }
 
         window.switchSection = switchSection;
+
+        window.addEventListener('popstate', function (event) {
+            const sectionId = event.state?.section || getCitizenSectionFromPath();
+            switchSection(sectionId, { updateHistory: false });
+        });
 
         const citizenMobileDock = document.querySelector('[data-citizen-nav-center]');
         const citizenDockTrigger = document.querySelector('[data-citizen-nav-trigger]');
@@ -2412,15 +2452,22 @@ if (navigator.geolocation) {
         // Check URL hash on page load
         window.addEventListener('load', function() {
             const forcedSection = @json(session('open_section', $errors->any() ? 'profile' : null));
-            const hash = forcedSection || window.location.hash.substring(1) || 'overview';
-            switchSection(hash, { skipLog: true });
+            const initialSection = forcedSection || getCitizenSectionFromPath() || window.initialCitizenSection || 'overview';
+            switchSection(initialSection, { updateHistory: false });
 
             const shouldOpenIncidentModal = @json((bool) session('open_incident_modal'));
-            if (shouldOpenIncidentModal) {
+            const shouldOpenIncidentFromQuery = new URLSearchParams(window.location.search).get('report') === '1';
+            if (shouldOpenIncidentModal || shouldOpenIncidentFromQuery) {
                 window.setTimeout(function() {
                     document.getElementById('latitude').value = window.userCoords?.currentLatitude ?? '';
                     document.getElementById('longitude').value = window.userCoords?.currentLongitude ?? '';
                     openIncidentModal();
+
+                    if (shouldOpenIncidentFromQuery) {
+                        const currentUrl = new URL(window.location.href);
+                        currentUrl.searchParams.delete('report');
+                        window.history.replaceState(window.history.state, '', currentUrl.toString());
+                    }
                 }, 250);
             }
         });

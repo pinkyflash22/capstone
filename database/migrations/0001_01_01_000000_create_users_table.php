@@ -62,6 +62,7 @@ return new class extends Migration
             $table -> integer('contact_number');
             $table->string('email')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
+            $table->boolean('is_verified')->default(true);
             $table->string('password')->nullable();
             $table->string('image')->nullable();
 

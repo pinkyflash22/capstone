@@ -9,13 +9,16 @@ let hydrantMarkers = [];
 let userMarker = null;
 let currentStationLayer = null;
 let currentHydrantLayer = null;
+let anonymousReportInFlight = false;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    primeVisitorLocation();
     initMap();
     loadStations();
     loadHydrants();
     initEventListeners();
+    initMobileEntryPage();
     initScrollAnimations();
 });
 
@@ -516,6 +519,222 @@ function initEventListeners() {
             closeAllModals();
         }
     });
+}
+
+function initMobileEntryPage() {
+    const anonymousReportButtons = document.querySelectorAll('[data-anonymous-report-trigger]');
+    const openMapButton = document.querySelector('[data-mobile-open-map]');
+
+    if (window.innerWidth <= 768 && window.location.hash === '#map') {
+        document.body.classList.add('mobile-show-landing');
+    }
+
+    anonymousReportButtons.forEach((button) => {
+        button.addEventListener('click', submitAnonymousIncidentReport);
+    });
+
+    if (!openMapButton) {
+        return;
+    }
+
+    openMapButton.addEventListener('click', () => {
+        document.body.classList.add('mobile-show-landing');
+
+        window.requestAnimationFrame(() => {
+            document.getElementById('map')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            map?.invalidateSize?.();
+        });
+    });
+}
+
+function primeVisitorLocation() {
+    if (!navigator.geolocation) {
+        return;
+    }
+
+    const cached = readCachedVisitorLocation();
+    const isFresh = cached && (Date.now() - Number(cached.timestamp || 0) < 5 * 60 * 1000);
+
+    if (isFresh) {
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            persistVisitorLocation(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+            console.warn('Visitor location prefetch failed:', error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function persistVisitorLocation(lat, lng) {
+    try {
+        window.localStorage.setItem('pyrosense:lastKnownCoords', JSON.stringify({
+            lat,
+            lng,
+            timestamp: Date.now()
+        }));
+    } catch (error) {
+        console.warn('Unable to cache visitor location:', error);
+    }
+}
+
+function readCachedVisitorLocation() {
+    try {
+        const raw = window.localStorage.getItem('pyrosense:lastKnownCoords');
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.warn('Unable to read cached visitor location:', error);
+        return null;
+    }
+}
+
+function getAnonymousUserId() {
+    const rawValue = document.querySelector('meta[name="anonymous-user-id"]')?.getAttribute('content') || '';
+    const parsed = Number(rawValue);
+
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function setAnonymousReportButtonsLoading(isLoading) {
+    const buttons = document.querySelectorAll('[data-anonymous-report-trigger]');
+
+    buttons.forEach((button) => {
+        if (!button.dataset.defaultLabel) {
+            button.dataset.defaultLabel = button.innerHTML;
+        }
+
+        button.disabled = isLoading;
+        button.classList.toggle('is-loading', isLoading);
+        button.innerHTML = isLoading
+            ? '<i class="fa-solid fa-spinner fa-spin"></i> Reporting...'
+            : button.dataset.defaultLabel;
+    });
+}
+
+function getFreshVisitorLocation(maxAgeMs = 10 * 60 * 1000) {
+    const cached = readCachedVisitorLocation();
+    if (cached?.lat && cached?.lng && Date.now() - Number(cached.timestamp || 0) <= maxAgeMs) {
+        return Promise.resolve({
+            lat: Number(cached.lat),
+            lng: Number(cached.lng),
+        });
+    }
+
+    if (!navigator.geolocation) {
+        return Promise.reject(new Error('Location services are not available on this device.'));
+    }
+
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = Number(position.coords.latitude);
+                const lng = Number(position.coords.longitude);
+                persistVisitorLocation(lat, lng);
+                resolve({ lat, lng });
+            },
+            () => {
+                reject(new Error('Unable to get your current location. Please allow location access and try again.'));
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
+            }
+        );
+    });
+}
+
+async function createAnonymousIncidentMarker(lat, lng) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const response = await fetch('/api/markers', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({
+            title: 'Anonymous Fire Emergency',
+            description: 'Fire emergency reported anonymously.',
+            lat,
+            lng,
+            status: 'active',
+            category: 'fire',
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save the anonymous report marker.');
+    }
+
+    const payload = await response.json();
+    const markerId = payload?.data?.marker_id || payload?.marker_id || null;
+
+    if (!markerId) {
+        throw new Error('The system did not return a marker ID for the anonymous report.');
+    }
+
+    return Number(markerId);
+}
+
+async function createAnonymousIncident(markerId, anonymousUserId) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const response = await fetch('/api/incidents', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({
+            marker_id: markerId,
+            reported_by: anonymousUserId,
+            status: 'reported',
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to submit the anonymous fire report.');
+    }
+
+    return response.json();
+}
+
+async function submitAnonymousIncidentReport() {
+    if (anonymousReportInFlight) {
+        return;
+    }
+
+    const anonymousUserId = getAnonymousUserId();
+    if (!anonymousUserId) {
+        alert('Anonymous reporting is not available yet because the anonymous account is missing.');
+        return;
+    }
+
+    try {
+        anonymousReportInFlight = true;
+        setAnonymousReportButtonsLoading(true);
+
+        const coords = await getFreshVisitorLocation();
+        const markerId = await createAnonymousIncidentMarker(coords.lat, coords.lng);
+        await createAnonymousIncident(markerId, anonymousUserId);
+
+        alert('Anonymous fire report sent successfully.');
+    } catch (error) {
+        console.error('Anonymous report failed:', error);
+        alert(error.message || 'Failed to send the anonymous fire report.');
+    } finally {
+        anonymousReportInFlight = false;
+        setAnonymousReportButtonsLoading(false);
+    }
 }
 
 // Search location
@@ -1046,27 +1265,8 @@ function initScrollAnimations() {
         if (delay) {
             item.style.setProperty('--reveal-delay', `${delay}ms`);
         }
+        item.classList.add('is-visible');
     });
-
-    if (!('IntersectionObserver' in window)) {
-        revealItems.forEach((item) => item.classList.add('is-visible'));
-        return;
-    }
-
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
-            } else {
-                entry.target.classList.remove('is-visible');
-            }
-        });
-    }, {
-        threshold: 0.16,
-        rootMargin: '0px 0px -40px 0px'
-    });
-
-    revealItems.forEach((item) => observer.observe(item));
 
     const heroParallaxTarget = document.querySelector('.hero-parallax-target');
     if (!heroParallaxTarget || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="anonymous-user-id" content="{{ \App\Models\User::resolveAnonymousUserId() ?? '' }}">
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -16,6 +17,35 @@
     @include('partials.pwa-head')
 </head>
 <body>
+    <section class="mobile-entry-page">
+        <div class="mobile-entry-card">
+            <div class="mobile-entry-brand">
+                <div class="logo-icon mobile-entry-logo" style="width: 88px; height: 64px; border-radius: 20px; padding: 0.45rem 0.7rem;">
+                    <img src="{{ asset('storage/defaults/pyrosense.png') }}" alt="PyroSense logo" class="logo-image">
+                </div>
+                <span class="mobile-entry-title">Pyro<span>Sense</span></span>
+            </div>
+
+            <p class="mobile-entry-copy">Quick access for mobile users.</p>
+
+            <div class="mobile-entry-actions">
+                <button type="button" class="mobile-entry-btn mobile-entry-btn--primary" data-anonymous-report-trigger>
+                    <i class="fa-solid fa-user-secret"></i>
+                    Report Anonymously
+                </button>
+                <a href="{{ route('auth.login') }}" class="mobile-entry-btn mobile-entry-btn--secondary">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    Sign In
+                </a>
+                <button type="button" class="mobile-entry-btn mobile-entry-btn--ghost" data-mobile-open-map>
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    View Map
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <div class="desktop-landing-shell">
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
@@ -62,6 +92,21 @@
                         Real-time location tracking, emergency alerts, and quick access 
                         to fire stations and hydrants in Pangasinan. Your safety is our priority.
                     </p>
+
+                    <div class="hero-actions reveal-on-scroll" data-reveal="up" data-reveal-delay="240">
+                        <button type="button" class="hero-action-btn hero-action-btn--primary" data-anonymous-report-trigger>
+                            <i class="fa-solid fa-user-secret"></i>
+                            Report Anonymously
+                        </button>
+                        <a href="{{ route('auth.login') }}" class="hero-action-btn hero-action-btn--secondary">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            Sign In
+                        </a>
+                        <a href="#map" class="hero-action-btn hero-action-btn--ghost">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                            View Map
+                        </a>
+                    </div>
 
                     <!-- Search Card -->
                     <div class="search-card reveal-on-scroll" data-reveal="up" data-reveal-delay="280">
@@ -289,6 +334,7 @@
             </div>
         </div>
     </footer>
+    </div>
 
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

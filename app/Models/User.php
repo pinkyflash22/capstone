@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Builder;
 use App\Models\FullAddress;
 use App\Models\Role;
 use App\Models\Shift;
@@ -50,6 +51,7 @@ protected $primaryKey = 'user_id';
         'contact_number',
         'email',
         'email_verified_at',
+        'is_verified',
         'password',
         'image',
         'google_id',
@@ -74,6 +76,7 @@ protected $primaryKey = 'user_id';
     {
         return [
             'email_verified_at' => 'datetime',
+            'is_verified' => 'boolean',
             'password' => 'hashed',
         ];
     }
@@ -214,5 +217,20 @@ public function fsicRequests()
 public function otpRequests()
 {
     return $this->hasMany(OtpRequest::class);
+}
+
+public function scopeAnonymous(Builder $query): Builder
+{
+    return $query->whereHas('role', function ($roleQuery) {
+        $roleQuery->where('role', 'anonymous');
+    });
+}
+
+public static function resolveAnonymousUserId(): ?int
+{
+    return static::query()
+        ->anonymous()
+        ->orderBy('user_id')
+        ->value('user_id');
 }
 }

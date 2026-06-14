@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-18T02:30:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="dfd-level-0" name="DFD Level 0">
+    <mxGraphModel dx="1920" dy="1080" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="l0-citizen" value="Citizen" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-firefighter" value="Firefighter" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="300" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="40" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-barangay" value="Barangay Hall / Officer" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="700" width="220" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-system" value="0&#xa;&#xa;Proposed System PyroSense:&#xa;A Predictive Fire Risk Analysis and Response&#xa;Optimization System Incorporating GIS Technology" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="430" y="220" width="760" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e1" value="Digital incident report, request details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-citizen" target="l0-system">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e2" value="Acknowledgement, report status, public alerts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-system" target="l0-citizen">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e3" value="Dispatch details, optimized route, assignment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-system" target="l0-firefighter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e4" value="Live status, arrival, completion report" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-firefighter" target="l0-system">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e5" value="Approvals, incident oversight, prediction request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-admin" target="l0-system">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e6" value="Dashboards, analytics, incident records, AI recommendations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-system" target="l0-admin">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e7" value="Barangay fire records, compliance updates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-barangay" target="l0-system">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="l0-e8" value="Prediction checklist, action plan, risk advisories" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l0-system" target="l0-barangay">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-1" name="DFD Level 1">
+    <mxGraphModel dx="1920" dy="1080" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="l1-citizen" value="Citizen" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="180" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-firefighter" value="Firefighter" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="420" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="660" width="170" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-barangay" value="Barangay Hall / Officer" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1470" y="660" width="190" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p1" value="1&#xa;Managing User&#xa;Accounts" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="70" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p2" value="2&#xa;Managing Incident&#xa;and Response Records" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="240" width="250" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p3" value="3&#xa;Managing GIS Markers&#xa;and Risk Areas" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="420" width="250" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p4" value="4&#xa;Analyzing Routes&#xa;and Resources" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="240" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p5" value="5&#xa;Managing Requests&#xa;and Reports" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="420" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-p6" value="6&#xa;Running Predictive Analysis,&#xa;Risk Scoring, and Recommendations" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;strokeWidth=3;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="960" y="280" width="320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-d1" value="D1&#xa;User Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="60" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-d2" value="D2&#xa;Incident Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="220" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-d3" value="D3&#xa;Request Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="400" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-d4" value="D4&#xa;Marker and Risk Area Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="520" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-d5" value="D5&#xa;Historical, Analysis, and&#xa;Recommendation Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="720" width="240" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1-e1" value="Registration details, profile updates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-citizen" target="l1-p1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e2" value="Incident report and request form" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-citizen" target="l1-p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e3" value="Status updates, response logs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-firefighter" target="l1-p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e4" value="Dispatch assignment, route details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p4" target="l1-firefighter"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e5" value="Approvals, maintenance, review parameters" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-admin" target="l1-p1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e6" value="Incident supervision" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-admin" target="l1-p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e7" value="Marker, station, and risk-area updates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-admin" target="l1-p3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e8" value="Prediction request, time range, barangay focus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-admin" target="l1-p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e9" value="Barangay fire records, checklist compliance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-barangay" target="l1-p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e10" value="Risk alerts, action plan checklists" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p6" target="l1-barangay"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e11" value="User account details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p1" target="l1-d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e12" value="Incident records" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p2" target="l1-d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e13" value="Request forms and report references" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p5" target="l1-d3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e14" value="Marker coordinates, stations, risk areas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p3" target="l1-d4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e15" value="Historical inputs, analyses, AI outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="l1-p6" target="l1-d5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e16" value="Incident and location details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p2" target="l1-p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e17" value="Validated incident reports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p2" target="l1-p5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e18" value="Location and marker context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="l1-p3" target="l1-p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e19" value="Historical incident, GIS, and barangay context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="l1-p2" target="l1-p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e20" value="Spatial risk factors" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="l1-p3" target="l1-p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l1-e21" value="Analytics dashboard, predictions, recommendations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="l1-p6" target="l1-admin"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-users" name="DFD Level 2.1 Users">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="u-cit" value="Citizen" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="120" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="u-fire" value="Firefighter" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="310" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="u-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="500" width="170" height="70" as="geometry"/></mxCell>
+        <mxCell id="u-p11" value="1.1&#xa;Register User&#xa;Account" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="420" y="90" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="u-p12" value="1.2&#xa;Update User&#xa;Account" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="420" y="260" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="u-p13" value="1.3&#xa;Deactivate / Delete&#xa;User Account" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="420" y="440" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="u-d1" value="D1&#xa;User Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="980" y="250" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="u-e1" value="Registration form, account details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-cit" target="u-p11"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e2" value="Profile changes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-fire" target="u-p12"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e3" value="Account maintenance, review" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-admin" target="u-p12"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e4" value="Account removal request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-admin" target="u-p13"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e5" value="User account information" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-p11" target="u-d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e6" value="Modified user information" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-p12" target="u-d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="u-e7" value="Retrieved user account information" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="u-d1" target="u-p13"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-incidents" name="DFD Level 2.2 Incidents and Routing">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="i-cit" value="Citizen" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="30" y="130" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="i-fire" value="Firefighter" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="30" y="320" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="i-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="30" y="520" width="170" height="70" as="geometry"/></mxCell>
+        <mxCell id="i-p21" value="2.1&#xa;Report / Create&#xa;Incident" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="320" y="110" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="i-p22" value="2.2&#xa;Update Incident&#xa;Status" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="320" y="280" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="i-p23" value="2.3&#xa;Close / Archive&#xa;Incident" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="320" y="450" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="i-p24" value="2.4&#xa;Analyze Route and&#xa;Available Resources" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="700" y="150" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="i-p25" value="2.5&#xa;Generate Dispatch&#xa;Route" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="700" y="340" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="i-d2" value="D2&#xa;Incident Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1220" y="250" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="i-e1" value="Report incident form / details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-cit" target="i-p21"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e2" value="Update status, arrival, completion" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-fire" target="i-p22"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e3" value="Incident supervision, correction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-admin" target="i-p22"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e4" value="Incident archive / deletion request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-admin" target="i-p23"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e5" value="Incident information" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-p21" target="i-d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e6" value="Modified incident details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-p22" target="i-d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e7" value="Retrieved incident record" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-d2" target="i-p23"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e8" value="Incident type, location, reporter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-p21" target="i-p24"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e9" value="Incident details, location, team availability" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-p24" target="i-p25"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="i-e10" value="Dispatch route and assignment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="i-p25" target="i-fire"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-markers" name="DFD Level 2.3 Markers and Risk Areas">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="m-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="280" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="m-p31" value="3.1&#xa;Create Marker or&#xa;Risk Area" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="80" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="m-p32" value="3.2&#xa;Update Marker or&#xa;Risk Area" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="250" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="m-p33" value="3.3&#xa;Delete / Archive&#xa;Marker" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="420" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="m-d4" value="D4&#xa;Marker and Risk Area Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="920" y="250" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="m-e1" value="Marker details, coordinates, category" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-admin" target="m-p31"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m-e2" value="Marker details, risk attributes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-admin" target="m-p32"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m-e3" value="Marker identifier" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-admin" target="m-p33"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m-e4" value="Marker / risk-area details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-p31" target="m-d4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m-e5" value="Modified marker details" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-p32" target="m-d4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m-e6" value="Retrieved marker record" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="m-d4" target="m-p33"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dfd-level-2-predictive" name="DFD Level 2.6 Predictive Analysis">
+    <mxGraphModel dx="1920" dy="1080" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p-admin" value="Administrator / Chief" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="120" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="p-barangay" value="Barangay Hall / Officer" style="rounded=0;whiteSpace=wrap;html=1;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="610" width="190" height="80" as="geometry"/></mxCell>
+        <mxCell id="p-p61" value="6.1&#xa;Collect Historical Incident,&#xa;Weather, and Barangay Context" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="340" y="90" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="p-p62" value="6.2&#xa;Prepare Station / Barangay&#xa;Prediction Dataset" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="340" y="250" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="p-p63" value="6.3&#xa;Run Machine Learning&#xa;Risk Prediction" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffe599;strokeColor=#bf9000;strokeWidth=3;" vertex="1" parent="1"><mxGeometry x="760" y="250" width="280" height="110" as="geometry"/></mxCell>
+        <mxCell id="p-p64" value="6.4&#xa;Store Analysis, Probability,&#xa;and Predicted Risk Level" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="1160" y="90" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="p-p65" value="6.5&#xa;Generate Recommendations,&#xa;Checklists, and Action Plans" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffe599;strokeColor=#bf9000;strokeWidth=3;" vertex="1" parent="1"><mxGeometry x="1160" y="250" width="320" height="110" as="geometry"/></mxCell>
+        <mxCell id="p-p66" value="6.6&#xa;Send Prediction Outputs&#xa;for Review and Compliance" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="1160" y="430" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="p-d2" value="D2&#xa;Incident Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="740" y="40" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="p-d4" value="D4&#xa;Marker and Risk Area Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="740" y="510" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="p-d5" value="D5&#xa;Historical Fire, Analysis,&#xa;and Recommendation Records" style="shape=mxgraph.dfd.data_store_with_id;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1590" y="250" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="p-e1" value="Prediction parameters, station, barangay, period" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-admin" target="p-p61"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e2" value="Barangay fire records, local context, remarks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-barangay" target="p-p61"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e3" value="Historical incident data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-d2" target="p-p61"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e4" value="Spatial risk factors, marker location, station coverage" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-d4" target="p-p61"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e5" value="Prepared analysis inputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-p61" target="p-p62"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e6" value="Encoded and validated dataset" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-p62" target="p-p63"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e7" value="Predicted incident pattern, risk score, probability" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#bf9000;strokeWidth=2;" edge="1" parent="1" source="p-p63" target="p-p64"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e8" value="Prediction results and supporting analysis" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#bf9000;strokeWidth=2;" edge="1" parent="1" source="p-p64" target="p-p65"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e9" value="Analysis record, predictions, stored outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-p64" target="p-d5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e10" value="Recommendations, AI checklist items, action plan" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#bf9000;strokeWidth=2;" edge="1" parent="1" source="p-p65" target="p-p66"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e11" value="Checklist, recommendation, compliance targets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#bf9000;strokeWidth=2;" edge="1" parent="1" source="p-p66" target="p-barangay"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e12" value="Prediction dashboard, risk summary, action plan review" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#bf9000;strokeWidth=2;" edge="1" parent="1" source="p-p66" target="p-admin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e13" value="Stored recommendations and checklist status" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-p65" target="p-d5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-e14" value="Compliance remarks, checklist updates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="1" source="p-barangay" target="p-p66"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

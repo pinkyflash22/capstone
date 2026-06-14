@@ -10,11 +10,13 @@
     
     <title>PyroSense · Management</title>
     
+    @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
 </head>
-<body>
+<body class="chief-dashboard-page">
     <!-- Side Navigation (same as announcements) -->
-    <aside class="sidebar">
+    @include('admin.partials.sidebar', ['active' => 'management'])
+    {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
                 <div class="logo-area">
@@ -110,7 +112,7 @@
                 </button>
             </form>
         </div>
-    </aside>
+    </aside> --}}
 
     <!-- BACKDROP for mobile -->
     <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden transition-opacity duration-300"></div>

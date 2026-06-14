@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta charset="UTF-8">
@@ -25,10 +25,16 @@
     
     <title>PyroSense · Dashboard</title>
     
+    @include('partials.pwa-head')
     <style>
         /* All your existing styles remain the same */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
         * { 
             font-family: 'Inter', sans-serif; 
             margin: 0;
@@ -40,6 +46,8 @@
             background-color: #f3f4f6;
             min-height: 100vh;
             display: flex;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
         }
         /* Add to your existing styles in dashboard.blade.php */
 @keyframes blink {
@@ -283,6 +291,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            padding-bottom: calc(24px + var(--safe-bottom));
         }
 
         /* Top Navigation */
@@ -1269,69 +1278,14 @@
             scrollbar-width: none;
         }
     </style>
+    @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/app.css', 'resources/js/map.js'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
 
 </head>
-<body>
+<body class="chief-dashboard-page">
     <!-- SIDE NAVIGATION -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header-gradient px-6 py-8">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30">
-                    <i class="fa-solid fa-fire-extinguisher text-white text-xl"></i>
-                </div>
-                <div>
-                    <h2 class="text-white font-bold text-xl leading-tight">PyroSense</h2>
-                    <p class="text-white/70 text-xs uppercase tracking-widest">Admin Hub</p>
-                </div>
-            </div>
-        </div>
-
-        <nav class="mt-6 flex-1 px-4">
-            <p class="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Core Overview</p>
-            <a href="{{ route('admin.dashboard') }}" class="nav-item active">
-                <i class="fa-solid fa-gauge-high"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="{{ route('admin.announcements') }}" class="nav-item">
-                <i class="fa-solid fa-bullhorn"></i>
-                <span>Announcements</span>
-            </a>
-            <a href="{{ route('admin.management') }}" class="nav-item">
-                <i class="fa-solid fa-map-location-dot"></i>
-                <span>Incident Management</span>
-            </a>
-            <a href="{{ route('admin.reports') }}" class="nav-item">
-                <i class="fa-solid fa-chart-pie"></i>
-                <span>Detailed Reports</span>
-            </a>
-            <a href="{{ route('admin.resource-management.index') }}" class="nav-item">
-                <i class="fa-solid fa-toolbox"></i>
-                <span>Resources</span>
-            </a>
-
-            <p class="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-8 mb-4">Intelligence</p>
-            <a href="{{ route('admin.analytics') }}" class="nav-item">
-                <i class="fa-solid fa-chart-line"></i>
-                <span>Predictive Analytics</span>
-            </a>
-        </nav>
-
-        <div class="p-4 border-t border-slate-100">
-            <div class="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border border-blue-200">
-                        {{ substr(auth()->user()->first_name ?? 'A', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'D', 0, 1) }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-slate-800 truncate">{{ auth()->user()->first_name }}</p>
-                        <p class="text-[10px] text-slate-500 font-medium">Administrator</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </aside>
+    @include('admin.partials.sidebar', ['active' => 'dashboard'])
     {{-- <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
@@ -1438,29 +1392,29 @@
         <nav class="lector-top-bar">
             <div class="flex items-center gap-4">
                 <button id="openSidebar" class="lg:hidden text-slate-600">
-                    <i class="fa-solid fa-bars-staggered text-xl"></i>
+                    <i class="fa-solid fa-bars text-xl"></i>
                 </button>
                 <div class="hidden lg:block">
-                    <h1 class="text-xl font-bold text-slate-800">Operations Control</h1>
+                    <h1 class="text-xl font-bold text-slate-800">Commander's Dashboard</h1>
                     <p class="text-xs text-slate-500 font-medium">Monitoring Command Center • {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-6">
                 <!-- Notifications -->
-                <div class="relative">
-                    <button class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200">
+                <div class="hidden md:block relative">
+                    <button class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative">
                         <i class="fa-regular fa-bell"></i>
                         @if($alerts->count() > 0)
-                        <span class="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
                         @endif
                     </button>
                 </div>
 
                 <!-- User Profile Dropdown -->
-                <div class="user-dropdown">
+                <div class="hidden md:block user-dropdown">
                     <button id="userDropdownBtn" class="user-dropdown-toggle">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-blue-200">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
                             {{ substr(auth()->user()->first_name ?? 'A', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'D', 0, 1) }}
                         </div>
                         <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
@@ -1497,8 +1451,57 @@
 
         <!-- DASHBOARD CONTENT -->
         <div class="dashboard-container">
+            <div class="chief-dashboard-welcome bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-8 mb-8 flex items-start justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-amber-900 mb-2">Welcome back, {{ auth()->user()->first_name }}!</h1>
+                    <p class="text-amber-700 font-medium">System Command Overview. {{ now()->format('l, F j, Y') }}</p>
+                </div>
+                <div class="hidden md:flex items-center gap-4 bg-white/50 p-2 rounded-xl border border-amber-100">
+                    <div class="text-right">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Command Status</p>
+                        <p class="text-xs font-bold text-green-600">OPERATIONAL</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
+                        <i class="fa-solid fa-signal"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div id="announcements" class="lector-card mb-8 scroll-mt-24">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
+                            <i class="fa-solid fa-bullhorn"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800">Latest Announcements</h2>
+                            <p class="text-xs text-slate-500 font-medium">Recent system-wide posts from command</p>
+                        </div>
+                    </div>
+                    <a href="{{ route('admin.announcements') }}" class="text-xs font-semibold text-amber-700 hover:text-amber-800">Open full announcements</a>
+                </div>
+                <div class="grid gap-4">
+                    @forelse ($posts as $post)
+                        <article class="rounded-2xl border border-slate-100 bg-slate-50/70 px-5 py-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-800">{{ $post->title }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600 line-clamp-2">{{ \Illuminate\Support\Str::limit(strip_tags($post->content ?? $post->body ?? ''), 140) }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500 border border-slate-200">
+                                    {{ optional($post->created_at)->diffForHumans() }}
+                                </span>
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-500">
+                            No announcements published yet.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
             <!-- page title + date -->
-            <div class="page-header">
+            <div id="dashboard" class="page-header scroll-mt-24">
                 <h1>Operations Dashboard</h1>
                 <div class="page-date">
                     <i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs
@@ -1506,20 +1509,20 @@
             </div>
 
             <!-- emergency banner -->
-            <div class="bg-blue-50 border-l-4 border-blue-500 rounded-2xl p-6 mb-8 flex items-start gap-4">
-                <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0 border border-blue-200">
+            <div class="bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-6 mb-8 flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 flex-shrink-0 border border-amber-200">
                     <i class="fa-solid fa-triangle-exclamation text-xl"></i>
                 </div>
                 <div class="flex-1">
-                    <h4 class="text-blue-900 font-bold text-lg mb-1">Operational Alert</h4>
-                    <p class="text-blue-700 leading-relaxed font-medium">Red flag warning active in Sector 4. All primary response units in Sector 4 are on heightened readiness. Crews are advised to monitor weather patterns in real-time.</p>
+                    <h4 class="text-amber-900 font-bold text-lg mb-1">Operational Alert</h4>
+                    <p class="text-amber-700 leading-relaxed font-medium">Red flag warning active in Sector 4. All primary response units in Sector 4 are on heightened readiness. Crews are advised to monitor weather patterns in real-time.</p>
                 </div>
             </div>
 
             <!-- KPI cards -->
             <div class="kpi-grid">
                 <div class="lector-card kpi-card">
-                    <div class="kpi-icon bg-blue-100 text-blue-600">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
                         <i class="fa-solid fa-fire"></i>
                     </div>
                     <div class="kpi-info">
@@ -1529,7 +1532,7 @@
                 </div>
 
                 <div class="lector-card kpi-card">
-                    <div class="kpi-icon bg-blue-100 text-blue-600">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
                         <i class="fa-solid fa-truck"></i>
                     </div>
                     <div class="kpi-info">
@@ -1539,7 +1542,7 @@
                 </div>
 
                 <div class="lector-card kpi-card">
-                    <div class="kpi-icon bg-blue-100 text-blue-600">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
                         <i class="fa-solid fa-water"></i>
                     </div>
                     <div class="kpi-info">
@@ -1549,7 +1552,7 @@
                 </div>
 
                 <div class="lector-card kpi-card">
-                    <div class="kpi-icon bg-blue-100 text-blue-600">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
                         <i class="fa-solid fa-clock"></i>
                     </div>
                     <div class="kpi-info">
@@ -1560,7 +1563,7 @@
             </div>
 
             <!-- Full Width Map -->
-            <div class="lector-card mb-8">
+            <div id="management" class="lector-card mb-8 scroll-mt-24">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
@@ -1585,7 +1588,7 @@
             </div>
 
             <!-- Charts Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div id="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 scroll-mt-24">
                 <!-- Incident History Graph -->
                 <div class="lector-card">
                     <div class="flex items-center justify-between mb-6">
@@ -1610,7 +1613,7 @@
                 </div>
 
                 <!-- Incident Type Distribution -->
-                <div class="chart-card">
+                <div id="reports" class="chart-card scroll-mt-24">
                     <div class="chart-header">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <i class="fa-solid fa-chart-pie" style="color: #dc2626;"></i>
@@ -1836,7 +1839,7 @@
             </div>
 
             <!-- Equipment Card (replacing Today's Operational Summary) -->
-            <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+            <div id="resources" class="bg-white rounded-xl shadow-lg overflow-hidden mb-6 scroll-mt-24">
                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
@@ -2847,5 +2850,6 @@
         }
     };
 </script>
+@include('partials.pwa-body', ['showPwaInstallButton' => true])
 </body>
 </html>

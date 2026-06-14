@@ -16,7 +16,7 @@ class UserLogController extends Controller
             ->orderByDesc('created_at')
             ->limit((int) min(max($request->integer('limit', 100), 1), 200))
             ->get([
-                'user_log_id',
+                'id as user_log_id',
                 'action',
                 'ip_address',
                 'user_agent',
@@ -54,7 +54,7 @@ class UserLogController extends Controller
             ->with(['user.role'])
             ->orderByDesc('created_at')
             ->get([
-                'user_log_id',
+                'id as user_log_id',
                 'user_id',
                 'action',
                 'ip_address',

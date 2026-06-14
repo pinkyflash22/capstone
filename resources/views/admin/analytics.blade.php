@@ -14,6 +14,7 @@
     
     <title>PyroSense · AI Predictive Analytics</title>
     
+    @vite(['resources/css/chief/dashboard.css'])
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { font-family: 'Inter', sans-serif; }
@@ -205,8 +206,9 @@
         }
     </style>
 </head>
-<body>
-    <aside class="sidebar">
+<body class="chief-dashboard-page">
+    @include('admin.partials.sidebar', ['active' => 'analytics'])
+    {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="logo-area">
                 <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
@@ -223,7 +225,7 @@
             <a href="#" class="nav-item"><i class="fa-solid fa-map-location-dot"></i> Incident Map</a>
             <a href="#" class="nav-item"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</a>
         </nav>
-    </aside>
+    </aside> --}}
 
     <main class="main-content">
         <div class="top-nav">

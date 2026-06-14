@@ -50,6 +50,24 @@ class SampleUsersSeeder extends Seeder
                 'email' => 'firefighter.sample@example.com',
             ],
             [
+                'role' => 'firefighter',
+                'account_code' => 'FIR-0002',
+                'first_name' => 'Luis',
+                'middle_name' => 'Garcia',
+                'last_name' => 'Morales',
+                'contact_number' => 9171001008,
+                'email' => 'firefighter.two.sample@example.com',
+            ],
+            [
+                'role' => 'firefighter',
+                'account_code' => 'FIR-0003',
+                'first_name' => 'Jose',
+                'middle_name' => 'Navarro',
+                'last_name' => 'Castro',
+                'contact_number' => 9171001009,
+                'email' => 'firefighter.three.sample@example.com',
+            ],
+            [
                 'role' => 'citizen',
                 'account_code' => 'CIT-0001',
                 'first_name' => 'Ana',
@@ -66,6 +84,15 @@ class SampleUsersSeeder extends Seeder
                 'last_name' => 'Barangay',
                 'contact_number' => 9171001006,
                 'email' => 'barangay.sample@example.com',
+            ],
+            [
+                'role' => 'anonymous',
+                'account_code' => 'ANO-0001',
+                'first_name' => 'Anonymous',
+                'middle_name' => 'System',
+                'last_name' => 'Reporter',
+                'contact_number' => 9171001007,
+                'email' => 'anonymous.reporter@example.com',
             ],
         ];
 
@@ -86,6 +113,7 @@ class SampleUsersSeeder extends Seeder
                     'address_id' => $addressId,
                     'contact_number' => $definition['contact_number'],
                     'email' => $definition['email'],
+                    'is_verified' => true,
                     'password' => Hash::make('password123'),
                     'email_verified_at' => now(),
                     'updated_at' => now(),

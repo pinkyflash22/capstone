@@ -1069,7 +1069,7 @@
                 <!-- Login Form -->
                 <form method="POST" action="{{ route('auth.authenticate') }}" id="loginForm">
                     @csrf
-                    <input type="hidden" name="post_login_action" value="{{ request('post_login_action') }}">
+                    <input type="hidden" name="post_login_action" id="postLoginActionField" value="{{ request('post_login_action') }}">
 
                     <!-- Email Field -->
                     <div class="form-group">
@@ -1136,6 +1136,7 @@
                     <a
                         href="{{ route('auth.google.redirect', array_filter(['post_login_action' => request('post_login_action')])) }}"
                         class="btn-google"
+                        id="googleLoginLink"
                     >
                         <i class="fa-brands fa-google"></i>
                         <span>Continue with Google</span>
@@ -1224,6 +1225,36 @@
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-spinner"></span> Signing in...';
         });
+
+        (function() {
+            const postLoginActionField = document.getElementById('postLoginActionField');
+            const googleLoginLink = document.getElementById('googleLoginLink');
+            const initialAction = postLoginActionField?.value || '';
+            const userAgent = navigator.userAgent || '';
+            const isStandaloneDisplay = window.matchMedia('(display-mode: standalone)').matches
+                || window.matchMedia('(display-mode: fullscreen)').matches
+                || window.matchMedia('(display-mode: minimal-ui)').matches;
+            const launchedFromAppShell = document.referrer.startsWith('android-app://');
+            const isTouchViewport = window.matchMedia('(max-width: 768px)').matches
+                && window.matchMedia('(pointer: coarse)').matches;
+            const isMobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(userAgent);
+            const isMobilePwaFlow = isStandaloneDisplay
+                || window.navigator.standalone === true
+                || launchedFromAppShell
+                || (isTouchViewport && isMobileUserAgent);
+
+            if (!isMobilePwaFlow || !postLoginActionField || initialAction === 'quick-report') {
+                return;
+            }
+
+            postLoginActionField.value = 'citizen-mobile-hub';
+
+            if (googleLoginLink) {
+                const url = new URL(googleLoginLink.href, window.location.origin);
+                url.searchParams.set('post_login_action', 'citizen-mobile-hub');
+                googleLoginLink.href = url.toString();
+            }
+        })();
 
         // Prevent back button to login page after successful login
         (function() {

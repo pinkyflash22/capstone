@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             // EquipmentCategoriesSeeder::class,
             SampleDefaultDataSeeder::class,
             StationOfficersSeeder::class,
+            SampleTeamsSeeder::class,
             HistoricalDataSeeder::class,
         ]);
     }

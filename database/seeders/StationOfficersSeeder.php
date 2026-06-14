@@ -10,7 +10,7 @@ class StationOfficersSeeder extends Seeder
     public function run(): void
     {
         $now = now();
-        $stationId = DB::table('stations')->where('station_code', 'ST-001')->value('station_id');
+        $stationId = $this->resolveSeedStationId();
 
         if (! $stationId) {
             return;
@@ -24,6 +24,16 @@ class StationOfficersSeeder extends Seeder
             ],
             [
                 'account_code' => 'FIR-0001',
+                'rank' => 'Fire Officer 1',
+                'status' => 'available',
+            ],
+            [
+                'account_code' => 'FIR-0002',
+                'rank' => 'Fire Officer 1',
+                'status' => 'available',
+            ],
+            [
+                'account_code' => 'FIR-0003',
                 'rank' => 'Fire Officer 1',
                 'status' => 'available',
             ],
@@ -49,5 +59,22 @@ class StationOfficersSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    private function resolveSeedStationId(): ?int
+    {
+        $preferredStationId = DB::table('stations')
+            ->where('station_code', 'ST-001')
+            ->value('station_id');
+
+        if ($preferredStationId) {
+            return (int) $preferredStationId;
+        }
+
+        $fallbackStationId = DB::table('stations')
+            ->orderBy('station_id')
+            ->value('station_id');
+
+        return $fallbackStationId ? (int) $fallbackStationId : null;
     }
 }

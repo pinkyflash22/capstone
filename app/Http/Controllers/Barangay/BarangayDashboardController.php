@@ -10,12 +10,16 @@ use App\Models\BarangayPredictionChecklist;
 use App\Models\City;
 use App\Models\FullAddress;
 use App\Models\HistoricalFireIncident;
+use App\Models\Incident;
 use App\Models\Marker;
 use App\Models\Post;
+use App\Models\RiskArea;
+use App\Models\Station;
 use App\Models\User;
-use App\Services\UserActivityLogger;
+use App\Support\UserActivityLogger;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -65,8 +69,10 @@ class BarangayDashboardController extends Controller
         $historicalIncidents = collect();
         $predictionChecklists = collect();
         $fireRecords = collect();
+        $riskAreas = collect();
         $markers = collect();
         $miniMapPins = collect();
+        $stations = Station::query()->orderBy('station_name')->get();
 
         if ($barangay) {
             $historicalIncidents = HistoricalFireIncident::query()
@@ -85,7 +91,7 @@ class BarangayDashboardController extends Controller
                 ->get();
 
             $markers = Marker::query()
-                ->whereIn('category', ['barangay', 'fire', 'school', 'hydrant', 'bridge', 'station'])
+                ->whereIn('category', ['barangay', 'fire', 'school', 'hydrant', 'bridge', 'station', 'risk'])
                 ->orderByDesc('marker_id')
                 ->limit(18)
                 ->get();
@@ -95,6 +101,13 @@ class BarangayDashboardController extends Controller
             $fireRecords = BarangayFireRecord::query()
                 ->where('barangay_hall_id', $hall->barangay_hall_id)
                 ->orderByDesc('incident_date')
+                ->limit(12)
+                ->get();
+
+            $riskAreas = RiskArea::query()
+                ->with(['marker', 'station', 'reporter'])
+                ->where('barangay_hall_id', $hall->barangay_hall_id)
+                ->orderByDesc('created_at')
                 ->limit(12)
                 ->get();
 
@@ -173,6 +186,25 @@ class BarangayDashboardController extends Controller
                     })
                     ->filter()
             )
+            ->merge(
+                $riskAreas
+                    ->map(function (RiskArea $riskArea) {
+                        $marker = $riskArea->marker;
+
+                        if (! $marker || $marker->lat === null || $marker->lng === null) {
+                            return null;
+                        }
+
+                        return [
+                            'title' => $marker->title ?: 'Risk marker',
+                            'category' => 'risk',
+                            'lat' => (float) $marker->lat,
+                            'lng' => (float) $marker->lng,
+                            'meta' => strtoupper($riskArea->status ?: 'pending') . ' · ' . str_replace('_', ' ', $riskArea->risk_factor),
+                        ];
+                    })
+                    ->filter()
+            )
             ->unique(function (array $pin) {
                 return $pin['title'] . '|' . $pin['lat'] . '|' . $pin['lng'];
             })
@@ -183,9 +215,11 @@ class BarangayDashboardController extends Controller
             'historicalIncidents' => $historicalIncidents,
             'predictionChecklists' => $predictionChecklists,
             'fireRecords' => $fireRecords,
+            'riskAreas' => $riskAreas,
             'markers' => $markers,
             'miniMapPins' => $miniMapPins,
             'latestPosts' => $latestPosts,
+            'stations' => $stations,
             'hazardMix' => $hazardMix,
             'statusMix' => $statusMix,
             'priorityMix' => $priorityMix,
@@ -199,6 +233,7 @@ class BarangayDashboardController extends Controller
                 'open_actions' => $predictionChecklists->whereIn('status', ['pending', 'in_progress'])->count(),
                 'critical_actions' => $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
                 'recorded_reports' => $fireRecords->count(),
+                'risk_markers' => $riskAreas->count(),
                 'total_hazards_reported' => (int) $historicalIncidents->sum(function (HistoricalFireIncident $incident) {
                     return max(1, (int) ($incident->incident_count ?? 1));
                 }),
@@ -242,6 +277,178 @@ class BarangayDashboardController extends Controller
     public function reports()
     {
         return view('barangay.reports', $this->buildPortalData());
+    }
+
+    public function storeFireReport(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'location_description' => ['required', 'string', 'max:1000'],
+            'fire_classification' => ['required', Rule::in(['accidental', 'intentional', 'undetermined'])],
+            'fire_cause' => ['nullable', 'string', 'max:255'],
+            'incident_date' => ['required', 'date'],
+            'incident_count' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $context = $this->resolveBarangayContext();
+        $hall = $context['hall'];
+
+        DB::transaction(function () use ($validated, $hall, $request) {
+            $marker = Marker::create([
+                'title' => $validated['title'],
+                'description' => $validated['location_description'],
+                'lat' => $validated['lat'],
+                'lng' => $validated['lng'],
+                'status' => 'active',
+                'category' => 'fire',
+            ]);
+
+            $incident = Incident::create([
+                'marker_id' => $marker->marker_id,
+                'status' => 'Reported',
+                'team_id' => null,
+                'reported_by' => Auth::user()?->user_id,
+            ]);
+
+            if ($hall) {
+                BarangayFireRecord::create([
+                    'barangay_hall_id' => $hall->barangay_hall_id,
+                    'incident_id' => $incident->incident_id,
+                    'reported_by' => Auth::user()?->user_id,
+                    'incident_date' => $validated['incident_date'],
+                    'incident_count' => $validated['incident_count'] ?? 1,
+                    'fire_classification' => $validated['fire_classification'],
+                    'fire_cause' => $validated['fire_cause'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+            }
+
+            UserActivityLogger::log('submitted fire report', Auth::user()?->user_id, $request);
+        });
+
+        return redirect()
+            ->route('barangay.reports')
+            ->with('success', 'Fire report submitted successfully and forwarded into the system incident flow.');
+    }
+
+    public function storeQuickFireReport(Request $request)
+    {
+        $validated = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $context = $this->resolveBarangayContext();
+        $hall = $context['hall'];
+        $userId = Auth::user()?->user_id;
+        $timestamp = now();
+
+        $incident = DB::transaction(function () use ($validated, $hall, $userId, $timestamp, $request) {
+            $marker = Marker::create([
+                'title' => 'Barangay Fire Emergency',
+                'description' => 'Fire emergency reported from barangay quick action.',
+                'lat' => $validated['lat'],
+                'lng' => $validated['lng'],
+                'status' => 'active',
+                'category' => 'fire',
+            ]);
+
+            $incident = Incident::create([
+                'marker_id' => $marker->marker_id,
+                'status' => 'Reported',
+                'team_id' => null,
+                'reported_by' => $userId,
+            ]);
+
+            if ($hall) {
+                BarangayFireRecord::create([
+                    'barangay_hall_id' => $hall->barangay_hall_id,
+                    'incident_id' => $incident->incident_id,
+                    'reported_by' => $userId,
+                    'incident_date' => $timestamp->toDateString(),
+                    'incident_count' => 1,
+                    'fire_classification' => 'undetermined',
+                    'fire_cause' => null,
+                    'notes' => 'Submitted from the barangay quick report action.',
+                ]);
+            }
+
+            UserActivityLogger::log('submitted quick fire report', $userId, $request);
+
+            return $incident;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Fire report submitted successfully.',
+            'data' => [
+                'incident_id' => $incident->incident_id,
+            ],
+        ]);
+    }
+
+    public function storeRiskArea(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'location_description' => ['required', 'string', 'max:1000'],
+            'risk_factor' => ['required', Rule::in(['people_density', 'housing_material', 'housing_spacing', 'electrical_risk', 'wiring'])],
+            'mode' => ['required', Rule::in(['low', 'medium', 'high', 'concrete', 'mixed', 'light_materials', 'dikit_dikit', 'nearly_dikit_dikit', 'moderate', 'far', 'none', 'octopus', 'straight', 'overflow'])],
+            'hazard_type' => ['required', Rule::in(['overcrowding', 'electrical', 'flammable', 'none'])],
+            'status' => ['required', Rule::in(['pending', 'verified', 'resolved'])],
+            'station_id' => ['nullable', 'exists:stations,station_id'],
+            'risk_score' => ['nullable', 'numeric', 'between:0,100'],
+            'estimated_radius' => ['nullable', 'numeric', 'between:0,10000'],
+            'near_hydrant' => ['nullable', 'boolean'],
+            'near_water_source' => ['nullable', 'boolean'],
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $context = $this->resolveBarangayContext();
+        $hall = $context['hall'];
+
+        if (! $hall) {
+            return redirect()
+                ->route('barangay.risk-map')
+                ->withErrors(['risk_area' => 'Your barangay account is not linked to a barangay hall yet, so risk markers cannot be recorded.']);
+        }
+
+        DB::transaction(function () use ($validated, $hall, $request) {
+            $marker = Marker::create([
+                'title' => $validated['title'],
+                'description' => trim($validated['location_description'] . "\n\n" . ($validated['notes'] ?? '')),
+                'lat' => $validated['lat'],
+                'lng' => $validated['lng'],
+                'status' => 'active',
+                'category' => 'risk',
+            ]);
+
+            RiskArea::create([
+                'marker_id' => $marker->marker_id,
+                'barangay_hall_id' => $hall->barangay_hall_id,
+                'station_id' => $validated['station_id'] ?? null,
+                'risk_factor' => $validated['risk_factor'],
+                'mode' => $validated['mode'],
+                'hazard_type' => $validated['hazard_type'],
+                'risk_score' => $validated['risk_score'] ?? null,
+                'estimated_radius' => $validated['estimated_radius'] ?? null,
+                'near_hydrant' => (bool) ($validated['near_hydrant'] ?? false),
+                'near_water_source' => (bool) ($validated['near_water_source'] ?? false),
+                'status' => $validated['status'],
+                'reported_by' => Auth::user()?->user_id,
+            ]);
+
+            UserActivityLogger::log('submitted risk area', Auth::user()?->user_id, $request);
+        });
+
+        return redirect()
+            ->route('barangay.risk-map')
+            ->with('success', 'Risk area marker submitted successfully.');
     }
 
     public function awareness()

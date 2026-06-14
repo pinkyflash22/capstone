@@ -64,7 +64,9 @@ class ManagementController extends Controller
         $equipment = Equipment::with([ 'stationEquipments.station'])->get();
         
         
-         $roles = Role::orderBy('role')->get();
+         $roles = Role::where('role', '!=', 'anonymous')
+            ->orderBy('role')
+            ->get();
 
         $totalIncidents = $incidents;
         
@@ -162,7 +164,11 @@ public function storePersonnel(Request $request)
         $role = Role::find($validated['role_id']);
          if (!$role) {
                 throw new \Exception('Role not found.');
-            }            
+            }
+
+        if (strtolower($role->role) === 'anonymous') {
+            throw new \Exception('Anonymous role cannot be assigned from this page.');
+        }
 
         $accountCode = $this->generateAccountCode($role->role);
         $addressId = null;
@@ -180,6 +186,7 @@ public function storePersonnel(Request $request)
 
         $personnel->contact_number = $validated['contact_number'] ?? null;
         $personnel->role_id = $validated['role_id'];
+        $personnel->is_verified = true;
          $personnel->address_id = $addressId;
         $personnel->save();
         

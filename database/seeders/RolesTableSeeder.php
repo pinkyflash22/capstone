@@ -14,6 +14,7 @@ class RolesTableSeeder extends Seeder
             'provincial admin',
             'chief',
             'citizen',
+            'anonymous',
             'firefighter',
             'barangay',
         ];

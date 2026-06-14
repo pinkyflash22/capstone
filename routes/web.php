@@ -53,6 +53,9 @@ use Illuminate\Support\Facades\Route;
         Route::post('/auth', [LoginController::class, 'authenticate'])->name('auth.authenticate');
         Route::get('/auth/google/redirect', [LoginController::class, 'redirectToGoogle'])->name('auth.google.redirect');
         Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+        Route::get('/auth/google/verify', [LoginController::class, 'showGoogleVerificationForm'])->name('auth.google.verify');
+        Route::post('/auth/google/verify', [LoginController::class, 'verifyGoogleOtp'])->name('auth.google.verify.submit');
+        Route::post('/auth/google/resend-otp', [LoginController::class, 'resendGoogleOtp'])->name('auth.google.resend-otp');
     });
 
     Route::get('/pwa/quick-report', [PublicController::class, 'pwaQuickReport'])->name('pwa.quick-report');
@@ -390,7 +393,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     });  
 
  Route::middleware(['role:citizen'])->prefix('citizen')->name('citizen.')->group(function () {
-        Route::get('/dashboard', [PublicController::class, 'index'])->name('dashboard'); // CORRECT
+        Route::get('/mobile-hub', [PublicController::class, 'mobileHub'])->name('mobile-hub');
+        Route::get('/dashboard/{section?}', [PublicController::class, 'index'])
+            ->where('section', implode('|', PublicController::citizenDashboardSections()))
+            ->name('dashboard');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');
         Route::resource('incident', IncidentController::class);
@@ -411,9 +417,12 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard', [BarangayDashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/hazards', [BarangayDashboardController::class, 'hazards'])->name('hazards');
         Route::get('/risk-map', [BarangayDashboardController::class, 'riskMap'])->name('risk-map');
+        Route::post('/risk-map', [BarangayDashboardController::class, 'storeRiskArea'])->name('risk-map.store');
         Route::get('/patrols', [BarangayDashboardController::class, 'patrols'])->name('patrols');
         Route::get('/assessment', [BarangayDashboardController::class, 'assessment'])->name('assessment');
         Route::get('/reports', [BarangayDashboardController::class, 'reports'])->name('reports');
+        Route::post('/reports/fire', [BarangayDashboardController::class, 'storeFireReport'])->name('reports.fire.store');
+        Route::post('/reports/quick', [BarangayDashboardController::class, 'storeQuickFireReport'])->name('reports.quick');
         Route::get('/awareness', [BarangayDashboardController::class, 'awareness'])->name('awareness');
         Route::get('/profile', [BarangayDashboardController::class, 'profile'])->name('profile');
         Route::put('/profile', [BarangayDashboardController::class, 'updateProfile'])->name('profile.update');

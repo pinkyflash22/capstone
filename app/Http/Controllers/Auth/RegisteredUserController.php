@@ -181,6 +181,7 @@ class RegisteredUserController extends Controller
                     'postal_id' => $formData['postal_id'] ?? null,
                     'street' => $formData['street'] ?? null,
                     'phone_verified_at' => now(), // Mark phone as verified
+                    'is_verified' => true,
                 ]);
 
                 // Update OTP request with user_id

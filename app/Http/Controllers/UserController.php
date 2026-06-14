@@ -43,6 +43,8 @@ class UserController extends Controller
             $validated['password'] = Hash::make($validated['password']);
         }
 
+        $validated['is_verified'] = true;
+
         User::create($validated);
 
         return redirect()->route('users.index')

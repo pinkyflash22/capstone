@@ -22,9 +22,29 @@ use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
 {
+    private const CITIZEN_DASHBOARD_SECTIONS = [
+        'overview',
+        'alerts',
+        'incidents',
+        'fsic',
+        'contacts',
+        'announcements',
+        'safety',
+        'neighborhood',
+        'events',
+        'news',
+        'profile',
+        'notifications',
+    ];
+
     public function pwaQuickReport()
     {
         return view('pwa.quick-report');
+    }
+
+    public static function citizenDashboardSections(): array
+    {
+        return self::CITIZEN_DASHBOARD_SECTIONS;
     }
 
     private function buildCitizenWeeklyActivity($incidents): array
@@ -94,18 +114,44 @@ class PublicController extends Controller
         return 'low';
     }
 
+    private function resolveCitizenIncidentTypeId(Incident $incident): int
+    {
+        return 1;
+    }
+
+    private function resolveCitizenIncidentTypeName(Incident $incident): string
+    {
+        return 'Fire';
+    }
+
+    private function resolveCitizenIncidentStatusId(Incident $incident): int
+    {
+        return match (strtolower(trim((string) ($incident->status ?? '')))) {
+            'responding', 'en-route', 'en route' => 2,
+            'on scene', 'on-scene' => 3,
+            'controlled', 'completed' => 4,
+            'closed' => 5,
+            default => 1,
+        };
+    }
+
     private function serializeCitizenIncident(Incident $incident, ?float $distanceMeters = null): array
     {
         return [
             'incident_id' => $incident->incident_id,
             'status'=> $incident->status,
-           
+            'incident_status' => $incident->status,
+            'incident_status_id' => $this->resolveCitizenIncidentStatusId($incident),
+            'incident_type' => $this->resolveCitizenIncidentTypeName($incident),
+            'incident_type_name' => $this->resolveCitizenIncidentTypeName($incident),
+            'incident_type_id' => $this->resolveCitizenIncidentTypeId($incident),
             'created_at' => optional($incident->created_at)->toISOString(),
             'created_at_human' => optional($incident->created_at)?->diffForHumans(),
             'marker_id' => $incident->marker_id,
             'lat' => $incident->marker?->lat,
             'lng' => $incident->marker?->lng,
             'address' => $incident->marker?->description,
+            'marker' => $incident->marker,
             'distance_meters' => $distanceMeters !== null ? round($distanceMeters) : null,
         ];
     }
@@ -182,9 +228,10 @@ class PublicController extends Controller
     }
 
     //note dapat kapag mag papass sa isang view kung lahat ng data kailangan mo, idaan mo nalang sa isang controller
-    public function index()
-    {       
+    public function index(?string $section = null)
+    {
         $accountId = Auth::user()->user_id;
+        $initialSection = in_array($section, self::CITIZEN_DASHBOARD_SECTIONS, true) ? $section : 'overview';
 
         $incidents = Incident::with('marker')->get();
         $userReports = Incident::where('reported_by', $accountId)->count();
@@ -215,7 +262,7 @@ class PublicController extends Controller
         $fsicRequests = FsicRequest::where('user_id', $accountId)->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
-        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents'));
+        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection'));
         // return view('citizen.dashboard', compact('usermarker'));
 
     }
@@ -234,6 +281,17 @@ class PublicController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->buildCitizenDashboardData($accountId, $latitude, $longitude),
+        ]);
+    }
+
+    public function mobileHub()
+    {
+        $user = Auth::user();
+
+        abort_unless($user && strtolower($user->role->role ?? '') === 'citizen', 403);
+
+        return view('citizen.mobile-hub', [
+            'displayName' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Citizen',
         ]);
     }
 
@@ -307,7 +365,7 @@ class PublicController extends Controller
         }
 
         return redirect()
-            ->to(route('citizen.dashboard') . '#profile')
+            ->route('citizen.dashboard', ['section' => 'profile'])
             ->with('success', 'Profile updated successfully.')
             ->with('open_section', 'profile');
     }

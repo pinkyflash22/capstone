@@ -759,6 +759,7 @@ public function storeFullAddress(Request $request)
             'email' => null,
             'password' => null,
             'phone_verified_at' => now(),
+            'is_verified' => true,
         ]);
         UserActivityLogger::log('created walk-in user', Auth::user()?->user_id, $request);
 

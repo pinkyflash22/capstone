@@ -10,6 +10,7 @@
     
     <title>PyroSense · Resource Management</title>
     
+    @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
     @vite(['resources/js/admin/resource-management.js'])
     @vite(['resources/js/admin/resources.js'])
@@ -607,9 +608,10 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-dashboard-page">
     <!-- Side Navigation -->
-    <aside class="sidebar">
+    @include('admin.partials.sidebar', ['active' => 'resources'])
+    {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
                <div class="logo-area">
@@ -655,7 +657,7 @@
         <div class="logout-container">
             <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="logout-btn"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>Logout</span></button></form>
         </div>
-    </aside>
+    </aside> --}}
     <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
 
     <main class="main-content">

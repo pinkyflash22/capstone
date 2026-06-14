@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <title>PyroSense · Reports & Analytics</title>
+    @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
     @vite(['resources/js/admin/reports.js'])
 
@@ -561,9 +562,10 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-dashboard-page">
     <!-- Side Navigation -->
-    <aside class="sidebar">
+    @include('admin.partials.sidebar', ['active' => 'reports'])
+    {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
                 <div class="logo-area">
@@ -666,7 +668,7 @@
                 </button>
             </form>
         </div>
-    </aside>
+    </aside> --}}
 
     <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
 

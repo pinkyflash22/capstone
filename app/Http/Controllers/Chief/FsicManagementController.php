@@ -130,6 +130,7 @@ public function createApplicant(Request $request)
             'password' => Hash::make('pyrosense123'),
             'address_id' => null,
             'phone_verified_at' => now(), // Auto-verify phone for admin-created users
+            'is_verified' => true,
         ]);
         
         DB::commit();

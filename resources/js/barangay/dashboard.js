@@ -12,6 +12,8 @@ function getCategoryVisual(category) {
             return { color: '#d97706', icon: 'fa-building-shield', label: 'Barangay' };
         case 'station':
             return { color: '#2563eb', icon: 'fa-house-fire', label: 'Station' };
+        case 'risk':
+            return { color: '#b91c1c', icon: 'fa-triangle-exclamation', label: 'Risk Area' };
         case 'hydrant':
             return { color: '#0f766e', icon: 'fa-faucet-drip', label: 'Hydrant' };
         case 'school':
@@ -65,6 +67,20 @@ function normalizeMarkers(payload) {
     return [];
 }
 
+function getFilterKey(category) {
+    const normalized = String(category || '').trim().toLowerCase();
+
+    if (normalized === 'fire') {
+        return 'incidents';
+    }
+
+    if (normalized === 'station') {
+        return 'stations';
+    }
+
+    return 'hazards';
+}
+
 function createPopupContent(marker, highlighted = false) {
     const visual = getCategoryVisual(marker.category);
 
@@ -95,6 +111,9 @@ async function loadDashboardMap() {
     }
 
     const latestPinsElement = document.getElementById('barangayDashboardMapLatestPins');
+    const incidentCountElement = document.getElementById('barangayMapIncidentCount');
+    const lastUpdatedElement = document.getElementById('barangayMapLastUpdated');
+    const filterButtons = Array.from(document.querySelectorAll('[data-map-filter]'));
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const currentUserId = document.querySelector('meta[name="user-id"]')?.getAttribute('content') || '';
     const latestPins = (() => {
@@ -119,6 +138,11 @@ async function loadDashboardMap() {
     const allMarkerLayer = L.layerGroup().addTo(map);
     const latestPinLayer = L.layerGroup().addTo(map);
     const userLayer = L.layerGroup().addTo(map);
+    const categoryLayers = {
+        incidents: L.layerGroup(),
+        stations: L.layerGroup(),
+        hazards: L.layerGroup(),
+    };
     const bounds = L.latLngBounds();
     let userMarker = null;
     let userAccuracyCircle = null;
@@ -148,12 +172,16 @@ async function loadDashboardMap() {
     });
 
     validMarkers.forEach((marker) => {
+        const filterKey = getFilterKey(marker.category);
         const leafletMarker = L.marker([Number(marker.lat), Number(marker.lng)], {
             icon: buildIcon(marker.category, false),
         });
 
         leafletMarker.bindPopup(createPopupContent(marker, false));
         leafletMarker.addTo(allMarkerLayer);
+        if (categoryLayers[filterKey]) {
+            leafletMarker.addTo(categoryLayers[filterKey]);
+        }
         bounds.extend([Number(marker.lat), Number(marker.lng)]);
     });
 
@@ -194,6 +222,20 @@ async function loadDashboardMap() {
         }
     }
 
+    if (incidentCountElement) {
+        incidentCountElement.textContent = String(validMarkers.filter((marker) => getFilterKey(marker.category) === 'incidents').length);
+    }
+
+    if (lastUpdatedElement) {
+        lastUpdatedElement.textContent = new Date().toLocaleString([], {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    }
+
     const overlays = {
         'All Markers': allMarkerLayer,
         'Latest Hazard Pins': latestPinLayer,
@@ -204,6 +246,36 @@ async function loadDashboardMap() {
         collapsed: false,
         position: 'topright',
     }).addTo(map);
+
+    function applyMapFilter(filter) {
+        allMarkerLayer.remove();
+        Object.values(categoryLayers).forEach((layer) => {
+            layer.remove();
+        });
+
+        if (filter === 'all') {
+            allMarkerLayer.addTo(map);
+        } else if (categoryLayers[filter]) {
+            categoryLayers[filter].addTo(map);
+        } else {
+            allMarkerLayer.addTo(map);
+        }
+
+        latestPinLayer.addTo(map);
+        userLayer.addTo(map);
+    }
+
+    filterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const filter = button.dataset.mapFilter || 'all';
+
+            filterButtons.forEach((candidate) => candidate.classList.remove('is-active'));
+            button.classList.add('is-active');
+            applyMapFilter(filter);
+        });
+    });
+
+    applyMapFilter('all');
 
     async function persistUserLocation(latitude, longitude) {
         if (!currentUserId || !csrfToken) {

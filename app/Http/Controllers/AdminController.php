@@ -4,12 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Marker;
-use App\Models\MarkerCategory;
 use App\Models\StationOfficer;
 
 use App\Models\Incident;
-use App\Models\IncidentStatus;
-
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Station;
@@ -17,41 +14,67 @@ use App\Models\Province;
 use App\Models\City;
 use App\Models\Barangay;
 use App\Models\FullAddress;
+use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
+    private function getDashboardMarkerCategories(): Collection
+    {
+        return collect([
+            (object) ['markerCategory_id' => 1, 'marker_category' => 'Fire Station'],
+            (object) ['markerCategory_id' => 2, 'marker_category' => 'Hydrant'],
+            (object) ['markerCategory_id' => 3, 'marker_category' => 'Fire'],
+            (object) ['markerCategory_id' => 4, 'marker_category' => 'School'],
+            (object) ['markerCategory_id' => 5, 'marker_category' => 'Barangay'],
+            (object) ['markerCategory_id' => 6, 'marker_category' => 'Bridge'],
+        ]);
+    }
+
+    private function getIncidentStatusOptions(): Collection
+    {
+        return collect([
+            (object) ['status' => 'Reported'],
+            (object) ['status' => 'Responding'],
+            (object) ['status' => 'On Scene'],
+            (object) ['status' => 'Controlled'],
+            (object) ['status' => 'Closed'],
+        ]);
+    }
+
     public function index()
     {
-        $categories = MarkerCategory::all();
-        $mapmarker = Marker::with('category','stations')->get();
-        $incidents = Incident::with(['marker','incidentType'])->get();
+        $categories = $this->getDashboardMarkerCategories();
+        $mapmarker = Marker::with('stations')->get();
+        $incidents = Incident::with(['marker'])->get();
         $alerts = Incident::with('marker')->get();
+        $posts = Post::latest()->take(5)->get();
         $stations = Station::all();
         $provinces = Province::orderBy('province_name')->get();
         $stationperson = StationOfficer::with('station','station.users')->get();
         // Get all users with role 'chief'
         $chiefRole = Role::where('role', 'chief')->first();
         $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
-        $hydrantTypes = \App\Models\HydrantType::all();
-        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes'));
+        $hydrantTypes = collect();
+        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'posts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes'));
     }
 
     //for reports
 
     public function reports()
     {
-        $categories = MarkerCategory::all();
-        $mapmarker = Marker::with('category','stations')->get();
-        $incidents = Incident::with(['marker','incidentType', 'incidentStatus','team.station'])->get();
+        $categories = $this->getDashboardMarkerCategories();
+        $mapmarker = Marker::with('stations')->get();
+        $incidents = Incident::with(['marker', 'team'])->get();
         $alerts = Incident::with('marker')->get();
-        $stations = Station::with(['marker.status', 'users'])->get();
+        $stations = Station::with(['marker', 'users'])->get();
         $provinces = Province::orderBy('province_name')->get();
         $stationperson = StationOfficer::with('station','station.users')->get();
         // Get all users with role 'chief'
         $chiefRole = Role::where('role', 'chief')->first();
-        $incidentStatuses = IncidentStatus::all();
+        $incidentStatuses = $this->getIncidentStatusOptions();
 
         $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
         return view('admin.reports', compact('categories','incidentStatuses', 'mapmarker', 'incidents', 'alerts', 'stations', 'chiefs', 'provinces','stationperson'));
@@ -59,9 +82,9 @@ class AdminController extends Controller
     }
 
     public function findex(){
-         $categories = MarkerCategory::all();
-        $mapmarker = Marker::with('category','stations')->get();
-        $incidents = Incident::with(['marker','incidentType'])->get();
+         $categories = $this->getDashboardMarkerCategories();
+        $mapmarker = Marker::with('stations')->get();
+        $incidents = Incident::with(['marker'])->get();
         $alerts = Incident::with('marker')->get();
         $stations = Station::all();
         $provinces = Province::orderBy('province_name')->get();
@@ -79,7 +102,7 @@ class AdminController extends Controller
     }
     public function maps()
     {   
-        $mapmarker = Marker::with('category')->get();
+        $mapmarker = Marker::all();
         return view('admin.incidentmap', compact('mapmarker'));
     }
 

@@ -27,6 +27,13 @@
     <span class="hero-badge"><i class="fa-regular fa-building"></i> {{ $barangay?->barangay_name ?? 'Barangay Desk' }}</span>
 @endsection
 
+@section('top_bar_actions')
+    <a href="{{ route('barangay.reports') }}" class="portal-report-fire-btn" data-barangay-quick-report data-report-url="{{ route('barangay.reports.quick') }}">
+        <i class="fa-solid fa-fire-flame-curved"></i>
+        <span>Report Fire</span>
+    </a>
+@endsection
+
 @section('content')
     @if (session('success'))
         <div class="panel-card mb-6 rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">

@@ -397,8 +397,9 @@ class IncidentController extends Controller
 
         $data = Incident::create($validated);
 
-        if (Auth::check()) {
-            UserActivityLogger::log('created incident', Auth::id(), $request);
+        $logUserId = (int) ($validated['reported_by'] ?? Auth::id() ?? 0);
+        if ($logUserId > 0) {
+            UserActivityLogger::log('created incident', $logUserId, $request);
         }
 
         return response()->json(['success'=>true,'data'=>$data]);

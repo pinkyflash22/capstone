@@ -33,6 +33,7 @@ export default defineConfig({
                 'resources/js/functions.js',
                 'resources/js/landing/main.js',
                 'resources/js/map.js',
+                'resources/js/mobile-hub.js',
                 'resources/js/staff/fire.js',
                 'resources/js/user.js',
             ],

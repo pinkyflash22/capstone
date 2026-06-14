@@ -184,6 +184,7 @@ class RegisterController extends Controller
                 'contact_number' => $validated['contact_number'],
                 'role_id' => $validated['role_id'],
                 'address_id' => $addressId,
+                'is_verified' => true,
                 'password' => Hash::make($plainPassword),
             ]);
 
@@ -769,6 +770,7 @@ public function verifyOTPAndRegister(Request $request)
                 'address_id' => $addressId,
                 'password' => Hash::make($formData['password']),
                 'email_verified_at' => now(),
+                'is_verified' => true,
             ];
 
             $user = User::create($userData);

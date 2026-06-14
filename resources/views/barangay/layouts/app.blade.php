@@ -10,6 +10,7 @@
 
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
@@ -44,6 +45,41 @@
 
         .user-dropdown {
             position: relative;
+        }
+
+        .portal-top-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .portal-report-fire-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 0 16px;
+            border-radius: 999px;
+            text-decoration: none;
+            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            color: #ffffff;
+            font-size: 0.82rem;
+            font-weight: 800;
+            white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 12px 24px rgba(234, 88, 12, 0.18);
+            transition: all 0.2s ease;
+        }
+
+        .portal-report-fire-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(234, 88, 12, 0.24);
+        }
+
+        .portal-report-fire-btn.is-loading {
+            opacity: 0.72;
+            pointer-events: none;
         }
 
         .user-dropdown-toggle {
@@ -141,6 +177,37 @@
             margin-top: 18px;
         }
 
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .hero-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 0 16px;
+            border-radius: 999px;
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 800;
+            transition: all 0.2s ease;
+        }
+
+        .hero-action-btn--primary {
+            background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+            color: #ffffff;
+            box-shadow: 0 12px 24px rgba(234, 88, 12, 0.18);
+        }
+
+        .hero-action-btn--primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(234, 88, 12, 0.24);
+        }
+
         .hero-badge {
             display: inline-flex;
             align-items: center;
@@ -153,6 +220,43 @@
             border: 1px solid rgba(245, 158, 11, 0.14);
             font-size: 0.82rem;
             font-weight: 800;
+        }
+
+        .barangay-quick-report-status {
+            position: fixed;
+            top: 104px;
+            right: 28px;
+            z-index: 80;
+            min-width: 280px;
+            max-width: min(420px, calc(100vw - 32px));
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+            color: #0f172a;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.22s ease;
+        }
+
+        .barangay-quick-report-status.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .barangay-quick-report-status.is-success {
+            border-color: rgba(34, 197, 94, 0.22);
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .barangay-quick-report-status.is-error {
+            border-color: rgba(239, 68, 68, 0.22);
+            background: #fef2f2;
+            color: #991b1b;
         }
 
         .summary-grid,
@@ -375,6 +479,14 @@
             .main-content {
                 margin-left: 0;
             }
+
+            .barangay-quick-report-status {
+                top: 92px;
+                right: 16px;
+                left: 16px;
+                min-width: 0;
+                max-width: none;
+            }
         }
 
         @media (max-width: 768px) {
@@ -413,43 +525,56 @@
                 </div>
             </div>
 
-            <div class="hidden md:block user-dropdown">
-                <button id="userDropdownBtn" class="user-dropdown-toggle">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
-                        {{ strtoupper(substr(auth()->user()->first_name ?? 'B', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1)) }}
-                    </div>
-                    <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
-                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
-                </button>
+            <div class="hidden md:flex portal-top-actions">
+                @hasSection('top_bar_actions')
+                    @yield('top_bar_actions')
+                @else
+                    <a href="{{ route('barangay.reports') }}" class="portal-report-fire-btn" data-barangay-quick-report data-report-url="{{ route('barangay.reports.quick') }}">
+                        <i class="fa-solid fa-fire-flame-curved"></i>
+                        <span>Report Fire</span>
+                    </a>
+                @endif
 
-                <div id="userDropdownMenu" class="user-dropdown-menu">
-                    <div class="p-4 border-b border-slate-100 bg-slate-50/50">
-                        <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p>
-                        <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
-                    </div>
-                    <div class="p-2">
-                        <a href="{{ route('barangay.profile') }}" class="user-dropdown-item">
-                            <i class="fa-regular fa-user"></i>
-                            <span>Barangay Profile</span>
-                        </a>
-                        <a href="#" class="user-dropdown-item chief-open-logs">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                            <span>My Logs</span>
-                        </a>
-                        <div class="h-px bg-slate-100 my-2"></div>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
-                                <i class="fa-solid fa-sign-out-alt"></i>
-                                <span>Logout</span>
-                            </button>
-                        </form>
+                <div class="user-dropdown">
+                    <button id="userDropdownBtn" class="user-dropdown-toggle">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
+                            {{ strtoupper(substr(auth()->user()->first_name ?? 'B', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1)) }}
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+                    </button>
+
+                    <div id="userDropdownMenu" class="user-dropdown-menu">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p>
+                            <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
+                        </div>
+                        <div class="p-2">
+                            <a href="{{ route('barangay.profile') }}" class="user-dropdown-item">
+                                <i class="fa-regular fa-user"></i>
+                                <span>Barangay Profile</span>
+                            </a>
+                            <a href="#" class="user-dropdown-item chief-open-logs">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <span>My Logs</span>
+                            </a>
+                            <div class="h-px bg-slate-100 my-2"></div>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
+                                    <i class="fa-solid fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
         </nav>
 
         <div class="portal-shell">
+            <div id="barangayQuickReportStatus" class="barangay-quick-report-status" role="status" aria-live="polite"></div>
+
             <div id="barangayWelcomeToast" class="chief-mobile-welcome-toast" role="status" aria-live="polite">
                 <div class="chief-mobile-welcome-toast__icon">
                     <i class="fa-solid fa-shield-heart"></i>
@@ -467,6 +592,11 @@
                     <div class="hero-badges">
                         @yield('hero_badges')
                     </div>
+                    @hasSection('hero_actions')
+                        <div class="hero-actions">
+                            @yield('hero_actions')
+                        </div>
+                    @endif
                 </div>
 
                 <div class="summary-grid">
@@ -498,9 +628,12 @@
             const sidebar = document.getElementById('sidebar');
             const openBtn = document.getElementById('openSidebar');
             const welcomeToast = document.getElementById('barangayWelcomeToast');
+            const quickReportStatus = document.getElementById('barangayQuickReportStatus');
+            const quickReportButtons = document.querySelectorAll('[data-barangay-quick-report]');
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
             let welcomeToastTimer = null;
+            let quickReportTimer = null;
 
             openBtn?.addEventListener('click', function () {
                 sidebar?.classList.toggle('open');
@@ -529,6 +662,141 @@
                 userDropdownMenu.addEventListener('click', function (event) {
                     event.stopPropagation();
                 });
+            }
+
+            quickReportButtons.forEach((button) => {
+                button.addEventListener('click', async function (event) {
+                    event.preventDefault();
+                    await submitQuickFireReport(button);
+                });
+            });
+
+            function showQuickReportStatus(message, type = 'error') {
+                if (!quickReportStatus) {
+                    return;
+                }
+
+                quickReportStatus.textContent = message;
+                quickReportStatus.className = `barangay-quick-report-status is-visible ${type === 'success' ? 'is-success' : 'is-error'}`;
+                window.clearTimeout(quickReportTimer);
+                quickReportTimer = window.setTimeout(() => {
+                    quickReportStatus.className = 'barangay-quick-report-status';
+                    quickReportStatus.textContent = '';
+                }, 3800);
+            }
+
+            function readCachedCoords() {
+                try {
+                    const raw = window.localStorage.getItem('pyrosense:lastKnownCoords');
+                    const parsed = raw ? JSON.parse(raw) : null;
+
+                    if (!parsed?.lat || !parsed?.lng) {
+                        return null;
+                    }
+
+                    return {
+                        lat: Number(parsed.lat),
+                        lng: Number(parsed.lng),
+                        timestamp: Number(parsed.timestamp || 0),
+                    };
+                } catch (error) {
+                    console.warn('Unable to read cached coordinates:', error);
+                    return null;
+                }
+            }
+
+            function writeCachedCoords(lat, lng) {
+                try {
+                    window.localStorage.setItem('pyrosense:lastKnownCoords', JSON.stringify({
+                        lat,
+                        lng,
+                        timestamp: Date.now(),
+                    }));
+                } catch (error) {
+                    console.warn('Unable to cache coordinates:', error);
+                }
+            }
+
+            function getCurrentCoords(maxAgeMs = 10 * 60 * 1000) {
+                const cached = readCachedCoords();
+                if (cached && Date.now() - cached.timestamp <= maxAgeMs) {
+                    return Promise.resolve(cached);
+                }
+
+                if (!navigator.geolocation) {
+                    return Promise.reject(new Error('Location services are not available on this device.'));
+                }
+
+                return new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const coords = {
+                                lat: Number(position.coords.latitude),
+                                lng: Number(position.coords.longitude),
+                                timestamp: Date.now(),
+                            };
+
+                            writeCachedCoords(coords.lat, coords.lng);
+                            resolve(coords);
+                        },
+                        () => {
+                            if (cached) {
+                                resolve(cached);
+                                return;
+                            }
+
+                            reject(new Error('Unable to get your current location. Please allow location access and try again.'));
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0,
+                        }
+                    );
+                });
+            }
+
+            async function submitQuickFireReport(button) {
+                const reportUrl = button.getAttribute('data-report-url');
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                if (!reportUrl) {
+                    window.location.href = button.getAttribute('href') || '{{ route('barangay.reports') }}';
+                    return;
+                }
+
+                button.classList.add('is-loading');
+                button.setAttribute('aria-busy', 'true');
+                showQuickReportStatus('Getting your location and sending the fire report...', 'success');
+
+                try {
+                    const coords = await getCurrentCoords();
+                    const response = await fetch(reportUrl, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify({
+                            lat: coords.lat,
+                            lng: coords.lng,
+                        }),
+                    });
+
+                    const payload = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || 'Unable to submit the fire report right now.');
+                    }
+
+                    showQuickReportStatus(payload?.message || 'Fire report submitted successfully.', 'success');
+                } catch (error) {
+                    showQuickReportStatus(error.message || 'Unable to submit the fire report right now.');
+                } finally {
+                    button.classList.remove('is-loading');
+                    button.removeAttribute('aria-busy');
+                }
             }
         });
     </script>
