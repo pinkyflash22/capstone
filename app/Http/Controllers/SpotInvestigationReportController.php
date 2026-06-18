@@ -6,6 +6,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\Incident;
 use App\Models\Weather;
 use App\Models\StationOfficer;
+use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 
@@ -97,6 +98,7 @@ class SpotInvestigationReportController extends Controller
         ]);
 
        $response = SpotInvestigationReport::create($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $response->incident_id);
         UserActivityLogger::log('created spot report', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true, 'data'=>$response]);
     }
@@ -133,6 +135,7 @@ class SpotInvestigationReportController extends Controller
         ]);
 
           $spot->update($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $spot->incident_id);
         UserActivityLogger::log('updated spot report', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true]);
     }
@@ -146,7 +149,9 @@ class SpotInvestigationReportController extends Controller
 
         }
 
+        $incidentId = (int) $spot->incident_id;
         $spot->delete();
+        HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted spot report', auth()->user()?->user_id, request());
         return response()->json(['success'=>true]);
     }

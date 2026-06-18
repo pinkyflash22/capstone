@@ -11,6 +11,7 @@ use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
 use App\Models\User;
+use App\Support\BarangayNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -1497,6 +1498,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
             ]);
 
             $this->syncChecklistItems($saved, array_values(array_filter($plan['checklist_items'] ?? [])));
+            BarangayNotificationService::notifyActionPlanChecklistPublished($saved);
 
             $savedPlans[] = $saved->fresh();
         }

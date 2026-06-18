@@ -7,6 +7,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\FireOrigin;
 use App\Models\StationOfficer;
 use App\Models\User;
+use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 
@@ -39,6 +40,7 @@ class ProgressInvestigationReportController extends Controller
         ]);
 
         $data = ProgressInvestigationReport::create($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->spotInvestigation?->incident_id);
         UserActivityLogger::log('created progress rpt', auth()->user()?->user_id, $request);
 
         return response()->json(['success'=> true, 'data'=> $data]);
@@ -62,6 +64,7 @@ class ProgressInvestigationReportController extends Controller
     ]);
 
     $progress = ProgressInvestigationReport::create($validated);
+    HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
     return response()->json(['success' => true, 'data' => $progress]);
 }
 
@@ -94,6 +97,7 @@ class ProgressInvestigationReportController extends Controller
         ]);
 
         $progress->update($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated progress rpt', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true]);
     }
@@ -104,7 +108,9 @@ class ProgressInvestigationReportController extends Controller
             return back()->with('error', 'Cannot delete progress report with existing final investigation.');
         }
 
+        $incidentId = (int) $progressInvestigationReport->spotInvestigation?->incident_id;
         $progressInvestigationReport->delete();
+        HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted progress rpt', auth()->user()?->user_id, request());
 
         return redirect()->route('progress-investigation-reports.index')

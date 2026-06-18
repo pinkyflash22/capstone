@@ -260,7 +260,7 @@ If `matplotlib` is installed, the script also saves charts into `capstone-ai/cha
 python capstone-ai/generate_historical_data_json.py
 ```
 
-This creates a demo `historical_data` JSON file for 2021-2025 using the same logic as `HistoricalDataSeeder`.
+This creates a `historical_data` JSON file aligned with the Urbiztondo 2023-2026 records used by `HistoricalDataSeeder`.
 
 ## Generate station + barangay monthly JSON
 

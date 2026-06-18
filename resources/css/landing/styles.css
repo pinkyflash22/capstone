@@ -316,6 +316,7 @@ body {
     flex-wrap: wrap;
     gap: 0.85rem;
     margin-bottom: 1.5rem;
+    align-items: stretch;
 }
 
 .hero-action-btn {
@@ -330,6 +331,7 @@ body {
     text-decoration: none;
     transition: all 0.2s;
     border: 1px solid transparent;
+    flex: 1 1 220px;
 }
 
 .hero-action-btn:hover {
@@ -352,6 +354,22 @@ body {
     background: var(--gradient-soft);
     color: var(--gray-700);
     border-color: rgba(198, 61, 38, 0.08);
+}
+
+@media (min-width: 769px) {
+    .hero-actions {
+        width: min(620px, 100%);
+        justify-content: flex-start;
+    }
+
+    .hero-action-btn--primary {
+        flex: 0 1 auto;
+    }
+
+    .hero-action-btn--ghost {
+        flex: 0 1 auto;
+        margin-left: auto;
+    }
 }
 
 /* Search Card */

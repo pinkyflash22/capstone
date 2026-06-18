@@ -14,6 +14,7 @@ use App\Models\HistoricalFireIncident;
 use App\Models\IncidentType;
 use App\Models\IncidentStatus;
 use App\Models\IncidentReport;
+use App\Models\IncidentContext;
 
 class Incident extends Model
 {
@@ -66,5 +67,10 @@ class Incident extends Model
     public function historicalRecords()
     {
         return $this->hasMany(HistoricalFireIncident::class, 'incident_id', 'incident_id');
+    }
+
+    public function context()
+    {
+        return $this->hasOne(IncidentContext::class, 'incident_id', 'incident_id');
     }
 }

@@ -33,6 +33,7 @@ use App\Http\Controllers\FsicRequestController;
 use App\Http\Controllers\MarkerCategoryController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\ResourceManagementController;
+use App\Http\Controllers\RiskAreaReviewController;
 
 
 
@@ -206,6 +207,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
+        Route::get('/risk-reviews', [RiskAreaReviewController::class, 'adminIndex'])->name('risk-reviews.index');
+        Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'adminReview'])->name('risk-reviews.review');
+        Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminUpdateActive'])->name('risk-reviews.active.update');
+        Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminDeleteActive'])->name('risk-reviews.active.delete');
          
 
             
@@ -264,6 +269,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [StationAdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[StationAdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
+        Route::get('/risk-reviews', [RiskAreaReviewController::class, 'chiefIndex'])->name('risk-reviews.index');
+        Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'chiefReview'])->name('risk-reviews.review');
+        Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'chiefUpdateActive'])->name('risk-reviews.active.update');
+        Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'chiefDeleteActive'])->name('risk-reviews.active.delete');
         Route::get('/schedule', [StationAdminController::class, 'schedule'])->name('schedule');
         Route::post('/schedule/events', [StationAdminController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::get('/profile', [StationAdminController::class, 'profile'])->name('profile');
@@ -418,10 +427,19 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/hazards', [BarangayDashboardController::class, 'hazards'])->name('hazards');
         Route::get('/risk-map', [BarangayDashboardController::class, 'riskMap'])->name('risk-map');
         Route::post('/risk-map', [BarangayDashboardController::class, 'storeRiskArea'])->name('risk-map.store');
+        Route::put('/risk-map/{riskAreaId}', [BarangayDashboardController::class, 'updateRiskArea'])->name('risk-map.update');
+        Route::delete('/risk-map/{riskAreaId}', [BarangayDashboardController::class, 'destroyRiskArea'])->name('risk-map.destroy');
         Route::get('/patrols', [BarangayDashboardController::class, 'patrols'])->name('patrols');
         Route::get('/assessment', [BarangayDashboardController::class, 'assessment'])->name('assessment');
+        Route::get('/checklists', [BarangayDashboardController::class, 'checklists'])->name('checklists');
+        Route::get('/checklists/content', [BarangayDashboardController::class, 'checklistsContent'])->name('checklists.content');
+        Route::get('/notifications', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+        Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');
         Route::get('/reports', [BarangayDashboardController::class, 'reports'])->name('reports');
         Route::post('/reports/fire', [BarangayDashboardController::class, 'storeFireReport'])->name('reports.fire.store');
+        Route::put('/reports/fire/{recordId}', [BarangayDashboardController::class, 'updateFireReport'])->name('reports.fire.update');
+        Route::delete('/reports/fire/{recordId}', [BarangayDashboardController::class, 'destroyFireReport'])->name('reports.fire.destroy');
         Route::post('/reports/quick', [BarangayDashboardController::class, 'storeQuickFireReport'])->name('reports.quick');
         Route::get('/awareness', [BarangayDashboardController::class, 'awareness'])->name('awareness');
         Route::get('/profile', [BarangayDashboardController::class, 'profile'])->name('profile');

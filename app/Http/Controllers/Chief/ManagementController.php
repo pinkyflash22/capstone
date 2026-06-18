@@ -14,6 +14,7 @@ use App\Models\StationOfficer;
 use App\Models\Team;
 
 use App\Models\User;
+use App\Support\IncidentContextDispatcher;
 use App\Models\Role;
 use App\Models\Province;
 use App\Models\SpotInvestigationReport;
@@ -605,6 +606,7 @@ public function storeIncident(Request $request)
             'reported_at' => now(),
             'created_at' => now()
         ]);
+        IncidentContextDispatcher::dispatchFor($incident);
         UserActivityLogger::log('created incident', Auth::user()?->user_id, $request);
 
         return response()->json([

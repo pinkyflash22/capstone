@@ -54,6 +54,190 @@
             flex-shrink: 0;
         }
 
+        .portal-notification-shell {
+            position: relative;
+        }
+
+        .portal-notification-btn {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #334155;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            transition: all 0.2s ease;
+        }
+
+        .portal-notification-btn:hover {
+            border-color: rgba(245, 158, 11, 0.26);
+            color: #c2410c;
+            transform: translateY(-1px);
+        }
+
+        .portal-notification-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(239, 68, 68, 0.24);
+        }
+
+        .portal-notification-badge.is-hidden {
+            display: none;
+        }
+
+        .portal-notification-panel {
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 0;
+            width: min(380px, calc(100vw - 48px));
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 24px 44px rgba(15, 23, 42, 0.16);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.22s ease;
+            overflow: hidden;
+            z-index: 55;
+        }
+
+        .portal-notification-panel.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .portal-notification-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 18px 14px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+            background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+        }
+
+        .portal-notification-panel-head strong {
+            display: block;
+            color: #0f172a;
+            font-size: 0.95rem;
+        }
+
+        .portal-notification-panel-head span {
+            display: block;
+            color: #64748b;
+            font-size: 0.72rem;
+            margin-top: 2px;
+        }
+
+        .portal-notification-link-btn {
+            border: none;
+            background: transparent;
+            color: #ea580c;
+            font-size: 0.76rem;
+            font-weight: 800;
+            padding: 0;
+        }
+
+        .portal-notification-list {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .portal-notification-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            display: grid;
+            grid-template-columns: 40px minmax(0, 1fr);
+            gap: 12px;
+            text-align: left;
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+            transition: background 0.2s ease;
+        }
+
+        .portal-notification-item:hover {
+            background: #fff7ed;
+        }
+
+        .portal-notification-item.is-unread {
+            background: rgba(255, 247, 237, 0.62);
+        }
+
+        .portal-notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .portal-notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            color: #c2410c;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.08);
+        }
+
+        .portal-notification-copy {
+            min-width: 0;
+        }
+
+        .portal-notification-copy strong,
+        .portal-notification-empty strong {
+            display: block;
+            color: #0f172a;
+            font-size: 0.86rem;
+            line-height: 1.35;
+        }
+
+        .portal-notification-copy p,
+        .portal-notification-empty p {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 0.76rem;
+            line-height: 1.5;
+        }
+
+        .portal-notification-meta {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            color: #94a3b8;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .portal-notification-empty {
+            padding: 26px 22px;
+            text-align: center;
+        }
+
         .portal-report-fire-btn {
             display: inline-flex;
             align-items: center;
@@ -259,15 +443,66 @@
             color: #991b1b;
         }
 
-        .summary-grid,
+        .barangay-live-alert-toast {
+            position: fixed;
+            top: 104px;
+            left: 50%;
+            transform: translate(-50%, -14px);
+            z-index: 90;
+            width: min(460px, calc(100vw - 28px));
+            padding: 16px 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(239, 68, 68, 0.16);
+            background: linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%);
+            box-shadow: 0 24px 44px rgba(15, 23, 42, 0.16);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.22s ease;
+        }
+
+        .barangay-live-alert-toast.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0);
+        }
+
+        .barangay-live-alert-toast__row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .barangay-live-alert-toast__icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 12px 24px rgba(220, 38, 38, 0.24);
+        }
+
+        .barangay-live-alert-toast__copy strong {
+            display: block;
+            color: #7f1d1d;
+            font-size: 0.92rem;
+            line-height: 1.25;
+        }
+
+        .barangay-live-alert-toast__copy p {
+            margin: 4px 0 0;
+            color: #9f1239;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
         .metric-grid,
         .panel-grid {
             display: grid;
             gap: 18px;
-        }
-
-        .summary-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .metric-grid {
@@ -282,7 +517,6 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
-        .summary-card,
         .metric-card,
         .panel-card {
             background: rgba(255, 255, 255, 0.94);
@@ -291,7 +525,6 @@
             box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
         }
 
-        .summary-card,
         .metric-card {
             padding: 18px 18px 16px;
         }
@@ -300,7 +533,6 @@
             padding: 22px 24px;
         }
 
-        .summary-label,
         .metric-label,
         .panel-eyebrow {
             color: #64748b;
@@ -310,7 +542,6 @@
             letter-spacing: 0.08em;
         }
 
-        .summary-value,
         .metric-value {
             margin-top: 6px;
             color: #0f172a;
@@ -498,7 +729,6 @@
                 display: none;
             }
 
-            .summary-grid,
             .two-col {
                 grid-template-columns: 1fr;
             }
@@ -511,6 +741,15 @@
     </style>
 </head>
 <body>
+    @php
+        $initialBarangayNotifications = auth()->check()
+            ? auth()->user()->notifications()->latest()->limit(8)->get()
+            : collect();
+        $initialBarangayUnreadCount = auth()->check()
+            ? auth()->user()->unreadNotifications()->count()
+            : 0;
+    @endphp
+
     @include('barangay.partials.sidebar', ['active' => trim($__env->yieldContent('active_nav'))])
 
     <main class="main-content">
@@ -534,6 +773,64 @@
                         <span>Report Fire</span>
                     </a>
                 @endif
+
+                <div
+                    class="portal-notification-shell"
+                    data-barangay-notifications
+                    data-fetch-url="{{ route('barangay.notifications.index') }}"
+                    data-read-url-template="{{ route('barangay.notifications.read', ['notificationId' => '__ID__']) }}"
+                    data-read-all-url="{{ route('barangay.notifications.read-all') }}"
+                >
+                    <button type="button" class="portal-notification-btn" data-barangay-notification-toggle aria-label="Open barangay notifications">
+                        <i class="bi bi-bell-fill"></i>
+                        <span class="portal-notification-badge {{ $initialBarangayUnreadCount > 0 ? '' : 'is-hidden' }}" data-barangay-notification-badge>
+                            {{ $initialBarangayUnreadCount > 99 ? '99+' : $initialBarangayUnreadCount }}
+                        </span>
+                    </button>
+
+                    <div class="portal-notification-panel" data-barangay-notification-panel>
+                        <div class="portal-notification-panel-head">
+                            <div>
+                                <strong>Barangay Notifications</strong>
+                                <span>Fires nearby, checklist updates, and hazard review activity</span>
+                            </div>
+                            <button type="button" class="portal-notification-link-btn" data-barangay-notification-read-all>
+                                Mark all read
+                            </button>
+                        </div>
+                        <div class="portal-notification-list" data-barangay-notification-list>
+                            @forelse ($initialBarangayNotifications as $notification)
+                                @php
+                                    $notificationData = is_array($notification->data) ? $notification->data : [];
+                                @endphp
+                                <button
+                                    type="button"
+                                    class="portal-notification-item {{ $notification->read_at ? '' : 'is-unread' }}"
+                                    data-barangay-notification-item
+                                    data-notification-id="{{ $notification->id }}"
+                                    data-notification-url="{{ $notificationData['url'] ?? '' }}"
+                                >
+                                    <span class="portal-notification-icon">
+                                        <i class="{{ $notificationData['icon'] ?? 'bi bi-bell-fill' }}"></i>
+                                    </span>
+                                    <span class="portal-notification-copy">
+                                        <strong>{{ $notificationData['title'] ?? 'Barangay notification' }}</strong>
+                                        <p>{{ $notificationData['message'] ?? 'A new barangay event is available.' }}</p>
+                                        <span class="portal-notification-meta">
+                                            <span>{{ $notification->created_at?->diffForHumans() }}</span>
+                                            <span>{{ strtoupper(str_replace('-', ' ', $notificationData['category'] ?? 'general')) }}</span>
+                                        </span>
+                                    </span>
+                                </button>
+                            @empty
+                                <div class="portal-notification-empty" data-barangay-notification-empty>
+                                    <strong>No notifications yet</strong>
+                                    <p>Barangay alerts will appear here as soon as the system records them.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
 
                 <div class="user-dropdown">
                     <button id="userDropdownBtn" class="user-dropdown-toggle">
@@ -574,6 +871,7 @@
 
         <div class="portal-shell">
             <div id="barangayQuickReportStatus" class="barangay-quick-report-status" role="status" aria-live="polite"></div>
+            <div id="barangayLiveAlertToast" class="barangay-live-alert-toast" role="alert" aria-live="assertive"></div>
 
             <div id="barangayWelcomeToast" class="chief-mobile-welcome-toast" role="status" aria-live="polite">
                 <div class="chief-mobile-welcome-toast__icon">
@@ -585,39 +883,22 @@
                 </div>
             </div>
 
-            <section class="hero-card">
-                <div>
-                    <h1>@yield('hero_title', 'Barangay safety operations in one place.')</h1>
-                    <p>@yield('hero_copy', 'Monitor community hazards, review risk zones, and keep preparedness work aligned with the latest barangay-level records.')</p>
-                    <div class="hero-badges">
-                        @yield('hero_badges')
-                    </div>
-                    @hasSection('hero_actions')
-                        <div class="hero-actions">
-                            @yield('hero_actions')
+            @if (! trim($__env->yieldContent('hide_hero')))
+                <section class="hero-card">
+                    <div>
+                        <h1>@yield('hero_title', 'Barangay safety operations in one place.')</h1>
+                        <p>@yield('hero_copy', 'Monitor community hazards, review risk zones, and keep preparedness work aligned with the latest barangay-level records.')</p>
+                        <div class="hero-badges">
+                            @yield('hero_badges')
                         </div>
-                    @endif
-                </div>
-
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <div class="summary-label">Barangay</div>
-                        <div class="summary-value" style="font-size:1.2rem;">{{ $barangay?->barangay_name ?? 'Not linked' }}</div>
+                        @hasSection('hero_actions')
+                            <div class="hero-actions">
+                                @yield('hero_actions')
+                            </div>
+                        @endif
                     </div>
-                    <div class="summary-card">
-                        <div class="summary-label">City</div>
-                        <div class="summary-value" style="font-size:1.2rem;">{{ $city?->city_name ?? 'No city data' }}</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-label">Hall</div>
-                        <div class="summary-value" style="font-size:1rem;">{{ $hall?->hall_name ?? 'Hall profile pending' }}</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-label">Officer</div>
-                        <div class="summary-value" style="font-size:1rem;">{{ auth()->user()->full_name }}</div>
-                    </div>
-                </div>
-            </section>
+                </section>
+            @endif
 
             @yield('content')
         </div>
@@ -632,8 +913,18 @@
             const quickReportButtons = document.querySelectorAll('[data-barangay-quick-report]');
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
+            const barangayLiveAlertToast = document.getElementById('barangayLiveAlertToast');
+            const notificationShell = document.querySelector('[data-barangay-notifications]');
+            const notificationToggle = notificationShell?.querySelector('[data-barangay-notification-toggle]');
+            const notificationPanel = notificationShell?.querySelector('[data-barangay-notification-panel]');
+            const notificationList = notificationShell?.querySelector('[data-barangay-notification-list]');
+            const notificationBadge = notificationShell?.querySelector('[data-barangay-notification-badge]');
+            const readAllNotificationsBtn = notificationShell?.querySelector('[data-barangay-notification-read-all]');
             let welcomeToastTimer = null;
             let quickReportTimer = null;
+            let notificationRefreshTimer = null;
+            let barangayLiveAlertTimer = null;
+            let barangayIncidentAudioContext = null;
 
             openBtn?.addEventListener('click', function () {
                 sidebar?.classList.toggle('open');
@@ -650,6 +941,7 @@
             if (userDropdownBtn && userDropdownMenu) {
                 userDropdownBtn.addEventListener('click', function (event) {
                     event.stopPropagation();
+                    notificationPanel?.classList.remove('show');
                     userDropdownMenu.classList.toggle('show');
                 });
 
@@ -664,12 +956,288 @@
                 });
             }
 
+            if (notificationToggle && notificationPanel && notificationShell) {
+                notificationToggle.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    userDropdownMenu?.classList.remove('show');
+                    notificationPanel.classList.toggle('show');
+                });
+
+                notificationPanel.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!notificationShell.contains(event.target)) {
+                        notificationPanel.classList.remove('show');
+                    }
+                });
+            }
+
+            readAllNotificationsBtn?.addEventListener('click', async function () {
+                const url = notificationShell?.getAttribute('data-read-all-url');
+                if (!url) {
+                    return;
+                }
+
+                try {
+                    await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        },
+                    });
+
+                    await refreshBarangayNotifications();
+                } catch (error) {
+                    console.warn('Unable to mark notifications as read:', error);
+                }
+            });
+
             quickReportButtons.forEach((button) => {
                 button.addEventListener('click', async function (event) {
                     event.preventDefault();
                     await submitQuickFireReport(button);
                 });
             });
+
+            notificationList?.addEventListener('click', async function (event) {
+                const item = event.target.closest('[data-barangay-notification-item]');
+                if (!item || !notificationShell) {
+                    return;
+                }
+
+                const template = notificationShell.getAttribute('data-read-url-template') || '';
+                const notificationId = item.getAttribute('data-notification-id') || '';
+                const redirectUrl = item.getAttribute('data-notification-url') || '';
+                const readUrl = template.replace('__ID__', notificationId);
+
+                try {
+                    if (notificationId && readUrl) {
+                        await fetch(readUrl, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                            },
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Unable to mark notification as read:', error);
+                }
+
+                await refreshBarangayNotifications();
+
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
+            });
+
+            async function refreshBarangayNotifications() {
+                const fetchUrl = notificationShell?.getAttribute('data-fetch-url');
+                if (!fetchUrl || !notificationList) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(fetchUrl, {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Notification refresh failed.');
+                    }
+
+                    const payload = await response.json();
+                    const notifications = Array.isArray(payload.notifications) ? payload.notifications : [];
+                    triggerBarangayLiveAlerts(notifications);
+                    renderBarangayNotifications(notifications, Number(payload.unread_count || 0));
+                } catch (error) {
+                    console.warn('Unable to refresh barangay notifications:', error);
+                }
+            }
+
+            function ensureBarangayIncidentAudio() {
+                if (barangayIncidentAudioContext) {
+                    return;
+                }
+
+                try {
+                    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContextCtor) {
+                        return;
+                    }
+
+                    barangayIncidentAudioContext = new AudioContextCtor();
+                    if (barangayIncidentAudioContext.state === 'suspended') {
+                        barangayIncidentAudioContext.resume().catch(() => {});
+                    }
+                } catch (error) {
+                    console.warn('Unable to initialize barangay alert audio:', error);
+                }
+            }
+
+            function playBarangayIncidentTone() {
+                ensureBarangayIncidentAudio();
+                if (!barangayIncidentAudioContext) {
+                    return;
+                }
+
+                try {
+                    const now = barangayIncidentAudioContext.currentTime;
+                    [880, 660, 880].forEach((frequency, index) => {
+                        const oscillator = barangayIncidentAudioContext.createOscillator();
+                        const gainNode = barangayIncidentAudioContext.createGain();
+                        const startAt = now + (index * 0.18);
+
+                        oscillator.type = 'sine';
+                        oscillator.frequency.value = frequency;
+                        gainNode.gain.setValueAtTime(0.0001, startAt);
+                        gainNode.gain.exponentialRampToValueAtTime(0.16, startAt + 0.03);
+                        gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.16);
+
+                        oscillator.connect(gainNode);
+                        gainNode.connect(barangayIncidentAudioContext.destination);
+                        oscillator.start(startAt);
+                        oscillator.stop(startAt + 0.17);
+                    });
+                } catch (error) {
+                    console.warn('Unable to play barangay alert tone:', error);
+                }
+            }
+
+            function showBarangayLiveAlertToast(title, message) {
+                if (!barangayLiveAlertToast) {
+                    return;
+                }
+
+                barangayLiveAlertToast.innerHTML = `
+                    <div class="barangay-live-alert-toast__row">
+                        <div class="barangay-live-alert-toast__icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                        <div class="barangay-live-alert-toast__copy">
+                            <strong>${escapeHtml(title)}</strong>
+                            <p>${escapeHtml(message)}</p>
+                        </div>
+                    </div>
+                `;
+                barangayLiveAlertToast.classList.add('is-visible');
+                window.clearTimeout(barangayLiveAlertTimer);
+                barangayLiveAlertTimer = window.setTimeout(() => {
+                    barangayLiveAlertToast.classList.remove('is-visible');
+                }, 6000);
+            }
+
+            function triggerBarangayLiveAlerts(notifications) {
+                const storageKey = 'pyrosense_barangay_fire_alert_seen';
+                let seenIds = [];
+
+                try {
+                    seenIds = JSON.parse(window.localStorage.getItem(storageKey) || '[]');
+                    if (!Array.isArray(seenIds)) {
+                        seenIds = [];
+                    }
+                } catch (error) {
+                    seenIds = [];
+                }
+
+                let changed = false;
+
+                notifications.forEach((notification) => {
+                    if (notification?.category !== 'fire-nearby' || !notification?.id) {
+                        return;
+                    }
+
+                    if (seenIds.includes(notification.id)) {
+                        return;
+                    }
+
+                    seenIds.push(notification.id);
+                    changed = true;
+                    playBarangayIncidentTone();
+                    if (navigator.vibrate) {
+                        navigator.vibrate([240, 120, 240]);
+                    }
+                    showBarangayLiveAlertToast(
+                        notification.title || 'Nearby fire alert',
+                        notification.message || 'A fire incident was reported near the barangay area.'
+                    );
+                });
+
+                if (changed) {
+                    try {
+                        window.localStorage.setItem(storageKey, JSON.stringify(seenIds.slice(-40)));
+                    } catch (error) {
+                        console.warn('Unable to persist barangay fire alert state:', error);
+                    }
+                }
+            }
+
+            function renderBarangayNotifications(notifications, unreadCount) {
+                if (!notificationList || !notificationBadge) {
+                    return;
+                }
+
+                notificationBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                notificationBadge.classList.toggle('is-hidden', unreadCount < 1);
+
+                if (!notifications.length) {
+                    notificationList.innerHTML = `
+                        <div class="portal-notification-empty" data-barangay-notification-empty>
+                            <strong>No notifications yet</strong>
+                            <p>Barangay alerts will appear here as soon as the system records them.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                notificationList.innerHTML = notifications.map((notification) => {
+                    const title = escapeHtml(notification.title || 'Barangay notification');
+                    const message = escapeHtml(notification.message || '');
+                    const icon = escapeHtml(notification.icon || 'bi bi-bell-fill');
+                    const createdAt = escapeHtml(notification.created_at_human || '');
+                    const category = escapeHtml(String(notification.category || 'general').replace(/-/g, ' ').toUpperCase());
+                    const url = escapeHtml(notification.url || '');
+                    const id = escapeHtml(notification.id || '');
+
+                    return `
+                        <button
+                            type="button"
+                            class="portal-notification-item ${notification.is_read ? '' : 'is-unread'}"
+                            data-barangay-notification-item
+                            data-notification-id="${id}"
+                            data-notification-url="${url}"
+                        >
+                            <span class="portal-notification-icon">
+                                <i class="${icon}"></i>
+                            </span>
+                            <span class="portal-notification-copy">
+                                <strong>${title}</strong>
+                                <p>${message}</p>
+                                <span class="portal-notification-meta">
+                                    <span>${createdAt}</span>
+                                    <span>${category}</span>
+                                </span>
+                            </span>
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            refreshBarangayNotifications();
+            notificationRefreshTimer = window.setInterval(refreshBarangayNotifications, 30000);
 
             function showQuickReportStatus(message, type = 'error') {
                 if (!quickReportStatus) {

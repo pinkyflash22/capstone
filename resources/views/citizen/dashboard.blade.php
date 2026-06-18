@@ -656,6 +656,29 @@
             font-size: 9px;
         }
 
+        .citizen-map-legend-swatch-barangay {
+            background: rgba(15, 118, 110, 0.14);
+        }
+
+        .citizen-map-legend-marker-barangay {
+            background: #0f766e;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+        }
+
+        .citizen-map-legend-marker-barangay svg {
+            width: 12px;
+            height: 12px;
+            stroke: #fff;
+            stroke-width: 1.8;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         .citizen-map-legend-item-sheet .citizen-map-legend-swatch-truck img {
             width: 12px;
             height: 12px;
@@ -676,6 +699,73 @@
 
         .citizen-map-stage > .flex.flex-col.sm\:flex-row.sm\:items-center.justify-between {
             display: none !important;
+        }
+
+        .citizen-overview-welcome {
+            display: none !important;
+        }
+
+        .citizen-welcome-alert {
+            position: fixed;
+            top: 84px;
+            left: 50%;
+            transform: translate(-50%, -16px);
+            width: min(420px, calc(100vw - 32px));
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(194, 65, 12, 0.98), rgba(249, 115, 22, 0.96));
+            color: #fff;
+            box-shadow: 0 18px 36px rgba(194, 65, 12, 0.28);
+            z-index: 70;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .citizen-welcome-alert.is-visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .citizen-welcome-alert__row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .citizen-welcome-alert__icon {
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .citizen-welcome-alert__copy strong {
+            display: block;
+            font-size: 0.98rem;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .citizen-welcome-alert__copy span {
+            display: block;
+            margin-top: 2px;
+            font-size: 0.82rem;
+            color: rgba(255, 247, 237, 0.94);
+        }
+
+        .citizen-welcome-alert__close {
+            margin-left: auto;
+            border: 0;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 1rem;
+            cursor: pointer;
+            pointer-events: auto;
         }
 
         #userMap {
@@ -1398,7 +1488,7 @@
                 <!-- User Info Badge -->
                 <div class="relative z-10 mt-4 flex items-center gap-2 text-xs bg-white/10 p-2 rounded-lg">
                     <i class="fa-solid fa-location-dot text-white/80"></i>
-                    <span class="text-white/90">{{ Auth::user()->userInfo->city ?? 'District 4' }}, {{ Auth::user()->userInfo->barangay ?? 'Zone 7' }}</span>
+                    <span id="citizenSidebarResolvedLocation" class="text-white/90">{{ Auth::user()->userInfo->city ?? 'District 4' }}, {{ Auth::user()->userInfo->barangay ?? 'Zone 7' }}</span>
                     <span class="ml-auto bg-green-400/20 text-green-200 px-2 py-0.5 rounded-full text-[10px]">verified</span>
                 </div>
             </div>
@@ -1692,6 +1782,7 @@
                 <div class="citizen-map-legend-list">
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-user"><span class="citizen-map-legend-marker citizen-map-legend-marker-user"><i class="fas fa-user-shield"></i></span></span><span>Your location</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-station"><span class="citizen-map-legend-marker citizen-map-legend-marker-station"><i class="fas fa-building"></i></span></span><span>Fire station</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-barangay"><span class="citizen-map-legend-marker citizen-map-legend-marker-barangay"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"></circle><circle cx="16" cy="9" r="2" fill="none"></circle><circle cx="12" cy="7" r="2" fill="none"></circle><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"></path></svg></span></span><span>Barangay hall</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-incident"><span class="citizen-map-legend-marker citizen-map-legend-marker-incident"><i class="fas fa-fire"></i></span></span><span>Incident marker</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-hydrant"><span class="citizen-map-legend-marker citizen-map-legend-marker-hydrant"><i class="fas fa-fire-extinguisher"></i></span></span><span>Hydrant</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-other"><span class="citizen-map-legend-marker citizen-map-legend-marker-other"><i class="fas fa-map-marker-alt"></i></span></span><span>Other marker</span></div>
@@ -1725,6 +1816,20 @@
                 {{ session('success') }}
             </div>
         @endif
+        <div id="citizenWelcomeAlert" class="citizen-welcome-alert" role="status" aria-live="polite">
+            <div class="citizen-welcome-alert__row">
+                <div class="citizen-welcome-alert__icon">
+                    <span class="material-symbols-rounded" aria-hidden="true">local_fire_department</span>
+                </div>
+                <div class="citizen-welcome-alert__copy">
+                    <strong>Welcome back, {{ $displayName }}</strong>
+                    <span>Citizen portal is ready with your alerts, map, and reports.</span>
+                </div>
+                <button type="button" id="citizenWelcomeAlertClose" class="citizen-welcome-alert__close" aria-label="Dismiss welcome alert">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
         <div id="citizenMobileWelcomeToast" class="citizen-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
             <div class="citizen-mobile-welcome-toast__icon">
                 <span class="material-symbols-rounded" aria-hidden="true">local_fire_department</span>
@@ -1753,9 +1858,9 @@
                     </div>
 
                     <!-- desktop quick actions -->
-                    <div class="hidden lg:flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-4">
                         <span class="text-sm text-gray-600"><i class="fa-regular fa-bell mr-1"></i> <span id="citizenTopUnreadValue">{{ $activeAlerts ?? 0 }}</span> unread</span>
-                        <span class="text-sm text-gray-600"><i class="fa-regular fa-clock mr-1"></i> {{ now()->format('l, M d') }}</span>
+                        <span id="citizenTopDateValue" class="text-sm text-gray-600"><i class="fa-regular fa-clock mr-1"></i> {{ now()->format('l, M d') }}</span>
                     </div>
 
                     <!-- right side -->
@@ -2050,6 +2155,51 @@
             // );
             window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
             console.log('officer dashboard: ', window.stationOfficer);
+            const citizenSidebarResolvedLocation = document.getElementById('citizenSidebarResolvedLocation');
+            const citizenWelcomeAlert = document.getElementById('citizenWelcomeAlert');
+            const citizenWelcomeAlertClose = document.getElementById('citizenWelcomeAlertClose');
+            let citizenWelcomeAlertTimer = null;
+
+            const showCitizenWelcomeAlert = () => {
+                if (!citizenWelcomeAlert) {
+                    return;
+                }
+
+                citizenWelcomeAlert.classList.add('is-visible');
+
+                if (citizenWelcomeAlertTimer) {
+                    clearTimeout(citizenWelcomeAlertTimer);
+                }
+
+                citizenWelcomeAlertTimer = window.setTimeout(() => {
+                    citizenWelcomeAlert.classList.remove('is-visible');
+                }, 4200);
+            };
+
+            citizenWelcomeAlertClose?.addEventListener('click', () => {
+                citizenWelcomeAlert?.classList.remove('is-visible');
+                if (citizenWelcomeAlertTimer) {
+                    clearTimeout(citizenWelcomeAlertTimer);
+                }
+            });
+
+            showCitizenWelcomeAlert();
+
+            const updateCitizenResolvedLocation = async (lat, lng) => {
+                if (!citizenSidebarResolvedLocation || typeof window.setThisName !== 'function') {
+                    return;
+                }
+
+                try {
+                    const resolvedName = await window.setThisName(lat, lng);
+                    if (resolvedName && resolvedName.trim() !== '') {
+                        citizenSidebarResolvedLocation.textContent = resolvedName.trim();
+                        citizenSidebarResolvedLocation.title = resolvedName.trim();
+                    }
+                } catch (error) {
+                    console.error('Failed to resolve citizen sidebar location:', error);
+                }
+            };
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
         function(position) {
@@ -2080,6 +2230,7 @@ if (navigator.geolocation) {
             if (typeof window.currentLoc === 'function') {
                 window.currentLoc(lat, lng);
             }
+            updateCitizenResolvedLocation(lat, lng);
             
             // Send location to server for other users to see
             sendUserLocationToServer(lat, lng);
@@ -2104,6 +2255,7 @@ if (navigator.geolocation) {
             if (typeof window.currentLoc === 'function') {
                 window.currentLoc(defaultLat, defaultLng);
             }
+            updateCitizenResolvedLocation(defaultLat, defaultLng);
         },
         { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -2131,6 +2283,7 @@ if (navigator.geolocation) {
                 if (typeof window.currentLoc === 'function') {
                     window.currentLoc(lat, lng);
                 }
+                updateCitizenResolvedLocation(lat, lng);
                 
                 console.log("Location updated for user:", window.currentUserId);
             },
@@ -2165,6 +2318,7 @@ if (navigator.geolocation) {
     if (window.refreshCitizenOverviewData) {
         window.refreshCitizenOverviewData();
     }
+    updateCitizenResolvedLocation(defaultLat, defaultLng);
     if (typeof window.currentLoc === 'function') {
         window.currentLoc(defaultLat, defaultLng);
     }
@@ -3073,6 +3227,12 @@ window.runPendingIncidentAutoAssignment = async function() {
 document.addEventListener('DOMContentLoaded', function() {
     window.runPendingIncidentAutoAssignment();
     window.setInterval(window.runPendingIncidentAutoAssignment, 10000);
+
+    if (window.refreshCitizenOverviewData) {
+        window.setInterval(() => {
+            window.refreshCitizenOverviewData();
+        }, 10000);
+    }
 });
         // Report incident triggers
         document.querySelectorAll('.report-incident-trigger').forEach(function(trigger) {

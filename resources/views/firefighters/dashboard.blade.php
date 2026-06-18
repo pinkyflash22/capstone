@@ -10,6 +10,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <meta name="user-role" content="{{ auth()->user()->role->role ?? 'firefighter' }}">
     <meta name="user-role-id" content="{{ auth()->user()->role_id ?? '' }}">
+    <meta name="station-id" content="{{ $thisStation ?? '' }}">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />

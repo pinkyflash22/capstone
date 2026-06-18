@@ -1,6 +1,7 @@
 const DEFAULT_CENTER = [15.8222, 120.3297];
 const DEFAULT_ZOOM = 13;
 const USER_FOCUS_ZOOM = 16;
+const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><circle cx="8" cy="9" r="2"></circle><circle cx="16" cy="9" r="2"></circle><circle cx="12" cy="7" r="2"></circle><path d="M4 18a4 4 0 0 1 8 0"></path><path d="M12 18a4 4 0 0 1 8 0"></path><path d="M8 16a4 4 0 0 1 8 0"></path></svg>';
 
 function getCategoryVisual(category) {
     const normalized = String(category || '').trim().toLowerCase();
@@ -9,19 +10,19 @@ function getCategoryVisual(category) {
         case 'fire':
             return { color: '#dc2626', icon: 'fa-fire', label: 'Fire' };
         case 'barangay':
-            return { color: '#d97706', icon: 'fa-building-shield', label: 'Barangay' };
+            return { color: '#0f766e', iconHtml: BARANGAY_GROUP_ICON_SVG, label: 'Barangay' };
         case 'station':
-            return { color: '#2563eb', icon: 'fa-house-fire', label: 'Station' };
+            return { color: '#2563eb', icon: 'fa-building', label: 'Station' };
         case 'risk':
             return { color: '#b91c1c', icon: 'fa-triangle-exclamation', label: 'Risk Area' };
         case 'hydrant':
-            return { color: '#0f766e', icon: 'fa-faucet-drip', label: 'Hydrant' };
+            return { color: '#ef4444', icon: 'fa-fire-extinguisher', label: 'Hydrant' };
         case 'school':
             return { color: '#7c3aed', icon: 'fa-school', label: 'School' };
         case 'bridge':
             return { color: '#475569', icon: 'fa-road-bridge', label: 'Bridge' };
         default:
-            return { color: '#64748b', icon: 'fa-location-dot', label: 'Marker' };
+            return { color: '#6b7280', icon: 'fa-map-marker-alt', label: 'Marker' };
     }
 }
 
@@ -29,6 +30,9 @@ function buildIcon(category, emphasized = false) {
     const visual = getCategoryVisual(category);
     const size = emphasized ? 22 : 18;
     const ring = emphasized ? '0 0 0 4px rgba(255,255,255,0.92), 0 12px 24px rgba(15,23,42,0.20)' : '0 0 0 3px rgba(255,255,255,0.92), 0 10px 20px rgba(15,23,42,0.14)';
+    const glyph = visual.iconHtml
+        ? `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${visual.iconHtml}</span>`
+        : `<i class="fa-solid ${visual.icon}" style="font-size:${emphasized ? '10px' : '8px'};"></i>`;
 
     return L.divIcon({
         className: 'barangay-dashboard-marker',
@@ -46,7 +50,7 @@ function buildIcon(category, emphasized = false) {
                 border:2px solid rgba(255,255,255,0.9);
                 position:relative;
             ">
-                <i class="fa-solid ${visual.icon}" style="font-size:${emphasized ? '10px' : '8px'};"></i>
+                ${glyph}
             </div>
         `,
         iconSize: [size, size],

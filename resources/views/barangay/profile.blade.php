@@ -1,31 +1,19 @@
 @extends('barangay.layouts.app')
 
 @php
-    $profileUser = $user ?? auth()->user();
-    $profileAddress = $profileUser?->address;
-    $profileBarangay = $profileAddress?->barangay;
-    $profileCity = $profileBarangay?->city;
-    $profileName = trim(($profileUser->first_name ?? '') . ' ' . ($profileUser->last_name ?? ''));
-    $profileName = $profileName !== '' ? $profileName : ($profileUser->name ?? 'Barangay Officer');
-    $profileInitials = strtoupper(substr($profileUser->first_name ?? 'B', 0, 1) . substr($profileUser->last_name ?? ($profileUser->first_name ?? 'D'), 0, 1));
-    $selectedCityId = old('city_id', $profileCity?->city_id);
-    $barangayOptions = collect();
-
-    if ($selectedCityId) {
-        $barangayOptions = optional($cities->firstWhere('city_id', (int) $selectedCityId))->barangays ?? collect();
-    }
+    $profileBarangay = $barangay ?? ($user?->address?->barangay);
+    $profileCity = $city ?? $profileBarangay?->city;
+    $profileHall = $hall;
+    $captainName = $connectedUsers->first(function ($connectedUser) {
+        return strtolower((string) ($connectedUser->role->role ?? '')) === 'barangay captain';
+    })?->full_name ?? auth()->user()->full_name;
+    $coverTitle = $profileBarangay?->barangay_name ? 'Barangay ' . $profileBarangay->barangay_name : 'Barangay Profile';
 @endphp
 
-@section('page_title', 'My Profile')
-@section('page_subtitle', 'Barangay account details and address information')
-@section('hero_title', 'Keep your barangay profile current.')
-@section('hero_copy', 'Update your contact information and address so barangay coordination records stay accurate across the portal.')
 @section('active_nav', 'profile')
-
-@section('hero_badges')
-    <span class="hero-badge"><i class="fa-regular fa-user"></i> Barangay Account</span>
-    <span class="hero-badge"><i class="fa-regular fa-building"></i> {{ $barangay?->barangay_name ?? 'Barangay Desk' }}</span>
-@endsection
+@section('page_title', 'Barangay Profile')
+@section('page_subtitle', 'Institution background and assigned barangay users')
+@section('hide_hero', '1')
 
 @section('top_bar_actions')
     <a href="{{ route('barangay.reports') }}" class="portal-report-fire-btn" data-barangay-quick-report data-report-url="{{ route('barangay.reports.quick') }}">
@@ -35,298 +23,467 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <div class="panel-card mb-6 rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {{ session('success') }}
-        </div>
-    @endif
+    <style>
+        .barangay-profile-cover {
+            overflow: hidden;
+            border-radius: 36px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 28px 60px rgba(15, 23, 42, 0.1);
+        }
 
-    @if ($errors->any())
-        <div class="panel-card mb-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <p class="font-semibold mb-1">Please fix the highlighted profile fields.</p>
-            <ul class="list-disc pl-5 space-y-1">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
+        .barangay-profile-cover__body {
+            padding: 20px;
+        }
+
+        .barangay-profile-cover__banner {
+            min-height: 180px;
+            border-radius: 28px;
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,0.75), transparent 32%),
+                radial-gradient(circle at 75% 20%, rgba(255,255,255,0.55), transparent 26%),
+                linear-gradient(135deg, rgba(191, 219, 254, 0.95), rgba(226, 232, 240, 0.95) 48%, rgba(254, 249, 195, 0.9) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .barangay-profile-cover__banner::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 30% 35%, rgba(255,255,255,0.7), transparent 18%),
+                radial-gradient(circle at 55% 25%, rgba(255,255,255,0.8), transparent 16%),
+                radial-gradient(circle at 75% 38%, rgba(255,255,255,0.65), transparent 20%);
+            opacity: 0.9;
+        }
+
+        .barangay-profile-cover__content {
+            padding: 24px 6px 10px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr);
+            gap: 28px;
+            align-items: start;
+        }
+
+        .barangay-profile-cover__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 34px;
+            padding: 0 14px;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid rgba(251, 191, 36, 0.22);
+            color: #c2410c;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .barangay-profile-cover__title {
+            margin: 16px 0 0;
+            font-size: clamp(2.2rem, 4vw, 3.8rem);
+            font-weight: 950;
+            letter-spacing: -0.04em;
+            line-height: 0.98;
+            color: #0f172a;
+        }
+
+        .barangay-profile-cover__copy {
+            margin: 18px 0 0;
+            max-width: 60ch;
+            color: #64748b;
+            font-size: 0.98rem;
+            line-height: 1.75;
+        }
+
+        .barangay-profile-cover__chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .barangay-profile-cover__chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 14px;
+            border-radius: 999px;
+            background: #fffaf0;
+            border: 1px solid rgba(251, 191, 36, 0.18);
+            color: #9a3412;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .barangay-profile-pane {
+            padding-top: 6px;
+        }
+
+        .barangay-profile-pane__grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .barangay-profile-pane__item {
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+        }
+
+        .barangay-profile-pane__item:last-child {
+            border-bottom: 0;
+        }
+
+        .barangay-profile-pane__label {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .barangay-profile-pane__value {
+            margin-top: 6px;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+
+        .barangay-profile-stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+            margin-top: 22px;
+        }
+
+        .barangay-profile-stat {
+            background: rgba(255, 255, 255, 0.94);
+            border-radius: 28px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            padding: 18px;
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.05);
+        }
+
+        .barangay-profile-stat__label {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .barangay-profile-stat__value {
+            margin-top: 8px;
+            color: #0f172a;
+            font-size: 1.8rem;
+            font-weight: 950;
+        }
+
+        .barangay-user-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .barangay-user-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 16px;
+            align-items: center;
+            padding: 18px;
+            border-radius: 24px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            background: linear-gradient(180deg, #ffffff 0%, #fffdfa 100%);
+        }
+
+        .barangay-user-row__name {
+            color: #0f172a;
+            font-size: 1.02rem;
+            font-weight: 850;
+            line-height: 1.4;
+        }
+
+        .barangay-user-row__meta {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.86rem;
+            line-height: 1.6;
+        }
+
+        .barangay-user-row__badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .barangay-user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid rgba(251, 191, 36, 0.22);
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        @media (max-width: 1100px) {
+            .barangay-profile-cover__content,
+            .barangay-profile-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .barangay-profile-cover__body {
+                padding: 14px;
+            }
+
+            .barangay-profile-cover__content {
+                padding: 18px 0 6px;
+            }
+
+            .barangay-profile-pane__grid {
+                grid-template-columns: 1fr;
+            }
+
+            .barangay-user-row {
+                grid-template-columns: 1fr;
+            }
+
+            .barangay-user-row__badges {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+
+    <section class="barangay-profile-cover" data-barangay-profile-root data-refresh-url="{{ route('barangay.profile') }}">
+        <div class="barangay-profile-cover__body">
+            <div class="barangay-profile-cover__banner"></div>
+            <div class="barangay-profile-cover__content">
+                <div>
+                    <span class="barangay-profile-cover__eyebrow">
+                        <i class="fa-solid fa-building-columns"></i>
+                        Barangay Institution Profile
+                    </span>
+                    <h2 id="barangayProfileTitle" class="barangay-profile-cover__title">{{ $coverTitle }}</h2>
+                    <p class="barangay-profile-cover__copy">
+                        Institutional background for the barangay desk, including local hall information, leadership reference, and the active barangay-linked users connected to this service area.
+                    </p>
+                    <div class="barangay-profile-cover__chips">
+                        <span id="barangayProfileCityChip" class="barangay-profile-cover__chip"><i class="fa-solid fa-location-dot"></i> {{ $profileCity?->city_name ?? 'City not linked' }}</span>
+                        <span id="barangayProfileCaptainChip" class="barangay-profile-cover__chip"><i class="fa-solid fa-user-shield"></i> {{ $captainName }}</span>
+                        <span id="barangayProfileUsersChip" class="barangay-profile-cover__chip"><i class="fa-solid fa-users"></i> {{ $connectedUsers->count() }} connected users</span>
+                    </div>
+                </div>
+
+                <aside class="barangay-profile-pane">
+                    <div class="barangay-profile-pane__grid">
+                        <div class="barangay-profile-pane__item">
+                            <div class="barangay-profile-pane__label">Barangay Hall</div>
+                            <div id="barangayProfileHallName" class="barangay-profile-pane__value">{{ $profileHall?->hall_name ?? 'Hall profile pending' }}</div>
+                        </div>
+                        <div class="barangay-profile-pane__item">
+                            <div class="barangay-profile-pane__label">Municipality / City</div>
+                            <div id="barangayProfileCityValue" class="barangay-profile-pane__value">{{ $profileCity?->city_name ?? 'No city data' }}</div>
+                        </div>
+                        <div class="barangay-profile-pane__item">
+                            <div class="barangay-profile-pane__label">Contact Number</div>
+                            <div id="barangayProfileHallContact" class="barangay-profile-pane__value">{{ $profileHall?->contact_number ?: 'No hall contact yet' }}</div>
+                        </div>
+                        <div class="barangay-profile-pane__item">
+                            <div class="barangay-profile-pane__label">Official Email</div>
+                            <div id="barangayProfileHallEmail" class="barangay-profile-pane__value">{{ $profileHall?->email ?: 'No hall email yet' }}</div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <section class="barangay-profile-stats">
+        <article class="barangay-profile-stat">
+            <div class="barangay-profile-stat__label">Connected Users</div>
+            <div id="barangayProfileStatUsers" class="barangay-profile-stat__value">{{ $connectedUsers->count() }}</div>
+        </article>
+        <article class="barangay-profile-stat">
+            <div class="barangay-profile-stat__label">Active Risk Records</div>
+            <div id="barangayProfileStatRiskAreas" class="barangay-profile-stat__value">{{ $riskAreas->count() }}</div>
+        </article>
+        <article class="barangay-profile-stat">
+            <div class="barangay-profile-stat__label">Fire Records</div>
+            <div id="barangayProfileStatFireRecords" class="barangay-profile-stat__value">{{ $fireRecords->count() }}</div>
+        </article>
+        <article class="barangay-profile-stat">
+            <div class="barangay-profile-stat__label">Checklist Items</div>
+            <div id="barangayProfileStatChecklists" class="barangay-profile-stat__value">{{ $predictionChecklists->count() }}</div>
+        </article>
+    </section>
+
+    <section class="panel-card mt-6">
+        <div class="panel-eyebrow">Connected Users</div>
+        <h3 class="panel-title">Barangay users assigned or linked to this barangay</h3>
+        <p class="panel-copy">This roster shows barangay-level accounts connected to this barangay through assignment or barangay-linked address information.</p>
+
+        @if($connectedUsers->isEmpty())
+            <div class="empty-state mt-6">No barangay-connected users are available yet for this barangay.</div>
+        @else
+            <div id="barangayConnectedUsersList" class="barangay-user-list">
+                @foreach ($connectedUsers as $connectedUser)
+                    @php
+                        $fullName = $connectedUser->full_name ?: trim(($connectedUser->first_name ?? '') . ' ' . ($connectedUser->last_name ?? ''));
+                        $position = $connectedUser->barangayOfficer?->position;
+                        $userBarangay = $connectedUser->barangayOfficer?->barangay?->barangay_name ?? $connectedUser->address?->barangay?->barangay_name;
+                    @endphp
+                    <div class="barangay-user-row">
+                        <div>
+                            <div class="barangay-user-row__name">{{ $fullName ?: 'Unnamed Barangay User' }}</div>
+                            <div class="barangay-user-row__meta">
+                                {{ $connectedUser->email ?: 'No email' }}<br>
+                                {{ $connectedUser->contact_number ?: 'No contact number' }}<br>
+                                {{ $userBarangay ?: 'Barangay not linked' }}
+                            </div>
+                        </div>
+                        <div class="barangay-user-row__badges">
+                            <span class="barangay-user-badge"><i class="fa-solid fa-id-badge"></i> {{ $connectedUser->role->role ?? 'barangay' }}</span>
+                            @if($position)
+                                <span class="barangay-user-badge"><i class="fa-solid fa-user-tie"></i> {{ $position }}</span>
+                            @endif
+                            @if($connectedUser->barangayOfficer)
+                                <span class="barangay-user-badge"><i class="fa-solid fa-link"></i> assigned</span>
+                            @else
+                                <span class="barangay-user-badge"><i class="fa-solid fa-location-dot"></i> linked</span>
+                            @endif
+                        </div>
+                    </div>
                 @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <div class="panel-grid two">
-        <section class="panel-card">
-            <div class="flex flex-col items-center text-center">
-                <div id="barangayProfileCardInitials" class="w-24 h-24 rounded-full bg-orange-100 text-orange-600 text-3xl font-bold flex items-center justify-center mb-4">
-                    {{ $profileInitials }}
-                </div>
-                <h2 id="barangayProfileCardName" class="text-2xl font-black text-slate-900">{{ $profileName }}</h2>
-                <p id="barangayProfileCardEmail" class="text-sm text-slate-500 mt-1">{{ $profileUser->email }}</p>
-                <span class="tag medium mt-4">{{ $profileUser->role->role ?? 'Barangay' }}</span>
             </div>
-
-            <div class="list-stack mt-8">
-                <div class="list-item">
-                    <div class="tiny-label">Member Since</div>
-                    <strong>{{ $profileUser->created_at?->format('F j, Y') }}</strong>
-                </div>
-                <div class="list-item">
-                    <div class="tiny-label">Last Login</div>
-                    <strong>{{ $profileUser->last_login_at ?? 'Today' }}</strong>
-                </div>
-                <div class="list-item">
-                    <div class="tiny-label">Current Address</div>
-                    <strong id="barangayProfileCurrentAddress">
-                        {{ $profileAddress?->street ? $profileAddress->street . ', ' : '' }}{{ $profileBarangay?->barangay_name ?? 'No barangay yet' }}, {{ $profileCity?->city_name ?? 'No city yet' }}
-                    </strong>
-                </div>
-                <div class="list-item">
-                    <div class="tiny-label">Contact Number</div>
-                    <strong id="barangayProfileContact">{{ $profileUser->contact_number ?: 'No contact number yet' }}</strong>
-                </div>
-            </div>
-        </section>
-
-        <section class="panel-card">
-            <form id="barangayProfileForm" method="POST" action="{{ route('barangay.profile.update') }}" class="space-y-6">
-                @csrf
-                @method('PUT')
-
-                <div>
-                    <p class="panel-eyebrow">Personal Information</p>
-                    <h2 class="panel-title">Barangay Profile Settings</h2>
-                    <p class="panel-copy">These details are used throughout the barangay portal and shared records.</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="barangay_first_name" class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                        <input id="barangay_first_name" name="first_name" type="text" value="{{ old('first_name', $profileUser->first_name) }}" class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label for="barangay_middle_name" class="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
-                        <input id="barangay_middle_name" name="middle_name" type="text" value="{{ old('middle_name', $profileUser->middle_name) }}" class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label for="barangay_last_name" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                        <input id="barangay_last_name" name="last_name" type="text" value="{{ old('last_name', $profileUser->last_name) }}" class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label for="barangay_contact_number" class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                        <input id="barangay_contact_number" name="contact_number" type="text" value="{{ old('contact_number', $profileUser->contact_number) }}" class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="barangay_email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                        <input id="barangay_email" name="email" type="email" value="{{ old('email', $profileUser->email) }}" class="w-full border rounded-lg px-3 py-2">
-                    </div>
-                </div>
-
-                <div>
-                    <p class="panel-eyebrow">Address Information</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                        <div>
-                            <label for="barangay_city_id" class="block text-sm font-medium text-gray-700 mb-1">City</label>
-                            <select id="barangay_city_id" name="city_id" class="w-full border rounded-lg px-3 py-2">
-                                <option value="">Select City</option>
-                                @foreach ($cities as $cityOption)
-                                    <option value="{{ $cityOption->city_id }}" @selected((string) old('city_id', $profileCity?->city_id) === (string) $cityOption->city_id)>
-                                        {{ $cityOption->city_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="barangay_barangay_id" class="block text-sm font-medium text-gray-700 mb-1">Barangay</label>
-                            <select id="barangay_barangay_id" name="barangay_id" class="w-full border rounded-lg px-3 py-2">
-                                <option value="">Select Barangay</option>
-                                @foreach ($barangayOptions as $barangayOption)
-                                    <option value="{{ $barangayOption->barangay_id }}" @selected((string) old('barangay_id', $profileBarangay?->barangay_id) === (string) $barangayOption->barangay_id)>
-                                        {{ $barangayOption->barangay_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label for="barangay_street" class="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-                            <input id="barangay_street" name="street" type="text" value="{{ old('street', $profileAddress?->street) }}" class="w-full border rounded-lg px-3 py-2" placeholder="Enter street address">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end">
-                    <button id="barangayProfileSaveBtn" type="submit" class="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition">
-                        Save Changes
-                    </button>
-                </div>
-            </form>
-        </section>
-    </div>
-
-    <div id="barangayProfileToast" class="fixed right-6 bottom-6 bg-green-600 text-white px-4 py-3 rounded-2xl shadow-xl opacity-0 pointer-events-none translate-y-2 transition-all duration-200 z-[6000] text-sm font-semibold"></div>
-
-    <div id="barangayProfileLoadingOverlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm hidden items-center justify-center z-[120]">
-        <div class="bg-white rounded-2xl shadow-xl px-6 py-5 flex items-center gap-3 text-slate-700">
-            <span class="text-orange-600"><i class="fa-solid fa-spinner fa-spin"></i></span>
-            <div>
-                <p class="font-semibold">Saving profile</p>
-                <p class="text-sm text-slate-500">Updating your information...</p>
-            </div>
-        </div>
-    </div>
+        @endif
+    </section>
 @endsection
 
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const profileForm = document.getElementById('barangayProfileForm');
-        const citySelect = document.getElementById('barangay_city_id');
-        const barangaySelect = document.getElementById('barangay_barangay_id');
-        const selectedBarangayId = @json((string) old('barangay_id', $profileBarangay?->barangay_id));
-        const loadingOverlay = document.getElementById('barangayProfileLoadingOverlay');
-        const saveBtn = document.getElementById('barangayProfileSaveBtn');
-        const toast = document.getElementById('barangayProfileToast');
-
-        if (!profileForm || !citySelect || !barangaySelect) {
+        const profileRoot = document.querySelector('[data-barangay-profile-root]');
+        if (!profileRoot) {
             return;
         }
 
-        function showProfileToast(message, isError = false) {
-            if (!toast) {
-                return;
+        const refreshUrl = profileRoot.dataset.refreshUrl;
+        const usersList = document.getElementById('barangayConnectedUsersList');
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderUserRow(user) {
+            const positionBadge = user.position
+                ? `<span class="barangay-user-badge"><i class="fa-solid fa-user-tie"></i> ${escapeHtml(user.position)}</span>`
+                : '';
+            const connectionBadge = user.connection_type === 'assigned'
+                ? '<span class="barangay-user-badge"><i class="fa-solid fa-link"></i> assigned</span>'
+                : '<span class="barangay-user-badge"><i class="fa-solid fa-location-dot"></i> linked</span>';
+
+            return `
+                <div class="barangay-user-row">
+                    <div>
+                        <div class="barangay-user-row__name">${escapeHtml(user.full_name || 'Unnamed Barangay User')}</div>
+                        <div class="barangay-user-row__meta">
+                            ${escapeHtml(user.email || 'No email')}<br>
+                            ${escapeHtml(user.contact_number || 'No contact number')}<br>
+                            ${escapeHtml(user.barangay_name || 'Barangay not linked')}
+                        </div>
+                    </div>
+                    <div class="barangay-user-row__badges">
+                        <span class="barangay-user-badge"><i class="fa-solid fa-id-badge"></i> ${escapeHtml(user.role || 'barangay')}</span>
+                        ${positionBadge}
+                        ${connectionBadge}
+                    </div>
+                </div>
+            `;
+        }
+
+        function setText(id, value, fallback = '') {
+            const node = document.getElementById(id);
+            if (node) {
+                node.textContent = value || fallback;
             }
-
-            toast.textContent = message;
-            toast.classList.remove('opacity-0', 'translate-y-2');
-            toast.classList.add('opacity-100', 'translate-y-0');
-            toast.style.background = isError ? 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)' : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)';
-
-            window.clearTimeout(window.barangayProfileToastTimer);
-            window.barangayProfileToastTimer = window.setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-2');
-            }, 2800);
         }
 
-        function clearProfileErrors() {
-            profileForm.querySelectorAll('.border-red-400').forEach((field) => {
-                field.classList.remove('border-red-400', 'ring-2', 'ring-red-100');
-            });
-
-            profileForm.querySelectorAll('.barangay-profile-error').forEach((node) => node.remove());
-        }
-
-        function applyFieldErrors(errors) {
-            Object.entries(errors).forEach(([field, messages]) => {
-                const input = profileForm.querySelector(`[name="${field}"]`);
-                if (!input) {
-                    return;
-                }
-
-                input.classList.add('border-red-400', 'ring-2', 'ring-red-100');
-                const error = document.createElement('p');
-                error.className = 'barangay-profile-error mt-1 text-sm text-red-600';
-                error.textContent = Array.isArray(messages) ? messages[0] : messages;
-                input.insertAdjacentElement('afterend', error);
-            });
-        }
-
-        function updateBarangayProfileUI(user) {
-            const fullName = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
-            const currentAddress = `${user.street ? `${user.street}, ` : ''}${user.barangay || 'No barangay yet'}, ${user.city || 'No city yet'}`;
-
-            const textMap = {
-                barangayProfileCardInitials: user.initials,
-                barangayProfileCardName: fullName,
-                barangayProfileCardEmail: user.email,
-                barangayProfileCurrentAddress: currentAddress,
-                barangayProfileContact: user.contact_number || 'No contact number yet',
-            };
-
-            Object.entries(textMap).forEach(([id, value]) => {
-                const node = document.getElementById(id);
-                if (node) {
-                    node.textContent = value ?? '';
-                }
-            });
-        }
-
-        async function loadBarangays(cityId, preferredBarangayId = '') {
-            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-
-            if (!cityId) {
-                return;
+        function setChip(id, iconClass, value) {
+            const node = document.getElementById(id);
+            if (node) {
+                node.innerHTML = `<i class="${iconClass}"></i> ${escapeHtml(value)}`;
             }
+        }
 
+        async function refreshBarangayProfile() {
             try {
-                const response = await fetch(`/api/barangays/${cityId}`);
-                const barangays = await response.json();
-
-                barangays.forEach((barangay) => {
-                    const option = document.createElement('option');
-                    option.value = barangay.barangay_id;
-                    option.textContent = barangay.barangay_name;
-
-                    if (preferredBarangayId && String(preferredBarangayId) === String(barangay.barangay_id)) {
-                        option.selected = true;
-                    }
-
-                    barangaySelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading barangays:', error);
-            }
-        }
-
-        citySelect.addEventListener('change', function () {
-            loadBarangays(this.value);
-        });
-
-        if (citySelect.value) {
-            loadBarangays(citySelect.value, selectedBarangayId);
-        }
-
-        profileForm.addEventListener('submit', async function (event) {
-            event.preventDefault();
-            clearProfileErrors();
-
-            loadingOverlay?.classList.remove('hidden');
-            loadingOverlay?.classList.add('flex');
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-
-            try {
-                const formData = new FormData(profileForm);
-
-                const response = await fetch(profileForm.action, {
-                    method: 'POST',
+                const response = await fetch(refreshUrl, {
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: formData,
+                    credentials: 'same-origin',
                 });
-
-                const payload = await response.json();
 
                 if (!response.ok) {
-                    if (response.status === 422 && payload.errors) {
-                        applyFieldErrors(payload.errors);
-                        showProfileToast('Please check the profile fields.', true);
-                        return;
-                    }
-
-                    throw new Error(payload.message || 'Unable to update profile.');
+                    throw new Error('Unable to refresh barangay profile.');
                 }
 
-                updateBarangayProfileUI(payload.user || {});
-                showProfileToast(payload.message || 'Profile updated successfully.');
+                const payload = await response.json();
+                const data = payload.data || {};
+                const barangay = data.barangay || {};
+                const stats = data.stats || {};
+                const connectedUsers = data.connected_users || [];
+
+                setText('barangayProfileTitle', barangay.name ? `Barangay ${barangay.name}` : 'Barangay Profile');
+                setChip('barangayProfileCityChip', 'fa-solid fa-location-dot', barangay.city || 'City not linked');
+                setChip('barangayProfileCaptainChip', 'fa-solid fa-user-shield', data.captain_name || 'Barangay officer');
+                setChip('barangayProfileUsersChip', 'fa-solid fa-users', `${connectedUsers.length} connected users`);
+                setText('barangayProfileHallName', barangay.hall_name || 'Hall profile pending');
+                setText('barangayProfileCityValue', barangay.city || 'No city data');
+                setText('barangayProfileHallContact', barangay.hall_contact_number || 'No hall contact yet');
+                setText('barangayProfileHallEmail', barangay.hall_email || 'No hall email yet');
+                setText('barangayProfileStatUsers', String(stats.connected_users ?? 0));
+                setText('barangayProfileStatRiskAreas', String(stats.active_risk_records ?? 0));
+                setText('barangayProfileStatFireRecords', String(stats.fire_records ?? 0));
+                setText('barangayProfileStatChecklists', String(stats.checklist_items ?? 0));
+
+                if (usersList) {
+                    usersList.innerHTML = connectedUsers.length
+                        ? connectedUsers.map(renderUserRow).join('')
+                        : '<div class="empty-state mt-6">No barangay-connected users are available yet for this barangay.</div>';
+                }
             } catch (error) {
-                console.error('Barangay profile update failed:', error);
-                showProfileToast(error.message || 'Failed to update profile.', true);
-            } finally {
-                loadingOverlay?.classList.add('hidden');
-                loadingOverlay?.classList.remove('flex');
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Changes';
+                console.error(error);
+            }
+        }
+
+        refreshBarangayProfile();
+        window.setInterval(refreshBarangayProfile, 30000);
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                refreshBarangayProfile();
             }
         });
     });

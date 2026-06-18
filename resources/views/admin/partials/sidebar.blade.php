@@ -13,6 +13,7 @@
             'title' => 'Strategic Assets',
             'items' => [
                 ['label' => 'Resources', 'route' => 'admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>'],
+                ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
                 ['label' => 'Analytics', 'route' => 'admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
                 ['label' => 'Executive Reports', 'route' => 'admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
             ],
@@ -27,6 +28,7 @@
     $mobileCenterItem = ['label' => 'Operations Room', 'route' => 'admin.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'];
     $mobileCenterActions = [
         ['label' => 'Resources', 'route' => 'admin.resource-management.index', 'active' => 'resources', 'mobile_icon' => 'inventory_2'],
+        ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
         ['label' => 'Reports', 'route' => 'admin.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
         ['label' => 'Management', 'route' => 'admin.management', 'active' => 'management', 'mobile_icon' => 'apartment'],
         ['label' => 'Announcements', 'route' => 'admin.announcements', 'active' => 'announcements', 'mobile_icon' => 'campaign'],

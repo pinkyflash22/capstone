@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\Station;
 use App\Models\User;
+use App\Support\IncidentContextDispatcher;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +44,21 @@ class IncidentController extends Controller
         }
 
         return 'Incident';
+    }
+
+    private function calculateDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+            * sin($dLng / 2) * sin($dLng / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
     }
 
     private function resolveIncidentStatusLabel(?Incident $incident): string
@@ -179,21 +195,6 @@ class IncidentController extends Controller
                 ]);
             }
         }
-    }
-
-    private function calculateDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
-    {
-        $earthRadius = 6371000;
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-
-        $a = sin($dLat / 2) * sin($dLat / 2)
-            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-            * sin($dLng / 2) * sin($dLng / 2);
-
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c;
     }
 
     private function getStationsSortedByDistance(float $lat, float $lng)
@@ -396,6 +397,7 @@ class IncidentController extends Controller
             : $this->resolveDatabaseStatusName($validated['status']);
 
         $data = Incident::create($validated);
+        IncidentContextDispatcher::dispatchFor($data);
 
         $logUserId = (int) ($validated['reported_by'] ?? Auth::id() ?? 0);
         if ($logUserId > 0) {
@@ -632,10 +634,34 @@ class IncidentController extends Controller
     
     public function latest()
     {
+        $stationMarkers = Station::with('marker')
+            ->get()
+            ->filter(fn ($station) => $station->marker && $station->marker->lat !== null && $station->marker->lng !== null)
+            ->values();
+
         $coord = Incident::with(['marker'])
             ->latest()
             ->get()
-            ->map(function (Incident $incident) {
+            ->map(function (Incident $incident) use ($stationMarkers) {
+                $nearestStation = null;
+                $nearestStationDistanceMeters = null;
+
+                if ($incident->marker && $incident->marker->lat !== null && $incident->marker->lng !== null) {
+                    foreach ($stationMarkers as $station) {
+                        $distanceMeters = $this->calculateDistanceMeters(
+                            (float) $incident->marker->lat,
+                            (float) $incident->marker->lng,
+                            (float) $station->marker->lat,
+                            (float) $station->marker->lng
+                        );
+
+                        if ($nearestStationDistanceMeters === null || $distanceMeters < $nearestStationDistanceMeters) {
+                            $nearestStationDistanceMeters = $distanceMeters;
+                            $nearestStation = $station;
+                        }
+                    }
+                }
+
                 return [
                     'incident_id' => $incident->incident_id,
                     'marker_id' => $incident->marker_id,
@@ -650,6 +676,11 @@ class IncidentController extends Controller
                     'marker' => $incident->marker,
                     'created_at' => $incident->created_at,
                     'updated_at' => $incident->updated_at,
+                    'nearest_station_id' => $nearestStation?->station_id,
+                    'nearest_station_name' => $nearestStation?->station_name,
+                    'nearest_station_distance_meters' => $nearestStationDistanceMeters !== null
+                        ? round($nearestStationDistanceMeters)
+                        : null,
                 ];
             });
 

@@ -3,23 +3,23 @@
     $barangayName = $barangay?->barangay_name ?? 'Barangay Area';
     $navItems = [
         ['label' => 'Dashboard', 'route' => 'barangay.dashboard', 'active' => 'dashboard', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>'],
-        ['label' => 'Hazards', 'route' => 'barangay.hazards', 'active' => 'hazards', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'],
-        ['label' => 'Risk Map', 'route' => 'barangay.risk-map', 'active' => 'risk-map', 'icon' => '<svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>'],
-        ['label' => 'Patrols', 'route' => 'barangay.patrols', 'active' => 'patrols', 'icon' => '<svg viewBox="0 0 24 24"><path d="M6 20h12"/><path d="M9 20V9l3-6 3 6v11"/><path d="M8 12h8"/></svg>'],
-        ['label' => 'Assessment', 'route' => 'barangay.assessment', 'active' => 'assessment', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M7 15l3-3 3 2 4-6"/></svg>'],
-        ['label' => 'Reports', 'route' => 'barangay.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
-        ['label' => 'Awareness', 'route' => 'barangay.awareness', 'active' => 'awareness', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>'],
+        ['label' => 'Map', 'route' => 'barangay.risk-map', 'active' => 'risk-map', 'icon' => '<svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>'],
+        ['label' => 'Fire Reports', 'route' => 'barangay.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
+        ['label' => 'Hazards & Risks', 'route' => 'barangay.hazards', 'active' => 'hazards', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'],
+        ['label' => 'Checklist Center', 'route' => 'barangay.checklists', 'active' => 'checklists', 'icon' => '<svg viewBox="0 0 24 24"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg>'],
+        ['label' => 'Awareness Posts', 'route' => 'barangay.awareness', 'active' => 'awareness', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>'],
+        ['label' => 'Barangay Profile', 'route' => 'barangay.profile', 'active' => 'profile', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>'],
     ];
     $mobileDockItems = [
-        ['label' => 'Hazards', 'route' => 'barangay.hazards', 'active' => 'hazards', 'mobile_icon' => 'warning'],
-        ['label' => 'Risk Map', 'route' => 'barangay.risk-map', 'active' => 'risk-map', 'mobile_icon' => 'map'],
-        ['label' => 'Patrols', 'route' => 'barangay.patrols', 'active' => 'patrols', 'mobile_icon' => 'shield'],
+        ['label' => 'Map', 'route' => 'barangay.risk-map', 'active' => 'risk-map', 'mobile_icon' => 'map'],
+        ['label' => 'Fire Reports', 'route' => 'barangay.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
+        ['label' => 'Hazards & Risks', 'route' => 'barangay.hazards', 'active' => 'hazards', 'mobile_icon' => 'warning'],
     ];
     $mobileCenterItem = ['label' => 'Dashboard', 'route' => 'barangay.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'];
     $mobileCenterActions = [
-        ['label' => 'Assessment', 'route' => 'barangay.assessment', 'active' => 'assessment', 'mobile_icon' => 'fact_check'],
-        ['label' => 'Reports', 'route' => 'barangay.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
-        ['label' => 'Awareness', 'route' => 'barangay.awareness', 'active' => 'awareness', 'mobile_icon' => 'campaign'],
+        ['label' => 'Checklist Center', 'route' => 'barangay.checklists', 'active' => 'checklists', 'mobile_icon' => 'checklist'],
+        ['label' => 'Awareness Posts', 'route' => 'barangay.awareness', 'active' => 'awareness', 'mobile_icon' => 'campaign'],
+        ['label' => 'Barangay Profile', 'route' => 'barangay.profile', 'active' => 'profile', 'mobile_icon' => 'person'],
     ];
 @endphp
 

@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 
 class MarkerController extends Controller
 {
-    private const MARKER_CATEGORIES = ['fire', 'station', 'hydrant', 'school', 'barangay', 'bridge'];
+    private const MARKER_CATEGORIES = ['fire', 'station', 'hydrant', 'school', 'barangay', 'bridge', 'risk', 'hazard'];
     private const MARKER_STATUSES = ['active', 'inactive', 'completed'];
 
     private function mapCategoryNameToEnum(?string $value): ?string
@@ -35,6 +35,10 @@ class MarkerController extends Controller
             str_contains($normalized, 'barangay') => 'barangay',
             $normalized === 'bridge',
             str_contains($normalized, 'bridge') => 'bridge',
+            $normalized === 'risk',
+            str_contains($normalized, 'risk') => 'risk',
+            $normalized === 'hazard',
+            str_contains($normalized, 'hazard') => 'hazard',
             default => in_array($normalized, self::MARKER_CATEGORIES, true) ? $normalized : null,
         };
     }

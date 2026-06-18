@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\BarangayPredictionChecklist;
+use App\Observers\BarangayPredictionChecklistObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 
@@ -20,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        BarangayPredictionChecklist::observe(BarangayPredictionChecklistObserver::class);
+
         if ($this->app->runningInConsole()) {
             return;
         }

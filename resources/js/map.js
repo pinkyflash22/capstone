@@ -533,11 +533,13 @@ function createRouteInfoCard() {
     }, 100);
 }
 
-function createLegendItemHtml({ iconClass, bgColor, label, shape = 'circle' }) {
+const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"/><circle cx="16" cy="9" r="2" fill="none"/><circle cx="12" cy="7" r="2" fill="none"/><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"/></svg>';
+
+function createLegendItemHtml({ iconClass = null, iconHtml = null, bgColor, label, shape = 'circle' }) {
     return `
         <div class="firefighter-map-legend-item">
             <span class="firefighter-map-legend-icon ${shape === 'square' ? 'is-square' : 'is-circle'}" style="background:${bgColor};">
-                <i class="fas ${iconClass}" style="font-size:12px;"></i>
+                ${iconHtml ? `<span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;">${iconHtml}</span>` : (iconClass ? `<i class="fas ${iconClass}" style="font-size:12px;"></i>` : '')}
             </span>
             <span class="firefighter-map-legend-label">${label}</span>
         </div>
@@ -558,6 +560,7 @@ function createFirefighterMapLegend() {
         <div class="firefighter-map-legend-title">Map Legend</div>
         <div class="firefighter-map-legend-items">
             ${createLegendItemHtml({ iconClass: 'fa-building', bgColor: '#2563eb', label: 'Fire Station' })}
+            ${createLegendItemHtml({ bgColor: '#0f766e', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
             ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
             ${createLegendItemHtml(getIncidentTypePresentation('Fire'))}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
@@ -578,6 +581,10 @@ function createChiefMapLegend() {
             <div class="chief-map-legend-item">
                 <span class="chief-map-legend-icon" style="background:#2563eb;"><i class="fas fa-building" style="font-size:12px;"></i></span>
                 <span class="chief-map-legend-label">Fire Station</span>
+            </div>
+            <div class="chief-map-legend-item">
+                <span class="chief-map-legend-icon" style="background:#0f766e;"><span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;">${BARANGAY_GROUP_ICON_SVG}</span></span>
+                <span class="chief-map-legend-label">Barangay Hall</span>
             </div>
             <div class="chief-map-legend-item">
                 <span class="chief-map-legend-icon is-square" style="background:#ef4444;"><i class="fas fa-fire-extinguisher" style="font-size:12px;"></i></span>
@@ -832,6 +839,7 @@ const roleName = String(document.querySelector('meta[name="user-role"]')?.getAtt
             : ''
     );
 const currentUserMetaId = String(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || 'guest').trim() || 'guest';
+const currentStationMetaId = String(document.querySelector('meta[name="station-id"]')?.getAttribute('content') || window.userStationId || '').trim();
 window.thisToken = roleToken;
 
 const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
@@ -1603,6 +1611,13 @@ function shouldNotifyForIncident(incident, options = {}) {
     if (typeof options.maxDistanceMeters === 'number') {
         const distanceMeters = getIncidentAlertDistanceMeters(incident);
         if (typeof distanceMeters !== 'number' || distanceMeters > options.maxDistanceMeters) {
+            return false;
+        }
+    }
+
+    if (options.nearestStationOnly && currentStationMetaId) {
+        const nearestStationId = String(incident?.nearest_station_id || '').trim();
+        if (!nearestStationId || nearestStationId !== currentStationMetaId) {
             return false;
         }
     }
@@ -3519,7 +3534,8 @@ async function updateCoordinate(data, options = {}) {
             window.incidentsData = incidents;
             if (roleName && roleName !== 'citizen' && typeof window.syncIncidentAlertFeed === 'function') {
                 window.syncIncidentAlertFeed(`map-${roleName}-incidents`, incidents, {
-                    titlePrefix: roleName === 'chief' ? 'Command Alert' : 'Responder Alert'
+                    titlePrefix: roleName === 'chief' ? 'Command Alert' : 'Responder Alert',
+                    nearestStationOnly: ['chief', 'firefighter'].includes(roleName)
                 });
             }
         }

@@ -868,6 +868,7 @@
                 <div class="map-legend">
                     <span class="legend-chip"><span class="legend-dot" style="background:#dc2626;"></span> Incidents</span>
                     <span class="legend-chip"><span class="legend-dot" style="background:#2563eb;"></span> Stations</span>
+                    <span class="legend-chip"><span class="legend-dot" style="background:#0f766e;"></span> Barangay hall</span>
                     <span class="legend-chip"><span class="legend-dot" style="background:#b91c1c;"></span> Hazard areas</span>
                     <span class="legend-chip"><span class="legend-dot" style="background:#0f766e;"></span> Support / hydrants</span>
                 </div>

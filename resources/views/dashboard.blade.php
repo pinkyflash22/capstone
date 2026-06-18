@@ -98,10 +98,6 @@
                             <i class="fa-solid fa-user-secret"></i>
                             Report Anonymously
                         </button>
-                        <a href="{{ route('auth.login') }}" class="hero-action-btn hero-action-btn--secondary">
-                            <i class="fa-solid fa-right-to-bracket"></i>
-                            Sign In
-                        </a>
                         <a href="#map" class="hero-action-btn hero-action-btn--ghost">
                             <i class="fa-solid fa-map-location-dot"></i>
                             View Map

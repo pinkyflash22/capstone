@@ -13,6 +13,7 @@ use App\Models\EquipmentToStation;
 use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\User;
+use App\Support\IncidentContextDispatcher;
 use App\Models\Role;
 use App\Models\Province;
 use Illuminate\Http\Request;
@@ -298,6 +299,7 @@ public function storeIncident(Request $request)
             'reported_at' => now(),
             'created_at' => now()
         ]);
+        IncidentContextDispatcher::dispatchFor($incident);
         
         return response()->json([
             'success' => true,

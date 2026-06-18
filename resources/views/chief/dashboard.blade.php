@@ -8,6 +8,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <meta name="user-role" content="{{ auth()->user()->role->role ?? 'citizen' }}">
     <meta name="user-role-id" content="{{ auth()->user()->role_id ?? 5 }}">
+    <meta name="station-id" content="{{ $stationperson->first()?->station_id ?? '' }}">
 
     <title>PyroSense · Chief Command Dashboard</title>
     

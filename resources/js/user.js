@@ -64,12 +64,52 @@ let citizenSearchDebounceTimer = null;
 let citizenSearchActiveIndex = -1;
 let citizenSearchLocationMarker = null;
 const CITIZEN_MAP_SEARCH_GEOCODE_KEY = window.geoapifyKey || '83677a1086d44c4e82f903fd2fe2ea9b';
+const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"/><circle cx="16" cy="9" r="2" fill="none"/><circle cx="12" cy="7" r="2" fill="none"/><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"/></svg>';
 const citizenMapLayerState = {
     stations: true,
     incidents: true,
     hydrants: true,
     others: true
 };
+
+function ensureCitizenMarkerPanes() {
+    if (!window.usermap) {
+        return;
+    }
+
+    const paneConfig = [
+        { name: 'citizenBarangayPane', zIndex: 620 },
+        { name: 'citizenStationPane', zIndex: 630 },
+        { name: 'citizenHydrantPane', zIndex: 640 },
+        { name: 'citizenIncidentPane', zIndex: 650 },
+        { name: 'citizenUserPane', zIndex: 660 },
+    ];
+
+    paneConfig.forEach(({ name, zIndex }) => {
+        const pane = window.usermap.getPane(name) || window.usermap.createPane(name);
+        pane.style.zIndex = String(zIndex);
+    });
+}
+
+function getCitizenMarkerPane(categoryKey, isIncidentMarker = false) {
+    if (isIncidentMarker || categoryKey === 'fire') {
+        return 'citizenIncidentPane';
+    }
+
+    if (categoryKey === 'hydrant') {
+        return 'citizenHydrantPane';
+    }
+
+    if (categoryKey === 'station') {
+        return 'citizenStationPane';
+    }
+
+    if (categoryKey === 'barangay') {
+        return 'citizenBarangayPane';
+    }
+
+    return 'markerPane';
+}
 
 function normalizeCitizenSearchText(value) {
     return String(value ?? '')
@@ -113,7 +153,7 @@ function getCitizenSearchIcon(categoryKey, incident = null) {
         case 'station':
             return 'fa-building';
         case 'barangay':
-            return 'fa-people-roof';
+            return 'fa-people-group';
         case 'school':
             return 'fa-school';
         case 'bridge':
@@ -633,9 +673,12 @@ function ensureCitizenLegendControl() {
     return citizenLegendControl;
 }
 
-function buildLegendSwatch({ color, icon, shape = 'circle', pulse = false, size = 18, borderWidth = 2, shadow = '0 3px 10px rgba(15,23,42,0.18)', iconSize = 9 }) {
+function buildLegendSwatch({ color, icon = null, iconHtml = null, shape = 'circle', pulse = false, size = 18, borderWidth = 2, shadow = '0 3px 10px rgba(15,23,42,0.18)', iconSize = 9 }) {
     const radius = shape === 'square' ? '4px 4px 8px 8px' : '9999px';
     const animation = pulse ? 'animation:pulse 1.5s infinite;' : '';
+    const glyph = iconHtml
+        ? `<span style="display:inline-flex;width:${iconSize + 6}px;height:${iconSize + 6}px;align-items:center;justify-content:center;">${iconHtml}</span>`
+        : (icon ? `<i class="fas ${icon}" data-inline-fa-processed="1"></i>` : '');
 
     return `
         <span style="
@@ -653,7 +696,7 @@ function buildLegendSwatch({ color, icon, shape = 'circle', pulse = false, size 
             flex-shrink: 0;
             ${animation}
         ">
-            <i class="fas ${icon}" data-inline-fa-processed="1"></i>
+            ${glyph}
         </span>
     `;
 }
@@ -850,6 +893,7 @@ document.addEventListener('DOMContentLoaded', function(){
     // Initialize map only once
     if (!window.usermap || !window.usermap._container) {
         window.usermap = L.map('userMap').setView([15.8222, 120.3297], 13);
+        ensureCitizenMarkerPanes();
 
         var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
@@ -901,6 +945,7 @@ document.addEventListener('DOMContentLoaded', function(){
         }, 500);
     } else {
         console.log("Map already exists, skipping initialization");
+        ensureCitizenMarkerPanes();
         // Load markers if not loaded
         if (!markersLoaded) {
             loadMarkers();
@@ -1073,7 +1118,7 @@ function getCitizenMarkerPresentation(categoryInput) {
         case 'school':
             return { key: categoryKey, label: 'School', icon: 'fa-school', color: '#7c3aed', accentClass: 'default' };
         case 'barangay':
-            return { key: categoryKey, label: 'Barangay', icon: 'fa-people-roof', color: '#0f766e', accentClass: 'default' };
+            return { key: categoryKey, label: 'Barangay', icon: 'fa-people-group', color: '#0f766e', accentClass: 'default' };
         case 'bridge':
             return { key: categoryKey, label: 'Bridge', icon: 'fa-road-bridge', color: '#64748b', accentClass: 'default' };
         default:
@@ -1193,6 +1238,14 @@ function getCitizenCategoryIcon(categoryInput) {
 
     ensureCitizenMarkerStyles();
 
+    const glyph = markerPresentation.key === 'barangay'
+        ? `<span style="display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;">${BARANGAY_GROUP_ICON_SVG}</span>`
+        : `<i class="fas ${markerPresentation.icon}" data-inline-fa-processed="1" style="
+                    color: white;
+                    font-size: 15px;
+                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22));
+                "></i>`;
+
     return L.divIcon({
         className: 'custom-fa-icon citizen-category-icon',
         html: `
@@ -1207,11 +1260,7 @@ function getCitizenCategoryIcon(categoryInput) {
                 box-shadow: 0 6px 14px rgba(15, 23, 42, 0.24);
                 border: 3px solid #ffffff;
             ">
-                <i class="fas ${markerPresentation.icon}" data-inline-fa-processed="1" style="
-                    color: white;
-                    font-size: 15px;
-                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22));
-                "></i>
+                ${glyph}
             </div>
         `,
         iconSize: [34, 34],
@@ -1568,7 +1617,11 @@ export async function loadMarkers() {
                 registerLegendEntry({
                     key: `marker-${markerLegend.key}`,
                     label: markerLegend.label,
-                    swatch: buildLegendSwatch({ color: markerLegend.color, icon: markerLegend.icon })
+                    swatch: buildLegendSwatch({
+                        color: markerLegend.color,
+                        icon: markerLegend.icon,
+                        iconHtml: markerLegend.key === 'barangay' ? BARANGAY_GROUP_ICON_SVG : null
+                    })
                 });
             }
             
@@ -1681,7 +1734,19 @@ export async function loadMarkers() {
             `;
             
             // Create marker and add to appropriate layer group
-            const marker = L.marker([usermark.lat, usermark.lng], { icon: icon })
+            const marker = L.marker([usermark.lat, usermark.lng], {
+                icon: icon,
+                pane: getCitizenMarkerPane(markerCategory, isIncidentMarker),
+                zIndexOffset: isIncidentMarker
+                    ? 400
+                    : isCitizenHydrantCategory(markerCategory)
+                        ? 300
+                        : isCitizenStationCategory(markerCategory)
+                            ? 200
+                            : markerCategory === 'barangay'
+                                ? 100
+                                : 0
+            })
                 .bindPopup(popupContent, {
                     minWidth: 250,
                     maxWidth: 300,

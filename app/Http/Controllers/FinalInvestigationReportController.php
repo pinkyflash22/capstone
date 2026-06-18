@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FinalInvestigationReport;
 use App\Models\FullAddress;
 use App\Models\ProgressInvestigationReport;
+use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 
@@ -35,6 +36,7 @@ class FinalInvestigationReportController extends Controller
         ]);
 
         $data = FinalInvestigationReport::create($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('created final report', auth()->user()?->user_id, $request);
 
         return response()->json(['success'=>true, 'data'=>$data]);
@@ -59,6 +61,7 @@ class FinalInvestigationReportController extends Controller
     ]);
 
     $final = FinalInvestigationReport::create($validated);
+    HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
     return response()->json(['success' => true, 'data' => $final]);
 }
 
@@ -88,6 +91,7 @@ class FinalInvestigationReportController extends Controller
         ]);
 
         $final->update($validated);
+        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated final report', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true]);
 
@@ -96,7 +100,9 @@ class FinalInvestigationReportController extends Controller
 
     public function destroy(FinalInvestigationReport $finalInvestigationReport)
     {
+        $incidentId = (int) $finalInvestigationReport->progressInvestigation?->spotInvestigation?->incident_id;
         $finalInvestigationReport->delete();
+        HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted final report', auth()->user()?->user_id, request());
 
         return redirect()->route('final-investigation-reports.index')

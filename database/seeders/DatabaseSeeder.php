@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             // HydrantTypesSeeder::class,
             // EquipmentCategoriesSeeder::class,
             SampleDefaultDataSeeder::class,
+            UrbiztondoBarangayHallSeeder::class,
             StationOfficersSeeder::class,
             SampleTeamsSeeder::class,
             HistoricalDataSeeder::class,
