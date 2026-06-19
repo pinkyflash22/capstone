@@ -8,7 +8,9 @@ import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import accuracy_score, brier_score_loss, classification_report, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -57,8 +59,14 @@ STATION_BARANGAY_MONTHLY_COLUMNS = [
     "month",
     "year",
     "incident_count",
+    "estimated_damage",
+    "injured_count",
+    "death_count",
     "risk_level",
     "average_temperature",
+    "average_humidity",
+    "average_wind_speed",
+    "weather_condition",
     "season",
     "near_water",
     "density",
@@ -239,11 +247,52 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
     if missing_columns:
         raise ValueError(f"station_barangay_monthly dataset is missing required fields: {', '.join(missing_columns)}")
 
-    numeric_columns = ["station_id", "barangay_id", "year", "incident_count", "average_temperature", "near_water"]
+    numeric_columns = [
+        "station_id",
+        "barangay_id",
+        "year",
+        "incident_count",
+        "estimated_damage",
+        "injured_count",
+        "death_count",
+        "average_temperature",
+        "average_humidity",
+        "average_wind_speed",
+        "near_water",
+    ]
     for column in numeric_columns:
         df[column] = pd.to_numeric(df[column], errors="coerce")
 
-    df = df.dropna(subset=STATION_BARANGAY_MONTHLY_COLUMNS).reset_index(drop=True)
+    for column in ["weather_condition", "season", "density", "materials", "peak_hours", "accesibility", "type_incident", "occupancy", "barangay_name", "risk_level"]:
+        if column not in df.columns:
+            df[column] = "unknown"
+        df[column] = df[column].fillna("unknown").astype(str).str.strip().replace("", "unknown")
+
+    for column in ["average_humidity", "average_wind_speed", "estimated_damage", "injured_count", "death_count"]:
+        if column not in df.columns:
+            df[column] = 0
+        df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
+
+    essential_columns = [
+        "station_id",
+        "barangay_id",
+        "barangay_name",
+        "month",
+        "year",
+        "incident_count",
+        "risk_level",
+        "average_temperature",
+        "season",
+        "near_water",
+        "density",
+        "materials",
+        "peak_hours",
+        "accesibility",
+        "type_incident",
+        "occupancy",
+    ]
+
+    df = df.dropna(subset=essential_columns).reset_index(drop=True)
     if df.empty:
         raise ValueError("No valid station_barangay_monthly rows left after cleaning.")
 
@@ -253,16 +302,22 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
     df["is_dry_season"] = (df["season"] == "dry").astype(int)
     df["high_density_flag"] = (df["density"] == "high").astype(int)
     df["water_access_flag"] = df["near_water"].astype(int)
+    df["temperature_signal"] = df["average_temperature"].fillna(0)
+    df["humidity_signal"] = df["average_humidity"].fillna(df["average_humidity"].median() if not df["average_humidity"].dropna().empty else 0)
+    df["wind_signal"] = df["average_wind_speed"].fillna(df["average_wind_speed"].median() if not df["average_wind_speed"].dropna().empty else 0)
     df["barangay_pressure_signal"] = (
         df["incident_count"] * 1.2
         + df["average_temperature"] * 0.35
         + df["high_density_flag"] * 2.5
         - df["water_access_flag"] * 0.75
+        + df["average_wind_speed"].fillna(0) * 0.15
+        - df["average_humidity"].fillna(0) * 0.03
     )
 
     df["target_high_risk_barangay_month"] = (
-        (df["risk_level"].str.lower() == "high") |
-        (df["incident_count"] >= 8)
+        (df["risk_level"].str.lower().isin(["medium", "high"])) |
+        (df["incident_count"] >= 1) |
+        (df["estimated_damage"].fillna(0) >= 50000)
     ).astype(int)
 
     feature_columns = [
@@ -270,13 +325,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "barangay_id",
         "year",
         "average_temperature",
+        "average_humidity",
+        "average_wind_speed",
         "water_access_flag",
         "month_sin",
         "month_cos",
         "is_dry_season",
         "high_density_flag",
+        "temperature_signal",
+        "humidity_signal",
+        "wind_signal",
         "barangay_pressure_signal",
         "barangay_name",
+        "weather_condition",
         "season",
         "density",
         "materials",
@@ -292,6 +353,7 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "raw_feature_columns": STATION_BARANGAY_MONTHLY_COLUMNS,
         "categorical_features": [
             "barangay_name",
+            "weather_condition",
             "season",
             "density",
             "materials",
@@ -305,14 +367,23 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "barangay_id",
             "year",
             "average_temperature",
+            "average_humidity",
+            "average_wind_speed",
             "water_access_flag",
             "month_sin",
             "month_cos",
             "is_dry_season",
             "high_density_flag",
+            "temperature_signal",
+            "humidity_signal",
+            "wind_signal",
             "barangay_pressure_signal",
         ],
         "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
+        "regression_targets": {
+            "predicted_incident_count": "incident_count",
+            "predicted_estimated_damage": "estimated_damage",
+        },
     }
     return df[feature_columns], df["target_high_risk_barangay_month"], feature_columns, metadata
 
@@ -537,6 +608,30 @@ def build_model(y_train: pd.Series, categorical_features: list[str]) -> Pipeline
     ])
 
 
+def build_regression_model(categorical_features: list[str]) -> Pipeline | RandomForestRegressor:
+    estimator = RandomForestRegressor(
+        n_estimators=250,
+        max_depth=12,
+        min_samples_leaf=2,
+        random_state=42,
+    )
+
+    if not categorical_features:
+        return estimator
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("categorical", OneHotEncoder(handle_unknown="ignore"), categorical_features),
+        ],
+        remainder="passthrough",
+    )
+
+    return Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", estimator),
+    ])
+
+
 def get_fitted_estimator(model):
     if isinstance(model, Pipeline):
         return get_fitted_estimator(model.named_steps["model"])
@@ -656,6 +751,42 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     global_feature_importance = aggregate_global_feature_importance(model, feature_columns)
     reference_profile = build_reference_profile(X, metadata["categorical_features"], metadata["numeric_features"])
     example_profiles = build_example_profiles(X, y)
+    regression_models: dict[str, object] = {}
+    regression_metrics: dict[str, dict] = {}
+
+    regression_targets = metadata.get("regression_targets", {})
+    if regression_targets:
+        for output_name, target_column in regression_targets.items():
+            if target_column not in pd.DataFrame(records).columns:
+                continue
+
+            target_values = pd.to_numeric(pd.DataFrame(records)[target_column], errors="coerce")
+            valid_mask = ~target_values.isna()
+            if valid_mask.sum() < 8:
+                continue
+
+            X_reg = X.loc[valid_mask].reset_index(drop=True)
+            y_reg = target_values.loc[valid_mask].reset_index(drop=True)
+            X_reg_train, X_reg_test, y_reg_train, y_reg_test = train_test_split(
+                X_reg,
+                y_reg,
+                test_size=0.25,
+                random_state=42,
+            )
+
+            regression_model = build_regression_model(metadata["categorical_features"])
+            regression_model.fit(X_reg_train, y_reg_train)
+            y_reg_pred = regression_model.predict(X_reg_test)
+
+            regression_models[output_name] = regression_model
+            regression_metrics[output_name] = {
+                "target_column": target_column,
+                "train_rows": int(len(X_reg_train)),
+                "test_rows": int(len(X_reg_test)),
+                "mae": float(round(mean_absolute_error(y_reg_test, y_reg_pred), 4)),
+                "rmse": float(round(math.sqrt(mean_squared_error(y_reg_test, y_reg_pred)), 4)),
+                "r2_score": float(round(r2_score(y_reg_test, y_reg_pred), 4)) if len(y_reg_test) > 1 else None,
+            }
 
     metrics = {
         "train_rows": int(len(X_train)),
@@ -669,10 +800,12 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "cross_val_roc_auc_mean": float(round(sum(cv_scores) / len(cv_scores), 4)) if len(cv_scores) else None,
         "cross_val_roc_auc_scores": [float(round(score, 4)) for score in cv_scores] if len(cv_scores) else [],
         "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
+        "regression_metrics": regression_metrics,
     }
 
     model_bundle = {
         "model": model,
+        "regression_models": regression_models,
         "feature_columns": feature_columns,
         "dataset_kind": metadata["dataset_kind"],
         "target_column": metadata["target_column"],
@@ -682,6 +815,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "global_feature_importance": global_feature_importance,
         "reference_profile": reference_profile,
         "example_profiles": example_profiles,
+        "regression_targets": regression_targets,
     }
     joblib.dump(model_bundle, MODEL_PATH)
 
@@ -696,11 +830,13 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "global_feature_importance": global_feature_importance[:10],
         "reference_profile": reference_profile,
         "metrics": metrics,
+        "trained_at": pd.Timestamp.utcnow().isoformat(),
         "notes": [
             "This is a JSON-first baseline designed for later API integration.",
             "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",
             "Deep learning is not recommended until the project has substantially more historical data.",
             "Use the prediction output drivers and ai_context fields when prompting a language model for recommendations.",
+            "Regression outputs are intended for forecasted incident counts and estimated damage totals.",
         ],
     }
     METADATA_PATH.write_text(json.dumps(metadata_payload, indent=2), encoding="utf-8")

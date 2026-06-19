@@ -1,22 +1,28 @@
 {
-  "dataset_path": "station_barangay_monthly_demo.json",
+  "dataset_path": "station_barangay_monthly_db.json",
   "model_path": "fire_model.pkl",
   "dataset_kind": "station_barangay_monthly",
   "target_column": "target_high_risk_barangay_month",
   "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
-  "records_used": 720,
+  "records_used": 432,
   "feature_columns": [
     "station_id",
     "barangay_id",
     "year",
     "average_temperature",
+    "average_humidity",
+    "average_wind_speed",
     "water_access_flag",
     "month_sin",
     "month_cos",
     "is_dry_season",
     "high_density_flag",
+    "temperature_signal",
+    "humidity_signal",
+    "wind_signal",
     "barangay_pressure_signal",
     "barangay_name",
+    "weather_condition",
     "season",
     "density",
     "materials",
@@ -27,115 +33,141 @@
   ],
   "global_feature_importance": [
     {
-      "feature": "barangay_pressure_signal",
-      "importance": 0.384
+      "feature": "type_incident",
+      "importance": 0.1419
     },
     {
-      "feature": "season",
-      "importance": 0.0975
-    },
-    {
-      "feature": "average_temperature",
-      "importance": 0.0778
+      "feature": "materials",
+      "importance": 0.1327
     },
     {
       "feature": "density",
-      "importance": 0.0755
+      "importance": 0.1082
     },
     {
-      "feature": "high_density_flag",
-      "importance": 0.049
+      "feature": "accesibility",
+      "importance": 0.0895
     },
     {
-      "feature": "month_sin",
-      "importance": 0.0458
+      "feature": "barangay_pressure_signal",
+      "importance": 0.088
     },
     {
-      "feature": "is_dry_season",
-      "importance": 0.0453
+      "feature": "peak_hours",
+      "importance": 0.0842
+    },
+    {
+      "feature": "occupancy",
+      "importance": 0.0797
     },
     {
       "feature": "barangay_name",
-      "importance": 0.0429
+      "importance": 0.0519
     },
     {
-      "feature": "water_access_flag",
-      "importance": 0.0354
+      "feature": "temperature_signal",
+      "importance": 0.0347
     },
     {
-      "feature": "type_incident",
-      "importance": 0.0251
+      "feature": "barangay_id",
+      "importance": 0.0322
     }
   ],
   "reference_profile": {
-    "station_id": 2.0,
-    "barangay_id": 202.5,
-    "year": 2023.0,
-    "average_temperature": 30.57,
-    "water_access_flag": 0.5,
+    "station_id": 1.0,
+    "barangay_id": 257.0,
+    "year": 2024.5,
+    "average_temperature": 30.0,
+    "average_humidity": 0.0,
+    "average_wind_speed": 0.0,
+    "water_access_flag": 0.0,
     "month_sin": -0.0,
     "month_cos": -0.0,
     "is_dry_season": 0.5,
     "high_density_flag": 0.0,
-    "barangay_pressure_signal": 19.4352,
-    "barangay_name": "Barangay Anonas",
+    "temperature_signal": 30.0,
+    "humidity_signal": 0.0,
+    "wind_signal": 0.0,
+    "barangay_pressure_signal": 10.5,
+    "barangay_name": "Angatel",
+    "weather_condition": "unknown",
     "season": "dry",
-    "density": "high",
-    "materials": "concrete",
-    "peak_hours": "afternoon",
-    "accesibility": "difficult access",
-    "type_incident": "electrical fire",
-    "occupancy": "industrial"
+    "density": "medium",
+    "materials": "mixed",
+    "peak_hours": "none recorded",
+    "accesibility": "moderate access",
+    "type_incident": "no recorded incident",
+    "occupancy": "mixed-use"
   },
   "metrics": {
-    "train_rows": 540,
-    "test_rows": 180,
-    "accuracy": 0.95,
-    "roc_auc": 0.9908,
-    "precision": 0.9595,
-    "recall": 0.9221,
-    "f1_score": 0.9404,
-    "brier_score": 0.0346,
-    "cross_val_roc_auc_mean": 0.9857,
+    "train_rows": 324,
+    "test_rows": 108,
+    "accuracy": 0.9722,
+    "roc_auc": 0.9048,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "brier_score": 0.0226,
+    "cross_val_roc_auc_mean": 0.9349,
     "cross_val_roc_auc_scores": [
-      0.9939,
-      0.9825,
-      0.9799,
-      0.9744,
-      0.9978
+      0.8333,
+      0.9643,
+      0.9583,
+      0.9226,
+      0.996
     ],
     "classification_report": {
       "0": {
-        "precision": 0.9433962264150944,
-        "recall": 0.970873786407767,
-        "f1-score": 0.9569377990430622,
-        "support": 103.0
+        "precision": 0.9722222222222222,
+        "recall": 1.0,
+        "f1-score": 0.9859154929577465,
+        "support": 105.0
       },
       "1": {
-        "precision": 0.9594594594594594,
-        "recall": 0.922077922077922,
-        "f1-score": 0.9403973509933775,
-        "support": 77.0
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3.0
       },
-      "accuracy": 0.95,
+      "accuracy": 0.9722222222222222,
       "macro avg": {
-        "precision": 0.9514278429372769,
-        "recall": 0.9464758542428445,
-        "f1-score": 0.9486675750182199,
-        "support": 180.0
+        "precision": 0.4861111111111111,
+        "recall": 0.5,
+        "f1-score": 0.49295774647887325,
+        "support": 108.0
       },
       "weighted avg": {
-        "precision": 0.9502677205507395,
-        "recall": 0.95,
-        "f1-score": 0.9498621629329194,
-        "support": 180.0
+        "precision": 0.945216049382716,
+        "recall": 0.9722222222222222,
+        "f1-score": 0.9585289514866979,
+        "support": 108.0
+      }
+    },
+    "regression_metrics": {
+      "predicted_incident_count": {
+        "target_column": "incident_count",
+        "train_rows": 324,
+        "test_rows": 108,
+        "mae": 0.0292,
+        "rmse": 0.1173,
+        "r2_score": 0.2434
+      },
+      "predicted_estimated_damage": {
+        "target_column": "estimated_damage",
+        "train_rows": 324,
+        "test_rows": 108,
+        "mae": 4379.6342,
+        "rmse": 27731.7579,
+        "r2_score": -32.5335
       }
     }
   },
+  "trained_at": "2026-06-19T02:43:00.578425+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",
     "Deep learning is not recommended until the project has substantially more historical data.",
-    "Use the prediction output drivers and ai_context fields when prompting a language model for recommendations."
+    "Use the prediction output drivers and ai_context fields when prompting a language model for recommendations.",
+    "Regression outputs are intended for forecasted incident counts and estimated damage totals."
   ]
 }

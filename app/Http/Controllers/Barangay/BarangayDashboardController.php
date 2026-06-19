@@ -13,6 +13,7 @@ use App\Models\HistoricalFireIncident;
 use App\Models\Incident;
 use App\Models\IncidentContext;
 use App\Models\Marker;
+use App\Models\MitigationAction;
 use App\Models\Post;
 use App\Models\RiskArea;
 use App\Models\RiskAreaPhoto;
@@ -441,6 +442,7 @@ class BarangayDashboardController extends Controller
         $predictionChecklists = collect();
         $fireRecords = collect();
         $riskAreas = collect();
+        $mitigationActions = collect();
         $markers = collect();
         $miniMapPins = collect();
         $stations = Station::query()->orderBy('station_name')->get();
@@ -466,6 +468,7 @@ class BarangayDashboardController extends Controller
                 ->orderByDesc('marker_id')
                 ->limit(18)
                 ->get();
+
         }
 
         if ($hall) {
@@ -480,6 +483,16 @@ class BarangayDashboardController extends Controller
                 ->where('barangay_hall_id', $hall->barangay_hall_id)
                 ->orderByDesc('created_at')
                 ->limit(12)
+                ->get();
+
+            $mitigationActions = MitigationAction::query()
+                ->with(['riskArea.marker', 'checklist', 'creator', 'attachments'])
+                ->where('barangay_id', $barangay?->barangay_id)
+                ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+                ->orderByRaw("FIELD(status, 'in_progress', 'planned', 'blocked', 'completed', 'cancelled')")
+                ->orderBy('target_date')
+                ->orderByDesc('created_at')
+                ->limit(16)
                 ->get();
 
             if ($hall->marker && $hall->marker->lat !== null && $hall->marker->lng !== null) {
@@ -587,6 +600,7 @@ class BarangayDashboardController extends Controller
             'predictionChecklists' => $predictionChecklists,
             'fireRecords' => $fireRecords,
             'riskAreas' => $riskAreas,
+            'mitigationActions' => $mitigationActions,
             'markers' => $markers,
             'miniMapPins' => $miniMapPins,
             'latestPosts' => $latestPosts,
@@ -603,6 +617,7 @@ class BarangayDashboardController extends Controller
                 'historical_total' => $historicalIncidents->count(),
                 'open_actions' => $predictionChecklists->whereIn('status', ['pending', 'in_progress'])->count(),
                 'critical_actions' => $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
+                'mitigation_open' => $mitigationActions->whereIn('status', ['planned', 'in_progress', 'blocked'])->count(),
                 'recorded_reports' => $fireRecords->count(),
                 'risk_markers' => $riskAreas->count(),
                 'total_hazards_reported' => (int) $historicalIncidents->sum(function (HistoricalFireIncident $incident) {

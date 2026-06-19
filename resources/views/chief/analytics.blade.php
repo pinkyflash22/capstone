@@ -1118,6 +1118,12 @@
                                 <div style="font-size: 24px; font-weight: 800; color: #7f1d1d; margin-top: 4px;">${escapeHtml(String(prediction.predicted_fire_incidents))}</div>
                            </div>`
                         : '';
+                    const predictedDamage = prediction.predicted_damage !== undefined && prediction.predicted_damage !== null
+                        ? `<div style="padding: 12px 14px; border-radius: 12px; background: rgba(249,115,22,0.10); border: 1px solid rgba(249,115,22,0.16);">
+                                <div style="font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 0.08em;">Estimated Damage Exposure</div>
+                                <div style="font-size: 20px; font-weight: 800; color: #9a3412; margin-top: 4px;">PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</div>
+                           </div>`
+                        : '';
                     const likelyPeakHours = (prediction.likely_peak_hours || []).length
                         ? `<div style="padding: 12px 14px; border-radius: 12px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.18);">
                                 <div style="font-size: 11px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: 0.08em;">Likely Peak Hours</div>
@@ -1145,6 +1151,7 @@
                             <p style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: #334155;">${escapeHtml(prediction.summary)}</p>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 14px;">
                                 ${predictedFireCount}
+                                ${predictedDamage}
                                 ${likelyPeakHours}
                             </div>
                             ${predictionDrivers ? `<div style="margin-top: 14px;">
@@ -2287,6 +2294,12 @@
                                 <div style="font-size: 24px; font-weight: 800; color: #7f1d1d; margin-top: 4px;">${escapeHtml(String(prediction.predicted_fire_incidents))}</div>
                            </div>`
                         : '';
+                    const predictedDamage = prediction.predicted_damage !== undefined && prediction.predicted_damage !== null
+                        ? `<div style="padding: 12px 14px; border-radius: 12px; background: rgba(249,115,22,0.10); border: 1px solid rgba(249,115,22,0.16);">
+                                <div style="font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 0.08em;">Estimated Damage Exposure</div>
+                                <div style="font-size: 20px; font-weight: 800; color: #9a3412; margin-top: 4px;">PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</div>
+                           </div>`
+                        : '';
                     const likelyPeakHours = (prediction.likely_peak_hours || []).length
                         ? `<div style="padding: 12px 14px; border-radius: 12px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.18);">
                                 <div style="font-size: 11px; font-weight: 700; color: #9a3412; text-transform: uppercase; letter-spacing: 0.08em;">Likely Peak Hours</div>
@@ -2314,6 +2327,7 @@
                             <p style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: #334155;">${escapeHtml(prediction.summary)}</p>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 14px;">
                                 ${predictedFireCount}
+                                ${predictedDamage}
                                 ${likelyPeakHours}
                             </div>
                             ${predictionDrivers ? `<div style="margin-top: 14px;">

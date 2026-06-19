@@ -11,6 +11,7 @@ use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
 use App\Models\User;
+use App\Services\ForecastModelService;
 use App\Support\BarangayNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,9 +25,11 @@ class AnalyticController extends Controller
 {
   
     private $apiKey;
+    private ForecastModelService $forecastModelService;
     
-    public function __construct()
+    public function __construct(ForecastModelService $forecastModelService)
     {
+        $this->forecastModelService = $forecastModelService;
         // Load API key from .env file
         $this->apiKey = env('OPENROUTER_API_KEY');
         
@@ -574,8 +577,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     }
     
     $predictionContext = $this->buildPredictionContext($teamIds, $predictionScope);
-    $modelPrediction = $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext);
     $barangayPredictions = $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext);
+    $modelPrediction = $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions);
     $selectedBarangayPrediction = null;
 
     if ($selectedBarangayId) {
@@ -694,84 +697,85 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         ];
     }
 
-    private function buildModelPredictionData($stationId, array $predictionContext, array $weatherContext = []): ?array
+    private function buildModelPredictionData($stationId, array $predictionContext, array $weatherContext = [], array $barangayPredictions = []): ?array
     {
         try {
-            $targetMonth = !empty($predictionContext['target_month_label'])
-                ? Carbon::createFromFormat('F Y', $predictionContext['target_month_label'])->startOfMonth()
-                : Carbon::now()->startOfMonth();
-
-            $historicalRow = DB::table('historical_data')
-                ->where('station_id', $stationId)
-                ->where('month', $targetMonth->format('F'))
-                ->where('year', $targetMonth->year)
-                ->first();
-
-            if (!$historicalRow) {
-                $historicalRow = DB::table('historical_data')
-                    ->where('station_id', $stationId)
-                    ->orderByDesc('year')
-                    ->orderByRaw("
-                        CASE month
-                            WHEN 'January' THEN 1
-                            WHEN 'February' THEN 2
-                            WHEN 'March' THEN 3
-                            WHEN 'April' THEN 4
-                            WHEN 'May' THEN 5
-                            WHEN 'June' THEN 6
-                            WHEN 'July' THEN 7
-                            WHEN 'August' THEN 8
-                            WHEN 'September' THEN 9
-                            WHEN 'October' THEN 10
-                            WHEN 'November' THEN 11
-                            WHEN 'December' THEN 12
-                            ELSE 13
-                        END DESC
-                    ")
-                    ->first();
-            }
-
-            if (!$historicalRow) {
+            if (empty($barangayPredictions)) {
                 return null;
             }
 
-            $payload = [
-                'station_id' => (int) $historicalRow->station_id,
-                'month' => $targetMonth->format('F'),
-                'year' => (int) $targetMonth->year,
-                'average_temperature' => isset($weatherContext['avg_temp_c']) && $weatherContext['avg_temp_c'] !== null
-                    ? (float) $weatherContext['avg_temp_c']
-                    : (float) $historicalRow->average_temperature,
-                'season' => $historicalRow->season,
-                'near_water' => (int) $historicalRow->near_water,
-                'density' => $historicalRow->density,
-                'materials' => $historicalRow->materials,
-                'peak_hours' => $historicalRow->peak_hours,
-                'accesibility' => $historicalRow->accesibility,
-                'type_incident' => $historicalRow->type_incident,
-                'occupancy' => $historicalRow->occupancy,
+            $probabilities = collect($barangayPredictions)->pluck('probability_percent')->filter(fn ($value) => is_numeric($value));
+            $predictedIncidentCount = (int) round(collect($barangayPredictions)->sum(function ($item) {
+                return (float) ($item['predicted_incident_count'] ?? 0);
+            }));
+            $predictedDamage = round((float) collect($barangayPredictions)->sum(function ($item) {
+                return (float) ($item['predicted_estimated_damage'] ?? 0);
+            }), 2);
+
+            $maxProbability = (float) ($probabilities->max() ?? 0);
+            $averageProbability = (float) ($probabilities->avg() ?? 0);
+            $stationProbability = round(($maxProbability * 0.55) + ($averageProbability * 0.45), 2);
+
+            $riskLevel = 'low';
+            if ($stationProbability >= 65 || $predictedIncidentCount >= 6 || $predictedDamage >= 500000) {
+                $riskLevel = 'high';
+            } elseif ($stationProbability >= 35 || $predictedIncidentCount >= 3 || $predictedDamage >= 150000) {
+                $riskLevel = 'moderate';
+            }
+
+            $driverSummaries = collect($barangayPredictions)
+                ->take(3)
+                ->flatMap(function ($item) {
+                    $barangayName = $item['barangay_name'] ?? 'Unknown barangay';
+
+                    return collect($item['drivers'] ?? [])
+                        ->take(2)
+                        ->map(function ($driver) use ($barangayName) {
+                            $summary = $driver['summary'] ?? null;
+
+                            return $summary ? "{$barangayName}: {$summary}" : null;
+                        });
+                })
+                ->filter()
+                ->values()
+                ->all();
+
+            $watchItems = collect($barangayPredictions)
+                ->flatMap(fn ($item) => $item['watch_items'] ?? [])
+                ->filter()
+                ->unique()
+                ->take(6)
+                ->values()
+                ->all();
+
+            $confidenceBand = 'low';
+            if ($stationProbability >= 75 || $stationProbability <= 20) {
+                $confidenceBand = 'high';
+            } elseif ($stationProbability >= 55 || $stationProbability <= 30) {
+                $confidenceBand = 'medium';
+            }
+
+            $decoded = [
+                'prediction' => $riskLevel === 'high' ? 1 : 0,
+                'probability' => round($stationProbability / 100, 4),
+                'probability_percent' => $stationProbability,
+                'risk_level' => $riskLevel,
+                'confidence_band' => $confidenceBand,
+                'target' => 'station_monthly_fire_pressure',
+                'predicted_incident_count' => $predictedIncidentCount,
+                'predicted_estimated_damage' => $predictedDamage,
+                'drivers' => array_map(fn ($summary) => ['summary' => $summary], $driverSummaries),
+                'watch_items' => $watchItems,
             ];
 
-            $process = Process::path(base_path())
-                ->input(json_encode($payload))
-                ->run(['python', 'capstone-ai/predict_event.py']);
-
-            if ($process->failed()) {
-                Log::warning('Python prediction process failed', [
-                    'error' => $process->errorOutput(),
-                    'output' => $process->output(),
-                ]);
-                return null;
-            }
-
-            $decoded = json_decode($process->output(), true);
-            if (!is_array($decoded)) {
-                Log::warning('Python prediction output was not valid JSON', ['output' => $process->output()]);
-                return null;
-            }
-
             return [
-                'input' => $payload,
+                'input' => [
+                    'station_id' => $stationId,
+                    'aggregation' => 'barangay_monthly_forecasts',
+                    'barangay_count' => count($barangayPredictions),
+                    'target_month_label' => $predictionContext['target_month_label'] ?? null,
+                    'weather_context' => $weatherContext,
+                ],
                 'output' => $decoded,
             ];
         } catch (\Throwable $e) {
@@ -783,6 +787,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     private function buildBarangayPredictionData(int $stationId, array $predictionContext, array $weatherContext = []): array
     {
         try {
+            $this->forecastModelService->ensureReady();
+
             $targetMonth = !empty($predictionContext['target_month_label'])
                 ? Carbon::createFromFormat('F Y', $predictionContext['target_month_label'])->startOfMonth()
                 : Carbon::now()->startOfMonth();
@@ -878,7 +884,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 return ($right['probability_percent'] ?? 0) <=> ($left['probability_percent'] ?? 0);
             });
 
-            return array_slice($forecasts, 0, 10);
+            return $forecasts;
         } catch (\Throwable $e) {
             Log::warning('Unable to build barangay prediction data: ' . $e->getMessage());
             return [];
@@ -983,6 +989,15 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $averageTemperature = isset($weatherContext['avg_temp_c']) && $weatherContext['avg_temp_c'] !== null
             ? (float) $weatherContext['avg_temp_c']
             : ($sameMonthIncidents->avg('temperature') ?: $stationHistoricalRow->average_temperature);
+        $averageHumidity = isset($weatherContext['humidity']) && $weatherContext['humidity'] !== null
+            ? (float) $weatherContext['humidity']
+            : ($sameMonthIncidents->avg('humidity') ?: null);
+        $averageWindSpeed = isset($weatherContext['wind_kph']) && $weatherContext['wind_kph'] !== null
+            ? (float) $weatherContext['wind_kph']
+            : ($sameMonthIncidents->avg('wind_speed') ?: null);
+        $weatherCondition = $weatherContext['condition']
+            ?? $weatherContext['summary']
+            ?? ($sameMonthIncidents->pluck('weather_condition')->filter()->countBy()->sortDesc()->keys()->first() ?: 'unknown');
 
         $historicalRiskLevel = $incidentCount >= 8
             ? 'high'
@@ -1019,6 +1034,9 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'incident_count' => $incidentCount,
             'risk_level' => $historicalRiskLevel,
             'average_temperature' => (float) $averageTemperature,
+            'average_humidity' => $averageHumidity !== null ? (float) $averageHumidity : null,
+            'average_wind_speed' => $averageWindSpeed !== null ? (float) $averageWindSpeed : null,
+            'weather_condition' => $weatherCondition,
             'season' => $stationHistoricalRow->season,
             'near_water' => $nearWater,
             'density' => $density,
@@ -1251,6 +1269,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $prompt .= "- Probability: " . (($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'] . "%" : 'N/A') . "\n";
             $prompt .= "- Risk Level: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
             $prompt .= "- Confidence Band: " . strtoupper($modelPrediction['confidence_band'] ?? 'unknown') . "\n";
+            $prompt .= "- Predicted Incident Count: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
+            $prompt .= "- Predicted Damage Exposure: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
             $prompt .= "- Watch Items: " . implode(', ', $modelPrediction['watch_items'] ?? ['None']) . "\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (!empty($driver['summary'])) {
@@ -1329,6 +1349,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $prompt .= "- Risk level: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
             $prompt .= "- Probability: " . (($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'] . "%" : 'N/A') . "\n";
             $prompt .= "- Confidence: " . strtoupper($modelPrediction['confidence_band'] ?? 'unknown') . "\n";
+            $prompt .= "- Predicted incidents: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
+            $prompt .= "- Predicted damage: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
             $prompt .= "- Watch items: " . implode(', ', $modelPrediction['watch_items'] ?? ['None']) . "\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (!empty($driver['summary'])) {
@@ -1363,6 +1385,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $modelPrediction = $data['model_prediction']['output'];
             $prompt .= "MODEL PROBABILITY: " . ($modelPrediction['probability_percent'] ?? 'N/A') . "%\n";
             $prompt .= "MODEL RISK LEVEL: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
+            $prompt .= "MODEL PREDICTED INCIDENT COUNT: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
+            $prompt .= "MODEL PREDICTED DAMAGE: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (!empty($driver['summary'])) {
                     $prompt .= "MODEL DRIVER: {$driver['summary']}\n";
@@ -2806,6 +2830,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
             (($weather['weather_risk_label'] ?? null) === 'High' ? 2 : (($weather['weather_risk_label'] ?? null) === 'Moderate' ? 1 : 0)) +
             ((($data['available_personnel'] ?? 0) / max(1, ($data['total_personnel'] ?? 1))) < 0.6 ? 1 : 0));
         $predictedFireCount = max($baseFireCount, $predictedFireCount);
+        $predictedDamage = null;
 
         $likelyPeakHours = $predictionContext['likely_peak_hours'] ?? [];
         if (empty($likelyPeakHours) && isset($data['peak_hour']) && $data['peak_hour'] !== null) {
@@ -2817,6 +2842,10 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
 
         if ($modelPrediction) {
             $predictedProbability = $modelPrediction['probability_percent'] ?? null;
+            $predictedFireCount = (int) round($modelPrediction['predicted_incident_count'] ?? $predictedFireCount);
+            $predictedDamage = isset($modelPrediction['predicted_estimated_damage'])
+                ? (float) $modelPrediction['predicted_estimated_damage']
+                : null;
             if ($predictedProbability !== null) {
                 $summary .= " The Random Forest model currently estimates a {$predictedProbability}% probability for {$modelPrediction['target']}.";
             }
@@ -2832,11 +2861,16 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
             $summary .= " Confirmed mitigation actions are currently reducing the projected risk context by about {$data['mitigation_context']['risk_reduction_percent']}%.";
         }
 
+        if (!is_null($predictedDamage)) {
+            $summary .= " Estimated possible damage exposure for the forecast window is around PHP " . number_format($predictedDamage, 2) . '.';
+        }
+
         return [
             'summary' => $summary,
             'forecast_window' => $forecastWindow,
             'outlook' => $outlook,
             'predicted_fire_incidents' => $predictedFireCount,
+            'predicted_damage' => $predictedDamage,
             'likely_peak_hours' => $likelyPeakHours,
             'drivers' => array_values(array_unique(array_filter($drivers))),
             'weather_context' => $weather ?: null,

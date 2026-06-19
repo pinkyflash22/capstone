@@ -50,7 +50,16 @@ def prepare_historical_request_frame(payload: dict, feature_columns: list[str]) 
 def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[str]) -> pd.DataFrame:
     df = pd.DataFrame([payload]).copy()
 
-    for column in ["station_id", "barangay_id", "year", "incident_count", "average_temperature", "near_water"]:
+    for column in [
+        "station_id",
+        "barangay_id",
+        "year",
+        "incident_count",
+        "average_temperature",
+        "average_humidity",
+        "average_wind_speed",
+        "near_water",
+    ]:
         df[column] = pd.to_numeric(df.get(column), errors="coerce")
 
     month_name = str(df.at[0, "month"])
@@ -60,18 +69,25 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
 
     season = str(df.at[0, "season"]).lower()
     density = str(df.at[0, "density"]).lower()
+    weather_condition = str(df.at[0, "weather_condition"] if "weather_condition" in df.columns else "unknown").strip().lower() or "unknown"
 
     df["month_sin"] = math.sin(2 * math.pi * month_number / 12.0)
     df["month_cos"] = math.cos(2 * math.pi * month_number / 12.0)
     df["water_access_flag"] = df["near_water"].astype(int)
     df["is_dry_season"] = 1 if season == "dry" else 0
     df["high_density_flag"] = 1 if density == "high" else 0
+    df["temperature_signal"] = df["average_temperature"].fillna(0)
+    df["humidity_signal"] = df["average_humidity"].fillna(0)
+    df["wind_signal"] = df["average_wind_speed"].fillna(0)
     df["barangay_pressure_signal"] = (
         df["incident_count"].fillna(0) * 1.2
         + df["average_temperature"] * 0.35
         + df["high_density_flag"] * 2.5
         - df["water_access_flag"] * 0.75
+        + df["average_wind_speed"].fillna(0) * 0.15
+        - df["average_humidity"].fillna(0) * 0.03
     )
+    df["weather_condition"] = weather_condition
 
     return df[feature_columns]
 
@@ -249,6 +265,22 @@ def build_ai_context(dataset_kind: str, target: str, probability: float, risk_le
     }
 
 
+def apply_reference_defaults(request_frame: pd.DataFrame, feature_columns: list[str], reference_profile: dict) -> pd.DataFrame:
+    normalized = request_frame.copy()
+
+    for column in feature_columns:
+        if column not in normalized.columns:
+            normalized[column] = reference_profile.get(column, 0)
+
+        fallback = reference_profile.get(column, 0)
+        normalized[column] = normalized[column].where(~normalized[column].isna(), fallback)
+
+        if normalized[column].dtype == object:
+            normalized[column] = normalized[column].replace("", fallback)
+
+    return normalized[feature_columns]
+
+
 def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind: str, target: str, reference_profile: dict, global_feature_importance: list[dict], feature_columns: list[str]) -> dict:
     probability = float(model.predict_proba(request_frame)[0][1])
     prediction = int(model.predict(request_frame)[0])
@@ -271,6 +303,25 @@ def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind:
     }
 
 
+def append_regression_outputs(bundle: dict, request_frame: pd.DataFrame, response: dict) -> dict:
+    regression_models = bundle.get("regression_models", {}) or {}
+
+    for output_name, model in regression_models.items():
+        try:
+            prediction_value = float(model.predict(request_frame)[0])
+        except Exception:
+            continue
+
+        if output_name == "predicted_incident_count":
+            response[output_name] = max(0, int(round(prediction_value)))
+        elif output_name == "predicted_estimated_damage":
+            response[output_name] = round(max(0.0, prediction_value), 2)
+        else:
+            response[output_name] = round(prediction_value, 4)
+
+    return response
+
+
 def predict(payload: dict) -> dict:
     bundle = joblib.load(MODEL_PATH)
     model = bundle["model"]
@@ -280,8 +331,12 @@ def predict(payload: dict) -> dict:
     global_feature_importance = bundle.get("global_feature_importance", [])
 
     if dataset_kind == "historical_data":
-        request_frame = prepare_historical_request_frame(payload, feature_columns)
-        return format_prediction_response(
+        request_frame = apply_reference_defaults(
+            prepare_historical_request_frame(payload, feature_columns),
+            feature_columns,
+            reference_profile,
+        )
+        response = format_prediction_response(
             model,
             request_frame,
             dataset_kind,
@@ -290,10 +345,15 @@ def predict(payload: dict) -> dict:
             global_feature_importance,
             feature_columns,
         )
+        return append_regression_outputs(bundle, request_frame, response)
 
     if dataset_kind == "station_barangay_monthly":
-        request_frame = prepare_station_barangay_request_frame(payload, feature_columns)
-        return format_prediction_response(
+        request_frame = apply_reference_defaults(
+            prepare_station_barangay_request_frame(payload, feature_columns),
+            feature_columns,
+            reference_profile,
+        )
+        response = format_prediction_response(
             model,
             request_frame,
             dataset_kind,
@@ -302,10 +362,15 @@ def predict(payload: dict) -> dict:
             global_feature_importance,
             feature_columns,
         )
+        return append_regression_outputs(bundle, request_frame, response)
 
     if dataset_kind == "merged_incident_dataset":
-        request_frame = prepare_merged_request_frame(payload, feature_columns)
-        return format_prediction_response(
+        request_frame = apply_reference_defaults(
+            prepare_merged_request_frame(payload, feature_columns),
+            feature_columns,
+            reference_profile,
+        )
+        response = format_prediction_response(
             model,
             request_frame,
             dataset_kind,
@@ -314,9 +379,14 @@ def predict(payload: dict) -> dict:
             global_feature_importance,
             feature_columns,
         )
+        return append_regression_outputs(bundle, request_frame, response)
 
-    request_frame = prepare_legacy_request_frame(payload, feature_columns)
-    return format_prediction_response(
+    request_frame = apply_reference_defaults(
+        prepare_legacy_request_frame(payload, feature_columns),
+        feature_columns,
+        reference_profile,
+    )
+    response = format_prediction_response(
         model,
         request_frame,
         dataset_kind,
@@ -325,6 +395,7 @@ def predict(payload: dict) -> dict:
         global_feature_importance,
         feature_columns,
     )
+    return append_regression_outputs(bundle, request_frame, response)
 
 
 if __name__ == "__main__":

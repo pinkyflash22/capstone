@@ -226,6 +226,10 @@
                 overflow-x: auto;
                 white-space: nowrap;
             }
+
+            .mitigation-form-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .checklist-refresh-note {
@@ -237,6 +241,7 @@
             font-size: 0.8rem;
             font-weight: 700;
         }
+
     </style>
 
     <div class="checklist-refresh-note">
@@ -247,6 +252,7 @@
     <div id="barangayChecklistContent" data-checklist-content-url="{{ route('barangay.checklists.content') }}">
         @include('barangay.partials.checklists-content')
     </div>
+
 @endsection
 
 @push('scripts')

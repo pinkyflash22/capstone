@@ -15,6 +15,7 @@
             'items' => [
                 ['label' => 'Resources', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>'],
                 ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
+                ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
                 ['label' => 'Analytics', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
                 ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'icon' => '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>'],
                 ['label' => 'Executive Reports', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
@@ -38,6 +39,7 @@
     $mobileCenterActions = [
         ['label' => 'FSIC Records', 'route' => 'station-admin.fsic', 'active' => 'fsic', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14l-2-1-2 1-2-1-2 1-2-1-2 1V3z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg>', 'mobile_icon' => 'folder_open'],
         ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
+        ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'mobile_icon' => 'task_alt'],
         ['label' => 'Executive Reports', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>', 'mobile_icon' => 'description'],
         ['label' => 'Resources', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>', 'mobile_icon' => 'inventory_2'],
         ['label' => 'Station Management', 'route' => 'station-admin.management', 'active' => 'management', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 20V5l7-2v17"/><path d="M12 20V9h7v11"/><path d="M8 8h1M8 11h1M8 14h1M15 12h1M15 15h1"/></svg>', 'mobile_icon' => 'apartment'],

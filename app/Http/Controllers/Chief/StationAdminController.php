@@ -15,9 +15,13 @@ use App\Models\Province;
 use App\Models\City;
 use App\Models\Barangay;
 use App\Models\BarangayOfficer;
+use App\Models\BarangayPredictionChecklist;
 use App\Models\FullAddress;
 use App\Models\FsicRequest;
 use App\Models\FsicApproval;
+use App\Models\MitigationAction;
+use App\Models\MitigationActionAttachment;
+use App\Models\RiskArea;
 use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
@@ -25,9 +29,12 @@ use App\Models\EventActivity;
 
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
 
@@ -175,6 +182,168 @@ class StationAdminController extends Controller
             ->pluck('team_id')
             ->filter()
             ->values();
+    }
+
+    protected function getManagedBarangaysForStationAdmin()
+    {
+        $stationOfficer = StationOfficer::query()
+            ->with(['station.address.barangay.city'])
+            ->where('user_id', Auth::user()->user_id)
+            ->first();
+
+        $cityId = $stationOfficer?->station?->address?->barangay?->city?->city_id;
+
+        return Barangay::query()
+            ->when($cityId, fn ($query) => $query->where('city_id', $cityId))
+            ->with('city')
+            ->orderBy('barangay_name')
+            ->get();
+    }
+
+    protected function mitigationCategoryOptions(): array
+    {
+        return [
+            'awareness' => 'Awareness Campaign',
+            'inspection' => 'Inspection / Patrol',
+            'infrastructure' => 'Infrastructure Upgrade',
+            'equipment' => 'Equipment / Supplies',
+            'policy' => 'Policy / Ordinance',
+            'training' => 'Training / Drill',
+            'emergency_access' => 'Emergency Access',
+            'hydrant_water' => 'Hydrant / Water Source',
+            'electrical' => 'Electrical Safety',
+            'housekeeping' => 'Housekeeping / Waste',
+            'community_response' => 'Community Response',
+            'other' => 'Other',
+        ];
+    }
+
+    protected function mitigationPriorityOptions(): array
+    {
+        return [
+            'critical' => 'Critical',
+            'high' => 'High',
+            'medium' => 'Medium',
+            'low' => 'Low',
+        ];
+    }
+
+    protected function mitigationStatusOptions(): array
+    {
+        return [
+            'planned' => 'Planned',
+            'in_progress' => 'In Progress',
+            'blocked' => 'Blocked',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+    }
+
+    protected function mitigationValidationRules(): array
+    {
+        return [
+            'barangay_id' => ['required', 'integer'],
+            'title' => ['required', 'string', 'max:255'],
+            'category' => ['required', Rule::in(array_keys($this->mitigationCategoryOptions()))],
+            'priority_level' => ['required', Rule::in(array_keys($this->mitigationPriorityOptions()))],
+            'status' => ['required', Rule::in(array_keys($this->mitigationStatusOptions()))],
+            'description' => ['required', 'string', 'max:3000'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+            'target_date' => ['nullable', 'date'],
+            'risk_area_id' => ['nullable', 'integer'],
+            'barangay_prediction_checklist_id' => ['nullable', 'integer'],
+            'ai_action_plan_checklist_id' => ['nullable', 'integer'],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx', 'max:10240'],
+        ];
+    }
+
+    protected function validateMitigationLinksForStation(array $validated, array $allowedBarangayIds): array
+    {
+        $barangayId = (int) $validated['barangay_id'];
+        $riskAreaId = ! empty($validated['risk_area_id']) ? (int) $validated['risk_area_id'] : null;
+        $checklistId = ! empty($validated['barangay_prediction_checklist_id']) ? (int) $validated['barangay_prediction_checklist_id'] : null;
+        $aiChecklistId = ! empty($validated['ai_action_plan_checklist_id']) ? (int) $validated['ai_action_plan_checklist_id'] : null;
+
+        if (! in_array($barangayId, $allowedBarangayIds, true)) {
+            throw ValidationException::withMessages([
+                'barangay_id' => 'Select a barangay within your station jurisdiction.',
+            ]);
+        }
+
+        if ($riskAreaId) {
+            $riskAreaExists = RiskArea::query()
+                ->where('risk_area_id', $riskAreaId)
+                ->whereHas('barangayHall', fn ($query) => $query->where('barangay_id', $barangayId))
+                ->exists();
+
+            if (! $riskAreaExists) {
+                throw ValidationException::withMessages([
+                    'risk_area_id' => 'Select a risk or hazard record that belongs to the chosen barangay.',
+                ]);
+            }
+        }
+
+        if ($checklistId) {
+            $checklistExists = BarangayPredictionChecklist::query()
+                ->where('barangay_prediction_checklist_id', $checklistId)
+                ->where('barangay_id', $barangayId)
+                ->exists();
+
+            if (! $checklistExists) {
+                throw ValidationException::withMessages([
+                    'barangay_prediction_checklist_id' => 'Select a checklist item that belongs to the chosen barangay.',
+                ]);
+            }
+        }
+
+        if ($aiChecklistId) {
+            $aiChecklistExists = DB::table('ai_action_plan_checklists')
+                ->where('ai_action_plan_checklist_id', $aiChecklistId)
+                ->where('barangay_id', $barangayId)
+                ->exists();
+
+            if (! $aiChecklistExists) {
+                throw ValidationException::withMessages([
+                    'ai_action_plan_checklist_id' => 'Select an AI action plan that belongs to the chosen barangay.',
+                ]);
+            }
+        }
+
+        return [
+            'barangay_id' => $barangayId,
+            'risk_area_id' => $riskAreaId,
+            'barangay_prediction_checklist_id' => $checklistId,
+            'ai_action_plan_checklist_id' => $aiChecklistId,
+        ];
+    }
+
+    protected function resolveManagedMitigationAction(int $mitigationActionId, array $allowedBarangayIds): MitigationAction
+    {
+        return MitigationAction::query()
+            ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
+            ->whereIn('barangay_id', $allowedBarangayIds)
+            ->findOrFail($mitigationActionId);
+    }
+
+    protected function storeMitigationAttachments(MitigationAction $action, Request $request): void
+    {
+        foreach ($request->file('attachments', []) as $file) {
+            if (! $file) {
+                continue;
+            }
+
+            $storedPath = $file->store('mitigation-actions', 'public');
+
+            MitigationActionAttachment::create([
+                'mitigation_action_id' => $action->mitigation_action_id,
+                'file_path' => $storedPath,
+                'file_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'attachment_type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'photo' : 'proof',
+            ]);
+        }
     }
 
     protected function generateCitizenAccountCode(): string
@@ -521,6 +690,151 @@ class StationAdminController extends Controller
 
         return view('chief.reports', compact('mapmarker', 'incidents', 'alerts', 'stations', 'chiefs', 'provinces','stationperson', 'reportPayload', 'stationProfile'));
 
+    }
+
+    public function mitigations()
+    {
+        $managedBarangays = $this->getManagedBarangaysForStationAdmin();
+        $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+
+        $mitigationActions = MitigationAction::query()
+            ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
+            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("FIELD(status, 'in_progress', 'planned', 'blocked', 'completed', 'cancelled')")
+            ->orderBy('target_date')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $riskAreas = RiskArea::query()
+            ->with(['marker', 'barangayHall.barangay'])
+            ->when(! empty($barangayIds), function ($query) use ($barangayIds) {
+                $query->whereHas('barangayHall', fn ($hallQuery) => $hallQuery->whereIn('barangay_id', $barangayIds));
+            })
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderByDesc('created_at')
+            ->get();
+
+        $predictionChecklists = BarangayPredictionChecklist::query()
+            ->with(['assignee', 'reviewer', 'barangay'])
+            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+            ->orderBy('target_date')
+            ->get();
+
+        $aiActionPlanOptions = DB::table('ai_action_plan_checklists')
+            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderByDesc('created_at')
+            ->get(['ai_action_plan_checklist_id', 'barangay_id', 'plan_title', 'priority_level', 'status']);
+
+        return view('chief.mitigations', [
+            'managedBarangays' => $managedBarangays,
+            'mitigationActions' => $mitigationActions,
+            'riskAreas' => $riskAreas,
+            'predictionChecklists' => $predictionChecklists,
+            'aiActionPlanOptions' => $aiActionPlanOptions,
+            'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
+            'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
+            'mitigationStatusOptions' => $this->mitigationStatusOptions(),
+        ]);
+    }
+
+    public function storeMitigation(Request $request)
+    {
+        $validated = $request->validate($this->mitigationValidationRules());
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
+
+        DB::transaction(function () use ($validated, $linkedIds, $request) {
+            $action = MitigationAction::create([
+                'barangay_id' => $linkedIds['barangay_id'],
+                'risk_area_id' => $linkedIds['risk_area_id'],
+                'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
+                'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
+                'title' => $validated['title'],
+                'category' => $validated['category'],
+                'priority_level' => $validated['priority_level'],
+                'status' => $validated['status'],
+                'target_date' => $validated['target_date'] ?? null,
+                'completed_at' => ($validated['status'] ?? null) === 'completed' ? now() : null,
+                'description' => $validated['description'],
+                'remarks' => $validated['remarks'] ?? null,
+                'created_by' => Auth::user()?->user_id,
+            ]);
+
+            $this->storeMitigationAttachments($action, $request);
+            UserActivityLogger::log('created station mitigation action', Auth::user()?->user_id, $request);
+        });
+
+        return redirect()->route('station-admin.mitigations')
+            ->with('success', 'Mitigation action created successfully.');
+    }
+
+    public function updateMitigation(Request $request, int $mitigationActionId)
+    {
+        $validated = $request->validate($this->mitigationValidationRules());
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
+        $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
+
+        DB::transaction(function () use ($validated, $linkedIds, $action, $request) {
+            $action->update([
+                'barangay_id' => $linkedIds['barangay_id'],
+                'risk_area_id' => $linkedIds['risk_area_id'],
+                'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
+                'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
+                'title' => $validated['title'],
+                'category' => $validated['category'],
+                'priority_level' => $validated['priority_level'],
+                'status' => $validated['status'],
+                'target_date' => $validated['target_date'] ?? null,
+                'completed_at' => ($validated['status'] ?? null) === 'completed'
+                    ? ($action->completed_at ?? now())
+                    : null,
+                'description' => $validated['description'],
+                'remarks' => $validated['remarks'] ?? null,
+                'reviewed_by' => Auth::user()?->user_id,
+                'reviewed_at' => now(),
+            ]);
+
+            $this->storeMitigationAttachments($action, $request);
+            UserActivityLogger::log('updated station mitigation action', Auth::user()?->user_id, $request);
+        });
+
+        return redirect()->route('station-admin.mitigations')
+            ->with('success', 'Mitigation action updated successfully.');
+    }
+
+    public function destroyMitigation(Request $request, int $mitigationActionId)
+    {
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
+
+        DB::transaction(function () use ($action, $request) {
+            foreach ($action->attachments as $attachment) {
+                if (! empty($attachment->file_path)) {
+                    Storage::disk('public')->delete($attachment->file_path);
+                }
+            }
+
+            $action->delete();
+            UserActivityLogger::log('deleted station mitigation action', Auth::user()?->user_id, $request);
+        });
+
+        return redirect()->route('station-admin.mitigations')
+            ->with('success', 'Mitigation action deleted successfully.');
     }
 
 
