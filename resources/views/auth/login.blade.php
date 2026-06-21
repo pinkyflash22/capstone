@@ -1221,6 +1221,13 @@
 
         // Form submission loading state
         document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfInput = this.querySelector('input[name="_token"]');
+
+            if (csrfMeta && csrfInput) {
+                csrfInput.value = csrfMeta;
+            }
+
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-spinner"></span> Signing in...';
@@ -1258,38 +1265,48 @@
 
         // Prevent back button to login page after successful login
         (function() {
-            history.pushState(null, null, location.href);
-            
-            window.addEventListener('popstate', function() {
-                fetch('/check-auth', {
+            const redirectAuthenticatedUser = () => {
+                return fetch('/check-auth', {
                     method: 'GET',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json'
-                    }
+                    },
+                    cache: 'no-store'
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.authenticated) {
-                        window.location.replace('{{ route("citizen.dashboard") }}');
-                    } else {
+                    if (data.authenticated && data.redirect_to) {
+                        window.location.replace(data.redirect_to);
+                        return true;
+                    }
+
+                    return false;
+                });
+            };
+
+            history.pushState(null, null, location.href);
+            
+            window.addEventListener('popstate', function() {
+                redirectAuthenticatedUser()
+                .then((wasRedirected) => {
+                    if (!wasRedirected) {
+                        window.location.reload();
                         history.pushState(null, null, location.href);
                     }
                 })
                 .catch(() => {
-                    history.pushState(null, null, location.href);
+                    window.location.reload();
                 });
             });
 
             window.addEventListener('pageshow', function(event) {
-                if (event.persisted) {
-                    fetch('/check-auth')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.authenticated) {
-                                window.location.replace('{{ route("citizen.dashboard") }}');
-                            }
-                        });
+                const navigationEntries = performance.getEntriesByType('navigation');
+                const isBackForwardNavigation = navigationEntries.length > 0
+                    && navigationEntries[0].type === 'back_forward';
+
+                if (event.persisted || isBackForwardNavigation) {
+                    window.location.reload();
                 }
             });
         })();

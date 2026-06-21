@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\PostController;
 // use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Api\MarkerController;
 use App\Http\Controllers\staff\FirefighterController;
+use App\Http\Controllers\staff\SpotInvestigationSirExportController;
 use App\Http\Controllers\Admin\ManagementController;
 
 use App\Http\Controllers\StationOfficerController;
@@ -25,6 +26,9 @@ use App\Http\Controllers\UserLogController;
 //station admin
 use App\Http\Controllers\Chief\StationAdminController;
 use App\Http\Controllers\Barangay\BarangayDashboardController;
+use App\Http\Controllers\BarangayController;
+use App\Http\Controllers\BoundaryLocationController;
+use App\Http\Controllers\StationMediaController;
 
 
 // use App\Http\Controllers\Auth\StationLoginController;
@@ -44,6 +48,7 @@ use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\OTPController;
 
 // use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 //note kailangan ko pang import ung controller para magamit ko yung mga functions nila sa routes
     Route::middleware('redirect.if.authenticated')->group(function () {
@@ -52,6 +57,7 @@ use Illuminate\Support\Facades\Route;
         Route::post('/register', [RegisterController::class, 'register'])->name('register.store');
         Route::get('/login',[LoginController::class, 'index'])->name('auth.login');
         Route::post('/auth', [LoginController::class, 'authenticate'])->name('auth.authenticate');
+        Route::get('/auth', fn () => redirect()->route('auth.login'));
         Route::get('/auth/google/redirect', [LoginController::class, 'redirectToGoogle'])->name('auth.google.redirect');
         Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');
         Route::get('/auth/google/verify', [LoginController::class, 'showGoogleVerificationForm'])->name('auth.google.verify');
@@ -108,8 +114,21 @@ Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-ap
 
 // This route should be outside the auth middleware
 Route::get('/check-auth', function() {
+    $user = Auth::user();
+    $role = strtolower($user?->role->role ?? '');
+
+    $redirectTo = match ($role) {
+        'admin' => route('admin.dashboard'),
+        'station admin', 'chief' => route('station-admin.dashboard'),
+        'firefighter' => route('firefighter.dashboard'),
+        'barangay', 'barangay captain' => route('barangay.dashboard'),
+        'citizen' => route('citizen.dashboard'),
+        default => null,
+    };
+
     return response()->json([
-        'authenticated' => Auth::check()
+        'authenticated' => Auth::check(),
+        'redirect_to' => $redirectTo,
     ]);
 });
 Route::middleware('auth')->post('/citizen/marker', [MarkerController::class, 'store']);
@@ -247,6 +266,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::put('/users/{id}', [StationOfficerController::class, 'updateUser'])->name('users.update');
         Route::put('/officers/{id}', [StationOfficerController::class, 'updateStationOfficer'])->name('officers.update');
         Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');
+        Route::post('/stations/{station}/media/profile', [StationMediaController::class, 'storeProfile'])->name('stations.media.profile');
+        Route::post('/stations/{station}/media/gallery', [StationMediaController::class, 'storeGallery'])->name('stations.media.gallery');
+        Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         // Route::get('/resource', function(){
@@ -258,6 +280,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
         Route::resource('resource-management', ResourceManagementController::class);
+        Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
+        Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])
+            ->name('barangay-boundaries.sync');
     
      });
 
@@ -308,6 +333,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
+        Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
         Route::get('/api/analyses/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysis']);
@@ -336,6 +362,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/users/{id}', [StationOfficerController::class, 'destroyUser'])->name('users.destroy');
         Route::put('/users/{id}', [StationOfficerController::class, 'updateUser'])->name('users.update');
         Route::put('/officers/{id}', [StationOfficerController::class, 'updateStationOfficer'])->name('officers.update');
+        Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');
+        Route::post('/stations/{station}/media/profile', [StationMediaController::class, 'storeProfile'])->name('stations.media.profile');
+        Route::post('/stations/{station}/media/gallery', [StationMediaController::class, 'storeGallery'])->name('stations.media.gallery');
+        Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         // Route::get('/resource', function(){
@@ -347,8 +377,11 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
         Route::resource('resource-management', App\Http\Controllers\Chief\ResourceManagementController::class);
+        Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
         Route::post('/resource-management/assign-equipment', [App\Http\Controllers\Chief\ResourceManagementController::class, 'assignEquipmentToStation'])
             ->name('resource-management.assign-equipment');
+        Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])
+            ->name('barangay-boundaries.sync');
     
     });
 
@@ -375,6 +408,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard', [FirefighterController::class, 'index'])->name('dashboard');
         Route::get('/incident-view', [FirefighterController::class, 'incidentView'])->name('view-this-page');
         Route::get('/my-station', [FirefighterController::class, 'myStation'])->name('my-station');
+        Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
         Route::get('/equipments', [FirefighterController::class, 'equipments'])->name('equipments');
         Route::get('/fsic-requests', [FirefighterController::class, 'equipments'])->name('fsic-requests');
         Route::get('/api/fsic-requests/{id}', [FirefighterController::class, 'getAssignedFsicRequest'])->name('fsic-requests.show');

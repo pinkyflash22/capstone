@@ -236,6 +236,111 @@
         .management-station-actions .btn-outline {
             min-width: 150px;
         }
+        .station-media-panel {
+            display: grid;
+            grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+            gap: 24px;
+            margin-bottom: 24px;
+            padding: 24px;
+            border-radius: 24px;
+            background: #fff;
+            border: 1px solid rgba(245, 158, 11, 0.12);
+            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.04);
+        }
+        .station-media-profile {
+            border-radius: 22px;
+            overflow: hidden;
+            min-height: 260px;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 1px solid rgba(245, 158, 11, 0.14);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c2410c;
+        }
+        .station-media-profile img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .station-media-profile i {
+            font-size: 3rem;
+        }
+        .station-media-tools {
+            display: grid;
+            gap: 18px;
+        }
+        .station-media-card {
+            padding: 18px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #fffaf6 0%, #fff 100%);
+            border: 1px solid rgba(245, 158, 11, 0.12);
+        }
+        .station-media-card h3 {
+            margin: 0 0 8px;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 800;
+        }
+        .station-media-card p {
+            margin: 0 0 14px;
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+        .station-media-card input[type="file"],
+        .station-media-card input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            background: #fff;
+            margin-bottom: 12px;
+        }
+        .station-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+        }
+        .station-gallery-item {
+            border-radius: 18px;
+            overflow: hidden;
+            background: #fff;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .station-gallery-item img {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            display: block;
+        }
+        .station-gallery-copy {
+            padding: 12px;
+            color: #475569;
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+        .station-gallery-actions {
+            padding: 0 12px 12px;
+        }
+        .station-flash {
+            margin-bottom: 18px;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .station-flash.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .station-flash.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
 
         @media (max-width: 768px) {
             .lector-top-bar {
@@ -258,6 +363,10 @@
             .management-station-badge {
                 width: 100%;
                 text-align: left;
+            }
+            .station-media-panel {
+                grid-template-columns: 1fr;
+                padding: 20px 18px;
             }
         }
 
@@ -924,6 +1033,15 @@
     $currentStation = ($stations ?? collect())->first();
     $currentStationMarker = $currentStation?->marker;
     $currentRoleName = strtolower(auth()->user()->role->role ?? '');
+    $currentStationProfilePath = $currentStation?->profileMedia?->path;
+    $currentStationProfileUrl = $currentStationProfilePath ? asset('storage/' . ltrim(str_replace('\\', '/', $currentStationProfilePath), '/')) : null;
+    $currentStationGallery = collect($currentStation?->galleryMedia ?? [])->map(function ($media) {
+        return [
+            'id' => $media->station_media_id,
+            'caption' => $media->caption,
+            'url' => asset('storage/' . ltrim(str_replace('\\', '/', (string) $media->path), '/')),
+        ];
+    });
 @endphp
 <body>
     @include('chief.partials.sidebar', ['active' => 'management'])
@@ -1037,6 +1155,13 @@
 
         <!-- MANAGEMENT CONTENT -->
         <div class="management-container">
+            @if(session('success'))
+                <div class="station-flash success">{{ session('success') }}</div>
+            @endif
+            @if($errors->any())
+                <div class="station-flash error">{{ $errors->first() }}</div>
+            @endif
+
             <div class="management-station-hero">
                 <div class="management-station-copy">
                     <p class="management-eyebrow">Current Command Station</p>
@@ -1064,6 +1189,73 @@
                     @endif
                 </div>
             </div>
+
+            @if($currentStation && in_array($currentRoleName, ['chief', 'station admin'], true))
+                <section class="station-media-panel">
+                    <div class="station-media-profile">
+                        @if($currentStationProfileUrl)
+                            <img src="{{ $currentStationProfileUrl }}" alt="{{ $currentStation->station_name }}">
+                        @else
+                            <i class="fa-solid fa-building-shield"></i>
+                        @endif
+                    </div>
+                    <div class="station-media-tools">
+                        <div class="station-media-card">
+                            <h3>Station Profile Image</h3>
+                            <p>Upload one main image for the station. This becomes the hero image shown on firefighter My Station.</p>
+                            <form method="POST" action="{{ route('station-admin.stations.media.profile', $currentStation->station_id) }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="file" name="profile_image" accept="image/*" required>
+                                <button type="submit" class="btn-primary">
+                                    <i class="fa-solid fa-upload"></i>
+                                    Save Profile Image
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="station-media-card">
+                            <h3>Station Gallery</h3>
+                            <p>Add supporting photos for the station grounds, apparatus bay, office, or other station-related visuals.</p>
+                            <form method="POST" action="{{ route('station-admin.stations.media.gallery', $currentStation->station_id) }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="file" name="gallery_images[]" accept="image/*" multiple required>
+                                <input type="text" name="caption" placeholder="Optional caption for this upload batch">
+                                <button type="submit" class="btn-outline">
+                                    <i class="fa-solid fa-images"></i>
+                                    Add Gallery Photos
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="station-media-card">
+                            <h3>Current Gallery</h3>
+                            <p>These images are visible to firefighters when they open the station page.</p>
+                            @if($currentStationGallery->isEmpty())
+                                <p>No gallery images uploaded yet.</p>
+                            @else
+                                <div class="station-gallery-grid">
+                                    @foreach($currentStationGallery as $photo)
+                                        <div class="station-gallery-item">
+                                            <img src="{{ $photo['url'] }}" alt="Station photo {{ $loop->iteration }}">
+                                            <div class="station-gallery-copy">{{ $photo['caption'] ?: 'Station photo #' . $loop->iteration }}</div>
+                                            <div class="station-gallery-actions">
+                                                <form method="POST" action="{{ route('station-admin.station-media.destroy', $photo['id']) }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn-outline" style="width:100%;">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        Remove
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </section>
+            @endif
 
             <!-- Page Header -->
             <div class="page-header">

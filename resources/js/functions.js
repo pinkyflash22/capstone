@@ -529,6 +529,8 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
             }
         }, 0);
         
+        window.latestIncidentSubmitMessage = incidentData?.message || null;
+
         return true;
         
     } catch (error) {

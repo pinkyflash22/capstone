@@ -438,25 +438,52 @@ class AnalyticsController extends Controller
      */
     private function callAIApi($prompt)
     {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(30)->post('https://openrouter.ai/api/v1/chat/completions', [
-            'model' => 'deepseek/deepseek-r1-distill-qwen-32b',
-            'messages' => [
-                ['role' => 'system', 'content' => 'You are a fire safety expert. Provide concise analysis.'],
-                ['role' => 'user', 'content' => $prompt]
-            ],
-            'temperature' => 0.3,
-            'max_tokens' => 500
-        ]);
-        
-        if (!$response->successful()) {
-            throw new \Exception('API call failed: ' . $response->status());
+        $errors = [];
+
+        foreach ($this->getOpenRouterModelCandidates() as $model) {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post('https://openrouter.ai/api/v1/chat/completions', [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You are a fire safety expert. Provide concise analysis.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'temperature' => 0.3,
+                'max_tokens' => 500
+            ]);
+            
+            if (!$response->successful()) {
+                $errors[] = "{$model}: HTTP {$response->status()}";
+                continue;
+            }
+            
+            $json = $response->json();
+            $content = $json['choices'][0]['message']['content'] ?? '';
+
+            if (!empty($content)) {
+                return $content;
+            }
+
+            $errors[] = "{$model}: empty response";
         }
-        
-        $json = $response->json();
-        return $json['choices'][0]['message']['content'] ?? '';
+
+        throw new \Exception('API call failed for all configured models: ' . implode(' | ', $errors));
+    }
+
+    private function getOpenRouterModelCandidates(): array
+    {
+        $models = array_filter([
+            env('OPENROUTER_MODEL'),
+            'deepseek/deepseek-r1-distill-llama-70b',
+            'openai/gpt-4o-mini',
+            'openai/gpt-4.1-mini',
+            'openai/gpt-3.5-turbo',
+            'deepseek/deepseek-r1-distill-qwen-32b',
+        ]);
+
+        return array_values(array_unique($models));
     }
     
     /**

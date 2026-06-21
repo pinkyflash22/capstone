@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Incident;
 use App\Models\IncidentContext;
+use App\Services\BoundaryMatcherService;
 use App\Support\BarangayNotificationService;
 use App\Support\HistoricalFireIncidentSynchronizer;
 use Carbon\Carbon;
@@ -14,6 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class EnrichIncidentContextJob implements ShouldQueue
 {
@@ -30,9 +32,9 @@ class EnrichIncidentContextJob implements ShouldQueue
     {
     }
 
-    public function handle(): void
+    public function handle(BoundaryMatcherService $boundaryMatcherService): void
     {
-        $incident = Incident::with(['marker', 'reporter.address'])->find($this->incidentId);
+        $incident = Incident::with(['marker', 'reporter.address', 'barangay'])->find($this->incidentId);
 
         if (! $incident || ! $incident->marker) {
             return;
@@ -40,6 +42,7 @@ class EnrichIncidentContextJob implements ShouldQueue
 
         $timestamp = $incident->created_at ? Carbon::parse($incident->created_at) : now();
         $marker = $incident->marker;
+        $this->resolveIncidentBarangay($incident, $boundaryMatcherService);
         $weather = $this->fetchWeatherContext($marker->lat, $marker->lng);
         $eventPeriod = $this->resolveEventPeriod($timestamp);
 
@@ -66,6 +69,70 @@ class EnrichIncidentContextJob implements ShouldQueue
 
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $incident->incident_id);
         BarangayNotificationService::notifyNearbyFireIncident($incident);
+    }
+
+    private function resolveIncidentBarangay(Incident $incident, BoundaryMatcherService $boundaryMatcherService): void
+    {
+        if (! $this->supportsIncidentBarangayResolution()) {
+            return;
+        }
+
+        $marker = $incident->marker;
+
+        if (! $marker || $marker->lat === null || $marker->lng === null) {
+            $incident->forceFill([
+                'barangay_id' => null,
+                'barangay_resolution_status' => 'failed',
+                'barangay_resolution_source' => 'missing-marker-coordinates',
+                'barangay_resolved_at' => now(),
+            ])->save();
+
+            return;
+        }
+
+        try {
+            $boundary = $boundaryMatcherService->locateBarangayBoundary(
+                (float) $marker->lat,
+                (float) $marker->lng
+            );
+
+            if ($boundary?->barangay_id) {
+                $incident->forceFill([
+                    'barangay_id' => (int) $boundary->barangay_id,
+                    'barangay_resolution_status' => 'matched',
+                    'barangay_resolution_source' => $boundary->source ?: 'boundary-location',
+                    'barangay_resolved_at' => now(),
+                ])->save();
+
+                return;
+            }
+
+            $incident->forceFill([
+                'barangay_id' => null,
+                'barangay_resolution_status' => 'unmatched',
+                'barangay_resolution_source' => 'boundary-location',
+                'barangay_resolved_at' => now(),
+            ])->save();
+        } catch (\Throwable $exception) {
+            Log::warning('Incident barangay enrichment failed: ' . $exception->getMessage(), [
+                'incident_id' => $this->incidentId,
+            ]);
+
+            $incident->forceFill([
+                'barangay_id' => null,
+                'barangay_resolution_status' => 'failed',
+                'barangay_resolution_source' => 'boundary-location',
+                'barangay_resolved_at' => now(),
+            ])->save();
+        }
+    }
+
+    private function supportsIncidentBarangayResolution(): bool
+    {
+        return Schema::hasColumn('incidents', 'barangay_id')
+            && Schema::hasColumn('incidents', 'barangay_resolution_status')
+            && Schema::hasColumn('incidents', 'barangay_resolution_source')
+            && Schema::hasColumn('incidents', 'barangay_resolved_at');
     }
 
     private function fetchWeatherContext($lat, $lng): array

@@ -107,7 +107,38 @@ class IncidentController extends Controller
 
     private function getIncidentRelations(): array
     {
-        return ['marker', 'team', 'reporter'];
+        return ['marker', 'team', 'reporter', 'barangay.city'];
+    }
+
+    private function supportsBarangayResolution(): bool
+    {
+        return Schema::hasColumn('incidents', 'barangay_id')
+            && Schema::hasColumn('incidents', 'barangay_resolution_status')
+            && Schema::hasColumn('incidents', 'barangay_resolution_source')
+            && Schema::hasColumn('incidents', 'barangay_resolved_at');
+    }
+
+    private function serializeIncident(Incident $incident): array
+    {
+        return [
+            ...$incident->toArray(),
+            'incident_type' => $this->resolveIncidentTypeLabel($incident),
+            'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
+            'incident_type_id' => null,
+            'incident_status' => $this->resolveIncidentStatusLabel($incident),
+            'incident_status_id' => $this->mapStatusNameToId($incident->status),
+            'barangay_resolution_status' => $this->supportsBarangayResolution()
+                ? ($incident->barangay_resolution_status ?? 'pending')
+                : 'pending',
+            'barangay_resolution_source' => $this->supportsBarangayResolution()
+                ? $incident->barangay_resolution_source
+                : null,
+            'barangay_resolved_at' => $this->supportsBarangayResolution()
+                ? optional($incident->barangay_resolved_at)->toISOString()
+                : null,
+            'barangay_name' => $this->supportsBarangayResolution() ? $incident->barangay?->barangay_name : null,
+            'barangay_city_name' => $this->supportsBarangayResolution() ? $incident->barangay?->city?->city_name : null,
+        ];
     }
 
     private function supportsLegacyIncidentStatus(): bool
@@ -396,6 +427,12 @@ class IncidentController extends Controller
             ? self::STATUS_DB_REPORTED
             : $this->resolveDatabaseStatusName($validated['status']);
 
+        if ($this->supportsBarangayResolution()) {
+            $validated['barangay_resolution_status'] = 'pending';
+            $validated['barangay_resolution_source'] = null;
+            $validated['barangay_resolved_at'] = null;
+        }
+
         $data = Incident::create($validated);
         IncidentContextDispatcher::dispatchFor($data);
 
@@ -404,7 +441,11 @@ class IncidentController extends Controller
             UserActivityLogger::log('created incident', $logUserId, $request);
         }
 
-        return response()->json(['success'=>true,'data'=>$data]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Incident reported successfully. Barangay matching is running in the background.',
+            'data' => $this->serializeIncident($data->fresh($this->getIncidentRelations())),
+        ]);
     }
 
     public function show(Incident $incident)
@@ -414,14 +455,7 @@ class IncidentController extends Controller
         if (request()->expectsJson()) {
             return response()->json([
                 'success' => true,
-                'data' => [
-                    ...$incident->toArray(),
-                    'incident_type' => $this->resolveIncidentTypeLabel($incident),
-                    'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
-                    'incident_type_id' => null,
-                    'incident_status' => $this->resolveIncidentStatusLabel($incident),
-                    'incident_status_id' => $this->mapStatusNameToId($incident->status),
-                ]
+                'data' => $this->serializeIncident($incident),
             ]);
         }
 
@@ -478,14 +512,7 @@ class IncidentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Report updated successfully.',
-            'data' => [
-                ...$incident->fresh(['marker'])->toArray(),
-                'incident_type' => $this->resolveIncidentTypeLabel($incident),
-                'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
-                'incident_type_id' => null,
-                'incident_status' => $this->resolveIncidentStatusLabel($incident),
-                'incident_status_id' => $this->mapStatusNameToId($incident->status),
-            ]
+            'data' => $this->serializeIncident($incident->fresh($this->getIncidentRelations())),
         ]);
    }
 
@@ -639,7 +666,7 @@ class IncidentController extends Controller
             ->filter(fn ($station) => $station->marker && $station->marker->lat !== null && $station->marker->lng !== null)
             ->values();
 
-        $coord = Incident::with(['marker'])
+        $coord = Incident::with($this->getIncidentRelations())
             ->latest()
             ->get()
             ->map(function (Incident $incident) use ($stationMarkers) {
@@ -667,6 +694,11 @@ class IncidentController extends Controller
                     'marker_id' => $incident->marker_id,
                     'team_id' => $incident->team_id,
                     'reported_by' => $incident->reported_by,
+                    'barangay_id' => $incident->barangay_id,
+                    'barangay_name' => $incident->barangay?->barangay_name,
+                    'barangay_resolution_status' => $incident->barangay_resolution_status ?? 'pending',
+                    'barangay_resolution_source' => $incident->barangay_resolution_source,
+                    'barangay_resolved_at' => optional($incident->barangay_resolved_at)->toISOString(),
                     'status' => $this->resolveIncidentStatusLabel($incident),
                     'incident_status' => $this->resolveIncidentStatusLabel($incident),
                     'incident_status_id' => $this->mapStatusNameToId($incident->status),
@@ -845,20 +877,11 @@ class IncidentController extends Controller
     public function myIncidents()
     {
         try {
-            $incidents = Incident::with(['marker'])
+            $incidents = Incident::with($this->getIncidentRelations())
                 ->where('reported_by', auth()->id())
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->map(function (Incident $incident) {
-                    return [
-                        ...$incident->toArray(),
-                        'incident_type' => $this->resolveIncidentTypeLabel($incident),
-                        'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
-                        'incident_type_id' => null,
-                        'incident_status' => $this->resolveIncidentStatusLabel($incident),
-                        'incident_status_id' => $this->mapStatusNameToId($incident->status),
-                    ];
-                });
+                ->map(fn (Incident $incident) => $this->serializeIncident($incident));
                 
             return response()->json([
                 'success' => true,
@@ -884,7 +907,7 @@ public function getRecentIncident(Request $request)
     try {
         $minutes = $request->input('minutes', 30);
         
-        $recentIncidents = Incident::with(['marker'])
+        $recentIncidents = Incident::with($this->getIncidentRelations())
             ->where('created_at', '>=', now()->subMinutes($minutes))
             ->orderBy('created_at', 'desc')
             ->get()
@@ -907,6 +930,9 @@ public function getRecentIncident(Request $request)
                     'address' => $incident->marker?->description,
                     'marker_id' => $incident->marker_id,
                     'marker' => $incident->marker,
+                    'barangay_id' => $incident->barangay_id,
+                    'barangay_name' => $incident->barangay?->barangay_name,
+                    'barangay_resolution_status' => $incident->barangay_resolution_status ?? 'pending',
                     'created_at' => $incident->created_at,
                     'updated_at' => $incident->updated_at,
                 ];

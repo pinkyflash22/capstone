@@ -8,6 +8,9 @@ use App\Models\FullAddress;
 use App\Models\BarangayHall;
 use App\Models\HistoricalFireIncident;
 use App\Models\BarangayPredictionChecklist;
+use App\Models\BoundaryLocation;
+use App\Models\Station;
+use App\Models\StationBarangayCoverage;
 
 class Barangay extends Model
 {
@@ -39,5 +42,28 @@ class Barangay extends Model
     public function predictionChecklists()
     {
         return $this->hasMany(BarangayPredictionChecklist::class, 'barangay_id', 'barangay_id');
+    }
+
+    public function boundaryLocations()
+    {
+        return $this->hasMany(BoundaryLocation::class, 'barangay_id', 'barangay_id');
+    }
+
+    public function stationCoverage()
+    {
+        return $this->hasMany(StationBarangayCoverage::class, 'barangay_id', 'barangay_id');
+    }
+
+    public function stations()
+    {
+        return $this->belongsToMany(
+            Station::class,
+            'station_barangay_coverage',
+            'barangay_id',
+            'station_id',
+            'barangay_id',
+            'station_id'
+        )->withPivot(['station_barangay_coverage_id', 'coverage_type', 'source', 'is_active'])
+            ->withTimestamps();
     }
 }

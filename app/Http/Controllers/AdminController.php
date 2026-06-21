@@ -58,7 +58,21 @@ class AdminController extends Controller
         $chiefRole = Role::where('role', 'chief')->first();
         $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
         $hydrantTypes = collect();
-        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'posts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes'));
+        $recentAnalyses = DB::table('analysis')
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(function ($analysis) {
+                $analysis->confidence_score = is_numeric($analysis->confidence_data ?? null)
+                    ? (int) $analysis->confidence_data
+                    : ($analysis->confidence_data ?? null);
+                $analysis->predictions = json_decode($analysis->predictions ?? 'null', true);
+                $analysis->recommendations = json_decode($analysis->recommendations ?? '[]', true);
+
+                return $analysis;
+            });
+
+        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'posts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes', 'recentAnalyses'));
     }
 
     //for reports

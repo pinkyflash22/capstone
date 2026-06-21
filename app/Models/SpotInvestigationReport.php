@@ -22,12 +22,26 @@ class SpotInvestigationReport extends Model
         'estimated_area',
         'weather_context',
         'station_officer_id',
-
+        'report_completed_at',
+        'memorandum_for',
+        'place_of_occurrence',
+        'involved_structure',
+        'establishment_name',
+        'occupant',
+        'highest_alarm_level',
+        'affected_establishments_count',
+        'description',
+        'fatality_details',
+        'details_of_investigation',
+        'disposition',
+        'noted_by_station_officer_id',
+        'approved_by_station_officer_id',
     ];
 
     protected $casts = [
         'fire_started' => 'datetime',
         'fire_out' => 'datetime',
+        'report_completed_at' => 'datetime',
         'weather_context' => 'array',
     ];
 
@@ -49,5 +63,15 @@ class SpotInvestigationReport extends Model
     public function progressInvestigation()
     {
         return $this->hasOne(ProgressInvestigationReport::class, 'spot_investigation_id', 'spot_investigation_report_id');
+    }
+
+    public function notedBy()
+    {
+        return $this->belongsTo(StationOfficer::class, 'noted_by_station_officer_id', 'station_officer_id');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(StationOfficer::class, 'approved_by_station_officer_id', 'station_officer_id');
     }
 }

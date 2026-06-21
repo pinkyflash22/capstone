@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Barangay;
 use App\Models\City;
+use App\Models\Incident;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class BarangayController extends Controller
@@ -36,8 +39,54 @@ class BarangayController extends Controller
 
     public function show(Barangay $barangay)
     {
-        $barangay->load('city.province', 'fullAddresses');
-        return view('admin.addresses.barangays.show', compact('barangay'));
+        $barangay->load([
+            'city.province',
+            'fullAddresses.users',
+            'hall.marker',
+            'hall.address',
+            'hall.riskAreas.marker',
+            'boundaryLocations',
+            'historicalFireIncidents',
+            'stations.address.barangay.city',
+        ]);
+
+        $residentCount = $barangay->fullAddresses
+            ->sum(fn ($address) => $address->users->count());
+
+        $liveIncidentCount = 0;
+
+        if (Schema::hasColumn('incidents', 'barangay_id')) {
+            $liveIncidentCount = Incident::query()
+                ->where('barangay_id', $barangay->barangay_id)
+                ->count();
+        }
+
+        $summary = [
+            'resident_count' => $residentCount,
+            'address_count' => $barangay->fullAddresses->count(),
+            'risk_area_count' => $barangay->hall?->riskAreas?->count() ?? 0,
+            'boundary_count' => $barangay->boundaryLocations->count(),
+            'historical_incident_count' => $barangay->historicalFireIncidents->count(),
+            'live_incident_count' => $liveIncidentCount,
+            'station_count' => $barangay->stations->count(),
+        ];
+
+        $recentHistoricalIncidents = $barangay->historicalFireIncidents
+            ->sortByDesc('incident_date')
+            ->take(8)
+            ->values();
+
+        $recentRiskAreas = collect($barangay->hall?->riskAreas ?? [])
+            ->sortByDesc('updated_at')
+            ->take(8)
+            ->values();
+
+        return view('admin.barangay-show', compact(
+            'barangay',
+            'summary',
+            'recentHistoricalIncidents',
+            'recentRiskAreas'
+        ));
     }
 
     public function edit(Barangay $barangay)

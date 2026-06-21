@@ -47,7 +47,7 @@ class ManagementController extends Controller
         $alerts = Incident::with('marker')->where('status', 'Reported')->get();
         
         // Get stations
-        $stations = Station::all();
+        $stations = Station::with(['marker', 'profileMedia', 'galleryMedia'])->get();
         $provinces = Province::orderBy('province_name')->get();
         
         // Get chiefs (users with role 'chief')

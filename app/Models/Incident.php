@@ -15,6 +15,7 @@ use App\Models\IncidentType;
 use App\Models\IncidentStatus;
 use App\Models\IncidentReport;
 use App\Models\IncidentContext;
+use App\Models\Barangay;
 
 class Incident extends Model
 {
@@ -24,9 +25,16 @@ class Incident extends Model
     protected $fillable = [
         'marker_id',
         'status',
- 
         'team_id',
         'reported_by',
+        'barangay_id',
+        'barangay_resolution_status',
+        'barangay_resolution_source',
+        'barangay_resolved_at',
+    ];
+
+    protected $casts = [
+        'barangay_resolved_at' => 'datetime',
     ];
 
     public function marker()
@@ -45,6 +53,11 @@ class Incident extends Model
     public function reporter()
     {
         return $this->belongsTo(User::class, 'reported_by', 'user_id');
+    }
+
+    public function barangay()
+    {
+        return $this->belongsTo(Barangay::class, 'barangay_id', 'barangay_id');
     }
 
   

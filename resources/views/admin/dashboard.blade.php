@@ -588,6 +588,120 @@
             border-color: #dc2626;
         }
 
+        .dashboard-welcome-toast {
+            position: fixed;
+            top: 92px;
+            right: 28px;
+            z-index: 180;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 320px;
+            max-width: 420px;
+            padding: 14px 16px;
+            border-radius: 22px;
+            background: rgba(255, 251, 235, 0.98);
+            border: 1px solid rgba(245, 158, 11, 0.18);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 0.24s ease, transform 0.24s ease;
+        }
+
+        .dashboard-welcome-toast.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .dashboard-welcome-toast__icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .dashboard-welcome-toast__copy strong {
+            display: block;
+            color: #9a3412;
+            font-size: 0.92rem;
+            line-height: 1.2;
+            font-weight: 800;
+        }
+
+        .dashboard-welcome-toast__copy span {
+            display: block;
+            color: #b45309;
+            font-size: 0.76rem;
+            line-height: 1.35;
+            margin-top: 3px;
+        }
+
+        .lector-top-bar {
+            border-radius: 28px;
+        }
+
+        .user-dropdown-toggle {
+            border-radius: 999px;
+        }
+
+        .chief-dashboard-welcome,
+        .dashboard-hidden-panel {
+            display: none !important;
+        }
+
+        .main-content .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .main-content .kpi-grid > * {
+            min-width: 0;
+        }
+
+        .main-content .kpi-card {
+            min-height: 92px;
+            min-width: 0;
+            padding: 14px 16px;
+            gap: 12px;
+        }
+
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            font-size: 18px;
+        }
+
+        .main-content .kpi-info h3 {
+            font-size: 11px;
+            letter-spacing: 0.08em;
+        }
+
+        .main-content .kpi-info p {
+            font-size: 20px;
+            line-height: 1.05;
+        }
+
+        @media (max-width: 1180px) {
+            .main-content .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .main-content .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .kpi-header {
             display: flex;
             justify-content: space-between;
@@ -1229,6 +1343,14 @@
         }
 
         @media (max-width: 768px) {
+            .dashboard-welcome-toast {
+                top: 82px;
+                left: 12px;
+                right: 12px;
+                min-width: 0;
+                max-width: none;
+            }
+
             .sidebar {
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
@@ -1451,6 +1573,16 @@
 
         <!-- DASHBOARD CONTENT -->
         <div class="dashboard-container">
+            <div id="adminDashboardWelcomeToast" class="dashboard-welcome-toast" role="status" aria-live="polite">
+                <div class="dashboard-welcome-toast__icon">
+                    <i class="fa-solid fa-signal"></i>
+                </div>
+                <div class="dashboard-welcome-toast__copy">
+                    <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
+                    <span>Command overview is ready. Recent analytics are loaded below.</span>
+                </div>
+            </div>
+
             <div class="chief-dashboard-welcome bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-8 mb-8 flex items-start justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-amber-900 mb-2">Welcome back, {{ auth()->user()->first_name }}!</h1>
@@ -1562,6 +1694,22 @@
                 </div>
             </div>
 
+            @php
+                $analysisTrendSeries = collect($recentAnalyses ?? [])
+                    ->sortBy('created_at')
+                    ->values()
+                    ->map(function ($analysis) {
+                        return [
+                            'label' => optional(\Carbon\Carbon::parse($analysis->created_at))->format('M d'),
+                            'incident_count' => (int) ($analysis->incident_count ?? 0),
+                            'predicted_fire_incidents' => (int) (data_get($analysis->predictions ?? [], 'predicted_fire_incidents') ?? 0),
+                            'confidence' => (int) ($analysis->confidence_score ?? 0),
+                            'risk_level' => (string) ($analysis->risk_level ?? 'Unknown'),
+                        ];
+                    })
+                    ->values();
+            @endphp
+
             <!-- Full Width Map -->
             <div id="management" class="lector-card mb-8 scroll-mt-24">
                 <div class="flex items-center justify-between mb-6">
@@ -1612,81 +1760,37 @@
                     </div>
                 </div>
 
-                <!-- Incident Type Distribution -->
+                <!-- ML Trend Analysis -->
                 <div id="reports" class="chart-card scroll-mt-24">
                     <div class="chart-header">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-chart-pie" style="color: #dc2626;"></i>
-                            <h3>Incident Type Distribution</h3>
+                            <i class="fa-solid fa-brain" style="color: #dc2626;"></i>
+                            <h3>ML Trend Analysis</h3>
                         </div>
-                        <span class="text-sm text-gray-500">Total: {{ $incidents->count() }}</span>
+                        <span class="text-sm text-gray-500">{{ $analysisTrendSeries->count() }} saved model run(s)</span>
                     </div>
-                    
-                    @php
-                        $fireCount = $incidents->filter(fn($incident) => strtolower((string) ($incident->marker->category ?? $incident->incident_type ?? '')) === 'fire')->count();
-                        $medicalCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'medical'))->count();
-                        $rescueCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'rescue'))->count();
-                        $otherCount = $incidents->count() - ($fireCount + $medicalCount + $rescueCount);
-                        
-                        $totalIncidents = max($incidents->count(), 1);
-                        
-                        $firePercent = round(($fireCount / $totalIncidents) * 100);
-                        $medicalPercent = round(($medicalCount / $totalIncidents) * 100);
-                        $rescuePercent = round(($rescueCount / $totalIncidents) * 100);
-                        $otherPercent = round(($otherCount / $totalIncidents) * 100);
-                    @endphp
-                    
-                    <div class="incident-distribution">
-                        <div class="incident-type-item">
-                            <span class="type-color fire"></span>
-                            <span class="type-name">Fire Incidents</span>
-                            <span class="type-count">{{ $fireCount }}</span>
-                            <span class="type-percent">{{ $firePercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill fire" style="width: {{ $firePercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color medical"></span>
-                            <span class="type-name">Medical Emergencies</span>
-                            <span class="type-count">{{ $medicalCount }}</span>
-                            <span class="type-percent">{{ $medicalPercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill medical" style="width: {{ $medicalPercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color rescue"></span>
-                            <span class="type-name">Rescue Operations</span>
-                            <span class="type-count">{{ $rescueCount }}</span>
-                            <span class="type-percent">{{ $rescuePercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill rescue" style="width: {{ $rescuePercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color other"></span>
-                            <span class="type-name">Other Incidents</span>
-                            <span class="type-count">{{ $otherCount }}</span>
-                            <span class="type-percent">{{ $otherPercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill other" style="width: {{ $otherPercent }}%"></div>
-                        </div>
+                    <div class="chart-container">
+                        <canvas id="analysisTrendChart"></canvas>
                     </div>
-                    
-                    <!-- Mini Donut Chart for Incident Types -->
-                    <div style="margin-top: 20px; height: 100px;">
-                        <canvas id="typeDonutChart"></canvas>
+                    <div class="grid grid-cols-3 gap-3 mt-4">
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Latest Risk</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->last()['risk_level'] ?? 'No data' }}</div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Latest Confidence</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->last()['confidence'] ?? 0 }}%</div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Forecast Runs</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->count() }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Second Row of Charts -->
-            <div class="charts-grid">
+            <div class="charts-grid dashboard-hidden-panel">
                 <!-- Incident Status Distribution -->
                 <div class="chart-card">
                     <div class="chart-header">
@@ -1756,7 +1860,7 @@
             </div>
 
             <!-- bottom grid: station status -->
-            <div class="bottom-grid">
+            <div class="bottom-grid dashboard-hidden-panel">
                 <!-- station readiness -->
                 <div class="station-card">
                     <div class="station-header">
@@ -1839,7 +1943,85 @@
             </div>
 
             <!-- Equipment Card (replacing Today's Operational Summary) -->
-            <div id="resources" class="bg-white rounded-xl shadow-lg overflow-hidden mb-6 scroll-mt-24">
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+                <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-4">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <i class="fas fa-brain"></i>
+                                Previous Analyses
+                            </h2>
+                            <p class="text-amber-50 text-sm mt-1">Latest saved AI forecasts across the command system.</p>
+                        </div>
+                        <a href="{{ route('admin.analytics') }}" class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/25 transition">
+                            <i class="fa-solid fa-chart-line"></i>
+                            Open Analytics
+                        </a>
+                    </div>
+                </div>
+                <div class="p-6">
+                    @forelse($recentAnalyses as $analysis)
+                        @php
+                            $prediction = $analysis->predictions ?? [];
+                            $predictionSummary = $prediction['summary'] ?? null;
+                            $predictionOutlook = $prediction['outlook'] ?? 'Unknown';
+                            $predictedFireIncidents = $prediction['predicted_fire_incidents'] ?? null;
+                        @endphp
+                        <div class="mb-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-orange-50/40 p-5 shadow-sm">
+                            <div class="flex items-start justify-between gap-4 flex-wrap">
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                            {{ $analysis->sector ?? 'System Analysis' }}
+                                        </span>
+                                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold
+                                            @if(strtolower($analysis->risk_level ?? '') === 'high' || strtolower($analysis->risk_level ?? '') === 'critical') bg-red-100 text-red-700
+                                            @elseif(strtolower($analysis->risk_level ?? '') === 'medium') bg-amber-100 text-amber-700
+                                            @else bg-emerald-100 text-emerald-700 @endif">
+                                            {{ $analysis->risk_level ?? 'Unknown Risk' }}
+                                        </span>
+                                    </div>
+                                    <h3 class="mt-3 text-lg font-bold text-slate-800">{{ $prediction['prediction_context']['target_period_label'] ?? ($prediction['forecast_window'] ?? ($analysis->period ?? 'Analysis Window')) }}</h3>
+                                    <p class="mt-1 text-sm text-slate-500">Saved {{ \Carbon\Carbon::parse($analysis->created_at)->format('M d, Y h:i A') }}</p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3 min-w-[220px]">
+                                    <div class="rounded-xl bg-white p-3 border border-slate-200">
+                                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Incidents</div>
+                                        <div class="mt-1 text-2xl font-extrabold text-slate-800">{{ $analysis->incident_count ?? 0 }}</div>
+                                    </div>
+                                    <div class="rounded-xl bg-white p-3 border border-slate-200">
+                                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Confidence</div>
+                                        <div class="mt-1 text-2xl font-extrabold text-slate-800">{{ (int) ($analysis->confidence_score ?? 0) }}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 rounded-2xl border border-amber-200/60 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
+                                <div class="flex items-center justify-between gap-3 flex-wrap">
+                                    <div>
+                                        <div class="text-[11px] font-bold uppercase tracking-wider text-amber-700">Prediction Outlook</div>
+                                        <div class="mt-1 text-base font-bold text-slate-800">{{ $predictionOutlook }}</div>
+                                    </div>
+                                    @if(!is_null($predictedFireIncidents))
+                                        <div class="rounded-xl bg-white px-4 py-3 border border-amber-200">
+                                            <div class="text-[11px] font-bold uppercase tracking-wider text-red-600">Possible Fire Incidents</div>
+                                            <div class="mt-1 text-2xl font-extrabold text-red-800">{{ $predictedFireIncidents }}</div>
+                                        </div>
+                                    @endif
+                                </div>
+                                <p class="mt-4 text-sm leading-6 text-slate-600">{{ $predictionSummary ?: 'No prediction summary available for this analysis.' }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+                            <div class="text-slate-400 text-3xl mb-3"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                            <p class="text-sm font-semibold text-slate-700">No previous analyses found</p>
+                            <p class="text-xs text-slate-500 mt-1">Run an AI analysis from the analytics page to start building prediction history.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div id="resources" class="dashboard-hidden-panel bg-white rounded-xl shadow-lg overflow-hidden mb-6 scroll-mt-24">
                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
@@ -2176,6 +2358,22 @@
                 </div>
             </div>
         </div>
+        @php
+            $fireCount = $incidents->filter(fn($incident) => strtolower((string) ($incident->marker->category ?? $incident->incident_type ?? '')) === 'fire')->count();
+            $medicalCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'medical'))->count();
+            $rescueCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'rescue'))->count();
+            $otherCount = $incidents->count() - ($fireCount + $medicalCount + $rescueCount);
+            $reportedCount = $incidents->where('status', 'reported')->count();
+            $respondingCount = $incidents->where('status', 'responding')->count();
+            $resolvedCount = $incidents->where('status', 'resolved')->count();
+            $completedCount = $incidents->where('status', 'completed')->count();
+            $hourlyData = array_fill(0, 24, 0);
+            foreach ($incidents as $incident) {
+                $hour = \Carbon\Carbon::parse($incident->created_at)->hour;
+                $hourlyData[$hour] = ($hourlyData[$hour] ?? 0) + 1;
+            }
+        @endphp
+
     </main>
 
 <script>
@@ -2191,6 +2389,7 @@
         completedCount: {{ $completedCount }},
         hourlyData: {{ json_encode(array_values($hourlyData)) }}
     };
+    const mlTrendData = @json($analysisTrendSeries);
 
     document.getElementById('stationProvince').addEventListener('change', function() {
         const provinceId = this.value;
@@ -2269,6 +2468,7 @@
     let icons = [];
 
     document.addEventListener('DOMContentLoaded', function() {
+        const welcomeToast = document.getElementById('adminDashboardWelcomeToast');
         // Alert bell toggle
         const alertBell = document.getElementById('alertBell');
         const alertsDropdown = document.getElementById('alertsDropdown');
@@ -2289,9 +2489,13 @@
 
         // Initialize all charts
         initializeCharts();
-        
-        // Load equipment
-        loadEquipment();
+
+        if (welcomeToast) {
+            welcomeToast.classList.add('is-visible');
+            window.setTimeout(() => {
+                welcomeToast.classList.remove('is-visible');
+            }, 3200);
+        }
         
         // Debug: Log available categories (remove this in production)
         console.log('Available categories:');
@@ -2404,26 +2608,74 @@
             loadChartData('week');
         }
 
-        // Type Donut Chart
-        const typeCtx = document.getElementById('typeDonutChart')?.getContext('2d');
-        if (typeCtx) {
-            new Chart(typeCtx, {
-                type: 'doughnut',
+        const analysisTrendCtx = document.getElementById('analysisTrendChart')?.getContext('2d');
+        if (analysisTrendCtx) {
+            new Chart(analysisTrendCtx, {
+                type: 'line',
                 data: {
-                    labels: ['Fire', 'Medical', 'Rescue', 'Other'],
-                    datasets: [{
-                        data: [chartData.fireCount, chartData.medicalCount, chartData.rescueCount, chartData.otherCount],
-                        backgroundColor: ['#ef4444', '#3b82f6', '#f97316', '#a855f7'],
-                        borderWidth: 0
-                    }]
+                    labels: mlTrendData.map((item) => item.label),
+                    datasets: [
+                        {
+                            label: 'Actual Incidents',
+                            data: mlTrendData.map((item) => item.incident_count),
+                            borderColor: '#c63d26',
+                            backgroundColor: 'rgba(198, 61, 38, 0.08)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            tension: 0.35,
+                            fill: false
+                        },
+                        {
+                            label: 'Predicted Fire Incidents',
+                            data: mlTrendData.map((item) => item.predicted_fire_incidents),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            tension: 0.35,
+                            borderDash: [8, 6],
+                            fill: false
+                        },
+                        {
+                            label: 'Confidence %',
+                            data: mlTrendData.map((item) => item.confidence),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3,
+                            yAxisID: 'confidenceAxis',
+                            fill: false
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
                     },
-                    cutout: '60%'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e5e7eb' },
+                            ticks: { precision: 0 }
+                        },
+                        confidenceAxis: {
+                            beginAtZero: true,
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            grid: { display: false },
+                            ticks: {
+                                callback: (value) => `${value}%`
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
                 }
             });
         }
@@ -2499,6 +2751,11 @@
 
     // Equipment Management Functions
     async function loadEquipment() {
+        const equipmentList = document.getElementById('equipmentList');
+        if (!equipmentList) {
+            return;
+        }
+
         try {
             const response = await fetch('/api/equipment/with-stations');
             if (!response.ok) throw new Error('Failed to fetch equipment');

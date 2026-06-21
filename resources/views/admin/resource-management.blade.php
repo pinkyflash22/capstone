@@ -181,6 +181,127 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
+        .boundary-control-card {
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            padding: 22px 24px;
+            margin-bottom: 24px;
+            border: 1px solid #eef2f6;
+        }
+
+        .boundary-control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .boundary-control-header h3 {
+            margin: 0 0 8px;
+            font-size: 1.08rem;
+            color: #1e293b;
+        }
+
+        .boundary-control-header p {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.9rem;
+            max-width: 70ch;
+            line-height: 1.55;
+        }
+
+        .boundary-summary {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .boundary-summary-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 36px;
+            padding: 0 14px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border: 1px solid #fed7aa;
+        }
+
+        .boundary-table-wrap {
+            overflow-x: auto;
+        }
+
+        .boundary-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .boundary-table th,
+        .boundary-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: left;
+            font-size: 0.84rem;
+            color: #475569;
+            vertical-align: middle;
+        }
+
+        .boundary-table th {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+        }
+
+        .boundary-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 30px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+
+        .boundary-status-pill.synced {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .boundary-status-pill.missing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .boundary-status-pill.invalid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .boundary-sync-btn {
+            min-height: 38px;
+            border: none;
+            border-radius: 10px;
+            padding: 0 14px;
+            background: #2c3e50;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .boundary-sync-btn[disabled] {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
         .search-box {
             display: flex;
             align-items: center;
@@ -673,6 +794,68 @@
                 <i class="fa-solid fa-circle-info"></i>
                 <div class="content"><strong>Resource Dashboard:</strong> Manage personnel, teams, and equipment across all stations.</div>
             </div>
+
+            @php
+                $syncedBoundaryCount = $boundaryBarangays->where('boundary_status', 'synced')->count();
+                $invalidBoundaryCount = $boundaryBarangays->where('boundary_status', 'invalid')->count();
+                $missingBoundaryCount = $boundaryBarangays->where('boundary_status', 'missing')->count();
+            @endphp
+
+            <section class="boundary-control-card">
+                <div class="boundary-control-header">
+                    <div>
+                        <h3><i class="fa-solid fa-draw-polygon"></i> Barangay Boundary Control</h3>
+                        <p>Geoapify boundary sync only runs when an administrator clicks a sync button. Refresh one barangay at a time to update stored polygons, then fine-tune the line manually on the map if needed.</p>
+                    </div>
+                    <div class="boundary-summary">
+                        <span class="boundary-summary-pill"><i class="fa-solid fa-layer-group"></i> {{ $boundaryBarangays->count() }} barangays</span>
+                        <span class="boundary-summary-pill"><i class="fa-solid fa-circle-check"></i> {{ $syncedBoundaryCount }} synced</span>
+                        <span class="boundary-summary-pill"><i class="fa-solid fa-triangle-exclamation"></i> {{ $invalidBoundaryCount }} invalid</span>
+                        <span class="boundary-summary-pill"><i class="fa-solid fa-clock-rotate-left"></i> {{ $missingBoundaryCount }} pending</span>
+                    </div>
+                </div>
+
+                <div class="boundary-table-wrap">
+                    <table class="boundary-table">
+                        <thead>
+                            <tr>
+                                <th>Barangay</th>
+                                <th>City</th>
+                                <th>Status</th>
+                                <th>Source</th>
+                                <th>Last Sync</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($boundaryBarangays as $boundaryBarangay)
+                                <tr>
+                                    <td><strong>{{ $boundaryBarangay['barangay_name'] }}</strong></td>
+                                    <td>{{ $boundaryBarangay['city_name'] ?? 'No city linked' }}</td>
+                                    <td>
+                                        <span class="boundary-status-pill {{ $boundaryBarangay['boundary_status'] }}">
+                                            <i class="fa-solid {{ $boundaryBarangay['boundary_status_icon'] }}"></i>
+                                            {{ $boundaryBarangay['boundary_status_label'] }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $boundaryBarangay['boundary_source'] ? strtoupper($boundaryBarangay['boundary_source']) : 'NONE' }}</td>
+                                    <td>{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
+                                    <td>
+                                        <a href="{{ route('admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-sync-btn" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                            Visit
+                                        </a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6">No barangays are available for boundary sync yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-user"></i></div><div class="stat-info"><h3>Total Personnel</h3><div class="stat-number">{{ $stationOfficers->count() }}</div><div class="stat-change">{{$stationOfficers->where('status','available')->count()}} active</div></div></div>
@@ -3796,6 +3979,46 @@ document.getElementById('createTeamForm')?.addEventListener('submit', function(e
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initTeamModal();
+
+    document.querySelectorAll('.boundary-sync-form').forEach((form) => {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const button = form.querySelector('.boundary-sync-btn');
+            const originalHtml = button?.innerHTML || 'Sync Boundary';
+
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+            }
+
+            try {
+                const response = await fetch(form.dataset.route, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.message || 'Boundary sync failed.');
+                }
+
+                showToast(payload.message || 'Boundary synced successfully.');
+                window.setTimeout(() => window.location.reload(), 700);
+            } catch (error) {
+                showToast(error.message || 'Boundary sync failed.', 'error');
+
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml;
+                }
+            }
+        });
+    });
 });
     </script>
 </body>

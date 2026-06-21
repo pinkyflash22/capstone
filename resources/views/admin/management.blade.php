@@ -12,6 +12,114 @@
     
     @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
+    <style>
+        .station-media-admin {
+            margin-bottom: 22px;
+            padding: 22px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #fff8ef 0%, #ffffff 100%);
+            border: 1px solid rgba(245, 158, 11, 0.12);
+            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.04);
+        }
+        .station-media-admin-head h2 {
+            margin: 0 0 8px;
+            color: #0f172a;
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+        .station-media-admin-head p {
+            margin: 0 0 18px;
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }
+        .station-media-admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+        }
+        .station-media-admin-card {
+            padding: 18px;
+            border-radius: 20px;
+            background: #fff;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .station-media-admin-card h3 {
+            margin: 0 0 8px;
+            color: #172033;
+            font-size: 1rem;
+            font-weight: 800;
+        }
+        .station-media-admin-card p {
+            margin: 0 0 12px;
+            color: #64748b;
+            font-size: 0.84rem;
+        }
+        .station-media-preview {
+            height: 180px;
+            border-radius: 18px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 1px solid rgba(245, 158, 11, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c2410c;
+            margin-bottom: 14px;
+        }
+        .station-media-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .station-media-preview i {
+            font-size: 2.6rem;
+        }
+        .station-media-admin-card input[type="file"],
+        .station-media-admin-card input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            background: #fff;
+            margin-bottom: 10px;
+        }
+        .station-media-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .station-media-mini {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .station-media-mini img {
+            width: 100%;
+            height: 78px;
+            object-fit: cover;
+            display: block;
+        }
+        .station-flash {
+            margin-bottom: 18px;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .station-flash.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .station-flash.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+    </style>
 </head>
 <body class="chief-dashboard-page">
     <!-- Side Navigation (same as announcements) -->
@@ -128,6 +236,13 @@
 
         <!-- MANAGEMENT CONTENT -->
         <div class="management-container">
+            @if(session('success'))
+                <div class="station-flash success">{{ session('success') }}</div>
+            @endif
+            @if($errors->any())
+                <div class="station-flash error">{{ $errors->first() }}</div>
+            @endif
+
             <!-- Page Header -->
             <div class="page-header">
                 <h1>
@@ -146,6 +261,61 @@
                     <strong>Management Dashboard:</strong> View and manage all your data in one place. Use the tabs below to switch between different data types.
                 </div>
             </div>
+
+            <section class="station-media-admin">
+                <div class="station-media-admin-head">
+                    <h2>Station Media Control</h2>
+                    <p>Upload one profile image and additional station photos. These appear on the station-facing pages used by responders.</p>
+                </div>
+                <div class="station-media-admin-grid">
+                    @foreach(($stations ?? collect()) as $station)
+                        @php
+                            $profilePath = $station->profileMedia?->path;
+                            $profileUrl = $profilePath ? asset('storage/' . ltrim(str_replace('\\', '/', $profilePath), '/')) : null;
+                        @endphp
+                        <div class="station-media-admin-card">
+                            <h3>{{ $station->station_name }}</h3>
+                            <p>{{ $station->station_code ?: 'No station code' }}{{ $station->marker?->title ? ' • ' . $station->marker->title : '' }}</p>
+                            <div class="station-media-preview">
+                                @if($profileUrl)
+                                    <img src="{{ $profileUrl }}" alt="{{ $station->station_name }}">
+                                @else
+                                    <i class="fa-solid fa-building-shield"></i>
+                                @endif
+                            </div>
+
+                            <form method="POST" action="{{ route('admin.stations.media.profile', $station->station_id) }}" enctype="multipart/form-data" style="margin-bottom: 10px;">
+                                @csrf
+                                <input type="file" name="profile_image" accept="image/*" required>
+                                <button type="submit" class="btn-primary" style="width:100%;">
+                                    <i class="fa-solid fa-upload"></i>
+                                    Save Profile Image
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ route('admin.stations.media.gallery', $station->station_id) }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="file" name="gallery_images[]" accept="image/*" multiple required>
+                                <input type="text" name="caption" placeholder="Optional caption">
+                                <button type="submit" class="btn-outline" style="width:100%;">
+                                    <i class="fa-solid fa-images"></i>
+                                    Add Gallery Photos
+                                </button>
+                            </form>
+
+                            @if($station->galleryMedia->isNotEmpty())
+                                <div class="station-media-mini-grid">
+                                    @foreach($station->galleryMedia->take(4) as $photo)
+                                        <div class="station-media-mini">
+                                            <img src="{{ asset('storage/' . ltrim(str_replace('\\', '/', $photo->path), '/')) }}" alt="Station gallery photo">
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </section>
 
             <!-- Tab Navigation -->
             <div class="tab-navigation">

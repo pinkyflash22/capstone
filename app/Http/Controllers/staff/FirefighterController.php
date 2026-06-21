@@ -33,6 +33,7 @@ use App\Models\EquipmentToStation;
 
 
 use Illuminate\Http\Request;
+use App\Services\BoundaryMatcherService;
 use App\Support\UserActivityLogger;
 
 class FirefighterController extends Controller
@@ -453,12 +454,14 @@ class FirefighterController extends Controller
         ]);
     }
 
-    public function myStation(){
+    public function myStation(BoundaryMatcherService $boundaryMatcherService){
         $userId = Auth::user()->user_id;
         $user = User::with(['role', 'address.barangay.city'])->where('user_id', $userId)->firstOrFail();
         $stationOfficer = StationOfficer::with([
                 'user.role',
                 'station.marker',
+                'station.profileMedia',
+                'station.galleryMedia',
                 'station.address.barangay.city',
             ])
             ->where('user_id', $userId)
@@ -538,7 +541,7 @@ class FirefighterController extends Controller
             ->orderBy('equipment_station_id')
             ->get();
 
-        $spotReports = SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'progressInvestigation'])
+        $spotReports = SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->get();
@@ -553,22 +556,49 @@ class FirefighterController extends Controller
             ->latest()
             ->get();
 
-        $availableSpotIncidents = Incident::with(['marker'])
-            ->where('status', self::STATUS_CONTROLLED)
+        $availableSpotIncidents = Incident::with(['marker', 'barangay.city'])
+            ->where(function ($query) {
+                $query->whereIn('status', [
+                    self::STATUS_CONTROLLED,
+                    'controlled',
+                    'Controlled',
+                    'completed',
+                    'Completed',
+                ]);
+            })
             ->whereIn('team_id', $stationTeamIds)
             ->whereNotIn('incident_id', function ($query) {
                 $query->select('incident_id')->from('spot_investigation_report');
             })
             ->latest()
-            ->get();
+            ->get()
+            ->map(function ($incident) use ($boundaryMatcherService) {
+                $resolvedBarangayName = $incident->barangay?->barangay_name;
+                $resolvedCityName = $incident->barangay?->city?->city_name;
 
-        $availableSpotReports = SpotInvestigationReport::with('incident.marker')
+                if ((! $resolvedBarangayName || ! $resolvedCityName) && $incident->marker?->lat !== null && $incident->marker?->lng !== null) {
+                    $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
+                        (float) $incident->marker->lat,
+                        (float) $incident->marker->lng
+                    );
+
+                    $resolvedBarangayName = $resolvedBarangayName ?: $matchedBoundary?->barangay?->barangay_name;
+                    $resolvedCityName = $resolvedCityName ?: $matchedBoundary?->barangay?->city?->city_name;
+                }
+
+                $incident->resolved_dropdown_barangay_name = $resolvedBarangayName;
+                $incident->resolved_dropdown_city_name = $resolvedCityName;
+
+                return $incident;
+            });
+
+        $availableSpotReports = SpotInvestigationReport::with(['incident.marker', 'incident.barangay.city'])
             ->whereDoesntHave('progressInvestigation')
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->get();
 
-        $availableProgressReports = ProgressInvestigationReport::with('spotInvestigation.incident.marker')
+        $availableProgressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city'])
             ->whereDoesntHave('finalInvestigation')
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()

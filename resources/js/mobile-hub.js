@@ -265,7 +265,51 @@ async function resolveNearestStation(lat, lng) {
     };
 }
 
+async function resolveMobileHubMarkerLabel(lat, lng) {
+    const geoapifyKey = window.geoapifyKey || '83677a1086d44c4e82f903fd2fe2ea9b';
+
+    if (!geoapifyKey) {
+        return {
+            title: 'Fire Emergency',
+            description: 'Fire emergency reported by citizen.',
+        };
+    }
+
+    try {
+        const params = new URLSearchParams({
+            lat: String(lat),
+            lon: String(lng),
+            format: 'json',
+            apiKey: geoapifyKey,
+        });
+
+        const response = await fetch(`https://api.geoapify.com/v1/geocode/reverse?${params.toString()}`);
+        if (!response.ok) {
+            throw new Error('Reverse geocoding failed.');
+        }
+
+        const payload = await response.json();
+        const result = Array.isArray(payload?.results) ? payload.results[0] : null;
+
+        const primary = result?.address_line1 || result?.formatted || result?.street || result?.suburb || result?.hamlet || null;
+        const locality = [result?.barangay, result?.city, result?.county].filter(Boolean).join(', ');
+
+        return {
+            title: primary || 'Fire Emergency',
+            description: locality || result?.formatted || 'Fire emergency reported by citizen.',
+        };
+    } catch (error) {
+        console.warn('Mobile hub reverse geocode failed:', error);
+        return {
+            title: 'Fire Emergency',
+            description: 'Fire emergency reported by citizen.',
+        };
+    }
+}
+
 async function createMarker(lat, lng) {
+    const markerLabel = await resolveMobileHubMarkerLabel(lat, lng);
+
     const response = await fetch('/api/markers', {
         method: 'POST',
         headers: {
@@ -274,8 +318,8 @@ async function createMarker(lat, lng) {
             'X-CSRF-TOKEN': csrfToken,
         },
         body: JSON.stringify({
-            title: 'Help Emergency',
-            description: 'Fire emergency reported by citizen.',
+            title: markerLabel.title,
+            description: markerLabel.description,
             lat,
             lng,
             status: 'active',
@@ -366,10 +410,13 @@ async function submitMobileHubIncidentReport() {
         const { stationId, stationName, teamId } = await resolveNearestStation(coords.lat, coords.lng);
         updateNearestStationContext(stationName);
         const markerId = await createMarker(coords.lat, coords.lng);
-        await createIncident(markerId, stationId, teamId);
+        const incidentPayload = await createIncident(markerId, stationId, teamId);
         await updateTeamStatus(teamId);
 
-        showHubStatus('Fire emergency report sent successfully. You can now stay here or open Dashboard / History.', 'success');
+        showHubStatus(
+            incidentPayload?.message || 'Fire emergency report sent successfully. Barangay matching is running in the background.',
+            'success'
+        );
     } catch (error) {
         console.error('Mobile hub report failed:', error);
         showHubStatus(error.message || 'Failed to send the report. Please try again.');

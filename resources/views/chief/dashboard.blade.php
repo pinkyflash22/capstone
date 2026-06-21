@@ -231,6 +231,124 @@
             color: #ffffff !important;
         }
 
+        .dashboard-welcome-toast {
+            position: fixed;
+            top: 92px;
+            right: 28px;
+            z-index: 180;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 320px;
+            max-width: 420px;
+            padding: 14px 16px;
+            border-radius: 22px;
+            background: rgba(255, 251, 235, 0.98);
+            border: 1px solid rgba(245, 158, 11, 0.18);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 0.24s ease, transform 0.24s ease;
+        }
+
+        .dashboard-welcome-toast.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .dashboard-welcome-toast__icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .dashboard-welcome-toast__copy {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .dashboard-welcome-toast__copy strong {
+            color: #9a3412;
+            font-size: 0.92rem;
+            line-height: 1.2;
+            font-weight: 800;
+        }
+
+        .dashboard-welcome-toast__copy span {
+            color: #b45309;
+            font-size: 0.76rem;
+            line-height: 1.35;
+        }
+
+        .chief-dashboard-welcome,
+        .dashboard-hidden-panel {
+            display: none !important;
+        }
+
+        .lector-top-bar {
+            border-radius: 28px;
+        }
+
+        .user-dropdown-toggle {
+            border-radius: 999px;
+        }
+
+        .dashboard-container .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .dashboard-container .kpi-grid > * {
+            min-width: 0;
+        }
+
+        .dashboard-container .kpi-card {
+            min-height: 92px;
+            min-width: 0;
+            padding: 14px 16px !important;
+            gap: 12px;
+        }
+
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            font-size: 18px;
+        }
+
+        .dashboard-container .kpi-info h3 {
+            font-size: 11px;
+            letter-spacing: 0.08em;
+        }
+
+        .dashboard-container .kpi-info p {
+            font-size: 20px;
+            line-height: 1.05;
+        }
+
+        @media (max-width: 1180px) {
+            .dashboard-container .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .dashboard-container .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @keyframes chiefLogShimmer {
             0% {
                 background-position: -200% 0;
@@ -374,13 +492,13 @@
 
         <!-- DASHBOARD CONTENT -->
         <div class="dashboard-container chief-dashboard-container">
-            <div id="chiefMobileWelcomeToast" class="chief-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
-                <div class="chief-mobile-welcome-toast__icon">
+            <div id="chiefMobileWelcomeToast" class="dashboard-welcome-toast" role="status" aria-live="polite">
+                <div class="dashboard-welcome-toast__icon">
                     <i class="fa-solid fa-signal"></i>
                 </div>
-                <div class="chief-mobile-welcome-toast__copy">
+                <div class="dashboard-welcome-toast__copy">
                     <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                    <span>Chief Command is operational.</span>
+                    <span>Chief Command is ready. Recent system insights are loaded below.</span>
                 </div>
             </div>
 
@@ -459,6 +577,22 @@
                     </div>
                 </div>
         </div>
+
+        @php
+            $analysisTrendSeries = collect($recentAnalyses ?? [])
+                ->sortBy('created_at')
+                ->values()
+                ->map(function ($analysis) {
+                    return [
+                        'label' => optional(\Carbon\Carbon::parse($analysis->created_at))->format('M d'),
+                        'incident_count' => (int) ($analysis->incident_count ?? 0),
+                        'predicted_fire_incidents' => (int) (data_get($analysis->predictions ?? [], 'predicted_fire_incidents') ?? 0),
+                        'confidence' => (int) ($analysis->confidence_score ?? 0),
+                        'risk_level' => (string) ($analysis->risk_level ?? 'Unknown'),
+                    ];
+                })
+                ->values();
+        @endphp
 
         <div id="chiefLogsModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm hidden items-center justify-center z-[5000] p-4">
             <div class="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
@@ -548,83 +682,39 @@
                     </div>
                 </div>
 
-                <!-- Incident Type Distribution -->
+                <!-- ML Trend Analysis -->
                 <div class="chart-card">
                     <div class="chart-header">
                         <div class="chart-title-group">
                             <span class="chart-title-icon">
-                                <i class="fa-solid fa-chart-pie"></i>
+                                <i class="fa-solid fa-brain"></i>
                             </span>
-                            <h3>Incident Type Distribution</h3>
+                            <h3>ML Trend Analysis</h3>
                         </div>
-                        <span class="chart-total-pill">Total: {{ $incidents->count() }}</span>
+                        <span class="chart-total-pill">{{ $analysisTrendSeries->count() }} saved model run(s)</span>
                     </div>
-                    
-                    @php
-                        $fireCount = $incidents->filter(fn($incident) => strtolower((string) ($incident->marker->category ?? $incident->incident_type ?? '')) === 'fire')->count();
-                        $medicalCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'medical'))->count();
-                        $rescueCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'rescue'))->count();
-                        $otherCount = $incidents->count() - ($fireCount + $medicalCount + $rescueCount);
-                        
-                        $totalIncidents = max($incidents->count(), 1);
-                        
-                        $firePercent = round(($fireCount / $totalIncidents) * 100);
-                        $medicalPercent = round(($medicalCount / $totalIncidents) * 100);
-                        $rescuePercent = round(($rescueCount / $totalIncidents) * 100);
-                        $otherPercent = round(($otherCount / $totalIncidents) * 100);
-                    @endphp
-                    
-                    <div class="incident-distribution">
-                        <div class="incident-type-item">
-                            <span class="type-color fire"></span>
-                            <span class="type-name">Fire Incidents</span>
-                            <span class="type-count">{{ $fireCount }}</span>
-                            <span class="type-percent">{{ $firePercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill fire" style="width: {{ $firePercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color medical"></span>
-                            <span class="type-name">Medical Emergencies</span>
-                            <span class="type-count">{{ $medicalCount }}</span>
-                            <span class="type-percent">{{ $medicalPercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill medical" style="width: {{ $medicalPercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color rescue"></span>
-                            <span class="type-name">Rescue Operations</span>
-                            <span class="type-count">{{ $rescueCount }}</span>
-                            <span class="type-percent">{{ $rescuePercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill rescue" style="width: {{ $rescuePercent }}%"></div>
-                        </div>
-                        
-                        <div class="incident-type-item">
-                            <span class="type-color other"></span>
-                            <span class="type-name">Other Incidents</span>
-                            <span class="type-count">{{ $otherCount }}</span>
-                            <span class="type-percent">{{ $otherPercent }}%</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill other" style="width: {{ $otherPercent }}%"></div>
-                        </div>
+                    <div class="chart-container">
+                        <canvas id="analysisTrendChart"></canvas>
                     </div>
-                    
-                    <!-- Mini Donut Chart for Incident Types -->
-                    <div class="chart-mini-donut">
-                        <canvas id="typeDonutChart"></canvas>
+                    <div class="mt-4 grid grid-cols-3 gap-3">
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Latest Risk</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->last()['risk_level'] ?? 'No data' }}</div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Latest Confidence</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->last()['confidence'] ?? 0 }}%</div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Forecast Runs</div>
+                            <div class="mt-1 text-base font-bold text-slate-800">{{ $analysisTrendSeries->count() }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Second Row of Charts -->
-            <div class="charts-grid" data-chief-insights-source>
+            <div class="charts-grid dashboard-hidden-panel" data-chief-insights-source>
                 <!-- Incident Status Distribution -->
                 <div class="chart-card">
                     <div class="chart-header">
@@ -698,7 +788,7 @@
             </div>
 
             <!-- bottom grid: station status -->
-            <div class="bottom-grid" data-chief-insights-source>
+            <div class="bottom-grid dashboard-hidden-panel" data-chief-insights-source>
                 <!-- station readiness -->
                 <div class="station-card">
                     <div class="station-header">
@@ -883,7 +973,7 @@
             </div>
 
             <!-- Equipment Card (replacing Today's Operational Summary) -->
-            <div class="chief-dashboard-equipment-card hidden md:block bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+            <div class="chief-dashboard-equipment-card dashboard-hidden-panel hidden md:block bg-white rounded-xl shadow-lg overflow-hidden mb-6">
                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
@@ -1251,7 +1341,21 @@
                     </div>
                 </form>
             </div>
-        </div>
+        @php
+            $fireCount = $incidents->filter(fn($incident) => strtolower((string) ($incident->marker->category ?? $incident->incident_type ?? '')) === 'fire')->count();
+            $medicalCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'medical'))->count();
+            $rescueCount = $incidents->filter(fn($incident) => str_contains(strtolower((string) ($incident->incident_type ?? '')), 'rescue'))->count();
+            $otherCount = $incidents->count() - ($fireCount + $medicalCount + $rescueCount);
+            $reportedCount = $incidents->where('status', 'Reported')->count();
+            $respondingCount = $incidents->where('status', 'Responding')->count();
+            $activeCount = $incidents->where('status', 'On Scene')->count();
+            $resolvedCount = $incidents->whereIn('status', ['Controlled', 'Closed'])->count();
+            $hourlyData = array_fill(0, 24, 0);
+            foreach ($incidents as $incident) {
+                $hour = \Carbon\Carbon::parse($incident->created_at)->hour;
+                $hourlyData[$hour] = ($hourlyData[$hour] ?? 0) + 1;
+            }
+        @endphp
 
     </main>
 
@@ -1270,6 +1374,7 @@
     };
 
     const incidentTrendData = @json($incidentTrendData);
+    const mlTrendData = @json($analysisTrendSeries);
     console.log('Incident Trend Data:', incidentTrendData);
     function bindAddressSelectors(prefix) {
         const provinceSelect = document.getElementById(`${prefix}Province`);
@@ -1424,7 +1529,7 @@
         let mobileToastTimer = null;
 
         function showMobileWelcomeToast() {
-            if (!mobileWelcomeToast || !isMobileViewport()) {
+            if (!mobileWelcomeToast) {
                 return;
             }
 
@@ -1500,10 +1605,7 @@
 
         // Initialize all charts
         initializeCharts();
-        
-        // Load equipment
-        loadEquipment();
-        
+
         // User dropdown toggle
         const userDropdownBtn = document.getElementById('userDropdownBtn');
         const userDropdownMenu = document.getElementById('userDropdownMenu');
@@ -1843,49 +1945,55 @@
             loadChartData('week');
         }
 
-        // Type Donut Chart
-        const typeCtx = document.getElementById('typeDonutChart')?.getContext('2d');
-        if (typeCtx) {
-            new Chart(typeCtx, {
-                type: 'doughnut',
+        const analysisTrendCtx = document.getElementById('analysisTrendChart')?.getContext('2d');
+        if (analysisTrendCtx) {
+            new Chart(analysisTrendCtx, {
+                type: 'line',
                 data: {
-                    labels: ['Fire', 'Medical', 'Rescue', 'Other'],
-                    datasets: [{
-                        data: [chartData.fireCount, chartData.medicalCount, chartData.rescueCount, chartData.otherCount],
-                        backgroundColor: ['#ef4444', '#3b82f6', '#f97316', '#a855f7'],
-                        borderWidth: 0
-                    }]
+                    labels: mlTrendData.map((item) => item.label),
+                    datasets: [
+                        {
+                            label: 'Actual Incidents',
+                            data: mlTrendData.map((item) => item.incident_count),
+                            borderColor: '#c63d26',
+                            backgroundColor: 'rgba(198, 61, 38, 0.08)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            tension: 0.35,
+                            fill: false
+                        },
+                        {
+                            label: 'Predicted Fire Incidents',
+                            data: mlTrendData.map((item) => item.predicted_fire_incidents),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            tension: 0.35,
+                            borderDash: [8, 6],
+                            fill: false
+                        },
+                        {
+                            label: 'Confidence %',
+                            data: mlTrendData.map((item) => item.confidence),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3,
+                            yAxisID: 'confidenceAxis',
+                            fill: false
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
-                    },
-                    cutout: '60%'
-                }
-            });
-        }
-
-        // Status Chart
-        const statusCtx = document.getElementById('statusChart')?.getContext('2d');
-        if (statusCtx) {
-            new Chart(statusCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Reported', 'Responding', 'Active', 'Resolved'],
-                    datasets: [{
-                        data: [chartData.reportedCount, chartData.respondingCount, chartData.activeCount, chartData.resolvedCount],
-                        backgroundColor: ['#ef4444', '#f97316', '#3b82f6', '#22c55e'],
-                        borderRadius: 6,
-                        barPercentage: 0.7
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
                     },
                     scales: {
                         y: {
@@ -1893,43 +2001,17 @@
                             grid: { color: '#e5e7eb' },
                             ticks: { precision: 0 }
                         },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        // Hourly Chart
-        const hourlyCtx = document.getElementById('hourlyChart')?.getContext('2d');
-        if (hourlyCtx) {
-            const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + ':00');
-            new Chart(hourlyCtx, {
-                type: 'line',
-                data: {
-                    labels: hours.filter((_, i) => i % 3 === 0),
-                    datasets: [{
-                        label: 'Incidents by Hour',
-                        data: chartData.hourlyData,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#3b82f6'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
+                        confidenceAxis: {
                             beginAtZero: true,
-                            grid: { color: '#e5e7eb' },
-                            ticks: { precision: 0 }
-                        }
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            grid: { display: false },
+                            ticks: {
+                                callback: (value) => `${value}%`
+                            }
+                        },
+                        x: { grid: { display: false } }
                     }
                 }
             });
@@ -1938,6 +2020,11 @@
 
     // Equipment Management Functions
     async function loadEquipment() {
+        const equipmentList = document.getElementById('equipmentList');
+        if (!equipmentList) {
+            return;
+        }
+
         try {
             const response = await fetch('{{ route('station-admin.management.equipment') }}', {
                 headers: {

@@ -2901,7 +2901,8 @@ document.getElementById('saveReport').addEventListener('click', async function(e
             if (typeof window.refreshCitizenOverviewData === 'function') {
                 window.refreshCitizenOverviewData();
             }
-            showIncidentToast('Incident reported successfully.');
+            showIncidentToast(window.latestIncidentSubmitMessage || 'Incident reported successfully.');
+            window.latestIncidentSubmitMessage = null;
         }
         
     } catch (error) {

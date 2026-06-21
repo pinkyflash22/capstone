@@ -72,6 +72,7 @@ let markerReferenceCache = {
 let manageShapesMode = false;
 let selectedShapeForEdit = null;
 let shapeFeatureGroup = null;
+let boundaryEditorContext = null;
 
 // Notification system
 let notifications = [];
@@ -129,6 +130,34 @@ window.userCoords = {
     currentLongitude: null,
     ready: false
 };
+
+function readBoundaryEditorContext() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const barangayId = Number(params.get('focus_barangay_id') || '');
+        const barangayName = (params.get('focus_barangay_name') || '').trim();
+        const lat = Number(params.get('focus_lat') || '');
+        const lng = Number(params.get('focus_lng') || '');
+        const openEditor = ['1', 'true', 'yes', 'on'].includes(String(params.get('open_boundary_editor') || '').toLowerCase());
+
+        if (!openEditor && !barangayId && !barangayName) {
+            return null;
+        }
+
+        return {
+            openEditor,
+            barangayId: Number.isFinite(barangayId) && barangayId > 0 ? barangayId : null,
+            barangayName: barangayName || null,
+            lat: Number.isFinite(lat) ? lat : null,
+            lng: Number.isFinite(lng) ? lng : null,
+        };
+    } catch (error) {
+        console.error('Failed to read boundary editor context:', error);
+        return null;
+    }
+}
+
+boundaryEditorContext = readBoundaryEditorContext();
 
 
 // ============================================================================
@@ -5748,6 +5777,9 @@ async function loadShapes() {
                 });
                 layer.shapeId = shape.id;
                 layer.shapeName = shape.name;
+                layer.shapeBarangayId = shape.barangay_id || null;
+                layer.shapeBoundaryType = shape.boundary_type || 'custom';
+                layer.shapeSource = shape.source || 'manual';
                 layer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(shape.id, layer, e.latlng); } });
                 if (shapeFeatureGroup) shapeFeatureGroup.addLayer(layer);
                 shapeLayers[shape.id] = layer;
@@ -5767,6 +5799,46 @@ function showLoadingModal(message) {
     modal.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 10000;`;
     modal.innerHTML = `<div style="background: white; padding: 30px; border-radius: 12px; text-align: center;"><i class="fas fa-circle-notch fa-spin" style="font-size: 40px; color: #3b82f6;"></i><p style="margin-top: 15px;">${message}</p></div>`;
     document.body.appendChild(modal);
+}
+
+function focusBoundaryEditorContext() {
+    if (!boundaryEditorContext || !window.map) {
+        return;
+    }
+
+    const matchedLayer = Object.values(shapeLayers).find((layer) => {
+        if (!layer) {
+            return false;
+        }
+
+        const matchesBarangayId = boundaryEditorContext.barangayId
+            && Number(layer.shapeBarangayId) === Number(boundaryEditorContext.barangayId);
+        const matchesBarangayType = (layer.shapeBoundaryType || '').toLowerCase() === 'barangay';
+
+        return matchesBarangayId && matchesBarangayType;
+    });
+
+    if (matchedLayer?.getBounds) {
+        const bounds = matchedLayer.getBounds();
+        if (bounds.isValid()) {
+            window.map.fitBounds(bounds.pad(0.2));
+        }
+
+        if (typeof matchedLayer.openTooltip === 'function') {
+            matchedLayer.openTooltip();
+        }
+
+        showNotification(`Boundary editor ready for ${boundaryEditorContext.barangayName || 'the selected barangay'}.`, 'success');
+        return;
+    }
+
+    if (boundaryEditorContext.lat !== null && boundaryEditorContext.lng !== null) {
+        window.map.setView([boundaryEditorContext.lat, boundaryEditorContext.lng], Math.max(window.map.getZoom(), 15));
+        showNotification(`No saved polygon yet for ${boundaryEditorContext.barangayName || 'this barangay'}. Draw one on the map to save it.`, 'info');
+        return;
+    }
+
+    showNotification(`Boundary editor opened for ${boundaryEditorContext.barangayName || 'the selected barangay'}.`, 'info');
 }
 
 function closeModal() {
@@ -5870,6 +5942,10 @@ function initAfterMapReady() {
 
         attachShapeToggleButton();
         window.addEventListener('resize', attachShapeToggleButton);
+
+        if (boundaryEditorContext?.openEditor && !manageShapesMode) {
+            toggleShapeManagement();
+        }
         
         const drawControl = new L.Control.Draw({ 
             edit: { featureGroup: drawnItems, edit: true, remove: true }, 
@@ -5884,11 +5960,25 @@ function initAfterMapReady() {
         window.map.on(L.Draw.Event.CREATED, function(event) {
             const layer = event.layer;
             const geojson = layer.toGeoJSON();
-            const shapeName = prompt('Enter shape name:', 'My Shape') || 'My Shape';
+            const defaultShapeName = boundaryEditorContext?.barangayName
+                ? `${boundaryEditorContext.barangayName} Boundary`
+                : 'My Shape';
+            const shapeName = prompt('Enter shape name:', defaultShapeName) || defaultShapeName;
+            const linkedBarangayId = boundaryEditorContext?.barangayId || null;
+            const linkedBarangayName = boundaryEditorContext?.barangayName
+                || (prompt('Optional: enter barangay name to link this boundary:', '') || '');
             fetch('/api/shapes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({ name: shapeName, geojson: JSON.stringify(geojson), station_id: null })
+                body: JSON.stringify({
+                    name: shapeName,
+                    geojson: JSON.stringify(geojson),
+                    station_id: null,
+                    barangay_id: linkedBarangayId,
+                    barangay_name: linkedBarangayName,
+                    boundary_type: linkedBarangayId || linkedBarangayName ? 'barangay' : 'custom',
+                    source: 'manual'
+                })
             })
             .then(async res => {
                 if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -5900,11 +5990,14 @@ function initAfterMapReady() {
                     const colorIndex = Object.keys(shapeLayers).length % colors.length;
                     const newLayer = L.geoJSON(geojson, { style: { color: colors[colorIndex], weight: 3, fillOpacity: 0.2, fillColor: colors[colorIndex] }, interactive: true });
                     newLayer.shapeId = data.shape.id;
-                    newLayer.shapeName = shapeName;
+                    newLayer.shapeName = data.shape.name || shapeName;
+                    newLayer.shapeBarangayId = data.shape.barangay_id || null;
+                    newLayer.shapeBoundaryType = data.shape.boundary_type || 'custom';
+                    newLayer.shapeSource = data.shape.source || 'manual';
                     newLayer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(data.shape.id, newLayer, e.latlng); } });
                     shapeFeatureGroup.addLayer(newLayer);
                     shapeLayers[data.shape.id] = newLayer;
-                    newLayer.bindTooltip(shapeName, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
+                    newLayer.bindTooltip(data.shape.name || shapeName, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
                     showNotification('Shape saved successfully!', 'success');
                 }
             })
@@ -5950,6 +6043,7 @@ function initAfterMapReady() {
     }
     
     loadShapes();
+    setTimeout(focusBoundaryEditorContext, 350);
     if (markerStatePollingInterval) {
         clearInterval(markerStatePollingInterval);
     }

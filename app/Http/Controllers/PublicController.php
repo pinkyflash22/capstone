@@ -152,17 +152,23 @@ class PublicController extends Controller
             'lng' => $incident->marker?->lng,
             'address' => $incident->marker?->description,
             'marker' => $incident->marker,
+            'barangay_id' => $incident->barangay_id,
+            'barangay_name' => $incident->barangay?->barangay_name,
+            'barangay_city_name' => $incident->barangay?->city?->city_name,
+            'barangay_resolution_status' => $incident->barangay_resolution_status ?? 'pending',
+            'barangay_resolution_source' => $incident->barangay_resolution_source,
+            'barangay_resolved_at' => optional($incident->barangay_resolved_at)->toISOString(),
             'distance_meters' => $distanceMeters !== null ? round($distanceMeters) : null,
         ];
     }
 
     private function buildCitizenDashboardData(int $accountId, ?float $latitude = null, ?float $longitude = null): array
     {
-        $incidents = Incident::with(['marker'])
+        $incidents = Incident::with(['marker', 'barangay.city'])
             ->orderByDesc('created_at')
             ->get();
 
-        $userIncidents = Incident::with(['marker'])
+        $userIncidents = Incident::with(['marker', 'barangay.city'])
             ->where('reported_by', $accountId)
             ->orderByDesc('created_at')
             ->get();
@@ -233,7 +239,7 @@ class PublicController extends Controller
         $accountId = Auth::user()->user_id;
         $initialSection = in_array($section, self::CITIZEN_DASHBOARD_SECTIONS, true) ? $section : 'overview';
 
-        $incidents = Incident::with('marker')->get();
+        $incidents = Incident::with(['marker', 'barangay.city'])->get();
         $userReports = Incident::where('reported_by', $accountId)->count();
         $countReport = Incident::where('reported_by', $accountId)->count();
         $userinfo = User::where('user_id', $accountId)->with('role','address','address.barangay','address.barangay.city')->get();
@@ -242,7 +248,7 @@ class PublicController extends Controller
         $cities = City::with('barangays')->orderBy('city_name')->get(['city_id', 'city_name']);
         $citizenUser = User::with(['role', 'address.barangay.city'])->findOrFail($accountId);
           $myReports = Incident::where('reported_by',$accountId)
-          ->with(['marker'])
+          ->with(['marker', 'barangay.city'])
            ->orderBy('created_at', 'desc')
           ->get();
 

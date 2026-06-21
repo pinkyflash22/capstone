@@ -12,6 +12,9 @@ use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\EquipmentToStation;
 use App\Models\BoundaryLocation;
+use App\Models\Barangay;
+use App\Models\StationBarangayCoverage;
+use App\Models\StationMedia;
 
 class Station extends Model
 {
@@ -71,10 +74,51 @@ class Station extends Model
     {
         return $this->hasMany(RiskArea::class, 'station_id', 'station_id');
     }
+
+    public function barangayCoverage()
+    {
+        return $this->hasMany(StationBarangayCoverage::class, 'station_id', 'station_id');
+    }
+
+    public function barangays()
+    {
+        return $this->belongsToMany(
+            Barangay::class,
+            'station_barangay_coverage',
+            'station_id',
+            'barangay_id',
+            'station_id',
+            'barangay_id'
+        )->withPivot(['station_barangay_coverage_id', 'coverage_type', 'source', 'is_active'])
+            ->withTimestamps();
+    }
+
     public function users()
 {
     return $this->belongsToMany(User::class, 'station_officers', 'station_id', 'user_id')
                 ->withPivot('rank')
                 ->withTimestamps();
 }
+
+    public function media()
+    {
+        return $this->hasMany(StationMedia::class, 'station_id', 'station_id')
+            ->orderBy('sort_order')
+            ->orderByDesc('station_media_id');
+    }
+
+    public function profileMedia()
+    {
+        return $this->hasOne(StationMedia::class, 'station_id', 'station_id')
+            ->where('kind', 'profile')
+            ->latest('station_media_id');
+    }
+
+    public function galleryMedia()
+    {
+        return $this->hasMany(StationMedia::class, 'station_id', 'station_id')
+            ->where('kind', 'gallery')
+            ->orderBy('sort_order')
+            ->orderByDesc('station_media_id');
+    }
 }

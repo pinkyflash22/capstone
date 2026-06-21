@@ -8,7 +8,6 @@ use App\Http\Controllers\StationController;
 
 use App\Http\Controllers\HydrantController;
 use App\Http\Controllers\HydrantTypeController;
-use App\Http\Controllers\ShapeController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\IncidentTypeController;
@@ -164,7 +163,7 @@ Route::prefix('/managements')->group(function () {
 // Get incidents for spot investigation (completed, not yet in spot_investigation)
 Route::get('/incidents-for-spot', function() {
     $incidents = DB::table('incidents')
-        ->where('status', 'completed')
+        ->whereIn('status', ['completed', 'Completed', 'controlled', 'Controlled'])
         ->whereNotIn('incident_id', function($query) {
             $query->select('incident_id')->from('spot_investigation_report');
         })
@@ -234,6 +233,7 @@ Route::get('/markers/count', function () {
 // Route::get('/spot-investigations', [SpotInvestigationReportController::class, 'getAllSpotInvestigations']);
 Route::get('/spot-investigations-available', [SpotInvestigationReportController::class, 'getAvailableSpotInvestigations']);
 Route::get('/progress-investigations-available', [FinalInvestigationReportController::class, 'getAvailableProgressInvestigations']);
+Route::post('/spot-investigation/draft-narrative', [SpotInvestigationReportController::class, 'draftNarrative']);
 Route::post('/spot-investigation', [SpotInvestigationReportController::class, 'store']);
 Route::put('/spot-investigation/{id}', [SpotInvestigationReportController::class, 'update']);
 Route::delete('/spot-investigation/{id}', [SpotInvestigationReportController::class, 'destroy']);
@@ -343,8 +343,9 @@ Route::get('/hydrant-types', [HydrantTypeController::class, 'index']);
 
 Route::get('/shapes', [BoundaryLocationController::class, 'index']); // fetch all shapes
 Route::post('/shapes', [BoundaryLocationController::class, 'store']); // save new shape
-Route::put('/shapes/{id}', [ShapeController::class, 'update']);
+Route::put('/shapes/{id}', [BoundaryLocationController::class, 'update']);
 Route::delete('/shapes/{id}', [BoundaryLocationController::class, 'destroy']);
+Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
 
 Route::post('/connection',[StationOfficerController::class, 'store'])->name('station-officer.store');
 // Route::get('/station-officers/{id}',[StationOfficerController::class, 'store'])->name('station-officer.store');

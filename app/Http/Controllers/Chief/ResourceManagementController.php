@@ -12,7 +12,10 @@ use App\Models\Role;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Province;
+use App\Models\Barangay;
+use App\Models\BoundaryLocation;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 
 
@@ -68,9 +71,108 @@ class ResourceManagementController extends Controller
         //need padin include ung citizen e
         $roles = Role::all();
         $provinces = Province::orderBy('province_name')->get();
+        $boundaryBarangays = $this->buildBoundaryBarangayList($stationExact);
         
         
-        return view('chief.resource-management', compact('citizens','allusers','provinces','roles','equipments','activeStations','users','stationOfficers','allTeam', 'currentStation'));
+        return view('chief.resource-management', compact('citizens','allusers','provinces','roles','equipments','activeStations','users','stationOfficers','allTeam', 'currentStation', 'boundaryBarangays'));
+    }
+
+    protected function buildBoundaryBarangayList(?int $stationId)
+    {
+        $supportsBarangayBoundaries = Schema::hasColumn('boundary_location', 'barangay_id')
+            && Schema::hasColumn('boundary_location', 'boundary_type');
+
+        $station = Station::query()
+            ->with($supportsBarangayBoundaries
+                ? ['address.barangay.city', 'barangays.city', 'barangays.boundaryLocations']
+                : ['address.barangay.city', 'barangays.city'])
+            ->find($stationId);
+
+        $cityId = $station?->address?->barangay?->city?->city_id;
+
+        $barangays = $station?->barangays;
+
+        if (! $barangays || $barangays->isEmpty()) {
+            $barangays = Barangay::query()
+                ->with($supportsBarangayBoundaries ? ['city', 'boundaryLocations'] : ['city'])
+                ->when($cityId, fn ($query) => $query->where('city_id', $cityId))
+                ->orderBy('barangay_name')
+                ->get();
+        }
+
+        return $barangays
+            ->sortBy('barangay_name')
+            ->values()
+            ->map(function (Barangay $barangay) {
+                $boundary = null;
+
+                if (isset($barangay->boundaryLocations)) {
+                    $boundary = $barangay->boundaryLocations
+                        ->where('boundary_type', 'barangay')
+                        ->sortByDesc('updated_at')
+                        ->first();
+                }
+
+                $boundaryState = $this->buildBoundaryState($barangay, $boundary);
+
+                return [
+                    'barangay_id' => $barangay->barangay_id,
+                    'barangay_name' => $barangay->barangay_name,
+                    'city_name' => $barangay->city?->city_name,
+                    'has_boundary' => $boundaryState['has_boundary'],
+                    'boundary_is_valid' => $boundaryState['is_valid'],
+                    'boundary_status' => $boundaryState['status'],
+                    'boundary_status_label' => $boundaryState['label'],
+                    'boundary_status_icon' => $boundaryState['icon'],
+                    'boundary_source' => $boundary?->source,
+                    'boundary_updated_at' => $boundary?->updated_at,
+                    'boundary_updated_at_human' => $boundary?->updated_at?->diffForHumans(),
+                    'boundary_name' => $boundary?->name,
+                    'external_place_id' => $boundary?->external_place_id,
+                ];
+            });
+    }
+
+    protected function buildBoundaryState(Barangay $barangay, ?BoundaryLocation $boundary): array
+    {
+        if (! $boundary) {
+            return [
+                'has_boundary' => false,
+                'is_valid' => false,
+                'status' => 'missing',
+                'label' => 'Needs Sync',
+                'icon' => 'fa-clock',
+            ];
+        }
+
+        $properties = (array) ($boundary->properties ?? []);
+        $geoapifyFeature = (array) ($properties['geoapify_feature'] ?? []);
+        $geoapifyName = trim((string) ($geoapifyFeature['name'] ?? ''));
+        $expectedBarangay = trim((string) $barangay->barangay_name);
+        $expectedCity = trim((string) ($barangay->city?->city_name ?? ''));
+
+        if (
+            $boundary->source === 'geoapify'
+            && $geoapifyName !== ''
+            && strcasecmp($geoapifyName, $expectedBarangay) !== 0
+            && ($expectedCity === '' || strcasecmp($geoapifyName, $expectedCity) === 0)
+        ) {
+            return [
+                'has_boundary' => true,
+                'is_valid' => false,
+                'status' => 'invalid',
+                'label' => 'Invalid Boundary',
+                'icon' => 'fa-triangle-exclamation',
+            ];
+        }
+
+        return [
+            'has_boundary' => true,
+            'is_valid' => true,
+            'status' => 'synced',
+            'label' => 'Boundary Ready',
+            'icon' => 'fa-circle-check',
+        ];
     }
 
     public function assignEquipmentToStation(Request $request)

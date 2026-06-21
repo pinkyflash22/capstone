@@ -50,7 +50,7 @@ class ManagementController extends Controller
     
         $mapmarker = Marker::with('stations')->get();
 
-        $stations = Station::where('station_id', $stationExact)->with(['marker'])->get();
+        $stations = Station::where('station_id', $stationExact)->with(['marker', 'profileMedia', 'galleryMedia'])->get();
         $stationOfficers = StationOfficer::with(['user.role', 'station'])
             ->where('station_id', $stationExact)
             ->get();

@@ -52,6 +52,20 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
     $barangayCoverageByStation = [];
 
     foreach ($stationCityIds as $stationId => $cityId) {
+        $explicitCoverage = DB::table('station_barangay_coverage')
+            ->join('barangays', 'station_barangay_coverage.barangay_id', '=', 'barangays.barangay_id')
+            ->where('station_barangay_coverage.station_id', $stationId)
+            ->where('station_barangay_coverage.is_active', true)
+            ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id')
+            ->get()
+            ->unique('barangay_id')
+            ->values();
+
+        if ($explicitCoverage->isNotEmpty()) {
+            $barangayCoverageByStation[(int) $stationId] = $explicitCoverage;
+            continue;
+        }
+
         $stationBarangays = collect();
 
         if ($cityId && isset($barangaysByCity[$cityId])) {
