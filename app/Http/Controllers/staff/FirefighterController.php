@@ -17,6 +17,7 @@ use App\Models\Province;
 use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
+use App\Models\EventActivity;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -627,10 +628,50 @@ class FirefighterController extends Controller
     }
 
     public function schedule()
-{
-    $userinfo = User::with(['role', 'address.barangay.city'])->where('user_id', Auth::user()->user_id)->get();
-    return view('firefighters.schedule', compact('userinfo'));
-}
+    {
+        $userId = Auth::user()->user_id;
+
+        $userinfo = User::with(['role', 'address.barangay.city'])
+            ->where('user_id', $userId)
+            ->get();
+
+        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        $stationId = $stationOfficer?->station_id;
+        $stationName = $stationOfficer?->station?->station_name;
+
+        $scheduleEvents = collect();
+
+        if ($stationId) {
+            $scheduleEvents = EventActivity::query()
+                ->where('station_id', $stationId)
+                ->orderBy('event_date')
+                ->orderBy('start_time')
+                ->get()
+                ->map(function (EventActivity $event) {
+                    return [
+                        'id' => $event->event_id,
+                        'title' => $event->event,
+                        'type' => $event->activity_type ?: 'operations',
+                        'date' => optional($event->event_date)->toDateString(),
+                        'startTime' => $event->start_time,
+                        'endTime' => $event->end_time,
+                        'timeLabel' => $event->schedule,
+                        'location' => $event->barangay,
+                        'description' => $event->notes,
+                        'status' => $event->status,
+                    ];
+                })
+                ->values();
+        }
+
+        return view('firefighters.schedule', compact(
+            'userinfo',
+            'stationOfficer',
+            'stationId',
+            'stationName',
+            'scheduleEvents'
+        ));
+    }
 
 public function certifications()
 {

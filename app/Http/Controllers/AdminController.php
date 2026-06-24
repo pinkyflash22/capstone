@@ -15,6 +15,7 @@ use App\Models\City;
 use App\Models\Barangay;
 use App\Models\FullAddress;
 use App\Models\Post;
+use App\Models\EventActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -93,6 +94,41 @@ class AdminController extends Controller
         $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
         return view('admin.reports', compact('categories','incidentStatuses', 'mapmarker', 'incidents', 'alerts', 'stations', 'chiefs', 'provinces','stationperson'));
 
+    }
+
+    public function schedule()
+    {
+        $stations = Station::query()
+            ->orderBy('station_name')
+            ->get(['station_id', 'station_name']);
+
+        $scheduleEvents = EventActivity::query()
+            ->with('station')
+            ->orderBy('event_date')
+            ->orderBy('start_time')
+            ->get()
+            ->map(function (EventActivity $event) {
+                return [
+                    'event_id' => $event->event_id,
+                    'event' => $event->event,
+                    'event_date' => optional($event->event_date)->toDateString(),
+                    'start_time' => $event->start_time,
+                    'end_time' => $event->end_time,
+                    'schedule' => $event->schedule,
+                    'activity_type' => $event->activity_type ?: 'operations',
+                    'status' => $event->status,
+                    'barangay' => $event->barangay,
+                    'notes' => $event->notes,
+                    'station_id' => $event->station_id,
+                    'station_name' => $event->station?->station_name ?: 'Unassigned Station',
+                ];
+            })
+            ->values();
+
+        return view('admin.schedule', [
+            'scheduleEvents' => $scheduleEvents,
+            'stations' => $stations,
+        ]);
     }
 
     public function findex(){

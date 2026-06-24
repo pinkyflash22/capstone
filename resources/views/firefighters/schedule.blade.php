@@ -452,44 +452,44 @@
             color: #6b7280;
         }
         
-        .event-item.training {
+        .event-item.drill {
             background: #fef3c7;
             border-left-color: #f59e0b;
         }
-        
-        .event-item.training .event-title {
+
+        .event-item.drill .event-title {
             color: #92400e;
         }
-        
-        .event-item.certification {
+
+        .event-item.inspection {
             background: #dcfce7;
             border-left-color: #22c55e;
         }
-        
-        .event-item.certification .event-title {
+
+        .event-item.inspection .event-title {
             color: #166534;
         }
-        
-        .add-event-btn {
-            position: absolute;
-            bottom: 8px;
-            right: 8px;
-            width: 24px;
-            height: 24px;
-            background: #3b82f6;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.2s;
+
+        .event-item.operations,
+        .event-item.command,
+        .event-item.logistics {
+            background: #dbeafe;
+            border-left-color: #2563eb;
         }
-        
-        .calendar-day:hover .add-event-btn {
-            opacity: 1;
+
+        .event-item.operations .event-title,
+        .event-item.command .event-title,
+        .event-item.logistics .event-title {
+            color: #1d4ed8;
+        }
+
+        .event-item.community {
+            background: #fce7f3;
+            border-left-color: #ec4899;
+        }
+
+        .event-item.community .event-title {
+            color: #be185d;
         }
         
         /* Upcoming Events List */
@@ -556,19 +556,26 @@
             font-weight: 600;
         }
         
-        .event-badge.training {
+        .event-badge.drill {
             background: #fef3c7;
             color: #92400e;
         }
-        
-        .event-badge.certification {
+
+        .event-badge.inspection {
             background: #dcfce7;
             color: #166534;
         }
-        
-        .event-badge.meeting {
+
+        .event-badge.operations,
+        .event-badge.command,
+        .event-badge.logistics {
             background: #dbeafe;
             color: #1e40af;
+        }
+
+        .event-badge.community {
+            background: #fce7f3;
+            color: #be185d;
         }
         
         .modal {
@@ -721,11 +728,11 @@
                     </div>
 
                     <div class="flex items-center space-x-4">
-                        <span class="hidden sm:inline text-sm text-gray-600">Station 7</span>
-                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-                            <i class="fa-solid fa-circle"></i>
-                            <span class="hidden sm:inline">On Duty</span>
-                        </button>
+                        <span class="hidden sm:inline text-sm text-gray-600">{{ $stationName ?: 'Unassigned Station' }}</span>
+                        <div class="bg-blue-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-days"></i>
+                            <span class="hidden sm:inline">Station Schedule</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -754,35 +761,35 @@
 
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-title">Training Sessions</span>
+                    <span class="stat-title">Drills & Inspections</span>
                     <div class="stat-icon green">
                         <i class="fa-solid fa-graduation-cap"></i>
                     </div>
                 </div>
                 <div class="stat-value" id="trainingCount">0</div>
-                <div class="stat-trend">Scheduled this month</div>
+                <div class="stat-trend">Upcoming schedule blocks</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-title">Duty Shifts</span>
+                    <span class="stat-title">Operations Blocks</span>
                     <div class="stat-icon purple">
                         <i class="fa-solid fa-clock"></i>
                     </div>
                 </div>
                 <div class="stat-value" id="shiftCount">0</div>
-                <div class="stat-trend">This week</div>
+                <div class="stat-trend">Upcoming station duties</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-title">Certifications Due</span>
+                    <span class="stat-title">Community & Command</span>
                     <div class="stat-icon orange">
                         <i class="fa-solid fa-certificate"></i>
                     </div>
                 </div>
                 <div class="stat-value" id="certDueCount">0</div>
-                <div class="stat-trend">Expiring soon</div>
+                <div class="stat-trend">Upcoming coordination events</div>
             </div>
         </div>
 
@@ -833,14 +840,14 @@
             <div>
                 <div class="section-header">
                     <h2><i class="fa-solid fa-clock"></i> Upcoming Events</h2>
-                    <button class="view-all" onclick="openAddEventModal()">+ Add Event</button>
+                    <span class="view-all" style="cursor: default; opacity: 0.8;">Station Calendar</span>
                 </div>
                 <div class="events-list" id="upcomingEventsList"></div>
             </div>
 
             <div>
                 <div class="section-header">
-                    <h2><i class="fa-solid fa-chalkboard-user"></i> Training Reminders</h2>
+                    <h2><i class="fa-solid fa-chalkboard-user"></i> Drill & Inspection Reminders</h2>
                     <a href="{{ route('firefighter.training') }}" class="view-all">View All</a>
                 </div>
                 <div class="events-list" id="trainingRemindersList"></div>
@@ -848,63 +855,19 @@
         </div>
     </main>
 
-    <!-- Add Event Modal -->
-    <div id="eventModal" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-bottom: 20px;">Add New Event</h3>
-            <form id="eventForm">
-                <div class="form-group">
-                    <label class="form-label">Event Title</label>
-                    <input type="text" class="form-input" id="eventTitle" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Event Type</label>
-                    <select class="form-select" id="eventType">
-                        <option value="training">Training</option>
-                        <option value="certification">Certification</option>
-                        <option value="meeting">Meeting</option>
-                        <option value="shift">Duty Shift</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Date</label>
-                    <input type="date" class="form-input" id="eventDate" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Start Time</label>
-                    <input type="time" class="form-input" id="eventStartTime">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">End Time</label>
-                    <input type="time" class="form-input" id="eventEndTime">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Location</label>
-                    <input type="text" class="form-input" id="eventLocation" placeholder="Station 7, Training Ground, etc.">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-textarea" id="eventDescription" rows="3" placeholder="Additional details..."></textarea>
-                </div>
-                <div class="flex justify-end gap-2">
-                    <button type="button" class="btn btn-outline" onclick="closeEventModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Event</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div id="toast" class="toast"></div>
 
     <script>
-        // Sample events data
-        let events = [
-            { id: 1, title: 'Fire Safety Training', type: 'training', date: '2024-03-15', startTime: '09:00', endTime: '17:00', location: 'Training Ground', description: 'Annual fire safety refresher course' },
-            { id: 2, title: 'CPR Certification', type: 'certification', date: '2024-03-20', startTime: '08:00', endTime: '12:00', location: 'Station 7', description: 'CPR recertification' },
-            { id: 3, title: 'Station Meeting', type: 'meeting', date: '2024-03-10', startTime: '14:00', endTime: '15:30', location: 'Conference Room', description: 'Weekly station briefing' },
-            { id: 4, title: 'Night Shift', type: 'shift', date: '2024-03-12', startTime: '20:00', endTime: '08:00', location: 'Station 7', description: 'Overnight duty' },
-            { id: 5, title: 'Hazmat Training', type: 'training', date: '2024-03-25', startTime: '09:00', endTime: '16:00', location: 'Training Center', description: 'Hazardous materials handling' }
-        ];
+        const stationName = @json($stationName ?: 'Unassigned Station');
+        const typeLabels = {
+            operations: 'Operations',
+            drill: 'Drill',
+            community: 'Community',
+            inspection: 'Inspection',
+            command: 'Command',
+            logistics: 'Logistics',
+        };
+        let events = @json($scheduleEvents ?? []);
 
         let currentDate = new Date();
         let currentView = 'month';
@@ -955,11 +918,6 @@
                 renderCalendar();
             });
             
-            // Event form submission
-            document.getElementById('eventForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                addEvent();
-            });
         });
         
         function renderCalendar() {
@@ -1020,7 +978,7 @@
                     eventsHtml += `
                         <div class="event-item ${event.type}" onclick="viewEvent(${event.id})">
                             <div class="event-title">${escapeHtml(event.title)}</div>
-                            ${event.startTime ? `<div class="event-time">${event.startTime}</div>` : ''}
+                            ${(event.timeLabel || event.startTime) ? `<div class="event-time">${escapeHtml(event.timeLabel || event.startTime)}</div>` : ''}
                         </div>
                     `;
                 });
@@ -1029,9 +987,6 @@
                     <div class="calendar-day ${isToday ? 'today' : ''}">
                         <div class="day-number">${d}</div>
                         ${eventsHtml}
-                        <div class="add-event-btn" onclick="openAddEventModal('${dateStr}')">
-                            <i class="fa-solid fa-plus"></i>
-                        </div>
                     </div>
                 `;
             }
@@ -1100,13 +1055,6 @@
             
             sortedEvents.forEach(event => {
                 const eventDate = new Date(event.date);
-                const typeLabels = {
-                    training: 'Training',
-                    certification: 'Certification',
-                    meeting: 'Meeting',
-                    shift: 'Duty Shift'
-                };
-                
                 listHtml += `
                     <div class="event-card" onclick="viewEvent(${event.id})">
                         <div class="event-date">
@@ -1116,10 +1064,10 @@
                         <div class="event-info">
                             <div class="event-name">${escapeHtml(event.title)}</div>
                             <div class="event-location">
-                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || 'Station 7')}
+                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || stationName)}
                             </div>
                         </div>
-                        <div class="event-badge ${event.type}">${typeLabels[event.type]}</div>
+                        <div class="event-badge ${event.type}">${typeLabels[event.type] || 'Activity'}</div>
                     </div>
                 `;
             });
@@ -1144,13 +1092,6 @@
             let eventsHtml = '';
             upcomingEvents.forEach(event => {
                 const eventDate = new Date(event.date);
-                const typeLabels = {
-                    training: 'Training',
-                    certification: 'Certification',
-                    meeting: 'Meeting',
-                    shift: 'Duty Shift'
-                };
-                
                 eventsHtml += `
                     <div class="event-card" onclick="viewEvent(${event.id})">
                         <div class="event-date">
@@ -1160,10 +1101,10 @@
                         <div class="event-info">
                             <div class="event-name">${escapeHtml(event.title)}</div>
                             <div class="event-location">
-                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || 'Station 7')}
+                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || stationName)}
                             </div>
                         </div>
-                        <div class="event-badge ${event.type}">${typeLabels[event.type]}</div>
+                        <div class="event-badge ${event.type}">${typeLabels[event.type] || 'Activity'}</div>
                     </div>
                 `;
             });
@@ -1175,7 +1116,7 @@
             document.getElementById('upcomingEventsList').innerHTML = eventsHtml;
             
             // Training reminders
-            const trainingEvents = events.filter(e => e.type === 'training' && new Date(e.date) >= today).slice(0, 3);
+            const trainingEvents = events.filter(e => ['drill', 'inspection'].includes(e.type) && new Date(e.date) >= today).slice(0, 3);
             let trainingHtml = '';
             trainingEvents.forEach(event => {
                 const eventDate = new Date(event.date);
@@ -1188,16 +1129,16 @@
                         <div class="event-info">
                             <div class="event-name">${escapeHtml(event.title)}</div>
                             <div class="event-location">
-                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || 'Training Ground')}
+                                <i class="fa-solid fa-location-dot"></i> ${escapeHtml(event.location || stationName)}
                             </div>
                         </div>
-                        <div class="event-badge training">Training</div>
+                        <div class="event-badge ${event.type}">${typeLabels[event.type] || 'Activity'}</div>
                     </div>
                 `;
             });
             
             if (trainingEvents.length === 0) {
-                trainingHtml = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-chalkboard-user text-3xl mb-2"></i><p>No upcoming training</p></div>';
+                trainingHtml = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-chalkboard-user text-3xl mb-2"></i><p>No upcoming drills or inspections</p></div>';
             }
             
             document.getElementById('trainingRemindersList').innerHTML = trainingHtml;
@@ -1210,9 +1151,9 @@
             nextMonth.setDate(today.getDate() + 30);
             
             const upcoming = events.filter(e => new Date(e.date) >= today && new Date(e.date) <= nextMonth);
-            const trainings = events.filter(e => e.type === 'training' && new Date(e.date) >= today);
-            const shifts = events.filter(e => e.type === 'shift' && new Date(e.date) >= today);
-            const certsDue = events.filter(e => e.type === 'certification' && new Date(e.date) >= today && new Date(e.date) <= nextMonth);
+            const trainings = events.filter(e => ['drill', 'inspection'].includes(e.type) && new Date(e.date) >= today);
+            const shifts = events.filter(e => ['operations', 'logistics'].includes(e.type) && new Date(e.date) >= today);
+            const certsDue = events.filter(e => ['community', 'command'].includes(e.type) && new Date(e.date) >= today);
             
             document.getElementById('upcomingCount').textContent = upcoming.length;
             document.getElementById('trainingCount').textContent = trainings.length;
@@ -1220,42 +1161,17 @@
             document.getElementById('certDueCount').textContent = certsDue.length;
         }
         
-        function openAddEventModal(date = null) {
-            if (date) {
-                document.getElementById('eventDate').value = date;
-            }
-            document.getElementById('eventModal').classList.add('active');
-        }
-        
-        function closeEventModal() {
-            document.getElementById('eventModal').classList.remove('active');
-            document.getElementById('eventForm').reset();
-        }
-        
-        function addEvent() {
-            const newEvent = {
-                id: events.length + 1,
-                title: document.getElementById('eventTitle').value,
-                type: document.getElementById('eventType').value,
-                date: document.getElementById('eventDate').value,
-                startTime: document.getElementById('eventStartTime').value,
-                endTime: document.getElementById('eventEndTime').value,
-                location: document.getElementById('eventLocation').value,
-                description: document.getElementById('eventDescription').value
-            };
-            
-            events.push(newEvent);
-            closeEventModal();
-            renderCalendar();
-            updateStats();
-            renderUpcomingEvents();
-            showToast('Event added successfully!', 'success');
-        }
-        
         function viewEvent(id) {
             const event = events.find(e => e.id === id);
             if (event) {
-                alert(`Event: ${event.title}\nDate: ${event.date}\nLocation: ${event.location || 'Station 7'}\nDescription: ${event.description || 'No description'}`);
+                alert(
+                    `Event: ${event.title}\n` +
+                    `Date: ${event.date}\n` +
+                    `Time: ${event.timeLabel || [event.startTime, event.endTime].filter(Boolean).join(' - ') || 'No time set'}\n` +
+                    `Location: ${event.location || stationName}\n` +
+                    `Type: ${typeLabels[event.type] || 'Activity'}\n` +
+                    `Description: ${event.description || 'No description'}`
+                );
             }
         }
         
@@ -1276,8 +1192,6 @@
             }, 3000);
         }
         
-        window.openAddEventModal = openAddEventModal;
-        window.closeEventModal = closeEventModal;
         window.viewEvent = viewEvent;
     </script>
 

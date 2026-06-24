@@ -97,9 +97,36 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" data-citizen-insights-source><div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5"><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4"><div><h3 class="font-bold text-gray-800 text-base">Incident Trends</h3><p class="text-xs text-gray-400 mt-0.5">Overview of Latest Week</p></div><div class="flex items-center gap-3 flex-wrap"><div class="flex gap-0.5 bg-gray-100 p-1 rounded-lg"><button class="chart-period-btn lector-period-btn active" data-period="week">Weekly</button><button class="chart-period-btn lector-period-btn" data-period="month">Monthly</button><button class="chart-period-btn lector-period-btn" data-period="year">Yearly</button></div><div class="flex gap-3"><span class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#e91e8c;"></span>Reported</span><span class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#a78bfa;"></span>Resolved</span></div></div></div><div class="h-56 relative"><canvas id="incidentTrendChart"></canvas></div></div><div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col"><div class="mb-3"><h3 class="font-bold text-gray-800 text-base">Incident Types</h3><p class="text-xs text-gray-400 mt-0.5">Latest Month</p></div><div class="flex-1 relative" style="min-height:160px;"><canvas id="incidentTypeChart"></canvas></div><div id="typeBreakdown" class="grid grid-cols-3 gap-x-2 gap-y-2 mt-4 text-center"></div></div></div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" data-citizen-insights-source><div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5"><h3 class="font-semibold text-gray-700 text-sm flex items-center gap-2 mb-4"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Incident Status</h3><div class="h-48 relative"><canvas id="incidentStatusChart"></canvas></div></div><div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5"><h3 class="font-semibold text-gray-700 text-sm flex items-center gap-2 mb-4"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--c-secondary);" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Peak Hours</h3><div class="h-48 relative"><canvas id="hourlyDistributionChart"></canvas></div></div><div class="rounded-2xl shadow-sm border border-gray-100 p-5" style="background:linear-gradient(135deg,#fce4ec 0%,#ede9fe 100%);"><h3 class="font-semibold text-gray-700 text-sm flex items-center gap-2 mb-4"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--c-primary);" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>Current Risk Level</h3><div class="text-center"><div class="relative inline-block"><svg class="w-32 h-32" viewBox="0 0 128 128"><circle stroke-width="10" stroke="#e5e7eb" fill="transparent" r="54" cx="64" cy="64"/><circle stroke-width="10" stroke="url(#riskGrad)" fill="transparent" r="54" cx="64" cy="64" stroke-dasharray="339" stroke-dashoffset="{{ 339 - (339 * ($riskPercentage ?? 65) / 100) }}" stroke-linecap="round" transform="rotate(-90 64 64)"/><defs><linearGradient id="riskGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#e91e8c"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-3xl font-bold text-gray-800">{{ $riskPercentage ?? 65 }}%</span><span class="text-xs text-gray-500">risk index</span></div></div><div class="mt-3"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium @if(($riskLevel ?? 'moderate') == 'low') bg-green-100 text-green-700 @elseif(($riskLevel ?? 'moderate') == 'moderate') bg-yellow-100 text-yellow-700 @else bg-pink-100 text-pink-700 @endif">{{ ucfirst($riskLevel ?? 'moderate') }} Risk</span></div></div></div></div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" data-citizen-insights-source>
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="font-bold text-gray-800 text-base">Incident Trends</h3>
+                    <p id="incidentTrendRangeLabel" class="text-xs text-gray-400 mt-0.5">Showing reports for the selected period</p>
+                </div>
+                <div class="flex items-end gap-3 flex-wrap">
+                    <label class="flex flex-col gap-1 text-xs text-gray-500 font-medium">
+                        <span>Start date</span>
+                        <input id="incidentTrendStartDate" type="date" class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white">
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-gray-500 font-medium">
+                        <span>End date</span>
+                        <input id="incidentTrendEndDate" type="date" class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white">
+                    </label>
+                    <button id="incidentTrendResetBtn" type="button" class="lector-period-btn active">Reset</button>
+                </div>
+            </div>
+            <div class="h-56 relative"><canvas id="incidentTrendChart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col">
+            <div class="mb-3">
+                <h3 class="font-bold text-gray-800 text-base">Your Report Types</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Risk, hazard, and fire reports you submitted</p>
+            </div>
+            <div class="flex-1 relative" style="min-height:220px;"><canvas id="citizenReportTypeChart"></canvas></div>
+            <div id="citizenReportTypeBreakdown" class="grid grid-cols-3 gap-x-2 gap-y-2 mt-4 text-center"></div>
+        </div>
+    </div>
 </div>{{-- end #section-overview --}}
 
 <div id="topRoutePanelHost" style="display:none; position:fixed; right:24px; bottom:180px; z-index:520; width:min(380px, calc(100vw - 32px));"></div>
@@ -158,8 +185,16 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const incidents = @json($incidents);
+    const userIncidents = @json($myReports ?? []);
     const chartPalette = ['#dc2626', '#f97316', '#f59e0b', '#fb7185', '#38bdf8', '#8b5cf6', '#10b981'];
     const chartState = {};
+    const trendRangeLabel = document.getElementById('incidentTrendRangeLabel');
+    const trendStartDateInput = document.getElementById('incidentTrendStartDate');
+    const trendEndDateInput = document.getElementById('incidentTrendEndDate');
+    const trendResetBtn = document.getElementById('incidentTrendResetBtn');
+    const trendFilterState = { start: '', end: '' };
+    let currentIncidents = Array.isArray(incidents) ? incidents : [];
+    let currentUserIncidents = Array.isArray(userIncidents) ? userIncidents : [];
 
     function readType(incident) {
         return incident?.incident_type?.type
@@ -183,31 +218,115 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    function processIncidentData(source) {
-        const normalized = (Array.isArray(source) ? source : []).map(normalizeIncident);
-        const typeCounts = {};
-        const statusCounts = {};
-        const hourlyCounts = Array(24).fill(0);
-        const dailyCounts = Array(7).fill(0);
+    function classifyCitizenReport(record) {
+        const descriptor = [
+            record?.incident_type_name,
+            record?.incident_type?.type,
+            record?.incident_type,
+            record?.type,
+            record?.entry_type,
+            record?.report_kind,
+            record?.category
+        ].filter(Boolean).join(' ').toLowerCase();
 
-        normalized.forEach((incident) => {
-            typeCounts[incident.type] = (typeCounts[incident.type] || 0) + 1;
-            statusCounts[incident.status] = (statusCounts[incident.status] || 0) + 1;
+        if (descriptor.includes('risk')) {
+            return 'Risk';
+        }
 
-            if (incident.created_at) {
-                const created = new Date(incident.created_at);
-                if (!Number.isNaN(created.getTime())) {
-                    hourlyCounts[created.getHours()] += 1;
-                    dailyCounts[created.getDay()] += 1;
-                }
+        if (descriptor.includes('hazard')) {
+            return 'Hazard';
+        }
+
+        return 'Fire';
+    }
+
+    function toDateKey(value) {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function formatDateLabel(dateKey) {
+        const date = new Date(`${dateKey}T00:00:00`);
+        if (Number.isNaN(date.getTime())) {
+            return dateKey;
+        }
+
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+
+    function filterIncidentsByDateRange(source) {
+        return source.filter((incident) => {
+            const createdDateKey = toDateKey(incident.created_at);
+
+            if (!createdDateKey) {
+                return false;
             }
+
+            if (trendFilterState.start && createdDateKey < trendFilterState.start) {
+                return false;
+            }
+
+            if (trendFilterState.end && createdDateKey > trendFilterState.end) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    function processIncidentData(source, userSource) {
+        const normalized = (Array.isArray(source) ? source : []).map(normalizeIncident);
+        const filtered = filterIncidentsByDateRange(normalized);
+        const reportTypeCounts = { Risk: 0, Hazard: 0, Fire: 0 };
+        const trendCounts = new Map();
+
+        filtered.forEach((incident) => {
+            const createdDateKey = toDateKey(incident.created_at);
+            if (!createdDateKey) {
+                return;
+            }
+
+            trendCounts.set(createdDateKey, (trendCounts.get(createdDateKey) || 0) + 1);
         });
 
-        return { typeCounts, statusCounts, hourlyCounts, dailyCounts };
+        (Array.isArray(userSource) ? userSource : []).forEach((record) => {
+            const category = classifyCitizenReport(record);
+            reportTypeCounts[category] = (reportTypeCounts[category] || 0) + 1;
+        });
+
+        const sortedTrendEntries = Array.from(trendCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+        return {
+            trendLabels: sortedTrendEntries.map(([dateKey]) => formatDateLabel(dateKey)),
+            trendValues: sortedTrendEntries.map(([, count]) => count),
+            reportTypeCounts,
+        };
+    }
+
+    function getIncidentBounds(source) {
+        const normalized = (Array.isArray(source) ? source : [])
+            .map(normalizeIncident)
+            .filter((incident) => toDateKey(incident.created_at))
+            .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+
+        return {
+            start: normalized[0] ? toDateKey(normalized[0].created_at) : '',
+            end: normalized[normalized.length - 1] ? toDateKey(normalized[normalized.length - 1].created_at) : '',
+        };
     }
 
     function renderTypeBreakdown(typeCounts) {
-        const breakdown = document.getElementById('typeBreakdown');
+        const breakdown = document.getElementById('citizenReportTypeBreakdown');
         if (!breakdown) {
             return;
         }
@@ -222,10 +341,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         breakdown.innerHTML = entries.map(([type, count], index) => {
             const pct = Math.round((count / total) * 100);
+            const breakdownColors = {
+                Risk: '#7c3aed',
+                Hazard: '#f59e0b',
+                Fire: '#dc2626',
+            };
             return `
                 <div class="text-center">
                     <p class="text-base font-bold text-gray-800">${pct}<span class="text-xs font-normal text-gray-400">%</span></p>
-                    <p class="text-[10px] text-gray-400 truncate" style="color:${chartPalette[index % chartPalette.length]};">${type}</p>
+                    <p class="text-[10px] text-gray-400 truncate" style="color:${breakdownColors[type] || chartPalette[index % chartPalette.length]};">${type}</p>
                 </div>
             `;
         }).join('');
@@ -237,21 +361,39 @@ document.addEventListener('DOMContentLoaded', function() {
         return gradient;
     }
 
-    function buildCharts(source) {
-        const { typeCounts, statusCounts, hourlyCounts, dailyCounts } = processIncidentData(source);
+    function syncTrendRangeLabel(labels) {
+        if (!trendRangeLabel) {
+            return;
+        }
+
+        if (trendFilterState.start || trendFilterState.end) {
+            const startLabel = trendFilterState.start ? formatDateLabel(trendFilterState.start) : 'Beginning';
+            const endLabel = trendFilterState.end ? formatDateLabel(trendFilterState.end) : 'Today';
+            trendRangeLabel.textContent = `Showing reports from ${startLabel} to ${endLabel}`;
+            return;
+        }
+
+        if (labels.length >= 2) {
+            trendRangeLabel.textContent = `Showing reports from ${labels[0]} to ${labels[labels.length - 1]}`;
+            return;
+        }
+
+        trendRangeLabel.textContent = labels.length ? `Showing reports for ${labels[0]}` : 'No reports found in the selected period';
+    }
+
+    function buildCharts(source, userSource) {
+        const { trendLabels, trendValues, reportTypeCounts } = processIncidentData(source, userSource);
         const trendCtx = document.getElementById('incidentTrendChart')?.getContext('2d');
-        const typeCtx = document.getElementById('incidentTypeChart')?.getContext('2d');
-        const statusCtx = document.getElementById('incidentStatusChart')?.getContext('2d');
-        const hourlyCtx = document.getElementById('hourlyDistributionChart')?.getContext('2d');
+        const typeCtx = document.getElementById('citizenReportTypeChart')?.getContext('2d');
 
         if (trendCtx && !chartState.trend) {
             chartState.trend = new Chart(trendCtx, {
                 type: 'line',
                 data: {
-                    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                    labels: trendLabels,
                     datasets: [{
-                        label: 'Incidents',
-                        data: dailyCounts,
+                        label: 'Reports',
+                        data: trendValues,
                         borderColor: '#dc2626',
                         backgroundColor: createGradient(trendCtx, [
                             [0, 'rgba(220, 38, 38, 0.28)'],
@@ -279,7 +421,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } else if (chartState.trend) {
-            chartState.trend.data.datasets[0].data = dailyCounts;
+            chartState.trend.data.labels = trendLabels;
+            chartState.trend.data.datasets[0].data = trendValues;
             chartState.trend.update();
         }
 
@@ -287,10 +430,10 @@ document.addEventListener('DOMContentLoaded', function() {
             chartState.type = new Chart(typeCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: Object.keys(typeCounts),
+                    labels: Object.keys(reportTypeCounts),
                     datasets: [{
-                        data: Object.values(typeCounts),
-                        backgroundColor: Object.keys(typeCounts).map((_, index) => chartPalette[index % chartPalette.length]),
+                        data: Object.values(reportTypeCounts),
+                        backgroundColor: ['#7c3aed', '#f59e0b', '#dc2626'],
                         borderWidth: 0,
                         hoverOffset: 6
                     }]
@@ -303,91 +446,90 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } else if (chartState.type) {
-            chartState.type.data.labels = Object.keys(typeCounts);
-            chartState.type.data.datasets[0].data = Object.values(typeCounts);
-            chartState.type.data.datasets[0].backgroundColor = Object.keys(typeCounts).map((_, index) => chartPalette[index % chartPalette.length]);
+            chartState.type.data.labels = Object.keys(reportTypeCounts);
+            chartState.type.data.datasets[0].data = Object.values(reportTypeCounts);
             chartState.type.update();
         }
 
-        if (statusCtx && !chartState.status) {
-            chartState.status = new Chart(statusCtx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(statusCounts).map((status) => status.charAt(0).toUpperCase() + status.slice(1)),
-                    datasets: [{
-                        data: Object.values(statusCounts),
-                        backgroundColor: ['#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#dc2626'],
-                        borderRadius: 8,
-                        barPercentage: 0.65
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-                        x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } }
-                    }
-                }
-            });
-        } else if (chartState.status) {
-            chartState.status.data.labels = Object.keys(statusCounts).map((status) => status.charAt(0).toUpperCase() + status.slice(1));
-            chartState.status.data.datasets[0].data = Object.values(statusCounts);
-            chartState.status.update();
-        }
-
-        if (hourlyCtx && !chartState.hourly) {
-            chartState.hourly = new Chart(hourlyCtx, {
-                type: 'line',
-                data: {
-                    labels: Array.from({ length: 24 }, (_, index) => `${String(index).padStart(2, '0')}:00`).filter((_, index) => index % 3 === 0),
-                    datasets: [{
-                        label: 'Incidents',
-                        data: hourlyCounts.filter((_, index) => index % 3 === 0),
-                        borderColor: '#f97316',
-                        backgroundColor: createGradient(hourlyCtx, [
-                            [0, 'rgba(249, 115, 22, 0.24)'],
-                            [1, 'rgba(249, 115, 22, 0.02)']
-                        ]),
-                        borderWidth: 2,
-                        tension: 0.45,
-                        fill: true,
-                        pointBackgroundColor: '#f97316',
-                        pointRadius: 3,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
-                        x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
-                    }
-                }
-            });
-        } else if (chartState.hourly) {
-            chartState.hourly.data.datasets[0].data = hourlyCounts.filter((_, index) => index % 3 === 0);
-            chartState.hourly.update();
-        }
-
-        renderTypeBreakdown(typeCounts);
+        renderTypeBreakdown(reportTypeCounts);
+        syncTrendRangeLabel(trendLabels);
     }
 
     window.updateCitizenOverviewCharts = function(payload) {
-        buildCharts(Array.isArray(payload) ? payload : []);
+        const source = Array.isArray(payload)
+            ? { incidents: payload, user_incidents: window.myReportedIncidents || [] }
+            : (payload || {});
+
+        currentIncidents = Array.isArray(source.incidents) ? source.incidents : [];
+        currentUserIncidents = Array.isArray(source.user_incidents) ? source.user_incidents : [];
+
+        const bounds = getIncidentBounds(currentIncidents);
+        if (trendStartDateInput) {
+            trendStartDateInput.min = bounds.start || '';
+            trendStartDateInput.max = bounds.end || '';
+        }
+        if (trendEndDateInput) {
+            trendEndDateInput.min = bounds.start || '';
+            trendEndDateInput.max = bounds.end || '';
+        }
+
+        buildCharts(
+            currentIncidents,
+            currentUserIncidents
+        );
     };
 
-    buildCharts(incidents);
+    const initialBounds = getIncidentBounds(currentIncidents);
+    const initialStart = initialBounds.start;
+    const initialEnd = initialBounds.end;
 
-    document.querySelectorAll('.chart-period-btn').forEach((button) => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.chart-period-btn').forEach((candidate) => candidate.classList.remove('active'));
-            this.classList.add('active');
+    trendFilterState.start = initialStart;
+    trendFilterState.end = initialEnd;
+
+    if (trendStartDateInput) {
+        trendStartDateInput.value = initialStart;
+        trendStartDateInput.max = initialEnd || '';
+        trendStartDateInput.addEventListener('change', function() {
+            trendFilterState.start = this.value;
+            if (trendEndDateInput && trendFilterState.end && trendFilterState.start && trendFilterState.start > trendFilterState.end) {
+                trendFilterState.end = trendFilterState.start;
+                trendEndDateInput.value = trendFilterState.end;
+            }
+            buildCharts(currentIncidents, currentUserIncidents);
         });
+    }
+
+    if (trendEndDateInput) {
+        trendEndDateInput.value = initialEnd;
+        trendEndDateInput.min = initialStart || '';
+        trendEndDateInput.addEventListener('change', function() {
+            trendFilterState.end = this.value;
+            if (trendStartDateInput && trendFilterState.start && trendFilterState.end && trendFilterState.end < trendFilterState.start) {
+                trendFilterState.start = trendFilterState.end;
+                trendStartDateInput.value = trendFilterState.start;
+            }
+            buildCharts(currentIncidents, currentUserIncidents);
+        });
+    }
+
+    trendResetBtn?.addEventListener('click', function() {
+        const currentBounds = getIncidentBounds(currentIncidents);
+        trendFilterState.start = currentBounds.start;
+        trendFilterState.end = currentBounds.end;
+
+        if (trendStartDateInput) {
+            trendStartDateInput.value = currentBounds.start;
+        }
+
+        if (trendEndDateInput) {
+            trendEndDateInput.value = currentBounds.end;
+        }
+
+        buildCharts(currentIncidents, currentUserIncidents);
     });
+
+    window.myReportedIncidents = Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : currentUserIncidents;
+    buildCharts(currentIncidents, window.myReportedIncidents);
 
     const fab        = document.getElementById('alertsFab');
     const panel      = document.getElementById('alertsPanel');

@@ -7,6 +7,7 @@
                 ['label' => 'Operations Room', 'route' => 'admin.dashboard', 'active' => 'dashboard', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>'],
                 ['label' => 'Announcements', 'route' => 'admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>'],
                 ['label' => 'Incident Management', 'route' => 'admin.management', 'active' => 'management', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 20V5l7-2v17"/><path d="M12 20V9h7v11"/><path d="M8 8h1M8 11h1M8 14h1M15 12h1M15 15h1"/></svg>'],
+                ['label' => 'Activity Schedule', 'route' => 'admin.schedule', 'active' => 'schedule', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3v4"/><path d="M17 3v4"/><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M13 14h3"/><path d="M8 17h3"/></svg>'],
             ],
         ],
         [
@@ -31,6 +32,7 @@
         ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
         ['label' => 'Reports', 'route' => 'admin.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
         ['label' => 'Management', 'route' => 'admin.management', 'active' => 'management', 'mobile_icon' => 'apartment'],
+        ['label' => 'Schedule', 'route' => 'admin.schedule', 'active' => 'schedule', 'mobile_icon' => 'event'],
         ['label' => 'Announcements', 'route' => 'admin.announcements', 'active' => 'announcements', 'mobile_icon' => 'campaign'],
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'],
     ];

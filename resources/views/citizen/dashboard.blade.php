@@ -3116,7 +3116,10 @@ window.refreshCitizenOverviewData = async function() {
         }
 
         if (typeof window.updateCitizenOverviewCharts === 'function') {
-            window.updateCitizenOverviewCharts(Array.isArray(data.incidents) ? data.incidents : []);
+            window.updateCitizenOverviewCharts({
+                incidents: Array.isArray(data.incidents) ? data.incidents : [],
+                user_incidents: userIncidents,
+            });
         }
 
         if (typeof window.refreshCitizenMapSearchIndex === 'function') {

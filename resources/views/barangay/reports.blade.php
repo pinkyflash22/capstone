@@ -37,7 +37,7 @@
                 <h3 class="panel-title">Recorded fire reports for this barangay hall</h3>
                 <p class="panel-copy">This list is limited to barangay-side fire records. Creating, editing, and deleting here also updates the linked incident and marker data.</p>
             </div>
-            <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-center">   
                 <div class="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     <strong class="block text-lg text-slate-900">{{ $fireRecords->count() }}</strong>
                     Showing records

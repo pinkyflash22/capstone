@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Station;
 
 class EventActivity extends Model
 {
@@ -25,4 +26,9 @@ class EventActivity extends Model
     protected $casts = [
         'event_date' => 'date',
     ];
+
+    public function station()
+    {
+        return $this->belongsTo(Station::class, 'station_id', 'station_id');
+    }
 }

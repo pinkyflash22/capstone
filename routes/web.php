@@ -226,6 +226,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
+        Route::get('/schedule', [AdminController::class, 'schedule'])->name('schedule');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'adminIndex'])->name('risk-reviews.index');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'adminReview'])->name('risk-reviews.review');
         Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminUpdateActive'])->name('risk-reviews.active.update');
