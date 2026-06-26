@@ -30,7 +30,7 @@
                     <polyline points="0,35 18,25 35,30 52,18 70,23 88,12 105,16 120,8" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     <polygon points="0,35 18,25 35,30 52,18 70,23 88,12 105,16 120,8 120,40 0,40" fill="rgba(255,255,255,0.12)"/>
                 </svg>
-                <p id="citizenOverviewTotalReportsValue" class="lector-sparkcard-amount">{{ $countReport ?? 0 }}</p>
+                <p id="citizenOverviewTotalReportsValue" class="lector-sparkcard-amount">{{ $overviewReportCount ?? $countReport ?? 0 }}</p>
                 <p class="lector-sparkcard-date">{{ now()->subDays(30)->format('M d') }} â€“ {{ now()->format('M d') }}</p>
             </div>
         </div>
@@ -185,7 +185,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const incidents = @json($incidents);
-    const userIncidents = @json($myReports ?? []);
+    const userReportRecords = @json($citizenCombinedReports ?? []);
     const chartPalette = ['#dc2626', '#f97316', '#f59e0b', '#fb7185', '#38bdf8', '#8b5cf6', '#10b981'];
     const chartState = {};
     const trendRangeLabel = document.getElementById('incidentTrendRangeLabel');
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const trendResetBtn = document.getElementById('incidentTrendResetBtn');
     const trendFilterState = { start: '', end: '' };
     let currentIncidents = Array.isArray(incidents) ? incidents : [];
-    let currentUserIncidents = Array.isArray(userIncidents) ? userIncidents : [];
+    let currentUserReports = Array.isArray(userReportRecords) ? userReportRecords : [];
 
     function readType(incident) {
         return incident?.incident_type?.type
@@ -457,11 +457,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.updateCitizenOverviewCharts = function(payload) {
         const source = Array.isArray(payload)
-            ? { incidents: payload, user_incidents: window.myReportedIncidents || [] }
+            ? { incidents: payload, user_reports: window.citizenCombinedReports || [] }
             : (payload || {});
 
         currentIncidents = Array.isArray(source.incidents) ? source.incidents : [];
-        currentUserIncidents = Array.isArray(source.user_incidents) ? source.user_incidents : [];
+        currentUserReports = Array.isArray(source.user_reports) ? source.user_reports : [];
 
         const bounds = getIncidentBounds(currentIncidents);
         if (trendStartDateInput) {
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         buildCharts(
             currentIncidents,
-            currentUserIncidents
+            currentUserReports
         );
     };
 
@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 trendFilterState.end = trendFilterState.start;
                 trendEndDateInput.value = trendFilterState.end;
             }
-            buildCharts(currentIncidents, currentUserIncidents);
+            buildCharts(currentIncidents, currentUserReports);
         });
     }
 
@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 trendFilterState.start = trendFilterState.end;
                 trendStartDateInput.value = trendFilterState.start;
             }
-            buildCharts(currentIncidents, currentUserIncidents);
+            buildCharts(currentIncidents, currentUserReports);
         });
     }
 
@@ -525,11 +525,11 @@ document.addEventListener('DOMContentLoaded', function() {
             trendEndDateInput.value = currentBounds.end;
         }
 
-        buildCharts(currentIncidents, currentUserIncidents);
+        buildCharts(currentIncidents, currentUserReports);
     });
 
-    window.myReportedIncidents = Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : currentUserIncidents;
-    buildCharts(currentIncidents, window.myReportedIncidents);
+    window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : currentUserReports;
+    buildCharts(currentIncidents, window.citizenCombinedReports);
 
     const fab        = document.getElementById('alertsFab');
     const panel      = document.getElementById('alertsPanel');

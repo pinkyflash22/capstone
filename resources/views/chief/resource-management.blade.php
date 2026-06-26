@@ -978,17 +978,271 @@
         }
 
         @media (max-width: 768px) {
-            .main-content { padding: 16px; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .form-grid { grid-template-columns: 1fr; }
-            .full-width { grid-column: span 1; }
-            .station-table { font-size: 0.75rem; }
-            .station-table th, .station-table td { padding: 10px 12px; }
-            .lector-top-bar { padding: 0 16px; border-radius: 20px; }
+            body.chief-legacy-layout {
+                background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
+            }
+
+            .main-content {
+                padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
+            }
+
+            .lector-top-bar {
+                min-height: 48px !important;
+                height: 48px !important;
+                margin: 8px auto 12px !important;
+                padding: 0 10px !important;
+                width: calc(100% - 4px) !important;
+                max-width: 330px !important;
+                border-radius: 14px !important;
+                top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+            }
+
+            .lector-top-bar .flex.items-center.gap-4,
+            .lector-top-bar .flex.items-center.gap-6 {
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle {
+                padding: 4px 8px !important;
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle .w-8.h-8 {
+                width: 1.75rem !important;
+                height: 1.75rem !important;
+            }
+
+            .management-container {
+                max-width: 330px;
+                gap: 12px;
+            }
+
+            .page-header {
+                margin-bottom: 12px;
+                gap: 8px;
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .page-header h1 {
+                font-size: 0.95rem;
+                gap: 8px;
+            }
+
+            .date {
+                font-size: 0.62rem;
+                padding: 6px 10px;
+            }
+
+            .alert-banner {
+                margin-bottom: 12px;
+                padding: 10px 12px;
+                gap: 8px;
+                border-radius: 14px;
+                font-size: 0.7rem;
+                line-height: 1.45;
+            }
+
+            .boundary-control-card,
+            .station-grid,
+            .stat-card {
+                border-radius: 16px;
+            }
+
+            .boundary-control-card {
+                padding: 12px;
+            }
+
+            .boundary-control-header {
+                gap: 10px;
+                margin-bottom: 12px;
+            }
+
+            .boundary-control-header h3 {
+                font-size: 0.86rem;
+                margin-bottom: 4px;
+            }
+
+            .boundary-control-header p {
+                font-size: 0.68rem;
+                line-height: 1.45;
+            }
+
+            .boundary-summary {
+                gap: 6px;
+            }
+
+            .boundary-summary-pill {
+                min-height: 28px;
+                padding: 0 10px;
+                font-size: 0.62rem;
+                gap: 6px;
+            }
+
+            .boundary-table th,
+            .boundary-table td {
+                padding: 8px 8px;
+                font-size: 0.68rem;
+            }
+
+            .boundary-table th {
+                font-size: 0.58rem;
+            }
+
+            .boundary-sync-btn {
+                min-height: 30px;
+                padding: 0 10px;
+                font-size: 0.64rem;
+                border-radius: 10px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                margin-bottom: 12px;
+            }
+
+            .stat-card {
+                padding: 12px;
+                gap: 10px;
+            }
+
+            .stat-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                font-size: 15px;
+            }
+
+            .stat-info h3 {
+                font-size: 0.58rem;
+                margin-bottom: 4px;
+            }
+
+            .stat-number {
+                font-size: 1rem;
+            }
+
+            .stat-change {
+                font-size: 0.55rem;
+                margin-top: 2px;
+            }
+
+            .search-filter-bar {
+                margin-bottom: 12px;
+                padding: 10px 12px;
+                border-radius: 16px;
+                gap: 10px;
+            }
+
+            .search-box {
+                max-width: none;
+                width: 100%;
+                min-height: 38px;
+                padding: 6px 12px;
+            }
+
+            .search-box input,
+            .filter-select,
+            .btn-filter,
+            .add-dropdown-btn {
+                font-size: 0.68rem;
+            }
+
+            .filter-actions {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .filter-select,
+            .btn-filter,
+            .add-dropdown-btn {
+                min-height: 34px;
+                padding: 6px 10px;
+                border-radius: 10px;
+            }
+
+            .add-dropdown {
+                width: 100%;
+            }
+
+            .add-dropdown-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .add-dropdown-content {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .section-header {
+                padding: 12px;
+                gap: 10px;
+            }
+
+            .section-header h3 {
+                font-size: 0.82rem;
+                gap: 8px;
+            }
+
+            .section-header h3 i {
+                width: 30px;
+                height: 30px;
+                border-radius: 10px;
+                font-size: 0.8rem;
+            }
+
+            .stat-badge {
+                min-height: 28px;
+                padding: 0 10px;
+                font-size: 0.62rem;
+            }
+
+            .filter-controls {
+                width: 100%;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .filter-select-sm {
+                min-height: 34px;
+                padding: 6px 10px;
+                font-size: 0.68rem;
+                border-radius: 10px;
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .station-table {
+                font-size: 0.68rem;
+                min-width: 720px;
+            }
+
+            .station-table th,
+            .station-table td {
+                padding: 8px 10px;
+                font-size: 0.66rem;
+            }
+
+            .station-table th {
+                font-size: 0.56rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .full-width {
+                grid-column: span 1;
+            }
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
     <!-- Side Navigation -->
     @include('chief.partials.sidebar', ['active' => 'resources'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">

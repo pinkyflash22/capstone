@@ -47,20 +47,6 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --mobile-bottom-nav-h: calc(64px + var(--safe-bottom));
-  --upload-bg: #f8f9fa;
-  --upload-border: #e0e0e0;
-  --upload-border-active: #4a6cf7;
-  --upload-text: #4a4a4a;
-  --upload-icon: #4a6cf7;
-  --upload-btn-bg: #4a6cf7;
-  --upload-btn-bg-hover: #3652cc;
-  --upload-btn-text: #ffffff;
-  --upload-item-bg: #ffffff;
-  --upload-item-border: #e0e0e0;
-  --upload-item-progress: #4a6cf7;
-  --upload-item-icon: #27ae60;
-  --upload-item-remove: #e74c3c;
-  --upload-transition: all 0.3s ease;
 }
 
 .material-symbols-rounded {
@@ -85,175 +71,7 @@
 /* Dark mode variables */
 @media (prefers-color-scheme: dark) {
   :root {
-    --upload-bg: #1e1e1e;
-    --upload-border: #333333;
-    --upload-border-active: #6c8fff;
-    --upload-text: #e1e1e1;
-    --upload-icon: #6c8fff;
-    --upload-btn-bg: #6c8fff;
-    --upload-btn-bg-hover: #5373e0;
-    --upload-btn-text: #ffffff;
-    --upload-item-bg: #2a2a2a;
-    --upload-item-border: #333333;
-    --upload-item-progress: #6c8fff;
-    --upload-item-icon: #27ae60;
-    --upload-item-remove: #e74c3c;
   }
-}
-
-.file-upload-container {
-  width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.file-upload-area {
-  position: relative;
-  width: 100%;
-  min-height: 250px;
-  background-color: var(--upload-bg);
-  border: 2px dashed var(--upload-border);
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 30px 20px;
-  box-sizing: border-box;
-  transition: var(--upload-transition);
-  overflow: hidden;
-}
-
-.file-upload-area.active {
-  border-color: var(--upload-border-active);
-  background-color: rgba(74, 108, 247, 0.05);
-}
-
-.file-upload-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--upload-text);
-  width: 100%;
-}
-
-.file-upload-message i {
-  font-size: 3rem;
-  color: var(--upload-icon);
-  margin-bottom: 1rem;
-}
-
-.file-upload-message h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1.2rem;
-}
-
-.file-upload-message p {
-  margin: 0.5rem 0;
-}
-
-.file-upload-btn {
-  display: inline-block;
-  padding: 10px 20px;
-  margin: 10px 0;
-  background-color: var(--upload-btn-bg);
-  color: var(--upload-btn-text);
-  border-radius: 5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--upload-transition);
-}
-
-.file-upload-btn:hover {
-  background-color: var(--upload-btn-bg-hover);
-}
-
-.file-upload-info {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
-
-.file-upload-preview {
-  width: 100%;
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.upload-item {
-  display: flex;
-  align-items: center;
-  background-color: var(--upload-item-bg);
-  border: 1px solid var(--upload-item-border);
-  border-radius: 5px;
-  padding: 10px;
-  position: relative;
-}
-
-.upload-item-icon {
-  font-size: 1.5rem;
-  margin-right: 15px;
-}
-
-.upload-item-details {
-  flex: 1;
-}
-
-.upload-item-name {
-  font-weight: 500;
-  margin-bottom: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-
-.upload-item-size {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
-
-.upload-item-progress-container {
-  width: 100%;
-  height: 4px;
-  background-color: var(--upload-border);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 5px;
-}
-
-.upload-item-progress {
-  height: 100%;
-  background-color: var(--upload-item-progress);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.upload-item-actions {
-  display: flex;
-  align-items: center;
-}
-
-.upload-item-status {
-  margin-right: 10px;
-  font-size: 1rem;
-}
-
-.upload-item-remove {
-  background: none;
-  border: none;
-  color: var(--upload-item-remove);
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 5px;
-  transition: var(--upload-transition);
-}
-
-.upload-item-remove:hover {
-  opacity: 0.8;
 }
         .modal {
             display: none;
@@ -1439,6 +1257,7 @@
     // Also pass incidents data to JavaScript
     window.incidentsData = @json($incidents) || [];
     window.myReportedIncidents = @json($myReports) || [];
+    window.citizenCombinedReports = @json($citizenCombinedReports ?? []) || [];
     window.currentCitizenId = {{ $accountId ?? 'null' }};
     window.citizenSidebarDefaults = {
         drills: Number(@json($drillsAttended ?? 5)),
@@ -1541,7 +1360,7 @@
                         </div>
                         <div class="bg-orange-50 p-2 rounded-lg text-center">
                             <p class="text-xs text-gray-500">Reports</p>
-                            <p id="citizenSidebarReportsValue" class="text-lg font-bold text-orange-600">{{ $countReport ?? 0 }}</p>
+                            <p id="citizenSidebarReportsValue" class="text-lg font-bold text-orange-600">{{ $overviewReportCount ?? $countReport ?? 0 }}</p>
                             {{-- <p class="text-lg font-bold text-orange-600">{{ $incidents ?? 0 }}</p> --}}
 
                         </div>
@@ -1973,29 +1792,33 @@
                             
                         {{-- <input type="hidden" name=""  id="marker_id_input" value=""> --}}
                         {{-- <input type="hidden" name="reported_by" value="{{ $accountId }}"> --}}
-                        <label class="block mb-2 font-semibold">Attach Image</label>
-                        <div class="file-upload-container">
-                            <div class="file-upload-area" id="drop-area">
-                                <div class="file-upload-message">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <h3>Drag & Drop Files Here</h3>
-                                <p>or</p>
-                                {{-- <label for="myfile" class="file-upload-btn">Browse Files</label> --}}
-                                {{-- <input type="file" id="fileUpload" multiple hidden> --}}
-                                <input type="file" id="myfile" name="file" accept="image/*,video/*"  >
-
-                                <p class="file-upload-info">Supports: JPG, PNG, PDF, DOC, MP4 (Max: 10MB)</p>
-                                </div>
-                                <div class="file-upload-preview" id="previewArea"></div>
-                            </div>
+                        <div class="rounded-xl border border-orange-100 bg-orange-50 px-4 py-4 text-sm text-slate-700 mb-4">
+                            <p class="font-semibold text-slate-900 mb-1">Choose a report type</p>
+                            <p>Use your current location to submit a fire, risk, or hazard report from the citizen dashboard.</p>
                         </div>
-                        
+                        <div id="hazardLocationPanel" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 mb-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900 mb-1">Hazard location</p>
+                                    <p>For hazard reports, use your location or pick a point within 100 meters on the map.</p>
+                                </div>
+                                <span class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Hazard only</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                <button type="button" id="hazardUseCurrentLocationButton" class="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm">Use My Location</button>
+                                <button type="button" id="hazardPickOnMapButton" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm">Pick on Map (100m)</button>
+                            </div>
+                            <p id="hazardLocationStatus" class="mt-3 text-xs text-slate-500">Hazard reports will use your current location unless you pick another point on the map.</p>
+                        </div>
+
                         <input type="hidden" name="" id="reported_by" value="{{ $accountId }}">
                     <input type="hidden" id="latitude" value="">
                     <input type="hidden" id="longitude" value="">
-                    <div class="flex justify-end gap-2">
+                    <div class="flex flex-wrap justify-end gap-2">
                         <button type="button" id="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                        <button  id="saveReport" class="px-4 py-2 bg-blue-600 text-white rounded">Submit</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="hazard">Report Hazard</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-violet-600 text-white rounded" data-report-kind="risk">Report Risk</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-blue-600 text-white rounded" data-report-kind="fire">Report Fire</button>
                     </div>
                 </form>
             </div>
@@ -2773,13 +2596,197 @@ if (navigator.geolocation) {
         });
 
         // Modal Functions
+        const citizenHazardDraft = {
+            mode: 'current',
+            selectedLat: null,
+            selectedLng: null,
+            picking: false,
+            circle: null,
+            marker: null,
+            clickHandler: null,
+        };
+
+        function getCitizenDistanceMeters(lat1, lng1, lat2, lng2) {
+            const earthRadius = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return earthRadius * c;
+        }
+
+        function clearCitizenHazardPickVisuals() {
+            if (citizenHazardDraft.circle && window.usermap) {
+                window.usermap.removeLayer(citizenHazardDraft.circle);
+            }
+            if (citizenHazardDraft.marker && window.usermap) {
+                window.usermap.removeLayer(citizenHazardDraft.marker);
+            }
+            citizenHazardDraft.circle = null;
+            citizenHazardDraft.marker = null;
+        }
+
+        function stopCitizenHazardMapPick() {
+            if (citizenHazardDraft.clickHandler && window.usermap) {
+                window.usermap.off('click', citizenHazardDraft.clickHandler);
+            }
+            citizenHazardDraft.clickHandler = null;
+            citizenHazardDraft.picking = false;
+            clearCitizenHazardPickVisuals();
+        }
+
+        function updateCitizenHazardLocationUi() {
+            const statusNode = document.getElementById('hazardLocationStatus');
+            const useCurrentButton = document.getElementById('hazardUseCurrentLocationButton');
+            const pickOnMapButton = document.getElementById('hazardPickOnMapButton');
+
+            if (useCurrentButton) {
+                useCurrentButton.classList.toggle('bg-slate-900', citizenHazardDraft.mode === 'current');
+                useCurrentButton.classList.toggle('text-white', citizenHazardDraft.mode === 'current');
+                useCurrentButton.classList.toggle('border', citizenHazardDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('border-slate-300', citizenHazardDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('bg-white', citizenHazardDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('text-slate-700', citizenHazardDraft.mode !== 'current');
+            }
+
+            if (pickOnMapButton) {
+                pickOnMapButton.classList.toggle('bg-slate-900', citizenHazardDraft.mode === 'picked');
+                pickOnMapButton.classList.toggle('text-white', citizenHazardDraft.mode === 'picked');
+                pickOnMapButton.classList.toggle('border', citizenHazardDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('border-slate-300', citizenHazardDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('bg-white', citizenHazardDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('text-slate-700', citizenHazardDraft.mode !== 'picked');
+            }
+
+            if (!statusNode) {
+                return;
+            }
+
+            if (citizenHazardDraft.picking) {
+                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the hazard point.';
+                return;
+            }
+
+            if (citizenHazardDraft.mode === 'picked' && citizenHazardDraft.selectedLat !== null && citizenHazardDraft.selectedLng !== null) {
+                statusNode.textContent = `Selected map point: ${citizenHazardDraft.selectedLat.toFixed(6)}, ${citizenHazardDraft.selectedLng.toFixed(6)}.`;
+                return;
+            }
+
+            statusNode.textContent = 'Hazard reports will use your current location unless you pick another point on the map.';
+        }
+
+        function setCitizenHazardCurrentLocation() {
+            if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
+                window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
+                return;
+            }
+
+            stopCitizenHazardMapPick();
+            citizenHazardDraft.mode = 'current';
+            citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
+            citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            updateCitizenHazardLocationUi();
+        }
+
+        function startCitizenHazardMapPick() {
+            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+                window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
+                return;
+            }
+
+            citizenHazardDraft.mode = 'picked';
+            citizenHazardDraft.picking = true;
+
+            document.getElementById('incidentModal').style.display = 'none';
+            window.switchSection?.('overview');
+
+            window.setTimeout(() => {
+                if (!window.usermap) {
+                    citizenHazardDraft.picking = false;
+                    updateCitizenHazardLocationUi();
+                    window.showCitizenToast?.('Map is not ready yet. Please try again.', true);
+                    return;
+                }
+
+                stopCitizenHazardMapPick();
+                citizenHazardDraft.mode = 'picked';
+                citizenHazardDraft.picking = true;
+
+                const originLat = Number(window.userCoords.currentLatitude);
+                const originLng = Number(window.userCoords.currentLongitude);
+
+                window.usermap.invalidateSize();
+                window.usermap.setView([originLat, originLng], Math.max(window.usermap.getZoom() || 15, 17), { animate: true });
+
+                citizenHazardDraft.circle = L.circle([originLat, originLng], {
+                    radius: 100,
+                    color: '#f59e0b',
+                    fillColor: '#fbbf24',
+                    fillOpacity: 0.16,
+                    weight: 2,
+                }).addTo(window.usermap);
+
+                if (citizenHazardDraft.selectedLat !== null && citizenHazardDraft.selectedLng !== null) {
+                    citizenHazardDraft.marker = L.marker([citizenHazardDraft.selectedLat, citizenHazardDraft.selectedLng]).addTo(window.usermap);
+                }
+
+                citizenHazardDraft.clickHandler = function(event) {
+                    const targetLat = Number(event.latlng.lat);
+                    const targetLng = Number(event.latlng.lng);
+                    const distance = getCitizenDistanceMeters(originLat, originLng, targetLat, targetLng);
+
+                    if (distance > 100) {
+                        window.showCitizenToast?.('Please pick a point within 100 meters of your current location.', true);
+                        return;
+                    }
+
+                    citizenHazardDraft.selectedLat = targetLat;
+                    citizenHazardDraft.selectedLng = targetLng;
+                    citizenHazardDraft.picking = false;
+
+                    if (citizenHazardDraft.marker && window.usermap) {
+                        window.usermap.removeLayer(citizenHazardDraft.marker);
+                    }
+
+                    citizenHazardDraft.marker = L.marker([targetLat, targetLng]).addTo(window.usermap);
+
+                    if (citizenHazardDraft.clickHandler && window.usermap) {
+                        window.usermap.off('click', citizenHazardDraft.clickHandler);
+                    }
+                    citizenHazardDraft.clickHandler = null;
+
+                    updateCitizenHazardLocationUi();
+                    openIncidentModal();
+                    window.showCitizenToast?.('Hazard point selected. Tap Report Hazard to submit.', false, 3800);
+                };
+
+                window.usermap.on('click', citizenHazardDraft.clickHandler);
+                updateCitizenHazardLocationUi();
+                window.showCitizenToast?.('Tap the map within 100 meters of your current location to place the hazard point.', false, 4200);
+            }, 200);
+        }
+
         function openIncidentModal() {
+            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
+                citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            }
+            updateCitizenHazardLocationUi();
             document.getElementById('incidentModal').style.display = 'flex';
-         
         }
 
         document.getElementById('closeModal').addEventListener('click', function() {
             document.getElementById('incidentModal').style.display = 'none';
+        });
+
+        document.getElementById('hazardUseCurrentLocationButton')?.addEventListener('click', function() {
+            setCitizenHazardCurrentLocation();
+        });
+
+        document.getElementById('hazardPickOnMapButton')?.addEventListener('click', function() {
+            startCitizenHazardMapPick();
         });
 
 
@@ -2850,10 +2857,7 @@ if (navigator.geolocation) {
 //         window.location.replace('{{ route("auth.login") }}');
 //     });
 // });
-document.getElementById('saveReport').addEventListener('click', async function(e) {
-    e.preventDefault();
-
-    const imageInput = document.getElementById('myfile');
+async function submitCitizenQuickReport(reportKind) {
     const description = '';
     const incidentTypeId = 1;
     const reporter = document.getElementById('reported_by').value;
@@ -2861,6 +2865,17 @@ document.getElementById('saveReport').addEventListener('click', async function(e
     const loadingTitle = document.getElementById('incidentReportLoadingTitle');
     const loadingMessage = document.getElementById('incidentReportLoadingMessage');
     const showIncidentToast = window.showCitizenToast;
+    const actionButtons = Array.from(document.querySelectorAll('.js-citizen-report-action'));
+    const actionButton = actionButtons.find((button) => button.dataset.reportKind === reportKind) || null;
+    const originalButtonLabels = actionButtons.map((button) => ({
+        button,
+        text: button.textContent
+    }));
+    const reportLabels = {
+        fire: 'fire report',
+        risk: 'risk report',
+        hazard: 'hazard report',
+    };
 
     // Check if location is ready
     if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
@@ -2868,52 +2883,115 @@ document.getElementById('saveReport').addEventListener('click', async function(e
         return;
     }
 
+    if (reportKind === 'hazard' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
+        startCitizenHazardMapPick();
+        return;
+    }
+
     // Close modal early for better UX
     document.getElementById('incidentModal').style.display = 'none';
 
     // Show loading state
-    const saveButton = document.getElementById('saveReport');
-    const originalText = saveButton.textContent;
-    saveButton.textContent = 'Saving...';
-    saveButton.disabled = true;
-    if (loadingTitle) loadingTitle.textContent = 'Preparing report';
+    actionButtons.forEach((button) => {
+        button.disabled = true;
+    });
+    if (actionButton) {
+        actionButton.textContent = 'Saving...';
+    }
+    if (loadingTitle) loadingTitle.textContent = `Preparing ${reportLabels[reportKind] || 'report'}`;
     if (loadingMessage) loadingMessage.textContent = 'Validating incident details...';
     loadingOverlay?.classList.remove('hidden');
     loadingOverlay?.classList.add('flex');
 
     try {
-        // Save incident - pass the file input element, not the file object
-        const success = await window.saveIncident(
-            description,
-            window.userCoords.currentLatitude,
-            window.userCoords.currentLongitude,
-            incidentTypeId,
-            imageInput,
-            reporter
-        );
+        let success = false;
+        let successMessage = '';
+
+        if (reportKind === 'fire') {
+            success = await window.saveIncident(
+                description,
+                window.userCoords.currentLatitude,
+                window.userCoords.currentLongitude,
+                incidentTypeId,
+                null,
+                reporter
+            );
+            successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
+        } else {
+            const targetLat = reportKind === 'hazard' && citizenHazardDraft.mode === 'picked'
+                ? Number(citizenHazardDraft.selectedLat)
+                : Number(window.userCoords.currentLatitude);
+            const targetLng = reportKind === 'hazard' && citizenHazardDraft.mode === 'picked'
+                ? Number(citizenHazardDraft.selectedLng)
+                : Number(window.userCoords.currentLongitude);
+            const response = await fetch('{{ route('citizen.risk-reports.store') }}', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    report_kind: reportKind,
+                    lat: targetLat,
+                    lng: targetLng,
+                    user_lat: Number(window.userCoords.currentLatitude),
+                    user_lng: Number(window.userCoords.currentLongitude)
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload?.message || `Failed to submit ${reportKind} report.`);
+            }
+
+            success = Boolean(payload?.success);
+            successMessage = payload?.message || `${reportKind.charAt(0).toUpperCase() + reportKind.slice(1)} report submitted successfully.`;
+            window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
+            if (payload?.data?.report) {
+                window.citizenCombinedReports.unshift(payload.data.report);
+            }
+            if (typeof window.refreshCitizenMarkersIfChanged === 'function') {
+                window.refreshCitizenMarkersIfChanged(true);
+            }
+        }
 
         if (success) {
             document.getElementById('incidentForm').reset();
-            const previewArea = document.getElementById('previewArea');
-            if (previewArea) {
-                previewArea.innerHTML = '';
+            if (reportKind === 'hazard') {
+                citizenHazardDraft.mode = 'current';
+                citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                stopCitizenHazardMapPick();
+                updateCitizenHazardLocationUi();
             }
             if (typeof window.refreshCitizenOverviewData === 'function') {
-                window.refreshCitizenOverviewData();
+                await window.refreshCitizenOverviewData();
             }
-            showIncidentToast(window.latestIncidentSubmitMessage || 'Incident reported successfully.');
+            showIncidentToast(successMessage);
             window.latestIncidentSubmitMessage = null;
         }
         
     } catch (error) {
         console.error('Error:', error);
-        showIncidentToast('Failed to report incident: ' + error.message, true);
+        showIncidentToast(`Failed to submit ${reportLabels[reportKind] || 'report'}: ${error.message}`, true);
     } finally {
-        saveButton.textContent = originalText;
-        saveButton.disabled = false;
+        originalButtonLabels.forEach(({ button, text }) => {
+            button.textContent = text;
+            button.disabled = false;
+        });
         loadingOverlay?.classList.add('hidden');
         loadingOverlay?.classList.remove('flex');
     }
+}
+
+document.querySelectorAll('.js-citizen-report-action').forEach((button) => {
+    button.addEventListener('click', function(e) {
+        e.preventDefault();
+        submitCitizenQuickReport(this.dataset.reportKind || 'fire');
+    });
 });
 
 window.updateIncidentReportLoading = function(stage, detail = '') {
@@ -3059,6 +3137,7 @@ window.refreshCitizenOverviewData = async function() {
         const summary = data.summary || {};
         const nearbyIncidents = Array.isArray(data.nearby_incidents) ? data.nearby_incidents : [];
         const userIncidents = Array.isArray(data.user_incidents) ? data.user_incidents : [];
+        const userReports = Array.isArray(data.user_reports) ? data.user_reports : userIncidents;
         const activeAlerts = Number(summary.active_alerts || 0);
         window.incidentsData = Array.isArray(data.incidents) ? data.incidents : [];
 
@@ -3108,6 +3187,7 @@ window.refreshCitizenOverviewData = async function() {
         setText('citizenNearbyAlertsCount', `${nearbyIncidents.length} incident(s) nearby`);
 
         window.myReportedIncidents = userIncidents;
+        window.citizenCombinedReports = userReports;
         window.renderCitizenWeeklyActivity(data.weekly_activity || null);
 
         const riskPercentageNode = document.getElementById('citizenOverviewRiskPercentageValue');
@@ -3118,7 +3198,7 @@ window.refreshCitizenOverviewData = async function() {
         if (typeof window.updateCitizenOverviewCharts === 'function') {
             window.updateCitizenOverviewCharts({
                 incidents: Array.isArray(data.incidents) ? data.incidents : [],
-                user_incidents: userIncidents,
+                user_reports: userReports,
             });
         }
 
@@ -3266,202 +3346,6 @@ document.addEventListener('DOMContentLoaded', function() {
         //     });
         // });
 
-        document.addEventListener('DOMContentLoaded', function() {
-  const dropArea = document.getElementById('drop-area');
-  const fileInput = document.getElementById('myfile');
-  const previewArea = document.getElementById('previewArea');
-  
-  // Max file size in bytes (10MB)
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  
-  // Allowed file types
-  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'video/mp4'];
-  
-  // Prevent default drag behaviors
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, preventDefaults, false);
-    document.body.addEventListener(eventName, preventDefaults, false);
-  });
-  
-  // Highlight drop area when item is dragged over it
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropArea.addEventListener(eventName, highlight, false);
-  });
-  
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, unhighlight, false);
-  });
-  
-  // Handle dropped files
-  dropArea.addEventListener('drop', handleDrop, false);
-  
-  // Handle files from input field
-  fileInput.addEventListener('change', function() {
-    fileInput._selectedFile = this.files && this.files.length > 0 ? this.files[0] : null;
-    handleFiles(this.files);
-  });
-  
-  function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  
-  function highlight() {
-    dropArea.classList.add('active');
-  }
-  
-  function unhighlight() {
-    dropArea.classList.remove('active');
-  }
-  
-  function handleDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-
-    syncSelectedFiles(files);
-    handleFiles(files);
-  }
-  
-  function handleFiles(files) {
-    const filesArray = Array.from(files);
-    
-    if (filesArray.length === 0) return;
-    
-    previewArea.innerHTML = '';
-
-    // Process each file
-    filesArray.forEach(file => {
-      // Validate file type and size
-      if (!validateFile(file)) return;
-      
-      // Create preview item
-      const uploadItem = createUploadItem(file);
-      previewArea.appendChild(uploadItem);
-      
-      // Simulate upload
-      simulateUpload(uploadItem, file);
-    });
-    
-    // Clear the input field to allow selecting the same file again
-    // fileInput.value = '';
-  }
-
-  function syncSelectedFiles(files) {
-    if (!files || files.length === 0) {
-      return;
-    }
-
-    try {
-      const dataTransfer = new DataTransfer();
-
-      Array.from(files).forEach(file => {
-        dataTransfer.items.add(file);
-      });
-
-      fileInput.files = dataTransfer.files;
-      fileInput._selectedFile = dataTransfer.files[0] || null;
-    } catch (error) {
-      console.warn('Unable to sync dropped files to input:', error);
-      fileInput._selectedFile = files[0] || null;
-    }
-  }
-  
-  function validateFile(file) {
-    // Check file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      window.showCitizenToast?.(`File type not allowed: ${file.type}`, true);
-      return false;
-    }
-    
-    // Check file size
-    if (file.size > MAX_FILE_SIZE) {
-      window.showCitizenToast?.(`File too large: ${file.name} (${formatFileSize(file.size)})`, true);
-      return false;
-    }
-    
-    return true;
-  }
-  
-  function createUploadItem(file) {
-    const item = document.createElement('div');
-    item.className = 'upload-item';
-    
-    const iconClass = getFileIconClass(file.type);
-    
-    item.innerHTML = `
-<div class="upload-item-icon">
-  <i class="${iconClass}"></i>
-</div>
-
-<div class="upload-item-details">
-  <div class="upload-item-name">${file.name}</div>
-  <div class="upload-item-size">${formatFileSize(file.size)}</div>
-  <div class="upload-item-progress-container">
-    <div class="upload-item-progress" style="width: 0%"></div>
-  </div>
-</div>
-
-<div class="upload-item-actions">
-  <div class="upload-item-status">
-    <i class="fas fa-spinner fa-spin"></i>
-  </div>
-
-  <button class="upload-item-remove">
-    <i class="fas fa-times"></i>
-  </button>
-</div>
-    `;
-    
-    // Add event listener to remove button
-    item.querySelector('.upload-item-remove').addEventListener('click', function() {
-      item.remove();
-    });
-    
-    return item;
-  }
-  
-  function simulateUpload(item, file) {
-    const progressBar = item.querySelector('.upload-item-progress');
-    const statusIcon = item.querySelector('.upload-item-status i');
-    let progress = 0;
-    
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      progress += Math.random() * 10;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        
-        // Update status icon
-        statusIcon.className = 'fas fa-check';
-        statusIcon.style.color = 'var(--upload-item-icon)';
-      }
-      
-      progressBar.style.width = `${progress}%`;
-    }, 200);
-  }
-  
-  function getFileIconClass(fileType) {
-    if (fileType.startsWith('image/')) {
-      return 'fas fa-image';
-    } else if (fileType === 'application/pdf') {
-      return 'fas fa-file-pdf';
-    } else if (fileType.includes('word')) {
-      return 'fas fa-file-word';
-    } else if (fileType.startsWith('video/')) {
-      return 'fas fa-file-video';
-    } else {
-      return 'fas fa-file';
-    }
-  }
-  
-  function formatFileSize(bytes) {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
-  }
-});
     </script>
     
 @include('partials.user-activity-logger')

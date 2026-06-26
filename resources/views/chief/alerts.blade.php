@@ -1206,7 +1206,7 @@
     </style>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/js/map.js'])
 </head>
-<body>
+<body class="chief-legacy-layout">
     <!-- SIDE NAVIGATION -->
     @include('chief.partials.sidebar', ['active' => 'dashboard'])
     <aside class="sidebar legacy-chief-sidebar" id="legacySidebar" style="display:none;">

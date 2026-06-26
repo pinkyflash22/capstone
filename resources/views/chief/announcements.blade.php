@@ -658,9 +658,150 @@
                 grid-template-rows: minmax(280px, 44vh) 1fr;
             }
         }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
+            }
+
+            .announcements-shell {
+                max-width: 330px;
+                gap: 12px;
+            }
+
+            .page-shell {
+                max-width: 330px;
+            }
+
+            .lector-top-bar {
+                min-height: 48px !important;
+                height: 48px !important;
+                margin: 8px auto 0 !important;
+                padding: 0 10px !important;
+                width: calc(100% - 4px) !important;
+                max-width: 330px !important;
+                border-radius: 14px !important;
+                top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+            }
+
+            .lector-top-bar .flex.items-center.gap-4,
+            .lector-top-bar .flex.items-center.gap-6 {
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .btn.btn-outline {
+                min-height: 30px;
+                padding: 0 8px;
+                font-size: 0.62rem;
+                border-radius: 9px;
+            }
+
+            .lector-top-bar .user-dropdown-toggle {
+                padding: 4px 8px !important;
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle .w-8.h-8 {
+                width: 1.75rem !important;
+                height: 1.75rem !important;
+            }
+
+            .announcements-hero {
+                padding: 14px;
+                gap: 10px;
+                border-radius: 18px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .announcements-hero-copy h1 {
+                font-size: 1rem;
+                line-height: 1.12;
+            }
+
+            .announcements-hero-copy p {
+                margin-top: 6px;
+                font-size: 0.7rem;
+                line-height: 1.42;
+            }
+
+            .announcements-pill {
+                min-height: 32px;
+                padding: 0 10px;
+                gap: 6px;
+                font-size: 0.64rem;
+            }
+
+            .top-bar {
+                display: none;
+            }
+
+            .create-post-card,
+            .composer-card,
+            .post-card,
+            .feed {
+                border-radius: 16px;
+            }
+
+            .composer-header {
+                gap: 10px;
+                margin-bottom: 12px;
+                padding: 14px 14px 0;
+            }
+
+            .post-avatar {
+                width: 36px;
+                height: 36px;
+                font-size: 0.75rem;
+            }
+
+            .composer-name {
+                font-size: 0.82rem;
+            }
+
+            .composer-role {
+                font-size: 0.66rem;
+            }
+
+            .composer-controls {
+                gap: 10px;
+                padding: 0 14px 14px;
+            }
+
+            .post-input {
+                font-size: 0.72rem;
+                border-radius: 12px;
+                padding: 10px 12px;
+            }
+
+            .post-attachments,
+            .post-actions {
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .attachment-btn,
+            .btn.btn-outline,
+            .btn.btn-primary {
+                min-height: 34px;
+                padding: 0 10px;
+                font-size: 0.68rem;
+                border-radius: 10px;
+            }
+
+            .poll-builder {
+                gap: 10px;
+                padding: 10px;
+                border-radius: 12px;
+            }
+
+            .feed {
+                gap: 10px;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
     @include('chief.partials.sidebar', ['active' => 'announcements'])
     <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden transition-opacity duration-300"></div>
 

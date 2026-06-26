@@ -264,6 +264,7 @@
                         <option value="365">Last year</option>
                     </select>
                 </div>
+                <div id="predictionApiError" style="display:none;margin-top:16px;border:1px solid rgba(220,38,38,0.18);background:#fef2f2;color:#991b1b;border-radius:16px;padding:18px 20px;"></div>
             </div>
 
             <!-- Dashboard Grid -->
@@ -336,6 +337,34 @@
         let hourlyChart, dailyChart;
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+        function showPredictionApiError(message, details = null) {
+            const errorBox = document.getElementById('predictionApiError');
+            const fallbackMessage = message || 'Prediction could not be completed right now.';
+            const detailHtml = details
+                ? `<div style="margin-top:8px;font-size:13px;color:#7f1d1d;">${details}</div>`
+                : '';
+
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML = `
+                    <div style="font-weight:800;font-size:15px;">Prediction service unavailable</div>
+                    <div style="margin-top:6px;font-size:14px;line-height:1.5;">${fallbackMessage}</div>
+                    ${detailHtml}
+                `;
+            }
+
+            alert(details ? `${fallbackMessage}\n\n${details}` : fallbackMessage);
+        }
+
+        function clearPredictionApiError() {
+            const errorBox = document.getElementById('predictionApiError');
+
+            if (errorBox) {
+                errorBox.style.display = 'none';
+                errorBox.innerHTML = '';
+            }
+        }
+
         async function loadStations() {
             try {
                 const response = await fetch('/admin/api/stations-for-analytics', {
@@ -385,6 +414,7 @@
         async function runAIAnalysis(locationId) {
             const overlay = document.getElementById('loadingOverlay');
             overlay.classList.add('active');
+            clearPredictionApiError();
 
             const periodDays = document.getElementById('periodSelect').value;
 
@@ -403,7 +433,22 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    let errorPayload = null;
+                    let errorText = '';
+
+                    try {
+                        errorPayload = await response.json();
+                    } catch (parseError) {
+                        errorText = await response.text();
+                    }
+
+                    console.error('Error response:', errorPayload || errorText);
+                    throw new Error(
+                        errorPayload?.details
+                        || errorPayload?.message
+                        || errorText
+                        || `HTTP error! status: ${response.status}`
+                    );
                 }
                 
                 const result = await response.json();
@@ -414,11 +459,11 @@
                     const locationName = result.location_name || 'Selected Location';
                     document.getElementById('selectedStationBadge').innerHTML = `<i class="fa-solid fa-location-dot"></i> ${locationName}`;
                 } else {
-                    alert('Error: ' + (result.message || 'Analysis failed'));
+                    showPredictionApiError(result.message || 'Analysis failed', result.details || null);
                 }
             } catch (error) {
                 console.error('Analysis error:', error);
-                alert('Failed to run AI analysis: ' + error.message);
+                showPredictionApiError('Failed to run AI analysis.', error.message);
             } finally {
                 overlay.classList.remove('active');
             }

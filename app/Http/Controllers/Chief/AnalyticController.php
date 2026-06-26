@@ -11,6 +11,7 @@ use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
 use App\Models\User;
+use App\Services\BarangayPredictionService;
 use App\Services\ForecastModelService;
 use App\Support\BarangayNotificationService;
 use Illuminate\Http\Request;
@@ -19,7 +20,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Process;
 use Carbon\Carbon;
 
 class AnalyticController extends Controller
@@ -27,11 +27,16 @@ class AnalyticController extends Controller
   
     private $apiKey;
     private ?string $lastAiModelUsed = null;
+    private BarangayPredictionService $barangayPredictionService;
     private ForecastModelService $forecastModelService;
     
-    public function __construct(ForecastModelService $forecastModelService)
+    public function __construct(
+        ForecastModelService $forecastModelService,
+        BarangayPredictionService $barangayPredictionService
+    )
     {
         $this->forecastModelService = $forecastModelService;
+        $this->barangayPredictionService = $barangayPredictionService;
         // Load API key from .env file
         $this->apiKey = env('OPENROUTER_API_KEY');
         
@@ -303,6 +308,27 @@ class AnalyticController extends Controller
                 'message' => 'Analysis failed: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function runPredictionApi(Request $request)
+    {
+        try {
+            if (! $this->forecastModelService->ensureReady()) {
+                throw new \RuntimeException('Forecast model could not be prepared automatically. Check the model files and training command on the server.');
+            }
+
+            $this->barangayPredictionService->assertRuntimeReady();
+        } catch (\Throwable $e) {
+            Log::warning('Prediction API runtime check failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Prediction service is not ready on this server.',
+                'details' => $e->getMessage(),
+            ], 503);
+        }
+
+        return $this->runAIPredictiveAnalysis($request);
     }
     
     /**
@@ -978,26 +1004,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     continue;
                 }
 
-                $process = Process::path(base_path())
-                    ->input(json_encode($payload))
-                    ->run(['python', 'capstone-ai/predict_event.py']);
+                $decoded = $this->barangayPredictionService->predict($payload);
 
-                if ($process->failed()) {
-                    Log::warning('Python barangay prediction process failed', [
+                if (! is_array($decoded)) {
+                    Log::warning('Skipping barangay prediction because the Python response was invalid.', [
                         'station_id' => $stationId,
                         'barangay_id' => $barangay->barangay_id ?? null,
-                        'error' => $process->errorOutput(),
-                        'output' => $process->output(),
-                    ]);
-                    continue;
-                }
-
-                $decoded = json_decode($process->output(), true);
-                if (!is_array($decoded)) {
-                    Log::warning('Python barangay prediction output was not valid JSON', [
-                        'station_id' => $stationId,
-                        'barangay_id' => $barangay->barangay_id ?? null,
-                        'output' => $process->output(),
                     ]);
                     continue;
                 }

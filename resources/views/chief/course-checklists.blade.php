@@ -665,7 +665,7 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
     <div class="chief-checklist-shell">
         @include('chief.partials.sidebar', ['active' => 'course-checklists'])
 

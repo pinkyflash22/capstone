@@ -795,7 +795,7 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
     @include('chief.partials.sidebar', ['active' => 'schedule'])
 
     <main class="main-content">

@@ -136,11 +136,13 @@ function readBoundaryEditorContext() {
         const params = new URLSearchParams(window.location.search);
         const barangayId = Number(params.get('focus_barangay_id') || '');
         const barangayName = (params.get('focus_barangay_name') || '').trim();
+        const cityId = Number(params.get('focus_city_id') || '');
+        const cityName = (params.get('focus_city_name') || '').trim();
         const lat = Number(params.get('focus_lat') || '');
         const lng = Number(params.get('focus_lng') || '');
         const openEditor = ['1', 'true', 'yes', 'on'].includes(String(params.get('open_boundary_editor') || '').toLowerCase());
 
-        if (!openEditor && !barangayId && !barangayName) {
+        if (!openEditor && !barangayId && !barangayName && !cityId && !cityName) {
             return null;
         }
 
@@ -148,6 +150,8 @@ function readBoundaryEditorContext() {
             openEditor,
             barangayId: Number.isFinite(barangayId) && barangayId > 0 ? barangayId : null,
             barangayName: barangayName || null,
+            cityId: Number.isFinite(cityId) && cityId > 0 ? cityId : null,
+            cityName: cityName || null,
             lat: Number.isFinite(lat) ? lat : null,
             lng: Number.isFinite(lng) ? lng : null,
         };
@@ -158,6 +162,561 @@ function readBoundaryEditorContext() {
 }
 
 boundaryEditorContext = readBoundaryEditorContext();
+
+let boundarySaveModalPromiseResolvers = null;
+let cachedBoundaryCities = null;
+const cachedBoundaryBarangaysByCity = new Map();
+let cachedBoundaryEditorDefaults = null;
+
+function ensureBoundarySaveModal() {
+    let modal = document.getElementById('boundarySaveModal');
+    if (modal) {
+        return modal;
+    }
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .boundary-save-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.56);
+            backdrop-filter: blur(6px);
+        }
+        .boundary-save-modal.is-open {
+            display: flex;
+        }
+        .boundary-save-modal__card {
+            width: min(100%, 520px);
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+            overflow: hidden;
+        }
+        .boundary-save-modal__header {
+            padding: 20px 22px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        }
+        .boundary-save-modal__eyebrow {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #c2410c;
+            margin-bottom: 6px;
+        }
+        .boundary-save-modal__title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .boundary-save-modal__copy {
+            margin: 8px 0 0;
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.55;
+        }
+        .boundary-save-modal__progress {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            padding: 16px 22px 0;
+        }
+        .boundary-save-modal__step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .boundary-save-modal__step.is-active {
+            background: #fff7ed;
+            border-color: rgba(249, 115, 22, 0.28);
+            color: #9a3412;
+        }
+        .boundary-save-modal__step-index {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(148, 163, 184, 0.16);
+        }
+        .boundary-save-modal__step.is-active .boundary-save-modal__step-index {
+            background: #ea580c;
+            color: #ffffff;
+        }
+        .boundary-save-modal__body {
+            padding: 18px 22px 22px;
+        }
+        .boundary-save-modal__panel {
+            display: none;
+        }
+        .boundary-save-modal__panel.is-active {
+            display: block;
+        }
+        .boundary-save-modal__label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .boundary-save-modal__input,
+        .boundary-save-modal__select {
+            width: 100%;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #0f172a;
+            background: #ffffff;
+        }
+        .boundary-save-modal__input:focus,
+        .boundary-save-modal__select:focus {
+            outline: none;
+            border-color: #ea580c;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+        }
+        .boundary-save-modal__hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        .boundary-save-modal__summary {
+            display: grid;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+        }
+        .boundary-save-modal__summary-item strong {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+        .boundary-save-modal__summary-item span {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .boundary-save-modal__actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 22px 22px;
+        }
+        .boundary-save-modal__actions-right {
+            display: flex;
+            gap: 10px;
+        }
+        .boundary-save-modal__button {
+            border: none;
+            border-radius: 14px;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .boundary-save-modal__button--ghost {
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .boundary-save-modal__button--secondary {
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .boundary-save-modal__button--primary {
+            background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+            color: #ffffff;
+        }
+        .boundary-save-modal__button[disabled] {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+        @media (max-width: 640px) {
+            .boundary-save-modal__progress {
+                grid-template-columns: 1fr;
+            }
+            .boundary-save-modal__actions {
+                flex-direction: column;
+            }
+            .boundary-save-modal__actions-right {
+                justify-content: stretch;
+            }
+            .boundary-save-modal__actions-right .boundary-save-modal__button,
+            .boundary-save-modal__actions .boundary-save-modal__button {
+                width: 100%;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    modal = document.createElement('div');
+    modal.id = 'boundarySaveModal';
+    modal.className = 'boundary-save-modal';
+    modal.innerHTML = `
+        <div class="boundary-save-modal__card" role="dialog" aria-modal="true" aria-labelledby="boundarySaveModalTitle">
+            <div class="boundary-save-modal__header">
+                <div class="boundary-save-modal__eyebrow">Boundary Setup</div>
+                <h3 id="boundarySaveModalTitle" class="boundary-save-modal__title">Save Boundary Shape</h3>
+                <p class="boundary-save-modal__copy">Name the shape, select the municipality or city, then connect it to the correct barangay before saving.</p>
+            </div>
+            <div class="boundary-save-modal__progress">
+                <div class="boundary-save-modal__step is-active" data-boundary-step="1"><span class="boundary-save-modal__step-index">1</span><span>Name</span></div>
+                <div class="boundary-save-modal__step" data-boundary-step="2"><span class="boundary-save-modal__step-index">2</span><span>Municipality</span></div>
+                <div class="boundary-save-modal__step" data-boundary-step="3"><span class="boundary-save-modal__step-index">3</span><span>Barangay</span></div>
+            </div>
+            <div class="boundary-save-modal__body">
+                <section class="boundary-save-modal__panel is-active" data-boundary-panel="1">
+                    <label class="boundary-save-modal__label" for="boundaryShapeNameInput">Boundary name</label>
+                    <input id="boundaryShapeNameInput" class="boundary-save-modal__input" type="text" maxlength="255" placeholder="Example: Poblacion Boundary">
+                    <p class="boundary-save-modal__hint">This is the label users will see when the saved boundary is loaded on the map.</p>
+                </section>
+                <section class="boundary-save-modal__panel" data-boundary-panel="2">
+                    <label class="boundary-save-modal__label" for="boundaryCitySelect">Municipality / City</label>
+                    <select id="boundaryCitySelect" class="boundary-save-modal__select">
+                        <option value="">Select a municipality or city</option>
+                    </select>
+                    <p class="boundary-save-modal__hint">Barangays in the next step will be filtered to the selected municipality or city.</p>
+                </section>
+                <section class="boundary-save-modal__panel" data-boundary-panel="3">
+                    <label class="boundary-save-modal__label" for="boundaryBarangaySelect">Barangay</label>
+                    <select id="boundaryBarangaySelect" class="boundary-save-modal__select" disabled>
+                        <option value="">Select a barangay</option>
+                    </select>
+                    <p class="boundary-save-modal__hint">Save only after the correct barangay is selected. This connects the drawn shape to boundary CRUD records.</p>
+                    <div class="boundary-save-modal__summary" style="margin-top: 14px;">
+                        <div class="boundary-save-modal__summary-item">
+                            <strong>Name</strong>
+                            <span id="boundarySaveSummaryName">-</span>
+                        </div>
+                        <div class="boundary-save-modal__summary-item">
+                            <strong>Municipality / City</strong>
+                            <span id="boundarySaveSummaryCity">-</span>
+                        </div>
+                        <div class="boundary-save-modal__summary-item">
+                            <strong>Barangay</strong>
+                            <span id="boundarySaveSummaryBarangay">-</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="boundary-save-modal__actions">
+                <button type="button" id="boundarySaveCancelBtn" class="boundary-save-modal__button boundary-save-modal__button--ghost">Cancel</button>
+                <div class="boundary-save-modal__actions-right">
+                    <button type="button" id="boundarySaveBackBtn" class="boundary-save-modal__button boundary-save-modal__button--secondary" style="display:none;">Back</button>
+                    <button type="button" id="boundarySaveNextBtn" class="boundary-save-modal__button boundary-save-modal__button--primary">Next</button>
+                    <button type="button" id="boundarySaveSubmitBtn" class="boundary-save-modal__button boundary-save-modal__button--primary" style="display:none;">Save Boundary</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    return modal;
+}
+
+async function fetchBoundaryCities() {
+    if (Array.isArray(cachedBoundaryCities)) {
+        return cachedBoundaryCities;
+    }
+
+    const response = await fetch('/api/boundaries/cities', {
+        headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to load cities (${response.status})`);
+    }
+
+    const payload = await response.json();
+    cachedBoundaryCities = Array.isArray(payload) ? payload : [];
+    return cachedBoundaryCities;
+}
+
+async function fetchBoundaryBarangays(cityId) {
+    const normalizedCityId = Number(cityId || 0);
+
+    if (!normalizedCityId) {
+        return [];
+    }
+
+    if (cachedBoundaryBarangaysByCity.has(normalizedCityId)) {
+        return cachedBoundaryBarangaysByCity.get(normalizedCityId);
+    }
+
+    const response = await fetch(`/api/boundaries/barangays/${normalizedCityId}`, {
+        headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to load barangays (${response.status})`);
+    }
+
+    const payload = await response.json();
+    const barangays = Array.isArray(payload) ? payload : [];
+    cachedBoundaryBarangaysByCity.set(normalizedCityId, barangays);
+    return barangays;
+}
+
+async function fetchBoundaryEditorDefaults() {
+    if (cachedBoundaryEditorDefaults) {
+        return cachedBoundaryEditorDefaults;
+    }
+
+    const response = await fetch('/api/boundaries/editor-context', {
+        headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to load boundary editor defaults (${response.status})`);
+    }
+
+    const payload = await response.json();
+    cachedBoundaryEditorDefaults = payload || {};
+    return cachedBoundaryEditorDefaults;
+}
+
+async function openBoundarySaveModal({ defaultName = 'My Shape', context = null } = {}) {
+    const modal = ensureBoundarySaveModal();
+    const nameInput = document.getElementById('boundaryShapeNameInput');
+    const citySelect = document.getElementById('boundaryCitySelect');
+    const barangaySelect = document.getElementById('boundaryBarangaySelect');
+    const summaryName = document.getElementById('boundarySaveSummaryName');
+    const summaryCity = document.getElementById('boundarySaveSummaryCity');
+    const summaryBarangay = document.getElementById('boundarySaveSummaryBarangay');
+    const backBtn = document.getElementById('boundarySaveBackBtn');
+    const nextBtn = document.getElementById('boundarySaveNextBtn');
+    const submitBtn = document.getElementById('boundarySaveSubmitBtn');
+    const cancelBtn = document.getElementById('boundarySaveCancelBtn');
+    const stepIndicators = Array.from(modal.querySelectorAll('[data-boundary-step]'));
+    const stepPanels = Array.from(modal.querySelectorAll('[data-boundary-panel]'));
+
+    let currentStep = 1;
+    let isClosing = false;
+    const editorDefaults = await fetchBoundaryEditorDefaults().catch(() => ({}));
+    let selectedCityId = context?.cityId || editorDefaults?.default_city_id || null;
+    let selectedBarangayId = context?.barangayId || null;
+    const shouldLockCity = Boolean(context?.cityId || editorDefaults?.locked_to_station_city);
+
+    const setStep = (step) => {
+        currentStep = step;
+        stepIndicators.forEach((item) => {
+            item.classList.toggle('is-active', Number(item.dataset.boundaryStep) === step);
+        });
+        stepPanels.forEach((panel) => {
+            panel.classList.toggle('is-active', Number(panel.dataset.boundaryPanel) === step);
+        });
+        backBtn.style.display = step > 1 ? '' : 'none';
+        nextBtn.style.display = step < 3 ? '' : 'none';
+        submitBtn.style.display = step === 3 ? '' : 'none';
+    };
+
+    const closeWith = (result) => {
+        if (isClosing) {
+            return;
+        }
+
+        isClosing = true;
+        modal.classList.remove('is-open');
+        document.body.style.overflow = '';
+
+        cancelBtn.onclick = null;
+        backBtn.onclick = null;
+        nextBtn.onclick = null;
+        submitBtn.onclick = null;
+        citySelect.onchange = null;
+
+        if (boundarySaveModalPromiseResolvers) {
+            const resolvers = boundarySaveModalPromiseResolvers;
+            boundarySaveModalPromiseResolvers = null;
+            resolvers.resolve(result);
+        }
+    };
+
+    const syncSummary = () => {
+        const selectedCityLabel = citySelect.options[citySelect.selectedIndex]?.text || '-';
+        const selectedBarangayLabel = barangaySelect.options[barangaySelect.selectedIndex]?.text || '-';
+        summaryName.textContent = nameInput.value.trim() || '-';
+        summaryCity.textContent = selectedCityId ? selectedCityLabel : '-';
+        summaryBarangay.textContent = selectedBarangayId ? selectedBarangayLabel : '-';
+    };
+
+    const fillCityOptions = async () => {
+        const cities = await fetchBoundaryCities();
+        citySelect.innerHTML = '<option value="">Select a municipality or city</option>';
+
+        cities.forEach((city) => {
+            const option = document.createElement('option');
+            option.value = String(city.city_id);
+            option.textContent = city.province_name
+                ? `${city.city_name}, ${city.province_name}`
+                : city.city_name;
+            option.dataset.cityName = city.city_name || '';
+            citySelect.appendChild(option);
+        });
+
+        if (selectedCityId) {
+            citySelect.value = String(selectedCityId);
+        } else if (context?.cityName) {
+            const fallbackOption = Array.from(citySelect.options).find((option) => option.dataset.cityName === context.cityName);
+            if (fallbackOption) {
+                selectedCityId = Number(fallbackOption.value);
+                citySelect.value = fallbackOption.value;
+            }
+        } else if (editorDefaults?.default_city_name) {
+            const fallbackOption = Array.from(citySelect.options).find((option) => option.dataset.cityName === editorDefaults.default_city_name);
+            if (fallbackOption) {
+                selectedCityId = Number(fallbackOption.value);
+                citySelect.value = fallbackOption.value;
+            }
+        }
+
+        citySelect.disabled = shouldLockCity;
+    };
+
+    const fillBarangayOptions = async (cityId) => {
+        barangaySelect.innerHTML = '<option value="">Select a barangay</option>';
+        barangaySelect.disabled = true;
+        selectedBarangayId = context?.barangayId || selectedBarangayId;
+
+        if (!cityId) {
+            syncSummary();
+            return;
+        }
+
+        const barangays = await fetchBoundaryBarangays(cityId);
+        barangays.forEach((barangay) => {
+            const option = document.createElement('option');
+            option.value = String(barangay.barangay_id);
+            option.textContent = barangay.barangay_name || `Barangay ${barangay.barangay_id}`;
+            option.dataset.barangayName = barangay.barangay_name || '';
+            barangaySelect.appendChild(option);
+        });
+
+        if (selectedBarangayId) {
+            barangaySelect.value = String(selectedBarangayId);
+        } else if (context?.barangayName) {
+            const fallbackOption = Array.from(barangaySelect.options).find((option) => option.dataset.barangayName === context.barangayName);
+            if (fallbackOption) {
+                selectedBarangayId = Number(fallbackOption.value);
+                barangaySelect.value = fallbackOption.value;
+            }
+        }
+
+        barangaySelect.disabled = false;
+        if (barangays.length === 0) {
+            barangaySelect.innerHTML = '<option value="">No available barangays without a boundary yet</option>';
+            barangaySelect.disabled = true;
+        }
+        syncSummary();
+    };
+
+    nameInput.value = defaultName;
+    citySelect.innerHTML = '<option value="">Loading municipalities...</option>';
+    barangaySelect.innerHTML = '<option value="">Select a barangay</option>';
+    barangaySelect.disabled = true;
+    summaryName.textContent = defaultName || '-';
+    summaryCity.textContent = '-';
+    summaryBarangay.textContent = '-';
+    modal.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    setStep(1);
+
+    const resultPromise = new Promise((resolve, reject) => {
+        boundarySaveModalPromiseResolvers = { resolve, reject };
+    });
+
+    await fillCityOptions();
+    await fillBarangayOptions(selectedCityId);
+    syncSummary();
+
+    citySelect.onchange = async function () {
+        selectedCityId = Number(this.value || 0) || null;
+        selectedBarangayId = null;
+        await fillBarangayOptions(selectedCityId);
+        syncSummary();
+    };
+
+    barangaySelect.onchange = function () {
+        selectedBarangayId = Number(this.value || 0) || null;
+        syncSummary();
+    };
+
+    cancelBtn.onclick = () => closeWith(null);
+    backBtn.onclick = () => setStep(Math.max(1, currentStep - 1));
+    nextBtn.onclick = async () => {
+        if (currentStep === 1) {
+            if (!nameInput.value.trim()) {
+                showNotification('Please enter a boundary name first.', 'warning');
+                nameInput.focus();
+                return;
+            }
+            syncSummary();
+            setStep(2);
+            return;
+        }
+
+        if (currentStep === 2) {
+            if (!citySelect.value) {
+                showNotification('Select a municipality or city before continuing.', 'warning');
+                citySelect.focus();
+                return;
+            }
+            syncSummary();
+            setStep(3);
+        }
+    };
+
+    submitBtn.onclick = () => {
+        const selectedBarangayOption = barangaySelect.options[barangaySelect.selectedIndex];
+
+        if (!nameInput.value.trim()) {
+            setStep(1);
+            showNotification('Please enter a boundary name first.', 'warning');
+            return;
+        }
+
+        if (!citySelect.value) {
+            setStep(2);
+            showNotification('Select a municipality or city before saving.', 'warning');
+            return;
+        }
+
+        if (!barangaySelect.value || !selectedBarangayOption) {
+            showNotification('Select the barangay that this boundary belongs to.', 'warning');
+            barangaySelect.focus();
+            return;
+        }
+
+        closeWith({
+            name: nameInput.value.trim(),
+            city_id: Number(citySelect.value),
+            city_name: citySelect.options[citySelect.selectedIndex]?.dataset.cityName || citySelect.options[citySelect.selectedIndex]?.text || '',
+            barangay_id: Number(barangaySelect.value),
+            barangay_name: selectedBarangayOption.dataset.barangayName || selectedBarangayOption.text || '',
+        });
+    };
+
+    return resultPromise;
+}
 
 
 // ============================================================================
@@ -5957,26 +6516,41 @@ function initAfterMapReady() {
         window.map.on(L.Draw.Event.DRAWSTOP, () => { isDrawing = false; });
         window.map.on(L.Draw.Event.DRAWVERTEX, () => { isDrawing = true; });
         
-        window.map.on(L.Draw.Event.CREATED, function(event) {
+        window.map.on(L.Draw.Event.CREATED, async function(event) {
             const layer = event.layer;
             const geojson = layer.toGeoJSON();
             const defaultShapeName = boundaryEditorContext?.barangayName
                 ? `${boundaryEditorContext.barangayName} Boundary`
                 : 'My Shape';
-            const shapeName = prompt('Enter shape name:', defaultShapeName) || defaultShapeName;
-            const linkedBarangayId = boundaryEditorContext?.barangayId || null;
-            const linkedBarangayName = boundaryEditorContext?.barangayName
-                || (prompt('Optional: enter barangay name to link this boundary:', '') || '');
+
+            let boundaryMeta = null;
+
+            try {
+                boundaryMeta = await openBoundarySaveModal({
+                    defaultName: defaultShapeName,
+                    context: boundaryEditorContext,
+                });
+            } catch (modalError) {
+                console.error('Boundary save modal failed:', modalError);
+                showNotification('Unable to open boundary save form.', 'error');
+                return;
+            }
+
+            if (!boundaryMeta) {
+                showNotification('Boundary save canceled.', 'info');
+                return;
+            }
+
             fetch('/api/shapes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                 body: JSON.stringify({
-                    name: shapeName,
+                    name: boundaryMeta.name,
                     geojson: JSON.stringify(geojson),
                     station_id: null,
-                    barangay_id: linkedBarangayId,
-                    barangay_name: linkedBarangayName,
-                    boundary_type: linkedBarangayId || linkedBarangayName ? 'barangay' : 'custom',
+                    barangay_id: boundaryMeta.barangay_id,
+                    barangay_name: boundaryMeta.barangay_name,
+                    boundary_type: 'barangay',
                     source: 'manual'
                 })
             })
@@ -5990,14 +6564,15 @@ function initAfterMapReady() {
                     const colorIndex = Object.keys(shapeLayers).length % colors.length;
                     const newLayer = L.geoJSON(geojson, { style: { color: colors[colorIndex], weight: 3, fillOpacity: 0.2, fillColor: colors[colorIndex] }, interactive: true });
                     newLayer.shapeId = data.shape.id;
-                    newLayer.shapeName = data.shape.name || shapeName;
+                    newLayer.shapeName = data.shape.name || boundaryMeta.name;
                     newLayer.shapeBarangayId = data.shape.barangay_id || null;
                     newLayer.shapeBoundaryType = data.shape.boundary_type || 'custom';
                     newLayer.shapeSource = data.shape.source || 'manual';
                     newLayer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(data.shape.id, newLayer, e.latlng); } });
                     shapeFeatureGroup.addLayer(newLayer);
                     shapeLayers[data.shape.id] = newLayer;
-                    newLayer.bindTooltip(data.shape.name || shapeName, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
+                    cachedBoundaryBarangaysByCity.delete(boundaryMeta.city_id);
+                    newLayer.bindTooltip(data.shape.name || boundaryMeta.name, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
                     showNotification('Shape saved successfully!', 'success');
                 }
             })

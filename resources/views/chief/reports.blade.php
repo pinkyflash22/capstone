@@ -637,7 +637,7 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
    @include('chief.partials.sidebar', ['active' => 'reports'])
    <aside class="sidebar legacy-chief-sidebar" style="display:none;">
         <div class="sidebar-header">

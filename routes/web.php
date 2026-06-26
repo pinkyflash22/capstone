@@ -445,6 +445,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard/{section?}', [PublicController::class, 'index'])
             ->where('section', implode('|', PublicController::citizenDashboardSections()))
             ->name('dashboard');
+        Route::post('/risk-reports', [PublicController::class, 'storeCitizenRiskReport'])->name('risk-reports.store');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');
         Route::resource('incident', IncidentController::class);

@@ -108,7 +108,7 @@
     
 
 </head>
-<body class="chief-map-page bg-gray-50 min-h-screen flex flex-col lg:flex-row">
+<body class="chief-legacy-layout chief-map-page bg-gray-50 min-h-screen flex flex-col lg:flex-row">
 
     <!-- SIDE NAVIGATION (mobile drawer & desktop fixed) -->
     @include('chief.partials.sidebar', ['active' => 'dashboard'])

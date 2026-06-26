@@ -1043,7 +1043,7 @@
         ];
     });
 @endphp
-<body>
+<body class="chief-legacy-layout">
     @include('chief.partials.sidebar', ['active' => 'management'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
         <div class="sidebar-header">

@@ -1002,6 +1002,10 @@
         }
 
         @media (max-width: 768px) {
+            body.chief-legacy-layout {
+                background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
+            }
+
             .legacy-chief-sidebar {
                 transform: translateX(-100%);
             }
@@ -1012,6 +1016,7 @@
             
             .main-content {
                 margin-left: 0;
+                padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
             }
             
             .top-nav-container {
@@ -1043,9 +1048,231 @@
             .grid-cols-2 {
                 grid-template-columns: 1fr;
             }
-            
+
+            .lector-top-bar {
+                min-height: 48px !important;
+                height: 48px !important;
+                margin: 8px auto 0 !important;
+                padding: 0 10px !important;
+                width: calc(100% - 20px) !important;
+                max-width: 330px !important;
+                border-radius: 14px !important;
+                top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+            }
+
+            .lector-top-bar .flex.items-center.gap-4 {
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .flex.items-center.gap-6 {
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .w-10.h-10 {
+                width: 2rem !important;
+                height: 2rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle {
+                padding: 4px 8px !important;
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle .w-8.h-8 {
+                width: 1.75rem !important;
+                height: 1.75rem !important;
+            }
+
+            .fsic-content-shell {
+                max-width: 330px;
+                padding: 0.7rem 0.5rem 1.4rem;
+            }
+
+            .fsic-toolbar {
+                align-items: stretch;
+                gap: 0.6rem;
+                margin-bottom: 0.8rem;
+            }
+
+            .fsic-page-title {
+                font-size: 0.9rem;
+                line-height: 1.2;
+            }
+
+            .fsic-page-copy {
+                font-size: 0.68rem;
+                line-height: 1.4;
+            }
+
+            .fsic-summary-pills {
+                gap: 0.35rem;
+            }
+
+            .fsic-summary-pill {
+                min-height: 1.75rem;
+                padding: 0 0.55rem;
+                font-size: 0.62rem;
+                gap: 0.35rem;
+            }
+
+            .fsic-summary-pill i {
+                font-size: 0.7rem;
+            }
+
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+                min-height: 2rem;
+                padding: 0.65rem 0.8rem;
+                font-size: 0.7rem;
+                border-radius: 0.8rem;
+            }
+
+            .tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x proximity;
+                padding: 0.42rem;
+                gap: 0.35rem;
+                border-radius: 1rem;
+            }
+
+            .tabs::-webkit-scrollbar {
+                display: none;
+            }
+
+            .tab-btn {
+                flex: 0 0 auto;
+                white-space: nowrap;
+                scroll-snap-align: start;
+                padding: 0.52rem 0.7rem;
+                font-size: 0.6rem;
+                border-radius: 0.75rem;
+            }
+
+            .tabs-container,
+            .requests-card {
+                min-height: auto;
+            }
+
+            .requests-card {
+                border-radius: 1.15rem;
+            }
+
+            .requests-card .p-5 {
+                padding: 0.85rem 0.95rem;
+            }
+
+            .requests-card .p-5 h2 {
+                font-size: 0.8rem;
+                line-height: 1.4;
+            }
+
+            .table-wrapper {
+                overflow: visible;
+                padding: 0.75rem;
+            }
+
+            .fsic-table,
+            .fsic-table thead,
+            .fsic-table tbody,
+            .fsic-table tr,
+            .fsic-table th,
+            .fsic-table td {
+                display: block;
+                width: 100%;
+            }
+
             .fsic-table {
-                min-width: 800px;
+                min-width: 0;
+                border-collapse: separate;
+            }
+
+            .fsic-table thead {
+                display: none;
+            }
+
+            .fsic-table tbody {
+                display: grid;
+                gap: 0.65rem;
+            }
+
+            .fsic-table tbody tr {
+                background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+                border: 1px solid #f3e4c8;
+                border-radius: 0.9rem;
+                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+                padding: 0.25rem 0;
+                overflow: hidden;
+            }
+
+            .fsic-table td {
+                border-bottom: 1px solid #f8ede0;
+                padding: 0.62rem 0.8rem;
+                font-size: 0.72rem;
+                line-height: 1.45;
+            }
+
+            .fsic-table td:last-child {
+                border-bottom: none;
+            }
+
+            .fsic-table td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 0.28rem;
+                font-size: 0.56rem;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #94a3b8;
+            }
+
+            .fsic-request-primary {
+                gap: 0.2rem;
+            }
+
+            .fsic-request-title {
+                font-size: 0.8rem;
+            }
+
+            .fsic-request-meta {
+                font-size: 0.64rem;
+            }
+
+            .fsic-request-code {
+                font-size: 0.8rem;
+            }
+
+            .fsic-status-pill {
+                width: fit-content;
+                min-height: 1.55rem;
+                padding: 0 0.55rem;
+                font-size: 0.62rem;
+            }
+
+            .fsic-action-group {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 0.45rem;
+            }
+
+            .fsic-action-btn {
+                width: 100%;
+                justify-content: center;
+                min-height: 1.95rem;
+                padding: 0.45rem 0.7rem;
+                font-size: 0.65rem;
+            }
+
+            .fsic-table-empty {
+                padding: 1.7rem 0.9rem;
+                font-size: 0.72rem;
+            }
+
+            .fsic-table-empty strong {
+                font-size: 0.82rem;
             }
         }
         
@@ -1216,7 +1443,7 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
 
     <!-- SIDE NAVIGATION -->
     @include('chief.partials.sidebar', ['active' => 'fsic'])
@@ -1419,13 +1646,13 @@
                                 <tbody>
                                     @forelse($pendingRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->request_code }}</td>
-                                        <td>{{ $request->date_requested->format('M d, Y') }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td>{{ $request->barangay }}, {{ $request->city }}</td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Date">{{ $request->date_requested->format('M d, Y') }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Address">{{ $request->barangay }}, {{ $request->city }}</td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                                 <button class="fsic-action-btn is-review" onclick="reviewRequest({{ $request->id }})"><i class="fa-solid fa-clipboard-list"></i><span>Review</span></button>
@@ -1468,13 +1695,13 @@
                                 <tbody>
                                     @forelse($forInspectionRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->request_code }}</td>
-                                        <td>{{ $request->date_requested->format('M d, Y') }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ optional($request->inspection)->stationOfficer?->user?->first_name ? 'Assigned officer ready' : 'Awaiting field update' }}</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td>{{ $request->barangay }}, {{ $request->city }}</td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Date">{{ $request->date_requested->format('M d, Y') }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ optional($request->inspection)->stationOfficer?->user?->first_name ? 'Assigned officer ready' : 'Awaiting field update' }}</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Address">{{ $request->barangay }}, {{ $request->city }}</td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                                 <button class="fsic-action-btn is-inspect" onclick="openInspectionModal({{ $request->id }})"><i class="fa-solid fa-clipboard-check"></i><span>Inspect</span></button>
@@ -1516,12 +1743,12 @@
                                 <tbody>
                                     @forelse($inspectedRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->request_code }}</td>
-                                        <td>{{ $request->date_requested->format('M d, Y') }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">Inspection report submitted</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Date">{{ $request->date_requested->format('M d, Y') }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">Inspection report submitted</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                                 <button class="fsic-action-btn is-approve" onclick="openApprovalModal({{ $request->id }})"><i class="fa-solid fa-certificate"></i><span>Approve</span></button>
@@ -1566,14 +1793,14 @@
                                 <tbody>
                                     @forelse($approvedRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->approval->fsic_number ?? 'N/A' }}</td>
-                                        <td>{{ $request->request_code }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td>{{ $request->approval->date_issued ? \Carbon\Carbon::parse($request->approval->date_issued)->format('M d, Y') : 'Not yet issued' }}</td>
-                                        <td>{{ $request->approval->valid_until ?? 'N/A' }}</td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="FSIC Number">{{ $request->approval->fsic_number ?? 'N/A' }}</td>
+                                        <td data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Date Issued">{{ $request->approval->date_issued ? \Carbon\Carbon::parse($request->approval->date_issued)->format('M d, Y') : 'Not yet issued' }}</td>
+                                        <td data-label="Valid Until">{{ $request->approval->valid_until ?? 'N/A' }}</td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                                 <button class="fsic-action-btn is-certificate" onclick="openCertificateModal({{ $request->id }})"><i class="fa-solid fa-file-lines"></i><span>Certificate</span></button>
@@ -1615,12 +1842,12 @@
                                 <tbody>
                                     @forelse($rejectedRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->request_code }}</td>
-                                        <td>{{ $request->date_requested->format('M d, Y') }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">Request was declined</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Date">{{ $request->date_requested->format('M d, Y') }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">Request was declined</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                             </div>
@@ -1661,12 +1888,12 @@
                                 <tbody>
                                     @forelse($allRequests ?? [] as $request)
                                     <tr>
-                                        <td class="fsic-request-code">{{ $request->request_code }}</td>
-                                        <td>{{ $request->date_requested->format('M d, Y') }}</td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
-                                        <td><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
-                                        <td><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
-                                        <td>
+                                        <td class="fsic-request-code" data-label="Request Code">{{ $request->request_code }}</td>
+                                        <td data-label="Date">{{ $request->date_requested->format('M d, Y') }}</td>
+                                        <td data-label="Applicant"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->user->first_name ?? '' }} {{ $request->user->last_name ?? '' }}</span><span class="fsic-request-meta">{{ $request->owner_name ?: 'Applicant record' }}</span></div></td>
+                                        <td data-label="Business Name"><div class="fsic-request-primary"><span class="fsic-request-title">{{ $request->business_name }}</span><span class="fsic-request-meta">{{ $request->business_type ?: 'Business request' }}</span></div></td>
+                                        <td data-label="Status"><span class="fsic-status-pill {{ $request->status_badge }}">{{ ucwords(str_replace('_', ' ', $request->status)) }}</span></td>
+                                        <td data-label="Actions">
                                             <div class="fsic-action-group">
                                                 <button class="fsic-action-btn is-view" onclick="viewRequest({{ $request->id }})"><i class="fa-solid fa-eye"></i><span>View</span></button>
                                             </div>

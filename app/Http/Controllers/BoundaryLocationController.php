@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Barangay;
 use App\Models\BoundaryLocation;
+use App\Models\City;
 use App\Models\Station;
+use App\Models\StationOfficer;
 use App\Services\BoundaryMatcherService;
 use App\Services\GeoapifyBoundaryService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -95,6 +97,64 @@ class BoundaryLocationController extends Controller
     public function getMapBoundaries(): JsonResponse
     {
         return $this->index(request());
+    }
+
+    public function cityOptions(): JsonResponse
+    {
+        $cities = City::query()
+            ->with('province')
+            ->orderBy('city_name')
+            ->get()
+            ->map(function (City $city) {
+                return [
+                    'city_id' => $city->city_id,
+                    'city_name' => $city->city_name,
+                    'province_id' => $city->province_id,
+                    'province_name' => $city->province?->province_name,
+                ];
+            })
+            ->values();
+
+        return response()->json($cities);
+    }
+
+    public function editorContext(): JsonResponse
+    {
+        $stationOfficer = StationOfficer::query()
+            ->with(['station.address.barangay.city'])
+            ->where('user_id', Auth::user()?->user_id)
+            ->first();
+
+        $city = $stationOfficer?->station?->address?->barangay?->city;
+
+        return response()->json([
+            'default_city_id' => $city?->city_id,
+            'default_city_name' => $city?->city_name,
+            'locked_to_station_city' => (bool) $city,
+            'station_id' => $stationOfficer?->station_id,
+            'station_name' => $stationOfficer?->station?->station_name,
+        ]);
+    }
+
+    public function availableBarangays(int $cityId): JsonResponse
+    {
+        $existingBoundaryBarangayIds = BoundaryLocation::query()
+            ->where('boundary_type', 'barangay')
+            ->whereNotNull('barangay_id')
+            ->pluck('barangay_id')
+            ->filter()
+            ->values();
+
+        $barangays = Barangay::query()
+            ->where('city_id', $cityId)
+            ->when(
+                $existingBoundaryBarangayIds->isNotEmpty(),
+                fn ($query) => $query->whereNotIn('barangay_id', $existingBoundaryBarangayIds->all())
+            )
+            ->orderBy('barangay_name')
+            ->get(['barangay_id', 'barangay_name', 'city_id']);
+
+        return response()->json($barangays);
     }
 
     public function importBarangayBoundary(

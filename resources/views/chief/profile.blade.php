@@ -128,7 +128,7 @@
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
 @php
     $profileUser = $user ?? auth()->user();
     $profileAddress = $profileUser?->address;

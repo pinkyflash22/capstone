@@ -410,15 +410,105 @@
         @media (max-width: 768px) {
             .legacy-chief-sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
             .legacy-chief-sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .dashboard-grid { grid-template-columns: 1fr; }
+            .main-content {
+                margin-left: 0;
+                padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
+            }
+            .dashboard-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
             .top-nav-container { padding: 0 16px; }
             .step-item { flex-direction: column; align-items: flex-start; }
             .step-number { margin-bottom: 8px; }
+
+            .lector-top-bar {
+                min-height: 48px !important;
+                height: 48px !important;
+                margin: 8px auto 0 !important;
+                padding: 0 10px !important;
+                width: calc(100% - 20px) !important;
+                max-width: 330px !important;
+                border-radius: 14px !important;
+                top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+            }
+
+            .lector-top-bar .flex.items-center.gap-4,
+            .lector-top-bar .flex.items-center.gap-6 {
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle {
+                padding: 4px 8px !important;
+                gap: 0.45rem !important;
+            }
+
+            .lector-top-bar .user-dropdown-toggle .w-8.h-8 {
+                width: 1.75rem !important;
+                height: 1.75rem !important;
+            }
+
+            .station-badge {
+                font-size: 0.62rem !important;
+                padding: 4px 8px !important;
+                max-width: 132px !important;
+            }
+
+            .content-container {
+                max-width: 330px;
+                padding: 12px 8px 0;
+            }
+
+            .content-container > div:first-child h1 {
+                font-size: 1rem !important;
+                line-height: 1.15;
+            }
+
+            .content-container > div:first-child p {
+                font-size: 0.68rem !important;
+                line-height: 1.4;
+            }
+
+            .stat-card {
+                border-radius: 14px;
+                padding: 12px !important;
+            }
+
+            .form-select {
+                min-height: 34px;
+                font-size: 0.68rem;
+                padding: 6px 10px;
+            }
+
+            #riskScore {
+                font-size: 2rem !important;
+            }
+
+            #riskLabel,
+            #confidenceScore {
+                font-size: 0.7rem !important;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                margin-bottom: 12px;
+            }
+
+            canvas {
+                max-height: 180px !important;
+            }
+
+            .recommendation-card {
+                padding: 12px;
+                border-radius: 10px;
+            }
+
+            .explore-btn {
+                font-size: 0.68rem;
+                padding: 4px 6px;
+            }
         }
     </style>
 </head>
-<body>
+<body class="chief-legacy-layout">
 
     @include('chief.partials.sidebar', ['active' => 'analytics'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
@@ -914,6 +1004,26 @@
                 .replace(/-/g, ' ');
         }
 
+        function showPredictionApiError(message, details = null) {
+            const predictionContainer = document.getElementById('aiPrediction');
+            const fallbackMessage = message || 'Prediction could not be completed right now.';
+            const detailHtml = details
+                ? `<div style="margin-top:8px;font-size:13px;color:#7f1d1d;">${details}</div>`
+                : '';
+
+            if (predictionContainer) {
+                predictionContainer.innerHTML = `
+                    <div style="border:1px solid rgba(220,38,38,0.18); background:#fef2f2; color:#991b1b; border-radius:16px; padding:18px 20px;">
+                        <div style="font-weight:800; font-size:15px;">Prediction service unavailable</div>
+                        <div style="margin-top:6px; font-size:14px; line-height:1.5;">${fallbackMessage}</div>
+                        ${detailHtml}
+                    </div>
+                `;
+            }
+
+            alert(details ? `${fallbackMessage}\n\n${details}` : fallbackMessage);
+        }
+
         async function runAIAnalysis(locationId, predictionScope = 'current_month') {
             const overlay = document.getElementById('loadingOverlay');
             overlay.classList.add('active');
@@ -921,7 +1031,7 @@
             const periodDays = document.getElementById('periodSelect').value;
 
             try {
-                const response = await fetch('/station-admin/api/ai-predictive-analysis', {
+                const response = await fetch('/api/station-admin/predictions', {
                     method: 'POST',
                     headers: { 
                         'Accept': 'application/json', 
@@ -936,9 +1046,22 @@
                 });
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    let errorPayload = null;
+                    let errorText = '';
+
+                    try {
+                        errorPayload = await response.json();
+                    } catch (parseError) {
+                        errorText = await response.text();
+                    }
+
+                    console.error('Error response:', errorPayload || errorText);
+                    throw new Error(
+                        errorPayload?.details
+                        || errorPayload?.message
+                        || errorText
+                        || `HTTP error! status: ${response.status}`
+                    );
                 }
                 
                 const result = await response.json();
@@ -951,11 +1074,11 @@
                     document.getElementById('selectedStationBadge').innerHTML = `<i class="fa-solid fa-location-dot"></i> ${result.location_name || 'Selected Location'} · ${scopeLabel}${aiModelLabel ? ` · <i class="fa-solid fa-microchip"></i> ${aiModelLabel}` : ''}`;
                     updateRecommendationScopeLabel();
                 } else {
-                    alert('Error: ' + (result.message || 'Analysis failed'));
+                    showPredictionApiError(result.message || 'Analysis failed', result.details || null);
                 }
             } catch (error) {
                 console.error('Analysis error:', error);
-                alert('Failed to run AI analysis: ' + error.message);
+                showPredictionApiError('Failed to run AI analysis.', error.message);
             } finally {
                 overlay.classList.remove('active');
             }

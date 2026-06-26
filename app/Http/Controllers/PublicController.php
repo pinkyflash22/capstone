@@ -13,11 +13,16 @@ use App\Models\InspectionChecklist;
 use App\Models\FsicApproval;
 use App\Models\FsicInspection;
 use App\Models\Province;
+use App\Models\BarangayHall;
+use App\Models\RiskArea;
 use App\Models\User;
 use App\Models\City;
 use App\Models\FullAddress;
+use App\Services\BoundaryMatcherService;
+use App\Support\BarangayNotificationService;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
@@ -162,6 +167,49 @@ class PublicController extends Controller
         ];
     }
 
+    private function serializeCitizenRiskReport(RiskArea $riskArea): array
+    {
+        $entryType = strtolower(trim((string) ($riskArea->entry_type ?? 'risk')));
+
+        return [
+            'risk_area_id' => $riskArea->risk_area_id,
+            'created_at' => optional($riskArea->created_at)->toISOString(),
+            'report_kind' => $entryType,
+            'entry_type' => $entryType,
+            'category' => $entryType,
+            'type' => $entryType === 'hazard' ? 'Hazard' : 'Risk',
+            'title' => $riskArea->marker?->title ?? ($entryType === 'hazard' ? 'Citizen Hazard Report' : 'Citizen Risk Report'),
+            'condition_label' => $riskArea->condition_label,
+        ];
+    }
+
+    private function resolveCitizenQuickRiskTemplate(string $reportKind): array
+    {
+        if ($reportKind === 'hazard') {
+            return [
+                'title' => 'Citizen Hazard Report',
+                'location_description' => 'Citizen-submitted hazard report awaiting barangay review.',
+                'entry_type' => 'hazard',
+                'hazard_category' => 'electrical_hazard',
+                'risk_type' => null,
+                'condition_code' => 'exposed_wires',
+                'marker_category' => 'hazard',
+                'review_notes' => 'Awaiting chief or administrator verification after citizen quick-report submission.',
+            ];
+        }
+
+        return [
+            'title' => 'Citizen Risk Report',
+            'location_description' => 'Citizen-submitted area risk report awaiting barangay review.',
+            'entry_type' => 'risk',
+            'hazard_category' => null,
+            'risk_type' => 'historical_fire_prone_risk',
+            'condition_code' => 'known_fire_prone_location',
+            'marker_category' => 'risk',
+            'review_notes' => 'Awaiting chief or administrator verification after citizen quick-report submission.',
+        ];
+    }
+
     private function buildCitizenDashboardData(int $accountId, ?float $latitude = null, ?float $longitude = null): array
     {
         $incidents = Incident::with(['marker', 'barangay.city'])
@@ -173,7 +221,12 @@ class PublicController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $userReports = $userIncidents->count();
+        $userRiskReports = RiskArea::with(['marker'])
+            ->where('reported_by', $accountId)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $userReports = $userIncidents->count() + $userRiskReports->count();
         $countReport = $userReports;
         $fireCount = Incident::where('status', 'Reported')->count();
         $totalIncidentCount = max($incidents->count(), 1);
@@ -225,6 +278,11 @@ class PublicController extends Controller
             ],
             'incidents' => $incidents->map(fn ($incident) => $this->serializeCitizenIncident($incident))->values(),
             'user_incidents' => $userIncidents->map(fn ($incident) => $this->serializeCitizenIncident($incident))->values(),
+            'user_reports' => $userIncidents
+                ->map(fn ($incident) => $this->serializeCitizenIncident($incident))
+                ->concat($userRiskReports->map(fn ($riskArea) => $this->serializeCitizenRiskReport($riskArea)))
+                ->sortByDesc('created_at')
+                ->values(),
             'nearby_incidents' => $activeNearbyIncidents
                 ->map(fn ($incident) => $this->serializeCitizenIncident($incident, $incident->computed_distance_meters ?? null))
                 ->values(),
@@ -261,6 +319,8 @@ class PublicController extends Controller
         $activeAlerts = $dashboardData['summary']['active_alerts'];
         $totalAlerts = $activeAlerts;
         $nearbyIncidents = collect($dashboardData['nearby_incidents']);
+        $overviewReportCount = $dashboardData['summary']['total_reports'];
+        $citizenCombinedReports = $dashboardData['user_reports'];
 
 
         //request
@@ -268,7 +328,7 @@ class PublicController extends Controller
         $fsicRequests = FsicRequest::where('user_id', $accountId)->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
-        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection'));
+        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports'));
         // return view('citizen.dashboard', compact('usermarker'));
 
     }
@@ -298,6 +358,118 @@ class PublicController extends Controller
 
         return view('citizen.mobile-hub', [
             'displayName' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Citizen',
+        ]);
+    }
+
+    public function storeCitizenRiskReport(Request $request, BoundaryMatcherService $boundaryMatcherService)
+    {
+        $validated = $request->validate([
+            'report_kind' => ['required', Rule::in(['hazard', 'risk'])],
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+            'user_lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'user_lng' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $user = User::with('address.barangay.barangayHall')->findOrFail(Auth::user()->user_id);
+        $template = $this->resolveCitizenQuickRiskTemplate($validated['report_kind']);
+        $targetLat = (float) $validated['lat'];
+        $targetLng = (float) $validated['lng'];
+        $hall = null;
+
+        if ($validated['report_kind'] === 'hazard') {
+            $userLat = isset($validated['user_lat']) ? (float) $validated['user_lat'] : null;
+            $userLng = isset($validated['user_lng']) ? (float) $validated['user_lng'] : null;
+
+            if ($userLat === null || $userLng === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your current location is required to validate hazard reports.',
+                ], 422);
+            }
+
+            $distanceFromCitizen = $this->calculateDistanceMeters($userLat, $userLng, $targetLat, $targetLng);
+
+            if ($distanceFromCitizen > 100) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hazard reports must use your current location or a point within 100 meters of you.',
+                ], 422);
+            }
+
+            $boundary = $boundaryMatcherService->locateBarangayBoundary($targetLat, $targetLng);
+
+            if (! $boundary || ! $boundary->barangay_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected hazard point is outside the saved barangay boundaries.',
+                ], 422);
+            }
+
+            $hall = BarangayHall::query()
+                ->with('barangay')
+                ->where('barangay_id', $boundary->barangay_id)
+                ->first();
+
+            if (! $hall) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The matched barangay does not have a linked barangay hall yet.',
+                ], 422);
+            }
+        } else {
+            $hall = $user->address?->barangay?->barangayHall;
+
+            if (! $hall) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your citizen account is not linked to a barangay hall yet, so this report cannot be submitted.',
+                ], 422);
+            }
+        }
+
+        $riskArea = DB::transaction(function () use ($validated, $template, $hall, $user, $targetLat, $targetLng) {
+            $marker = Marker::create([
+                'title' => $template['title'],
+                'description' => $template['location_description'],
+                'lat' => $targetLat,
+                'lng' => $targetLng,
+                'status' => 'active',
+                'category' => $template['marker_category'],
+            ]);
+
+            return RiskArea::create([
+                'marker_id' => $marker->marker_id,
+                'barangay_hall_id' => $hall->barangay_hall_id,
+                'station_id' => null,
+                'entry_type' => $template['entry_type'],
+                'hazard_category' => $template['hazard_category'],
+                'risk_type' => $template['risk_type'],
+                'street_or_sitio' => $user->address?->street,
+                'risk_factor' => $template['entry_type'] === 'hazard' ? 'electrical_risk' : 'wiring',
+                'mode' => $template['entry_type'] === 'hazard' ? 'high' : 'risk',
+                'condition_code' => $template['condition_code'],
+                'condition_label' => $template['entry_type'] === 'hazard' ? 'Exposed wires' : 'Known fire-prone location',
+                'hazard_type' => $template['entry_type'] === 'hazard' ? 'electrical' : 'none',
+                'remarks' => 'Citizen quick report submitted from the dashboard confirmation dialog.',
+                'status' => 'pending',
+                'review_status' => 'pending',
+                'review_type' => 'create',
+                'review_notes' => $template['review_notes'],
+                'reported_by' => $user->user_id,
+            ]);
+        });
+
+        $riskArea->loadMissing(['marker', 'barangayHall.barangay']);
+        BarangayNotificationService::notifyRiskAreaSubmitted($riskArea);
+        UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => ucfirst($validated['report_kind']) . ' report submitted successfully.',
+            'data' => [
+                'report' => $this->serializeCitizenRiskReport($riskArea),
+            ],
         ]);
     }
 

@@ -22,6 +22,7 @@ use App\Http\Controllers\SpotInvestigationReportController;
 use App\Http\Controllers\ProgressInvestigationReportController;
 use App\Http\Controllers\FinalInvestigationReportController;
 use App\Http\Controllers\OTPController;
+use App\Http\Controllers\Chief\AnalyticController as ChiefAnalyticController;
 
 
 
@@ -176,6 +177,12 @@ Route::get('/incidents-for-spot', function() {
 //sms otp
 Route::post('/send-otp', [OTPController::class, 'sendOTP']);
 Route::post('/verify-otp', [OTPController::class, 'verifyOTP']);
+
+Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,chief'])
+    ->prefix('station-admin')
+    ->group(function () {
+        Route::post('/predictions', [ChiefAnalyticController::class, 'runPredictionApi']);
+    });
 // Add to your routes/api.php or web.php
 Route::get('/firefighter/assigned-incidents/{firefighterId}', [IncidentController::class, 'getAssignedIncidents']);
 Route::get('/incidents/{incidentId}', [IncidentController::class, 'show']);
@@ -342,6 +349,9 @@ Route::get('/hydrant-types', [HydrantTypeController::class, 'index']);
 // Route::put('/personnel/{id}/availability', [PersonnelController::class, 'updateAvailability']);
 
 Route::get('/shapes', [BoundaryLocationController::class, 'index']); // fetch all shapes
+Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
+Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
+Route::get('/boundaries/barangays/{cityId}', [BoundaryLocationController::class, 'availableBarangays']);
 Route::post('/shapes', [BoundaryLocationController::class, 'store']); // save new shape
 Route::put('/shapes/{id}', [BoundaryLocationController::class, 'update']);
 Route::delete('/shapes/{id}', [BoundaryLocationController::class, 'destroy']);

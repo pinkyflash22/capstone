@@ -56,6 +56,8 @@
                         'open_boundary_editor' => 1,
                         'focus_barangay_id' => $barangay->barangay_id,
                         'focus_barangay_name' => $barangay->barangay_name,
+                        'focus_city_id' => $barangay->city?->city_id,
+                        'focus_city_name' => $barangay->city?->city_name,
                         'focus_lat' => $focusLat,
                         'focus_lng' => $focusLng,
                     ], fn ($value) => $value !== null && $value !== '')) }}"
