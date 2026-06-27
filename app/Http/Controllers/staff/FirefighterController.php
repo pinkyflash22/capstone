@@ -545,17 +545,20 @@ class FirefighterController extends Controller
         $spotReports = SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'spot_page')
+            ->withQueryString();
 
-        $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'finalInvestigation'])
+        $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'progress_page')
+            ->withQueryString();
 
-        $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin'])
+        $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'final_page')
+            ->withQueryString();
 
         $availableSpotIncidents = Incident::with(['marker', 'barangay.city'])
             ->where(function ($query) {

@@ -16,6 +16,8 @@ use App\Http\Controllers\Admin\PostController;
 // use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Api\MarkerController;
 use App\Http\Controllers\staff\FirefighterController;
+use App\Http\Controllers\staff\FinalInvestigationFirExportController;
+use App\Http\Controllers\staff\ProgressInvestigationPirExportController;
 use App\Http\Controllers\staff\SpotInvestigationSirExportController;
 use App\Http\Controllers\Admin\ManagementController;
 
@@ -410,6 +412,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/incident-view', [FirefighterController::class, 'incidentView'])->name('view-this-page');
         Route::get('/my-station', [FirefighterController::class, 'myStation'])->name('my-station');
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
+        Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
+        Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
         Route::get('/equipments', [FirefighterController::class, 'equipments'])->name('equipments');
         Route::get('/fsic-requests', [FirefighterController::class, 'equipments'])->name('fsic-requests');
         Route::get('/api/fsic-requests/{id}', [FirefighterController::class, 'getAssignedFsicRequest'])->name('fsic-requests.show');

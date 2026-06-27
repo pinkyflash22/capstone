@@ -216,6 +216,17 @@ class SpotInvestigationSirExporter
         $xpath->registerNamespace('w', self::WORD_NS);
 
         $paragraphs = iterator_to_array($xpath->query('//w:p') ?: []);
+        $paragraphEntries = [];
+        foreach ($paragraphs as $paragraph) {
+            if (! $paragraph instanceof DOMElement) {
+                continue;
+            }
+
+            $paragraphEntries[] = [
+                'paragraph' => $paragraph,
+                'text' => $this->paragraphText($paragraph, $xpath),
+            ];
+        }
 
         $state = null;
         $detailsParagraphs = $this->splitNarrativeParagraphs((string) $data['details_of_investigation']);
@@ -225,12 +236,14 @@ class SpotInvestigationSirExporter
         $detailsSpacerPending = false;
         $dispositionSpacerPending = false;
 
-        foreach ($paragraphs as $paragraph) {
-            if (! $paragraph instanceof DOMElement) {
+        foreach ($paragraphEntries as $entry) {
+            $paragraph = $entry['paragraph'];
+            $text = $entry['text'];
+
+            if (! $this->canUseParagraph($paragraph)) {
                 continue;
             }
 
-            $text = $this->paragraphText($paragraph, $xpath);
             if ($text === '' && $state === null) {
                 continue;
             }
@@ -579,20 +592,50 @@ class SpotInvestigationSirExporter
 
     private function paragraphText(DOMElement $paragraph, DOMXPath $xpath): string
     {
-        $parts = [];
-
-        foreach ($xpath->query('.//w:t', $paragraph) ?: [] as $textNode) {
-            $parts[] = $textNode->textContent;
-        }
+        $parts = $this->collectWordTextNodes($paragraph);
 
         return trim(preg_replace('/\s+/', ' ', implode('', $parts)) ?? '');
     }
 
+    private function collectWordTextNodes(DOMElement $element): array
+    {
+        $parts = [];
+
+        try {
+            foreach ($element->childNodes as $child) {
+                if (! $child instanceof \DOMNode) {
+                    continue;
+                }
+
+                if ($child instanceof DOMElement && $child->namespaceURI === self::WORD_NS && $child->localName === 't') {
+                    $parts[] = $child->textContent;
+                    continue;
+                }
+
+                if ($child instanceof DOMElement && $child->hasChildNodes()) {
+                    array_push($parts, ...$this->collectWordTextNodes($child));
+                }
+            }
+        } catch (\Throwable) {
+            return $parts;
+        }
+
+        return $parts;
+    }
+
     private function clearParagraph(DOMElement $paragraph): void
     {
+        if (! $this->canUseParagraph($paragraph)) {
+            return;
+        }
+
         $children = [];
-        foreach ($paragraph->childNodes as $child) {
-            $children[] = $child;
+        try {
+            foreach ($paragraph->childNodes as $child) {
+                $children[] = $child;
+            }
+        } catch (\Throwable) {
+            return;
         }
 
         foreach ($children as $child) {
@@ -600,7 +643,11 @@ class SpotInvestigationSirExporter
                 continue;
             }
 
-            $paragraph->removeChild($child);
+            try {
+                $paragraph->removeChild($child);
+            } catch (\Throwable) {
+                return;
+            }
         }
     }
 
@@ -621,9 +668,18 @@ class SpotInvestigationSirExporter
 
     private function setParagraphSegments(DOMElement $paragraph, array $segments, array $options = []): void
     {
+        if (! $this->canUseParagraph($paragraph)) {
+            return;
+        }
+
         $this->clearParagraph($paragraph);
 
-        $document = $paragraph->ownerDocument;
+        try {
+            $document = $paragraph->ownerDocument;
+        } catch (\Throwable) {
+            return;
+        }
+
         if (! $document) {
             return;
         }
@@ -739,6 +795,15 @@ class SpotInvestigationSirExporter
             }
 
             $paragraph->appendChild($run);
+        }
+    }
+
+    private function canUseParagraph(DOMElement $paragraph): bool
+    {
+        try {
+            return $paragraph->ownerDocument instanceof DOMDocument;
+        } catch (\Throwable) {
+            return false;
         }
     }
 

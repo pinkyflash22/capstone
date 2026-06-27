@@ -1139,6 +1139,9 @@
         window.executiveReportData = @json($reportPayload ?? ['spot' => [], 'progress' => [], 'final' => []]);
         window.executiveStationProfile = @json($stationProfile ?? []);
         let currentGeneratedRows = [];
+        let currentGeneratedType = 'spot';
+        let currentPreviewPage = 1;
+        const previewPageSize = 15;
 
         function formatDateTime(value) {
             if (!value) return 'N/A';
@@ -1262,6 +1265,26 @@
             return html;
         }
 
+        function renderExecutivePreviewPage(reportType, data, page = 1) {
+            const container = document.getElementById('previewContent');
+            const totalPages = Math.max(1, Math.ceil(data.length / previewPageSize));
+            currentPreviewPage = Math.min(Math.max(1, page), totalPages);
+            const startIndex = (currentPreviewPage - 1) * previewPageSize;
+            const endIndex = Math.min(startIndex + previewPageSize, data.length);
+            const pageRows = data.slice(startIndex, endIndex);
+            const controls = data.length > previewPageSize ? `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;">
+                    <div style="font-size:0.82rem;color:#64748b;">Showing ${startIndex + 1}-${endIndex} of ${data.length} records</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button type="button" class="btn-export" onclick="renderExecutivePreviewPage('${reportType}', currentGeneratedRows, ${currentPreviewPage - 1})" ${currentPreviewPage <= 1 ? 'disabled' : ''}>Prev</button>
+                        <div class="stat-badge">Page ${currentPreviewPage} of ${totalPages}</div>
+                        <button type="button" class="btn-export" onclick="renderExecutivePreviewPage('${reportType}', currentGeneratedRows, ${currentPreviewPage + 1})" ${currentPreviewPage >= totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                </div>
+            ` : '';
+            container.innerHTML = buildTableHtml(reportType, pageRows) + controls;
+        }
+
         function saveToHistory(reportType, recordCount) {
             const history = JSON.parse(localStorage.getItem('chiefExecutiveReportHistory') || '[]');
             const typeNames = { spot: 'Spot Investigation', progress: 'Progress Investigation', final: 'Final Investigation' };
@@ -1291,6 +1314,8 @@
             const typeNames = { spot: 'Spot Investigation', progress: 'Progress Investigation', final: 'Final Investigation' };
 
             currentGeneratedRows = data;
+            currentGeneratedType = reportType;
+            currentPreviewPage = 1;
             titleSpan.textContent = `- ${typeNames[reportType]}`;
             countSpan.textContent = data.length;
 
@@ -1301,7 +1326,7 @@
                 return;
             }
 
-            container.innerHTML = buildTableHtml(reportType, data);
+            renderExecutivePreviewPage(reportType, data, 1);
             preview.style.display = 'block';
             saveToHistory(reportType, data.length);
             preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1320,7 +1345,9 @@
 
         exportReportAsCSV = function () {
             if (!currentGeneratedRows.length) return showToast('No generated report to export', 'error');
-            const table = document.querySelector('#previewContent table');
+            const temp = document.createElement('div');
+            temp.innerHTML = buildTableHtml(currentGeneratedType, currentGeneratedRows);
+            const table = temp.querySelector('table');
             if (!table) return showToast('No table available for export', 'error');
             const rows = Array.from(table.querySelectorAll('tr')).map(row => Array.from(row.querySelectorAll('th, td')).map(cell => `"${cell.innerText.replace(/"/g, '""')}"`).join(','));
             const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -1337,10 +1364,10 @@
 
         function exportReportAsPDF() {
             if (!currentGeneratedRows.length) return showToast('No generated report to export', 'error');
-            const reportType = document.getElementById('reportType').value;
+            const reportType = currentGeneratedType;
             const typeNames = { spot: 'Spot Investigation', progress: 'Progress Investigation', final: 'Final Investigation' };
             const station = window.executiveStationProfile || {};
-            const tableHtml = document.querySelector('#previewContent').innerHTML;
+            const tableHtml = buildTableHtml(reportType, currentGeneratedRows);
             const printWindow = window.open('', '_blank', 'width=1200,height=900');
             printWindow.document.write(`<html><head><title>${typeNames[reportType]} - Executive Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#0f172a}.header{text-align:center;margin-bottom:24px}.header h1,.header h2{margin:0}.header h1{font-size:18px}.header h2{font-size:24px;margin-top:6px}.meta{margin-top:18px;margin-bottom:24px;font-size:13px;line-height:1.7}.meta strong{display:inline-block;min-width:140px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top}th{background:#fff7ed}</style></head><body><div class="header"><h1>Republic of the Philippines</h1><h1>Department of the Interior and Local Government</h1><h1>Bureau of Fire Protection</h1><h2>${typeNames[reportType]} Executive Report</h2></div><div class="meta"><div><strong>Station:</strong> ${station.station_name || 'N/A'} (${station.station_code || 'N/A'})</div><div><strong>Address:</strong> ${station.address || 'N/A'}</div><div><strong>Contact:</strong> ${station.contact_number || 'N/A'} | ${station.email || 'N/A'}</div><div><strong>Chief:</strong> ${station.chief_name || 'N/A'}</div><div><strong>Personnel Count:</strong> ${station.personnel_count || 0}</div><div><strong>Generated At:</strong> ${new Date().toLocaleString()}</div><div><strong>Total Records:</strong> ${currentGeneratedRows.length}</div></div>${tableHtml}</body></html>`);
             printWindow.document.close();

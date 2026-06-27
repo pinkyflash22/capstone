@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             PangasinanSeeder::class,
             RolesTableSeeder::class,
             SampleUsersSeeder::class,
+            FireOriginSeeder::class,
             // MarkerCategoriesSeeder::class,
             // StatusesSeeder::class,
             // HydrantTypesSeeder::class,

@@ -11,6 +11,7 @@
     @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
 
     @php
+        $activeReportTab = request('report_tab', 'spot');
         $stationImagePath = $station?->profileMedia?->path
             ?? $station?->marker?->multimedia?->path
             ?? $station?->marker?->image;
@@ -30,6 +31,66 @@
             $station?->address?->barangay?->city?->city_name,
         ])->filter()->join(', ');
 
+        $genericIncidentMarkerTitles = ['help emergency', 'fire emergency', 'emergency', 'incident'];
+        $genericIncidentMarkerDescriptions = [
+            'fire emergency reported by citizen.',
+            'fire emergency reported by citizen',
+            'reported by citizen',
+            'emergency reported by citizen',
+        ];
+
+        $resolveIncidentPrimaryLocation = function ($markerTitle, $markerDescription) use ($genericIncidentMarkerTitles, $genericIncidentMarkerDescriptions) {
+            $markerTitle = trim((string) $markerTitle);
+            $markerDescription = trim((string) $markerDescription);
+            $normalizedTitle = strtolower($markerTitle);
+            $normalizedDescription = strtolower($markerDescription);
+            $hasGenericTitle = in_array($normalizedTitle, $genericIncidentMarkerTitles, true);
+            $hasGenericDescription = in_array($normalizedDescription, $genericIncidentMarkerDescriptions, true);
+
+            if ($hasGenericTitle && $hasGenericDescription) {
+                return null;
+            }
+
+            if ($hasGenericTitle) {
+                return $markerDescription ?: null;
+            }
+
+            return $markerTitle ?: ($markerDescription ?: null);
+        };
+
+        $buildIncidentReferenceLabel = function ($primaryLocation, $barangayName, $cityName, $timestamp, $fallbackLabel = 'Reported incident') {
+            $locationLabel = trim((string) $primaryLocation) ?: $fallbackLabel;
+            $localityLabel = collect([$barangayName, $cityName])->filter()->join(', ') ?: 'Barangay not assigned';
+            $dateLabel = $timestamp ? $timestamp->format('M d, Y h:i A') : 'Date unavailable';
+
+            return collect([$locationLabel, $localityLabel, $dateLabel])->join(' | ');
+        };
+
+        $finalSubstantiatingDocumentOptions = [
+            'Spot Investigation Report',
+            'Progress Investigation Report',
+            'Affidavit of loss (itemized and duly notarized)',
+            'Sworn statement of loss submitted to insurance adjusters / companies',
+            'Latest complete inventory of stocks prior to the fire incident',
+            'Complete inventory of salvaged items after the fire incident',
+            'Complete copies of insurance policies to include co-insurances',
+            'Sworn statements of witnesses',
+            'Income Tax Return (ITR) for the last three (3) years',
+            'Financial statements for the last three (3) years',
+            'Balance sheets for the last three (3) years',
+            'Mayor\'s permit and Business license',
+            'Occupancy permit',
+            'Department of Trade and Industry (DTI) registration',
+            'Securities and Exchange Commission (SEC) registration',
+            'Latest Fire Safety Inspection Certificate (FSIC)',
+            'Complete list of employees',
+            'Approved Floor, Building and Electrical Plans',
+            'Copy of lease contract agreement',
+            'Land title / tax declaration',
+            'Fire Laboratory Services Report',
+            'Photographs of the fire scene',
+        ];
+
         $stationGallery = collect($station?->galleryMedia ?? [])
             ->map(function ($media) {
                 $normalizedPath = str_replace('\\', '/', (string) $media->path);
@@ -44,13 +105,25 @@
             })
             ->values();
 
-        $spotReportStore = $spotReports->mapWithKeys(function ($report) use ($currentOfficerName) {
+        $spotReportStore = $spotReports->mapWithKeys(function ($report) use ($currentOfficerName, $resolveIncidentPrimaryLocation, $buildIncidentReferenceLabel) {
+            $incidentPrimaryLocation = $resolveIncidentPrimaryLocation(
+                $report->incident?->marker?->title,
+                $report->incident?->marker?->description
+            );
+            $incidentReferenceLabel = $buildIncidentReferenceLabel(
+                $incidentPrimaryLocation,
+                $report->incident?->resolved_dropdown_barangay_name ?? $report->incident?->barangay?->barangay_name,
+                $report->incident?->resolved_dropdown_city_name ?? $report->incident?->barangay?->city?->city_name,
+                $report->fire_started ?? $report->incident?->created_at ?? $report->created_at,
+                'Reported incident'
+            );
+
             return [
                 $report->spot_investigation_report_id => [
                     'id' => $report->spot_investigation_report_id,
                     'type' => 'spot',
                     'incident_id' => $report->incident_id,
-                    'incident_location' => $report->incident?->marker?->title,
+                    'incident_location' => $incidentReferenceLabel,
                     'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
                     'fire_started' => optional($report->fire_started)->toIso8601String(),
                     'fire_out' => optional($report->fire_out)->toIso8601String(),
@@ -81,35 +154,86 @@
             ];
         })->all();
 
-        $progressReportStore = $progressReports->mapWithKeys(function ($report) use ($currentOfficerName) {
+        $progressReportStore = $progressReports->mapWithKeys(function ($report) use ($currentOfficerName, $resolveIncidentPrimaryLocation, $buildIncidentReferenceLabel) {
+            $incidentPrimaryLocation = $resolveIncidentPrimaryLocation(
+                $report->spotInvestigation?->incident?->marker?->title,
+                $report->spotInvestigation?->incident?->marker?->description
+            );
+            $incidentReferenceLabel = $buildIncidentReferenceLabel(
+                $incidentPrimaryLocation,
+                $report->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->spotInvestigation?->incident?->barangay?->barangay_name,
+                $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
+                $report->report_completed_at ?? $report->created_at ?? $report->spotInvestigation?->fire_started,
+                'Spot investigation'
+            );
+
             return [
                 $report->progress_investigation_report_id => [
                     'id' => $report->progress_investigation_report_id,
                     'type' => 'progress',
                     'spot_investigation_id' => $report->spot_investigation_id,
-                    'incident_location' => $report->spotInvestigation?->incident?->marker?->title,
+                    'incident_location' => $incidentReferenceLabel,
                     'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
                     'fire_origin_id' => $report->fire_origin_id,
                     'fire_origin_name' => $report->fireOrigin?->origin,
                     'fire_cause' => $report->fire_cause,
                     'responsible_arson' => $report->responsible_arson,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'memorandum_for' => $report->memorandum_for,
+                    'mission_order_number' => $report->mission_order_number,
+                    'mission_order_date' => optional($report->mission_order_date)->format('Y-m-d'),
+                    'facts_of_case' => $report->facts_of_case,
+                    'disposition' => $report->disposition,
+                    'noted_by_name' => trim(($report->notedBy?->user?->first_name ?? '') . ' ' . ($report->notedBy?->user?->last_name ?? '')),
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'has_final' => (bool) $report->finalInvestigation,
                 ],
             ];
         })->all();
 
-        $finalReportStore = $finalReports->mapWithKeys(function ($report) {
+        $finalReportStore = $finalReports->mapWithKeys(function ($report) use ($resolveIncidentPrimaryLocation, $buildIncidentReferenceLabel, $currentOfficerName) {
+            $incidentPrimaryLocation = $resolveIncidentPrimaryLocation(
+                $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title,
+                $report->progressInvestigation?->spotInvestigation?->incident?->marker?->description
+            );
+            $incidentReferenceLabel = $buildIncidentReferenceLabel(
+                $incidentPrimaryLocation,
+                $report->progressInvestigation?->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->progressInvestigation?->spotInvestigation?->incident?->barangay?->barangay_name,
+                $report->progressInvestigation?->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->progressInvestigation?->spotInvestigation?->incident?->barangay?->city?->city_name,
+                $report->created_at ?? $report->progressInvestigation?->report_completed_at,
+                'Progress investigation'
+            );
+
             return [
                 $report->final_investigation_report_id => [
                     'id' => $report->final_investigation_report_id,
                     'type' => 'final',
                     'progress_investigation_id' => $report->progress_investigation_id,
-                    'incident_location' => $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title,
+                    'incident_location' => $incidentReferenceLabel,
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
                     'exact_address' => $report->exact_address,
+                    'office_address' => $report->office_address,
+                    'alarm_at' => optional($report->alarm_at)->toIso8601String(),
+                    'establishment_burned' => $report->establishment_burned,
+                    'fire_victims' => $report->fire_victims,
+                    'origin_of_fire' => $report->origin_of_fire,
+                    'cause_of_fire' => $report->cause_of_fire,
                     'total_damage' => $report->total_damage,
                     'created_at' => optional($report->created_at)->toIso8601String(),
                     'fire_origin_name' => $report->progressInvestigation?->fireOrigin?->origin,
                     'fire_cause' => $report->progressInvestigation?->fire_cause,
+                    'substantiating_documents' => $report->substantiating_documents ?? [],
+                    'facts_of_case' => $report->facts_of_case,
+                    'discussion' => $report->discussion,
+                    'findings' => $report->findings,
+                    'recommendation' => $report->recommendation,
+                    'noted_by_name' => trim(($report->notedBy?->user?->first_name ?? '') . ' ' . ($report->notedBy?->user?->last_name ?? '')),
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                 ],
             ];
         })->all();
@@ -764,9 +888,9 @@
                             <div class="stat-block"><div class="stat-block-label">Station Officers</div><div class="stat-block-value">{{ $stationOfficers->count() }}</div></div>
                             <div class="stat-block"><div class="stat-block-label">Crew Members</div><div class="stat-block-value">{{ $crewMembers->count() }}</div></div>
                             <div class="stat-block"><div class="stat-block-label">Equipment Lines</div><div class="stat-block-value">{{ $equipmentAssignments->count() }}</div></div>
-                            <div class="stat-block"><div class="stat-block-label">Spot Reports</div><div class="stat-block-value" id="spotReportsCount">{{ $spotReports->count() }}</div></div>
-                            <div class="stat-block"><div class="stat-block-label">Progress Reports</div><div class="stat-block-value" id="progressReportsCount">{{ $progressReports->count() }}</div></div>
-                            <div class="stat-block"><div class="stat-block-label">Final Reports</div><div class="stat-block-value" id="finalReportsCount">{{ $finalReports->count() }}</div></div>
+                            <div class="stat-block"><div class="stat-block-label">Spot Reports</div><div class="stat-block-value" id="spotReportsCount">{{ $spotReports->total() }}</div></div>
+                            <div class="stat-block"><div class="stat-block-label">Progress Reports</div><div class="stat-block-value" id="progressReportsCount">{{ $progressReports->total() }}</div></div>
+                            <div class="stat-block"><div class="stat-block-label">Final Reports</div><div class="stat-block-value" id="finalReportsCount">{{ $finalReports->total() }}</div></div>
                         </div>
                     </div>
                 </div>
@@ -869,12 +993,12 @@
                 </div>
 
                 <div class="report-tabs" id="reportTabs">
-                    <button type="button" class="report-tab active" data-report-tab="spot">Spot Investigation</button>
-                    <button type="button" class="report-tab" data-report-tab="progress">Progress Investigation</button>
-                    <button type="button" class="report-tab" data-report-tab="final">Final Investigation</button>
+                    <button type="button" class="report-tab {{ $activeReportTab === 'spot' ? 'active' : '' }}" data-report-tab="spot">Spot Investigation</button>
+                    <button type="button" class="report-tab {{ $activeReportTab === 'progress' ? 'active' : '' }}" data-report-tab="progress">Progress Investigation</button>
+                    <button type="button" class="report-tab {{ $activeReportTab === 'final' ? 'active' : '' }}" data-report-tab="final">Final Investigation</button>
                 </div>
 
-                <div class="report-panel active" data-report-panel="spot">
+                <div class="report-panel {{ $activeReportTab === 'spot' ? 'active' : '' }}" data-report-panel="spot">
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead>
@@ -902,6 +1026,7 @@
                                         <td>
                                             <div class="table-actions">
                                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">View</button>
+                                                <a class="table-action edit" href="{{ route('firefighter.spot-reports.sir.word', ['spotReportId' => $report->spot_investigation_report_id]) }}">Word</a>
                                                 <button type="button" class="table-action edit" data-report-action="edit" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Edit</button>
                                                 @unless($hasProgress)
                                                     <button type="button" class="table-action delete" data-report-action="delete" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Delete</button>
@@ -922,9 +1047,14 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($spotReports->hasPages())
+                        <div style="padding-top: 16px;">
+                            {{ $spotReports->appends(['report_tab' => 'spot'])->links() }}
+                        </div>
+                    @endif
                 </div>
 
-                <div class="report-panel" data-report-panel="progress">
+                <div class="report-panel {{ $activeReportTab === 'progress' ? 'active' : '' }}" data-report-panel="progress">
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead>
@@ -952,6 +1082,7 @@
                                         <td>
                                             <div class="table-actions">
                                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">View</button>
+                                                <a class="table-action edit" href="{{ route('firefighter.progress-reports.pir.word', ['progressReportId' => $report->progress_investigation_report_id]) }}">Word</a>
                                                 @unless($hasFinal)
                                                     <button type="button" class="table-action edit" data-report-action="edit" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">Edit</button>
                                                     <button type="button" class="table-action delete" data-report-action="delete" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">Delete</button>
@@ -972,9 +1103,14 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($progressReports->hasPages())
+                        <div style="padding-top: 16px;">
+                            {{ $progressReports->appends(['report_tab' => 'progress'])->links() }}
+                        </div>
+                    @endif
                 </div>
 
-                <div class="report-panel" data-report-panel="final">
+                <div class="report-panel {{ $activeReportTab === 'final' ? 'active' : '' }}" data-report-panel="final">
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead>
@@ -999,6 +1135,9 @@
                                         <td>
                                             <div class="table-actions">
                                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">View</button>
+                                                <a class="table-action edit" href="{{ route('firefighter.final-reports.fir.word', ['finalReportId' => $report->final_investigation_report_id]) }}">Word</a>
+                                                <button type="button" class="table-action edit" data-report-action="edit" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Edit</button>
+                                                <button type="button" class="table-action delete" data-report-action="delete" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Delete</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1015,6 +1154,11 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($finalReports->hasPages())
+                        <div style="padding-top: 16px;">
+                            {{ $finalReports->appends(['report_tab' => 'final'])->links() }}
+                        </div>
+                    @endif
                 </div>
             </section>
 
@@ -1067,28 +1211,22 @@
                                 <option value="">Select incident</option>
                                 @foreach($availableSpotIncidents as $incident)
                                     @php
-                                        $incidentMarkerTitle = trim((string) $incident->marker?->title);
-                                        $incidentMarkerDescription = trim((string) $incident->marker?->description);
-                                        $incidentHasGenericTitle = in_array(strtolower($incidentMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true);
-                                        $incidentHasGenericDescription = in_array(strtolower($incidentMarkerDescription), ['fire emergency reported by citizen.', 'fire emergency reported by citizen', 'reported by citizen', 'emergency reported by citizen'], true);
-                                        $incidentPrimaryLocation = in_array(strtolower($incidentMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true)
-                                            ? ($incidentMarkerDescription ?: null)
-                                            : ($incidentMarkerTitle ?: $incidentMarkerDescription);
-                                        $incidentLocalityLabel = collect([
+                                        $incidentPrimaryLocation = $resolveIncidentPrimaryLocation(
+                                            $incident->marker?->title,
+                                            $incident->marker?->description
+                                        );
+                                        $incidentLocationLabel = $buildIncidentReferenceLabel(
+                                            $incidentPrimaryLocation,
                                             $incident->resolved_dropdown_barangay_name ?? $incident->barangay?->barangay_name,
                                             $incident->resolved_dropdown_city_name ?? $incident->barangay?->city?->city_name,
-                                        ])->filter()->join(', ');
-                                        if ($incidentHasGenericTitle && $incidentHasGenericDescription) {
-                                            $incidentPrimaryLocation = null;
-                                        }
-                                        $incidentLocationLabel = $incidentPrimaryLocation && $incidentLocalityLabel
-                                            ? $incidentPrimaryLocation . ' - ' . $incidentLocalityLabel
-                                            : ($incidentPrimaryLocation ?: ($incidentLocalityLabel ?: 'Reported incident location'));
+                                            $incident->created_at ?? $incident->updated_at,
+                                            'Reported incident'
+                                        );
                                     @endphp
                                     <option
                                         value="{{ $incident->incident_id }}"
                                         data-updated-at="{{ optional($incident->updated_at)->format('Y-m-d\TH:i') }}"
-                                        data-location="{{ $incidentLocationLabel ?: 'Unknown location' }}"
+                                        data-location="{{ $incidentLocationLabel }}"
                                     >
                                         {{ $incidentLocationLabel }}
                                     </option>
@@ -1233,27 +1371,21 @@
                                 <option value="">Select spot investigation</option>
                                 @foreach($availableSpotReports as $report)
                                     @php
-                                        $spotMarkerTitle = trim((string) $report->incident?->marker?->title);
-                                        $spotMarkerDescription = trim((string) $report->incident?->marker?->description);
-                                        $spotHasGenericTitle = in_array(strtolower($spotMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true);
-                                        $spotHasGenericDescription = in_array(strtolower($spotMarkerDescription), ['fire emergency reported by citizen.', 'fire emergency reported by citizen', 'reported by citizen', 'emergency reported by citizen'], true);
-                                        $spotPrimaryLocation = in_array(strtolower($spotMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true)
-                                            ? ($spotMarkerDescription ?: null)
-                                            : ($spotMarkerTitle ?: $spotMarkerDescription);
-                                        $spotLocalityLabel = collect([
-                                            $report->incident?->barangay?->barangay_name,
-                                            $report->incident?->barangay?->city?->city_name,
-                                        ])->filter()->join(', ');
-                                        if ($spotHasGenericTitle && $spotHasGenericDescription) {
-                                            $spotPrimaryLocation = null;
-                                        }
-                                        $spotLocationLabel = $spotPrimaryLocation && $spotLocalityLabel
-                                            ? $spotPrimaryLocation . ' - ' . $spotLocalityLabel
-                                            : ($spotPrimaryLocation ?: ($spotLocalityLabel ?: 'Reported incident location'));
+                                        $spotPrimaryLocation = $resolveIncidentPrimaryLocation(
+                                            $report->incident?->marker?->title,
+                                            $report->incident?->marker?->description
+                                        );
+                                        $spotLocationLabel = $buildIncidentReferenceLabel(
+                                            $spotPrimaryLocation,
+                                            $report->incident?->resolved_dropdown_barangay_name ?? $report->incident?->barangay?->barangay_name,
+                                            $report->incident?->resolved_dropdown_city_name ?? $report->incident?->barangay?->city?->city_name,
+                                            $report->fire_started ?? $report->created_at ?? $report->incident?->created_at,
+                                            'Spot investigation'
+                                        );
                                     @endphp
                                     <option
                                         value="{{ $report->spot_investigation_report_id }}"
-                                        data-location="{{ $spotLocationLabel ?: 'Unknown incident location' }}"
+                                        data-location="{{ $spotLocationLabel }}"
                                     >
                                         {{ $spotLocationLabel }}
                                     </option>
@@ -1267,15 +1399,70 @@
                                 @foreach($fireOrigins as $origin)
                                     <option value="{{ $origin->fire_origin_id }}">{{ $origin->origin ?? ('Origin #' . $origin->fire_origin_id) }}</option>
                                 @endforeach
+                                <option value="other">Other</option>
                             </select>
+                        </div>
+                        <div class="form-group" data-fire-origin-other-group style="display:none;">
+                            <label class="form-label">Specify Fire Origin</label>
+                            <input type="text" name="fire_origin_other" class="form-input" placeholder="Type the fire origin">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Responsible Arson</label>
                             <input type="text" name="responsible_arson" class="form-input" placeholder="Optional arson subject">
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Report Completed</label>
+                            <input type="datetime-local" name="report_completed_at" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Memorandum For</label>
+                            <input type="text" name="memorandum_for" class="form-input" placeholder="Respective head of office">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mission Order Number</label>
+                            <input type="text" name="mission_order_number" class="form-input" placeholder="Optional mission order number">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mission Order Date</label>
+                            <input type="date" name="mission_order_date" class="form-input">
+                        </div>
                         <div class="form-group full">
                             <label class="form-label">Fire Cause</label>
                             <textarea name="fire_cause" class="form-textarea" required placeholder="Enter investigation findings and fire cause"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Facts of the Case</label>
+                            <textarea name="facts_of_case" class="form-textarea" rows="6" placeholder="Follow-up facts established during the progress investigation"></textarea>
+                            <div class="table-muted" style="margin-top: 0.55rem;">Generate a cleaner progress narrative from your findings and the linked spot report context.</div>
+                            <button type="button" class="btn btn-outline" data-generate-progress-narrative style="margin-top: 0.85rem; width: fit-content;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
+                            </button>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Disposition</label>
+                            <textarea name="disposition" class="form-textarea" rows="4" placeholder="Assessment, referral, or recommended disposition"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Noted By</label>
+                            <select class="form-select" name="noted_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}">
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Approved By</label>
+                            <select class="form-select" name="approved_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}">
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -1303,27 +1490,21 @@
                                 <option value="">Select progress investigation</option>
                                 @foreach($availableProgressReports as $report)
                                     @php
-                                        $progressMarkerTitle = trim((string) $report->spotInvestigation?->incident?->marker?->title);
-                                        $progressMarkerDescription = trim((string) $report->spotInvestigation?->incident?->marker?->description);
-                                        $progressHasGenericTitle = in_array(strtolower($progressMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true);
-                                        $progressHasGenericDescription = in_array(strtolower($progressMarkerDescription), ['fire emergency reported by citizen.', 'fire emergency reported by citizen', 'reported by citizen', 'emergency reported by citizen'], true);
-                                        $progressPrimaryLocation = in_array(strtolower($progressMarkerTitle), ['help emergency', 'fire emergency', 'emergency', 'incident'], true)
-                                            ? ($progressMarkerDescription ?: null)
-                                            : ($progressMarkerTitle ?: $progressMarkerDescription);
-                                        $progressLocalityLabel = collect([
-                                            $report->spotInvestigation?->incident?->barangay?->barangay_name,
-                                            $report->spotInvestigation?->incident?->barangay?->city?->city_name,
-                                        ])->filter()->join(', ');
-                                        if ($progressHasGenericTitle && $progressHasGenericDescription) {
-                                            $progressPrimaryLocation = null;
-                                        }
-                                        $progressLocationLabel = $progressPrimaryLocation && $progressLocalityLabel
-                                            ? $progressPrimaryLocation . ' - ' . $progressLocalityLabel
-                                            : ($progressPrimaryLocation ?: ($progressLocalityLabel ?: 'Reported incident location'));
+                                        $progressPrimaryLocation = $resolveIncidentPrimaryLocation(
+                                            $report->spotInvestigation?->incident?->marker?->title,
+                                            $report->spotInvestigation?->incident?->marker?->description
+                                        );
+                                        $progressLocationLabel = $buildIncidentReferenceLabel(
+                                            $progressPrimaryLocation,
+                                            $report->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->spotInvestigation?->incident?->barangay?->barangay_name,
+                                            $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
+                                            $report->report_completed_at ?? $report->created_at ?? $report->spotInvestigation?->fire_started,
+                                            'Progress investigation'
+                                        );
                                     @endphp
                                     <option
                                         value="{{ $report->progress_investigation_report_id }}"
-                                        data-location="{{ $progressLocationLabel ?: 'Unknown incident location' }}"
+                                        data-location="{{ $progressLocationLabel }}"
                                     >
                                         {{ $progressLocationLabel }}
                                     </option>
@@ -1334,9 +1515,96 @@
                             <label class="form-label">Total Damage</label>
                             <input type="number" min="0" step="0.01" name="total_damage" class="form-input" required>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Report Completed</label>
+                            <input type="datetime-local" name="report_completed_at" class="form-input">
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Office Address</label>
+                            <textarea name="office_address" class="form-textarea" rows="2" placeholder="Complete address of the respective investigation and intelligence office"></textarea>
+                        </div>
                         <div class="form-group full">
                             <label class="form-label">Exact Address</label>
                             <textarea name="exact_address" class="form-textarea" required placeholder="Enter the exact address for the final investigation report"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Time and Date of Alarm</label>
+                            <input type="datetime-local" name="alarm_at" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Establishment Burned</label>
+                            <input type="text" name="establishment_burned" class="form-input" placeholder="Name of establishment and occupancy">
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Fire Victim/s</label>
+                            <textarea name="fire_victims" class="form-textarea" rows="2" placeholder="Complete name of the fire victim/s or casualty summary"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Origin of Fire</label>
+                            <textarea name="origin_of_fire" class="form-textarea" rows="2" placeholder="Clearly state where the fire originated"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Cause of Fire</label>
+                            <textarea name="cause_of_fire" class="form-textarea" rows="2" placeholder="Clearly state the cause of fire"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Substantiating Documents</label>
+                            <div class="detail-grid" style="gap: 10px;">
+                                @foreach($finalSubstantiatingDocumentOptions as $documentOption)
+                                    <label class="detail-item" style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+                                        <input
+                                            type="checkbox"
+                                            name="substantiating_documents[]"
+                                            value="{{ $documentOption }}"
+                                            {{ in_array($documentOption, ['Spot Investigation Report', 'Progress Investigation Report'], true) ? 'checked' : '' }}
+                                            style="margin-top:4px;"
+                                        >
+                                        <span>{{ $documentOption }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Facts of the Case</label>
+                            <textarea name="facts_of_case" class="form-textarea" rows="5" placeholder="Details of the fire incident, burned premises, documents, witnesses, and other established matters"></textarea>
+                            <div class="table-muted" style="margin-top: 0.55rem;">Generate the final investigation narrative sections from the linked progress and spot reports, then adjust before saving.</div>
+                            <button type="button" class="btn btn-outline" data-generate-final-narrative style="margin-top: 0.85rem; width: fit-content;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative Sections
+                            </button>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Discussion</label>
+                            <textarea name="discussion" class="form-textarea" rows="5" placeholder="Explain how the origin and cause of fire were established"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Findings</label>
+                            <textarea name="findings" class="form-textarea" rows="4" placeholder="State whether the fire was accidental or intentional and other findings"></textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Recommendation</label>
+                            <textarea name="recommendation" class="form-textarea" rows="4" placeholder="Enter the Fire Arson Investigator recommendation"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Noted By</label>
+                            <select class="form-select" name="noted_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}">
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Approved By</label>
+                            <select class="form-select" name="approved_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}">
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -1373,7 +1641,11 @@
         const manageReportModalBody = document.getElementById('manageReportModalBody');
         const manageReportModalFooter = document.getElementById('manageReportModalFooter');
         const reportToastStack = document.getElementById('reportToastStack');
+        const initialReportTab = @json($activeReportTab);
         const sirWordRouteTemplate = @json(route('firefighter.spot-reports.sir.word', ['spotReportId' => '__SPOT_REPORT_ID__']));
+        const pirWordRouteTemplate = @json(route('firefighter.progress-reports.pir.word', ['progressReportId' => '__PROGRESS_REPORT_ID__']));
+        const firWordRouteTemplate = @json(route('firefighter.final-reports.fir.word', ['finalReportId' => '__FINAL_REPORT_ID__']));
+        const finalSubstantiatingDocumentOptions = @json($finalSubstantiatingDocumentOptions);
 
         const reportStore = {
             spot: @json($spotReportStore),
@@ -1383,6 +1655,14 @@
 
         function buildSirRoute(template, reportId) {
             return template.replace('__SPOT_REPORT_ID__', encodeURIComponent(reportId));
+        }
+
+        function buildPirRoute(template, reportId) {
+            return template.replace('__PROGRESS_REPORT_ID__', encodeURIComponent(reportId));
+        }
+
+        function buildFirRoute(template, reportId) {
+            return template.replace('__FINAL_REPORT_ID__', encodeURIComponent(reportId));
         }
 
         function escapeHtml(value) {
@@ -1433,6 +1713,10 @@
         }
 
         function switchReportTab(type) {
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('report_tab', type);
+            window.history.replaceState({}, '', currentUrl);
+
             document.querySelectorAll('.report-tab').forEach((tab) => {
                 tab.classList.toggle('active', tab.dataset.reportTab === type);
             });
@@ -1565,9 +1849,232 @@
             });
         }
 
+        async function generateProgressNarrative(form, triggerButton) {
+            const narrativeField = form?.querySelector('textarea[name="facts_of_case"]');
+            if (!form || !narrativeField) return;
+
+            const formData = new FormData(form);
+            const fireOriginSelect = form?.querySelector('select[name="fire_origin_id"]');
+            const payload = {
+                spot_investigation_id: formData.get('spot_investigation_id') || form?.dataset?.spotInvestigationId || '',
+                fire_origin: fireOriginSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
+                fire_cause: formData.get('fire_cause') || '',
+                responsible_arson: formData.get('responsible_arson') || '',
+                report_completed_at: formData.get('report_completed_at') || '',
+                memorandum_for: formData.get('memorandum_for') || '',
+                mission_order_number: formData.get('mission_order_number') || '',
+                mission_order_date: formData.get('mission_order_date') || '',
+                facts_of_case: formData.get('facts_of_case') || '',
+                disposition: formData.get('disposition') || '',
+            };
+
+            const hasUsefulInput = Object.values(payload).some((value) => String(value || '').trim() !== '');
+            if (!hasUsefulInput) {
+                showToast('Add some progress investigation findings first before generating a narrative.', 'error');
+                return;
+            }
+
+            const originalHtml = triggerButton.innerHTML;
+            triggerButton.disabled = true;
+            triggerButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Drafting...';
+            showToast('Generating a cleaner progress narrative draft...', 'info', 1800);
+
+            try {
+                const response = await fetch('/api/progress-investigation/draft-narrative', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.message || 'Failed to generate a narrative draft.');
+                }
+
+                narrativeField.value = result.data?.narrative || '';
+                showToast('Progress narrative draft generated. You can still edit it before saving.', 'success');
+            } catch (error) {
+                console.error('Progress narrative draft failed:', error);
+                showToast(error.message || 'Failed to generate a narrative draft.', 'error');
+            } finally {
+                triggerButton.disabled = false;
+                triggerButton.innerHTML = originalHtml;
+            }
+        }
+
+        function bindProgressNarrativeButtons(scope = document) {
+            scope.querySelectorAll('[data-generate-progress-narrative]').forEach((button) => {
+                if (button.dataset.boundNarrativeButton === 'true') return;
+                button.dataset.boundNarrativeButton = 'true';
+                button.addEventListener('click', () => {
+                    const form = button.closest('form');
+                    generateProgressNarrative(form, button);
+                });
+            });
+        }
+
+        async function generateFinalNarrative(form, triggerButton) {
+            const factsField = form?.querySelector('textarea[name="facts_of_case"]');
+            if (!form || !factsField) return;
+
+            const formData = new FormData(form);
+            const payload = {
+                progress_investigation_id: formData.get('progress_investigation_id') || form?.dataset?.progressInvestigationId || '',
+                exact_address: formData.get('exact_address') || '',
+                office_address: formData.get('office_address') || '',
+                alarm_at: formData.get('alarm_at') || '',
+                establishment_burned: formData.get('establishment_burned') || '',
+                fire_victims: formData.get('fire_victims') || '',
+                origin_of_fire: formData.get('origin_of_fire') || '',
+                cause_of_fire: formData.get('cause_of_fire') || '',
+                total_damage: formData.get('total_damage') || '',
+                substantiating_documents: formData.getAll('substantiating_documents[]'),
+                facts_of_case: formData.get('facts_of_case') || '',
+                discussion: formData.get('discussion') || '',
+                findings: formData.get('findings') || '',
+                recommendation: formData.get('recommendation') || '',
+            };
+
+            const hasUsefulInput = Object.values(payload).some((value) => Array.isArray(value)
+                ? value.length > 0
+                : String(value || '').trim() !== '');
+            if (!hasUsefulInput) {
+                showToast('Add some final investigation findings first before generating the narrative sections.', 'error');
+                return;
+            }
+
+            const originalHtml = triggerButton.innerHTML;
+            triggerButton.disabled = true;
+            triggerButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Drafting...';
+            showToast('Generating final investigation narrative sections...', 'info', 1800);
+
+            try {
+                const response = await fetch('/api/final-investigation/draft-narrative', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.message || 'Failed to generate the narrative sections.');
+                }
+
+                form.querySelector('textarea[name="facts_of_case"]').value = result.data?.facts_of_case || '';
+                form.querySelector('textarea[name="discussion"]').value = result.data?.discussion || '';
+                form.querySelector('textarea[name="findings"]').value = result.data?.findings || '';
+                form.querySelector('textarea[name="recommendation"]').value = result.data?.recommendation || '';
+                showToast('Final narrative sections generated. You can still edit them before saving.', 'success');
+            } catch (error) {
+                console.error('Final narrative draft failed:', error);
+                showToast(error.message || 'Failed to generate the narrative sections.', 'error');
+            } finally {
+                triggerButton.disabled = false;
+                triggerButton.innerHTML = originalHtml;
+            }
+        }
+
+        function bindFinalNarrativeButtons(scope = document) {
+            scope.querySelectorAll('[data-generate-final-narrative]').forEach((button) => {
+                if (button.dataset.boundNarrativeButton === 'true') return;
+                button.dataset.boundNarrativeButton = 'true';
+                button.addEventListener('click', () => {
+                    const form = button.closest('form');
+                    generateFinalNarrative(form, button);
+                });
+            });
+        }
+
+        function syncFireOriginOtherVisibility(form, selectedValue = null, selectedLabel = '') {
+            if (!form) return;
+
+            const select = form.querySelector('select[name="fire_origin_id"]');
+            const otherGroup = form.querySelector('[data-fire-origin-other-group]');
+            const otherInput = form.querySelector('input[name="fire_origin_other"]');
+            if (!select || !otherGroup || !otherInput) return;
+
+            const resolvedValue = selectedValue ?? select.value;
+            const isOther = resolvedValue === 'other';
+
+            otherGroup.style.display = isOther ? '' : 'none';
+            otherInput.required = isOther;
+
+            if (isOther && selectedLabel && !otherInput.value) {
+                otherInput.value = selectedLabel;
+            }
+
+            if (!isOther) {
+                otherInput.value = '';
+            }
+        }
+
+        function bindFireOriginOtherField(scope = document, report = null) {
+            scope.querySelectorAll('form').forEach((form) => {
+                const select = form.querySelector('select[name="fire_origin_id"]');
+                const otherGroup = form.querySelector('[data-fire-origin-other-group]');
+                if (!select || !otherGroup || select.dataset.fireOriginOtherBound === 'true') return;
+
+                select.dataset.fireOriginOtherBound = 'true';
+                select.addEventListener('change', () => syncFireOriginOtherVisibility(form));
+
+                const shouldTreatAsOther = report
+                    && report.type === 'progress'
+                    && report.fire_origin_name
+                    && !Array.from(select.options).some((option) => option.value === String(report.fire_origin_id) && option.textContent?.trim() === report.fire_origin_name);
+
+                if (shouldTreatAsOther) {
+                    select.value = 'other';
+                    syncFireOriginOtherVisibility(form, 'other', report.fire_origin_name);
+                } else {
+                    syncFireOriginOtherVisibility(form);
+                }
+            });
+        }
+
         function getSelectedOptionText(select) {
             const option = select?.options?.[select.selectedIndex];
             return option?.dataset?.location || option?.textContent?.trim() || 'Unknown incident location';
+        }
+
+        function getCheckedValues(form, inputName) {
+            return Array.from(form?.querySelectorAll(`input[name="${inputName}"]:checked`) || []).map((input) => input.value);
+        }
+
+        function syncFinalReportLinkedFields(form, progressReportId) {
+            if (!form) return;
+
+            const linkedProgress = reportStore.progress?.[String(progressReportId)] || reportStore.progress?.[progressReportId];
+            if (!linkedProgress) return;
+
+            const originField = form.querySelector('textarea[name="origin_of_fire"]');
+            if (originField && (!originField.value.trim() || form === finalForm)) {
+                originField.value = linkedProgress.fire_origin_name || '';
+            }
+        }
+
+        function renderSubstantiatingDocumentCheckboxes(selectedValues = []) {
+            const selectedSet = new Set((selectedValues || []).map(String));
+
+            return finalSubstantiatingDocumentOptions.map((label) => `
+                <label class="detail-item" style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+                    <input
+                        type="checkbox"
+                        name="substantiating_documents[]"
+                        value="${escapeHtml(label)}"
+                        ${selectedSet.has(label) ? 'checked' : ''}
+                        style="margin-top:4px;"
+                    >
+                    <span>${escapeHtml(label)}</span>
+                </label>
+            `).join('');
         }
 
         function createActionButtons(type, report) {
@@ -1583,7 +2090,17 @@
                 }
             }
 
+            if (type === 'progress') {
+                actions.push(`<a class="table-action edit" href="${buildPirRoute(pirWordRouteTemplate, report.id)}">Word</a>`);
+            }
+
             if (type === 'progress' && !report.has_final) {
+                actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
+                actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
+            }
+
+            if (type === 'final') {
+                actions.push(`<a class="table-action edit" href="${buildFirRoute(firWordRouteTemplate, report.id)}">Word</a>`);
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
                 actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
             }
@@ -1702,7 +2219,15 @@
                         <div class="detail-item"><div class="detail-label">Fire Origin</div><div class="detail-value">${escapeHtml(report.fire_origin_name || 'N/A')}</div></div>
                         <div class="detail-item"><div class="detail-label">Responsible Arson</div><div class="detail-value">${escapeHtml(report.responsible_arson || 'Not specified')}</div></div>
                         <div class="detail-item"><div class="detail-label">Investigator</div><div class="detail-value">${escapeHtml(report.investigator_name || currentOfficerName)}</div></div>
+                        <div class="detail-item"><div class="detail-label">Report Completed</div><div class="detail-value">${escapeHtml(formatDateTime(report.report_completed_at))}</div></div>
+                        <div class="detail-item"><div class="detail-label">Memorandum For</div><div class="detail-value">${escapeHtml(report.memorandum_for || 'Not provided')}</div></div>
+                        <div class="detail-item"><div class="detail-label">Mission Order Number</div><div class="detail-value">${escapeHtml(report.mission_order_number || 'Not provided')}</div></div>
+                        <div class="detail-item"><div class="detail-label">Mission Order Date</div><div class="detail-value">${escapeHtml(report.mission_order_date || 'Not provided')}</div></div>
                         <div class="detail-item full"><div class="detail-label">Fire Cause</div><div class="detail-value">${escapeHtml(report.fire_cause || 'N/A')}</div></div>
+                        <div class="detail-item full"><div class="detail-label">Facts of the Case</div><div class="detail-value">${escapeHtml(report.facts_of_case || 'Not provided')}</div></div>
+                        <div class="detail-item full"><div class="detail-label">Disposition</div><div class="detail-value">${escapeHtml(report.disposition || 'Not provided')}</div></div>
+                        <div class="detail-item"><div class="detail-label">Noted By</div><div class="detail-value">${escapeHtml(report.noted_by_name || 'Not assigned')}</div></div>
+                        <div class="detail-item"><div class="detail-label">Approved By</div><div class="detail-value">${escapeHtml(report.approved_by_name || 'Not assigned')}</div></div>
                     </div>
                 `;
             }
@@ -1711,11 +2236,23 @@
                 <div class="detail-grid">
                     <div class="detail-item"><div class="detail-label">Progress Report</div><div class="detail-value">Progress #${escapeHtml(report.progress_investigation_id)}</div></div>
                     <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Investigator</div><div class="detail-value">${escapeHtml(report.investigator_name || currentOfficerName)}</div></div>
+                    <div class="detail-item"><div class="detail-label">Report Completed</div><div class="detail-value">${escapeHtml(formatDateTime(report.report_completed_at || report.created_at))}</div></div>
                     <div class="detail-item"><div class="detail-label">Total Damage</div><div class="detail-value">${escapeHtml(formatMoney(report.total_damage))}</div></div>
-                    <div class="detail-item"><div class="detail-label">Created</div><div class="detail-value">${escapeHtml(formatDateTime(report.created_at))}</div></div>
-                    <div class="detail-item"><div class="detail-label">Fire Origin</div><div class="detail-value">${escapeHtml(report.fire_origin_name || 'N/A')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Alarm Time</div><div class="detail-value">${escapeHtml(formatDateTime(report.alarm_at))}</div></div>
+                    <div class="detail-item"><div class="detail-label">Fire Origin</div><div class="detail-value">${escapeHtml(report.origin_of_fire || report.fire_origin_name || 'N/A')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Office Address</div><div class="detail-value">${escapeHtml(report.office_address || 'Not provided')}</div></div>
                     <div class="detail-item full"><div class="detail-label">Exact Address</div><div class="detail-value">${escapeHtml(report.exact_address || 'N/A')}</div></div>
-                    <div class="detail-item full"><div class="detail-label">Fire Cause</div><div class="detail-value">${escapeHtml(report.fire_cause || 'N/A')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Establishment Burned</div><div class="detail-value">${escapeHtml(report.establishment_burned || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Fire Victim/s</div><div class="detail-value">${escapeHtml(report.fire_victims || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Cause of Fire</div><div class="detail-value">${escapeHtml(report.cause_of_fire || report.fire_cause || 'N/A')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Substantiating Documents</div><div class="detail-value">${escapeHtml((report.substantiating_documents || []).join('\n') || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Facts of the Case</div><div class="detail-value">${escapeHtml(report.facts_of_case || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Discussion</div><div class="detail-value">${escapeHtml(report.discussion || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Findings</div><div class="detail-value">${escapeHtml(report.findings || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Recommendation</div><div class="detail-value">${escapeHtml(report.recommendation || 'Not provided')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Noted By</div><div class="detail-value">${escapeHtml(report.noted_by_name || 'Not assigned')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Approved By</div><div class="detail-value">${escapeHtml(report.approved_by_name || 'Not assigned')}</div></div>
                 </div>
             `;
         }
@@ -1785,24 +2322,170 @@
                 `;
             }
 
+            if (type === 'progress') {
+                return `
+                    <form id="manageReportEditForm" class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Fire Origin</label>
+                            <select class="form-select" name="fire_origin_id">
+                                <option value="">Select fire origin</option>
+                                @foreach($fireOrigins as $origin)
+                                    <option value="{{ $origin->fire_origin_id }}">{{ $origin->origin ?? ('Origin #' . $origin->fire_origin_id) }}</option>
+                                @endforeach
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group" data-fire-origin-other-group style="display:none;">
+                            <label class="form-label">Specify Fire Origin</label>
+                            <input class="form-input" type="text" name="fire_origin_other" value="">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Responsible Arson</label>
+                            <input class="form-input" type="text" name="responsible_arson" value="${escapeHtml(report.responsible_arson || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Report Completed</label>
+                            <input class="form-input" type="datetime-local" name="report_completed_at" value="${escapeHtml((report.report_completed_at || '').slice(0, 16))}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Memorandum For</label>
+                            <input class="form-input" type="text" name="memorandum_for" value="${escapeHtml(report.memorandum_for || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mission Order Number</label>
+                            <input class="form-input" type="text" name="mission_order_number" value="${escapeHtml(report.mission_order_number || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mission Order Date</label>
+                            <input class="form-input" type="date" name="mission_order_date" value="${escapeHtml(report.mission_order_date || '')}">
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Fire Cause</label>
+                            <textarea class="form-textarea" name="fire_cause" required>${escapeHtml(report.fire_cause || '')}</textarea>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Facts of the Case</label>
+                            <textarea class="form-textarea" name="facts_of_case" rows="6">${escapeHtml(report.facts_of_case || '')}</textarea>
+                            <div class="table-muted" style="margin-top: 0.55rem;">Generate a refined progress narrative from the linked spot report context and your current findings.</div>
+                            <button type="button" class="btn btn-outline" data-generate-progress-narrative style="margin-top: 0.85rem; width: fit-content;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
+                            </button>
+                        </div>
+                        <div class="form-group full">
+                            <label class="form-label">Disposition</label>
+                            <textarea class="form-textarea" name="disposition" rows="4">${escapeHtml(report.disposition || '')}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Noted By</label>
+                            <select class="form-select" name="noted_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}" ${String(report.noted_by_station_officer_id || '') === '{{ $officer->station_officer_id }}' ? 'selected' : ''}>
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Approved By</label>
+                            <select class="form-select" name="approved_by_station_officer_id">
+                                <option value="">Select officer</option>
+                                @foreach($stationOfficers as $officer)
+                                    <option value="{{ $officer->station_officer_id }}" ${String(report.approved_by_station_officer_id || '') === '{{ $officer->station_officer_id }}' ? 'selected' : ''}>
+                                        {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                `;
+            }
+
             return `
                 <form id="manageReportEditForm" class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">Fire Origin</label>
-                        <select class="form-select" name="fire_origin_id">
-                            <option value="">Select fire origin</option>
-                            @foreach($fireOrigins as $origin)
-                                <option value="{{ $origin->fire_origin_id }}">{{ $origin->origin ?? ('Origin #' . $origin->fire_origin_id) }}</option>
+                        <label class="form-label">Total Damage</label>
+                        <input class="form-input" type="number" min="0" step="0.01" name="total_damage" value="${escapeHtml(report.total_damage || 0)}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Report Completed</label>
+                        <input class="form-input" type="datetime-local" name="report_completed_at" value="${escapeHtml((report.report_completed_at || '').slice(0, 16))}">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Office Address</label>
+                        <textarea class="form-textarea" name="office_address" rows="2">${escapeHtml(report.office_address || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Exact Address</label>
+                        <textarea class="form-textarea" name="exact_address" rows="2" required>${escapeHtml(report.exact_address || '')}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Time and Date of Alarm</label>
+                        <input class="form-input" type="datetime-local" name="alarm_at" value="${escapeHtml((report.alarm_at || '').slice(0, 16))}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Establishment Burned</label>
+                        <input class="form-input" type="text" name="establishment_burned" value="${escapeHtml(report.establishment_burned || '')}">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Fire Victim/s</label>
+                        <textarea class="form-textarea" name="fire_victims" rows="2">${escapeHtml(report.fire_victims || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Origin of Fire</label>
+                        <textarea class="form-textarea" name="origin_of_fire" rows="2">${escapeHtml(report.origin_of_fire || report.fire_origin_name || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Cause of Fire</label>
+                        <textarea class="form-textarea" name="cause_of_fire" rows="2">${escapeHtml(report.cause_of_fire || report.fire_cause || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Substantiating Documents</label>
+                        <div class="detail-grid" style="gap: 10px;">
+                            ${renderSubstantiatingDocumentCheckboxes((report.substantiating_documents || []).length ? report.substantiating_documents : ['Spot Investigation Report', 'Progress Investigation Report'])}
+                        </div>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Facts of the Case</label>
+                        <textarea class="form-textarea" name="facts_of_case" rows="5">${escapeHtml(report.facts_of_case || '')}</textarea>
+                        <div class="table-muted" style="margin-top: 0.55rem;">Generate the final investigation narrative sections from the linked progress and spot reports, then fine-tune them before saving.</div>
+                        <button type="button" class="btn btn-outline" data-generate-final-narrative style="margin-top: 0.85rem; width: fit-content;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative Sections
+                        </button>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Discussion</label>
+                        <textarea class="form-textarea" name="discussion" rows="5">${escapeHtml(report.discussion || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Findings</label>
+                        <textarea class="form-textarea" name="findings" rows="4">${escapeHtml(report.findings || '')}</textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Recommendation</label>
+                        <textarea class="form-textarea" name="recommendation" rows="4">${escapeHtml(report.recommendation || '')}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Noted By</label>
+                        <select class="form-select" name="noted_by_station_officer_id">
+                            <option value="">Select officer</option>
+                            @foreach($stationOfficers as $officer)
+                                <option value="{{ $officer->station_officer_id }}" ${String(report.noted_by_station_officer_id || '') === '{{ $officer->station_officer_id }}' ? 'selected' : ''}>
+                                    {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Responsible Arson</label>
-                        <input class="form-input" type="text" name="responsible_arson" value="${escapeHtml(report.responsible_arson || '')}">
-                    </div>
-                    <div class="form-group full">
-                        <label class="form-label">Fire Cause</label>
-                        <textarea class="form-textarea" name="fire_cause" required>${escapeHtml(report.fire_cause || '')}</textarea>
+                        <label class="form-label">Approved By</label>
+                        <select class="form-select" name="approved_by_station_officer_id">
+                            <option value="">Select officer</option>
+                            @foreach($stationOfficers as $officer)
+                                <option value="{{ $officer->station_officer_id }}" ${String(report.approved_by_station_officer_id || '') === '{{ $officer->station_officer_id }}' ? 'selected' : ''}>
+                                    {{ trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? '')) ?: ('Officer #' . $officer->station_officer_id) }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                 </form>
             `;
@@ -1817,7 +2500,15 @@
                     <a class="btn btn-outline" href="${buildSirRoute(sirWordRouteTemplate, report.id)}">Download Word</a>
                     <button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>
                 `
-                : '<button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>';
+                : type === 'progress'
+                ? `
+                    <a class="btn btn-outline" href="${buildPirRoute(pirWordRouteTemplate, report.id)}">Download Word</a>
+                    <button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>
+                `
+                : `
+                    <a class="btn btn-outline" href="${buildFirRoute(firWordRouteTemplate, report.id)}">Download Word</a>
+                    <button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>
+                `;
         }
 
         function openEditModal(type, report) {
@@ -1832,10 +2523,23 @@
                 bindSpotNarrativeButtons(manageReportModalBody);
             }
             if (type === 'progress') {
+                const editForm = manageReportModalBody.querySelector('#manageReportEditForm');
+                if (editForm) {
+                    editForm.dataset.spotInvestigationId = report.spot_investigation_id || '';
+                }
                 const fireOriginInput = manageReportModalBody.querySelector('select[name="fire_origin_id"]');
                 if (fireOriginInput) {
                     fireOriginInput.value = report.fire_origin_id ? String(report.fire_origin_id) : '';
                 }
+                bindFireOriginOtherField(manageReportModalBody, report);
+                bindProgressNarrativeButtons(manageReportModalBody);
+            }
+            if (type === 'final') {
+                const editForm = manageReportModalBody.querySelector('#manageReportEditForm');
+                if (editForm) {
+                    editForm.dataset.progressInvestigationId = report.progress_investigation_id || '';
+                }
+                bindFinalNarrativeButtons(manageReportModalBody);
             }
             manageReportModalFooter.innerHTML = `
                 <button type="button" class="btn btn-outline" data-close-manage-modal>Cancel</button>
@@ -1900,11 +2604,43 @@
                     updated.approved_by_station_officer_id = formData.get('approved_by_station_officer_id');
                     updated.noted_by_name = manageReportModalBody.querySelector('select[name="noted_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
                     updated.approved_by_name = manageReportModalBody.querySelector('select[name="approved_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
-                } else {
-                    updated.fire_origin_id = formData.get('fire_origin_id');
-                    updated.fire_origin_name = manageReportModalBody.querySelector('select[name="fire_origin_id"]')?.selectedOptions?.[0]?.textContent?.trim() || 'N/A';
+                } else if (type === 'progress') {
+                    updated.fire_origin_id = result.data?.fire_origin_id ?? formData.get('fire_origin_id');
+                    updated.fire_origin_name = result.data?.fire_origin?.origin
+                        || (formData.get('fire_origin_id') === 'other'
+                            ? (formData.get('fire_origin_other') || 'N/A')
+                            : (manageReportModalBody.querySelector('select[name="fire_origin_id"]')?.selectedOptions?.[0]?.textContent?.trim() || 'N/A'));
                     updated.responsible_arson = formData.get('responsible_arson');
                     updated.fire_cause = formData.get('fire_cause');
+                    updated.report_completed_at = formData.get('report_completed_at');
+                    updated.memorandum_for = formData.get('memorandum_for');
+                    updated.mission_order_number = formData.get('mission_order_number');
+                    updated.mission_order_date = formData.get('mission_order_date');
+                    updated.facts_of_case = formData.get('facts_of_case');
+                    updated.disposition = formData.get('disposition');
+                    updated.noted_by_station_officer_id = formData.get('noted_by_station_officer_id');
+                    updated.approved_by_station_officer_id = formData.get('approved_by_station_officer_id');
+                    updated.noted_by_name = manageReportModalBody.querySelector('select[name="noted_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
+                    updated.approved_by_name = manageReportModalBody.querySelector('select[name="approved_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
+                } else {
+                    updated.total_damage = formData.get('total_damage');
+                    updated.report_completed_at = formData.get('report_completed_at');
+                    updated.office_address = formData.get('office_address');
+                    updated.exact_address = formData.get('exact_address');
+                    updated.alarm_at = formData.get('alarm_at');
+                    updated.establishment_burned = formData.get('establishment_burned');
+                    updated.fire_victims = formData.get('fire_victims');
+                    updated.origin_of_fire = formData.get('origin_of_fire');
+                    updated.cause_of_fire = formData.get('cause_of_fire');
+                    updated.substantiating_documents = getCheckedValues(form, 'substantiating_documents[]');
+                    updated.facts_of_case = formData.get('facts_of_case');
+                    updated.discussion = formData.get('discussion');
+                    updated.findings = formData.get('findings');
+                    updated.recommendation = formData.get('recommendation');
+                    updated.noted_by_station_officer_id = formData.get('noted_by_station_officer_id');
+                    updated.approved_by_station_officer_id = formData.get('approved_by_station_officer_id');
+                    updated.noted_by_name = manageReportModalBody.querySelector('select[name="noted_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
+                    updated.approved_by_name = manageReportModalBody.querySelector('select[name="approved_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '';
                 }
 
                 reportStore[type][reportId] = updated;
@@ -2012,6 +2748,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            switchReportTab(initialReportTab);
+
             document.querySelectorAll('[data-open-report-modal]').forEach((button) => {
                 button.addEventListener('click', () => openReportModal(button.dataset.openReportModal));
             });
@@ -2058,6 +2796,13 @@
             const finalProgressSelect = finalForm?.querySelector('select[name="progress_investigation_id"]');
 
             bindSpotNarrativeButtons();
+            bindProgressNarrativeButtons();
+            bindFinalNarrativeButtons();
+            bindFireOriginOtherField(document);
+
+            finalProgressSelect?.addEventListener('change', (event) => {
+                syncFinalReportLinkedFields(finalForm, event.target.value);
+            });
 
             spotIncidentSelect?.addEventListener('change', (event) => {
                 const selectedOption = event.target.options[event.target.selectedIndex];
@@ -2122,7 +2867,9 @@
                 event.preventDefault();
                 const selectedSpotId = progressSpotSelect?.value;
                 const selectedLocation = getSelectedOptionText(progressSpotSelect);
-                const fireOriginName = progressFireOriginSelect?.options?.[progressFireOriginSelect.selectedIndex]?.textContent?.trim() || 'N/A';
+                const fireOriginName = progressForm.querySelector('input[name="fire_origin_other"]')?.value?.trim()
+                    || progressFireOriginSelect?.options?.[progressFireOriginSelect.selectedIndex]?.textContent?.trim()
+                    || 'N/A';
                 const mapped = await submitReportForm(
                     progressForm,
                     '/api/progress-investigation',
@@ -2133,10 +2880,20 @@
                         spot_investigation_id: formData.get('spot_investigation_id'),
                         incident_location: selectedLocation,
                         investigator_name: currentOfficerName,
-                        fire_origin_id: formData.get('fire_origin_id'),
-                        fire_origin_name: fireOriginName,
+                        fire_origin_id: data.fire_origin_id ?? formData.get('fire_origin_id'),
+                        fire_origin_name: data.fire_origin?.origin || fireOriginName,
                         fire_cause: formData.get('fire_cause'),
                         responsible_arson: formData.get('responsible_arson'),
+                        report_completed_at: formData.get('report_completed_at'),
+                        memorandum_for: formData.get('memorandum_for'),
+                        mission_order_number: formData.get('mission_order_number'),
+                        mission_order_date: formData.get('mission_order_date'),
+                        facts_of_case: formData.get('facts_of_case'),
+                        disposition: formData.get('disposition'),
+                        noted_by_station_officer_id: formData.get('noted_by_station_officer_id'),
+                        approved_by_station_officer_id: formData.get('approved_by_station_officer_id'),
+                        noted_by_name: progressForm.querySelector('select[name="noted_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '',
+                        approved_by_name: progressForm.querySelector('select[name="approved_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '',
                         has_final: false,
                     }),
                     appendProgressReportRow
@@ -2167,11 +2924,28 @@
                         type: 'final',
                         progress_investigation_id: formData.get('progress_investigation_id'),
                         incident_location: selectedLocation,
+                        investigator_name: currentOfficerName,
+                        report_completed_at: data.report_completed_at || formData.get('report_completed_at') || new Date().toISOString(),
+                        office_address: data.office_address || formData.get('office_address'),
                         exact_address: formData.get('exact_address'),
+                        alarm_at: data.alarm_at || formData.get('alarm_at'),
+                        establishment_burned: data.establishment_burned || formData.get('establishment_burned'),
+                        fire_victims: data.fire_victims || formData.get('fire_victims'),
+                        origin_of_fire: data.origin_of_fire || formData.get('origin_of_fire') || reportStore.progress[selectedProgressId]?.fire_origin_name || 'N/A',
+                        cause_of_fire: data.cause_of_fire || formData.get('cause_of_fire') || reportStore.progress[selectedProgressId]?.fire_cause || 'N/A',
                         total_damage: formData.get('total_damage'),
+                        substantiating_documents: data.substantiating_documents || formData.getAll('substantiating_documents[]'),
+                        facts_of_case: formData.get('facts_of_case'),
+                        discussion: formData.get('discussion'),
+                        findings: formData.get('findings'),
+                        recommendation: formData.get('recommendation'),
                         created_at: new Date().toISOString(),
                         fire_origin_name: reportStore.progress[selectedProgressId]?.fire_origin_name || 'N/A',
                         fire_cause: reportStore.progress[selectedProgressId]?.fire_cause || 'N/A',
+                        noted_by_station_officer_id: formData.get('noted_by_station_officer_id'),
+                        approved_by_station_officer_id: formData.get('approved_by_station_officer_id'),
+                        noted_by_name: finalForm.querySelector('select[name="noted_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '',
+                        approved_by_name: finalForm.querySelector('select[name="approved_by_station_officer_id"]')?.selectedOptions?.[0]?.textContent?.trim() || '',
                     }),
                     appendFinalReportRow
                 );

@@ -830,6 +830,10 @@
             chiefs: @json($chiefs ?? []),
             mapmarker: @json($mapmarker ?? [])
         };
+        let currentGeneratedRows = [];
+        let currentGeneratedType = 'incidents';
+        let currentPreviewPage = 1;
+        const previewPageSize = 15;
 
         // Function to show toast notification
         function showToast(message, type = 'success') {
@@ -914,6 +918,10 @@
                 });
             }
             
+            currentGeneratedRows = data;
+            currentGeneratedType = reportType;
+            currentPreviewPage = 1;
+
             // Update preview
             updateReportPreview(reportType, data);
             
@@ -924,35 +932,7 @@
         }
         
         // Function to update report preview
-        function updateReportPreview(reportType, data) {
-            const previewSection = document.getElementById('reportPreview');
-            const previewContent = document.getElementById('previewContent');
-            const recordCount = document.getElementById('recordCount');
-            const reportTitle = document.getElementById('reportTitle');
-            
-            const typeNames = {
-                incidents: 'Incident Report',
-                personnel: 'Personnel Report',
-                stations: 'Station Summary',
-                alerts: 'Alerts Report',
-                chiefs: 'Chiefs Report'
-            };
-            
-            reportTitle.textContent = `- ${typeNames[reportType]}`;
-            recordCount.textContent = data.length;
-            
-            if (data.length === 0) {
-                previewContent.innerHTML = `
-                    <div class="empty-preview">
-                        <i class="fa-regular fa-chart-scatter"></i>
-                        <p>No data matches your filters. Try adjusting the criteria.</p>
-                    </div>
-                `;
-                previewSection.style.display = 'block';
-                return;
-            }
-            
-            // Generate table based on report type
+        function buildAdminReportTableHtml(reportType, data) {
             let tableHtml = '<table class="report-table"><thead><tr>';
             console.log('Generating report for type:', reportType, 'with data:', data);
             if (reportType === 'incidents') {
@@ -1041,7 +1021,58 @@
             }
             
             tableHtml += '</tbody></table>';
-            previewContent.innerHTML = tableHtml;
+            return tableHtml;
+        }
+
+        function renderAdminPreviewPage(reportType, data, page = 1) {
+            const previewContent = document.getElementById('previewContent');
+            const totalPages = Math.max(1, Math.ceil(data.length / previewPageSize));
+            currentPreviewPage = Math.min(Math.max(1, page), totalPages);
+            const startIndex = (currentPreviewPage - 1) * previewPageSize;
+            const endIndex = Math.min(startIndex + previewPageSize, data.length);
+            const pageRows = data.slice(startIndex, endIndex);
+            const controls = data.length > previewPageSize ? `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;">
+                    <div style="font-size:0.82rem;color:#64748b;">Showing ${startIndex + 1}-${endIndex} of ${data.length} records</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button type="button" class="btn-export" onclick="renderAdminPreviewPage('${reportType}', currentGeneratedRows, ${currentPreviewPage - 1})" ${currentPreviewPage <= 1 ? 'disabled' : ''}>Prev</button>
+                        <div class="stat-badge">Page ${currentPreviewPage} of ${totalPages}</div>
+                        <button type="button" class="btn-export" onclick="renderAdminPreviewPage('${reportType}', currentGeneratedRows, ${currentPreviewPage + 1})" ${currentPreviewPage >= totalPages ? 'disabled' : ''}>Next</button>
+                    </div>
+                </div>
+            ` : '';
+            previewContent.innerHTML = buildAdminReportTableHtml(reportType, pageRows) + controls;
+        }
+
+        function updateReportPreview(reportType, data) {
+            const previewSection = document.getElementById('reportPreview');
+            const previewContent = document.getElementById('previewContent');
+            const recordCount = document.getElementById('recordCount');
+            const reportTitle = document.getElementById('reportTitle');
+            
+            const typeNames = {
+                incidents: 'Incident Report',
+                personnel: 'Personnel Report',
+                stations: 'Station Summary',
+                alerts: 'Alerts Report',
+                chiefs: 'Chiefs Report'
+            };
+            
+            reportTitle.textContent = `- ${typeNames[reportType]}`;
+            recordCount.textContent = data.length;
+            
+            if (data.length === 0) {
+                previewContent.innerHTML = `
+                    <div class="empty-preview">
+                        <i class="fa-regular fa-chart-scatter"></i>
+                        <p>No data matches your filters. Try adjusting the criteria.</p>
+                    </div>
+                `;
+                previewSection.style.display = 'block';
+                return;
+            }
+
+            renderAdminPreviewPage(reportType, data, 1);
             previewSection.style.display = 'block';
             
             // Scroll to preview
@@ -1199,17 +1230,16 @@ Station: ${personnel.station?.station_name}`);
         
         // Function to export report as CSV
         function exportReportAsCSV() {
-            const reportType = document.getElementById('reportType').value;
-            const previewContent = document.getElementById('previewContent');
-            const tables = previewContent.getElementsByTagName('table');
-            
-            if (tables.length === 0) {
+            if (!currentGeneratedRows.length) {
                 showToast('No data to export', 'error');
                 return;
             }
+
+            const temp = document.createElement('div');
+            temp.innerHTML = buildAdminReportTableHtml(currentGeneratedType, currentGeneratedRows);
             
             let csvContent = [];
-            const rows = tables[0].querySelectorAll('tr');
+            const rows = temp.querySelectorAll('tr');
             
             rows.forEach(row => {
                 const rowData = [];

@@ -241,6 +241,8 @@ Route::get('/markers/count', function () {
 Route::get('/spot-investigations-available', [SpotInvestigationReportController::class, 'getAvailableSpotInvestigations']);
 Route::get('/progress-investigations-available', [FinalInvestigationReportController::class, 'getAvailableProgressInvestigations']);
 Route::post('/spot-investigation/draft-narrative', [SpotInvestigationReportController::class, 'draftNarrative']);
+Route::post('/progress-investigation/draft-narrative', [ProgressInvestigationReportController::class, 'draftNarrative']);
+Route::post('/final-investigation/draft-narrative', [FinalInvestigationReportController::class, 'draftNarrative']);
 Route::post('/spot-investigation', [SpotInvestigationReportController::class, 'store']);
 Route::put('/spot-investigation/{id}', [SpotInvestigationReportController::class, 'update']);
 Route::delete('/spot-investigation/{id}', [SpotInvestigationReportController::class, 'destroy']);
@@ -249,9 +251,11 @@ Route::delete('/spot-investigation/{id}', [SpotInvestigationReportController::cl
 
 Route::post('/progress-investigation', [ProgressInvestigationReportController::class, 'store']);
 Route::put('/progress-investigation/{id}', [ProgressInvestigationReportController::class, 'update']);
+Route::delete('/progress-investigation/{progressInvestigationReport}', [ProgressInvestigationReportController::class, 'destroy']);
 
 Route::post('/final-investigation', [FinalInvestigationReportController::class, 'store']);
 Route::put('/final-investigation/{id}', [FinalInvestigationReportController::class, 'update']);
+Route::delete('/final-investigation/{finalInvestigationReport}', [FinalInvestigationReportController::class, 'destroy']);
 
 // Route::put('/incidents/{incidentId}/complete', [IncidentController::class, 'complete']);
 
