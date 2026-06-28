@@ -38,13 +38,29 @@ class ManagementController extends Controller
         'paramedic' => 'PAR',
         'investigator' => 'INV',
     ];
+
+    protected function currentUserId(): ?int
+    {
+        return Auth::user()?->user_id ?? Auth::id();
+    }
+
+    protected function currentStationOfficer(): ?StationOfficer
+    {
+        $userId = $this->currentUserId();
+
+        if (! $userId) {
+            return null;
+        }
+
+        return StationOfficer::where('user_id', $userId)->first();
+    }
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $thisUser = Auth::user()->user_id;
-        $thisStation = StationOfficer::where('user_id', $thisUser)->first();
+        $thisUser = $this->currentUserId();
+        $thisStation = $this->currentStationOfficer();
         $stationExact = $thisStation?->station_id;
 
     
@@ -136,8 +152,8 @@ class ManagementController extends Controller
 
     public function updateStation(Request $request, Station $station)
     {
-        $currentUserId = Auth::user()->user_id;
-        $stationOfficer = StationOfficer::where('user_id', $currentUserId)->first();
+        $currentUserId = $this->currentUserId();
+        $stationOfficer = $this->currentStationOfficer();
 
         if (!$stationOfficer || (int) $stationOfficer->station_id !== (int) $station->station_id) {
             abort(403, 'You are not allowed to update this station.');
@@ -266,8 +282,16 @@ class ManagementController extends Controller
 // }
 public function getIncidents(Request $request)
 {
-    $accountId = Auth::user()->user_id;
-    $stationOfficer = StationOfficer::where('user_id', $accountId)->first();
+    $stationOfficer = $this->currentStationOfficer();
+
+    if (! $stationOfficer?->station_id) {
+        return response()->json([
+            'success' => true,
+            'data' => [],
+            'message' => 'No station assignment found for this account.',
+        ]);
+    }
+
     $stationUserIds = StationOfficer::where('station_id', $stationOfficer?->station_id)
         ->pluck('user_id')
         ->filter()
@@ -624,8 +648,16 @@ public function storeIncident(Request $request)
 }
     public function getPersonnel(Request $request)
     {
-        $accountId = Auth::user()->user_id;
-        $stationOfficer = StationOfficer::where('user_id', $accountId)->first();
+        $stationOfficer = $this->currentStationOfficer();
+
+        if (! $stationOfficer?->station_id) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'No station assignment found for this account.',
+            ]);
+        }
+
         $query = StationOfficer::with(['user.role'])
             ->where('station_id', $stationOfficer?->station_id);
         
@@ -688,8 +720,16 @@ public function storeIncident(Request $request)
      */
     public function getEquipment(Request $request)
     {
-        $accountId = Auth::user()->user_id;
-        $stationOfficer = StationOfficer::where('user_id', $accountId)->first();
+        $stationOfficer = $this->currentStationOfficer();
+
+        if (! $stationOfficer?->station_id) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'No station assignment found for this account.',
+            ]);
+        }
+
         $query = EquipmentToStation::with(['equipment.category', 'station'])
             ->where('station_id', $stationOfficer?->station_id);
         
@@ -750,8 +790,16 @@ public function storeIncident(Request $request)
 
     public function getReports(Request $request)
     {
-        $accountId = Auth::user()->user_id;
-        $stationOfficer = StationOfficer::where('user_id', $accountId)->first();
+        $stationOfficer = $this->currentStationOfficer();
+
+        if (! $stationOfficer?->station_id) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'No station assignment found for this account.',
+            ]);
+        }
+
         $stationOfficerIds = StationOfficer::where('station_id', $stationOfficer?->station_id)
             ->pluck('station_officer_id')
             ->filter()

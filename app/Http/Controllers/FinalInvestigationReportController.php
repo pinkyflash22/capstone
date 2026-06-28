@@ -41,6 +41,7 @@ class FinalInvestigationReportController extends Controller
             'total_damage' => 'required|numeric|min:0',
             'exact_address' => 'required|string|max: 255',
             'report_completed_at' => 'nullable|date',
+            'memorandum_for' => 'nullable|string|max:255',
             'office_address' => 'nullable|string',
             'alarm_at' => 'nullable|date',
             'establishment_burned' => 'nullable|string|max:255',
@@ -114,6 +115,7 @@ class FinalInvestigationReportController extends Controller
         }
         $validated = $request->validate([
             'report_completed_at' => 'nullable|date',
+            'memorandum_for' => 'nullable|string|max:255',
             'exact_address' => 'required|string|max:255',
             'office_address' => 'nullable|string',
             'alarm_at' => 'nullable|date',

@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Multimedia;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaPath;
 use Illuminate\Support\Str;
 
 class MultimediaController extends Controller
@@ -23,7 +23,10 @@ class MultimediaController extends Controller
         // $multimediaId = 'MM-' . Str::uuid();
 
         // ✅ store file
-        $path = $file->store('multimedia', 'public');
+        $path = MediaPath::storeForDisk(
+            $file->store('multimedia', 'supabase'),
+            'supabase'
+        );
 
         // ✅ save to database
        $multimedia = Multimedia::create([
@@ -47,7 +50,7 @@ class MultimediaController extends Controller
                 'type' => $file->type,
                 'created_at' => $file->created_at,
                 // convert path → public URL
-                'url' => Storage::url($file->path),
+                'url' => MediaPath::url($file->path),
             ];
         });
 

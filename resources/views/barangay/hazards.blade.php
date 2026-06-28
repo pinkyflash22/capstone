@@ -759,8 +759,8 @@
                                         @if($riskArea->photos->isNotEmpty())
                                             <div class="hazards-photo-strip">
                                                 @foreach($riskArea->photos->take(3) as $photo)
-                                                    <a href="{{ asset('storage/' . ltrim($photo->photo_path, '/')) }}" target="_blank" rel="noopener" class="risk-photo-thumb">
-                                                        <img src="{{ asset('storage/' . ltrim($photo->photo_path, '/')) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
+                                                    <a href="{{ \App\Support\MediaPath::url($photo->photo_path) }}" target="_blank" rel="noopener" class="risk-photo-thumb">
+                                                        <img src="{{ \App\Support\MediaPath::url($photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
                                                     </a>
                                                 @endforeach
                                             </div>

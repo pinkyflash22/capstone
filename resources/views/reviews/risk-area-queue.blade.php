@@ -818,8 +818,8 @@
                                             <div class="request-field__label">Attached Photos</div>
                                             <div class="photo-strip">
                                                 @foreach ($item->photos as $photo)
-                                                    <a href="{{ asset('storage/' . $photo->photo_path) }}" target="_blank" rel="noopener">
-                                                        <img src="{{ asset('storage/' . $photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
+                                                    <a href="{{ \App\Support\MediaPath::url($photo->photo_path) }}" target="_blank" rel="noopener">
+                                                        <img src="{{ \App\Support\MediaPath::url($photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
                                                     </a>
                                                 @endforeach
                                             </div>
@@ -1171,8 +1171,8 @@
                                                         <p>Existing image evidence attached to this live record.</p>
                                                         <div class="photo-strip">
                                                             @foreach ($item->photos as $photo)
-                                                                <a href="{{ asset('storage/' . $photo->photo_path) }}" target="_blank" rel="noopener">
-                                                                    <img src="{{ asset('storage/' . $photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
+                                                                <a href="{{ \App\Support\MediaPath::url($photo->photo_path) }}" target="_blank" rel="noopener">
+                                                                    <img src="{{ \App\Support\MediaPath::url($photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}">
                                                                 </a>
                                                             @endforeach
                                                         </div>

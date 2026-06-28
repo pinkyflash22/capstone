@@ -268,10 +268,10 @@
                     <p>Upload one profile image and additional station photos. These appear on the station-facing pages used by responders.</p>
                 </div>
                 <div class="station-media-admin-grid">
-                    @foreach(($stations ?? collect()) as $station)
+                        @foreach(($stations ?? collect()) as $station)
                         @php
                             $profilePath = $station->profileMedia?->path;
-                            $profileUrl = $profilePath ? asset('storage/' . ltrim(str_replace('\\', '/', $profilePath), '/')) : null;
+                            $profileUrl = \App\Support\MediaPath::url($profilePath);
                         @endphp
                         <div class="station-media-admin-card">
                             <h3>{{ $station->station_name }}</h3>
@@ -307,7 +307,7 @@
                                 <div class="station-media-mini-grid">
                                     @foreach($station->galleryMedia->take(4) as $photo)
                                         <div class="station-media-mini">
-                                            <img src="{{ asset('storage/' . ltrim(str_replace('\\', '/', $photo->path), '/')) }}" alt="Station gallery photo">
+                                            <img src="{{ \App\Support\MediaPath::url($photo->path) }}" alt="Station gallery photo">
                                         </div>
                                     @endforeach
                                 </div>

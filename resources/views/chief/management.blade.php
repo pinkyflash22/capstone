@@ -1034,12 +1034,12 @@
     $currentStationMarker = $currentStation?->marker;
     $currentRoleName = strtolower(auth()->user()->role->role ?? '');
     $currentStationProfilePath = $currentStation?->profileMedia?->path;
-    $currentStationProfileUrl = $currentStationProfilePath ? asset('storage/' . ltrim(str_replace('\\', '/', $currentStationProfilePath), '/')) : null;
+    $currentStationProfileUrl = \App\Support\MediaPath::url($currentStationProfilePath);
     $currentStationGallery = collect($currentStation?->galleryMedia ?? [])->map(function ($media) {
         return [
             'id' => $media->station_media_id,
             'caption' => $media->caption,
-            'url' => asset('storage/' . ltrim(str_replace('\\', '/', (string) $media->path), '/')),
+            'url' => \App\Support\MediaPath::url($media->path),
         ];
     });
 @endphp

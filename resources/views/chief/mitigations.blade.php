@@ -296,7 +296,7 @@
                                                     @else
                                                         <div class="attachments">
                                                             @foreach($action->attachments as $attachment)
-                                                                <a href="{{ asset('storage/' . $attachment->file_path) }}" target="_blank" rel="noopener">{{ $attachment->file_name ?: 'Attachment' }}</a>
+                                                                <a href="{{ \App\Support\MediaPath::url($attachment->file_path) }}" target="_blank" rel="noopener">{{ $attachment->file_name ?: 'Attachment' }}</a>
                                                             @endforeach
                                                         </div>
                                                     @endif

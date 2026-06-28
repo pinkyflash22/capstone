@@ -6,7 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaPath;
 
 class Post extends Model
 {
@@ -77,11 +77,7 @@ public function getImageUrlsAttribute()
     }
 
     return collect($this->images)->map(function ($image) {
-        $cleanPath = str_replace('\\/', '/', $image);
-        if (!str_contains($cleanPath, '/')) {
-            $cleanPath = 'posts/' . ltrim($cleanPath, '/');
-        }
-        return '/storage/' . ltrim($cleanPath, '/');
+        return MediaPath::url($image);
     })->toArray();
 }
 
@@ -91,11 +87,7 @@ public function getImageUrlsAttribute()
             return null;
         }
 
-        $cleanPath = str_replace('\\/', '/', $this->video);
-        if (!str_contains($cleanPath, '/')) {
-            $cleanPath = 'posts/' . ltrim($cleanPath, '/');
-        }
-        return '/storage/' . ltrim($cleanPath, '/');
+        return MediaPath::url($this->video);
     }
 // public function getImageUrlsAttribute()
 // {

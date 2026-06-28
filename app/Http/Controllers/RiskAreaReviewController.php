@@ -6,12 +6,12 @@ use App\Models\RiskArea;
 use App\Models\RiskAreaPhoto;
 use App\Models\StationOfficer;
 use App\Support\BarangayNotificationService;
+use App\Support\MediaPath;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -342,7 +342,10 @@ class RiskAreaReviewController extends Controller
                     continue;
                 }
 
-                $storedPath = $photo->store('risk-areas', 'public');
+                $storedPath = MediaPath::storeForDisk(
+                    $photo->store('risk-areas', 'supabase'),
+                    'supabase'
+                );
 
                 RiskAreaPhoto::create([
                     'risk_area_id' => $riskArea->risk_area_id,
@@ -689,7 +692,7 @@ class RiskAreaReviewController extends Controller
 
         foreach ($riskArea->photos as $photo) {
             if (! empty($photo->photo_path)) {
-                Storage::disk('public')->delete($photo->photo_path);
+                MediaPath::delete($photo->photo_path);
             }
 
             $photo->delete();

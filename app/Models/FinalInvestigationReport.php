@@ -15,6 +15,7 @@ class FinalInvestigationReport extends Model
     protected $fillable = [
         'station_officer_id',
         'report_completed_at',
+        'memorandum_for',
         'exact_address',
         'office_address',
         'alarm_at',

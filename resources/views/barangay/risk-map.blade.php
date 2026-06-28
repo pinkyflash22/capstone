@@ -389,8 +389,8 @@
                             @if($riskArea->photos->isNotEmpty())
                                 <div class="mt-3 grid grid-cols-3 gap-2">
                                     @foreach($riskArea->photos->take(3) as $photo)
-                                        <a href="{{ asset('storage/' . ltrim($photo->photo_path, '/')) }}" target="_blank" rel="noopener" class="block overflow-hidden rounded-xl border border-slate-200 bg-white aspect-square">
-                                            <img src="{{ asset('storage/' . ltrim($photo->photo_path, '/')) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}" class="w-full h-full object-cover">
+                                        <a href="{{ \App\Support\MediaPath::url($photo->photo_path) }}" target="_blank" rel="noopener" class="block overflow-hidden rounded-xl border border-slate-200 bg-white aspect-square">
+                                            <img src="{{ \App\Support\MediaPath::url($photo->photo_path) }}" alt="{{ $photo->photo_name ?: 'Risk area photo' }}" class="w-full h-full object-cover">
                                         </a>
                                     @endforeach
                                 </div>

@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Support\BarangayNotificationService;
 use App\Support\IncidentContextDispatcher;
 use App\Support\HistoricalFireIncidentSynchronizer;
+use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -806,7 +807,7 @@ class BarangayDashboardController extends Controller
             ],
             'photos' => $riskArea->photos->take(3)->map(function (RiskAreaPhoto $photo) {
                 return [
-                    'url' => asset('storage/' . ltrim($photo->photo_path, '/')),
+                    'url' => MediaPath::url($photo->photo_path),
                     'name' => $photo->photo_name ?: 'Risk area photo',
                 ];
             })->values()->all(),
@@ -1188,7 +1189,10 @@ class BarangayDashboardController extends Controller
                     continue;
                 }
 
-                $storedPath = $photo->store('risk-areas', 'public');
+                $storedPath = MediaPath::storeForDisk(
+                    $photo->store('risk-areas', 'supabase'),
+                    'supabase'
+                );
 
                 RiskAreaPhoto::create([
                     'risk_area_id' => $riskArea->risk_area_id,
@@ -1287,7 +1291,10 @@ class BarangayDashboardController extends Controller
                     continue;
                 }
 
-                $storedPath = $photo->store('risk-areas', 'public');
+                $storedPath = MediaPath::storeForDisk(
+                    $photo->store('risk-areas', 'supabase'),
+                    'supabase'
+                );
 
                 RiskAreaPhoto::create([
                     'risk_area_id' => $riskArea->risk_area_id,

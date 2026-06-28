@@ -6,9 +6,9 @@ use App\Models\Marker;
 
 use App\Models\Status;
 use App\Models\Multimedia;
+use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class MarkerController extends Controller
@@ -291,9 +291,7 @@ public function update(Request $request, $markerId)
             // Delete multimedia if exists
             if ($marker->multimedia) {
                 try {
-                    if (\Storage::disk('public')->exists($marker->multimedia->path)) {
-                        \Storage::disk('public')->delete($marker->multimedia->path);
-                    }
+                    MediaPath::delete($marker->multimedia->path);
                     $marker->multimedia->delete();
                 } catch (\Exception $e) {
                     \Log::error('Error deleting multimedia', ['error' => $e->getMessage()]);

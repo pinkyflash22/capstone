@@ -18,6 +18,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\EventActivity;
+use App\Support\MediaPath;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -113,15 +114,13 @@ class FirefighterController extends Controller
             return null;
         }
 
-        $normalizedPath = str_replace('\\', '/', trim($path));
+        $normalizedPath = trim($path);
 
         if ($normalizedPath === '') {
             return null;
         }
 
-        return str_starts_with($normalizedPath, 'http://') || str_starts_with($normalizedPath, 'https://')
-            ? $normalizedPath
-            : asset('storage/' . ltrim($normalizedPath, '/'));
+        return MediaPath::url($normalizedPath);
     }
 
     protected function resolveUserTeam(?int $userId): ?Team

@@ -444,11 +444,7 @@ createPostElement(post) {
     if (post.image_urls && post.image_urls.length > 0) {
         if (post.image_urls.length === 1) {
             // Single image
-            const ur = post.image_urls[0];
-
-            const imageUrl = ur.substring(ur.indexOf('/storage'));
-            // post.image_urls[0];
-            console.log(imageUrl);
+            const imageUrl = post.image_urls[0];
             imagesHtml = `
                 <div class="post-media">
                     <img src="${imageUrl}" alt="Post image" loading="lazy"

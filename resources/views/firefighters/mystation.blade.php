@@ -19,10 +19,7 @@
         $currentOfficerName = trim(($stationOfficer?->user?->first_name ?? '') . ' ' . ($stationOfficer?->user?->last_name ?? '')) ?: 'Current Station Officer';
 
         if ($stationImagePath) {
-            $normalizedStationImage = str_replace('\\', '/', $stationImagePath);
-            $stationImageUrl = str_starts_with($normalizedStationImage, 'http://') || str_starts_with($normalizedStationImage, 'https://')
-                ? $normalizedStationImage
-                : asset('storage/' . ltrim($normalizedStationImage, '/'));
+            $stationImageUrl = \App\Support\MediaPath::url($stationImagePath);
         }
 
         $stationAddress = collect([
@@ -93,14 +90,10 @@
 
         $stationGallery = collect($station?->galleryMedia ?? [])
             ->map(function ($media) {
-                $normalizedPath = str_replace('\\', '/', (string) $media->path);
-
                 return [
                     'id' => $media->station_media_id,
                     'caption' => $media->caption,
-                    'url' => str_starts_with($normalizedPath, 'http://') || str_starts_with($normalizedPath, 'https://')
-                        ? $normalizedPath
-                        : asset('storage/' . ltrim($normalizedPath, '/')),
+                    'url' => \App\Support\MediaPath::url($media->path),
                 ];
             })
             ->values();
@@ -214,6 +207,7 @@
                     'incident_location' => $incidentReferenceLabel,
                     'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
                     'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'memorandum_for' => $report->memorandum_for,
                     'exact_address' => $report->exact_address,
                     'office_address' => $report->office_address,
                     'alarm_at' => optional($report->alarm_at)->toIso8601String(),
@@ -1519,6 +1513,10 @@
                             <label class="form-label">Report Completed</label>
                             <input type="datetime-local" name="report_completed_at" class="form-input">
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Respective Head of Office</label>
+                            <input type="text" name="memorandum_for" class="form-input" placeholder="Respective head of office">
+                        </div>
                         <div class="form-group full">
                             <label class="form-label">Office Address</label>
                             <textarea name="office_address" class="form-textarea" rows="2" placeholder="Complete address of the respective investigation and intelligence office"></textarea>
@@ -2420,6 +2418,10 @@
                         <textarea class="form-textarea" name="exact_address" rows="2" required>${escapeHtml(report.exact_address || '')}</textarea>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">Respective Head of Office</label>
+                        <input class="form-input" type="text" name="memorandum_for" value="${escapeHtml(report.memorandum_for || '')}">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Time and Date of Alarm</label>
                         <input class="form-input" type="datetime-local" name="alarm_at" value="${escapeHtml((report.alarm_at || '').slice(0, 16))}">
                     </div>
@@ -2625,6 +2627,7 @@
                 } else {
                     updated.total_damage = formData.get('total_damage');
                     updated.report_completed_at = formData.get('report_completed_at');
+                    updated.memorandum_for = formData.get('memorandum_for');
                     updated.office_address = formData.get('office_address');
                     updated.exact_address = formData.get('exact_address');
                     updated.alarm_at = formData.get('alarm_at');
@@ -2926,6 +2929,7 @@
                         incident_location: selectedLocation,
                         investigator_name: currentOfficerName,
                         report_completed_at: data.report_completed_at || formData.get('report_completed_at') || new Date().toISOString(),
+                        memorandum_for: formData.get('memorandum_for'),
                         office_address: data.office_address || formData.get('office_address'),
                         exact_address: formData.get('exact_address'),
                         alarm_at: data.alarm_at || formData.get('alarm_at'),

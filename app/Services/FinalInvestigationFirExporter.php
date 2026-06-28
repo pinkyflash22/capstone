@@ -14,7 +14,7 @@ use ZipArchive;
 class FinalInvestigationFirExporter
 {
     private const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-    private const TEMPLATE_PATH = 'app/private/templates/final-investigation-template-source-v2.docx';
+    private const TEMPLATE_PATH = 'app/private/templates/final-investigation-template-edited.docx';
     private const SUBSTANTIATING_DOCUMENT_OPTIONS = [
         'Spot Investigation Report',
         'Progress Investigation Report',
@@ -226,7 +226,6 @@ class FinalInvestigationFirExporter
         $recommendationParagraphs = $this->splitNarrativeParagraphs((string) $data['recommendation']);
         $recommendationParagraphIndex = 0;
         $selectedSubstantiatingDocuments = array_values(array_filter((array) ($data['substantiating_documents'] ?? [])));
-        $selectedSubstantiatingIndex = 0;
 
         foreach ($paragraphEntries as $entry) {
             $paragraph = $entry['paragraph'];
@@ -320,11 +319,10 @@ class FinalInvestigationFirExporter
 
             $normalizedSubstantiatingText = $this->normalizeSubstantiatingDocumentLabel($text);
             if (in_array($normalizedSubstantiatingText, self::SUBSTANTIATING_DOCUMENT_OPTIONS, true)) {
-                $nextSelectedDocument = $selectedSubstantiatingDocuments[$selectedSubstantiatingIndex] ?? null;
-                if ($nextSelectedDocument !== null) {
-                    $letterPrefix = chr(65 + $selectedSubstantiatingIndex) . '. ';
-                    $this->setParagraphText($paragraph, $letterPrefix . $nextSelectedDocument, ['first_line' => 360, 'align' => 'both']);
-                    $selectedSubstantiatingIndex++;
+                if (in_array($normalizedSubstantiatingText, $selectedSubstantiatingDocuments, true)) {
+                    $documentIndex = array_search($normalizedSubstantiatingText, self::SUBSTANTIATING_DOCUMENT_OPTIONS, true);
+                    $letterPrefix = $documentIndex !== false ? chr(65 + (int) $documentIndex) . '. ' : '';
+                    $this->setParagraphText($paragraph, $letterPrefix . $normalizedSubstantiatingText, ['first_line' => 360, 'align' => 'both']);
                 } else {
                     $this->clearParagraph($paragraph);
                 }
@@ -357,31 +355,37 @@ class FinalInvestigationFirExporter
                 continue;
             }
 
-            if (str_contains($text, 'Name and signature of the FAI')) {
+            if (
+                str_contains($text, 'Name and signature of the FAI')
+                || preg_match('/\bMarco Reyes Santos\b/i', $text)
+            ) {
                 $state = null;
                 $this->setParagraphSegments($paragraph, [
                     ['text' => $data['investigator_name'], 'bold' => true],
-                    ['break' => true],
                     ['text' => $data['investigator_role']],
-                ], ['align' => 'center']);
+                ]);
                 continue;
             }
 
-            if (str_contains($text, 'Name and signature of the Chief of the')) {
+            if (
+                str_contains($text, 'Name and signature of the Chief of the')
+                || preg_match('/\bJose Navarro Castro\b/i', $text)
+            ) {
                 $this->setParagraphSegments($paragraph, [
                     ['text' => $data['noted_by_name'], 'bold' => true],
-                    ['break' => true],
                     ['text' => $data['noted_by_role']],
-                ], ['align' => 'center']);
+                ]);
                 continue;
             }
 
-            if (str_contains($text, 'Name and Signature of the Head of Office')) {
+            if (
+                str_contains($text, 'Name and Signature of the Head of Office')
+                || preg_match('/\bLuis Garcia Morales\b/i', $text)
+            ) {
                 $this->setParagraphSegments($paragraph, [
                     ['text' => $data['approved_by_name'], 'bold' => true],
-                    ['break' => true],
                     ['text' => $data['approved_by_role']],
-                ], ['align' => 'center']);
+                ]);
                 continue;
             }
 

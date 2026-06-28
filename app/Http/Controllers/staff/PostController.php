@@ -7,8 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\Comment;
 use App\Models\PostLike;
+use App\Support\MediaPath;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Support\UserActivityLogger;
@@ -64,15 +64,18 @@ public function index()
                     $randomString = Str::random(30);
                     $extension = $image->getClientOriginalExtension();
                     $filename = $randomString . '.' . $extension;
-                    $path = $image->storeAs('posts', $filename, 'public');
-                    $imagePaths[] = $path;
+                    $path = $image->storeAs('posts', $filename, 'supabase');
+                    $imagePaths[] = MediaPath::storeForDisk($path, 'supabase');
                 }
             }
 
             if ($request->hasFile('video')) {
                 $videoFile = $request->file('video');
                 $videoFilename = Str::random(30) . '.' . $videoFile->getClientOriginalExtension();
-                $videoPath = $videoFile->storeAs('posts', $videoFilename, 'public');
+                $videoPath = MediaPath::storeForDisk(
+                    $videoFile->storeAs('posts', $videoFilename, 'supabase'),
+                    'supabase'
+                );
             }
 
             $pollOptions = collect($request->input('poll_options', []))
@@ -120,11 +123,11 @@ public function index()
             
             if (!empty($imagePaths)) {
                 foreach ($imagePaths as $path) {
-                    Storage::disk('public')->delete($path);
+                    MediaPath::delete($path);
                 }
             }
             if ($videoPath) {
-                Storage::disk('public')->delete($videoPath);
+                MediaPath::delete($videoPath);
             }
 
             return response()->json([
@@ -158,34 +161,40 @@ public function index()
 
             if ($request->boolean('remove_images')) {
                 foreach ($imagePaths as $path) {
-                    Storage::disk('public')->delete($path);
+                    MediaPath::delete($path);
                 }
                 $imagePaths = [];
             }
 
             if ($request->hasFile('images')) {
                 foreach ($imagePaths as $path) {
-                    Storage::disk('public')->delete($path);
+                    MediaPath::delete($path);
                 }
                 $imagePaths = [];
                 foreach ($request->file('images') as $image) {
                     $filename = Str::random(30) . '.' . $image->getClientOriginalExtension();
-                    $imagePaths[] = $image->storeAs('posts', $filename, 'public');
+                    $imagePaths[] = MediaPath::storeForDisk(
+                        $image->storeAs('posts', $filename, 'supabase'),
+                        'supabase'
+                    );
                 }
             }
 
             if ($request->boolean('remove_video') && $videoPath) {
-                Storage::disk('public')->delete($videoPath);
+                MediaPath::delete($videoPath);
                 $videoPath = null;
             }
 
             if ($request->hasFile('video')) {
                 if ($videoPath) {
-                    Storage::disk('public')->delete($videoPath);
+                    MediaPath::delete($videoPath);
                 }
                 $videoFile = $request->file('video');
                 $videoFilename = Str::random(30) . '.' . $videoFile->getClientOriginalExtension();
-                $videoPath = $videoFile->storeAs('posts', $videoFilename, 'public');
+                $videoPath = MediaPath::storeForDisk(
+                    $videoFile->storeAs('posts', $videoFilename, 'supabase'),
+                    'supabase'
+                );
             }
 
             $pollOptions = collect($request->input('poll_options', []))
@@ -419,11 +428,11 @@ public function index()
         try {
             if ($post->images) {
                 foreach ($post->images as $image) {
-                    Storage::disk('public')->delete($image);
+                    MediaPath::delete($image);
                 }
             }
             if ($post->video) {
-                Storage::disk('public')->delete($post->video);
+                MediaPath::delete($post->video);
             }
 
             $post->delete();

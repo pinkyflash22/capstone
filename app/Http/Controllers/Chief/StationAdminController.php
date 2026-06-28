@@ -29,12 +29,12 @@ use App\Models\EventActivity;
 
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
 
@@ -333,7 +333,10 @@ class StationAdminController extends Controller
                 continue;
             }
 
-            $storedPath = $file->store('mitigation-actions', 'public');
+            $storedPath = MediaPath::storeForDisk(
+                $file->store('mitigation-actions', 'supabase'),
+                'supabase'
+            );
 
             MitigationActionAttachment::create([
                 'mitigation_action_id' => $action->mitigation_action_id,
@@ -825,7 +828,7 @@ class StationAdminController extends Controller
         DB::transaction(function () use ($action, $request) {
             foreach ($action->attachments as $attachment) {
                 if (! empty($attachment->file_path)) {
-                    Storage::disk('public')->delete($attachment->file_path);
+                    MediaPath::delete($attachment->file_path);
                 }
             }
 

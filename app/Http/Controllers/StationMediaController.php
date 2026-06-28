@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Station;
 use App\Models\StationMedia;
 use App\Models\StationOfficer;
+use App\Support\MediaPath;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class StationMediaController extends Controller
 {
@@ -39,11 +39,14 @@ class StationMediaController extends Controller
 
         $existingProfile = $station->profileMedia()->first();
         if ($existingProfile) {
-            Storage::disk('public')->delete($existingProfile->path);
+            MediaPath::delete($existingProfile->path);
             $existingProfile->delete();
         }
 
-        $path = $validated['profile_image']->store('station-media/profile', 'public');
+        $path = MediaPath::storeForDisk(
+            $validated['profile_image']->store('station-media/profile', 'supabase'),
+            'supabase'
+        );
 
         StationMedia::create([
             'station_id' => $station->station_id,
@@ -70,7 +73,10 @@ class StationMediaController extends Controller
             ->max('sort_order');
 
         foreach ($validated['gallery_images'] as $index => $image) {
-            $path = $image->store('station-media/gallery', 'public');
+            $path = MediaPath::storeForDisk(
+                $image->store('station-media/gallery', 'supabase'),
+                'supabase'
+            );
 
             StationMedia::create([
                 'station_id' => $station->station_id,
@@ -90,7 +96,7 @@ class StationMediaController extends Controller
         $station = $stationMedia->station;
         abort_unless($station && $this->canManageStation($station), 403);
 
-        Storage::disk('public')->delete($stationMedia->path);
+        MediaPath::delete($stationMedia->path);
         $stationMedia->delete();
 
         return back()->with('success', 'Station image removed successfully.');

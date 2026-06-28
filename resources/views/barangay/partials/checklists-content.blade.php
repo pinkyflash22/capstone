@@ -167,7 +167,7 @@
                                 @else
                                     @foreach($action->attachments->take(3) as $attachment)
                                         <div class="checklist-inline-note">
-                                            <a href="{{ asset('storage/' . $attachment->file_path) }}" target="_blank" rel="noopener">{{ $attachment->file_name ?: 'Attachment' }}</a>
+                                            <a href="{{ \App\Support\MediaPath::url($attachment->file_path) }}" target="_blank" rel="noopener">{{ $attachment->file_name ?: 'Attachment' }}</a>
                                         </div>
                                     @endforeach
                                 @endif
