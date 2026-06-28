@@ -2,7 +2,7 @@
     "name": "PyroSense",
     "short_name": "PyroSense",
     "description": "Fire Response App and Predictive Analysis",
-    "start_url": "/pwa/quick-report",
+    "start_url": "/pwa/quick-report?source=installed",
     "scope": "/",
     "background_color": "#ffffff",
     "theme_color": "#d14b24",

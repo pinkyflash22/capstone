@@ -651,7 +651,15 @@ class LoginController extends Controller
             return;
         }
 
-        if ($postLoginAction === 'quick-report' && $role === 'citizen') {
+        if (in_array($postLoginAction, ['quick-report', 'citizen-mobile-hub'], true) && $role === 'citizen') {
+            session([
+                'redirect_to_citizen_mobile_hub' => true,
+            ]);
+
+            return;
+        }
+
+        if ($postLoginAction === 'quick-report-legacy' && $role === 'citizen') {
             session([
                 'open_section' => 'overview',
                 'open_incident_modal' => true,
