@@ -1,5 +1,5 @@
 @php
-    $pwaLogo = $pwaLogo ?? 'storage/defaults/pyrosense.png';
+    $pwaLogo = $pwaLogo ?? 'icon-192x192.png';
     $pwaThemeColor = $pwaThemeColor ?? '#d14b24';
 @endphp
 

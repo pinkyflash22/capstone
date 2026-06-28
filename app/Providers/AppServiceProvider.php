@@ -24,21 +24,26 @@ class AppServiceProvider extends ServiceProvider
     {
         BarangayPredictionChecklist::observe(BarangayPredictionChecklistObserver::class);
 
-        if ($this->app->runningInConsole()) {
-            return;
-        }
+        if (app()->environment('production')) {
+            $appUrl = rtrim((string) config('app.url'), '/');
 
-        $request = request();
-        $rootUrl = $request->getSchemeAndHttpHost();
+            if ($appUrl !== '') {
+                URL::forceRootUrl($appUrl);
+                URL::forceScheme((string) parse_url($appUrl, PHP_URL_SCHEME) ?: 'https');
+            }
+        } elseif (! $this->app->runningInConsole()) {
+            $request = request();
+            $rootUrl = $request->getSchemeAndHttpHost();
 
-        if ($rootUrl) {
-            URL::forceRootUrl($rootUrl);
-        }
+            if ($rootUrl) {
+                URL::forceRootUrl($rootUrl);
+            }
 
-        $forwardedProto = $request->header('X-Forwarded-Proto');
+            $forwardedProto = $request->header('X-Forwarded-Proto');
 
-        if ($request->isSecure() || $forwardedProto === 'https') {
-            URL::forceScheme('https');
+            if ($request->isSecure() || $forwardedProto === 'https') {
+                URL::forceScheme('https');
+            }
         }
     }
 }

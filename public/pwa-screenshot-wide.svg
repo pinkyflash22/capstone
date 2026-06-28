@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bgWide" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff5dc"/>
+      <stop offset="100%" stop-color="#fff0e8"/>
+    </linearGradient>
+    <linearGradient id="accentWide" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c63d26"/>
+      <stop offset="100%" stop-color="#d18a16"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bgWide)"/>
+  <rect x="28" y="28" width="1224" height="664" rx="34" fill="#ffffff" stroke="#f0d5c9" stroke-width="4"/>
+  <rect x="56" y="56" width="1168" height="86" rx="24" fill="url(#accentWide)"/>
+  <text x="96" y="110" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#fff">PyroSense Command Dashboard</text>
+  <text x="852" y="108" font-family="Arial, sans-serif" font-size="22" fill="#fff8f2">Render-deployed PWA experience</text>
+  <rect x="56" y="170" width="252" height="492" rx="28" fill="#fff8f4" stroke="#efd7cc"/>
+  <text x="88" y="216" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#81411f">Overview</text>
+  <rect x="88" y="248" width="188" height="86" rx="22" fill="#fff"/>
+  <rect x="88" y="354" width="188" height="86" rx="22" fill="#fff"/>
+  <rect x="88" y="460" width="188" height="86" rx="22" fill="#fff"/>
+  <text x="112" y="286" font-family="Arial, sans-serif" font-size="18" fill="#8f4b2d">Active Incidents</text>
+  <text x="112" y="320" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#c63d26">12</text>
+  <text x="112" y="392" font-family="Arial, sans-serif" font-size="18" fill="#8f4b2d">Responders Ready</text>
+  <text x="112" y="426" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#c63d26">28</text>
+  <text x="112" y="498" font-family="Arial, sans-serif" font-size="18" fill="#8f4b2d">Hydrants Nearby</text>
+  <text x="112" y="532" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#2563eb">46</text>
+  <rect x="334" y="170" width="540" height="492" rx="28" fill="#fffaf6" stroke="#efd7cc"/>
+  <text x="366" y="216" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#81411f">Incident Map and Routes</text>
+  <rect x="366" y="248" width="476" height="382" rx="22" fill="#f0ede8"/>
+  <path d="M398 560 C496 448, 594 520, 678 426 S812 360, 824 472" fill="none" stroke="#d18a16" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="488" cy="486" r="18" fill="#c63d26"/>
+  <circle cx="658" cy="458" r="18" fill="#c63d26"/>
+  <circle cx="784" cy="414" r="18" fill="#2563eb"/>
+  <rect x="902" y="170" width="322" height="236" rx="28" fill="#fff8f4" stroke="#efd7cc"/>
+  <text x="934" y="216" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#81411f">Forecast</text>
+  <rect x="934" y="252" width="258" height="22" rx="11" fill="#efe5dd"/>
+  <rect x="934" y="252" width="194" height="22" rx="11" fill="#c63d26"/>
+  <text x="934" y="310" font-family="Arial, sans-serif" font-size="20" fill="#8f4b2d">High-risk barangay probability</text>
+  <text x="934" y="360" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#c63d26">78%</text>
+  <rect x="902" y="426" width="322" height="236" rx="28" fill="#fff8f4" stroke="#efd7cc"/>
+  <text x="934" y="472" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#81411f">Actions</text>
+  <rect x="934" y="510" width="124" height="52" rx="16" fill="url(#accentWide)"/>
+  <rect x="1068" y="510" width="124" height="52" rx="16" fill="#ffffff" stroke="#d8b8a6"/>
+  <text x="966" y="543" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#fff">Dispatch</text>
+  <text x="1106" y="543" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#8f4b2d">Review</text>
+</svg>

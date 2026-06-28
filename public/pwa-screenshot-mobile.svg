@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1280" viewBox="0 0 720 1280">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff5dc"/>
+      <stop offset="100%" stop-color="#fff0e8"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c63d26"/>
+      <stop offset="100%" stop-color="#d18a16"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="1280" fill="url(#bg)"/>
+  <rect x="36" y="36" width="648" height="1208" rx="42" fill="#ffffff" stroke="#f1d2c5" stroke-width="4"/>
+  <rect x="72" y="88" width="576" height="112" rx="28" fill="url(#accent)"/>
+  <circle cx="134" cy="144" r="30" fill="#fff"/>
+  <text x="182" y="136" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#fff">PyroSense</text>
+  <text x="182" y="172" font-family="Arial, sans-serif" font-size="18" fill="#fff3ea">PWA mobile field dashboard</text>
+  <rect x="72" y="236" width="272" height="154" rx="26" fill="#fff7f2" stroke="#f0d5c9"/>
+  <rect x="376" y="236" width="272" height="154" rx="26" fill="#fff7f2" stroke="#f0d5c9"/>
+  <text x="104" y="290" font-family="Arial, sans-serif" font-size="22" fill="#8f4b2d">Active Incidents</text>
+  <text x="104" y="350" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#c63d26">12</text>
+  <text x="408" y="290" font-family="Arial, sans-serif" font-size="22" fill="#8f4b2d">Response Teams</text>
+  <text x="408" y="350" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#c63d26">5</text>
+  <rect x="72" y="430" width="576" height="300" rx="30" fill="#fffaf6" stroke="#efd7cc"/>
+  <text x="104" y="486" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#81411f">Live Incident Map</text>
+  <rect x="104" y="518" width="512" height="180" rx="22" fill="#f3efe8"/>
+  <path d="M136 658 C212 584, 270 610, 332 564 S474 530, 584 610" fill="none" stroke="#d18a16" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="238" cy="612" r="16" fill="#c63d26"/>
+  <circle cx="442" cy="578" r="16" fill="#c63d26"/>
+  <circle cx="524" cy="622" r="16" fill="#2563eb"/>
+  <rect x="72" y="770" width="576" height="178" rx="30" fill="#fff7f2" stroke="#efd7cc"/>
+  <text x="104" y="826" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#81411f">Barangay Risk Forecast</text>
+  <rect x="104" y="854" width="380" height="20" rx="10" fill="#efe5dd"/>
+  <rect x="104" y="854" width="300" height="20" rx="10" fill="#c63d26"/>
+  <text x="506" y="870" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#c63d26">78%</text>
+  <rect x="72" y="988" width="576" height="184" rx="30" fill="#fff7f2" stroke="#efd7cc"/>
+  <text x="104" y="1044" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#81411f">Quick Actions</text>
+  <rect x="104" y="1076" width="160" height="56" rx="18" fill="url(#accent)"/>
+  <rect x="280" y="1076" width="160" height="56" rx="18" fill="#ffffff" stroke="#d8b8a6"/>
+  <rect x="456" y="1076" width="160" height="56" rx="18" fill="#ffffff" stroke="#d8b8a6"/>
+  <text x="145" y="1113" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#fff">Report</text>
+  <text x="315" y="1113" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#8f4b2d">Map</text>
+  <text x="494" y="1113" font-family="Arial, sans-serif" font-size="21" font-weight="700" fill="#8f4b2d">Alerts</text>
+</svg>
