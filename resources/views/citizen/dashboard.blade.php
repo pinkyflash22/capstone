@@ -1794,21 +1794,34 @@
                         {{-- <input type="hidden" name="reported_by" value="{{ $accountId }}"> --}}
                         <div class="rounded-xl border border-orange-100 bg-orange-50 px-4 py-4 text-sm text-slate-700 mb-4">
                             <p class="font-semibold text-slate-900 mb-1">Choose a report type</p>
-                            <p>Use your current location to submit a fire, risk, or hazard report from the citizen dashboard.</p>
+                            <p>Use your current location to submit either an emergency fire report or a general safety concern.</p>
+                            <p class="mt-2 text-xs text-slate-500">If you are unsure whether it is a hazard or a risk, choose <strong>Safety Concern</strong>. PyroSense will save it first, then BFP can verify and reclassify it during review.</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 mb-4">
+                            <label for="concernTypeSelect" class="block font-semibold text-slate-900 mb-2">Safety concern type</label>
+                            <select id="concernTypeSelect" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700">
+                                <option value="unsure">I am not sure yet</option>
+                                <option value="electrical_issue">Electrical issue</option>
+                                <option value="unsafe_cooking_lpg">Unsafe cooking or LPG use</option>
+                                <option value="blocked_hydrant_access">Blocked hydrant or fire access</option>
+                                <option value="combustible_clutter">Combustible clutter or open burning</option>
+                                <option value="dense_fire_prone_area">Dense fire-prone area</option>
+                            </select>
+                            <p class="mt-2 text-xs text-slate-500">Choose the closest match. If it is unclear, leave it on <strong>I am not sure yet</strong> and let BFP review it.</p>
                         </div>
                         <div id="hazardLocationPanel" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 mb-4">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
-                                    <p class="font-semibold text-slate-900 mb-1">Hazard location</p>
-                                    <p>For hazard reports, use your location or pick a point within 100 meters on the map.</p>
+                                    <p class="font-semibold text-slate-900 mb-1">Safety concern location</p>
+                                    <p>For non-fire concerns, use your location or pick a point within 100 meters on the map.</p>
                                 </div>
-                                <span class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Hazard only</span>
+                                <span class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Non-fire</span>
                             </div>
                             <div class="flex flex-wrap gap-2 mt-3">
                                 <button type="button" id="hazardUseCurrentLocationButton" class="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm">Use My Location</button>
                                 <button type="button" id="hazardPickOnMapButton" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm">Pick on Map (100m)</button>
                             </div>
-                            <p id="hazardLocationStatus" class="mt-3 text-xs text-slate-500">Hazard reports will use your current location unless you pick another point on the map.</p>
+                            <p id="hazardLocationStatus" class="mt-3 text-xs text-slate-500">Safety concern reports will use your current location unless you pick another point on the map.</p>
                         </div>
 
                         <input type="hidden" name="" id="reported_by" value="{{ $accountId }}">
@@ -1816,8 +1829,7 @@
                     <input type="hidden" id="longitude" value="">
                     <div class="flex flex-wrap justify-end gap-2">
                         <button type="button" id="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="hazard">Report Hazard</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-violet-600 text-white rounded" data-report-kind="risk">Report Risk</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="concern">Report Safety Concern</button>
                         <button type="button" class="js-citizen-report-action px-4 py-2 bg-blue-600 text-white rounded" data-report-kind="fire">Report Fire</button>
                     </div>
                 </form>
@@ -2686,7 +2698,7 @@ if (navigator.geolocation) {
             }
 
             if (citizenHazardDraft.picking) {
-                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the hazard point.';
+                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the safety concern point.';
                 return;
             }
 
@@ -2695,7 +2707,7 @@ if (navigator.geolocation) {
                 return;
             }
 
-            statusNode.textContent = 'Hazard reports will use your current location unless you pick another point on the map.';
+            statusNode.textContent = 'Safety concern reports will use your current location unless you pick another point on the map.';
         }
 
         function setCitizenHazardCurrentLocation() {
@@ -2780,12 +2792,12 @@ if (navigator.geolocation) {
 
                     updateCitizenHazardLocationUi();
                     openIncidentModal();
-                    window.showCitizenToast?.('Hazard point selected. Tap Report Hazard to submit.', false, 3800);
+                    window.showCitizenToast?.('Safety concern point selected. Tap Report Safety Concern to submit.', false, 3800);
                 };
 
                 window.usermap.on('click', citizenHazardDraft.clickHandler);
                 updateCitizenHazardLocationUi();
-                window.showCitizenToast?.('Tap the map within 100 meters of your current location to place the hazard point.', false, 4200);
+                window.showCitizenToast?.('Tap the map within 100 meters of your current location to place the safety concern point.', false, 4200);
             }, 200);
         }
 
@@ -2882,6 +2894,7 @@ async function submitCitizenQuickReport(reportKind) {
     const description = '';
     const incidentTypeId = 1;
     const reporter = document.getElementById('reported_by').value;
+    const concernType = document.getElementById('concernTypeSelect')?.value || 'unsure';
     const loadingOverlay = document.getElementById('incidentReportLoadingOverlay');
     const loadingTitle = document.getElementById('incidentReportLoadingTitle');
     const loadingMessage = document.getElementById('incidentReportLoadingMessage');
@@ -2894,8 +2907,7 @@ async function submitCitizenQuickReport(reportKind) {
     }));
     const reportLabels = {
         fire: 'fire report',
-        risk: 'risk report',
-        hazard: 'hazard report',
+        concern: 'safety concern report',
     };
 
     // Check if location is ready
@@ -2904,7 +2916,7 @@ async function submitCitizenQuickReport(reportKind) {
         return;
     }
 
-    if (reportKind === 'hazard' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
+    if (reportKind === 'concern' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
         startCitizenHazardMapPick();
         return;
     }
@@ -2939,10 +2951,10 @@ async function submitCitizenQuickReport(reportKind) {
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
         } else {
-            const targetLat = reportKind === 'hazard' && citizenHazardDraft.mode === 'picked'
+            const targetLat = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
                 ? Number(citizenHazardDraft.selectedLat)
                 : Number(window.userCoords.currentLatitude);
-            const targetLng = reportKind === 'hazard' && citizenHazardDraft.mode === 'picked'
+            const targetLng = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
                 ? Number(citizenHazardDraft.selectedLng)
                 : Number(window.userCoords.currentLongitude);
             const response = await fetch('{{ route('citizen.risk-reports.store') }}', {
@@ -2955,6 +2967,7 @@ async function submitCitizenQuickReport(reportKind) {
                 },
                 body: JSON.stringify({
                     report_kind: reportKind,
+                    concern_type: concernType,
                     lat: targetLat,
                     lng: targetLng,
                     user_lat: Number(window.userCoords.currentLatitude),
@@ -2981,7 +2994,7 @@ async function submitCitizenQuickReport(reportKind) {
 
         if (success) {
             document.getElementById('incidentForm').reset();
-            if (reportKind === 'hazard') {
+            if (reportKind === 'concern') {
                 citizenHazardDraft.mode = 'current';
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
@@ -3322,7 +3335,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.runPendingIncidentAutoAssignment = async function() {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const incidentId = window.latestReportedIncidentId || null;
+
     if (!token) {
+        return;
+    }
+
+    if (!incidentId) {
         return;
     }
 
@@ -3335,7 +3354,7 @@ window.runPendingIncidentAutoAssignment = async function() {
 
         const controller = new AbortController();
         timeoutId = window.setTimeout(() => controller.abort(), 10000);
-        window.citizenAutoAssignRequest = fetch('/api/incidents/auto-assign-recent-unassigned', {
+        window.citizenAutoAssignRequest = fetch(`/api/incidents/${incidentId}/auto-assign`, {
             method: 'POST',
             cache: 'no-store',
             signal: controller.signal,
@@ -3347,13 +3366,13 @@ window.runPendingIncidentAutoAssignment = async function() {
         const response = await window.citizenAutoAssignRequest;
         window.clearTimeout(timeoutId);
         const result = await response.json().catch(() => ({}));
-        if (result?.success && Number(result.assigned) > 0) {
+        if (result?.success && result.assigned) {
             if (window.refreshCitizenOverviewData) {
                 window.refreshCitizenOverviewData();
             }
         }
     } catch (error) {
-        console.error('Background incident auto-assignment failed:', error);
+        console.error(`Background incident auto-assignment failed for incident ${incidentId}:`, error);
     } finally {
         if (timeoutId) {
             window.clearTimeout(timeoutId);

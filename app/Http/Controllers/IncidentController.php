@@ -14,6 +14,7 @@ use App\Support\IncidentContextDispatcher;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -285,6 +286,7 @@ class IncidentController extends Controller
 
         return Team::where('status', 'available')
             ->whereIn('team_leader', $stationOfficerUserIds->all())
+            ->lockForUpdate()
             ->orderBy('team_id')
             ->first();
     }
@@ -391,6 +393,62 @@ class IncidentController extends Controller
             'checked' => $incidents->count(),
             'assigned' => $assignedIncident ? [$assignedIncident] : [],
         ];
+    }
+
+    private function processSingleIncidentAssignment(Incident $incident): ?array
+    {
+        return DB::transaction(function () use ($incident) {
+            $lockedIncident = Incident::with('marker')
+                ->whereKey($incident->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedIncident) {
+                return null;
+            }
+
+            if ($lockedIncident->team_id || $lockedIncident->status !== self::STATUS_DB_REPORTED) {
+                return null;
+            }
+
+            $marker = $lockedIncident->marker;
+            if (! $marker || $marker->lat === null || $marker->lng === null) {
+                return null;
+            }
+
+            $nearestStations = $this->getCandidateStationsForIncident(
+                $lockedIncident,
+                (float) $marker->lat,
+                (float) $marker->lng
+            );
+
+            foreach ($nearestStations as $station) {
+                $stationId = (int) $station->station_id;
+                $team = $this->findAvailableTeamForStation($stationId);
+
+                if (! $team) {
+                    continue;
+                }
+
+                $lockedIncident->team_id = $team->team_id;
+                $lockedIncident->status = self::STATUS_DB_RESPONDING;
+                $lockedIncident->updated_at = now();
+                $lockedIncident->save();
+
+                $this->markTeamResponding($team);
+
+                return [
+                    'incident_id' => $lockedIncident->incident_id,
+                    'team_id' => $team->team_id,
+                    'station_id' => $stationId,
+                    'status' => self::STATUS_NAME_RESPONDING,
+                    'team_status_updated' => true,
+                    'created_at' => optional($lockedIncident->created_at)->toISOString(),
+                ];
+            }
+
+            return null;
+        });
     }
 
     public function index()
@@ -989,6 +1047,34 @@ public function autoAssignRecentUnassignedIncidents(Request $request)
         return response()->json([
             'success' => false,
             'message' => 'Failed to auto-assign pending incidents.'
+        ], 500);
+    }
+}
+
+public function autoAssignIncident(Request $request, string $incidentId)
+{
+    try {
+        $incident = Incident::with('marker')->findOrFail($incidentId);
+        $assigned = $this->processSingleIncidentAssignment($incident);
+
+        return response()->json([
+            'success' => true,
+            'incident_id' => (int) $incident->incident_id,
+            'assigned' => $assigned !== null,
+            'assigned_incident' => $assigned,
+            'message' => $assigned
+                ? 'Incident auto-assigned successfully.'
+                : 'No available team was assigned to this incident yet.',
+        ]);
+    } catch (\Throwable $e) {
+        Log::error('Error auto-assigning incident by id: ' . $e->getMessage(), [
+            'incident_id' => $incidentId,
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to auto-assign this incident.'
         ], 500);
     }
 }

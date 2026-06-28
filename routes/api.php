@@ -376,6 +376,7 @@ Route::prefix('personnel')->group(function () {
 });
 
 Route::get('/incident/latest', [IncidentController::class, 'latest']);
+Route::post('/incidents/{incidentId}/auto-assign', [IncidentController::class, 'autoAssignIncident']);
 Route::post('/incidents/auto-assign-recent-unassigned', [IncidentController::class, 'autoAssignRecentUnassignedIncidents']);
 // Route::post('/incidentReport', [IncidentReportController::class, 'store']);
 

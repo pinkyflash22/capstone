@@ -200,27 +200,125 @@ class PublicController extends Controller
     {
         if ($reportKind === 'hazard') {
             return [
-                'title' => 'Citizen Hazard Report',
-                'location_description' => 'Citizen-submitted hazard report awaiting barangay review.',
+                'title' => 'Citizen Hazard Concern',
+                'location_description' => 'Citizen-submitted on-site hazard concern awaiting BFP and barangay verification.',
                 'entry_type' => 'hazard',
                 'hazard_category' => 'electrical_hazard',
                 'risk_type' => null,
                 'condition_code' => 'exposed_wires',
                 'marker_category' => 'hazard',
-                'review_notes' => 'Awaiting chief or administrator verification after citizen quick-report submission.',
+                'risk_factor' => 'electrical_risk',
+                'mode' => 'high',
+                'condition_label' => 'Possible on-site hazard',
+                'hazard_type' => 'electrical',
+                'review_notes' => 'Awaiting BFP or administrator verification. Final classification may be adjusted after review.',
             ];
         }
 
         return [
-            'title' => 'Citizen Risk Report',
-            'location_description' => 'Citizen-submitted area risk report awaiting barangay review.',
+            'title' => 'Citizen Area Risk Concern',
+            'location_description' => 'Citizen-submitted area fire-risk concern awaiting BFP and barangay verification.',
             'entry_type' => 'risk',
             'hazard_category' => null,
             'risk_type' => 'historical_fire_prone_risk',
             'condition_code' => 'known_fire_prone_location',
             'marker_category' => 'risk',
-            'review_notes' => 'Awaiting chief or administrator verification after citizen quick-report submission.',
+            'risk_factor' => 'wiring',
+            'mode' => 'moderate',
+            'condition_label' => 'Possible fire-prone area',
+            'hazard_type' => 'none',
+            'review_notes' => 'Awaiting BFP or administrator verification. Final classification may be adjusted after review.',
         ];
+    }
+
+    private function resolveCitizenConcernTemplate(string $concernType): array
+    {
+        return match ($concernType) {
+            'electrical_issue' => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Possible electrical fire hazard reported by a citizen.',
+                'entry_type' => 'hazard',
+                'hazard_category' => 'electrical_hazard',
+                'risk_type' => null,
+                'risk_factor' => 'electrical_risk',
+                'mode' => 'high',
+                'condition_code' => 'electrical_issue',
+                'condition_label' => 'Possible electrical hazard',
+                'hazard_type' => 'electrical',
+                'marker_category' => 'hazard',
+                'review_notes' => 'Citizen reported a possible electrical hazard. Awaiting BFP verification and classification review.',
+            ],
+            'unsafe_cooking_lpg' => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Possible unsafe cooking or LPG setup reported by a citizen.',
+                'entry_type' => 'hazard',
+                'hazard_category' => 'flammable_hazard',
+                'risk_type' => null,
+                'risk_factor' => 'wiring',
+                'mode' => 'high',
+                'condition_code' => 'unsafe_cooking_lpg',
+                'condition_label' => 'Possible unsafe cooking or LPG setup',
+                'hazard_type' => 'flammable',
+                'marker_category' => 'hazard',
+                'review_notes' => 'Citizen reported a possible LPG or cooking-related hazard. Awaiting BFP verification and classification review.',
+            ],
+            'blocked_hydrant_access' => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Possible blocked hydrant or poor water access reported by a citizen.',
+                'entry_type' => 'risk',
+                'hazard_category' => null,
+                'risk_type' => 'hydrant_access_risk',
+                'risk_factor' => 'wiring',
+                'mode' => 'moderate',
+                'condition_code' => 'blocked_hydrant_access',
+                'condition_label' => 'Possible hydrant or water-access risk',
+                'hazard_type' => 'none',
+                'marker_category' => 'risk',
+                'review_notes' => 'Citizen reported a possible hydrant or water-access concern. Awaiting BFP verification and classification review.',
+            ],
+            'combustible_clutter' => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Possible combustible clutter or waste buildup reported by a citizen.',
+                'entry_type' => 'risk',
+                'hazard_category' => null,
+                'risk_type' => 'combustible_material_risk',
+                'risk_factor' => 'housing_material',
+                'mode' => 'moderate',
+                'condition_code' => 'combustible_clutter',
+                'condition_label' => 'Possible combustible clutter or waste buildup',
+                'hazard_type' => 'none',
+                'marker_category' => 'risk',
+                'review_notes' => 'Citizen reported possible combustible clutter or waste buildup. Awaiting BFP verification and classification review.',
+            ],
+            'dense_fire_prone_area' => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Possible fire-prone area condition reported by a citizen.',
+                'entry_type' => 'risk',
+                'hazard_category' => null,
+                'risk_type' => 'historical_fire_prone_risk',
+                'risk_factor' => 'housing_spacing',
+                'mode' => 'moderate',
+                'condition_code' => 'dense_fire_prone_area',
+                'condition_label' => 'Possible fire-prone area condition',
+                'hazard_type' => 'none',
+                'marker_category' => 'risk',
+                'review_notes' => 'Citizen reported a possible fire-prone area condition. Awaiting BFP verification and classification review.',
+            ],
+            default => [
+                'title' => 'Citizen Safety Concern',
+                'location_description' => 'Citizen-submitted safety concern awaiting BFP verification.',
+                'entry_type' => 'risk',
+                'hazard_category' => null,
+                'risk_type' => 'general_fire_safety_concern',
+                'risk_factor' => 'wiring',
+                'mode' => 'moderate',
+                'condition_code' => 'general_safety_concern',
+                'condition_label' => 'General fire safety concern',
+                'hazard_type' => 'none',
+                'marker_category' => 'risk',
+                'review_notes' => 'Citizen was unsure whether the concern was a risk or hazard. Awaiting BFP verification and final classification.',
+            ],
+        };
     }
 
     private function buildCitizenDashboardData(int $accountId, ?float $latitude = null, ?float $longitude = null): array
@@ -377,7 +475,15 @@ class PublicController extends Controller
     public function storeCitizenRiskReport(Request $request, BoundaryMatcherService $boundaryMatcherService)
     {
         $validated = $request->validate([
-            'report_kind' => ['required', Rule::in(['hazard', 'risk'])],
+            'report_kind' => ['required', Rule::in(['hazard', 'risk', 'concern'])],
+            'concern_type' => ['nullable', Rule::in([
+                'electrical_issue',
+                'unsafe_cooking_lpg',
+                'blocked_hydrant_access',
+                'combustible_clutter',
+                'dense_fire_prone_area',
+                'unsure',
+            ])],
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'user_lat' => ['nullable', 'numeric', 'between:-90,90'],
@@ -385,19 +491,24 @@ class PublicController extends Controller
         ]);
 
         $user = User::with('address.barangay.barangayHall')->findOrFail(Auth::user()->user_id);
-        $template = $this->resolveCitizenQuickRiskTemplate($validated['report_kind']);
+        $reportKind = $validated['report_kind'] === 'concern'
+            ? 'hazard'
+            : $validated['report_kind'];
+        $template = $validated['report_kind'] === 'concern'
+            ? $this->resolveCitizenConcernTemplate((string) ($validated['concern_type'] ?? 'unsure'))
+            : $this->resolveCitizenQuickRiskTemplate($validated['report_kind']);
         $targetLat = (float) $validated['lat'];
         $targetLng = (float) $validated['lng'];
         $hall = null;
 
-        if ($validated['report_kind'] === 'hazard') {
+        if ($reportKind === 'hazard') {
             $userLat = isset($validated['user_lat']) ? (float) $validated['user_lat'] : null;
             $userLng = isset($validated['user_lng']) ? (float) $validated['user_lng'] : null;
 
             if ($userLat === null || $userLng === null) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Your current location is required to validate hazard reports.',
+                    'message' => 'Your current location is required to validate non-fire safety concerns.',
                 ], 422);
             }
 
@@ -406,7 +517,7 @@ class PublicController extends Controller
             if ($distanceFromCitizen > 100) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Hazard reports must use your current location or a point within 100 meters of you.',
+                    'message' => 'Non-fire safety concerns must use your current location or a point within 100 meters of you.',
                 ], 422);
             }
 
@@ -459,12 +570,12 @@ class PublicController extends Controller
                 'hazard_category' => $template['hazard_category'],
                 'risk_type' => $template['risk_type'],
                 'street_or_sitio' => $user->address?->street,
-                'risk_factor' => $template['entry_type'] === 'hazard' ? 'electrical_risk' : 'wiring',
-                'mode' => $template['entry_type'] === 'hazard' ? 'high' : 'risk',
+                'risk_factor' => $template['risk_factor'],
+                'mode' => $template['mode'],
                 'condition_code' => $template['condition_code'],
-                'condition_label' => $template['entry_type'] === 'hazard' ? 'Exposed wires' : 'Known fire-prone location',
-                'hazard_type' => $template['entry_type'] === 'hazard' ? 'electrical' : 'none',
-                'remarks' => 'Citizen quick report submitted from the dashboard confirmation dialog.',
+                'condition_label' => $template['condition_label'],
+                'hazard_type' => $template['hazard_type'],
+                'remarks' => 'Citizen quick report submitted from the dashboard confirmation dialog. Initial citizen selection is subject to BFP verification and may be reclassified during review.',
                 'status' => 'pending',
                 'review_status' => 'pending',
                 'review_type' => 'create',
@@ -479,7 +590,10 @@ class PublicController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => ucfirst($validated['report_kind']) . ' report submitted successfully.',
+            'message' => ($validated['report_kind'] === 'concern'
+                ? 'Safety concern submitted successfully.'
+                : ucfirst($validated['report_kind']) . ' report submitted successfully.')
+                . ' BFP will verify the details and may reclassify it during review.',
             'data' => [
                 'report' => $this->serializeCitizenRiskReport($riskArea),
             ],
