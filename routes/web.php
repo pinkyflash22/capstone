@@ -493,6 +493,16 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         //     ->get('/management', function () {
         //         return view('management.dashboard');
         //     });
+    // Fallback for stale cached clients that still navigate to GET /logout.
+    // This does not perform logout on GET; it renders a CSRF-protected POST form and submits it immediately.
+    Route::get('/logout', function () {
+        return response()
+            ->view('auth.logout-redirect')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    })->name('logout.fallback');
+
     // Logout route (accessible to all authenticated users)
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 });

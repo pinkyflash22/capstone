@@ -308,14 +308,68 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
         const selectedFile = getIncidentUploadFile(imageInput);
         const title = 'Citizen Fire Emergency';
         let markerId = null;
+
+        const currentTime = new Date().toISOString();
+        const recentIncidentsResponse = await fetch('/api/recent-incidents?minutes=10', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
+
+        let recentIncidents = [];
+        if (recentIncidentsResponse.ok) {
+            const incidentsData = await recentIncidentsResponse.json();
+            recentIncidents = incidentsData.data || incidentsData.incidents || [];
+        }
+
+        const validation = await validateIncidentDuplicate(
+            parseFloat(lat),
+            parseFloat(lng),
+            currentTime,
+            recentIncidents,
+            type
+        );
+
+        if (validation.isDuplicate) {
+            const matchedIncident = validation.matchedIncident || {};
+            const matchedTime = matchedIncident.alarmdatetime ? new Date(matchedIncident.alarmdatetime) : null;
+            const minutesAgo = matchedTime
+                ? Math.round(Math.abs(new Date(currentTime) - matchedTime) / (1000 * 60))
+                : null;
+            const incidentLat = matchedIncident.marker?.coordinate?.marker?.lat || matchedIncident.marker?.lat || matchedIncident.lat;
+            const incidentLng = matchedIncident.marker?.coordinate?.marker?.lng || matchedIncident.marker?.lng || matchedIncident.lng;
+            const distanceMeters = (incidentLat !== undefined && incidentLng !== undefined)
+                ? Math.round(getDistanceMeters(parseFloat(lat), parseFloat(lng), parseFloat(incidentLat), parseFloat(incidentLng)))
+                : null;
+
+            const duplicateMessageParts = ['A fire report was already submitted for this area recently.'];
+
+            if (minutesAgo !== null) {
+                duplicateMessageParts.push(`Reported ${minutesAgo} minute${minutesAgo === 1 ? '' : 's'} ago.`);
+            }
+
+            if (distanceMeters !== null && !Number.isNaN(distanceMeters)) {
+                duplicateMessageParts.push(`Distance: ${distanceMeters} meters.`);
+            }
+
+            if (typeof window.showCitizenToast === 'function') {
+                window.showCitizenToast(duplicateMessageParts.join(' '), true, 5200);
+            } else {
+                showNotification(duplicateMessageParts.join(' '), 'warning', 5200);
+            }
+
+            return false;
+        }
+
         reportProgress(
-            selectedFile ? 'Uploading image' : 'Preparing report',
-            selectedFile ? 'Uploading your attachment before saving the emergency report...' : 'Saving your emergency report now...'
+            'Submitting',
+            selectedFile ? 'Uploading your attachment and saving your fire report...' : 'Saving your fire report...'
         );
         const multimediaId = await uploadIncidentMultimedia(selectedFile, csrfToken);
 
         // 2. Save marker
-        reportProgress('Saving location', 'Recording the emergency location and core incident details...');
         console.log('Saving marker...');
         const markerData = await saveIncidentMarker({
             title,
@@ -338,7 +392,7 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
         console.log('Marker ID:', markerId);
         
         // 5. Save incident
-        reportProgress('Submitting report', 'Saving the emergency report and dispatching background matching...');
+        reportProgress('Submitting', 'Finishing your fire report...');
         console.log('Saving incident...');
         const incidentPayload = {
             marker_id: markerId,
@@ -373,31 +427,6 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
             window.incidentsData = Array.isArray(window.incidentsData) ? window.incidentsData : [];
             window.incidentsData.unshift(incidentData.data);
         }
-
-        // Kick off heavier matching after the citizen already receives success feedback.
-        const incidentId = incidentData?.data?.incident_id || null;
-        window.setTimeout(() => {
-            if (!incidentId) {
-                return;
-            }
-
-            fetch(`/api/incidents/${incidentId}/auto-assign`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                }
-            })
-            .then((response) => response.ok ? response.json() : null)
-            .then((payload) => {
-                if (payload) {
-                    console.log(`Background incident auto-assignment triggered for incident ${incidentId}:`, payload);
-                }
-            })
-            .catch((error) => {
-                console.warn(`Background incident auto-assignment failed for incident ${incidentId}:`, error);
-            });
-        }, 0);
 
         window.setTimeout(() => {
             if (typeof window.refreshCitizenMarkersIfChanged === 'function') {

@@ -1495,13 +1495,16 @@
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" onclick="switchSection('contacts')" aria-label="Emergency Contacts">
                             <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">call</span>
                         </button>
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
+                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">report_problem</span>
+                        </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-insights-open aria-label="Charts and Cards">
                             <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">stacked_bar_chart</span>
                         </button>
                     </div>
 
-                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--center" data-citizen-nav-trigger onclick="openIncidentModal()" aria-label="Report incident">
-                        <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">report</span>
+                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--center" data-citizen-nav-trigger onclick="openFireIncidentModal()" aria-label="Report fire incident">
+                        <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">local_fire_department</span>
                     </button>
                 </div>
 
@@ -1771,12 +1774,34 @@
             @include('citizen.sections.notifications')
         </div>
 
-        <!-- Report Incident Modal -->
-        <div id="incidentModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center z-50 justify-center hidden">
+        <!-- Fire Report Modal -->
+        <div id="fireIncidentModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center z-50 justify-center hidden">
             <div class="bg-white rounded-lg shadow-lg w-96 p-6">
-                <h2 class="text-lg font-bold mb-4">Report Incident</h2>
-                {{-- <form id="incidentForm" action="{{ route('citizen.incident.store') }}" method="POST"> --}}
-                <form id="incidentForm" action="" method="POST" enctype="multipart/form-data">
+                <h2 class="text-lg font-bold mb-4">Report Fire Incident</h2>
+                <form id="fireIncidentForm" action="" method="POST">
+                    @csrf
+                    <div class="rounded-xl border border-red-100 bg-red-50 px-4 py-4 text-sm text-slate-700 mb-4">
+                        <p class="font-semibold text-slate-900 mb-1">Emergency fire report</p>
+                        <p>This sends an immediate fire report using your current location so BFP can start processing right away.</p>
+                        <p class="mt-2 text-xs text-slate-500">Use this only for actual fire emergencies. Follow-up station assignment and dispatch preparation continue in the background after the report is saved.</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 mb-4">
+                        <p class="font-semibold text-slate-900 mb-1">Location used</p>
+                        <p id="fireLocationStatus">Your current location will be used for this fire report.</p>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <button type="button" id="closeFireModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-blue-600 text-white rounded" data-report-kind="fire">Report Fire Incident</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Risk / Hazard Modal -->
+        <div id="concernReportModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center z-50 justify-center hidden">
+            <div class="bg-white rounded-lg shadow-lg w-96 p-6">
+                <h2 class="text-lg font-bold mb-4">Report Risk / Hazard</h2>
+                <form id="concernIncidentForm" action="" method="POST" enctype="multipart/form-data">
                     @csrf
                         @if($errors->any())
                             <div style="color:red;">
@@ -1787,18 +1812,15 @@
                                 </ul>
                             </div>
                         @endif
-                        <input type="hidden" name=""  id="latitude" required>
-                        <input type="hidden" name=""  id="longitude" required>
-                            
                         {{-- <input type="hidden" name=""  id="marker_id_input" value=""> --}}
                         {{-- <input type="hidden" name="reported_by" value="{{ $accountId }}"> --}}
                         <div class="rounded-xl border border-orange-100 bg-orange-50 px-4 py-4 text-sm text-slate-700 mb-4">
-                            <p class="font-semibold text-slate-900 mb-1">Choose a report type</p>
-                            <p>Use your current location to submit either an emergency fire report or a general safety concern.</p>
-                            <p class="mt-2 text-xs text-slate-500">If you are unsure whether it is a hazard or a risk, choose <strong>Safety Concern</strong>. PyroSense will save it first, then BFP can verify and reclassify it during review.</p>
+                            <p class="font-semibold text-slate-900 mb-1">Report a non-fire safety concern</p>
+                            <p>Use this for fire risks, hazards, unsafe conditions, or anything that needs BFP verification but is not an active fire emergency.</p>
+                            <p class="mt-2 text-xs text-slate-500">If you are unsure whether it is a hazard or a risk, PyroSense will still save it first and BFP can verify or reclassify it during review.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 mb-4">
-                            <label for="concernTypeSelect" class="block font-semibold text-slate-900 mb-2">Safety concern type</label>
+                            <label for="concernTypeSelect" class="block font-semibold text-slate-900 mb-2">Risk / Hazard type</label>
                             <select id="concernTypeSelect" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700">
                                 <option value="unsure">I am not sure yet</option>
                                 <option value="electrical_issue">Electrical issue</option>
@@ -1824,17 +1846,16 @@
                             <p id="hazardLocationStatus" class="mt-3 text-xs text-slate-500">Safety concern reports will use your current location unless you pick another point on the map.</p>
                         </div>
 
-                        <input type="hidden" name="" id="reported_by" value="{{ $accountId }}">
-                    <input type="hidden" id="latitude" value="">
-                    <input type="hidden" id="longitude" value="">
                     <div class="flex flex-wrap justify-end gap-2">
-                        <button type="button" id="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="concern">Report Safety Concern</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-blue-600 text-white rounded" data-report-kind="fire">Report Fire</button>
+                        <button type="button" id="closeConcernModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="concern">Submit Risk / Hazard</button>
                     </div>
                 </form>
             </div>
         </div>
+        <input type="hidden" id="reported_by" value="{{ $accountId }}">
+        <input type="hidden" id="latitude" value="">
+        <input type="hidden" id="longitude" value="">
     <div id="incidentReportLoadingOverlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm hidden items-center justify-center z-[120]">
         <div class="bg-white rounded-2xl shadow-xl px-6 py-5 flex items-center gap-3 text-slate-700">
             <span class="inline-fa-icon icon-spin text-orange-600" style="width: 1.25rem; height: 1.25rem;">
@@ -2471,7 +2492,7 @@ if (navigator.geolocation) {
                 window.setTimeout(function() {
                     document.getElementById('latitude').value = window.userCoords?.currentLatitude ?? '';
                     document.getElementById('longitude').value = window.userCoords?.currentLongitude ?? '';
-                    openIncidentModal();
+                    openFireIncidentModal();
 
                     if (shouldOpenIncidentFromQuery) {
                         const currentUrl = new URL(window.location.href);
@@ -2732,7 +2753,7 @@ if (navigator.geolocation) {
             citizenHazardDraft.mode = 'picked';
             citizenHazardDraft.picking = true;
 
-            document.getElementById('incidentModal').style.display = 'none';
+            document.getElementById('concernReportModal').style.display = 'none';
             window.switchSection?.('overview');
 
             window.setTimeout(() => {
@@ -2791,8 +2812,8 @@ if (navigator.geolocation) {
                     citizenHazardDraft.clickHandler = null;
 
                     updateCitizenHazardLocationUi();
-                    openIncidentModal();
-                    window.showCitizenToast?.('Safety concern point selected. Tap Report Safety Concern to submit.', false, 3800);
+                    openConcernReportModal();
+                    window.showCitizenToast?.('Safety concern point selected. Tap Submit Risk / Hazard to continue.', false, 3800);
                 };
 
                 window.usermap.on('click', citizenHazardDraft.clickHandler);
@@ -2801,17 +2822,34 @@ if (navigator.geolocation) {
             }, 200);
         }
 
-        function openIncidentModal() {
+        function openFireIncidentModal() {
+            const fireModal = document.getElementById('fireIncidentModal');
+            const fireLocationStatus = document.getElementById('fireLocationStatus');
+
+            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && fireLocationStatus) {
+                fireLocationStatus.textContent = `Current location ready: ${Number(window.userCoords.currentLatitude).toFixed(6)}, ${Number(window.userCoords.currentLongitude).toFixed(6)}.`;
+            } else if (fireLocationStatus) {
+                fireLocationStatus.textContent = 'Getting your current location now...';
+            }
+
+            fireModal.style.display = 'flex';
+        }
+
+        function openConcernReportModal() {
             if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
             }
             updateCitizenHazardLocationUi();
-            document.getElementById('incidentModal').style.display = 'flex';
+            document.getElementById('concernReportModal').style.display = 'flex';
         }
 
-        document.getElementById('closeModal').addEventListener('click', function() {
-            document.getElementById('incidentModal').style.display = 'none';
+        document.getElementById('closeFireModal').addEventListener('click', function() {
+            document.getElementById('fireIncidentModal').style.display = 'none';
+        });
+
+        document.getElementById('closeConcernModal').addEventListener('click', function() {
+            document.getElementById('concernReportModal').style.display = 'none';
         });
 
         document.getElementById('hazardUseCurrentLocationButton')?.addEventListener('click', function() {
@@ -2922,7 +2960,7 @@ async function submitCitizenQuickReport(reportKind) {
     }
 
     // Close modal early for better UX
-    document.getElementById('incidentModal').style.display = 'none';
+    document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal').style.display = 'none';
 
     // Show loading state
     actionButtons.forEach((button) => {
@@ -2993,7 +3031,11 @@ async function submitCitizenQuickReport(reportKind) {
         }
 
         if (success) {
-            document.getElementById('incidentForm').reset();
+            if (reportKind === 'fire') {
+                document.getElementById('fireIncidentForm')?.reset();
+            } else {
+                document.getElementById('concernIncidentForm')?.reset();
+            }
             if (reportKind === 'concern') {
                 citizenHazardDraft.mode = 'current';
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
@@ -3434,11 +3476,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
         // Report incident triggers
-        document.querySelectorAll('.report-incident-trigger').forEach(function(trigger) {
+document.querySelectorAll('.report-incident-trigger').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
                 document.getElementById('latitude').value = window.userCoords.currentLatitude;
                 document.getElementById('longitude').value =  window.userCoords.currentLongitude;
-                openIncidentModal();
+                openFireIncidentModal();
+            });
+        });
+
+        document.querySelectorAll('[data-citizen-risk-hazard-open]').forEach(function(trigger) {
+            trigger.addEventListener('click', function() {
+                openConcernReportModal();
             });
         });
 
@@ -3469,4 +3517,3 @@ document.addEventListener('DOMContentLoaded', function() {
 @include('partials.pwa-body')
 </body>
 </html>
-

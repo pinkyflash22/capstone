@@ -21,6 +21,7 @@ use App\Models\FullAddress;
 use App\Services\BoundaryMatcherService;
 use App\Support\BarangayNotificationService;
 use App\Support\UserActivityLogger;
+use App\Support\RiskAreaFollowUpDispatcher;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -585,15 +586,14 @@ class PublicController extends Controller
         });
 
         $riskArea->loadMissing(['marker', 'barangayHall.barangay']);
-        BarangayNotificationService::notifyRiskAreaSubmitted($riskArea);
+        RiskAreaFollowUpDispatcher::dispatchFor($riskArea);
         UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
 
         return response()->json([
             'success' => true,
-            'message' => ($validated['report_kind'] === 'concern'
-                ? 'Safety concern submitted successfully.'
-                : ucfirst($validated['report_kind']) . ' report submitted successfully.')
-                . ' BFP will verify the details and may reclassify it during review.',
+            'message' => $validated['report_kind'] === 'concern'
+                ? 'Risk/Hazard report submitted for BFP verification.'
+                : 'Risk/Hazard report submitted for BFP verification.',
             'data' => [
                 'report' => $this->serializeCitizenRiskReport($riskArea),
             ],

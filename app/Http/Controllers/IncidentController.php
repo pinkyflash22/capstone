@@ -11,7 +11,9 @@ use App\Models\StationOfficer;
 use App\Models\Station;
 use App\Models\User;
 use App\Support\IncidentContextDispatcher;
+use App\Support\IncidentFollowUpDispatcher;
 use App\Support\UserActivityLogger;
+use App\Services\IncidentAutoAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -219,7 +221,7 @@ class IncidentController extends Controller
 
         if (in_array($statusId, [self::STATUS_CONTROLLED, self::STATUS_CLOSED], true)) {
             try {
-                $this->processRecentUnassignedIncidents(60);
+                app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents(60);
             } catch (\Throwable $e) {
                 Log::error('Failed to auto-assign unassigned incidents after team became available: ' . $e->getMessage(), [
                     'incident_id' => $incident->incident_id,
@@ -493,6 +495,7 @@ class IncidentController extends Controller
 
         $data = Incident::create($validated);
         IncidentContextDispatcher::dispatchFor($data);
+        IncidentFollowUpDispatcher::dispatchFor($data);
 
         $logUserId = (int) ($validated['reported_by'] ?? Auth::id() ?? 0);
         if ($logUserId > 0) {
@@ -501,7 +504,7 @@ class IncidentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Incident reported successfully. Barangay matching is running in the background.',
+            'message' => 'Fire report submitted. BFP processing has started.',
             'data' => $this->serializeIncident($data->fresh($this->getIncidentRelations())),
         ]);
     }
@@ -1018,7 +1021,7 @@ public function autoAssignRecentUnassignedIncidents(Request $request)
 {
     try {
         $minutes = max(1, (int) $request->input('minutes', 60));
-        $result = $this->processRecentUnassignedIncidents($minutes);
+        $result = app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents($minutes);
 
         if ($result['checked'] === 0) {
             return response()->json([
@@ -1055,7 +1058,7 @@ public function autoAssignIncident(Request $request, string $incidentId)
 {
     try {
         $incident = Incident::with('marker')->findOrFail($incidentId);
-        $assigned = $this->processSingleIncidentAssignment($incident);
+        $assigned = app(IncidentAutoAssignmentService::class)->assignSingleIncident($incident);
 
         return response()->json([
             'success' => true,
