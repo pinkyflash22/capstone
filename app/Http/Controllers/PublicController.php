@@ -44,7 +44,20 @@ class PublicController extends Controller
 
     public function pwaQuickReport()
     {
-        return view('pwa.quick-report');
+        $user = Auth::user();
+        $role = strtolower((string) ($user?->role->role ?? ''));
+
+        if ($user && $role === 'citizen') {
+            return redirect()->route('citizen.mobile-hub');
+        }
+
+        if ($user) {
+            return redirect()->route('home');
+        }
+
+        return redirect()->route('auth.login', [
+            'post_login_action' => 'citizen-mobile-hub',
+        ]);
     }
 
     public static function citizenDashboardSections(): array

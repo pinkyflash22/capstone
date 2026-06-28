@@ -1059,10 +1059,10 @@
                     </div>
                 @endif
 
-                @if (request('post_login_action') === 'quick-report')
+                @if (in_array(request('post_login_action'), ['quick-report', 'citizen-mobile-hub'], true))
                     <div class="intent-banner">
-                        <strong>Quick report requested from the PWA</strong>
-                        <p>Sign in as a citizen and the incident report form will open automatically after login.</p>
+                        <strong>Mobile hub requested from the PWA</strong>
+                        <p>Sign in as a citizen and PyroSense will open the mobile action hub right after login.</p>
                     </div>
                 @endif
 
@@ -1277,7 +1277,7 @@
                 || launchedFromAppShell
                 || (isTouchViewport && isMobileUserAgent);
 
-            if (!isMobilePwaFlow || !postLoginActionField || initialAction === 'quick-report') {
+            if (!isMobilePwaFlow || !postLoginActionField || initialAction === 'citizen-mobile-hub') {
                 return;
             }
 
