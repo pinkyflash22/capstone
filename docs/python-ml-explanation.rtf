@@ -1,0 +1,50 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Calibri;}}
+\fs24
+\b PyroSense Python Machine Learning Explanation\b0\par
+\par
+\b What this document is for\b0\par
+This file explains in simple terms how the Python machine learning part of the project works, what model is being used, and how Laravel communicates with it.\par
+\par
+\b Short answer\b0\par
+Yes. This project uses a real machine learning model in Python. The model is trained in `capstone-ai/train_model.py` and used for prediction in `capstone-ai/predict_event.py`.\par
+\par
+\b Files involved\b0\par
+`capstone-ai/train_model.py`: trains the machine learning model.\par
+`capstone-ai/predict_event.py`: loads the trained model and predicts risk.\par
+`capstone-ai/fire_model.pkl`: saved trained model file.\par
+`capstone-ai/fire_model_metadata.json`: saved metadata about the model.\par
+`app/Services/BarangayPredictionService.php`: Laravel service that runs the Python script.\par
+`app/Services/ForecastModelService.php`: checks whether the model needs retraining.\par
+\par
+\b What model is used\b0\par
+The training code uses scikit-learn models. In the current code, the main imported models are `RandomForestClassifier`, `RandomForestRegressor`, and `CalibratedClassifierCV`.\par
+\par
+This means the project is not just using normal Python rules or if-statements. It is using a trained machine learning model saved into a `.pkl` file.\par
+\par
+\b Python libraries used\b0\par
+`pandas`: for preparing tabular data.\par
+`joblib`: for saving and loading the trained model.\par
+`scikit-learn`: for the machine learning model and preprocessing pipeline.\par
+\par
+\b How training works\b0\par
+The `train_model.py` script reads historical fire-related data, prepares the features, trains the machine learning model, and saves the result into `capstone-ai/fire_model.pkl`.\par
+\par
+The model metadata is also saved into `capstone-ai/fire_model_metadata.json` so the application can track feature columns and model information.\par
+\par
+\b How prediction works\b0\par
+When Laravel needs a prediction, it builds a payload for a station and barangay, then runs the Python prediction script.\par
+\par
+The Python script loads the saved model, transforms the input into the expected feature format, and returns prediction results as JSON.\par
+\par
+\b How Laravel communicates with Python\b0\par
+Laravel does not currently call Python through a separate HTTP API service. Instead, Laravel runs the Python script directly as a local process on the same server.\par
+\par
+This happens inside `app/Services/BarangayPredictionService.php` using Laravel `Process::run(...)`. So Python still executes, but you do not manually run it for normal app usage.\par
+\par
+\b Does this count as machine learning\b0\par
+Yes. Because the project trains a model from historical data and saves that trained model for later predictions, this is a machine learning workflow.\par
+\par
+\b Deployment note\b0\par
+If you deploy this project, the server must have Python installed together with the required ML libraries such as `pandas`, `joblib`, and `scikit-learn`. Since Laravel runs the Python script locally, both PHP and Python need to be available in the deployed environment.\par
+}

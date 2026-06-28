@@ -3072,18 +3072,28 @@
     // Initialize UnifiedMapService AFTER your existing map is ready
     document.addEventListener('DOMContentLoaded', function() {
         // Wait for your existing map to be initialized
+        let mapWaitAttempts = 0;
+        const maxMapWaitAttempts = 15;
         const checkMap = setInterval(function() {
+            mapWaitAttempts += 1;
+
             if (window.map && window.map._container) {
                 clearInterval(checkMap);
                 console.log('Existing map found, initializing UnifiedMapService...');
-                
-                // Create UnifiedMapService instance
-                window.unifiedMap = new UnifiedMapService();
-                
-                // Setup on existing map
-                window.unifiedMap.setupOnExistingMap();
-                
-                console.log('UnifiedMapService integrated with existing map');
+
+                if (typeof UnifiedMapService !== 'undefined') {
+                    window.unifiedMap = new UnifiedMapService();
+                    window.unifiedMap.setupOnExistingMap();
+                    console.log('UnifiedMapService integrated with existing map');
+                } else {
+                    console.warn('UnifiedMapService is not loaded on admin dashboard.');
+                }
+                return;
+            }
+
+            if (mapWaitAttempts >= maxMapWaitAttempts) {
+                clearInterval(checkMap);
+                console.warn('Admin dashboard map initialization timed out; continuing without UnifiedMapService.');
             }
         }, 1000);
     });

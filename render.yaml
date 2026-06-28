@@ -1,0 +1,74 @@
+services:
+  - type: web
+    name: capstone-project
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: APP_NAME
+        value: PyroSense
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        sync: false
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: FILESYSTEM_DISK
+        value: supabase
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SECRET
+        sync: false
+      - key: SUPABASE_REGION
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ENDPOINT
+        sync: false
+      - key: AI_PYTHON_BINARY
+        value: python3
+      - key: AI_PREDICTION_SCRIPT
+        value: capstone-ai/predict_event.py
+      - key: AI_MODEL_PATH
+        value: capstone-ai/fire_model.pkl
+      - key: AI_MODEL_METADATA_PATH
+        value: capstone-ai/fire_model_metadata.json
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: OPENROUTER_MODEL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false

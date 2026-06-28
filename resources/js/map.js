@@ -110,6 +110,37 @@ window.thisIncidents = null;
 let routePollingInterval = null;
 let markerStatePollingInterval = null;
 let lastMarkerStateSignature = null;
+const ROUTE_POLL_INTERVAL_MS = 10000;
+const MARKER_STATE_POLL_INTERVAL_MS = 30000;
+const LIVE_FETCH_TIMEOUT_MS = 10000;
+const liveRequestRegistry = new Map();
+
+function isPageVisible() {
+    return typeof document === 'undefined' || document.visibilityState === 'visible';
+}
+
+function fetchLiveResponseOnce(key, url, options = {}) {
+    if (liveRequestRegistry.has(key)) {
+        return liveRequestRegistry.get(key);
+    }
+
+    const controller = new AbortController();
+    const timeoutMs = options.timeoutMs ?? LIVE_FETCH_TIMEOUT_MS;
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    const { timeoutMs: _timeoutMs, headers = {}, ...restOptions } = options;
+    const requestPromise = fetch(url, {
+        cache: 'no-store',
+        ...restOptions,
+        headers,
+        signal: controller.signal
+    }).finally(() => {
+        window.clearTimeout(timeoutId);
+        liveRequestRegistry.delete(key);
+    });
+
+    liveRequestRegistry.set(key, requestPromise);
+    return requestPromise;
+}
 
 window.mapInstances = window.mapInstances || {};
 window.activeMapInstanceKey = window.activeMapInstanceKey || 'default';
@@ -808,7 +839,7 @@ async function sendUserLocationToServer(latitude, longitude) {
 // Function to fetch all firefighters' locations
 async function fetchAllFirefighterLocations() {
     try {
-        const response = await fetch('/api/firefighter/locations', {
+        const response = await fetchLiveResponseOnce('firefighter-locations', '/api/firefighter/locations', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -1292,7 +1323,7 @@ async function saveRouteToDatabase(route, destination) {
 
 async function fetchActiveRouteFromDatabase() {
     try {
-        const response = await fetch('/api/route/active');
+        const response = await fetchLiveResponseOnce('route-active-single', '/api/route/active');
         if (!response.ok) return null;
         
         const routes = await response.json();
@@ -3956,15 +3987,19 @@ function buildMarkerStateSignature(coordinates, incidents) {
 }
 
 async function pollMarkerStateChanges() {
+    if (!isPageVisible()) {
+        return;
+    }
+
     try {
         const [markersResponse, incidentsResponse] = await Promise.all([
-            fetch('/api/markers', {
+            fetchLiveResponseOnce('markers-poll', '/api/markers', {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken
                 }
             }),
-            fetch('/api/incident/latest', {
+            fetchLiveResponseOnce('incident-latest-poll', '/api/incident/latest', {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken
@@ -5770,7 +5805,12 @@ function startRoutePolling() {
 
     const pollRoutes = async () => {
         try {
-            const response = await fetch('/api/route/active');
+            const response = await fetchLiveResponseOnce('route-active-poll', '/api/route/active', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
             if (!response.ok) return;
             
             const routes = await response.json();
@@ -5904,8 +5944,7 @@ function startRoutePolling() {
 
     pollRoutes();
     
-    // Poll every 1 second instead of 3 seconds for real-time tracking
-    routePollingInterval = setInterval(pollRoutes, 1000);
+    routePollingInterval = setInterval(pollRoutes, ROUTE_POLL_INTERVAL_MS);
 }
 
 async function startSimulationFromPosition(routeId, startIndex) {
@@ -6622,7 +6661,7 @@ function initAfterMapReady() {
     if (markerStatePollingInterval) {
         clearInterval(markerStatePollingInterval);
     }
-    markerStatePollingInterval = setInterval(pollMarkerStateChanges, 5000);
+    markerStatePollingInterval = setInterval(pollMarkerStateChanges, MARKER_STATE_POLL_INTERVAL_MS);
     
     if (canManageMarkers) {
         window.map.on('click', function(e) {

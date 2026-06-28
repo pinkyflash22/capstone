@@ -818,10 +818,107 @@
     window.incidentCoords = @json($incidentCoords ?? []);
     window.currentFirefighterId = {{ auth()->user()->user_id ?? 'null' }};
     window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
+    const FF_LOCATION_PUSH_INTERVAL_MS = 45000;
+    const FF_LOCATION_PULL_INTERVAL_MS = 45000;
+    const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 60000;
+    const FF_AUTO_ASSIGN_INTERVAL_MS = 60000;
+    let ffLocationPushInterval = null;
+    let ffLocationPullInterval = null;
+    let ffAssignedIncidentsInterval = null;
+    let ffAutoAssignInterval = null;
+    const FF_FETCH_TIMEOUT_MS = 10000;
+    let ffAssignedIncidentsRequest = null;
+    let ffAutoAssignRequest = null;
+
+    function firefighterDashboardIsVisible() {
+        return document.visibilityState === 'visible';
+    }
+
+    function clearFirefighterDashboardIntervals() {
+        if (ffLocationPushInterval) {
+            clearInterval(ffLocationPushInterval);
+            ffLocationPushInterval = null;
+        }
+        if (ffLocationPullInterval) {
+            clearInterval(ffLocationPullInterval);
+            ffLocationPullInterval = null;
+        }
+        if (ffAssignedIncidentsInterval) {
+            clearInterval(ffAssignedIncidentsInterval);
+            ffAssignedIncidentsInterval = null;
+        }
+        if (ffAutoAssignInterval) {
+            clearInterval(ffAutoAssignInterval);
+            ffAutoAssignInterval = null;
+        }
+    }
+
+    function startFirefighterDashboardIntervals() {
+        clearFirefighterDashboardIntervals();
+
+        ffLocationPushInterval = setInterval(() => {
+            if (!firefighterDashboardIsVisible()) return;
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    updateUserLocation(window.currentUserId, lat, lng);
+                    sendUserLocationToServer(lat, lng);
+
+                    if (window.userMarker) {
+                        window.userMarker.setLatLng([lat, lng]);
+                    }
+                },
+                function(error) {
+                    console.error("Location update error:", error);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }, FF_LOCATION_PUSH_INTERVAL_MS);
+
+        ffLocationPullInterval = setInterval(() => {
+            if (!firefighterDashboardIsVisible()) return;
+            fetchAllFirefighterLocations();
+        }, FF_LOCATION_PULL_INTERVAL_MS);
+
+        ffAssignedIncidentsInterval = setInterval(() => {
+            if (!firefighterDashboardIsVisible()) return;
+            fetchAssignedIncidents();
+        }, FF_ASSIGNED_INCIDENTS_INTERVAL_MS);
+
+        ffAutoAssignInterval = setInterval(() => {
+            if (!firefighterDashboardIsVisible()) return;
+            window.runPendingIncidentAutoAssignment();
+        }, FF_AUTO_ASSIGN_INTERVAL_MS);
+    }
+
+    function fetchFirefighterDashboardOnce(currentRequest, url, options = {}) {
+        if (currentRequest) {
+            return currentRequest;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), FF_FETCH_TIMEOUT_MS);
+        const requestPromise = fetch(url, {
+            cache: 'no-store',
+            ...options,
+            signal: controller.signal
+        }).finally(() => {
+            window.clearTimeout(timeoutId);
+        });
+
+        return requestPromise;
+    }
+
     // Function to fetch assigned incidents
     async function fetchAssignedIncidents() {
         try {
-            const response = await fetch(`/firefighter/assigned/${window.currentFirefighterId}`);
+            ffAssignedIncidentsRequest = fetchFirefighterDashboardOnce(
+                ffAssignedIncidentsRequest,
+                `/firefighter/assigned/${window.currentFirefighterId}`
+            );
+            const response = await ffAssignedIncidentsRequest;
             if (!response.ok) throw new Error('Failed to fetch assigned incidents');
             
             const result = await response.json();
@@ -832,6 +929,9 @@
             window.assignedIncidentsData = incidents;
             
             displayAssignedIncidents(incidents);
+            if (typeof updateChartsWithData === 'function') {
+                updateChartsWithData(incidents);
+            }
             
             document.getElementById('assignedIncidentsCount').textContent = incidents.length;
             
@@ -846,6 +946,8 @@
                 </div>
             `;
             return [];
+        } finally {
+            ffAssignedIncidentsRequest = null;
         }
     }
 
@@ -1598,34 +1700,6 @@ if (navigator.geolocation) {
         { enableHighAccuracy: true, timeout: 10000 }
     );
     
-    // Start periodic location updates
-    setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                updateUserLocation(window.currentUserId, lat, lng);
-                sendUserLocationToServer(lat, lng);
-                
-                // Update marker position if exists
-                if (window.userMarker) {
-                    window.userMarker.setLatLng([lat, lng]);
-                }
-                
-                console.log("Location updated for user:", window.currentUserId);
-            },
-            function(error) {
-                console.error("Location update error:", error);
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    }, 30000); // Update every 30 seconds
-    
-    // Fetch all firefighters' locations every 15 seconds
-    setInterval(() => {
-        fetchAllFirefighterLocations();
-    }, 15000);
-    
     // Initial fetch
     setTimeout(() => {
         fetchAllFirefighterLocations();
@@ -1712,9 +1786,19 @@ if (navigator.geolocation) {
         }
         
         fetchAssignedIncidents();
-        setInterval(fetchAssignedIncidents, 30000);
         window.runPendingIncidentAutoAssignment();
-        setInterval(window.runPendingIncidentAutoAssignment, 10000);
+        startFirefighterDashboardIntervals();
+
+        document.addEventListener('visibilitychange', () => {
+            if (firefighterDashboardIsVisible()) {
+                fetchAssignedIncidents();
+                fetchAllFirefighterLocations();
+                startFirefighterDashboardIntervals();
+                return;
+            }
+
+            clearFirefighterDashboardIntervals();
+        });
         
         document.querySelectorAll('.status-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -2049,40 +2133,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-    // Call updateChartsWithData inside your fetchAssignedIncidents function after getting incidents
-async function fetchAssignedIncidents() {
-    try {
-        const response = await fetch(`/firefighter/assigned/${window.currentFirefighterId}`);
-        if (!response.ok) throw new Error('Failed to fetch assigned incidents');
-        
-        const result = await response.json();
-        console.log('API Response:', result);
-        
-        const incidents = result.data || [];
-        console.log('Incidents data:', incidents);
-        window.assignedIncidentsData = incidents;
-        
-        displayAssignedIncidents(incidents);
-        updateChartsWithData(incidents); // Add this line to update charts
-        
-        document.getElementById('assignedIncidentsCount').textContent = incidents.length;
-        
-        return incidents;
-    } catch (error) {
-        console.error('Error fetching assigned incidents:', error);
-        document.getElementById('assignedIncidentsList').innerHTML = `
-            <div class="empty-incidents">
-                <i class="fas fa-exclamation-triangle text-4xl mb-2 opacity-50"></i>
-                <p>Failed to load assigned incidents</p>
-                <button onclick="fetchAssignedIncidents()" class="btn btn-outline mt-2">Retry</button>
-            </div>
-        `;
-        return [];
-    }
-}
-
-window.refreshFirefighterAssignedIncidents = fetchAssignedIncidents;
-
 window.runPendingIncidentAutoAssignment = async function() {
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (!token) {
@@ -2090,19 +2140,22 @@ window.runPendingIncidentAutoAssignment = async function() {
     }
 
     try {
-        const response = await fetch('/api/incidents/auto-assign-recent-unassigned', {
+        ffAutoAssignRequest = fetchFirefighterDashboardOnce(ffAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': token
             }
         });
+        const response = await ffAutoAssignRequest;
         const result = await response.json().catch(() => ({}));
         if (result?.success && Number(result.assigned) > 0) {
             await fetchAssignedIncidents();
         }
     } catch (error) {
         console.error('Background incident auto-assignment failed:', error);
+    } finally {
+        ffAutoAssignRequest = null;
     }
 };
 </script>

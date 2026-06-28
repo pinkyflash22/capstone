@@ -1976,7 +1976,67 @@
             //             maximumAge: 0
             //     }
             // );
-            window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
+    window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
+    const CITIZEN_LOCATION_PUSH_INTERVAL_MS = 45000;
+    const CITIZEN_LOCATION_PULL_INTERVAL_MS = 45000;
+    let citizenLocationPushInterval = null;
+    let citizenLocationPullInterval = null;
+
+    function citizenDashboardIsVisible() {
+        return document.visibilityState === 'visible';
+    }
+
+    function clearCitizenDashboardLocationIntervals() {
+        if (citizenLocationPushInterval) {
+            clearInterval(citizenLocationPushInterval);
+            citizenLocationPushInterval = null;
+        }
+        if (citizenLocationPullInterval) {
+            clearInterval(citizenLocationPullInterval);
+            citizenLocationPullInterval = null;
+        }
+    }
+
+    function startCitizenDashboardLocationIntervals() {
+        clearCitizenDashboardLocationIntervals();
+
+        citizenLocationPushInterval = setInterval(() => {
+            if (!citizenDashboardIsVisible()) return;
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    updateUserLocation(window.currentUserId, lat, lng);
+                    window.userCoords.currentLatitude = lat;
+                    window.userCoords.currentLongitude = lng;
+                    window.userCoords.ready = true;
+                    if (window.refreshCitizenMapData) {
+                        window.refreshCitizenMapData();
+                    }
+                    if (window.refreshCitizenOverviewData) {
+                        window.refreshCitizenOverviewData();
+                    }
+
+                    sendUserLocationToServer(lat, lng);
+
+                    if (typeof window.currentLoc === 'function') {
+                        window.currentLoc(lat, lng);
+                    }
+                    updateCitizenResolvedLocation(lat, lng);
+                },
+                function(error) {
+                    console.error("Location update error:", error);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }, CITIZEN_LOCATION_PUSH_INTERVAL_MS);
+
+        citizenLocationPullInterval = setInterval(() => {
+            if (!citizenDashboardIsVisible()) return;
+            fetchAllFirefighterLocations();
+        }, CITIZEN_LOCATION_PULL_INTERVAL_MS);
+    }
             console.log('officer dashboard: ', window.stationOfficer);
             const citizenSidebarResolvedLocation = document.getElementById('citizenSidebarResolvedLocation');
             const citizenWelcomeAlert = document.getElementById('citizenWelcomeAlert');
@@ -2082,45 +2142,6 @@ if (navigator.geolocation) {
         },
         { enableHighAccuracy: true, timeout: 10000 }
     );
-    
-    // Start periodic location updates
-    setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                updateUserLocation(window.currentUserId, lat, lng);
-                window.userCoords.currentLatitude = lat;
-                window.userCoords.currentLongitude = lng;
-                window.userCoords.ready = true;
-                if (window.refreshCitizenMapData) {
-                    window.refreshCitizenMapData();
-                }
-                if (window.refreshCitizenOverviewData) {
-                    window.refreshCitizenOverviewData();
-                }
-                
-            
-                sendUserLocationToServer(lat, lng);
-                
-                if (typeof window.currentLoc === 'function') {
-                    window.currentLoc(lat, lng);
-                }
-                updateCitizenResolvedLocation(lat, lng);
-                
-                console.log("Location updated for user:", window.currentUserId);
-            },
-            function(error) {
-                console.error("Location update error:", error);
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    }, 30000); // Update every 30 seconds
-    
-    // Fetch all firefighters' locations every 15 seconds
-    setInterval(() => {
-        fetchAllFirefighterLocations();
-    }, 15000);
     
     // Initial fetch
     setTimeout(() => {
@@ -3115,18 +3136,29 @@ window.refreshCitizenOverviewData = async function() {
         return;
     }
 
+    let timeoutId = null;
     try {
+        if (window.citizenOverviewRequest) {
+            await window.citizenOverviewRequest;
+            return;
+        }
+
         const params = new URLSearchParams({
             lat: String(window.userCoords.currentLatitude),
             lng: String(window.userCoords.currentLongitude)
         });
 
-        const response = await fetch(`/citizen/dashboard-data?${params.toString()}`, {
+        const controller = new AbortController();
+        timeoutId = window.setTimeout(() => controller.abort(), 10000);
+        window.citizenOverviewRequest = fetch(`/citizen/dashboard-data?${params.toString()}`, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
-            }
+            },
+            cache: 'no-store',
+            signal: controller.signal
         });
+        const response = await window.citizenOverviewRequest;
 
         if (!response.ok) {
             throw new Error(`Dashboard refresh failed with status ${response.status}`);
@@ -3276,6 +3308,11 @@ window.refreshCitizenOverviewData = async function() {
         }
     } catch (error) {
         console.error('Error refreshing citizen overview data:', error);
+    } finally {
+        if (timeoutId) {
+            window.clearTimeout(timeoutId);
+        }
+        window.citizenOverviewRequest = null;
     }
 };
 
@@ -3289,14 +3326,26 @@ window.runPendingIncidentAutoAssignment = async function() {
         return;
     }
 
+    let timeoutId = null;
     try {
-        const response = await fetch('/api/incidents/auto-assign-recent-unassigned', {
+        if (window.citizenAutoAssignRequest) {
+            await window.citizenAutoAssignRequest;
+            return;
+        }
+
+        const controller = new AbortController();
+        timeoutId = window.setTimeout(() => controller.abort(), 10000);
+        window.citizenAutoAssignRequest = fetch('/api/incidents/auto-assign-recent-unassigned', {
             method: 'POST',
+            cache: 'no-store',
+            signal: controller.signal,
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': token
             }
         });
+        const response = await window.citizenAutoAssignRequest;
+        window.clearTimeout(timeoutId);
         const result = await response.json().catch(() => ({}));
         if (result?.success && Number(result.assigned) > 0) {
             if (window.refreshCitizenOverviewData) {
@@ -3305,18 +3354,65 @@ window.runPendingIncidentAutoAssignment = async function() {
         }
     } catch (error) {
         console.error('Background incident auto-assignment failed:', error);
+    } finally {
+        if (timeoutId) {
+            window.clearTimeout(timeoutId);
+        }
+        window.citizenAutoAssignRequest = null;
     }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
     window.runPendingIncidentAutoAssignment();
-    window.setInterval(window.runPendingIncidentAutoAssignment, 10000);
+    startCitizenDashboardLocationIntervals();
 
-    if (window.refreshCitizenOverviewData) {
-        window.setInterval(() => {
-            window.refreshCitizenOverviewData();
-        }, 10000);
+    const CITIZEN_AUTO_ASSIGN_INTERVAL_MS = 60000;
+    const CITIZEN_OVERVIEW_INTERVAL_MS = 30000;
+    let citizenAutoAssignInterval = null;
+    let citizenOverviewInterval = null;
+
+    function clearCitizenDashboardDataIntervals() {
+        if (citizenAutoAssignInterval) {
+            clearInterval(citizenAutoAssignInterval);
+            citizenAutoAssignInterval = null;
+        }
+        if (citizenOverviewInterval) {
+            clearInterval(citizenOverviewInterval);
+            citizenOverviewInterval = null;
+        }
     }
+
+    function startCitizenDashboardDataIntervals() {
+        clearCitizenDashboardDataIntervals();
+
+        citizenAutoAssignInterval = window.setInterval(() => {
+            if (!citizenDashboardIsVisible()) return;
+            window.runPendingIncidentAutoAssignment();
+        }, CITIZEN_AUTO_ASSIGN_INTERVAL_MS);
+
+        if (window.refreshCitizenOverviewData) {
+            citizenOverviewInterval = window.setInterval(() => {
+                if (!citizenDashboardIsVisible()) return;
+                window.refreshCitizenOverviewData();
+            }, CITIZEN_OVERVIEW_INTERVAL_MS);
+        }
+    }
+
+    startCitizenDashboardDataIntervals();
+
+    document.addEventListener('visibilitychange', () => {
+        if (citizenDashboardIsVisible()) {
+            startCitizenDashboardLocationIntervals();
+            startCitizenDashboardDataIntervals();
+            if (window.refreshCitizenOverviewData) {
+                window.refreshCitizenOverviewData();
+            }
+            return;
+        }
+
+        clearCitizenDashboardLocationIntervals();
+        clearCitizenDashboardDataIntervals();
+    });
 });
         // Report incident triggers
         document.querySelectorAll('.report-incident-trigger').forEach(function(trigger) {

@@ -55,6 +55,38 @@ let markerChangePollInterval = null;
 let latestCitizenMarkerSignature = null;
 let userRoutePanelLoading = false;
 let userRoutePanelMinimized = false;
+const CITIZEN_ROUTE_DISCOVERY_INTERVAL_MS = 10000;
+const CITIZEN_MARKER_WATCH_INTERVAL_MS = 30000;
+const CITIZEN_ROUTE_POLL_INTERVAL_MS = 10000;
+const CITIZEN_LIVE_FETCH_TIMEOUT_MS = 10000;
+const citizenLiveRequestRegistry = new Map();
+
+function citizenPageIsVisible() {
+    return typeof document === 'undefined' || document.visibilityState === 'visible';
+}
+
+function fetchCitizenLiveResponseOnce(key, url, options = {}) {
+    if (citizenLiveRequestRegistry.has(key)) {
+        return citizenLiveRequestRegistry.get(key);
+    }
+
+    const controller = new AbortController();
+    const timeoutMs = options.timeoutMs ?? CITIZEN_LIVE_FETCH_TIMEOUT_MS;
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    const { timeoutMs: _timeoutMs, headers = {}, ...restOptions } = options;
+    const requestPromise = fetch(url, {
+        cache: 'no-store',
+        ...restOptions,
+        headers,
+        signal: controller.signal
+    }).finally(() => {
+        window.clearTimeout(timeoutId);
+        citizenLiveRequestRegistry.delete(key);
+    });
+
+    citizenLiveRequestRegistry.set(key, requestPromise);
+    return requestPromise;
+}
 let citizenIncidentMarkerRefs = new Map();
 let citizenLegendControl = null;
 let citizenLayerControl = null;
@@ -1410,7 +1442,7 @@ async function syncCitizenRouteDisplay() {
     }
 
     try {
-        const response = await fetch('/api/route/active', {
+        const response = await fetchCitizenLiveResponseOnce('citizen-route-active', '/api/route/active', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -1450,7 +1482,10 @@ function startCitizenRouteDiscovery() {
     }
 
     syncCitizenRouteDisplay();
-    userOwnedRouteDiscoveryInterval = setInterval(syncCitizenRouteDisplay, 3000);
+    userOwnedRouteDiscoveryInterval = setInterval(() => {
+        if (!citizenPageIsVisible()) return;
+        syncCitizenRouteDisplay();
+    }, CITIZEN_ROUTE_DISCOVERY_INTERVAL_MS);
 }
 
 function refreshCitizenMapData() {
@@ -1458,8 +1493,12 @@ function refreshCitizenMapData() {
 }
 
 async function refreshCitizenMarkersIfChanged(forceReload = false) {
+    if (!forceReload && !citizenPageIsVisible()) {
+        return false;
+    }
+
     try {
-        const latestResponse = await fetch('/api/markers/latest', {
+        const latestResponse = await fetchCitizenLiveResponseOnce('citizen-markers-latest', '/api/markers/latest', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -1479,7 +1518,7 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
             return false;
         }
 
-        const markersResponse = await fetch('/api/markers', {
+        const markersResponse = await fetchCitizenLiveResponseOnce('citizen-markers', '/api/markers', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -1510,8 +1549,9 @@ function startCitizenMarkerWatcher() {
     }
 
     markerChangePollInterval = setInterval(() => {
+        if (!citizenPageIsVisible()) return;
         refreshCitizenMarkersIfChanged(false);
-    }, 12000);
+    }, CITIZEN_MARKER_WATCH_INTERVAL_MS);
 }
 
 export async function loadMarkers() {
@@ -3872,7 +3912,12 @@ function userStartRoutePollingForIncident(incidentId) {
         if (!incidentId) return;
         
         try {
-            const response = await fetch(`/api/route/active/${incidentId}`);
+            const response = await fetchCitizenLiveResponseOnce(`citizen-route-active-${incidentId}`, `/api/route/active/${incidentId}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
             if (!response.ok) return;
             
             const routes = await response.json();
@@ -3916,7 +3961,10 @@ function userStartRoutePollingForIncident(incidentId) {
     };
 
     pollRoutes();
-    userRoutePollingInterval = setInterval(pollRoutes, 2000);
+    userRoutePollingInterval = setInterval(() => {
+        if (!citizenPageIsVisible()) return;
+        pollRoutes();
+    }, CITIZEN_ROUTE_POLL_INTERVAL_MS);
 }
 
 function userStopRoutePolling() {

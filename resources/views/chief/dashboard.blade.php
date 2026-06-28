@@ -2552,12 +2552,13 @@
 
     async function refreshChiefDashboardStats() {
         try {
-            const response = await fetch('/station-admin/api/dashboard-stats', {
+            chiefStatsRequest = fetchChiefDashboardOnce(chiefStatsRequest, '/station-admin/api/dashboard-stats', {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             });
+            const response = await chiefStatsRequest;
 
             if (!response.ok) {
                 throw new Error(`Failed to load dashboard stats (${response.status})`);
@@ -2577,6 +2578,8 @@
             if (crewOnline) crewOnline.textContent = stats.crew_online ?? '0';
         } catch (error) {
             console.error('Error refreshing chief dashboard stats:', error);
+        } finally {
+            chiefStatsRequest = null;
         }
     }
 
@@ -2603,7 +2606,6 @@
         }
 
         refreshChiefDashboardStats();
-        window.setInterval(refreshChiefDashboardStats, 15000);
     });
     
     // Make functions globally available
@@ -2618,6 +2620,47 @@
     window.generateStationCodePreview = generateStationCodePreview;
     window.generateHydrantCodePreview = generateHydrantCodePreview;
     window.refreshChiefDashboardStats = refreshChiefDashboardStats;
+    window.CHIEF_STATS_INTERVAL_MS = 30000;
+    window.CHIEF_AUTO_ASSIGN_INTERVAL_MS = 60000;
+    window.CHIEF_NOTIFICATION_INTERVAL_MS = 15000;
+    window.chiefStatsInterval = null;
+    window.chiefAutoAssignInterval = null;
+    window.chiefNotificationInterval = null;
+    window.chiefDashboardIsVisible = function() {
+        return document.visibilityState === 'visible';
+    };
+    window.clearChiefDashboardIntervals = function() {
+        if (window.chiefStatsInterval) {
+            clearInterval(window.chiefStatsInterval);
+            window.chiefStatsInterval = null;
+        }
+        if (window.chiefAutoAssignInterval) {
+            clearInterval(window.chiefAutoAssignInterval);
+            window.chiefAutoAssignInterval = null;
+        }
+        if (window.chiefNotificationInterval) {
+            clearInterval(window.chiefNotificationInterval);
+            window.chiefNotificationInterval = null;
+        }
+    };
+    window.startChiefDashboardIntervals = function() {
+        window.clearChiefDashboardIntervals();
+
+        window.chiefStatsInterval = window.setInterval(() => {
+            if (!window.chiefDashboardIsVisible()) return;
+            refreshChiefDashboardStats();
+        }, window.CHIEF_STATS_INTERVAL_MS);
+
+        window.chiefAutoAssignInterval = window.setInterval(() => {
+            if (!window.chiefDashboardIsVisible()) return;
+            window.runPendingIncidentAutoAssignment();
+        }, window.CHIEF_AUTO_ASSIGN_INTERVAL_MS);
+
+        window.chiefNotificationInterval = window.setInterval(() => {
+            if (!window.chiefDashboardIsVisible()) return;
+            window.refreshChiefIncidentNotifications();
+        }, window.CHIEF_NOTIFICATION_INTERVAL_MS);
+    };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Add this at the end of your dashboard.blade.php, before closing body tag -->
@@ -2628,6 +2671,29 @@
 {{-- @vite(['resources/js/map/UnifiedMapService.js']) --}}
 
 <script>
+    const CHIEF_DASHBOARD_FETCH_TIMEOUT_MS = 10000;
+    let chiefAutoAssignRequest = null;
+    let chiefLatestIncidentRequest = null;
+    let chiefStatsRequest = null;
+
+    function fetchChiefDashboardOnce(currentRequest, url, options = {}) {
+        if (currentRequest) {
+            return currentRequest;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), CHIEF_DASHBOARD_FETCH_TIMEOUT_MS);
+        const requestPromise = fetch(url, {
+            cache: 'no-store',
+            ...options,
+            signal: controller.signal
+        }).finally(() => {
+            window.clearTimeout(timeoutId);
+        });
+
+        return requestPromise;
+    }
+
     window.runPendingIncidentAutoAssignment = async function() {
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         if (!token) {
@@ -2635,31 +2701,39 @@
         }
 
         try {
-            const response = await fetch('/api/incidents/auto-assign-recent-unassigned', {
+            chiefAutoAssignRequest = fetchChiefDashboardOnce(chiefAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': token
                 }
             });
+            const response = await chiefAutoAssignRequest;
 
             const result = await response.json().catch(() => ({}));
             if (result?.success && Number(result.assigned) > 0) {
-                window.location.reload();
+                await Promise.allSettled([
+                    refreshChiefDashboardStats(),
+                    window.refreshChiefIncidentNotifications(),
+                    typeof window.refreshEquipment === 'function' ? window.refreshEquipment() : Promise.resolve()
+                ]);
             }
         } catch (error) {
             console.error('Chief dashboard auto-assignment failed:', error);
+        } finally {
+            chiefAutoAssignRequest = null;
         }
     };
 
     window.refreshChiefIncidentNotifications = async function() {
         try {
-            const response = await fetch('/api/incident/latest', {
+            chiefLatestIncidentRequest = fetchChiefDashboardOnce(chiefLatestIncidentRequest, '/api/incident/latest', {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                 }
             });
+            const response = await chiefLatestIncidentRequest;
 
             if (!response.ok) {
                 throw new Error(`Failed to refresh chief incident notifications (${response.status})`);
@@ -2676,6 +2750,8 @@
             }
         } catch (error) {
             console.error('Chief incident notification refresh failed:', error);
+        } finally {
+            chiefLatestIncidentRequest = null;
         }
     };
 
@@ -2685,9 +2761,19 @@
     // Initialize UnifiedMapService AFTER your existing map is ready
     document.addEventListener('DOMContentLoaded', function() {
         window.runPendingIncidentAutoAssignment();
-        window.setInterval(window.runPendingIncidentAutoAssignment, 10000);
         window.refreshChiefIncidentNotifications();
-        window.setInterval(window.refreshChiefIncidentNotifications, 5000);
+        window.startChiefDashboardIntervals();
+
+        document.addEventListener('visibilitychange', () => {
+            if (window.chiefDashboardIsVisible()) {
+                refreshChiefDashboardStats();
+                window.refreshChiefIncidentNotifications();
+                window.startChiefDashboardIntervals();
+                return;
+            }
+
+            window.clearChiefDashboardIntervals();
+        });
 
         // Sidebar Mobile Toggle
         const openSidebarBtn = document.getElementById('openSidebar');
@@ -2707,7 +2793,11 @@
         }
 
         // Wait for your existing map to be initialized
+        let mapWaitAttempts = 0;
+        const maxMapWaitAttempts = 15;
         const checkMap = setInterval(function() {
+            mapWaitAttempts += 1;
+
             if (window.map && window.map._container) {
                 clearInterval(checkMap);
                 setTimeout(function() {
@@ -2724,6 +2814,12 @@
                 } else {
                     console.warn('UnifiedMapService is not loaded on chief dashboard.');
                 }
+                return;
+            }
+
+            if (mapWaitAttempts >= maxMapWaitAttempts) {
+                clearInterval(checkMap);
+                console.warn('Chief dashboard map initialization timed out; continuing without UnifiedMapService.');
             }
         }, 1000);
     });

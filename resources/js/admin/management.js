@@ -12,6 +12,7 @@ class ManagementPage {
         this.currentEditId = null;
         this.currentDeleteId = null;
         this.currentItem = null;
+        this.fetchTimeoutMs = 10000;
         this.data = {
             incidents: window.incidentDb || [],
             reports: window.reportDb || [],
@@ -207,7 +208,7 @@ class ManagementPage {
         this.showLoading(true);
         
         try {
-            const [incidents, reports, events, personnel, equipment, trainings] = await Promise.all([
+            const requests = await Promise.allSettled([
                 this.fetchData(`/api/management/incidents`),
                 this.fetchData(`/api/management/reports`),
                 this.fetchData(`/api/management/events`),
@@ -215,6 +216,9 @@ class ManagementPage {
                 this.fetchData(`/api/management/equipment`),
                 this.fetchData(`/api/management/trainings`)
             ]);
+            const [incidents, reports, events, personnel, equipment, trainings] = requests.map((result) =>
+                result.status === 'fulfilled' ? result.value : []
+            );
 
             this.data = {
                 incidents: incidents.length ? incidents : (window.incidentDb || []),
@@ -238,12 +242,17 @@ class ManagementPage {
     }
 
     async fetchData(url) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), this.fetchTimeoutMs);
+
         try {
             const response = await fetch(url, {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': this.csrfToken
-                }
+                },
+                cache: 'no-store',
+                signal: controller.signal
             });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
@@ -251,6 +260,8 @@ class ManagementPage {
         } catch (error) {
             console.error(`Error fetching ${url}:`, error);
             return [];
+        } finally {
+            window.clearTimeout(timeoutId);
         }
     }
 

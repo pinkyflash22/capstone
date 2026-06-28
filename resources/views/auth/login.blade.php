@@ -1219,8 +1219,27 @@
             }
         }
 
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const defaultSubmitMarkup = submitBtn ? submitBtn.innerHTML : '';
+        let loginSubmitRestoreTimer = null;
+
+        function restoreLoginSubmitState() {
+            if (loginSubmitRestoreTimer) {
+                window.clearTimeout(loginSubmitRestoreTimer);
+                loginSubmitRestoreTimer = null;
+            }
+
+            if (!submitBtn) {
+                return;
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = defaultSubmitMarkup;
+        }
+
         // Form submission loading state
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        loginForm.addEventListener('submit', function() {
             const csrfMeta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             const csrfInput = this.querySelector('input[name="_token"]');
 
@@ -1228,10 +1247,18 @@
                 csrfInput.value = csrfMeta;
             }
 
-            const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-spinner"></span> Signing in...';
+
+            loginSubmitRestoreTimer = window.setTimeout(() => {
+                if (window.location.pathname === new URL('{{ route('auth.login') }}', window.location.origin).pathname) {
+                    restoreLoginSubmitState();
+                }
+            }, 10000);
         });
+
+        window.addEventListener('pageshow', restoreLoginSubmitState);
+        window.addEventListener('load', restoreLoginSubmitState);
 
         (function() {
             const postLoginActionField = document.getElementById('postLoginActionField');
@@ -1266,13 +1293,17 @@
         // Prevent back button to login page after successful login
         (function() {
             const redirectAuthenticatedUser = () => {
+                const controller = new AbortController();
+                const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
                 return fetch('/check-auth', {
                     method: 'GET',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json'
                     },
-                    cache: 'no-store'
+                    cache: 'no-store',
+                    signal: controller.signal
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -1282,6 +1313,13 @@
                     }
 
                     return false;
+                })
+                .catch((error) => {
+                    console.warn('Login auth check failed or timed out:', error);
+                    return false;
+                })
+                .finally(() => {
+                    window.clearTimeout(timeoutId);
                 });
             };
 
