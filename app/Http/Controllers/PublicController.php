@@ -20,6 +20,7 @@ use App\Models\City;
 use App\Models\FullAddress;
 use App\Services\BoundaryMatcherService;
 use App\Support\BarangayNotificationService;
+use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Support\RiskAreaFollowUpDispatcher;
 use Illuminate\Support\Facades\Auth;
@@ -133,6 +134,17 @@ class PublicController extends Controller
         return 'low';
     }
 
+    private function formatCitizenLabel(?string $value, string $fallback = 'Unknown'): string
+    {
+        $normalized = trim((string) $value);
+
+        if ($normalized === '') {
+            return $fallback;
+        }
+
+        return ucwords(str_replace(['_', '-'], ' ', $normalized));
+    }
+
     private function resolveCitizenIncidentTypeId(Incident $incident): int
     {
         return 1;
@@ -156,20 +168,28 @@ class PublicController extends Controller
 
     private function serializeCitizenIncident(Incident $incident, ?float $distanceMeters = null): array
     {
+        $status = (string) ($incident->status ?? 'Reported');
+
         return [
             'incident_id' => $incident->incident_id,
-            'status'=> $incident->status,
-            'incident_status' => $incident->status,
+            'status'=> $status,
+            'incident_status' => $status,
             'incident_status_id' => $this->resolveCitizenIncidentStatusId($incident),
             'incident_type' => $this->resolveCitizenIncidentTypeName($incident),
             'incident_type_name' => $this->resolveCitizenIncidentTypeName($incident),
             'incident_type_id' => $this->resolveCitizenIncidentTypeId($incident),
+            'report_type' => 'fire',
+            'report_type_label' => 'Fire Incident',
+            'type_label' => 'Fire Incident',
+            'category_label' => 'Fire',
+            'status_label' => $this->formatCitizenLabel($status, 'Reported'),
             'created_at' => optional($incident->created_at)->toISOString(),
             'created_at_human' => optional($incident->created_at)?->diffForHumans(),
             'marker_id' => $incident->marker_id,
             'lat' => $incident->marker?->lat,
             'lng' => $incident->marker?->lng,
             'address' => $incident->marker?->description,
+            'location_label' => $incident->marker?->description ?: 'Location pending',
             'marker' => $incident->marker,
             'barangay_id' => $incident->barangay_id,
             'barangay_name' => $incident->barangay?->barangay_name,
@@ -184,17 +204,68 @@ class PublicController extends Controller
     private function serializeCitizenRiskReport(RiskArea $riskArea): array
     {
         $entryType = strtolower(trim((string) ($riskArea->entry_type ?? 'risk')));
+        $reviewStatus = (string) ($riskArea->review_status ?? 'pending');
+        $status = (string) ($riskArea->status ?? 'pending');
+        $typeLabel = $entryType === 'hazard' ? 'Risk/Hazard Factor' : 'Risk/Hazard Factor';
+        $categoryLabel = $entryType === 'hazard'
+            ? $this->formatCitizenLabel($riskArea->hazard_category ?? $riskArea->hazard_type, 'Hazard')
+            : $this->formatCitizenLabel($riskArea->risk_type ?? $riskArea->condition_label, 'Risk');
+        $photoUrls = $riskArea->photos
+            ->map(fn ($photo) => [
+                'url' => MediaPath::url($photo->photo_path),
+                'name' => $photo->photo_name,
+                'caption' => $photo->caption,
+            ])
+            ->filter(fn ($photo) => !empty($photo['url']))
+            ->values();
 
         return [
             'risk_area_id' => $riskArea->risk_area_id,
             'created_at' => optional($riskArea->created_at)->toISOString(),
+            'created_at_human' => optional($riskArea->created_at)?->diffForHumans(),
             'report_kind' => $entryType,
             'entry_type' => $entryType,
             'category' => $entryType,
             'type' => $entryType === 'hazard' ? 'Hazard' : 'Risk',
+            'report_type' => $entryType,
+            'report_type_label' => $typeLabel,
+            'type_label' => $entryType === 'hazard' ? 'Hazard Factor' : 'Risk Factor',
+            'category_label' => $categoryLabel,
             'title' => $riskArea->marker?->title ?? ($entryType === 'hazard' ? 'Citizen Hazard Report' : 'Citizen Risk Report'),
+            'description' => $riskArea->marker?->description ?? $riskArea->remarks ?? $riskArea->assessment_description,
             'condition_label' => $riskArea->condition_label,
+            'status' => $status,
+            'status_label' => $this->formatCitizenLabel($status, 'Pending'),
+            'review_status' => $reviewStatus,
+            'review_status_label' => $this->formatCitizenLabel($reviewStatus, 'Pending'),
+            'review_type' => $riskArea->review_type ?? 'create',
+            'remarks' => $riskArea->remarks,
+            'assessment_description' => $riskArea->assessment_description,
+            'street_or_sitio' => $riskArea->street_or_sitio,
+            'location_label' => $riskArea->street_or_sitio ?: ($riskArea->marker?->description ?: 'General area'),
+            'lat' => $riskArea->marker?->lat,
+            'lng' => $riskArea->marker?->lng,
+            'barangay_name' => $riskArea->barangayHall?->barangay?->barangay_name,
+            'barangay_city_name' => $riskArea->barangayHall?->barangay?->city?->city_name,
+            'marker_id' => $riskArea->marker_id,
+            'marker_category' => $riskArea->marker?->category,
+            'risk_type' => $riskArea->risk_type,
+            'hazard_category' => $riskArea->hazard_category,
+            'hazard_type' => $riskArea->hazard_type,
+            'photos' => $photoUrls,
+            'photo_url' => $photoUrls->first()['url'] ?? null,
         ];
+    }
+
+    private function serializeCitizenRiskMapRecord(RiskArea $riskArea): array
+    {
+        $report = $this->serializeCitizenRiskReport($riskArea);
+
+        return array_merge($report, [
+            'id' => $riskArea->risk_area_id,
+            'popup_title' => $report['title'],
+            'popup_subtitle' => $report['category_label'],
+        ]);
     }
 
     private function resolveCitizenQuickRiskTemplate(string $reportKind): array
@@ -333,10 +404,21 @@ class PublicController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $userRiskReports = RiskArea::with(['marker'])
+        $userRiskReports = RiskArea::with(['marker', 'photos', 'barangayHall.barangay.city'])
             ->where('reported_by', $accountId)
             ->orderByDesc('created_at')
             ->get();
+
+        $riskMapReports = RiskArea::with(['marker', 'photos', 'barangayHall.barangay.city'])
+            ->whereNotNull('marker_id')
+            ->where(function ($query) use ($accountId) {
+                $query->where('review_status', 'approved')
+                    ->orWhere('reported_by', $accountId);
+            })
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(fn ($riskArea) => $riskArea->marker?->lat !== null && $riskArea->marker?->lng !== null)
+            ->values();
 
         $userReports = $userIncidents->count() + $userRiskReports->count();
         $countReport = $userReports;
@@ -395,6 +477,9 @@ class PublicController extends Controller
                 ->concat($userRiskReports->map(fn ($riskArea) => $this->serializeCitizenRiskReport($riskArea)))
                 ->sortByDesc('created_at')
                 ->values(),
+            'risk_map_reports' => $riskMapReports
+                ->map(fn ($riskArea) => $this->serializeCitizenRiskMapRecord($riskArea))
+                ->values(),
             'nearby_incidents' => $activeNearbyIncidents
                 ->map(fn ($incident) => $this->serializeCitizenIncident($incident, $incident->computed_distance_meters ?? null))
                 ->values(),
@@ -433,6 +518,7 @@ class PublicController extends Controller
         $nearbyIncidents = collect($dashboardData['nearby_incidents']);
         $overviewReportCount = $dashboardData['summary']['total_reports'];
         $citizenCombinedReports = $dashboardData['user_reports'];
+        $riskMapReports = $dashboardData['risk_map_reports'];
 
 
         //request
@@ -440,7 +526,7 @@ class PublicController extends Controller
         $fsicRequests = FsicRequest::where('user_id', $accountId)->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
-        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports'));
+        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports'));
         // return view('citizen.dashboard', compact('usermarker'));
 
     }

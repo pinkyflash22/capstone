@@ -1257,7 +1257,9 @@
     // Also pass incidents data to JavaScript
     window.incidentsData = @json($incidents) || [];
     window.myReportedIncidents = @json($myReports) || [];
+    window.nearbyAlertsData = @json($nearbyIncidents ?? []) || [];
     window.citizenCombinedReports = @json($citizenCombinedReports ?? []) || [];
+    window.citizenRiskMapReports = @json($riskMapReports ?? []) || [];
     window.currentCitizenId = {{ $accountId ?? 'null' }};
     window.citizenSidebarDefaults = {
         drills: Number(@json($drillsAttended ?? 5)),
@@ -1411,12 +1413,12 @@
                     <li>
                         <a onclick="switchSection('alerts')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
-                            <span class="flex-1">Incidents & Alerts</span>
+                            <span class="flex-1">Areas of Concern</span>
                             <span id="citizenNavAlertsBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $activeAlerts ?? 0 }}</span>
                         </a>
                     </li>
                     <li>
-                        <a onclick="switchSection('fsic')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
+                        <a onclick="switchSection('fsic')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="fsic">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Requests</span>
                             <span id="citizenNavRequestsBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $fsicRequests->count() }}</span>
@@ -1489,7 +1491,7 @@
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="fsic" onclick="switchSection('fsic')" aria-label="Requests">
                             <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">folder_open</span>
                         </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" onclick="switchSection('alerts')" aria-label="Incidents and Alerts">
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" onclick="switchSection('alerts')" aria-label="Areas of Concern">
                             <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">warning</span>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" onclick="switchSection('contacts')" aria-label="Emergency Contacts">
@@ -1775,53 +1777,129 @@
         </div>
 
         <!-- Fire Report Modal -->
-        <div id="fireIncidentModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center z-50 justify-center hidden">
-            <div class="bg-white rounded-lg shadow-lg w-96 p-6">
-                <h2 class="text-lg font-bold mb-4">Report Fire Incident</h2>
-                <form id="fireIncidentForm" action="" method="POST">
+        <div id="fireIncidentModal" class="modal fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center z-50 justify-center hidden p-4">
+            <div class="w-full max-w-xl overflow-hidden rounded-[2rem] border border-orange-100 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.24)]">
+                <div class="relative overflow-hidden bg-gradient-to-r from-[#c63d26] via-[#d45a1a] to-[#e39b17] px-6 py-6 text-white">
+                    <div class="absolute inset-y-0 right-0 w-40 bg-white/10 blur-2xl"></div>
+                    <div class="relative flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
+                                <span class="material-symbols-rounded text-[28px]" aria-hidden="true">local_fire_department</span>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">PyroSense Emergency</p>
+                                <h2 class="mt-1 text-2xl font-bold leading-tight">Report Fire Incident</h2>
+                                <p class="mt-2 max-w-md text-sm text-white/85">Send an emergency fire report right away. BFP can begin processing immediately while station assignment continues in the background.</p>
+                            </div>
+                        </div>
+                        <button type="button" id="closeFireModal" class="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/12 text-white transition hover:bg-white/20" aria-label="Close fire report modal">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <form id="fireIncidentForm" action="" method="POST" class="px-6 py-6">
                     @csrf
-                    <div class="rounded-xl border border-red-100 bg-red-50 px-4 py-4 text-sm text-slate-700 mb-4">
-                        <p class="font-semibold text-slate-900 mb-1">Emergency fire report</p>
-                        <p>This sends an immediate fire report using your current location so BFP can start processing right away.</p>
-                        <p class="mt-2 text-xs text-slate-500">Use this only for actual fire emergencies. Follow-up station assignment and dispatch preparation continue in the background after the report is saved.</p>
+                    <div class="grid gap-4">
+                        <div class="rounded-3xl border border-red-100 bg-gradient-to-br from-red-50 via-orange-50 to-white p-5 text-sm text-slate-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900">Emergency fire report</p>
+                                    <p class="mt-1">Use this only for an actual fire emergency. The incident is saved first so the citizen gets instant feedback.</p>
+                                </div>
+                                <span class="rounded-full bg-red-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-red-700">Priority</span>
+                            </div>
+                            <p class="mt-3 text-xs text-slate-500">You can use your live location or choose a map point within 100 meters if the fire is slightly away from your exact GPS position.</p>
+                        </div>
+
+                        <div id="fireLocationPanel" class="rounded-3xl border border-orange-100 bg-[#fffaf4] p-5 text-sm text-slate-700 shadow-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900">Incident location</p>
+                                    <p class="mt-1 text-slate-600">Pick the exact fire point within a 100-meter radius of your current location.</p>
+                                </div>
+                                <span class="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-orange-700">100m radius</span>
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button type="button" id="fireUseCurrentLocationButton" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                    <span class="material-symbols-rounded text-[18px]" aria-hidden="true">my_location</span>
+                                    Use My Location
+                                </button>
+                                <button type="button" id="firePickOnMapButton" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700">
+                                    <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
+                                    Choose on Map (100m)
+                                </button>
+                            </div>
+
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location status</p>
+                                <p id="fireLocationStatus" class="mt-2 text-sm text-slate-700">Your current location will be used for this fire report.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 mb-4">
-                        <p class="font-semibold text-slate-900 mb-1">Location used</p>
-                        <p id="fireLocationStatus">Your current location will be used for this fire report.</p>
-                    </div>
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <button type="button" id="closeFireModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-blue-600 text-white rounded" data-report-kind="fire">Report Fire Incident</button>
+
+                    <div class="mt-6 flex flex-wrap justify-end gap-3">
+                        <button type="button" class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-fire-modal-close>Cancel</button>
+                        <button type="button" class="js-citizen-report-action inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#c63d26] to-[#e39b17] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(198,61,38,0.28)] transition hover:brightness-105" data-report-kind="fire">
+                            <span class="material-symbols-rounded text-[18px]" aria-hidden="true">bolt</span>
+                            Report Fire Incident
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- Risk / Hazard Modal -->
-        <div id="concernReportModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center z-50 justify-center hidden">
-            <div class="bg-white rounded-lg shadow-lg w-96 p-6">
-                <h2 class="text-lg font-bold mb-4">Report Risk / Hazard</h2>
-                <form id="concernIncidentForm" action="" method="POST" enctype="multipart/form-data">
+        <div id="concernReportModal" class="modal fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center z-50 justify-center hidden p-4">
+            <div class="w-full max-w-xl overflow-hidden rounded-[2rem] border border-amber-100 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.24)]">
+                <div class="relative overflow-hidden bg-gradient-to-r from-[#b45309] via-[#d97706] to-[#f59e0b] px-6 py-6 text-white">
+                    <div class="absolute inset-y-0 right-0 w-40 bg-white/10 blur-2xl"></div>
+                    <div class="relative flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
+                                <span class="material-symbols-rounded text-[28px]" aria-hidden="true">report_problem</span>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">PyroSense Community Safety</p>
+                                <h2 class="mt-1 text-2xl font-bold leading-tight">Report Risk / Hazard</h2>
+                                <p class="mt-2 max-w-md text-sm text-white/85">Report a non-fire safety concern for BFP review. PyroSense can still save unsure reports first, then BFP can verify or reclassify them.</p>
+                            </div>
+                        </div>
+                        <button type="button" id="closeConcernModal" class="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/12 text-white transition hover:bg-white/20" aria-label="Close risk and hazard modal">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <form id="concernIncidentForm" action="" method="POST" enctype="multipart/form-data" class="px-6 py-6">
                     @csrf
+                    <div class="grid gap-4">
                         @if($errors->any())
-                            <div style="color:red;">
-                                <ul>
+                            <div class="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                <ul class="space-y-1">
                                     @foreach($errors->all() as $error)
                                         <li>{{ $error }}</li>
                                     @endforeach
                                 </ul>
                             </div>
                         @endif
-                        {{-- <input type="hidden" name=""  id="marker_id_input" value=""> --}}
-                        {{-- <input type="hidden" name="reported_by" value="{{ $accountId }}"> --}}
-                        <div class="rounded-xl border border-orange-100 bg-orange-50 px-4 py-4 text-sm text-slate-700 mb-4">
-                            <p class="font-semibold text-slate-900 mb-1">Report a non-fire safety concern</p>
-                            <p>Use this for fire risks, hazards, unsafe conditions, or anything that needs BFP verification but is not an active fire emergency.</p>
-                            <p class="mt-2 text-xs text-slate-500">If you are unsure whether it is a hazard or a risk, PyroSense will still save it first and BFP can verify or reclassify it during review.</p>
+
+                        <div class="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-5 text-sm text-slate-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900">Non-fire safety concern</p>
+                                    <p class="mt-1">Use this for fire risks, hazards, unsafe conditions, blocked access, LPG issues, electrical concerns, or other report types that still need BFP attention.</p>
+                                </div>
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Review flow</span>
+                            </div>
+                            <p class="mt-3 text-xs text-slate-500">If the citizen is not sure whether it is a hazard or a risk, this report can still be submitted and verified later by BFP.</p>
                         </div>
-                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 mb-4">
-                            <label for="concernTypeSelect" class="block font-semibold text-slate-900 mb-2">Risk / Hazard type</label>
-                            <select id="concernTypeSelect" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700">
+
+                        <div class="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+                            <label for="concernTypeSelect" class="block text-sm font-semibold text-slate-900">Risk / Hazard type</label>
+                            <p class="mt-1 text-xs text-slate-500">Choose the closest type so the review queue starts with better context.</p>
+                            <select id="concernTypeSelect" class="mt-3 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-700 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100">
                                 <option value="unsure">I am not sure yet</option>
                                 <option value="electrical_issue">Electrical issue</option>
                                 <option value="unsafe_cooking_lpg">Unsafe cooking or LPG use</option>
@@ -1829,26 +1907,40 @@
                                 <option value="combustible_clutter">Combustible clutter or open burning</option>
                                 <option value="dense_fire_prone_area">Dense fire-prone area</option>
                             </select>
-                            <p class="mt-2 text-xs text-slate-500">Choose the closest match. If it is unclear, leave it on <strong>I am not sure yet</strong> and let BFP review it.</p>
-                        </div>
-                        <div id="hazardLocationPanel" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 mb-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="font-semibold text-slate-900 mb-1">Safety concern location</p>
-                                    <p>For non-fire concerns, use your location or pick a point within 100 meters on the map.</p>
-                                </div>
-                                <span class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Non-fire</span>
-                            </div>
-                            <div class="flex flex-wrap gap-2 mt-3">
-                                <button type="button" id="hazardUseCurrentLocationButton" class="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm">Use My Location</button>
-                                <button type="button" id="hazardPickOnMapButton" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm">Pick on Map (100m)</button>
-                            </div>
-                            <p id="hazardLocationStatus" class="mt-3 text-xs text-slate-500">Safety concern reports will use your current location unless you pick another point on the map.</p>
+                            <p class="mt-2 text-xs text-slate-500">If it is unclear, keep <strong>I am not sure yet</strong> and let BFP validate the correct classification.</p>
                         </div>
 
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <button type="button" id="closeConcernModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                        <button type="button" class="js-citizen-report-action px-4 py-2 bg-amber-500 text-white rounded" data-report-kind="concern">Submit Risk / Hazard</button>
+                        <div id="hazardLocationPanel" class="rounded-3xl border border-amber-100 bg-[#fffaf4] p-5 text-sm text-slate-700 shadow-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900">Safety concern location</p>
+                                    <p class="mt-1 text-slate-600">Use your current position or choose a point on the map within 100 meters.</p>
+                                </div>
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">100m radius</span>
+                            </div>
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button type="button" id="hazardUseCurrentLocationButton" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                    <span class="material-symbols-rounded text-[18px]" aria-hidden="true">my_location</span>
+                                    Use My Location
+                                </button>
+                                <button type="button" id="hazardPickOnMapButton" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-amber-300 hover:text-amber-700">
+                                    <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
+                                    Choose on Map (100m)
+                                </button>
+                            </div>
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location status</p>
+                                <p id="hazardLocationStatus" class="mt-2 text-sm text-slate-700">Safety concern reports will use your current location unless you pick another point on the map.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap justify-end gap-3">
+                        <button type="button" class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-concern-modal-close>Cancel</button>
+                        <button type="button" class="js-citizen-report-action inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#b45309] to-[#f59e0b] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(217,119,6,0.24)] transition hover:brightness-105" data-report-kind="concern">
+                            <span class="material-symbols-rounded text-[18px]" aria-hidden="true">send</span>
+                            Submit Risk / Hazard
+                        </button>
                     </div>
                 </form>
             </div>
@@ -2246,6 +2338,12 @@ if (navigator.geolocation) {
             document.querySelectorAll(`[data-section="${sectionId}"], [data-citizen-dock-item="${sectionId}"]`).forEach(item => {
                 item.classList.add('active');
             });
+
+            if (sectionId === 'alerts' && typeof window.refreshCitizenRiskConcernMap === 'function') {
+                window.setTimeout(() => {
+                    window.refreshCitizenRiskConcernMap(window.citizenRiskMapReports || []);
+                }, 120);
+            }
 
             if (updateHistory) {
                 const targetUrl = buildCitizenSectionUrl(sectionId);
@@ -2659,6 +2757,15 @@ if (navigator.geolocation) {
             marker: null,
             clickHandler: null,
         };
+        const citizenFireDraft = {
+            mode: 'current',
+            selectedLat: null,
+            selectedLng: null,
+            picking: false,
+            circle: null,
+            marker: null,
+            clickHandler: null,
+        };
 
         function getCitizenDistanceMeters(lat1, lng1, lat2, lng2) {
             const earthRadius = 6371000;
@@ -2682,6 +2789,17 @@ if (navigator.geolocation) {
             citizenHazardDraft.marker = null;
         }
 
+        function clearCitizenFirePickVisuals() {
+            if (citizenFireDraft.circle && window.usermap) {
+                window.usermap.removeLayer(citizenFireDraft.circle);
+            }
+            if (citizenFireDraft.marker && window.usermap) {
+                window.usermap.removeLayer(citizenFireDraft.marker);
+            }
+            citizenFireDraft.circle = null;
+            citizenFireDraft.marker = null;
+        }
+
         function stopCitizenHazardMapPick() {
             if (citizenHazardDraft.clickHandler && window.usermap) {
                 window.usermap.off('click', citizenHazardDraft.clickHandler);
@@ -2689,6 +2807,15 @@ if (navigator.geolocation) {
             citizenHazardDraft.clickHandler = null;
             citizenHazardDraft.picking = false;
             clearCitizenHazardPickVisuals();
+        }
+
+        function stopCitizenFireMapPick() {
+            if (citizenFireDraft.clickHandler && window.usermap) {
+                window.usermap.off('click', citizenFireDraft.clickHandler);
+            }
+            citizenFireDraft.clickHandler = null;
+            citizenFireDraft.picking = false;
+            clearCitizenFirePickVisuals();
         }
 
         function updateCitizenHazardLocationUi() {
@@ -2731,6 +2858,51 @@ if (navigator.geolocation) {
             statusNode.textContent = 'Safety concern reports will use your current location unless you pick another point on the map.';
         }
 
+        function updateCitizenFireLocationUi() {
+            const statusNode = document.getElementById('fireLocationStatus');
+            const useCurrentButton = document.getElementById('fireUseCurrentLocationButton');
+            const pickOnMapButton = document.getElementById('firePickOnMapButton');
+
+            if (useCurrentButton) {
+                useCurrentButton.classList.toggle('bg-slate-900', citizenFireDraft.mode === 'current');
+                useCurrentButton.classList.toggle('text-white', citizenFireDraft.mode === 'current');
+                useCurrentButton.classList.toggle('border', citizenFireDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('border-slate-300', citizenFireDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('bg-white', citizenFireDraft.mode !== 'current');
+                useCurrentButton.classList.toggle('text-slate-700', citizenFireDraft.mode !== 'current');
+            }
+
+            if (pickOnMapButton) {
+                pickOnMapButton.classList.toggle('bg-slate-900', citizenFireDraft.mode === 'picked');
+                pickOnMapButton.classList.toggle('text-white', citizenFireDraft.mode === 'picked');
+                pickOnMapButton.classList.toggle('border', citizenFireDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('border-slate-300', citizenFireDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('bg-white', citizenFireDraft.mode !== 'picked');
+                pickOnMapButton.classList.toggle('text-slate-700', citizenFireDraft.mode !== 'picked');
+            }
+
+            if (!statusNode) {
+                return;
+            }
+
+            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+                statusNode.textContent = 'Getting your current location now...';
+                return;
+            }
+
+            if (citizenFireDraft.picking) {
+                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the fire incident point.';
+                return;
+            }
+
+            if (citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
+                statusNode.textContent = `Selected fire point: ${citizenFireDraft.selectedLat.toFixed(6)}, ${citizenFireDraft.selectedLng.toFixed(6)}.`;
+                return;
+            }
+
+            statusNode.textContent = `Current location ready: ${Number(window.userCoords.currentLatitude).toFixed(6)}, ${Number(window.userCoords.currentLongitude).toFixed(6)}.`;
+        }
+
         function setCitizenHazardCurrentLocation() {
             if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
                 window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
@@ -2742,6 +2914,19 @@ if (navigator.geolocation) {
             citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
             citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
             updateCitizenHazardLocationUi();
+        }
+
+        function setCitizenFireCurrentLocation() {
+            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+                window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
+                return;
+            }
+
+            stopCitizenFireMapPick();
+            citizenFireDraft.mode = 'current';
+            citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
+            citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            updateCitizenFireLocationUi();
         }
 
         function startCitizenHazardMapPick() {
@@ -2822,16 +3007,93 @@ if (navigator.geolocation) {
             }, 200);
         }
 
-        function openFireIncidentModal() {
-            const fireModal = document.getElementById('fireIncidentModal');
-            const fireLocationStatus = document.getElementById('fireLocationStatus');
-
-            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && fireLocationStatus) {
-                fireLocationStatus.textContent = `Current location ready: ${Number(window.userCoords.currentLatitude).toFixed(6)}, ${Number(window.userCoords.currentLongitude).toFixed(6)}.`;
-            } else if (fireLocationStatus) {
-                fireLocationStatus.textContent = 'Getting your current location now...';
+        function startCitizenFireMapPick() {
+            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+                window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
+                return;
             }
 
+            citizenFireDraft.mode = 'picked';
+            citizenFireDraft.picking = true;
+
+            document.getElementById('fireIncidentModal').style.display = 'none';
+            window.switchSection?.('overview');
+
+            window.setTimeout(() => {
+                if (!window.usermap) {
+                    citizenFireDraft.picking = false;
+                    updateCitizenFireLocationUi();
+                    window.showCitizenToast?.('Map is not ready yet. Please try again.', true);
+                    return;
+                }
+
+                stopCitizenFireMapPick();
+                citizenFireDraft.mode = 'picked';
+                citizenFireDraft.picking = true;
+
+                const originLat = Number(window.userCoords.currentLatitude);
+                const originLng = Number(window.userCoords.currentLongitude);
+
+                window.usermap.invalidateSize();
+                window.usermap.setView([originLat, originLng], Math.max(window.usermap.getZoom() || 15, 17), { animate: true });
+
+                citizenFireDraft.circle = L.circle([originLat, originLng], {
+                    radius: 100,
+                    color: '#c63d26',
+                    fillColor: '#f97316',
+                    fillOpacity: 0.14,
+                    weight: 2,
+                }).addTo(window.usermap);
+
+                if (citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
+                    citizenFireDraft.marker = L.marker([citizenFireDraft.selectedLat, citizenFireDraft.selectedLng]).addTo(window.usermap);
+                }
+
+                citizenFireDraft.clickHandler = function(event) {
+                    const targetLat = Number(event.latlng.lat);
+                    const targetLng = Number(event.latlng.lng);
+                    const distance = getCitizenDistanceMeters(originLat, originLng, targetLat, targetLng);
+
+                    if (distance > 100) {
+                        window.showCitizenToast?.('Please pick the fire point within 100 meters of your current location.', true);
+                        return;
+                    }
+
+                    citizenFireDraft.selectedLat = targetLat;
+                    citizenFireDraft.selectedLng = targetLng;
+                    citizenFireDraft.picking = false;
+
+                    if (citizenFireDraft.marker && window.usermap) {
+                        window.usermap.removeLayer(citizenFireDraft.marker);
+                    }
+
+                    citizenFireDraft.marker = L.marker([targetLat, targetLng]).addTo(window.usermap);
+
+                    if (citizenFireDraft.clickHandler && window.usermap) {
+                        window.usermap.off('click', citizenFireDraft.clickHandler);
+                    }
+                    citizenFireDraft.clickHandler = null;
+
+                    updateCitizenFireLocationUi();
+                    openFireIncidentModal();
+                    window.showCitizenToast?.('Fire incident point selected. Tap Report Fire Incident to continue.', false, 3800);
+                };
+
+                window.usermap.on('click', citizenFireDraft.clickHandler);
+                updateCitizenFireLocationUi();
+                window.showCitizenToast?.('Tap the map within 100 meters of your current location to place the fire incident point.', false, 4200);
+            }, 200);
+        }
+
+        function openFireIncidentModal() {
+            const fireModal = document.getElementById('fireIncidentModal');
+
+            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null) {
+                citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            }
+
+            updateCitizenFireLocationUi();
             fireModal.style.display = 'flex';
         }
 
@@ -2844,12 +3106,16 @@ if (navigator.geolocation) {
             document.getElementById('concernReportModal').style.display = 'flex';
         }
 
-        document.getElementById('closeFireModal').addEventListener('click', function() {
-            document.getElementById('fireIncidentModal').style.display = 'none';
+        document.querySelectorAll('[data-fire-modal-close], #closeFireModal').forEach(function(trigger) {
+            trigger.addEventListener('click', function() {
+                document.getElementById('fireIncidentModal').style.display = 'none';
+            });
         });
 
-        document.getElementById('closeConcernModal').addEventListener('click', function() {
-            document.getElementById('concernReportModal').style.display = 'none';
+        document.querySelectorAll('[data-concern-modal-close], #closeConcernModal').forEach(function(trigger) {
+            trigger.addEventListener('click', function() {
+                document.getElementById('concernReportModal').style.display = 'none';
+            });
         });
 
         document.getElementById('hazardUseCurrentLocationButton')?.addEventListener('click', function() {
@@ -2858,6 +3124,14 @@ if (navigator.geolocation) {
 
         document.getElementById('hazardPickOnMapButton')?.addEventListener('click', function() {
             startCitizenHazardMapPick();
+        });
+
+        document.getElementById('fireUseCurrentLocationButton')?.addEventListener('click', function() {
+            setCitizenFireCurrentLocation();
+        });
+
+        document.getElementById('firePickOnMapButton')?.addEventListener('click', function() {
+            startCitizenFireMapPick();
         });
 
 
@@ -2954,6 +3228,11 @@ async function submitCitizenQuickReport(reportKind) {
         return;
     }
 
+    if (reportKind === 'fire' && citizenFireDraft.mode === 'picked' && (citizenFireDraft.selectedLat === null || citizenFireDraft.selectedLng === null)) {
+        startCitizenFireMapPick();
+        return;
+    }
+
     if (reportKind === 'concern' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
         startCitizenHazardMapPick();
         return;
@@ -2979,10 +3258,16 @@ async function submitCitizenQuickReport(reportKind) {
         let successMessage = '';
 
         if (reportKind === 'fire') {
+            const fireLat = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null
+                ? Number(citizenFireDraft.selectedLat)
+                : Number(window.userCoords.currentLatitude);
+            const fireLng = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLng !== null
+                ? Number(citizenFireDraft.selectedLng)
+                : Number(window.userCoords.currentLongitude);
             success = await window.saveIncident(
                 description,
-                window.userCoords.currentLatitude,
-                window.userCoords.currentLongitude,
+                fireLat,
+                fireLng,
                 incidentTypeId,
                 null,
                 reporter
@@ -3033,6 +3318,11 @@ async function submitCitizenQuickReport(reportKind) {
         if (success) {
             if (reportKind === 'fire') {
                 document.getElementById('fireIncidentForm')?.reset();
+                citizenFireDraft.mode = 'current';
+                citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                stopCitizenFireMapPick();
+                updateCitizenFireLocationUi();
             } else {
                 document.getElementById('concernIncidentForm')?.reset();
             }
@@ -3225,6 +3515,7 @@ window.refreshCitizenOverviewData = async function() {
         const nearbyIncidents = Array.isArray(data.nearby_incidents) ? data.nearby_incidents : [];
         const userIncidents = Array.isArray(data.user_incidents) ? data.user_incidents : [];
         const userReports = Array.isArray(data.user_reports) ? data.user_reports : userIncidents;
+        const riskMapReports = Array.isArray(data.risk_map_reports) ? data.risk_map_reports : [];
         const activeAlerts = Number(summary.active_alerts || 0);
         window.incidentsData = Array.isArray(data.incidents) ? data.incidents : [];
 
@@ -3274,7 +3565,9 @@ window.refreshCitizenOverviewData = async function() {
         setText('citizenNearbyAlertsCount', `${nearbyIncidents.length} incident(s) nearby`);
 
         window.myReportedIncidents = userIncidents;
+        window.nearbyAlertsData = nearbyIncidents;
         window.citizenCombinedReports = userReports;
+        window.citizenRiskMapReports = riskMapReports;
         window.renderCitizenWeeklyActivity(data.weekly_activity || null);
 
         const riskPercentageNode = document.getElementById('citizenOverviewRiskPercentageValue');
@@ -3295,6 +3588,14 @@ window.refreshCitizenOverviewData = async function() {
 
         if (typeof window.refreshCitizenAlertsSection === 'function') {
             window.refreshCitizenAlertsSection(Array.isArray(nearbyIncidents) ? nearbyIncidents : []);
+        }
+
+        if (typeof window.refreshCitizenAreasOfConcernReports === 'function') {
+            window.refreshCitizenAreasOfConcernReports(userReports);
+        }
+
+        if (typeof window.refreshCitizenRiskConcernMap === 'function') {
+            window.refreshCitizenRiskConcernMap(riskMapReports);
         }
 
         const fab = document.getElementById('alertsFab');

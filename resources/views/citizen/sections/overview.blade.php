@@ -149,6 +149,10 @@
     <i class="fas fa-bullhorn report-fab-icon"></i>
 </button>
 
+<button type="button" class="report-fab report-fab--concern" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
+    <i class="fas fa-triangle-exclamation report-fab-icon"></i>
+</button>
+
 {{-- Backdrop --}}
 <div id="alertsBackdrop" class="alerts-backdrop"></div>
 
@@ -599,9 +603,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 @media (max-width: 768px) {
     #alertsFab,
+    .report-fab--concern,
     .report-fab {
         display: none !important;
     }
+}
+
+.report-fab--concern {
+    bottom: 10.75rem !important;
+    background: linear-gradient(135deg, #f59e0b 0%, #fb7185 100%) !important;
+    box-shadow: 0 20px 36px rgba(245, 158, 11, 0.28) !important;
+}
+
+.report-fab--concern:hover {
+    box-shadow: 0 24px 42px rgba(245, 158, 11, 0.34) !important;
 }
 </style>
 
