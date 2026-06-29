@@ -2160,6 +2160,10 @@
             fetchAllFirefighterLocations();
         }, CITIZEN_LOCATION_PULL_INTERVAL_MS);
     }
+
+    window.citizenDashboardIsVisible = citizenDashboardIsVisible;
+    window.clearCitizenDashboardLocationIntervals = clearCitizenDashboardLocationIntervals;
+    window.startCitizenDashboardLocationIntervals = startCitizenDashboardLocationIntervals;
             console.log('officer dashboard: ', window.stationOfficer);
             const citizenSidebarResolvedLocation = document.getElementById('citizenSidebarResolvedLocation');
             const citizenWelcomeAlert = document.getElementById('citizenWelcomeAlert');
@@ -3735,7 +3739,7 @@ window.runPendingIncidentAutoAssignment = async function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     window.runPendingIncidentAutoAssignment();
-    startCitizenDashboardLocationIntervals();
+    window.startCitizenDashboardLocationIntervals?.();
 
     const CITIZEN_AUTO_ASSIGN_INTERVAL_MS = 60000;
     const CITIZEN_OVERVIEW_INTERVAL_MS = 30000;
@@ -3773,7 +3777,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.addEventListener('visibilitychange', () => {
         if (citizenDashboardIsVisible()) {
-            startCitizenDashboardLocationIntervals();
+            window.startCitizenDashboardLocationIntervals?.();
             startCitizenDashboardDataIntervals();
             if (window.refreshCitizenOverviewData) {
                 window.refreshCitizenOverviewData();
@@ -3781,7 +3785,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        clearCitizenDashboardLocationIntervals();
+        window.clearCitizenDashboardLocationIntervals?.();
         clearCitizenDashboardDataIntervals();
     });
 });

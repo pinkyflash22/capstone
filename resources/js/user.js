@@ -67,7 +67,7 @@ function citizenPageIsVisible() {
 
 function fetchCitizenLiveResponseOnce(key, url, options = {}) {
     if (citizenLiveRequestRegistry.has(key)) {
-        return citizenLiveRequestRegistry.get(key);
+        return citizenLiveRequestRegistry.get(key).then((response) => response.clone());
     }
 
     const controller = new AbortController();
@@ -85,7 +85,7 @@ function fetchCitizenLiveResponseOnce(key, url, options = {}) {
     });
 
     citizenLiveRequestRegistry.set(key, requestPromise);
-    return requestPromise;
+    return requestPromise.then((response) => response.clone());
 }
 let citizenIncidentMarkerRefs = new Map();
 let citizenLegendControl = null;

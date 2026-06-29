@@ -520,6 +520,8 @@ class IncidentController extends Controller
         $markerId = $validated['marker_id'] ?? null;
 
         $data = DB::transaction(function () use ($validated, $markerId) {
+            $createdMarker = null;
+
             if (! $markerId) {
                 $lat = (float) $validated['lat'];
                 $lng = (float) $validated['lng'];
@@ -533,16 +535,16 @@ class IncidentController extends Controller
                     ], 422));
                 }
 
-                $marker = Marker::create([
+                $createdMarker = Marker::create([
                     'title' => $validated['title'] ?? 'Citizen Fire Emergency',
                     'description' => $validated['description'] ?? 'Citizen-submitted fire emergency.',
                     'lat' => $lat,
                     'lng' => $lng,
-                    'status' => 'active',
+                    'status' => 'inactive',
                     'category' => 'fire',
                 ]);
 
-                $validated['marker_id'] = $marker->marker_id;
+                $validated['marker_id'] = $createdMarker->marker_id;
             } else {
                 $validated['marker_id'] = $markerId;
             }
@@ -559,7 +561,15 @@ class IncidentController extends Controller
                 $validated['barangay_resolved_at'] = null;
             }
 
-            return Incident::create($validated);
+            $incident = Incident::create($validated);
+
+            if ($createdMarker) {
+                $createdMarker->update([
+                    'status' => 'active',
+                ]);
+            }
+
+            return $incident;
         });
         IncidentContextDispatcher::dispatchFor($data);
         IncidentFollowUpDispatcher::dispatchFor($data);
