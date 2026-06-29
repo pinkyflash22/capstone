@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'brand_logo_path' => env('BRAND_LOGO_PATH', 'supabase://branding/logos/logo.png'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

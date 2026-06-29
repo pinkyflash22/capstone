@@ -960,7 +960,7 @@
         <div class="container">
             <a href="{{ route('home') }}" class="logo">
                 <div class="logo-icon">
-                    <img src="{{ asset('storage/defaults/pyrosense.png') }}" alt="PyroSense logo" class="logo-image">
+                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="logo-image">
                 </div>
                 <span class="logo-text">Pyro<span>Sense</span></span>
             </a>
@@ -990,7 +990,7 @@
                 <div class="brand-content">
                     <div class="brand-header">
                         <div class="brand-icon">
-                            <img src="{{ asset('storage/defaults/pyrosense.png') }}" alt="PyroSense logo">
+                            <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo">
                         </div>
                         <div class="brand-title">
                             <h2>PyroSense</h2>

@@ -42,7 +42,7 @@
     <div class="sidebar-header-gradient chief-shell-sidebar-header px-6 py-8">
         <div class="chief-shell-brand flex items-center gap-3">
             <div class="chief-shell-brand-icon w-20 h-14 bg-white rounded-2xl flex items-center justify-center border border-white/60 shadow-sm px-2 py-1">
-                <img src="{{ asset('storage/defaults/pyrosense.png') }}" alt="PyroSense logo" class="chief-shell-brand-logo w-full h-full object-contain">
+                <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="chief-shell-brand-logo w-full h-full object-contain">
             </div>
             <div class="chief-shell-brand-copy">
                 <h2 class="chief-shell-brand-title text-white font-bold text-xl leading-tight">PyroSense</h2>

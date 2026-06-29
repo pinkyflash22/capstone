@@ -503,7 +503,7 @@
         <section class="mobile-hub-card">
             <div class="mobile-hub-brand">
                 <div class="mobile-hub-logo">
-                    <img src="{{ asset('storage/defaults/pyrosense.png') }}" alt="PyroSense logo">
+                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo">
                 </div>
                 <div>
                     <div class="mobile-hub-title">Pyro<span>Sense</span></div>
