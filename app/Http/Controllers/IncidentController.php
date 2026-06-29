@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class IncidentController extends Controller
 {
@@ -67,6 +68,35 @@ class IncidentController extends Controller
     private function resolveIncidentStatusLabel(?Incident $incident): string
     {
         return $this->normalizeStatusName($incident?->status);
+    }
+
+    private function findRecentDuplicateIncident(float $lat, float $lng, int $minutes = 10, float $distanceThresholdMeters = 200): ?Incident
+    {
+        $recentIncidents = Incident::with(['marker'])
+            ->where('created_at', '>=', now()->subMinutes($minutes))
+            ->where('status', self::STATUS_DB_REPORTED)
+            ->orderByDesc('created_at')
+            ->get();
+
+        foreach ($recentIncidents as $recentIncident) {
+            $marker = $recentIncident->marker;
+            if (! $marker || $marker->lat === null || $marker->lng === null) {
+                continue;
+            }
+
+            $distanceMeters = $this->calculateDistanceMeters(
+                $lat,
+                $lng,
+                (float) $marker->lat,
+                (float) $marker->lng
+            );
+
+            if ($distanceMeters <= $distanceThresholdMeters) {
+                return $recentIncident;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeStatusName(?string $statusName): string
@@ -477,23 +507,60 @@ class IncidentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'marker_id' => 'required|exists:markers,marker_id',
+            'marker_id' => 'nullable|exists:markers,marker_id',
+            'lat' => 'required_without:marker_id|numeric|between:-90,90',
+            'lng' => 'required_without:marker_id|numeric|between:-180,180',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:1000',
             'status' => 'nullable|in:reported,en-route,on-scene,controlled,closed,completed,Reported,Responding,On Scene,Controlled,Closed',
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
         ]);
 
-        $validated['status'] = empty($validated['status'])
-            ? self::STATUS_DB_REPORTED
-            : $this->resolveDatabaseStatusName($validated['status']);
+        $markerId = $validated['marker_id'] ?? null;
 
-        if ($this->supportsBarangayResolution()) {
-            $validated['barangay_resolution_status'] = 'pending';
-            $validated['barangay_resolution_source'] = null;
-            $validated['barangay_resolved_at'] = null;
-        }
+        $data = DB::transaction(function () use ($validated, $markerId) {
+            if (! $markerId) {
+                $lat = (float) $validated['lat'];
+                $lng = (float) $validated['lng'];
 
-        $data = Incident::create($validated);
+                $duplicateIncident = $this->findRecentDuplicateIncident($lat, $lng);
+                if ($duplicateIncident) {
+                    throw new HttpResponseException(response()->json([
+                        'success' => false,
+                        'message' => 'A fire report was already submitted for this area recently.',
+                        'duplicate_incident_id' => $duplicateIncident->incident_id,
+                    ], 422));
+                }
+
+                $marker = Marker::create([
+                    'title' => $validated['title'] ?? 'Citizen Fire Emergency',
+                    'description' => $validated['description'] ?? 'Citizen-submitted fire emergency.',
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'status' => 'active',
+                    'category' => 'fire',
+                ]);
+
+                $validated['marker_id'] = $marker->marker_id;
+            } else {
+                $validated['marker_id'] = $markerId;
+            }
+
+            unset($validated['lat'], $validated['lng'], $validated['title'], $validated['description']);
+
+            $validated['status'] = empty($validated['status'])
+                ? self::STATUS_DB_REPORTED
+                : $this->resolveDatabaseStatusName($validated['status']);
+
+            if ($this->supportsBarangayResolution()) {
+                $validated['barangay_resolution_status'] = 'pending';
+                $validated['barangay_resolution_source'] = null;
+                $validated['barangay_resolved_at'] = null;
+            }
+
+            return Incident::create($validated);
+        });
         IncidentContextDispatcher::dispatchFor($data);
         IncidentFollowUpDispatcher::dispatchFor($data);
 

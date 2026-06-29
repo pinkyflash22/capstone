@@ -291,7 +291,6 @@ export async function userLocation(lat, lng, userid, values, image) {
 }
 
 export async function saveIncident(description, lat, lng, type, imageInput, reporter) {
-    console.log('saveIncident called with:', { description, lat, lng, type, reporter });
     const reportProgress = (stage, detail = '') => {
         if (typeof window.updateIncidentReportLoading === 'function') {
             window.updateIncidentReportLoading(stage, detail);
@@ -305,102 +304,19 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
     }
     
     try {
-        const selectedFile = getIncidentUploadFile(imageInput);
-        const title = 'Citizen Fire Emergency';
-        let markerId = null;
-
-        const currentTime = new Date().toISOString();
-        const recentIncidentsResponse = await fetch('/api/recent-incidents?minutes=10', {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            }
-        });
-
-        let recentIncidents = [];
-        if (recentIncidentsResponse.ok) {
-            const incidentsData = await recentIncidentsResponse.json();
-            recentIncidents = incidentsData.data || incidentsData.incidents || [];
-        }
-
-        const validation = await validateIncidentDuplicate(
-            parseFloat(lat),
-            parseFloat(lng),
-            currentTime,
-            recentIncidents,
-            type
-        );
-
-        if (validation.isDuplicate) {
-            const matchedIncident = validation.matchedIncident || {};
-            const matchedTime = matchedIncident.alarmdatetime ? new Date(matchedIncident.alarmdatetime) : null;
-            const minutesAgo = matchedTime
-                ? Math.round(Math.abs(new Date(currentTime) - matchedTime) / (1000 * 60))
-                : null;
-            const incidentLat = matchedIncident.marker?.coordinate?.marker?.lat || matchedIncident.marker?.lat || matchedIncident.lat;
-            const incidentLng = matchedIncident.marker?.coordinate?.marker?.lng || matchedIncident.marker?.lng || matchedIncident.lng;
-            const distanceMeters = (incidentLat !== undefined && incidentLng !== undefined)
-                ? Math.round(getDistanceMeters(parseFloat(lat), parseFloat(lng), parseFloat(incidentLat), parseFloat(incidentLng)))
-                : null;
-
-            const duplicateMessageParts = ['A fire report was already submitted for this area recently.'];
-
-            if (minutesAgo !== null) {
-                duplicateMessageParts.push(`Reported ${minutesAgo} minute${minutesAgo === 1 ? '' : 's'} ago.`);
-            }
-
-            if (distanceMeters !== null && !Number.isNaN(distanceMeters)) {
-                duplicateMessageParts.push(`Distance: ${distanceMeters} meters.`);
-            }
-
-            if (typeof window.showCitizenToast === 'function') {
-                window.showCitizenToast(duplicateMessageParts.join(' '), true, 5200);
-            } else {
-                showNotification(duplicateMessageParts.join(' '), 'warning', 5200);
-            }
-
-            return false;
-        }
-
-        reportProgress(
-            'Submitting',
-            selectedFile ? 'Uploading your attachment and saving your fire report...' : 'Saving your fire report...'
-        );
-        const multimediaId = await uploadIncidentMultimedia(selectedFile, csrfToken);
-
-        // 2. Save marker
-        console.log('Saving marker...');
-        const markerData = await saveIncidentMarker({
-            title,
-            description,
-            lat,
-            lng,
-            multimediaId,
-            csrfToken
-        });
-
-        console.log('Marker saved:', markerData);
-        
-        // Extract marker_id
-        markerId = markerData.data?.marker_id || markerData.marker_id;
-        
-        if (!markerId) {
-            throw new Error('No marker_id returned from server');
-        }
-        
-        console.log('Marker ID:', markerId);
-        
-        // 5. Save incident
-        reportProgress('Submitting', 'Finishing your fire report...');
-        console.log('Saving incident...');
+        reportProgress('Submitting', 'Sending your fire report...');
         const incidentPayload = {
-            marker_id: markerId,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            title: 'Citizen Fire Emergency',
+            description: description || 'Citizen-submitted fire emergency.',
             status: 'reported',
             reported_by: reporter,
             alarmdatetime: new Date().toISOString(),
         };
 
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
         const incidentResponse = await fetch('/citizen/incident', {
             method: 'POST',
             headers: {
@@ -408,43 +324,61 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
             },
-            body: JSON.stringify(incidentPayload)
+            body: JSON.stringify(incidentPayload),
+            signal: controller.signal,
         });
+        window.clearTimeout(timeoutId);
         
         if (!incidentResponse.ok) {
-            const errorText = await incidentResponse.text();
-            console.error('Incident save error:', errorText);
-            throw new Error('Failed to save incident');
+            const errorPayload = await incidentResponse.json().catch(() => null);
+            const errorMessage = errorPayload?.message || 'Failed to save incident';
+            console.error('Incident save error:', errorPayload || errorMessage);
+            throw new Error(errorMessage);
         }
         
         const incidentData = await incidentResponse.json();
-        console.log('Incident saved successfully:', incidentData);
 
         if (incidentData?.data) {
-            window.latestReportedIncidentId = incidentData.data.incident_id;
+            const incidentRecord = incidentData.data;
+            window.latestReportedIncidentId = incidentRecord.incident_id;
             window.myReportedIncidents = Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : [];
-            window.myReportedIncidents.unshift(incidentData.data);
+            window.myReportedIncidents.unshift(incidentRecord);
             window.incidentsData = Array.isArray(window.incidentsData) ? window.incidentsData : [];
-            window.incidentsData.unshift(incidentData.data);
-        }
+            window.incidentsData.unshift(incidentRecord);
 
-        window.setTimeout(() => {
-            if (typeof window.refreshCitizenMarkersIfChanged === 'function') {
-                window.refreshCitizenMarkersIfChanged(true);
-            } else if (typeof loadMarkers === 'function') {
-                loadMarkers();
+            const markerRecord = incidentRecord.marker || null;
+            if (markerRecord?.marker_id) {
+                window.mapData = window.mapData || {};
+                const userMarkers = Array.isArray(window.mapData.usermark) ? window.mapData.usermark : [];
+                const hasMarker = userMarkers.some((marker) => Number(marker?.marker_id) === Number(markerRecord.marker_id));
+
+                if (!hasMarker) {
+                    userMarkers.unshift(markerRecord);
+                    window.mapData.usermark = userMarkers;
+                }
+
+                if (typeof loadMarkers === 'function' && window.usermap) {
+                    window.setTimeout(() => {
+                        loadMarkers();
+                    }, 0);
+                }
             }
-            if (typeof window.startCitizenRouteDiscovery === 'function') {
-                window.startCitizenRouteDiscovery();
-            }
-        }, 0);
+        }
         
         window.latestIncidentSubmitMessage = incidentData?.message || null;
+        window.dispatchEvent(new CustomEvent('citizen-fire-report-saved', {
+            detail: {
+                incident: incidentData?.data || null,
+            },
+        }));
 
         return true;
         
     } catch (error) {
         console.error('Error in saveIncident:', error);
+        if (error?.name === 'AbortError') {
+            throw new Error('Fire report request took too long. Please try again.');
+        }
         throw error;
     }
 }

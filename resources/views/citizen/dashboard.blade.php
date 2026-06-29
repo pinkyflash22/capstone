@@ -1828,7 +1828,7 @@
                                 </button>
                                 <button type="button" id="firePickOnMapButton" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700">
                                     <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
-                                    Choose on Map (100m)
+                                    Choose Location (100m)
                                 </button>
                             </div>
 
@@ -1852,18 +1852,18 @@
 
         <!-- Risk / Hazard Modal -->
         <div id="concernReportModal" class="modal fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center z-50 justify-center hidden p-4">
-            <div class="w-full max-w-xl overflow-hidden rounded-[2rem] border border-amber-100 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.24)]">
-                <div class="relative overflow-hidden bg-gradient-to-r from-[#b45309] via-[#d97706] to-[#f59e0b] px-6 py-6 text-white">
-                    <div class="absolute inset-y-0 right-0 w-40 bg-white/10 blur-2xl"></div>
+            <div class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[2rem] border border-amber-100 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.24)]">
+                <div class="relative overflow-hidden bg-gradient-to-r from-[#b45309] via-[#d97706] to-[#f59e0b] px-5 py-4 text-white">
+                    <div class="absolute inset-y-0 right-0 w-32 bg-white/10 blur-2xl"></div>
                     <div class="relative flex items-start justify-between gap-4">
-                        <div class="flex items-start gap-4">
-                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
-                                <span class="material-symbols-rounded text-[28px]" aria-hidden="true">report_problem</span>
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
+                                <span class="material-symbols-rounded text-[24px]" aria-hidden="true">report_problem</span>
                             </div>
                             <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">PyroSense Community Safety</p>
-                                <h2 class="mt-1 text-2xl font-bold leading-tight">Report Risk / Hazard</h2>
-                                <p class="mt-2 max-w-md text-sm text-white/85">Report a non-fire safety concern for BFP review. PyroSense can still save unsure reports first, then BFP can verify or reclassify them.</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">PyroSense Community Safety</p>
+                                <h2 class="mt-1 text-xl font-bold leading-tight">Report Risk / Hazard</h2>
+                                <p class="mt-2 max-w-sm text-sm text-white/85">Choose the closest concern type and point. BFP will verify the final classification.</p>
                             </div>
                         </div>
                         <button type="button" id="closeConcernModal" class="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/12 text-white transition hover:bg-white/20" aria-label="Close risk and hazard modal">
@@ -1872,9 +1872,9 @@
                     </div>
                 </div>
 
-                <form id="concernIncidentForm" action="" method="POST" enctype="multipart/form-data" class="px-6 py-6">
+                <form id="concernIncidentForm" action="" method="POST" enctype="multipart/form-data" class="px-5 py-4">
                     @csrf
-                    <div class="grid gap-4">
+                    <div class="grid gap-3.5">
                         @if($errors->any())
                             <div class="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
                                 <ul class="space-y-1">
@@ -1885,20 +1885,19 @@
                             </div>
                         @endif
 
-                        <div class="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-5 text-sm text-slate-700">
+                        <div class="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-4 text-sm text-slate-700">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="font-semibold text-slate-900">Non-fire safety concern</p>
-                                    <p class="mt-1">Use this for fire risks, hazards, unsafe conditions, blocked access, LPG issues, electrical concerns, or other report types that still need BFP attention.</p>
+                                    <p class="mt-1">Use this for unsafe fire-related conditions that are not an active fire emergency.</p>
                                 </div>
-                                <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Review flow</span>
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">BFP review</span>
                             </div>
-                            <p class="mt-3 text-xs text-slate-500">If the citizen is not sure whether it is a hazard or a risk, this report can still be submitted and verified later by BFP.</p>
                         </div>
 
-                        <div class="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+                        <div class="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
                             <label for="concernTypeSelect" class="block text-sm font-semibold text-slate-900">Risk / Hazard type</label>
-                            <p class="mt-1 text-xs text-slate-500">Choose the closest type so the review queue starts with better context.</p>
+                            <p class="mt-1 text-xs text-slate-500">Required by the current citizen reporting flow. If unsure, keep the default option.</p>
                             <select id="concernTypeSelect" class="mt-3 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-700 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100">
                                 <option value="unsure">I am not sure yet</option>
                                 <option value="electrical_issue">Electrical issue</option>
@@ -1907,10 +1906,9 @@
                                 <option value="combustible_clutter">Combustible clutter or open burning</option>
                                 <option value="dense_fire_prone_area">Dense fire-prone area</option>
                             </select>
-                            <p class="mt-2 text-xs text-slate-500">If it is unclear, keep <strong>I am not sure yet</strong> and let BFP validate the correct classification.</p>
                         </div>
 
-                        <div id="hazardLocationPanel" class="rounded-3xl border border-amber-100 bg-[#fffaf4] p-5 text-sm text-slate-700 shadow-sm">
+                        <div id="hazardLocationPanel" class="rounded-3xl border border-amber-100 bg-[#fffaf4] p-4 text-sm text-slate-700 shadow-sm">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="font-semibold text-slate-900">Safety concern location</p>
@@ -1925,7 +1923,7 @@
                                 </button>
                                 <button type="button" id="hazardPickOnMapButton" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-amber-300 hover:text-amber-700">
                                     <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
-                                    Choose on Map (100m)
+                                    Choose Location (100m)
                                 </button>
                             </div>
                             <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
@@ -1935,7 +1933,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <div class="mt-4 flex flex-wrap justify-end gap-3">
                         <button type="button" class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-concern-modal-close>Cancel</button>
                         <button type="button" class="js-citizen-report-action inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#b45309] to-[#f59e0b] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(217,119,6,0.24)] transition hover:brightness-105" data-report-kind="concern">
                             <span class="material-symbols-rounded text-[18px]" aria-hidden="true">send</span>
@@ -3246,10 +3244,12 @@ async function submitCitizenQuickReport(reportKind) {
         button.disabled = true;
     });
     if (actionButton) {
-        actionButton.textContent = 'Saving...';
+        actionButton.textContent = reportKind === 'fire' ? 'Sending...' : 'Submitting...';
     }
-    if (loadingTitle) loadingTitle.textContent = `Preparing ${reportLabels[reportKind] || 'report'}`;
-    if (loadingMessage) loadingMessage.textContent = 'Validating incident details...';
+    if (loadingTitle) loadingTitle.textContent = reportKind === 'fire' ? 'Sending fire report' : `Submitting ${reportLabels[reportKind] || 'report'}`;
+    if (loadingMessage) loadingMessage.textContent = reportKind === 'fire'
+        ? 'Saving your fire report now...'
+        : 'Saving your safety concern...';
     loadingOverlay?.classList.remove('hidden');
     loadingOverlay?.classList.add('flex');
 
@@ -3310,8 +3310,15 @@ async function submitCitizenQuickReport(reportKind) {
             if (payload?.data?.report) {
                 window.citizenCombinedReports.unshift(payload.data.report);
             }
-            if (typeof window.refreshCitizenMarkersIfChanged === 'function') {
-                window.refreshCitizenMarkersIfChanged(true);
+            window.citizenRiskMapReports = Array.isArray(window.citizenRiskMapReports) ? window.citizenRiskMapReports : [];
+            if (payload?.data?.report) {
+                window.citizenRiskMapReports.unshift(payload.data.report);
+            }
+            if (typeof window.refreshCitizenAreasOfConcernReports === 'function') {
+                window.refreshCitizenAreasOfConcernReports(window.citizenCombinedReports);
+            }
+            if (typeof window.refreshCitizenRiskConcernMap === 'function') {
+                window.refreshCitizenRiskConcernMap(window.citizenRiskMapReports);
             }
         }
 
@@ -3333,11 +3340,13 @@ async function submitCitizenQuickReport(reportKind) {
                 stopCitizenHazardMapPick();
                 updateCitizenHazardLocationUi();
             }
-            if (typeof window.refreshCitizenOverviewData === 'function') {
-                await window.refreshCitizenOverviewData();
-            }
             showIncidentToast(successMessage);
             window.latestIncidentSubmitMessage = null;
+            if (typeof window.refreshCitizenOverviewData === 'function') {
+                window.refreshCitizenOverviewData().catch((refreshError) => {
+                    console.error('Citizen dashboard refresh failed after report submit:', refreshError);
+                });
+            }
         }
         
     } catch (error) {

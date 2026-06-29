@@ -1565,9 +1565,6 @@ export async function loadMarkers() {
     const incidentsData = window.incidentsData || [];
     buildCitizenMapSearchIndex(usermarkermap, incidentsData);
     
-    console.log('Loading markers:', usermarkermap.length);
-    console.log('Incidents data:', incidentsData.length);
-
     // Clear existing markers from all layers
     if (stationLayerGroup) stationLayerGroup.clearLayers();
     if (incidentLayerGroup) incidentLayerGroup.clearLayers();
@@ -1609,8 +1606,6 @@ export async function loadMarkers() {
             }
 
             markerCount++;
-            console.log(`Adding marker: ${usermark.title || 'Marker'} at ${usermark.lat}, ${usermark.lng} - Category: ${markerCategory}`);
-            
             // Extend bounds to include this marker
             bounds.extend([usermark.lat, usermark.lng]);
             
