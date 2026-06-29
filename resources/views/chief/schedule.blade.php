@@ -517,6 +517,32 @@
             line-height: 1.6;
         }
 
+        .agenda-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .agenda-action-btn {
+            border: 0;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .agenda-action-btn.edit {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .agenda-action-btn.delete {
+            background: #fff1f2;
+            color: #be123c;
+        }
+
         .agenda-empty {
             border: 1px dashed rgba(226, 232, 240, 1);
             border-radius: 22px;
@@ -723,6 +749,26 @@
             color: #9a3412;
             background: #fff7ed;
             border: 1px solid rgba(198, 61, 38, 0.12);
+        }
+
+        .schedule-delete-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            height: 44px;
+            padding: 0 18px;
+            border-radius: 14px;
+            font-size: 0.88rem;
+            font-weight: 800;
+            cursor: pointer;
+            border: 0;
+            color: #be123c;
+            background: #fff1f2;
+            margin-right: auto;
+        }
+
+        .schedule-delete-btn.show {
+            display: inline-flex;
         }
 
         #scheduleToast {
@@ -949,6 +995,7 @@
             <div class="schedule-modal-body">
                 <form id="scheduleEventForm">
                     <input id="scheduleStationId" name="station_id" type="hidden" value="{{ $stationId }}">
+                    <input id="scheduleEventId" name="event_id" type="hidden" value="">
                     <div class="schedule-form-grid">
                         <div class="schedule-form-field full">
                             <label for="scheduleEventTitle">Activity Name</label>
@@ -1005,6 +1052,7 @@
                         </div>
                     </div>
                     <div class="schedule-modal-actions">
+                        <button type="button" class="schedule-delete-btn" id="scheduleDeleteBtn">Delete Schedule</button>
                         <button type="button" class="schedule-cancel-btn" id="scheduleCancelBtn">Cancel</button>
                         <button type="submit" class="schedule-submit-btn" id="scheduleSubmitBtn">Save Schedule</button>
                     </div>
@@ -1060,6 +1108,8 @@
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             const scheduleStoreUrl = @json(route('station-admin.schedule.events.store'));
+            const scheduleUpdateUrlTemplate = @json(route('station-admin.schedule.events.update', ['eventActivity' => '__EVENT__']));
+            const scheduleDeleteUrlTemplate = @json(route('station-admin.schedule.events.destroy', ['eventActivity' => '__EVENT__']));
             const seedEvents = @json($scheduleEvents ?? []);
             const monthLabel = document.getElementById('calendarMonthLabel');
             const monthSummary = document.getElementById('scheduleMonthSummary');
@@ -1075,19 +1125,28 @@
             const scheduleModalClose = document.getElementById('scheduleModalClose');
             const scheduleCancelBtn = document.getElementById('scheduleCancelBtn');
             const scheduleEventForm = document.getElementById('scheduleEventForm');
+            const scheduleEventId = document.getElementById('scheduleEventId');
+            const scheduleEventTitle = document.getElementById('scheduleEventTitle');
+            const scheduleEventType = document.getElementById('scheduleEventType');
             const scheduleStationId = document.getElementById('scheduleStationId');
             const scheduleEventDate = document.getElementById('scheduleEventDate');
             const scheduleStartTime = document.getElementById('scheduleStartTime');
             const scheduleEndTime = document.getElementById('scheduleEndTime');
             const scheduleTimeHelp = document.getElementById('scheduleTimeHelp');
             const scheduleModalSubtitle = document.getElementById('scheduleModalSubtitle');
+            const scheduleModalTitle = document.getElementById('scheduleModalTitle');
             const scheduleSubmitBtn = document.getElementById('scheduleSubmitBtn');
+            const scheduleDeleteBtn = document.getElementById('scheduleDeleteBtn');
+            const scheduleStatus = document.getElementById('scheduleStatus');
+            const scheduleBarangay = document.getElementById('scheduleBarangay');
+            const scheduleNotes = document.getElementById('scheduleNotes');
             const scheduleToast = document.getElementById('scheduleToast');
             const stationId = @json($stationId);
 
             const state = {
                 viewDate: new Date(),
-                selectedDateKey: formatDateKey(new Date())
+                selectedDateKey: formatDateKey(new Date()),
+                editingEventId: null
             };
 
             const hourlySlots = Array.from({ length: 24 }, function (_, hour) {
@@ -1184,8 +1243,9 @@
                 return manilaNow.minute > 0 ? manilaNow.hour + 1 : manilaNow.hour;
             }
 
-            function getEventsForDate(dateKey) {
+            function getEventsForDate(dateKey, ignoreEventId = null) {
                 return seedEvents
+                    .filter(event => ignoreEventId === null || Number(event.event_id) !== Number(ignoreEventId))
                     .filter(event => event.event_date === dateKey)
                     .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`));
             }
@@ -1201,10 +1261,10 @@
                 return Number.isNaN(parsedHour) ? null : parsedHour;
             }
 
-            function getOccupiedHours(dateKey) {
+            function getOccupiedHours(dateKey, ignoreEventId = null) {
                 const occupiedHours = new Set();
 
-                getEventsForDate(dateKey).forEach(function (event) {
+                getEventsForDate(dateKey, ignoreEventId).forEach(function (event) {
                     const startHour = toHourNumber(event.start_time);
                     const endHour = toHourNumber(event.end_time);
 
@@ -1221,7 +1281,7 @@
             }
 
             function getAvailableStartHours(dateKey) {
-                const occupiedHours = getOccupiedHours(dateKey);
+                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId);
                 const minimumStartHour = getMinimumStartHour(dateKey);
 
                 return hourlySlots.filter(function (slot) {
@@ -1236,7 +1296,7 @@
                     return [];
                 }
 
-                const occupiedHours = getOccupiedHours(dateKey);
+                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId);
                 const availableEnds = [];
 
                 for (let hour = startHour + 1; hour <= 23; hour += 1) {
@@ -1351,6 +1411,10 @@
                         <h5>${event.event}</h5>
                         <p><i class="fa-regular fa-location-dot"></i> ${event.barangay || 'No location set'}</p>
                         ${event.notes ? `<p>${event.notes}</p>` : ''}
+                        <div class="agenda-actions">
+                            <button type="button" class="agenda-action-btn edit" data-event-edit="${event.event_id}"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button type="button" class="agenda-action-btn delete" data-event-delete="${event.event_id}"><i class="fa-solid fa-trash"></i> Delete</button>
+                        </div>
                     </article>
                 `;
             }
@@ -1464,17 +1528,61 @@
                 }
             }
 
-            function openScheduleModal(dateKey) {
+            function getEventById(eventId) {
+                return seedEvents.find(function (event) {
+                    return Number(event.event_id) === Number(eventId);
+                }) || null;
+            }
+
+            function replaceEventInSeed(updatedEvent) {
+                const targetIndex = seedEvents.findIndex(function (event) {
+                    return Number(event.event_id) === Number(updatedEvent.event_id);
+                });
+
+                if (targetIndex >= 0) {
+                    seedEvents[targetIndex] = updatedEvent;
+                } else {
+                    seedEvents.push(updatedEvent);
+                }
+            }
+
+            function removeEventFromSeed(eventId) {
+                const targetIndex = seedEvents.findIndex(function (event) {
+                    return Number(event.event_id) === Number(eventId);
+                });
+
+                if (targetIndex >= 0) {
+                    seedEvents.splice(targetIndex, 1);
+                }
+            }
+
+            function openScheduleModal(dateKey, eventData = null) {
                 if (dateKey < getTodayKey()) {
                     showScheduleToast('You can only add activities for today or a future date.', true);
                     return;
                 }
 
+                state.editingEventId = eventData ? Number(eventData.event_id) : null;
+                scheduleEventId.value = eventData?.event_id || '';
+                scheduleEventTitle.value = eventData?.event || '';
+                scheduleEventType.value = eventData?.activity_type || 'operations';
+                scheduleStatus.value = eventData?.status || 'planned';
+                scheduleBarangay.value = eventData?.barangay || '';
+                scheduleNotes.value = eventData?.notes || '';
                 scheduleEventDate.value = dateKey;
                 scheduleEventDate.min = getTodayKey();
                 scheduleStationId.value = stationId ?? '';
-                scheduleModalSubtitle.textContent = `Create a schedule block for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`;
+                scheduleModalTitle.textContent = eventData ? 'Edit Activity Schedule' : 'Add Activity Schedule';
+                scheduleModalSubtitle.textContent = eventData
+                    ? `Update the schedule block for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`
+                    : `Create a schedule block for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`;
+                scheduleSubmitBtn.textContent = eventData ? 'Update Schedule' : 'Save Schedule';
+                scheduleDeleteBtn.classList.toggle('show', Boolean(eventData));
                 refreshTimeSelectors(dateKey);
+                if (eventData?.start_time) {
+                    scheduleStartTime.value = eventData.start_time;
+                    refreshEndTimeOptions(dateKey, eventData.end_time || '');
+                }
                 scheduleModal.classList.add('show');
                 scheduleModal.setAttribute('aria-hidden', 'false');
             }
@@ -1483,6 +1591,16 @@
                 scheduleModal.classList.remove('show');
                 scheduleModal.setAttribute('aria-hidden', 'true');
                 scheduleEventForm.reset();
+                scheduleEventId.value = '';
+                scheduleEventTitle.value = '';
+                scheduleEventType.value = 'operations';
+                scheduleStatus.value = 'planned';
+                scheduleBarangay.value = '';
+                scheduleNotes.value = '';
+                scheduleModalTitle.textContent = 'Add Activity Schedule';
+                scheduleSubmitBtn.textContent = 'Save Schedule';
+                scheduleDeleteBtn.classList.remove('show');
+                state.editingEventId = null;
                 scheduleStationId.value = stationId ?? '';
                 scheduleEventDate.value = state.selectedDateKey;
                 scheduleEventDate.min = getTodayKey();
@@ -1511,6 +1629,22 @@
                 openScheduleModal(state.selectedDateKey);
             });
 
+            selectedDayAgenda?.addEventListener('click', function (event) {
+                const editButton = event.target.closest('[data-event-edit]');
+                const deleteButton = event.target.closest('[data-event-delete]');
+
+                if (editButton) {
+                    const eventData = getEventById(editButton.dataset.eventEdit);
+                    if (eventData) {
+                        openScheduleModal(eventData.event_date, eventData);
+                    }
+                }
+
+                if (deleteButton) {
+                    deleteScheduleEvent(deleteButton.dataset.eventDelete);
+                }
+            });
+
             scheduleModalClose?.addEventListener('click', closeScheduleModal);
             scheduleCancelBtn?.addEventListener('click', closeScheduleModal);
             scheduleEventDate?.addEventListener('change', function () {
@@ -1519,24 +1653,74 @@
             scheduleStartTime?.addEventListener('change', function () {
                 refreshEndTimeOptions(scheduleEventDate.value || state.selectedDateKey);
             });
+            scheduleDeleteBtn?.addEventListener('click', function () {
+                if (scheduleEventId.value) {
+                    deleteScheduleEvent(scheduleEventId.value, true);
+                }
+            });
             scheduleModal?.addEventListener('click', function (event) {
                 if (event.target === scheduleModal) {
                     closeScheduleModal();
                 }
             });
 
+            async function deleteScheduleEvent(eventId, closeModalAfter = false) {
+                const eventData = getEventById(eventId);
+
+                if (!eventData) {
+                    showScheduleToast('Schedule event not found.', true);
+                    return;
+                }
+
+                if (!window.confirm(`Delete "${eventData.event}" from the schedule?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(scheduleDeleteUrlTemplate.replace('__EVENT__', String(eventId)), {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to delete schedule event.');
+                    }
+
+                    removeEventFromSeed(eventId);
+                    renderUpcoming();
+                    renderCalendar();
+                    renderSelectedDay();
+                    if (closeModalAfter) {
+                        closeScheduleModal();
+                    }
+                    showScheduleToast('Schedule deleted successfully.');
+                } catch (error) {
+                    showScheduleToast(error.message || 'Unable to delete schedule.', true);
+                }
+            }
+
             scheduleEventForm?.addEventListener('submit', async function (event) {
                 event.preventDefault();
 
                 const formData = new FormData(scheduleEventForm);
                 const payload = Object.fromEntries(formData.entries());
+                const isEditing = Boolean(scheduleEventId.value);
 
                 scheduleSubmitBtn.disabled = true;
                 scheduleSubmitBtn.textContent = 'Saving...';
 
                 try {
-                    const response = await fetch(scheduleStoreUrl, {
-                        method: 'POST',
+                    const response = await fetch(
+                        isEditing
+                            ? scheduleUpdateUrlTemplate.replace('__EVENT__', String(scheduleEventId.value))
+                            : scheduleStoreUrl,
+                        {
+                        method: isEditing ? 'PUT' : 'POST',
                         headers: {
                             'Accept': 'application/json',
                             'Content-Type': 'application/json',
@@ -1551,19 +1735,19 @@
                         throw new Error(data.message || 'Failed to save schedule event.');
                     }
 
-                    seedEvents.push(data.data);
+                    replaceEventInSeed(data.data);
                     state.selectedDateKey = data.data.event_date;
                     state.viewDate = new Date(`${data.data.event_date}T00:00:00`);
                     renderUpcoming();
                     renderCalendar();
                     renderSelectedDay();
                     closeScheduleModal();
-                    showScheduleToast('Schedule saved successfully.');
+                    showScheduleToast(isEditing ? 'Schedule updated successfully.' : 'Schedule saved successfully.');
                 } catch (error) {
                     showScheduleToast(error.message || 'Unable to save schedule.', true);
                 } finally {
                     scheduleSubmitBtn.disabled = false;
-                    scheduleSubmitBtn.textContent = 'Save Schedule';
+                    scheduleSubmitBtn.textContent = scheduleEventId.value ? 'Update Schedule' : 'Save Schedule';
                 }
             });
 

@@ -1295,7 +1295,7 @@
             <div class="user-emergency-bg text-white p-6 relative">
                 <div class="flex items-center gap-3 relative z-10">
                     <div class="w-20 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm px-2 py-1">
-                        <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="w-full h-full object-contain">
+                        @include('partials.app-logo', ['class' => 'w-full h-full object-contain'])
                     </div>
                     <div>
                         <h2 class="text-xl font-bold">PyroSense </h2>
@@ -1675,7 +1675,7 @@
                         <!-- mobile logo -->
                         <div class="flex items-center space-x-2 lg:hidden">
                             <div class="w-14 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm ring-1 ring-orange-200 px-1.5 py-1">
-                                <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="w-full h-full object-contain">
+                                @include('partials.app-logo', ['class' => 'w-full h-full object-contain'])
                             </div>
                             <span class="text-lg font-bold text-gray-800">Pyro<span class="text-orange-600">Sense</span></span>
                         </div>
@@ -3676,6 +3676,9 @@ window.refreshCitizenOverviewData = async function() {
             }
         }
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Error refreshing citizen overview data:', error);
     } finally {
         if (timeoutId) {
@@ -3728,6 +3731,9 @@ window.runPendingIncidentAutoAssignment = async function() {
             }
         }
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error(`Background incident auto-assignment failed for incident ${incidentId}:`, error);
     } finally {
         if (timeoutId) {

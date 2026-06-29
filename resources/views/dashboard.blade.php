@@ -21,7 +21,7 @@
         <div class="mobile-entry-card">
             <div class="mobile-entry-brand">
                 <div class="logo-icon mobile-entry-logo" style="width: 88px; height: 64px; border-radius: 20px; padding: 0.45rem 0.7rem;">
-                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="logo-image">
+                    @include('partials.app-logo', ['class' => 'logo-image'])
                 </div>
                 <span class="mobile-entry-title">Pyro<span>Sense</span></span>
             </div>
@@ -51,7 +51,7 @@
         <div class="container">
             <a href="/" class="logo">
                 <div class="logo-icon" style="width: 76px; height: 56px; border-radius: 18px; padding: 0.35rem 0.55rem;">
-                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="logo-image">
+                    @include('partials.app-logo', ['class' => 'logo-image'])
                 </div>
                 <span class="logo-text">Pyro<span>Sense</span></span>
             </a>

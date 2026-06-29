@@ -29,7 +29,7 @@
             <div class="sidebar-header-content">
                 <div class="logo-area">
                     <div class="logo-icon">
-                        <i class="fa-solid fa-fire-extinguisher"></i>
+                        @include('partials.app-logo')
                     </div>
                     <div class="logo-text">
                         <h2>PyroSense</h2>

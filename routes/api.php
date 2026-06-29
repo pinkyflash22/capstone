@@ -317,8 +317,8 @@ Route::resource('route', RouteController::class);
 
 
 // Address API routes for station form
-Route::get('/api/cities/{provinceId}', [AdminController::class, 'getCities'])->name('api.cities');
-Route::get('/api/barangays/{cityId}', [AdminController::class, 'getBarangays'])->name('api.barangays');
+Route::get('/api/cities/{provinceId}', [AdminController::class, 'getCities'])->name('api.admin.cities');
+Route::get('/api/barangays/{cityId}', [AdminController::class, 'getBarangays'])->name('api.admin.barangays');
 Route::post('/full-addresses', [AdminController::class, 'storeFullAddress'])->name('api.full-addresses');
 Route::delete('/markers/{id}', [MarkerController::class, 'destroy']);
 Route::get('/markers/latest', [MarkerController::class, 'latest']); //latest markers 

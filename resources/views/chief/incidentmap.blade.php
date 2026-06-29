@@ -119,7 +119,7 @@
             <div class="emergency-bg text-white p-5 relative">
                 <div class="flex items-center gap-3 relative z-10">
                     <div class="w-10 h-10 bg-white/20 backdrop-blur rounded-lg flex items-center justify-center fire-icon">
-                        <i class="fa-solid fa-fire-extinguisher text-white text-xl"></i>
+                        @include('partials.app-logo')
                     </div>
                     <div>
                         <h2 class="text-xl font-bold">FireWatch 24/7</h2>
@@ -238,7 +238,7 @@
                         <!-- logo visible on mobile only (desktop already has sidebar brand) -->
                         <div class="flex items-center space-x-2 lg:hidden">
                             <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center fire-icon">
-                                <i class="fa-solid fa-fire-extinguisher text-white text-sm"></i>
+                                @include('partials.app-logo')
                             </div>
                             <span class="text-lg font-bold text-gray-800">Fire<span class="text-red-600">Watch</span></span>
                         </div>

@@ -211,7 +211,7 @@
     {{-- <aside class="sidebar">
         <div class="sidebar-header">
             <div class="logo-area">
-                <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                <div class="logo-icon">@include('partials.app-logo')</div>
                 <div class="logo-text"><h2>PyroSense</h2><p>BFP Command Center</p></div>
             </div>
             <div class="user-info">

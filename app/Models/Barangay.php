@@ -34,6 +34,11 @@ class Barangay extends Model
         return $this->hasOne(BarangayHall::class, 'barangay_id', 'barangay_id');
     }
 
+    public function barangayHall()
+    {
+        return $this->hall();
+    }
+
     public function historicalFireIncidents()
     {
         return $this->hasMany(HistoricalFireIncident::class, 'barangay_id', 'barangay_id');

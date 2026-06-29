@@ -864,6 +864,9 @@ async function fetchAllFirefighterLocations() {
         
         return data;
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return null;
+        }
         console.error('Error fetching firefighter locations:', error);
         return null;
     }

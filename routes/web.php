@@ -307,6 +307,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'chiefDeleteActive'])->name('risk-reviews.active.delete');
         Route::get('/schedule', [StationAdminController::class, 'schedule'])->name('schedule');
         Route::post('/schedule/events', [StationAdminController::class, 'storeScheduleEvent'])->name('schedule.events.store');
+        Route::put('/schedule/events/{eventActivity}', [StationAdminController::class, 'updateScheduleEvent'])->name('schedule.events.update');
+        Route::delete('/schedule/events/{eventActivity}', [StationAdminController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
         Route::get('/profile', [StationAdminController::class, 'profile'])->name('profile');
         Route::put('/profile', [StationAdminController::class, 'updateProfile'])->name('profile.update');
         Route::get('/api/dashboard-stats', [StationAdminController::class, 'dashboardStats'])->name('dashboard-stats');
@@ -419,6 +421,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/fsic-requests/{id}', [FirefighterController::class, 'getAssignedFsicRequest'])->name('fsic-requests.show');
         Route::post('/api/fsic-requests/{id}/inspect', [FirefighterController::class, 'submitFsicInspection'])->name('fsic-requests.inspect');
         Route::get('/schedule', [FirefighterController::class, 'schedule'])->name('schedule');
+        Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');
+        Route::put('/schedule/events/{eventActivity}', [FirefighterController::class, 'updateScheduleEvent'])->name('schedule.events.update');
+        Route::delete('/schedule/events/{eventActivity}', [FirefighterController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
         Route::get('/certifications', [FirefighterController::class, 'certifications'])->name('certifications');
         Route::get('/training', [FirefighterController::class, 'training'])->name('training');
         Route::get('/my-profile', [FirefighterController::class, 'myProfile'])->name('my-profile');

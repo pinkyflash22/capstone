@@ -104,6 +104,7 @@ class AdminController extends Controller
 
         $scheduleEvents = EventActivity::query()
             ->with('station')
+            ->whereNull('user_id')
             ->orderBy('event_date')
             ->orderBy('start_time')
             ->get()

@@ -40,6 +40,83 @@ use Carbon\Carbon;
 
 class StationAdminController extends Controller
 {
+    protected function serializeScheduleEvent(EventActivity $event): array
+    {
+        return [
+            'event_id' => $event->event_id,
+            'event' => $event->event,
+            'event_date' => optional($event->event_date)->toDateString(),
+            'start_time' => $event->start_time,
+            'end_time' => $event->end_time,
+            'schedule' => $event->schedule,
+            'activity_type' => $event->activity_type ?: 'operations',
+            'status' => $event->status,
+            'barangay' => $event->barangay,
+            'notes' => $event->notes,
+            'station_id' => $event->station_id,
+            'user_id' => $event->user_id,
+            'source_type' => 'official',
+            'source_label' => 'Official Schedule',
+            'can_edit' => true,
+            'can_delete' => true,
+        ];
+    }
+
+    protected function validateSchedulePayload(Request $request, array $validBarangayNames): array
+    {
+        return $request->validate([
+            'event' => ['required', 'string', 'max:255'],
+            'event_date' => ['required', 'date', 'after_or_equal:today'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'activity_type' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'string', 'max:50'],
+            'barangay' => ['nullable', 'string', 'max:255', Rule::in($validBarangayNames)],
+            'notes' => ['nullable', 'string'],
+        ]);
+    }
+
+    protected function assertValidScheduleWindow(array $validated): ?\Illuminate\Http\JsonResponse
+    {
+        $manilaNow = Carbon::now('Asia/Manila');
+        $eventDate = Carbon::parse($validated['event_date'], 'Asia/Manila');
+
+        if ($eventDate->isSameDay($manilaNow)) {
+            $minimumStartHour = $manilaNow->minute > 0 ? $manilaNow->hour + 1 : $manilaNow->hour;
+            $requestedStartHour = (int) Carbon::createFromFormat('H:i', $validated['start_time'], 'Asia/Manila')->format('H');
+
+            if ($requestedStartHour < $minimumStartHour) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'For today, only current or future Asia/Manila time slots can be scheduled.'
+                ], 422);
+            }
+        }
+
+        return null;
+    }
+
+    protected function buildScheduleLabel(string $startTime, string $endTime): string
+    {
+        return Carbon::createFromFormat('H:i', $startTime)->format('g:i A')
+            . ' - '
+            . Carbon::createFromFormat('H:i', $endTime)->format('g:i A');
+    }
+
+    protected function hasOfficialScheduleConflict(int $stationId, array $validated, ?int $ignoreEventId = null): bool
+    {
+        return EventActivity::query()
+            ->where('station_id', $stationId)
+            ->whereNull('user_id')
+            ->whereDate('event_date', $validated['event_date'])
+            ->when($ignoreEventId, function ($query) use ($ignoreEventId) {
+                $query->where('event_id', '!=', $ignoreEventId);
+            })
+            ->where('start_time', '<', $validated['end_time'])
+            ->where('end_time', '>', $validated['start_time'])
+            ->exists();
+    }
+
     protected function buildIncidentTrendData($incidents): array
     {
         $weekLabels = collect(range(6, 0))
@@ -385,24 +462,11 @@ class StationAdminController extends Controller
         if ($stationId) {
             $scheduleEvents = EventActivity::query()
                 ->where('station_id', $stationId)
+                ->whereNull('user_id')
                 ->orderBy('event_date')
                 ->orderBy('start_time')
                 ->get()
-                ->map(function (EventActivity $event) {
-                    return [
-                        'event_id' => $event->event_id,
-                        'event' => $event->event,
-                        'event_date' => optional($event->event_date)->toDateString(),
-                        'start_time' => $event->start_time,
-                        'end_time' => $event->end_time,
-                        'schedule' => $event->schedule,
-                        'activity_type' => $event->activity_type,
-                        'status' => $event->status,
-                        'barangay' => $event->barangay,
-                        'notes' => $event->notes,
-                        'station_id' => $event->station_id,
-                    ];
-                })
+                ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event))
                 ->values();
         }
 
@@ -433,38 +497,14 @@ class StationAdminController extends Controller
             ->pluck('barangay_name')
             ->all();
 
-        $validated = $request->validate([
-            'event' => ['required', 'string', 'max:255'],
-            'event_date' => ['required', 'date', 'after_or_equal:today'],
-            'start_time' => ['required', 'date_format:H:i'],
-            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
-            'activity_type' => ['nullable', 'string', 'max:50'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'barangay' => ['nullable', 'string', 'max:255', Rule::in($validBarangayNames)],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $validated = $this->validateSchedulePayload($request, $validBarangayNames);
+        $windowError = $this->assertValidScheduleWindow($validated);
 
-        $manilaNow = Carbon::now('Asia/Manila');
-        $eventDate = Carbon::parse($validated['event_date'], 'Asia/Manila');
-
-        if ($eventDate->isSameDay($manilaNow)) {
-            $minimumStartHour = $manilaNow->minute > 0 ? $manilaNow->hour + 1 : $manilaNow->hour;
-            $requestedStartHour = (int) Carbon::createFromFormat('H:i', $validated['start_time'], 'Asia/Manila')->format('H');
-
-            if ($requestedStartHour < $minimumStartHour) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'For today, only current or future Asia/Manila time slots can be scheduled.'
-                ], 422);
-            }
+        if ($windowError) {
+            return $windowError;
         }
 
-        $hasConflict = EventActivity::query()
-            ->where('station_id', $stationId)
-            ->whereDate('event_date', $validated['event_date'])
-            ->where('start_time', '<=', $validated['end_time'])
-            ->where('end_time', '>=', $validated['start_time'])
-            ->exists();
+        $hasConflict = $this->hasOfficialScheduleConflict($stationId, $validated);
 
         if ($hasConflict) {
             return response()->json([
@@ -473,9 +513,7 @@ class StationAdminController extends Controller
             ], 422);
         }
 
-        $scheduleLabel = Carbon::createFromFormat('H:i', $validated['start_time'])->format('g:i A')
-            . ' - '
-            . Carbon::createFromFormat('H:i', $validated['end_time'])->format('g:i A');
+        $scheduleLabel = $this->buildScheduleLabel($validated['start_time'], $validated['end_time']);
 
         $event = EventActivity::create([
             'event' => $validated['event'],
@@ -488,6 +526,7 @@ class StationAdminController extends Controller
             'barangay' => $validated['barangay'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'station_id' => $stationId,
+            'user_id' => null,
         ]);
 
         UserActivityLogger::log('created schedule event', Auth::user()?->user_id, $request);
@@ -496,17 +535,86 @@ class StationAdminController extends Controller
             'success' => true,
             'message' => 'Schedule event created successfully.',
             'data' => [
-                'event_id' => $event->event_id,
-                'event' => $event->event,
-                'event_date' => optional($event->event_date)->toDateString(),
-                'start_time' => $event->start_time,
-                'end_time' => $event->end_time,
-                'schedule' => $event->schedule,
-                'activity_type' => $event->activity_type,
-                'status' => $event->status,
-                'barangay' => $event->barangay,
-                'notes' => $event->notes,
-                'station_id' => $event->station_id,
+                ...$this->serializeScheduleEvent($event),
+            ],
+        ]);
+    }
+
+    public function updateScheduleEvent(Request $request, EventActivity $eventActivity)
+    {
+        $stationOfficer = $this->getAuthenticatedStationOfficer();
+        $stationId = $stationOfficer?->station_id;
+
+        if (! $stationId || (int) $eventActivity->station_id !== (int) $stationId || $eventActivity->user_id !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not allowed to edit this schedule event.',
+            ], 403);
+        }
+
+        $validBarangayNames = Barangay::query()
+            ->whereHas('city', function ($query) {
+                $query->whereRaw('LOWER(city_name) = ?', ['urbiztondo']);
+            })
+            ->pluck('barangay_name')
+            ->all();
+
+        $validated = $this->validateSchedulePayload($request, $validBarangayNames);
+        $windowError = $this->assertValidScheduleWindow($validated);
+
+        if ($windowError) {
+            return $windowError;
+        }
+
+        if ($this->hasOfficialScheduleConflict($stationId, $validated, (int) $eventActivity->event_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected time range is already occupied for this station.'
+            ], 422);
+        }
+
+        $eventActivity->update([
+            'event' => $validated['event'],
+            'event_date' => $validated['event_date'],
+            'start_time' => $validated['start_time'],
+            'end_time' => $validated['end_time'],
+            'schedule' => $this->buildScheduleLabel($validated['start_time'], $validated['end_time']),
+            'activity_type' => $validated['activity_type'] ?? 'operations',
+            'status' => $validated['status'] ?? 'planned',
+            'barangay' => $validated['barangay'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        UserActivityLogger::log('updated schedule event', Auth::user()?->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Schedule event updated successfully.',
+            'data' => $this->serializeScheduleEvent($eventActivity->fresh()),
+        ]);
+    }
+
+    public function destroyScheduleEvent(Request $request, EventActivity $eventActivity)
+    {
+        $stationOfficer = $this->getAuthenticatedStationOfficer();
+        $stationId = $stationOfficer?->station_id;
+
+        if (! $stationId || (int) $eventActivity->station_id !== (int) $stationId || $eventActivity->user_id !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not allowed to delete this schedule event.',
+            ], 403);
+        }
+
+        $deletedEventId = $eventActivity->event_id;
+        $eventActivity->delete();
+        UserActivityLogger::log('deleted schedule event', Auth::user()?->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Schedule event deleted successfully.',
+            'data' => [
+                'event_id' => $deletedEventId,
             ],
         ]);
     }

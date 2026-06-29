@@ -960,7 +960,7 @@
         <div class="container">
             <a href="{{ route('home') }}" class="logo">
                 <div class="logo-icon">
-                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="logo-image">
+                    @include('partials.app-logo', ['class' => 'logo-image'])
                 </div>
                 <span class="logo-text">Pyro<span>Sense</span></span>
             </a>
@@ -990,7 +990,7 @@
                 <div class="brand-content">
                     <div class="brand-header">
                         <div class="brand-icon">
-                            <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo">
+                            @include('partials.app-logo')
                         </div>
                         <div class="brand-title">
                             <h2>PyroSense</h2>

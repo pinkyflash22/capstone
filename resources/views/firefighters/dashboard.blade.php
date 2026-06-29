@@ -238,7 +238,7 @@
         <div class="sidebar-header-gradient px-6 py-8">
             <div class="ff-shell-brand flex items-center gap-3">
                 <div class="ff-shell-brand-icon w-20 h-14 bg-white rounded-2xl flex items-center justify-center border border-white/60 shadow-sm px-2 py-1">
-                    <img src="{{ \App\Support\MediaPath::url(config('app.brand_logo_path')) }}" alt="PyroSense logo" class="ff-shell-brand-logo w-full h-full object-contain">
+                    @include('partials.app-logo', ['class' => 'ff-shell-brand-logo w-full h-full object-contain'])
                 </div>
                 <div class="ff-shell-brand-copy">
                     <h2 class="ff-shell-brand-title text-white font-bold text-xl leading-tight">PyroSense</h2>

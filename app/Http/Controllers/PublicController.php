@@ -577,7 +577,7 @@ class PublicController extends Controller
             'user_lng' => ['nullable', 'numeric', 'between:-180,180'],
         ]);
 
-        $user = User::with('address.barangay.barangayHall')->findOrFail(Auth::user()->user_id);
+        $user = User::with('address.barangay.hall')->findOrFail(Auth::user()->user_id);
         $reportKind = $validated['report_kind'] === 'concern'
             ? 'hazard'
             : $validated['report_kind'];
@@ -629,7 +629,7 @@ class PublicController extends Controller
                 ], 422);
             }
         } else {
-            $hall = $user->address?->barangay?->barangayHall;
+            $hall = $user->address?->barangay?->hall;
 
             if (! $hall) {
                 return response()->json([

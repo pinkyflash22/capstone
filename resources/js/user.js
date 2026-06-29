@@ -1472,6 +1472,9 @@ async function syncCitizenRouteDisplay() {
         userTrackedIncidentId = incidentId;
         await userFetchAndDisplayRoutesForIncident(incidentId);
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Error syncing citizen route display:', error);
     }
 }
@@ -1538,6 +1541,9 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
         loadMarkers();
         return true;
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return false;
+        }
         console.error('Error refreshing citizen markers:', error);
         return false;
     }

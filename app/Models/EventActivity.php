@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Station;
+use App\Models\User;
 
 class EventActivity extends Model
 {
@@ -21,6 +22,7 @@ class EventActivity extends Model
         'barangay',
         'notes',
         'station_id',
+        'user_id',
     ];
 
     protected $casts = [
@@ -30,5 +32,10 @@ class EventActivity extends Model
     public function station()
     {
         return $this->belongsTo(Station::class, 'station_id', 'station_id');
+    }
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 }

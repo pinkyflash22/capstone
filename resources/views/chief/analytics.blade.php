@@ -515,7 +515,7 @@
         <div class="sidebar-header">
             <div class="sidebar-header-content">
                 <div class="logo-area">
-                    <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                    <div class="logo-icon">@include('partials.app-logo')</div>
                     <div class="logo-text"><h2>PyroSense</h2><p>command center</p></div>
                 </div>
                 <div class="user-info">
