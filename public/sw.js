@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260630-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260630-3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -10,6 +10,8 @@ const APP_SHELL_URLS = [
     LANDING_URL,
     '/dashboard',
     '/citizen/dashboard',
+    '/citizen/mobile-hub',
+    '/pwa/start',
     '/pwa/quick-report',
     '/manifest.json',
     OFFLINE_URL,
@@ -112,6 +114,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (!isSameOrigin) {
+        return;
+    }
+
     if (isStaticAsset) {
         event.respondWith(cacheFirst(request, STATIC_CACHE));
         return;
@@ -163,7 +169,7 @@ async function handleNavigationRequest(request) {
 }
 
 async function cacheFirst(request, cacheName) {
-    const cached = await caches.match(request, { ignoreSearch: true });
+    const cached = await caches.match(request);
     if (cached) {
         return cached;
     }

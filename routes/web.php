@@ -67,6 +67,7 @@ use Illuminate\Support\Facades\Route;
         Route::post('/auth/google/resend-otp', [LoginController::class, 'resendGoogleOtp'])->name('auth.google.resend-otp');
     });
 
+    Route::get('/pwa/start', [PublicController::class, 'pwaQuickReport'])->name('pwa.start');
     Route::get('/pwa/quick-report', [PublicController::class, 'pwaQuickReport'])->name('pwa.quick-report');
 
     // Registration routes with OTP
