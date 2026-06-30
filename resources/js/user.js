@@ -282,6 +282,10 @@ async function searchCitizenMapGeocode(query) {
         return [];
     }
 
+    if (window.pyroPwa?.isOffline?.()) {
+        return [];
+    }
+
     try {
         const params = new URLSearchParams({
             text: query,
@@ -938,7 +942,8 @@ document.addEventListener('DOMContentLoaded', function(){
                 attribution: 'Tiles © Esri'
             }
         );
-        
+        window.pyroPwa?.attachMapOfflineNotice?.(window.usermap);
+
         // Initialize layer groups
         stationLayerGroup = L.layerGroup().addTo(window.usermap);
         incidentLayerGroup = L.layerGroup().addTo(window.usermap);
@@ -1537,12 +1542,19 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
         window.mapData.usermark = Array.isArray(markers)
             ? markers
             : (Array.isArray(markers?.data) ? markers.data : []);
+        window.pyroPwa?.storeDataset?.('citizen-map-markers', window.mapData.usermark);
         latestCitizenMarkerSignature = nextSignature;
         loadMarkers();
         return true;
     } catch (error) {
         if (error?.name === 'AbortError') {
             return false;
+        }
+        const cachedMarkers = window.pyroPwa?.loadDataset?.('citizen-map-markers', []);
+        if (Array.isArray(cachedMarkers) && cachedMarkers.length) {
+            window.mapData = window.mapData || {};
+            window.mapData.usermark = cachedMarkers;
+            loadMarkers();
         }
         console.error('Error refreshing citizen markers:', error);
         return false;
@@ -1565,6 +1577,14 @@ export async function loadMarkers() {
     if (!window.usermap) {
         console.error('Map not initialized, cannot load markers');
         return;
+    }
+
+    if ((!Array.isArray(window.mapData?.usermark) || !window.mapData.usermark.length) && window.pyroPwa?.loadDataset) {
+        const cachedMarkers = window.pyroPwa.loadDataset('citizen-map-markers', []);
+        if (Array.isArray(cachedMarkers) && cachedMarkers.length) {
+            window.mapData = window.mapData || {};
+            window.mapData.usermark = cachedMarkers;
+        }
     }
     
     const usermarkermap = window.mapData.usermark || [];

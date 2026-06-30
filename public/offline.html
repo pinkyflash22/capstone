@@ -2,66 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="title" content="InfyBonus">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d14b24">
+    <title>PyroSense Offline</title>
     <style>
-        .error_body {
-            margin: 0;
-            padding: 0;
+        :root {
+            --primary: #c63d26;
+            --accent: #d18a16;
+            --surface: #fffdf8;
+            --surface-soft: #fff7ed;
+            --text: #1f2937;
+            --muted: #64748b;
+        }
+
+        * {
             box-sizing: border-box;
-            height: 100vh;
-            width: 100%;
-            background: #f9f9f9;
         }
 
-        .error_container .error_heading {
-            color: transparent;
-            font-size: 160px;
+        body {
             margin: 0;
-            font-weight: 900;
-            letter-spacing: 20px;
-            background-size: 100% 100%;
-            background: linear-gradient(90deg, #6b719b 38%, #9da3cc 53%, #979dce 65%);
-            -webkit-background-clip: text;
-            -moz-background-clip: text;
-            -ms-background-clip: text;
+            min-height: 100vh;
+            font-family: Inter, "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top right, rgba(209, 138, 22, 0.18), transparent 24%),
+                radial-gradient(circle at left center, rgba(198, 61, 38, 0.08), transparent 28%),
+                #fbf7ef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
 
-        @media (max-width: 540px) {
-            .error_container .error_heading {
-                font-size: 120px;
-                letter-spacing: 10px;
-            }
+        .offline-card {
+            width: min(100%, 460px);
+            background: rgba(255, 253, 248, 0.96);
+            border: 1px solid rgba(198, 61, 38, 0.12);
+            border-radius: 28px;
+            padding: 28px 24px;
+            box-shadow: 0 28px 60px rgba(198, 61, 38, 0.16);
+            text-align: center;
         }
 
-        .error_container .error_btn {
-            background-color: #6e749e !important;
-            border: none;
-            outline: none;
+        .offline-logo {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 18px;
+            border-radius: 22px;
+            background: linear-gradient(135deg, rgba(198, 61, 38, 0.14), rgba(209, 138, 22, 0.16));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 30px;
+            font-weight: 800;
         }
 
-        .error_container .error_btn:focus {
-            box-shadow: none !important;
+        .offline-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: var(--surface-soft);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
         }
 
-        .error_container .error_message,
-        .error_container .error_paragraph {
-            color: #787878;
+        h1 {
+            margin: 0 0 10px;
+            font-size: 32px;
+            line-height: 1.15;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .offline-panel {
+            margin-top: 20px;
+            padding: 18px;
+            border-radius: 20px;
+            background: #ffffff;
+            border: 1px solid rgba(198, 61, 38, 0.08);
+            text-align: left;
+        }
+
+        .offline-panel strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .offline-panel ul {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .offline-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
+
+        .offline-btn {
+            flex: 1 1 180px;
+            min-height: 50px;
+            border: 0;
+            border-radius: 999px;
+            font-size: 15px;
+            font-weight: 800;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .offline-btn--primary {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: #fff;
+            box-shadow: 0 16px 28px rgba(198, 61, 38, 0.2);
+        }
+
+        .offline-btn--secondary {
+            background: #fff;
+            color: var(--primary);
+            border: 1px solid rgba(198, 61, 38, 0.14);
         }
     </style>
 </head>
 <body>
-<div class="error_body">
-    <div
-        class="container error_container d-flex justify-content-center align-items-center flex-column w-100 h-100 p-5 text-center">
-        <h2 class="error_message text-center mb-3">Boo! You don't have an internet connection</h2>
-        <p class="error_paragraph text-center mb-5">
-            Please check your network connection and try again.
-        </p>
-        <a href="/" class="btn btn-primary error_btn">Back to Home Page</a>
-    </div>
-</div>
+    <main class="offline-card">
+        <div class="offline-logo">P</div>
+        <div class="offline-eyebrow">Offline Ready</div>
+        <h1>PyroSense is still available offline.</h1>
+        <p>The network is currently unavailable, but your cached landing page, saved dashboard data, and queued reports can still be used.</p>
+
+        <section class="offline-panel">
+            <strong>What still works</strong>
+            <ul>
+                <li>Cached pages and previously opened dashboards</li>
+                <li>Saved alerts, incidents, markers, hydrants, stations, and barangay map data</li>
+                <li>Offline report queue that syncs automatically when the connection returns</li>
+            </ul>
+        </section>
+
+        <div class="offline-actions">
+            <a class="offline-btn offline-btn--primary" href="/">Open Cached Landing Page</a>
+            <button class="offline-btn offline-btn--secondary" type="button" onclick="window.location.reload()">Try Again</button>
+        </div>
+    </main>
 </body>
 </html>

@@ -1,149 +1,227 @@
-const CACHE_NAME = "laravel-pwa-1777032801";
-const OFFLINE_URL = "/offline.html";
+const CACHE_VERSION = 'pyrosense-pwa-v20260630-1';
+const SHELL_CACHE = `${CACHE_VERSION}-shell`;
+const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
+const TILE_CACHE = `${CACHE_VERSION}-tiles`;
+const OFFLINE_URL = '/offline.html';
+const LANDING_URL = '/';
 
-const FILES_TO_CACHE = [
-    "/pwa/quick-report",
-    OFFLINE_URL
+const APP_SHELL_URLS = [
+    LANDING_URL,
+    '/dashboard',
+    '/citizen/dashboard',
+    '/pwa/quick-report',
+    '/manifest.json',
+    OFFLINE_URL,
+    '/icon-72x72.png',
+    '/icon-192x192.png',
+    '/icon-512x512.png',
+    '/pwa-screenshot-mobile.svg',
+    '/pwa-screenshot-wide.svg'
 ];
 
-self.addEventListener("install", (event) => {
-    console.log("[Laravel PWA] Service Worker installing...");
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(FILES_TO_CACHE))
-            .then(() => self.skipWaiting())
-    );
+self.addEventListener('install', (event) => {
+    event.waitUntil((async () => {
+        const cache = await caches.open(SHELL_CACHE);
+
+        await Promise.all(APP_SHELL_URLS.map(async (url) => {
+            try {
+                const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+                if (response && (response.ok || response.type === 'opaque')) {
+                    await cache.put(url, response.clone());
+                }
+            } catch (error) {
+                console.warn('[PyroSense PWA] Failed to precache:', url, error);
+            }
+        }));
+
+        await self.skipWaiting();
+    })());
 });
 
-self.addEventListener("activate", (event) => {
-    console.log("[Laravel PWA] Service Worker activated.");
-    event.waitUntil(
-        caches.keys().then((keys) =>
-            Promise.all(
-                keys.map((key) => {
-                    if (key !== CACHE_NAME) {
-                        return caches.delete(key);
-                    }
-                })
-            )
-        ).then(() => self.clients.claim())
-    );
+self.addEventListener('activate', (event) => {
+    event.waitUntil((async () => {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => {
+            if (![
+                SHELL_CACHE,
+                STATIC_CACHE,
+                DYNAMIC_CACHE,
+                TILE_CACHE
+            ].includes(key)) {
+                return caches.delete(key);
+            }
+            return Promise.resolve();
+        }));
+
+        await self.clients.claim();
+    })());
 });
 
-self.addEventListener("message", (event) => {
-    if (event.data && event.data.type === "SKIP_WAITING") {
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
 });
 
-self.addEventListener("fetch", (event) => {
-    const request = event.request;
-    const requestUrl = new URL(request.url);
-    const isSameOrigin = requestUrl.origin === self.location.origin;
+self.addEventListener('fetch', (event) => {
+    const { request } = event;
+
+    if (request.method !== 'GET') {
+        return;
+    }
+
+    const url = new URL(request.url);
+    const isSameOrigin = url.origin === self.location.origin;
+    const isNavigation = request.mode === 'navigate';
+    const isTileRequest = url.hostname.includes('tile.openstreetmap.org')
+        || url.pathname.includes('/MapServer/tile/');
+    const isStaticAsset = request.destination === 'style'
+        || request.destination === 'script'
+        || request.destination === 'image'
+        || request.destination === 'font'
+        || url.pathname.startsWith('/build/')
+        || url.pathname.startsWith('/assets/')
+        || url.pathname.startsWith('/storage/')
+        || url.pathname.endsWith('.css')
+        || url.pathname.endsWith('.js')
+        || url.pathname.endsWith('.png')
+        || url.pathname.endsWith('.jpg')
+        || url.pathname.endsWith('.jpeg')
+        || url.pathname.endsWith('.svg')
+        || url.pathname.endsWith('.webp')
+        || url.pathname.endsWith('.ico')
+        || url.pathname.endsWith('.woff2');
+    const isApiRequest = isSameOrigin && (
+        url.pathname.startsWith('/api/')
+        || url.pathname.startsWith('/citizen/dashboard-data')
+        || url.pathname.startsWith('/firefighter/')
+        || url.pathname.startsWith('/admin/')
+        || url.pathname.startsWith('/chief/')
+        || url.pathname.startsWith('/barangay/')
+    );
     const isAuthRequest = isSameOrigin && (
-        requestUrl.pathname === "/login" ||
-        requestUrl.pathname === "/logout" ||
-        requestUrl.pathname === "/auth" ||
-        requestUrl.pathname.startsWith("/auth/") ||
-        requestUrl.pathname === "/check-auth"
-    );
-    const isLiveApiRequest = isSameOrigin && (
-        requestUrl.pathname.startsWith("/api/") ||
-        requestUrl.pathname.startsWith("/firefighter/") ||
-        requestUrl.pathname === "/markers" ||
-        requestUrl.pathname === "/latest" ||
-        requestUrl.pathname === "/active" ||
-        requestUrl.pathname === "/locations" ||
-        requestUrl.pathname === "/auto-assign-recent-unassigned" ||
-        requestUrl.pathname.endsWith("/markers") ||
-        requestUrl.pathname.endsWith("/latest") ||
-        requestUrl.pathname.endsWith("/active") ||
-        requestUrl.pathname.endsWith("/locations") ||
-        requestUrl.pathname.endsWith("/auto-assign-recent-unassigned")
-    );
-    const isStaticAssetRequest = (
-        request.destination === "style" ||
-        request.destination === "script" ||
-        request.destination === "image" ||
-        request.destination === "font"
+        url.pathname === '/login'
+        || url.pathname === '/logout'
+        || url.pathname.startsWith('/auth/')
+        || url.pathname === '/check-auth'
     );
 
-    if (request.method !== "GET") {
+    if (isTileRequest) {
+        event.respondWith(cacheFirst(request, TILE_CACHE));
         return;
     }
 
-    if (isAuthRequest || isLiveApiRequest) {
+    if (isStaticAsset) {
+        event.respondWith(cacheFirst(request, STATIC_CACHE));
         return;
     }
 
-    if (request.mode === "navigate") {
-        event.respondWith(
-            fetch(request).catch(() => caches.match(OFFLINE_URL))
-        );
+    if (isNavigation) {
+        event.respondWith(handleNavigationRequest(request));
         return;
     }
 
-    if (isStaticAssetRequest) {
-        event.respondWith(
-            caches.match(request).then((cached) => {
-                return cached || fetch(request).then((response) => {
-                    if (!response || response.status !== 200) {
-                        return response;
-                    }
-
-                    return caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(request, response.clone());
-                        return response;
-                    });
-                });
-            })
-        );
+    if (isApiRequest && !isAuthRequest) {
+        event.respondWith(networkFirst(request, DYNAMIC_CACHE));
         return;
+    }
+
+    if (isSameOrigin) {
+        event.respondWith(networkFirst(request, DYNAMIC_CACHE));
     }
 });
 
-self.addEventListener("sync", (event) => {
-    if (event.tag === "laravel-pwa-sync") {
-        event.waitUntil(syncRequests());
-    }
-});
-
-async function syncRequests() {
-    const db = await openDB();
-    const tx = db.transaction("offline-requests", "readonly");
-    const store = tx.objectStore("offline-requests");
-    const requests = await getAllRequests(store);
-
-    for (const req of requests) {
-        try {
-            const response = await fetch(req.url, {
-                method: req.method,
-                headers: req.headers,
-                body: req.body
-            });
-
-            if (response.ok) {
-                const deleteTx = db.transaction("offline-requests", "readwrite");
-                deleteTx.objectStore("offline-requests").delete(req.id);
-            }
-        } catch (err) {
-            console.error("[Laravel PWA] Sync failed for:", req.url, err);
+async function handleNavigationRequest(request) {
+    try {
+        const response = await fetch(request);
+        const cache = await caches.open(DYNAMIC_CACHE);
+        cache.put(request, response.clone());
+        return response;
+    } catch (error) {
+        const cachedPage = await caches.match(request, { ignoreSearch: true });
+        if (cachedPage) {
+            return cachedPage;
         }
+
+        const cachedLanding = await caches.match(LANDING_URL, { ignoreSearch: true });
+        if (cachedLanding) {
+            return cachedLanding;
+        }
+
+        const offlinePage = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+        if (offlinePage) {
+            return offlinePage;
+        }
+
+        return new Response('Offline', {
+            status: 503,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'text/plain' }
+        });
     }
 }
 
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open("laravel-pwa-sync", 1);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+async function cacheFirst(request, cacheName) {
+    const cached = await caches.match(request, { ignoreSearch: true });
+    if (cached) {
+        return cached;
+    }
+
+    try {
+        const response = await fetch(request);
+        if (response && (response.ok || response.type === 'opaque')) {
+            const cache = await caches.open(cacheName);
+            cache.put(request, response.clone());
+        }
+        return response;
+    } catch (error) {
+        if (request.destination === 'image') {
+            const fallbackImage = await caches.match('/icon-192x192.png');
+            if (fallbackImage) {
+                return fallbackImage;
+            }
+        }
+
+        throw error;
+    }
 }
 
-function getAllRequests(store) {
-    return new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+async function networkFirst(request, cacheName) {
+    try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+            const cache = await caches.open(cacheName);
+            cache.put(request, response.clone());
+        }
+        return response;
+    } catch (error) {
+        const cached = await caches.match(request, { ignoreSearch: true });
+        if (cached) {
+            return cached;
+        }
+
+        if (request.mode === 'navigate') {
+            const cachedLanding = await caches.match(LANDING_URL, { ignoreSearch: true });
+            if (cachedLanding) {
+                return cachedLanding;
+            }
+
+            const offlinePage = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+            if (offlinePage) {
+                return offlinePage;
+            }
+        }
+
+        return new Response(JSON.stringify({
+            success: false,
+            offline: true,
+            message: 'Offline fallback unavailable'
+        }), {
+            status: 503,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
 }

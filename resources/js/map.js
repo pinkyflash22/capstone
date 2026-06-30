@@ -6491,7 +6491,8 @@ function initAfterMapReady() {
     
     var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(window.map);
     var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, attribution: 'Tiles © Esri' });
-    
+    window.pyroPwa?.attachMapOfflineNotice?.(window.map);
+
     console.log(roleToken);
     console.log('User Role:', roleName, 'Role ID:', roleToken);
     routeOverlayControl = L.control.layers({ "Street Map": street, "Satellite": satellite }, {

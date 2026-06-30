@@ -1,5 +1,6 @@
 @php
     $showPwaInstallButton = $showPwaInstallButton ?? false;
+    $pwaServiceWorkerVersion = file_exists(public_path('sw.js')) ? (string) filemtime(public_path('sw.js')) : (string) time();
 @endphp
 
 @laravelPwa
@@ -240,3 +241,382 @@
         })();
     </script>
 @endif
+
+<style>
+    .pyrosense-connection-pill {
+        position: fixed;
+        left: 16px;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        z-index: 1550;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        max-width: min(420px, calc(100vw - 32px));
+        padding: 12px 15px;
+        border-radius: 18px;
+        background: rgba(15, 23, 42, 0.92);
+        color: #fff7ed;
+        border: 1px solid rgba(251, 146, 60, 0.22);
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
+        backdrop-filter: blur(14px);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .pyrosense-connection-pill.is-visible {
+        display: inline-flex;
+    }
+
+    .pyrosense-connection-pill__icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.12);
+        font-weight: 800;
+    }
+
+    .pyrosense-connection-pill__copy strong,
+    .pyrosense-connection-pill__copy span {
+        display: block;
+    }
+
+    .pyrosense-connection-pill__copy strong {
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .pyrosense-connection-pill__copy span {
+        margin-top: 2px;
+        color: rgba(255, 247, 237, 0.84);
+    }
+
+    .pyrosense-map-offline-note {
+        position: absolute;
+        top: 88px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 700;
+        display: none;
+        width: min(92%, 420px);
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(255, 248, 235, 0.96);
+        color: #9a3412;
+        border: 1px solid rgba(249, 115, 22, 0.22);
+        box-shadow: 0 14px 30px rgba(249, 115, 22, 0.12);
+        text-align: center;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+
+    .pyrosense-map-offline-note.is-visible {
+        display: block;
+    }
+
+    @media (max-width: 640px) {
+        .pyrosense-connection-pill {
+            left: 12px;
+            right: 12px;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            max-width: none;
+        }
+    }
+</style>
+
+<div id="pyrosenseConnectionPill" class="pyrosense-connection-pill" role="status" aria-live="polite">
+    <span id="pyrosenseConnectionPillIcon" class="pyrosense-connection-pill__icon">!</span>
+    <span class="pyrosense-connection-pill__copy">
+        <strong id="pyrosenseConnectionPillTitle">Offline mode</strong>
+        <span id="pyrosenseConnectionPillText">Saved pages and queued reports will stay available.</span>
+    </span>
+</div>
+
+<script>
+    (function () {
+        const STORAGE_PREFIX = 'pyrosense-pwa';
+        const DATASET_KEY = `${STORAGE_PREFIX}:datasets`;
+        const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue`;
+        const STATUS_KEY = `${STORAGE_PREFIX}:status`;
+        const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
+        const pill = document.getElementById('pyrosenseConnectionPill');
+        const pillIcon = document.getElementById('pyrosenseConnectionPillIcon');
+        const pillTitle = document.getElementById('pyrosenseConnectionPillTitle');
+        const pillText = document.getElementById('pyrosenseConnectionPillText');
+
+        function safeReadJson(key, fallback) {
+            try {
+                const raw = window.localStorage?.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch (error) {
+                console.warn('[PyroSense PWA] Failed to read local storage key:', key, error);
+                return fallback;
+            }
+        }
+
+        function safeWriteJson(key, value) {
+            try {
+                window.localStorage?.setItem(key, JSON.stringify(value));
+                return true;
+            } catch (error) {
+                console.warn('[PyroSense PWA] Failed to write local storage key:', key, error);
+                return false;
+            }
+        }
+
+        function getQueue() {
+            const queue = safeReadJson(REPORT_QUEUE_KEY, []);
+            return Array.isArray(queue) ? queue : [];
+        }
+
+        function setQueue(queue) {
+            safeWriteJson(REPORT_QUEUE_KEY, Array.isArray(queue) ? queue : []);
+        }
+
+        function getDatasets() {
+            const datasets = safeReadJson(DATASET_KEY, {});
+            return datasets && typeof datasets === 'object' ? datasets : {};
+        }
+
+        function setDatasets(nextDatasets) {
+            safeWriteJson(DATASET_KEY, nextDatasets && typeof nextDatasets === 'object' ? nextDatasets : {});
+        }
+
+        function showConnectionState(title, message, icon) {
+            if (!pill || !pillIcon || !pillTitle || !pillText) {
+                return;
+            }
+
+            pillTitle.textContent = title;
+            pillText.textContent = message;
+            pillIcon.textContent = icon;
+            pill.classList.add('is-visible');
+        }
+
+        function hideConnectionState() {
+            if (!pill) {
+                return;
+            }
+
+            pill.classList.remove('is-visible');
+        }
+
+        function updateConnectionState(forceVisible = false) {
+            const pendingCount = getQueue().length;
+            const offline = !window.navigator.onLine;
+
+            if (offline) {
+                showConnectionState(
+                    'Offline mode',
+                    pendingCount > 0
+                        ? `${pendingCount} report${pendingCount === 1 ? '' : 's'} pending sync. Cached pages and saved data are still available.`
+                        : 'Cached pages and your last saved dashboard data are still available.',
+                    '!'
+                );
+                return;
+            }
+
+            if (pendingCount > 0 || forceVisible) {
+                showConnectionState(
+                    pendingCount > 0 ? 'Reconnecting' : 'Back online',
+                    pendingCount > 0
+                        ? `Syncing ${pendingCount} queued report${pendingCount === 1 ? '' : 's'} now.`
+                        : 'Live updates and online reporting are available again.',
+                    pendingCount > 0 ? '…' : '✓'
+                );
+                if (!pendingCount) {
+                    window.setTimeout(hideConnectionState, 2200);
+                }
+                return;
+            }
+
+            hideConnectionState();
+        }
+
+        async function syncQueuedReports() {
+            if (!window.navigator.onLine) {
+                updateConnectionState(true);
+                return { synced: 0, remaining: getQueue().length };
+            }
+
+            const queue = getQueue();
+            if (!queue.length) {
+                updateConnectionState(true);
+                return { synced: 0, remaining: 0 };
+            }
+
+            const remaining = [];
+            let synced = 0;
+
+            for (const item of queue) {
+                try {
+                    const response = await fetch(item.url, {
+                        method: item.method || 'POST',
+                        headers: item.headers || {},
+                        body: item.body || null
+                    });
+
+                    if (!response.ok) {
+                        remaining.push(item);
+                        continue;
+                    }
+
+                    const payload = await response.json().catch(() => ({}));
+                    synced += 1;
+
+                    window.dispatchEvent(new CustomEvent('pyrosense:report-synced', {
+                        detail: {
+                            queueItem: item,
+                            response: payload
+                        }
+                    }));
+                } catch (error) {
+                    remaining.push(item);
+                }
+            }
+
+            setQueue(remaining);
+            safeWriteJson(STATUS_KEY, {
+                synced_at: new Date().toISOString(),
+                synced,
+                remaining: remaining.length
+            });
+
+            updateConnectionState(true);
+
+            if (!remaining.length) {
+                window.setTimeout(hideConnectionState, 2200);
+            }
+
+            return { synced, remaining: remaining.length };
+        }
+
+        function storeDataset(name, data) {
+            if (!name) {
+                return;
+            }
+
+            const datasets = getDatasets();
+            datasets[name] = {
+                stored_at: new Date().toISOString(),
+                data
+            };
+            setDatasets(datasets);
+        }
+
+        function loadDataset(name, fallback = null) {
+            const datasets = getDatasets();
+            return datasets[name]?.data ?? fallback;
+        }
+
+        function enqueueOfflineReport(report) {
+            const queue = getQueue();
+            const item = {
+                id: report.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                url: report.url,
+                method: report.method || 'POST',
+                headers: report.headers || {},
+                body: report.body || null,
+                type: report.type || 'report',
+                created_at: report.created_at || new Date().toISOString(),
+                meta: report.meta || {}
+            };
+
+            queue.push(item);
+            setQueue(queue);
+            updateConnectionState(true);
+
+            window.dispatchEvent(new CustomEvent('pyrosense:report-queued', {
+                detail: {
+                    queueItem: item,
+                    pendingCount: queue.length
+                }
+            }));
+
+            return item;
+        }
+
+        function attachMapOfflineNotice(mapInstance, options = {}) {
+            if (!mapInstance || mapInstance.__pyrosenseOfflineNoticeBound) {
+                return;
+            }
+
+            const container = mapInstance.getContainer?.();
+            if (!container) {
+                return;
+            }
+
+            const message = options.message || 'Map tiles are unavailable offline. Showing last saved data.';
+            const note = document.createElement('div');
+            note.className = 'pyrosense-map-offline-note';
+            note.textContent = message;
+            container.appendChild(note);
+
+            const showNote = function () {
+                note.classList.add('is-visible');
+            };
+
+            const hideNote = function () {
+                note.classList.remove('is-visible');
+            };
+
+            mapInstance.eachLayer((layer) => {
+                if (layer instanceof L.TileLayer) {
+                    layer.on('tileerror', showNote);
+                    layer.on('load', hideNote);
+                }
+            });
+
+            mapInstance.__pyrosenseOfflineNoticeBound = true;
+            mapInstance.__pyrosenseOfflineNote = note;
+        }
+
+        async function ensureServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.register(SW_URL, { scope: '/' });
+                if (window.navigator.onLine) {
+                    registration.update?.();
+                }
+            } catch (error) {
+                console.error('[PyroSense PWA] Service worker registration failed:', error);
+            }
+        }
+
+        window.pyroPwa = Object.assign(window.pyroPwa || {}, {
+            storeDataset,
+            loadDataset,
+            enqueueOfflineReport,
+            syncQueuedReports,
+            updateConnectionState,
+            attachMapOfflineNotice,
+            getPendingReportCount: () => getQueue().length,
+            getQueuedReports: () => getQueue().slice(),
+            isOffline: () => !window.navigator.onLine
+        });
+
+        window.addEventListener('online', function () {
+            updateConnectionState(true);
+            syncQueuedReports();
+        });
+
+        window.addEventListener('offline', function () {
+            updateConnectionState(true);
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            ensureServiceWorker();
+            updateConnectionState(false);
+            if (window.navigator.onLine && getQueue().length) {
+                syncQueuedReports();
+            }
+        });
+    })();
+</script>

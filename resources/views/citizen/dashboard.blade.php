@@ -3204,6 +3204,55 @@ if (navigator.geolocation) {
 //         window.location.replace('{{ route("auth.login") }}');
 //     });
 // });
+function addPendingCitizenOfflineReport(reportKind, payload) {
+    const queuedAt = new Date().toISOString();
+    const pendingStatus = 'Pending sync';
+
+    if (reportKind === 'fire') {
+        const pendingIncident = {
+            incident_id: `offline-fire-${Date.now()}`,
+            incident_type: 'Fire Incident',
+            incident_status: pendingStatus,
+            created_at: queuedAt,
+            created_at_human: pendingStatus,
+            marker_id: null,
+            lat: payload.lat,
+            lng: payload.lng,
+            distance_meters: 0
+        };
+
+        window.myReportedIncidents = Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : [];
+        window.myReportedIncidents.unshift(pendingIncident);
+        window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
+        window.citizenCombinedReports.unshift({
+            ...pendingIncident,
+            report_type: 'Fire Incident'
+        });
+        window.renderCitizenWeeklyActivity();
+        window.refreshCitizenAreasOfConcernReports?.(window.citizenCombinedReports);
+        return;
+    }
+
+    const pendingConcern = {
+        id: `offline-concern-${Date.now()}`,
+        report_type: 'Risk/Hazard Factor',
+        category: payload.concern_type || 'unsure',
+        status: pendingStatus,
+        verification_status: pendingStatus,
+        created_at: queuedAt,
+        created_at_human: pendingStatus,
+        lat: payload.lat,
+        lng: payload.lng
+    };
+
+    window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
+    window.citizenCombinedReports.unshift(pendingConcern);
+    window.citizenRiskMapReports = Array.isArray(window.citizenRiskMapReports) ? window.citizenRiskMapReports : [];
+    window.citizenRiskMapReports.unshift(pendingConcern);
+    window.refreshCitizenAreasOfConcernReports?.(window.citizenCombinedReports);
+    window.refreshCitizenRiskConcernMap?.(window.citizenRiskMapReports);
+}
+
 async function submitCitizenQuickReport(reportKind) {
     const description = '';
     const incidentTypeId = 1;
@@ -3223,6 +3272,7 @@ async function submitCitizenQuickReport(reportKind) {
         fire: 'fire report',
         concern: 'safety concern report',
     };
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     // Check if location is ready
     if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
@@ -3237,6 +3287,73 @@ async function submitCitizenQuickReport(reportKind) {
 
     if (reportKind === 'concern' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
         startCitizenHazardMapPick();
+        return;
+    }
+
+    const fireLat = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null
+        ? Number(citizenFireDraft.selectedLat)
+        : Number(window.userCoords.currentLatitude);
+    const fireLng = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLng !== null
+        ? Number(citizenFireDraft.selectedLng)
+        : Number(window.userCoords.currentLongitude);
+    const concernLat = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
+        ? Number(citizenHazardDraft.selectedLat)
+        : Number(window.userCoords.currentLatitude);
+    const concernLng = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
+        ? Number(citizenHazardDraft.selectedLng)
+        : Number(window.userCoords.currentLongitude);
+
+    if (window.pyroPwa?.isOffline?.()) {
+        const firePayload = {
+            lat: fireLat,
+            lng: fireLng,
+            title: 'Citizen Fire Emergency',
+            description: description || 'Citizen-submitted fire emergency.',
+            status: 'reported',
+            reported_by: reporter,
+            alarmdatetime: new Date().toISOString(),
+        };
+        const concernPayload = {
+            report_kind: reportKind,
+            concern_type: concernType,
+            lat: concernLat,
+            lng: concernLng,
+            user_lat: Number(window.userCoords.currentLatitude),
+            user_lng: Number(window.userCoords.currentLongitude)
+        };
+
+        const queuePayload = reportKind === 'fire'
+            ? {
+                url: '/citizen/incident',
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(firePayload),
+                type: 'fire-report',
+                meta: { reportKind: 'fire' }
+            }
+            : {
+                url: '{{ route('citizen.risk-reports.store') }}',
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(concernPayload),
+                type: 'concern-report',
+                meta: { reportKind: 'concern' }
+            };
+
+        window.pyroPwa?.enqueueOfflineReport?.(queuePayload);
+        addPendingCitizenOfflineReport(reportKind, reportKind === 'fire' ? firePayload : concernPayload);
+        document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal').style.display = 'none';
+        showIncidentToast?.(`${reportLabels[reportKind] || 'Report'} saved offline. Pending sync.`, false, 4200);
         return;
     }
 
@@ -3262,12 +3379,6 @@ async function submitCitizenQuickReport(reportKind) {
         let successMessage = '';
 
         if (reportKind === 'fire') {
-            const fireLat = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null
-                ? Number(citizenFireDraft.selectedLat)
-                : Number(window.userCoords.currentLatitude);
-            const fireLng = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLng !== null
-                ? Number(citizenFireDraft.selectedLng)
-                : Number(window.userCoords.currentLongitude);
             success = await window.saveIncident(
                 description,
                 fireLat,
@@ -3278,25 +3389,19 @@ async function submitCitizenQuickReport(reportKind) {
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
         } else {
-            const targetLat = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
-                ? Number(citizenHazardDraft.selectedLat)
-                : Number(window.userCoords.currentLatitude);
-            const targetLng = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
-                ? Number(citizenHazardDraft.selectedLng)
-                : Number(window.userCoords.currentLongitude);
             const response = await fetch('{{ route('citizen.risk-reports.store') }}', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({
                     report_kind: reportKind,
                     concern_type: concernType,
-                    lat: targetLat,
-                    lng: targetLng,
+                    lat: concernLat,
+                    lng: concernLng,
                     user_lat: Number(window.userCoords.currentLatitude),
                     user_lng: Number(window.userCoords.currentLongitude)
                 })
@@ -3489,6 +3594,171 @@ window.renderCitizenWeeklyActivity = function(activityData = null) {
     }
 };
 
+window.applyCitizenOverviewData = function(data = {}, options = {}) {
+    const summary = data.summary || {};
+    const nearbyIncidents = Array.isArray(data.nearby_incidents) ? data.nearby_incidents : [];
+    const userIncidents = Array.isArray(data.user_incidents) ? data.user_incidents : [];
+    const userReports = Array.isArray(data.user_reports) ? data.user_reports : userIncidents;
+    const riskMapReports = Array.isArray(data.risk_map_reports) ? data.risk_map_reports : [];
+    const activeAlerts = Number(summary.active_alerts || 0);
+    window.incidentsData = Array.isArray(data.incidents) ? data.incidents : [];
+
+    if (typeof window.syncIncidentAlertFeed === 'function') {
+        window.syncIncidentAlertFeed('citizen-nearby-incidents', nearbyIncidents, {
+            titlePrefix: options.fromCache ? 'Cached Emergency Alert' : 'Nearby Emergency Alert',
+            maxDistanceMeters: 500
+        });
+    }
+
+    const setText = (id, value) => {
+        const node = document.getElementById(id);
+        if (node) {
+            node.textContent = value;
+        }
+    };
+
+    const getStatusMeta = (statusValue = '') => {
+        const status = String(statusValue).trim().toLowerCase();
+
+        if (status === 'reported' || status === 'pending sync') {
+            return { dotClass: 'dot-yellow', badgeClass: 'sbadge-yellow', label: statusValue || 'Pending sync' };
+        }
+        if (status === 'responding') {
+            return { dotClass: 'dot-blue', badgeClass: 'sbadge-blue', label: 'Responding' };
+        }
+        if (status === 'on scene') {
+            return { dotClass: 'dot-purple', badgeClass: 'sbadge-purple', label: 'On scene' };
+        }
+
+        return { dotClass: 'dot-red', badgeClass: 'sbadge-red', label: statusValue || 'Unknown' };
+    };
+
+    setText('citizenActiveNearYouValue', activeAlerts);
+    setText('citizenOverviewYourReportsValue', summary.your_reports ?? userReports.length ?? 0);
+    setText('citizenOverviewTotalReportsValue', summary.total_reports ?? userReports.length ?? 0);
+    setText('citizenOverviewZoneRiskValue', summary.risk_level ? String(summary.risk_level).charAt(0).toUpperCase() + String(summary.risk_level).slice(1) : 'Moderate');
+    setText('citizenOverviewRiskLevelLabel', `${summary.risk_level ? String(summary.risk_level).charAt(0).toUpperCase() + String(summary.risk_level).slice(1) : 'Moderate'} risk`);
+    setText('citizenOverviewActiveAlertsValue', activeAlerts);
+    setText('citizenSidebarAlertsValue', activeAlerts);
+    setText('citizenSidebarReportsValue', summary.total_reports ?? userReports.length ?? 0);
+    setText('citizenSidebarDrillsValue', data.sidebar?.drills ?? window.citizenSidebarDefaults?.drills ?? 0);
+    setText('citizenSidebarBadgesValue', data.sidebar?.badges ?? window.citizenSidebarDefaults?.badges ?? 0);
+    setText('citizenNavAlertsBadge', activeAlerts);
+    setText('citizenNavRequestsBadge', data.requests_count ?? document.getElementById('citizenNavRequestsBadge')?.textContent ?? 0);
+    setText('citizenTopUnreadValue', activeAlerts);
+    setText('citizenNearbyAlertsCount', `${nearbyIncidents.length} incident(s) nearby${options.fromCache ? ' · cached' : ''}`);
+
+    window.myReportedIncidents = userIncidents;
+    window.nearbyAlertsData = nearbyIncidents;
+    window.citizenCombinedReports = userReports;
+    window.citizenRiskMapReports = riskMapReports;
+    window.renderCitizenWeeklyActivity(data.weekly_activity || null);
+
+    const riskPercentageNode = document.getElementById('citizenOverviewRiskPercentageValue');
+    if (riskPercentageNode) {
+        riskPercentageNode.innerHTML = `${summary.risk_percentage ?? 0}<span class="text-lg font-medium">%</span>`;
+    }
+
+    if (typeof window.updateCitizenOverviewCharts === 'function') {
+        window.updateCitizenOverviewCharts({
+            incidents: Array.isArray(data.incidents) ? data.incidents : [],
+            user_reports: userReports,
+        });
+    }
+
+    if (typeof window.refreshCitizenMapSearchIndex === 'function') {
+        window.refreshCitizenMapSearchIndex();
+    }
+
+    if (typeof window.refreshCitizenAlertsSection === 'function') {
+        window.refreshCitizenAlertsSection(Array.isArray(nearbyIncidents) ? nearbyIncidents : []);
+    }
+
+    if (typeof window.refreshCitizenAreasOfConcernReports === 'function') {
+        window.refreshCitizenAreasOfConcernReports(userReports);
+    }
+
+    if (typeof window.refreshCitizenRiskConcernMap === 'function') {
+        window.refreshCitizenRiskConcernMap(riskMapReports);
+    }
+
+    const fab = document.getElementById('alertsFab');
+    let fabBadge = document.getElementById('citizenAlertsFabBadge');
+    if (activeAlerts > 0) {
+        if (!fabBadge && fab) {
+            fabBadge = document.createElement('span');
+            fabBadge.id = 'citizenAlertsFabBadge';
+            fabBadge.className = 'alerts-fab-badge';
+            fab.appendChild(fabBadge);
+        }
+        if (fabBadge) {
+            fabBadge.textContent = activeAlerts;
+        }
+    } else if (fabBadge) {
+        fabBadge.remove();
+    }
+
+    const alertsList = document.getElementById('citizenAlertsPanelList');
+    if (!alertsList) {
+        return;
+    }
+
+    if (!nearbyIncidents.length) {
+        alertsList.innerHTML = `
+            <div class="text-center py-12 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/>
+                </svg>
+                <p class="text-sm font-medium">No active alerts</p>
+                <p class="text-xs mt-1">${options.fromCache ? 'Showing your last saved dashboard snapshot' : 'Your area is currently clear'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    alertsList.innerHTML = nearbyIncidents.map((incident) => {
+        const statusMeta = getStatusMeta(incident.incident_status);
+        const distanceKm = typeof incident.distance_meters === 'number'
+            ? ` · ${(incident.distance_meters / 1000).toFixed(1)} km away`
+            : '';
+
+        return `
+            <button type="button" class="alerts-panel-item w-full text-left js-citizen-alert-focus" data-incident='${JSON.stringify(incident).replace(/'/g, '&#39;')}'>
+                <span class="alerts-dot ${statusMeta.dotClass}"></span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-800 truncate">Fire ${incident.incident_type || 'Incident'}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${incident.created_at_human || 'Just now'}${distanceKm}</p>
+                </div>
+                <span class="alerts-status-badge ${statusMeta.badgeClass}">${statusMeta.label}</span>
+            </button>
+        `;
+    }).join('');
+
+    alertsList.querySelectorAll('.js-citizen-alert-focus').forEach((button) => {
+        button.addEventListener('click', function() {
+            try {
+                const incident = JSON.parse(this.dataset.incident || '{}');
+                if (typeof window.switchSection === 'function') {
+                    window.switchSection('overview');
+                }
+                if (typeof window.focusCitizenIncidentOnMap === 'function') {
+                    window.focusCitizenIncidentOnMap(incident);
+                }
+            } catch (parseError) {
+                console.error('Unable to focus incident from alerts panel:', parseError);
+            }
+        });
+    });
+};
+
+window.persistCitizenOverviewOfflineData = function(data = {}) {
+    window.pyroPwa?.storeDataset?.('citizen-overview', data);
+    window.pyroPwa?.storeDataset?.('citizen-alerts', Array.isArray(data.nearby_incidents) ? data.nearby_incidents : []);
+    window.pyroPwa?.storeDataset?.('citizen-incidents', Array.isArray(data.incidents) ? data.incidents : []);
+    window.pyroPwa?.storeDataset?.('citizen-user-reports', Array.isArray(data.user_reports) ? data.user_reports : []);
+    window.pyroPwa?.storeDataset?.('citizen-risk-map-reports', Array.isArray(data.risk_map_reports) ? data.risk_map_reports : []);
+};
+
 window.refreshCitizenOverviewData = async function() {
     if (!window.userCoords?.ready || !window.userCoords?.currentLatitude || !window.userCoords?.currentLongitude) {
         return;
@@ -3524,6 +3794,9 @@ window.refreshCitizenOverviewData = async function() {
 
         const payload = await response.json();
         const data = payload?.data || {};
+        window.persistCitizenOverviewOfflineData(data);
+        window.applyCitizenOverviewData(data, { fromCache: false });
+        return;
         const summary = data.summary || {};
         const nearbyIncidents = Array.isArray(data.nearby_incidents) ? data.nearby_incidents : [];
         const userIncidents = Array.isArray(data.user_incidents) ? data.user_incidents : [];
@@ -3679,6 +3952,11 @@ window.refreshCitizenOverviewData = async function() {
         if (error?.name === 'AbortError') {
             return;
         }
+        const cachedOverview = window.pyroPwa?.loadDataset?.('citizen-overview', null);
+        if (cachedOverview) {
+            window.applyCitizenOverviewData(cachedOverview, { fromCache: true });
+            return;
+        }
         console.error('Error refreshing citizen overview data:', error);
     } finally {
         if (timeoutId) {
@@ -3690,6 +3968,13 @@ window.refreshCitizenOverviewData = async function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     window.renderCitizenWeeklyActivity();
+});
+
+window.addEventListener('pyrosense:report-synced', function() {
+    window.showCitizenToast?.('Queued report synced successfully.', false, 2800);
+    if (typeof window.refreshCitizenOverviewData === 'function' && window.userCoords?.ready) {
+        window.refreshCitizenOverviewData();
+    }
 });
 
 window.runPendingIncidentAutoAssignment = async function() {
