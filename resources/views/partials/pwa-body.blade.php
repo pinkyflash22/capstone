@@ -1,10 +1,12 @@
 @php
     $showPwaInstallButton = $showPwaInstallButton ?? false;
     $pwaServiceWorkerVersion = file_exists(public_path('sw.js')) ? (string) filemtime(public_path('sw.js')) : (string) time();
+    $pwaInstallScript = asset('pwa-install.js') . '?v=' . $pwaServiceWorkerVersion;
+    $pwaBackgroundSyncScript = asset('background-sync.js') . '?v=' . $pwaServiceWorkerVersion;
 @endphp
 
-@laravelPwa
-@pwaUpdateNotifier
+<script src="{{ $pwaInstallScript }}"></script>
+<script src="{{ $pwaBackgroundSyncScript }}"></script>
 
 @if ($showPwaInstallButton)
     <style>
@@ -426,7 +428,7 @@
                     pendingCount > 0
                         ? `Syncing ${pendingCount} queued report${pendingCount === 1 ? '' : 's'} now.`
                         : 'Live updates and online reporting are available again.',
-                    pendingCount > 0 ? '…' : '✓'
+                    pendingCount > 0 ? '...' : 'OK'
                 );
                 if (!pendingCount) {
                     window.setTimeout(hideConnectionState, 2200);

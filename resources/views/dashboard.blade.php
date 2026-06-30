@@ -51,6 +51,8 @@
         <div class="container">
             <a href="/" class="logo">
                 <div class="logo-icon" style="width: 76px; height: 56px; border-radius: 18px; padding: 0.35rem 0.55rem;">
+
+                {{-- <div class="logo-icon" style="width: 76px; height: 56px; border-radius: 18px; padding: 0.35rem 0.55rem;"> --}}
                     @include('partials.app-logo', ['class' => 'logo-image'])
                 </div>
                 <span class="logo-text">Pyro<span>Sense</span></span>
