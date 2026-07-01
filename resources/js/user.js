@@ -931,15 +931,30 @@ document.addEventListener('DOMContentLoaded', function(){
         window.usermap = L.map('userMap').setView([15.8222, 120.3297], 13);
         ensureCitizenMarkerPanes();
 
+        var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+        }).addTo(window.usermap);
+
         var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(window.usermap);
+        });
+
+        var hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
+        });
         
         var satellite = L.tileLayer(
             'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
             {
                 maxZoom: 18,
                 attribution: 'Tiles © Esri'
+            }
+        );
+        var waterReference = L.tileLayer(
+            'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference/MapServer/tile/{z}/{y}/{x}',
+            {
+                maxZoom: 18,
+                attribution: 'Hydro reference (c) Esri'
             }
         );
         window.pyroPwa?.attachMapOfflineNotice?.(window.usermap);
@@ -949,13 +964,21 @@ document.addEventListener('DOMContentLoaded', function(){
         incidentLayerGroup = L.layerGroup().addTo(window.usermap);
         hydrantLayerGroup = L.layerGroup().addTo(window.usermap);
         otherLayerGroup = L.layerGroup().addTo(window.usermap);
+
+        const citizenBaseMaps = {
+            "Carto Light": cartoLight,
+            "OSM Standard": street,
+            "OSM HOT": hotStreet,
+            "Satellite": satellite
+        };
         
         // Create layer control with all groups
-        citizenLayerControl = L.control.layers(null, {
-            "🚒 Fire Stations": stationLayerGroup,
-            "🔥 Incidents": incidentLayerGroup,
-            "💧 Fire Hydrants": hydrantLayerGroup,
-            "📍 Other Markers": otherLayerGroup
+        citizenLayerControl = L.control.layers(citizenBaseMaps, {
+            "Fire Stations": stationLayerGroup,
+            "Incidents": incidentLayerGroup,
+            "Fire Hydrants": hydrantLayerGroup,
+            "Other Markers": otherLayerGroup,
+            "Water Reference": waterReference
         }, {
             collapsed: false,
             position: 'topright'
