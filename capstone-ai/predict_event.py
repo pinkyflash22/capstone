@@ -59,6 +59,19 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         "average_humidity",
         "average_wind_speed",
         "near_water",
+        "verified_risk_area_count",
+        "verified_hazard_count",
+        "verified_risk_count",
+        "high_assessment_count",
+        "blocked_hydrant_count",
+        "combustible_material_count",
+        "informal_settlement_count",
+        "cooking_fire_activity_count",
+        "poor_waste_disposal_count",
+        "previous_fire_prone_count",
+        "poor_access_count",
+        "affected_households",
+        "risk_area_pressure_signal",
     ]:
         df[column] = pd.to_numeric(df.get(column), errors="coerce")
 
@@ -79,6 +92,22 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
     df["temperature_signal"] = df["average_temperature"].fillna(0)
     df["humidity_signal"] = df["average_humidity"].fillna(0)
     df["wind_signal"] = df["average_wind_speed"].fillna(0)
+    for column in [
+        "verified_risk_area_count",
+        "verified_hazard_count",
+        "verified_risk_count",
+        "high_assessment_count",
+        "blocked_hydrant_count",
+        "combustible_material_count",
+        "informal_settlement_count",
+        "cooking_fire_activity_count",
+        "poor_waste_disposal_count",
+        "previous_fire_prone_count",
+        "poor_access_count",
+        "affected_households",
+        "risk_area_pressure_signal",
+    ]:
+        df[column] = df[column].fillna(0)
     df["barangay_pressure_signal"] = (
         df["incident_count"].fillna(0) * 1.2
         + df["average_temperature"] * 0.35
@@ -86,6 +115,9 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         - df["water_access_flag"] * 0.75
         + df["average_wind_speed"].fillna(0) * 0.15
         - df["average_humidity"].fillna(0) * 0.03
+        + df["risk_area_pressure_signal"] * 0.9
+        + df["high_assessment_count"] * 1.1
+        + df["blocked_hydrant_count"] * 0.8
     )
     df["weather_condition"] = weather_condition
 

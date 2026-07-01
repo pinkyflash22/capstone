@@ -69,12 +69,41 @@ STATION_BARANGAY_MONTHLY_COLUMNS = [
     "weather_condition",
     "season",
     "near_water",
+    "verified_risk_area_count",
+    "verified_hazard_count",
+    "verified_risk_count",
+    "high_assessment_count",
+    "blocked_hydrant_count",
+    "combustible_material_count",
+    "informal_settlement_count",
+    "cooking_fire_activity_count",
+    "poor_waste_disposal_count",
+    "previous_fire_prone_count",
+    "poor_access_count",
+    "affected_households",
+    "risk_area_pressure_signal",
     "density",
     "materials",
     "peak_hours",
     "accesibility",
     "type_incident",
     "occupancy",
+]
+
+RISK_AREA_SIGNAL_COLUMNS = [
+    "verified_risk_area_count",
+    "verified_hazard_count",
+    "verified_risk_count",
+    "high_assessment_count",
+    "blocked_hydrant_count",
+    "combustible_material_count",
+    "informal_settlement_count",
+    "cooking_fire_activity_count",
+    "poor_waste_disposal_count",
+    "previous_fire_prone_count",
+    "poor_access_count",
+    "affected_households",
+    "risk_area_pressure_signal",
 ]
 
 MERGED_INCIDENT_REQUIRED_COLUMNS = [
@@ -243,7 +272,10 @@ def prepare_historical_dataframe(records: list[dict]) -> tuple[pd.DataFrame, pd.
 def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.DataFrame, pd.Series, list[str], dict]:
     df = pd.DataFrame(records).copy()
 
-    missing_columns = [column for column in STATION_BARANGAY_MONTHLY_COLUMNS if column not in df.columns]
+    missing_columns = [
+        column for column in STATION_BARANGAY_MONTHLY_COLUMNS
+        if column not in df.columns and column not in RISK_AREA_SIGNAL_COLUMNS
+    ]
     if missing_columns:
         raise ValueError(f"station_barangay_monthly dataset is missing required fields: {', '.join(missing_columns)}")
 
@@ -259,6 +291,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "average_humidity",
         "average_wind_speed",
         "near_water",
+        "verified_risk_area_count",
+        "verified_hazard_count",
+        "verified_risk_count",
+        "high_assessment_count",
+        "blocked_hydrant_count",
+        "combustible_material_count",
+        "informal_settlement_count",
+        "cooking_fire_activity_count",
+        "poor_waste_disposal_count",
+        "previous_fire_prone_count",
+        "poor_access_count",
+        "affected_households",
+        "risk_area_pressure_signal",
     ]
     for column in numeric_columns:
         df[column] = pd.to_numeric(df[column], errors="coerce")
@@ -269,6 +314,11 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         df[column] = df[column].fillna("unknown").astype(str).str.strip().replace("", "unknown")
 
     for column in ["average_humidity", "average_wind_speed", "estimated_damage", "injured_count", "death_count"]:
+        if column not in df.columns:
+            df[column] = 0
+        df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
+
+    for column in RISK_AREA_SIGNAL_COLUMNS:
         if column not in df.columns:
             df[column] = 0
         df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
@@ -312,6 +362,9 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         - df["water_access_flag"] * 0.75
         + df["average_wind_speed"].fillna(0) * 0.15
         - df["average_humidity"].fillna(0) * 0.03
+        + df["risk_area_pressure_signal"] * 0.9
+        + df["high_assessment_count"] * 1.1
+        + df["blocked_hydrant_count"] * 0.8
     )
 
     df["target_high_risk_barangay_month"] = (
@@ -328,6 +381,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "average_humidity",
         "average_wind_speed",
         "water_access_flag",
+        "verified_risk_area_count",
+        "verified_hazard_count",
+        "verified_risk_count",
+        "high_assessment_count",
+        "blocked_hydrant_count",
+        "combustible_material_count",
+        "informal_settlement_count",
+        "cooking_fire_activity_count",
+        "poor_waste_disposal_count",
+        "previous_fire_prone_count",
+        "poor_access_count",
+        "affected_households",
+        "risk_area_pressure_signal",
         "month_sin",
         "month_cos",
         "is_dry_season",
@@ -370,6 +436,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "average_humidity",
             "average_wind_speed",
             "water_access_flag",
+            "verified_risk_area_count",
+            "verified_hazard_count",
+            "verified_risk_count",
+            "high_assessment_count",
+            "blocked_hydrant_count",
+            "combustible_material_count",
+            "informal_settlement_count",
+            "cooking_fire_activity_count",
+            "poor_waste_disposal_count",
+            "previous_fire_prone_count",
+            "poor_access_count",
+            "affected_households",
+            "risk_area_pressure_signal",
             "month_sin",
             "month_cos",
             "is_dry_season",

@@ -3508,6 +3508,103 @@ window.showCitizenToast = function(message, isError = false, duration = 2800) {
     }, duration);
 };
 
+const CITIZEN_NEARBY_ALERT_SEEN_KEY = 'pyrosense:citizen-nearby-alerts:v1';
+const CITIZEN_NEARBY_ALERT_SEEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readCitizenSeenNearbyAlerts() {
+    try {
+        const decoded = JSON.parse(localStorage.getItem(CITIZEN_NEARBY_ALERT_SEEN_KEY) || '{}');
+        const now = Date.now();
+
+        Object.entries(decoded).forEach(([key, timestamp]) => {
+            if (!timestamp || now - Number(timestamp) > CITIZEN_NEARBY_ALERT_SEEN_TTL_MS) {
+                delete decoded[key];
+            }
+        });
+
+        localStorage.setItem(CITIZEN_NEARBY_ALERT_SEEN_KEY, JSON.stringify(decoded));
+        return decoded;
+    } catch (error) {
+        return {};
+    }
+}
+
+function markCitizenNearbyAlertSeen(key) {
+    if (!key) return;
+
+    const seen = readCitizenSeenNearbyAlerts();
+    seen[key] = Date.now();
+    localStorage.setItem(CITIZEN_NEARBY_ALERT_SEEN_KEY, JSON.stringify(seen));
+}
+
+function getCitizenNearbyAlertKey(incident = {}) {
+    return String(
+        incident.incident_id
+        || incident.id
+        || incident.marker_id
+        || `${incident.lat || incident.latitude || 'na'}:${incident.lng || incident.longitude || 'na'}:${incident.created_at || ''}`
+    );
+}
+
+window.requestCitizenEmergencyNotificationPermission = function() {
+    if (!('Notification' in window) || Notification.permission !== 'default') {
+        return;
+    }
+
+    Notification.requestPermission().catch(() => {});
+};
+
+function sendCitizenNearbyBrowserNotification(incident = {}) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
+
+    const distanceLabel = typeof incident.distance_meters === 'number'
+        ? `${Math.round(incident.distance_meters)} meters away`
+        : 'near your area';
+    const statusLabel = incident.incident_status || incident.status || 'Reported';
+
+    try {
+        new Notification('PyroSense nearby fire alert', {
+            body: `Fire incident ${distanceLabel}. Status: ${statusLabel}.`,
+            tag: `pyrosense-citizen-alert-${getCitizenNearbyAlertKey(incident)}`,
+            renotify: true,
+            vibrate: [220, 120, 220],
+            icon: '/icon-192x192.png',
+            badge: '/icon-72x72.png'
+        });
+    } catch (error) {
+        console.warn('Unable to show citizen nearby browser notification:', error);
+    }
+}
+
+function notifyNewCitizenNearbyAlerts(nearbyIncidents = [], options = {}) {
+    if (options.fromCache || !Array.isArray(nearbyIncidents) || !nearbyIncidents.length) {
+        return;
+    }
+
+    const seen = readCitizenSeenNearbyAlerts();
+    nearbyIncidents.forEach((incident) => {
+        const key = getCitizenNearbyAlertKey(incident);
+        if (!key || seen[key]) {
+            return;
+        }
+
+        const status = String(incident.incident_status || incident.status || '').toLowerCase();
+        if (['closed', 'controlled', 'resolved'].includes(status)) {
+            markCitizenNearbyAlertSeen(key);
+            return;
+        }
+
+        const distanceLabel = typeof incident.distance_meters === 'number'
+            ? ` about ${Math.round(incident.distance_meters)}m away`
+            : '';
+        window.showCitizenToast?.(`Nearby fire alert${distanceLabel}. Tap the bell to view details.`, false, 6500);
+        sendCitizenNearbyBrowserNotification(incident);
+        markCitizenNearbyAlertSeen(key);
+    });
+}
+
 window.renderCitizenWeeklyActivity = function(activityData = null) {
     const barsContainer = document.getElementById('citizenWeeklyActivityBars');
     const labelsContainer = document.getElementById('citizenWeeklyActivityLabels');
@@ -3603,11 +3700,16 @@ window.applyCitizenOverviewData = function(data = {}, options = {}) {
     const activeAlerts = Number(summary.active_alerts || 0);
     window.incidentsData = Array.isArray(data.incidents) ? data.incidents : [];
 
+    let mapAlertEntries = [];
     if (typeof window.syncIncidentAlertFeed === 'function') {
-        window.syncIncidentAlertFeed('citizen-nearby-incidents', nearbyIncidents, {
+        mapAlertEntries = window.syncIncidentAlertFeed('citizen-nearby-incidents', nearbyIncidents, {
             titlePrefix: options.fromCache ? 'Cached Emergency Alert' : 'Nearby Emergency Alert',
             maxDistanceMeters: 500
-        });
+        }) || [];
+    }
+
+    if (!mapAlertEntries.length) {
+        notifyNewCitizenNearbyAlerts(nearbyIncidents, options);
     }
 
     const setText = (id, value) => {
@@ -3968,6 +4070,12 @@ window.refreshCitizenOverviewData = async function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     window.renderCitizenWeeklyActivity();
+
+    document.querySelectorAll('#alertsFab, .report-incident-trigger, [data-citizen-risk-hazard-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            window.requestCitizenEmergencyNotificationPermission?.();
+        }, { once: true });
+    });
 });
 
 window.addEventListener('pyrosense:report-synced', function() {

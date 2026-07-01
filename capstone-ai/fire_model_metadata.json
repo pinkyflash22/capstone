@@ -4,7 +4,7 @@
   "dataset_kind": "station_barangay_monthly",
   "target_column": "target_high_risk_barangay_month",
   "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
-  "records_used": 432,
+  "records_used": 384,
   "feature_columns": [
     "station_id",
     "barangay_id",
@@ -13,6 +13,19 @@
     "average_humidity",
     "average_wind_speed",
     "water_access_flag",
+    "verified_risk_area_count",
+    "verified_hazard_count",
+    "verified_risk_count",
+    "high_assessment_count",
+    "blocked_hydrant_count",
+    "combustible_material_count",
+    "informal_settlement_count",
+    "cooking_fire_activity_count",
+    "poor_waste_disposal_count",
+    "previous_fire_prone_count",
+    "poor_access_count",
+    "affected_households",
+    "risk_area_pressure_signal",
     "month_sin",
     "month_cos",
     "is_dry_season",
@@ -33,54 +46,67 @@
   ],
   "global_feature_importance": [
     {
-      "feature": "type_incident",
-      "importance": 0.1419
-    },
-    {
       "feature": "materials",
-      "importance": 0.1327
-    },
-    {
-      "feature": "density",
-      "importance": 0.1082
-    },
-    {
-      "feature": "accesibility",
-      "importance": 0.0895
-    },
-    {
-      "feature": "barangay_pressure_signal",
-      "importance": 0.088
-    },
-    {
-      "feature": "peak_hours",
-      "importance": 0.0842
+      "importance": 0.1547
     },
     {
       "feature": "occupancy",
-      "importance": 0.0797
+      "importance": 0.1419
+    },
+    {
+      "feature": "density",
+      "importance": 0.1285
+    },
+    {
+      "feature": "peak_hours",
+      "importance": 0.1165
+    },
+    {
+      "feature": "barangay_pressure_signal",
+      "importance": 0.0926
+    },
+    {
+      "feature": "accesibility",
+      "importance": 0.084
+    },
+    {
+      "feature": "type_incident",
+      "importance": 0.0765
     },
     {
       "feature": "barangay_name",
-      "importance": 0.0519
-    },
-    {
-      "feature": "temperature_signal",
-      "importance": 0.0347
+      "importance": 0.0386
     },
     {
       "feature": "barangay_id",
-      "importance": 0.0322
+      "importance": 0.029
+    },
+    {
+      "feature": "temperature_signal",
+      "importance": 0.0287
     }
   ],
   "reference_profile": {
     "station_id": 1.0,
-    "barangay_id": 257.0,
+    "barangay_id": 259.0,
     "year": 2024.5,
     "average_temperature": 30.0,
     "average_humidity": 0.0,
     "average_wind_speed": 0.0,
     "water_access_flag": 0.0,
+    "verified_risk_area_count": 0.0,
+    "verified_hazard_count": 0.0,
+    "verified_risk_count": 0.0,
+    "high_assessment_count": 0.0,
+    "blocked_hydrant_count": 0.0,
+    "combustible_material_count": 0.0,
+    "informal_settlement_count": 0.0,
+    "cooking_fire_activity_count": 0.0,
+    "poor_waste_disposal_count": 0.0,
+    "previous_fire_prone_count": 0.0,
+    "poor_access_count": 0.0,
+    "affected_households": 0.0,
+    "risk_area_pressure_signal": 0.0,
     "month_sin": -0.0,
     "month_cos": -0.0,
     "is_dry_season": 0.5,
@@ -100,28 +126,28 @@
     "occupancy": "mixed-use"
   },
   "metrics": {
-    "train_rows": 324,
-    "test_rows": 108,
-    "accuracy": 0.9722,
-    "roc_auc": 0.9048,
+    "train_rows": 288,
+    "test_rows": 96,
+    "accuracy": 0.9688,
+    "roc_auc": 0.957,
     "precision": 0.0,
     "recall": 0.0,
     "f1_score": 0.0,
-    "brier_score": 0.0226,
-    "cross_val_roc_auc_mean": 0.9349,
+    "brier_score": 0.0248,
+    "cross_val_roc_auc_mean": 0.9557,
     "cross_val_roc_auc_scores": [
-      0.8333,
-      0.9643,
-      0.9583,
-      0.9226,
-      0.996
+      0.96,
+      0.92,
+      0.9505,
+      0.955,
+      0.9932
     ],
     "classification_report": {
       "0": {
-        "precision": 0.9722222222222222,
+        "precision": 0.96875,
         "recall": 1.0,
-        "f1-score": 0.9859154929577465,
-        "support": 105.0
+        "f1-score": 0.9841269841269841,
+        "support": 93.0
       },
       "1": {
         "precision": 0.0,
@@ -129,40 +155,40 @@
         "f1-score": 0.0,
         "support": 3.0
       },
-      "accuracy": 0.9722222222222222,
+      "accuracy": 0.96875,
       "macro avg": {
-        "precision": 0.4861111111111111,
+        "precision": 0.484375,
         "recall": 0.5,
-        "f1-score": 0.49295774647887325,
-        "support": 108.0
+        "f1-score": 0.49206349206349204,
+        "support": 96.0
       },
       "weighted avg": {
-        "precision": 0.945216049382716,
-        "recall": 0.9722222222222222,
-        "f1-score": 0.9585289514866979,
-        "support": 108.0
+        "precision": 0.9384765625,
+        "recall": 0.96875,
+        "f1-score": 0.9533730158730158,
+        "support": 96.0
       }
     },
     "regression_metrics": {
       "predicted_incident_count": {
         "target_column": "incident_count",
-        "train_rows": 324,
-        "test_rows": 108,
-        "mae": 0.0292,
-        "rmse": 0.1173,
-        "r2_score": 0.2434
+        "train_rows": 288,
+        "test_rows": 96,
+        "mae": 0.0215,
+        "rmse": 0.1335,
+        "r2_score": 0.1269
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
-        "train_rows": 324,
-        "test_rows": 108,
-        "mae": 4379.6342,
-        "rmse": 27731.7579,
-        "r2_score": -32.5335
+        "train_rows": 288,
+        "test_rows": 96,
+        "mae": 1022.2417,
+        "rmse": 5880.382,
+        "r2_score": -0.2954
       }
     }
   },
-  "trained_at": "2026-06-19T02:43:00.578425+00:00",
+  "trained_at": "2026-06-30T23:38:10.575441+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

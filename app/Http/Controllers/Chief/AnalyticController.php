@@ -17,6 +17,7 @@ use App\Support\BarangayNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -329,6 +330,48 @@ class AnalyticController extends Controller
         }
 
         return $this->runAIPredictiveAnalysis($request);
+    }
+
+    public function retrainForecastModel()
+    {
+        try {
+            @set_time_limit(180);
+            @ini_set('max_execution_time', '180');
+
+            $exitCode = Artisan::call('ai:train-forecast-model', [
+                '--dataset' => 'capstone-ai/station_barangay_monthly_db.json',
+                '--export' => true,
+            ]);
+
+            $output = trim(Artisan::output());
+
+            if ($exitCode !== 0) {
+                Log::warning('Manual forecast model retrain failed.', [
+                    'exit_code' => $exitCode,
+                    'output' => $output,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Model retraining failed. Check server logs for details.',
+                    'output' => $output,
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Forecast model retrained successfully using the latest database export.',
+                'output' => $output,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Manual forecast model retrain error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to retrain the model on this server.',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
     }
     
     /**
@@ -1171,17 +1214,63 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $occupancy = $stationHistoricalRow->occupancy ?: 'residential';
         $accessibility = $stationHistoricalRow->accesibility ?: 'moderate access';
 
-        $nearWater = DB::table('risk_areas')
+        $riskAreaSignals = DB::table('risk_areas')
             ->join('barangay_halls', 'risk_areas.barangay_hall_id', '=', 'barangay_halls.barangay_hall_id')
             ->where('risk_areas.station_id', $stationId)
             ->where('barangay_halls.barangay_id', $barangay->barangay_id)
             ->where(function ($query) {
-                $query->where('risk_areas.near_water_source', 1)
-                    ->orWhere('risk_areas.near_hydrant', 1);
+                $query->where('risk_areas.review_status', 'approved')
+                    ->orWhere('risk_areas.status', 'verified');
             })
-            ->exists()
-            ? 1
-            : (int) ($stationHistoricalRow->near_water ?? 0);
+            ->where(function ($query) {
+                $query->whereNull('risk_areas.review_type')
+                    ->orWhere('risk_areas.review_type', '!=', 'delete');
+            })
+            ->selectRaw("
+                MAX(CASE WHEN risk_areas.near_water_source = 1 OR risk_areas.near_hydrant = 1 THEN 1 ELSE 0 END) as near_water,
+                COUNT(*) as verified_risk_area_count,
+                SUM(CASE WHEN risk_areas.entry_type = 'hazard' THEN 1 ELSE 0 END) as verified_hazard_count,
+                SUM(CASE WHEN risk_areas.entry_type = 'risk' OR risk_areas.entry_type IS NULL THEN 1 ELSE 0 END) as verified_risk_count,
+                SUM(CASE WHEN risk_areas.assessment_level = 'high' THEN 1 ELSE 0 END) as high_assessment_count,
+                SUM(CASE WHEN risk_areas.blocked_hydrant = 1 THEN 1 ELSE 0 END) as blocked_hydrant_count,
+                SUM(CASE WHEN risk_areas.combustible_materials_present = 1 THEN 1 ELSE 0 END) as combustible_material_count,
+                SUM(CASE WHEN risk_areas.informal_settlement = 1 THEN 1 ELSE 0 END) as informal_settlement_count,
+                SUM(CASE WHEN risk_areas.cooking_fire_prone_activity = 1 THEN 1 ELSE 0 END) as cooking_fire_activity_count,
+                SUM(CASE WHEN risk_areas.poor_waste_disposal = 1 THEN 1 ELSE 0 END) as poor_waste_disposal_count,
+                SUM(CASE WHEN risk_areas.previous_fire_prone_location = 1 THEN 1 ELSE 0 END) as previous_fire_prone_count,
+                SUM(CASE WHEN risk_areas.road_accessibility IN ('difficult', 'very_difficult') THEN 1 ELSE 0 END) as poor_access_count,
+                COALESCE(SUM(risk_areas.estimated_affected_households), 0) as affected_households
+            ")
+            ->first();
+
+        $verifiedRiskAreaCount = (int) ($riskAreaSignals->verified_risk_area_count ?? 0);
+        $verifiedHazardCount = (int) ($riskAreaSignals->verified_hazard_count ?? 0);
+        $verifiedRiskCount = (int) ($riskAreaSignals->verified_risk_count ?? 0);
+        $highAssessmentCount = (int) ($riskAreaSignals->high_assessment_count ?? 0);
+        $blockedHydrantCount = (int) ($riskAreaSignals->blocked_hydrant_count ?? 0);
+        $combustibleMaterialCount = (int) ($riskAreaSignals->combustible_material_count ?? 0);
+        $informalSettlementCount = (int) ($riskAreaSignals->informal_settlement_count ?? 0);
+        $cookingFireActivityCount = (int) ($riskAreaSignals->cooking_fire_activity_count ?? 0);
+        $poorWasteDisposalCount = (int) ($riskAreaSignals->poor_waste_disposal_count ?? 0);
+        $previousFireProneCount = (int) ($riskAreaSignals->previous_fire_prone_count ?? 0);
+        $poorAccessCount = (int) ($riskAreaSignals->poor_access_count ?? 0);
+        $affectedHouseholds = (int) ($riskAreaSignals->affected_households ?? 0);
+        $riskAreaPressureSignal = round(
+            ($verifiedRiskAreaCount * 0.8)
+            + ($verifiedHazardCount * 1.1)
+            + ($highAssessmentCount * 2.5)
+            + ($blockedHydrantCount * 1.8)
+            + ($combustibleMaterialCount * 1.6)
+            + ($informalSettlementCount * 1.3)
+            + ($cookingFireActivityCount * 1.2)
+            + ($poorWasteDisposalCount * 0.8)
+            + ($previousFireProneCount * 1.6)
+            + ($poorAccessCount * 1.4)
+            + min($affectedHouseholds / 25, 5),
+            4
+        );
+
+        $nearWater = (int) ($riskAreaSignals->near_water ?? $stationHistoricalRow->near_water ?? 0);
 
         return [
             'station_id' => $stationId,
@@ -1197,6 +1286,19 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'weather_condition' => $weatherCondition,
             'season' => $stationHistoricalRow->season,
             'near_water' => $nearWater,
+            'verified_risk_area_count' => $verifiedRiskAreaCount,
+            'verified_hazard_count' => $verifiedHazardCount,
+            'verified_risk_count' => $verifiedRiskCount,
+            'high_assessment_count' => $highAssessmentCount,
+            'blocked_hydrant_count' => $blockedHydrantCount,
+            'combustible_material_count' => $combustibleMaterialCount,
+            'informal_settlement_count' => $informalSettlementCount,
+            'cooking_fire_activity_count' => $cookingFireActivityCount,
+            'poor_waste_disposal_count' => $poorWasteDisposalCount,
+            'previous_fire_prone_count' => $previousFireProneCount,
+            'poor_access_count' => $poorAccessCount,
+            'affected_households' => $affectedHouseholds,
+            'risk_area_pressure_signal' => $riskAreaPressureSignal,
             'density' => $density,
             'materials' => $materials,
             'peak_hours' => $peakHours,

@@ -341,6 +341,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
+        Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
         Route::get('/api/analyses/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysis']);
         Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);

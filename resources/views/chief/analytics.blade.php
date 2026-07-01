@@ -606,7 +606,7 @@
 
             <div class="stat-card" style="margin-bottom: 24px;">
                 <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-user"></i> Select Location for Analysis</h3>
-                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 16px;">
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto auto; gap: 16px;">
                     <select id="stationSelect" class="form-select">
                         <option value="">Loading locations...</option>
                     </select>
@@ -618,6 +618,9 @@
                     </button>
                     <button id="predictNextMonthBtn" style="background: #f59e0b; color: white; padding: 10px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
                         <i class="fa-solid fa-calendar-plus"></i> Predict Next Month
+                    </button>
+                    <button id="retrainModelBtn" type="button" style="background: #0f766e; color: white; padding: 10px 18px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                        <i class="fa-solid fa-rotate"></i> Retrain Model
                     </button>
                 </div>
                 <div style="margin-top: 16px;">
@@ -1753,6 +1756,46 @@
             if (confirm('Call emergency services (911)?')) window.location.href = 'tel:911';
         }
 
+        async function retrainForecastModel() {
+            const button = document.getElementById('retrainModelBtn');
+            if (!confirm('Retrain the prediction model using the latest database records? This can take a few moments.')) {
+                return;
+            }
+
+            const originalHtml = button?.innerHTML;
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = '0.7';
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Retraining...';
+            }
+
+            try {
+                const response = await fetch('/station-admin/api/retrain-forecast-model', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Model retraining failed.');
+                }
+
+                alert(result.message || 'Forecast model retrained successfully.');
+            } catch (error) {
+                alert(error.message || 'Unable to retrain the forecast model.');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.style.opacity = '';
+                    button.innerHTML = originalHtml;
+                }
+            }
+        }
+
         document.getElementById('analyzeBtn')?.addEventListener('click', () => {
             const stationSelect = document.getElementById('stationSelect');
             if (stationSelect.value) runAIAnalysis(stationSelect.value, 'current_month');
@@ -1764,6 +1807,8 @@
             if (stationSelect.value) runAIAnalysis(stationSelect.value, 'next_month');
             else alert('Please select a location');
         });
+
+        document.getElementById('retrainModelBtn')?.addEventListener('click', retrainForecastModel);
 
         document.getElementById('stationSelect')?.addEventListener('change', (e) => {
             populateBarangaySelectFromStation(e.target.value);

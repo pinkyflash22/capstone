@@ -37,11 +37,35 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
         ->leftJoin('barangays', 'full_addresses.barangay_id', '=', 'barangays.barangay_id')
         ->pluck('barangays.city_id', 'stations.station_id');
 
-    $riskAreaWaterByBarangay = DB::table('risk_areas')
+    $riskAreaSignalsByBarangay = DB::table('risk_areas')
         ->join('barangay_halls', 'risk_areas.barangay_hall_id', '=', 'barangay_halls.barangay_hall_id')
-        ->selectRaw('barangay_halls.barangay_id, MAX(CASE WHEN risk_areas.near_water_source = 1 OR risk_areas.near_hydrant = 1 THEN 1 ELSE 0 END) as near_water')
+        ->where(function ($query) {
+            $query->where('risk_areas.review_status', 'approved')
+                ->orWhere('risk_areas.status', 'verified');
+        })
+        ->where(function ($query) {
+            $query->whereNull('risk_areas.review_type')
+                ->orWhere('risk_areas.review_type', '!=', 'delete');
+        })
+        ->selectRaw("
+            barangay_halls.barangay_id,
+            MAX(CASE WHEN risk_areas.near_water_source = 1 OR risk_areas.near_hydrant = 1 THEN 1 ELSE 0 END) as near_water,
+            COUNT(*) as verified_risk_area_count,
+            SUM(CASE WHEN risk_areas.entry_type = 'hazard' THEN 1 ELSE 0 END) as verified_hazard_count,
+            SUM(CASE WHEN risk_areas.entry_type = 'risk' OR risk_areas.entry_type IS NULL THEN 1 ELSE 0 END) as verified_risk_count,
+            SUM(CASE WHEN risk_areas.assessment_level = 'high' THEN 1 ELSE 0 END) as high_assessment_count,
+            SUM(CASE WHEN risk_areas.blocked_hydrant = 1 THEN 1 ELSE 0 END) as blocked_hydrant_count,
+            SUM(CASE WHEN risk_areas.combustible_materials_present = 1 THEN 1 ELSE 0 END) as combustible_material_count,
+            SUM(CASE WHEN risk_areas.informal_settlement = 1 THEN 1 ELSE 0 END) as informal_settlement_count,
+            SUM(CASE WHEN risk_areas.cooking_fire_prone_activity = 1 THEN 1 ELSE 0 END) as cooking_fire_activity_count,
+            SUM(CASE WHEN risk_areas.poor_waste_disposal = 1 THEN 1 ELSE 0 END) as poor_waste_disposal_count,
+            SUM(CASE WHEN risk_areas.previous_fire_prone_location = 1 THEN 1 ELSE 0 END) as previous_fire_prone_count,
+            SUM(CASE WHEN risk_areas.road_accessibility IN ('difficult', 'very_difficult') THEN 1 ELSE 0 END) as poor_access_count,
+            COALESCE(SUM(risk_areas.estimated_affected_households), 0) as affected_households
+        ")
         ->groupBy('barangay_halls.barangay_id')
-        ->pluck('near_water', 'barangay_halls.barangay_id');
+        ->get()
+        ->keyBy('barangay_id');
 
     $barangaysByCity = DB::table('barangays')
         ->select('barangay_id', 'barangay_name', 'city_id')
@@ -221,10 +245,38 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
                 ->keys()
                 ->first();
 
+            $riskSignals = $riskAreaSignalsByBarangay[(int) $barangay->barangay_id] ?? null;
+            $verifiedRiskAreaCount = (int) ($riskSignals->verified_risk_area_count ?? 0);
+            $verifiedHazardCount = (int) ($riskSignals->verified_hazard_count ?? 0);
+            $verifiedRiskCount = (int) ($riskSignals->verified_risk_count ?? 0);
+            $highAssessmentCount = (int) ($riskSignals->high_assessment_count ?? 0);
+            $blockedHydrantCount = (int) ($riskSignals->blocked_hydrant_count ?? 0);
+            $combustibleMaterialCount = (int) ($riskSignals->combustible_material_count ?? 0);
+            $informalSettlementCount = (int) ($riskSignals->informal_settlement_count ?? 0);
+            $cookingFireActivityCount = (int) ($riskSignals->cooking_fire_activity_count ?? 0);
+            $poorWasteDisposalCount = (int) ($riskSignals->poor_waste_disposal_count ?? 0);
+            $previousFireProneCount = (int) ($riskSignals->previous_fire_prone_count ?? 0);
+            $poorAccessCount = (int) ($riskSignals->poor_access_count ?? 0);
+            $affectedHouseholds = (int) ($riskSignals->affected_households ?? 0);
+            $riskAreaPressureSignal = round(
+                ($verifiedRiskAreaCount * 0.8)
+                + ($verifiedHazardCount * 1.1)
+                + ($highAssessmentCount * 2.5)
+                + ($blockedHydrantCount * 1.8)
+                + ($combustibleMaterialCount * 1.6)
+                + ($informalSettlementCount * 1.3)
+                + ($cookingFireActivityCount * 1.2)
+                + ($poorWasteDisposalCount * 0.8)
+                + ($previousFireProneCount * 1.6)
+                + ($poorAccessCount * 1.4)
+                + min($affectedHouseholds / 25, 5),
+                4
+            );
+
             $riskLevel = 'low';
-            if ($incidentCount >= 3 || $estimatedDamage >= 250000 || $deathCount > 0) {
+            if ($incidentCount >= 3 || $estimatedDamage >= 250000 || $deathCount > 0 || $highAssessmentCount >= 2 || $riskAreaPressureSignal >= 7) {
                 $riskLevel = 'high';
-            } elseif ($incidentCount >= 1 || $estimatedDamage >= 50000 || $injuredCount > 0) {
+            } elseif ($incidentCount >= 1 || $estimatedDamage >= 50000 || $injuredCount > 0 || $verifiedRiskAreaCount >= 2 || $riskAreaPressureSignal >= 3) {
                 $riskLevel = 'medium';
             }
 
@@ -244,7 +296,20 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
                 'average_wind_speed' => $windAverage !== null ? round((float) $windAverage, 2) : null,
                 'weather_condition' => $weatherMode ?: 'unknown',
                 'season' => $row->season,
-                'near_water' => (int) ($riskAreaWaterByBarangay[(int) $barangay->barangay_id] ?? $row->near_water ?? 0),
+                'near_water' => (int) ($riskSignals->near_water ?? $row->near_water ?? 0),
+                'verified_risk_area_count' => $verifiedRiskAreaCount,
+                'verified_hazard_count' => $verifiedHazardCount,
+                'verified_risk_count' => $verifiedRiskCount,
+                'high_assessment_count' => $highAssessmentCount,
+                'blocked_hydrant_count' => $blockedHydrantCount,
+                'combustible_material_count' => $combustibleMaterialCount,
+                'informal_settlement_count' => $informalSettlementCount,
+                'cooking_fire_activity_count' => $cookingFireActivityCount,
+                'poor_waste_disposal_count' => $poorWasteDisposalCount,
+                'previous_fire_prone_count' => $previousFireProneCount,
+                'poor_access_count' => $poorAccessCount,
+                'affected_households' => $affectedHouseholds,
+                'risk_area_pressure_signal' => $riskAreaPressureSignal,
                 'density' => $row->density ?: 'medium',
                 'materials' => $row->materials ?: 'mixed',
                 'peak_hours' => $peakHours ?: ($row->peak_hours ?: 'unknown'),
@@ -279,6 +344,19 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
             'weather_condition',
             'season',
             'near_water',
+            'verified_risk_area_count',
+            'verified_hazard_count',
+            'verified_risk_count',
+            'high_assessment_count',
+            'blocked_hydrant_count',
+            'combustible_material_count',
+            'informal_settlement_count',
+            'cooking_fire_activity_count',
+            'poor_waste_disposal_count',
+            'previous_fire_prone_count',
+            'poor_access_count',
+            'affected_households',
+            'risk_area_pressure_signal',
             'density',
             'materials',
             'peak_hours',
