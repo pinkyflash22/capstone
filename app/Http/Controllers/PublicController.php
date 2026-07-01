@@ -25,6 +25,7 @@ use App\Support\UserActivityLogger;
 use App\Support\RiskAreaFollowUpDispatcher;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
@@ -759,6 +760,89 @@ class PublicController extends Controller
             ->route('citizen.dashboard', ['section' => 'profile'])
             ->with('success', 'Profile updated successfully.')
             ->with('open_section', 'profile');
+    }
+
+    public function updateProfileEmail(Request $request)
+    {
+        $user = User::findOrFail(Auth::id());
+
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
+            'current_password' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+                'errors' => [
+                    'current_password' => ['Current password is incorrect.'],
+                ],
+            ], 422);
+        }
+
+        if ($user->email === $validated['email']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a different email address.',
+                'errors' => [
+                    'email' => ['Please enter a different email address.'],
+                ],
+            ], 422);
+        }
+
+        $user->email = $validated['email'];
+        $user->save();
+
+        UserActivityLogger::log('updated email address', Auth::user()?->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email address updated successfully.',
+            'user' => [
+                'email' => $user->email,
+            ],
+        ]);
+    }
+
+    public function updateProfilePassword(Request $request)
+    {
+        $user = User::findOrFail(Auth::id());
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+                'errors' => [
+                    'current_password' => ['Current password is incorrect.'],
+                ],
+            ], 422);
+        }
+
+        if (Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please choose a password different from your current password.',
+                'errors' => [
+                    'password' => ['Please choose a password different from your current password.'],
+                ],
+            ], 422);
+        }
+
+        $user->password = Hash::make($validated['password']);
+        $user->save();
+
+        UserActivityLogger::log('updated password', Auth::user()?->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully.',
+        ]);
     }
 
 

@@ -1,4 +1,5 @@
 @import "./styles.css";
+@import "./system-polish.css";
 
 @tailwind base;
 @tailwind components;

@@ -606,7 +606,7 @@
 
             <div class="stat-card" style="margin-bottom: 24px;">
                 <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-user"></i> Select Location for Analysis</h3>
-                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto auto; gap: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: stretch;">
                     <select id="stationSelect" class="form-select">
                         <option value="">Loading locations...</option>
                     </select>

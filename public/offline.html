@@ -56,6 +56,14 @@
             color: var(--primary);
             font-size: 30px;
             font-weight: 800;
+            overflow: hidden;
+        }
+
+        .offline-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 10px;
         }
 
         .offline-eyebrow {
@@ -146,7 +154,7 @@
 </head>
 <body>
     <main class="offline-card">
-        <div class="offline-logo">P</div>
+        <div class="offline-logo"><img src="/logo.png" alt="PyroSense logo"></div>
         <div class="offline-eyebrow">Offline Ready</div>
         <h1>PyroSense is still available offline.</h1>
         <p>The network is currently unavailable, but your cached landing page, saved dashboard data, and queued reports can still be used.</p>

@@ -1472,11 +1472,11 @@ button.text-orange-600:hover {
 
 .report-fab {
   position: fixed;
-  right: 20px;
+  right: 28px;
   bottom: 98px;
   z-index: 500;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -1500,7 +1500,7 @@ button.text-orange-600:hover {
 }
 
 .report-fab-icon {
-  font-size: 22px;
+  font-size: 19px;
   line-height: 1;
 }
 
@@ -1647,8 +1647,8 @@ button.alerts-panel-item {
   }
   .alerts-panel   { width: 100vw; max-width: 100vw; }
   .alerts-fab     { bottom: 20px; right: 16px; width: 50px; height: 50px; }
-  .report-fab     { bottom: 76px; right: 10px; width: 58px; height: 58px; }
-  .report-fab-icon { font-size: 18px; }
+  .report-fab     { bottom: 76px; right: 16px; width: 50px; height: 50px; }
+  .report-fab-icon { font-size: 16px; }
 
   .lector-kpi-card    { padding: 12px; gap: 10px; }
   .lector-kpi-value   { font-size: 18px; }

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260630-3';
+const CACHE_VERSION = 'pyrosense-pwa-v20260701-1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -15,6 +15,7 @@ const APP_SHELL_URLS = [
     '/pwa/quick-report',
     '/manifest.json',
     OFFLINE_URL,
+    '/logo.png',
     '/icon-72x72.png',
     '/icon-192x192.png',
     '/icon-512x512.png',
@@ -183,7 +184,7 @@ async function cacheFirst(request, cacheName) {
         return response;
     } catch (error) {
         if (request.destination === 'image') {
-            const fallbackImage = await caches.match('/icon-192x192.png');
+            const fallbackImage = await caches.match('/logo.png') || await caches.match('/icon-192x192.png');
             if (fallbackImage) {
                 return fallbackImage;
             }

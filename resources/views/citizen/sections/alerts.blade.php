@@ -10,119 +10,842 @@
         ->values();
 @endphp
 
-<div id="section-alerts" class="content-section">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-6">
-        <div>
-            <h1 class="text-2xl lg:text-3xl font-bold text-slate-800">Areas of Concern</h1>
-            <p class="text-sm text-slate-500 mt-1">Track active fire alerts near you, review your submitted reports, and inspect mapped risk or hazard factors.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                <i class="fa-solid fa-fire"></i>
-                <span id="areasConcernActiveAlertsValue">{{ $nearbyAlertCollection->count() }}</span> active fire alerts
-            </span>
-            <button
-                type="button"
-                id="openCitizenReportsHistoryBtn"
-                class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#c63d26] to-[#e39b17] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(198,61,38,0.22)] transition hover:brightness-105"
-            >
-                <i class="fa-solid fa-clock-rotate-left"></i>
-                View My Reports History
-            </button>
-        </div>
-    </div>
+<style>
+    #section-alerts.areas-concern-page {
+        --aoc-red: #c63d26;
+        --aoc-red-dark: #9f2f1d;
+        --aoc-orange: #e39b17;
+        --aoc-cream: #fff8ed;
+        --aoc-ink: #132033;
+        --aoc-muted: #64748b;
+        --aoc-line: rgba(198, 61, 38, 0.14);
+        --aoc-shadow: 0 22px 54px rgba(88, 43, 20, 0.1);
+        width: min(100%, 1240px);
+        margin-inline: auto;
+        padding: clamp(0.85rem, 1.45vw, 1.35rem);
+        padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+        color: var(--aoc-ink);
+    }
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-        <div class="rounded-3xl border border-red-100 bg-gradient-to-br from-white via-red-50 to-orange-50 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
+    #section-alerts .aoc-shell {
+        display: grid;
+        gap: clamp(1rem, 2vw, 1.35rem);
+    }
+
+    #section-alerts .aoc-hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(198, 61, 38, 0.16);
+        border-radius: 2rem;
+        background:
+            radial-gradient(circle at 92% 12%, rgba(227, 155, 23, 0.24), transparent 16rem),
+            linear-gradient(135deg, rgba(255, 248, 237, 0.98), rgba(255, 255, 255, 0.96));
+        box-shadow: var(--aoc-shadow);
+        padding: clamp(1.1rem, 3vw, 1.75rem);
+    }
+
+    #section-alerts .aoc-hero::before {
+        content: '';
+        position: absolute;
+        inset: auto -4rem -6rem auto;
+        width: 15rem;
+        height: 15rem;
+        border-radius: 999px;
+        background: rgba(198, 61, 38, 0.08);
+        pointer-events: none;
+    }
+
+    #section-alerts .aoc-hero-grid {
+        position: relative;
+        display: grid;
+        gap: 1.1rem;
+    }
+
+    #section-alerts .aoc-eyebrow,
+    #section-alerts .aoc-section-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        width: fit-content;
+        border-radius: 999px;
+        background: rgba(198, 61, 38, 0.1);
+        color: var(--aoc-red-dark);
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.7rem;
+    }
+
+    #section-alerts .aoc-title {
+        margin-top: 0.8rem;
+        color: var(--aoc-ink);
+        font-size: clamp(1.85rem, 6vw, 3rem);
+        font-weight: 900;
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+    }
+
+    #section-alerts .aoc-subtitle {
+        max-width: 45rem;
+        margin-top: 0.75rem;
+        color: var(--aoc-muted);
+        font-size: clamp(0.94rem, 2.4vw, 1.03rem);
+        line-height: 1.72;
+    }
+
+    #section-alerts .aoc-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    #section-alerts .aoc-alert-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-height: 44px;
+        border-radius: 999px;
+        border: 1px solid rgba(239, 68, 68, 0.16);
+        background: linear-gradient(135deg, #fff1f2, #fff7ed);
+        color: #b91c1c;
+        padding: 0.72rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 850;
+        box-shadow: 0 12px 30px rgba(198, 61, 38, 0.1);
+    }
+
+    #section-alerts .aoc-history-btn {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.62rem;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, var(--aoc-red), var(--aoc-orange));
+        color: #fff;
+        padding: 0.82rem 1.1rem;
+        font-size: 0.92rem;
+        font-weight: 850;
+        box-shadow: 0 16px 34px rgba(198, 61, 38, 0.24);
+    }
+
+    #section-alerts .aoc-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    #section-alerts .aoc-stat-card,
+    #section-alerts .aoc-panel,
+    #section-alerts .aoc-map-card,
+    #section-alerts .aoc-snapshot {
+        border: 1px solid rgba(120, 53, 15, 0.11);
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 18px 40px rgba(88, 43, 20, 0.075);
+    }
+
+    #section-alerts .aoc-stat-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.6rem;
+        padding: 1.1rem;
+    }
+
+    #section-alerts .aoc-stat-card::after {
+        content: '';
+        position: absolute;
+        inset: auto -2rem -3rem auto;
+        width: 8rem;
+        height: 8rem;
+        border-radius: 999px;
+        background: var(--aoc-stat-glow, rgba(198, 61, 38, 0.08));
+    }
+
+    #section-alerts .aoc-stat-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.8rem;
+    }
+
+    #section-alerts .aoc-stat-label {
+        color: var(--aoc-muted);
+        font-size: 0.82rem;
+        font-weight: 750;
+    }
+
+    #section-alerts .aoc-stat-value {
+        margin-top: 0.42rem;
+        color: var(--aoc-ink);
+        font-size: clamp(2rem, 6vw, 2.65rem);
+        font-weight: 950;
+        letter-spacing: -0.055em;
+        line-height: 1;
+    }
+
+    #section-alerts .aoc-stat-icon {
+        display: inline-flex;
+        width: 3rem;
+        height: 3rem;
+        flex: 0 0 3rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1.05rem;
+        background: var(--aoc-icon-bg, #fff1f2);
+        color: var(--aoc-icon-color, #dc2626);
+        font-size: 1.1rem;
+    }
+
+    #section-alerts .aoc-stat-copy {
+        position: relative;
+        z-index: 1;
+        margin-top: 0.9rem;
+        color: var(--aoc-muted);
+        font-size: 0.78rem;
+        line-height: 1.55;
+    }
+
+    #section-alerts .aoc-panel,
+    #section-alerts .aoc-map-card,
+    #section-alerts .aoc-snapshot {
+        overflow: hidden;
+        border-radius: 1.75rem;
+    }
+
+    #section-alerts .aoc-panel-head,
+    #section-alerts .aoc-map-head,
+    #section-alerts .aoc-snapshot-head {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        background: linear-gradient(135deg, rgba(255, 248, 237, 0.74), rgba(255, 255, 255, 0.96));
+        padding: 1.1rem;
+    }
+
+    #section-alerts .aoc-panel-head-row,
+    #section-alerts .aoc-map-head-row {
+        display: grid;
+        gap: 1rem;
+    }
+
+    #section-alerts .aoc-section-title {
+        margin-top: 0.55rem;
+        color: var(--aoc-ink);
+        font-size: clamp(1.1rem, 3vw, 1.35rem);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+    }
+
+    #section-alerts .aoc-section-copy {
+        margin-top: 0.35rem;
+        color: var(--aoc-muted);
+        font-size: 0.88rem;
+        line-height: 1.62;
+    }
+
+    #section-alerts .aoc-filter-row {
+        display: grid;
+        gap: 0.65rem;
+    }
+
+    #section-alerts .aoc-search-wrap {
+        position: relative;
+    }
+
+    #section-alerts .aoc-search-icon {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #cbd5e1;
+        font-size: 0.85rem;
+    }
+
+    #section-alerts .aoc-input,
+    #section-alerts .aoc-select {
+        width: 100%;
+        min-height: 46px;
+        border-radius: 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: #fff;
+        color: #334155;
+        font-size: 0.9rem;
+        outline: none;
+    }
+
+    #section-alerts .aoc-input {
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+    }
+
+    #section-alerts .aoc-select {
+        padding: 0.75rem 0.95rem;
+    }
+
+    #section-alerts .aoc-filter-control {
+        position: relative;
+        min-width: 0;
+    }
+
+    #section-alerts .aoc-filter-icon {
+        display: none;
+    }
+
+    #section-alerts .aoc-filter-button,
+    #section-alerts .aoc-filter-menu {
+        display: none;
+    }
+
+    #section-alerts .aoc-map-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.1rem;
+    }
+
+    #section-alerts .aoc-map-body,
+    #section-alerts .aoc-snapshot-body {
+        padding: 1.1rem;
+    }
+
+    #section-alerts #areasConcernRiskMap {
+        min-height: 24rem;
+        border-radius: 1.4rem !important;
+        border-color: rgba(198, 61, 38, 0.14) !important;
+    }
+
+    #section-alerts .aoc-map-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: fit-content;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #475569;
+        padding: 0.55rem 0.8rem;
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+    }
+
+    #section-alerts .aoc-mini-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    #section-alerts .aoc-mini-card {
+        border-radius: 1.25rem;
+        padding: 1rem;
+        background: linear-gradient(135deg, #fff7ed, #fff);
+        border: 1px solid rgba(198, 61, 38, 0.1);
+    }
+
+    #section-alerts .aoc-alert-card {
+        padding: 1rem;
+        transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    #section-alerts .aoc-alert-card:hover {
+        background: rgba(255, 247, 237, 0.58);
+    }
+
+    #section-alerts .aoc-alert-main {
+        display: grid;
+        gap: 1rem;
+    }
+
+    #section-alerts .aoc-alert-identity {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+        min-width: 0;
+    }
+
+    #section-alerts .aoc-alert-icon {
+        display: inline-flex;
+        width: 2.8rem;
+        height: 2.8rem;
+        flex: 0 0 2.8rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, #fee2e2, #ffedd5);
+        color: #dc2626;
+        box-shadow: 0 12px 24px rgba(220, 38, 38, 0.12);
+    }
+
+    #section-alerts .aoc-alert-title {
+        color: var(--aoc-ink);
+        font-size: 1rem;
+        font-weight: 850;
+    }
+
+    #section-alerts .aoc-alert-address {
+        margin-top: 0.22rem;
+        color: var(--aoc-muted);
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    #section-alerts .aoc-alert-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        color: var(--aoc-muted);
+        font-size: 0.76rem;
+    }
+
+    #section-alerts .aoc-alert-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        border-radius: 999px;
+        background: #f8fafc;
+        padding: 0.4rem 0.62rem;
+    }
+
+    #section-alerts .aoc-alert-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
+
+    #section-alerts .aoc-action-btn {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.38rem;
+        border-radius: 0.9rem;
+        padding: 0.6rem 0.82rem;
+        font-size: 0.84rem;
+        font-weight: 800;
+        transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    #section-alerts .aoc-action-btn--primary {
+        background: #fff7ed;
+        color: #c2410c;
+    }
+
+    #section-alerts .aoc-action-btn--muted {
+        background: #f8fafc;
+        color: #475569;
+    }
+
+    #section-alerts .aoc-action-btn--map {
+        background: #ecfeff;
+        color: #0f766e;
+    }
+
+    #section-alerts .aoc-recent-report {
+        display: block;
+        width: 100%;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: linear-gradient(135deg, #fff, #fffaf5);
+        padding: 1rem;
+        text-align: left;
+        transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    #section-alerts .aoc-recent-report:hover {
+        border-color: rgba(198, 61, 38, 0.22);
+        background: #fff7ed;
+    }
+
+    @media (min-width: 760px) {
+        #section-alerts .aoc-hero-grid,
+        #section-alerts .aoc-panel-head-row,
+        #section-alerts .aoc-map-head-row {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+        }
+
+        #section-alerts .aoc-filter-row {
+            grid-template-columns: minmax(15rem, 1fr) 11rem 11rem;
+            align-items: center;
+        }
+
+        #section-alerts .aoc-alert-main {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+        }
+
+        #section-alerts .aoc-alert-actions {
+            justify-content: flex-end;
+        }
+    }
+
+    @media (max-width: 900px) {
+        #section-alerts .aoc-map-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 520px) {
+        #section-alerts.areas-concern-page {
+            width: 100%;
+            padding: 1rem;
+            padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #section-alerts .aoc-shell {
+            gap: 1rem;
+        }
+
+        #section-alerts .aoc-hero {
+            border-radius: 1.4rem;
+            margin-inline: 0;
+            padding: 1.35rem 1rem 1.05rem;
+            box-shadow: none;
+            background:
+                radial-gradient(circle at 88% 20%, rgba(227, 155, 23, 0.2), transparent 8rem),
+                linear-gradient(145deg, rgba(255, 253, 247, 0.98), rgba(255, 248, 237, 0.94));
+        }
+
+        #section-alerts .aoc-title {
+            max-width: 15rem;
+            font-size: 2rem;
+            line-height: 1.05;
+            letter-spacing: -0.05em;
+        }
+
+        #section-alerts .aoc-subtitle {
+            max-width: 17rem;
+            font-size: 0.93rem;
+            line-height: 1.58;
+        }
+
+        #section-alerts .aoc-panel,
+        #section-alerts .aoc-map-card,
+        #section-alerts .aoc-snapshot {
+            border-radius: 1.2rem;
+            border: 1px solid rgba(120, 53, 15, 0.09);
+            box-shadow: none;
+            margin-inline: 0;
+        }
+
+        #section-alerts .aoc-hero-actions,
+        #section-alerts .aoc-history-btn,
+        #section-alerts .aoc-alert-pill {
+            width: 100%;
+        }
+
+        #section-alerts .aoc-alert-pill,
+        #section-alerts .aoc-history-btn {
+            justify-content: center;
+        }
+
+        #section-alerts .aoc-alert-pill {
+            margin-top: 0.35rem;
+            border-radius: 1rem;
+        }
+
+        #section-alerts .aoc-history-btn {
+            border-radius: 1rem;
+            min-height: 52px;
+            font-size: 0.98rem;
+        }
+
+        #section-alerts .aoc-history-btn::after {
+            content: '\f105';
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            margin-left: auto;
+        }
+
+        #section-alerts .aoc-stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        #section-alerts .aoc-stat-card {
+            min-height: 8.25rem;
+            border-radius: 1rem;
+            padding: 0.72rem;
+        }
+
+        #section-alerts .aoc-stat-top {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        #section-alerts .aoc-stat-icon {
+            order: -1;
+            width: 2.25rem;
+            height: 2.25rem;
+            flex-basis: 2.25rem;
+            border-radius: 0.78rem;
+            font-size: 0.95rem;
+        }
+
+        #section-alerts .aoc-stat-label {
+            font-size: 0.68rem;
+            line-height: 1.18;
+        }
+
+        #section-alerts .aoc-stat-value {
+            margin-top: 0.28rem;
+            font-size: 1.7rem;
+        }
+
+        #section-alerts .aoc-stat-copy {
+            display: none;
+        }
+
+        #section-alerts .aoc-panel-head,
+        #section-alerts .aoc-map-head,
+        #section-alerts .aoc-snapshot-head,
+        #section-alerts .aoc-map-body,
+        #section-alerts .aoc-snapshot-body {
+            padding: 1rem 0.95rem;
+        }
+
+        #section-alerts .aoc-panel-head,
+        #section-alerts .aoc-map-head,
+        #section-alerts .aoc-snapshot-head {
+            background: transparent;
+        }
+
+        #section-alerts .aoc-filter-row {
+            grid-template-columns: minmax(0, 1fr) 46px 46px;
+            gap: 0.45rem;
+            align-items: center;
+        }
+
+        #section-alerts .aoc-input {
+            font-size: 0.86rem;
+            padding-right: 0.75rem;
+        }
+
+        #section-alerts .aoc-search-wrap,
+        #section-alerts .aoc-filter-control {
+            min-height: 46px;
+        }
+
+        #section-alerts .aoc-filter-control {
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 1rem;
+            background: #fff;
+            color: #c2410c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
+        }
+
+        #section-alerts .aoc-filter-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        #section-alerts .aoc-filter-control .aoc-select {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #section-alerts .aoc-filter-button {
+            display: inline-flex;
+            width: 100%;
+            height: 100%;
+            min-height: 46px;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: inherit;
+            background: transparent;
+            color: inherit;
+        }
+
+        #section-alerts .aoc-filter-menu {
+            display: block;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.5rem);
+            z-index: 30;
+            width: max-content;
+            min-width: 11.5rem;
+            max-width: calc(100vw - 2rem);
+            border: 1px solid rgba(198, 61, 38, 0.14);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 18px 40px rgba(88, 43, 20, 0.16);
+            padding: 0.35rem;
+        }
+
+        #section-alerts .aoc-filter-menu[hidden] {
+            display: none;
+        }
+
+        #section-alerts .aoc-filter-option {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            border: 0;
+            border-radius: 0.75rem;
+            background: transparent;
+            color: #334155;
+            padding: 0.68rem 0.78rem;
+            text-align: left;
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+
+        #section-alerts .aoc-filter-option.is-active {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        #section-alerts #areasConcernRiskMap {
+            min-height: 20rem;
+            border-radius: 0.9rem !important;
+        }
+
+        #section-alerts .aoc-alert-actions,
+        #section-alerts .aoc-action-btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div id="section-alerts" class="content-section areas-concern-page">
+    <div class="aoc-shell">
+        <section class="aoc-hero">
+            <div class="aoc-hero-grid">
                 <div>
-                    <p class="text-sm font-medium text-slate-500">Active Fire Alerts</p>
-                    <p id="areasConcernAlertCountCard" class="mt-2 text-3xl font-bold text-slate-900">{{ $nearbyAlertCollection->count() }}</p>
+                    <span class="aoc-eyebrow"><i class="fa-solid fa-shield-heart"></i> Citizen awareness</span>
+                    <h1 class="aoc-title">Areas of Concern</h1>
+                    <p class="aoc-subtitle">Track active fire alerts near you, review your submitted reports, and inspect mapped risk or hazard factors in one focused dashboard.</p>
                 </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600">
-                    <i class="fa-solid fa-fire text-xl"></i>
-                </div>
-            </div>
-            <p class="mt-3 text-xs text-slate-500">Nearby fire incidents still in reported, responding, or on-scene status.</p>
-        </div>
-
-        <div class="rounded-3xl border border-amber-100 bg-gradient-to-br from-white via-amber-50 to-orange-50 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-slate-500">My Submitted Reports</p>
-                    <p id="areasConcernReportCountCard" class="mt-2 text-3xl font-bold text-slate-900">{{ $combinedReportCollection->count() }}</p>
-                </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-                    <i class="fa-solid fa-file-lines text-xl"></i>
-                </div>
-            </div>
-            <p class="mt-3 text-xs text-slate-500">Includes your fire incident submissions and your risk or hazard factors.</p>
-        </div>
-
-        <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-sky-50 to-cyan-50 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-slate-500">Risk / Hazard Markers</p>
-                    <p id="areasConcernRiskMarkerCountCard" class="mt-2 text-3xl font-bold text-slate-900">{{ $riskMapCollection->count() }}</p>
-                </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
-                </div>
-            </div>
-            <p class="mt-3 text-xs text-slate-500">Mapped risk and hazard records already approved for display or submitted by you.</p>
-        </div>
-    </div>
-
-    <div class="rounded-3xl border border-slate-200 bg-white shadow-sm mb-6 overflow-hidden">
-        <div class="border-b border-slate-200 px-5 py-5">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">Active Alerts</h2>
-                    <p class="text-sm text-slate-500">This view only shows fire alerts for citizen awareness. Use search, status, and sorting to narrow the list.</p>
-                </div>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input
-                            id="areasConcernAlertSearch"
-                            type="search"
-                            placeholder="Search address, barangay, or status"
-                            class="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100 sm:w-72"
-                        >
-                    </div>
-                    <select id="areasConcernStatusFilter" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                        <option value="all">All statuses</option>
-                        @foreach($initialAlertStatuses as $statusLabel)
-                            <option value="{{ strtolower($statusLabel) }}">{{ $statusLabel }}</option>
-                        @endforeach
-                    </select>
-                    <select id="areasConcernSortFilter" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100">
-                        <option value="newest">Newest first</option>
-                        <option value="oldest">Oldest first</option>
-                        <option value="closest">Closest first</option>
-                        <option value="status">Status</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div id="areasConcernAlertsList" class="divide-y divide-slate-100"></div>
-    </div>
-
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-slate-200 px-5 py-5">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-900">Risk and Hazard Map</h2>
-                        <p class="text-sm text-slate-500">Mapped non-fire concerns shared through PyroSense. Marker details include category, status, location context, and available image preview.</p>
-                    </div>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span id="areasConcernMapMarkerCount">{{ $riskMapCollection->count() }}</span> markers
+                <div class="aoc-hero-actions">
+                    <span class="aoc-alert-pill">
+                        <i class="fa-solid fa-fire-flame-curved"></i>
+                        <span><span id="areasConcernActiveAlertsValue">{{ $nearbyAlertCollection->count() }}</span> active fire alerts</span>
                     </span>
+                    <button type="button" id="openCitizenReportsHistoryBtn" class="aoc-history-btn">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>View My Reports History</span>
+                    </button>
                 </div>
             </div>
-            <div class="p-5">
+        </section>
+
+        <section class="aoc-stats-grid" aria-label="Areas of Concern summary">
+            <div class="aoc-stat-card" style="--aoc-stat-glow:rgba(220,38,38,0.1);--aoc-icon-bg:#fff1f2;--aoc-icon-color:#dc2626;">
+                <div class="aoc-stat-top">
+                    <div>
+                        <p class="aoc-stat-label">Active Fire Alerts</p>
+                        <p id="areasConcernAlertCountCard" class="aoc-stat-value">{{ $nearbyAlertCollection->count() }}</p>
+                    </div>
+                    <div class="aoc-stat-icon"><i class="fa-solid fa-fire"></i></div>
+                </div>
+                <p class="aoc-stat-copy">Nearby fire incidents still in reported, responding, or on-scene status.</p>
+            </div>
+
+            <div class="aoc-stat-card" style="--aoc-stat-glow:rgba(227,155,23,0.14);--aoc-icon-bg:#fffbeb;--aoc-icon-color:#d97706;">
+                <div class="aoc-stat-top">
+                    <div>
+                        <p class="aoc-stat-label">My Submitted Reports</p>
+                        <p id="areasConcernReportCountCard" class="aoc-stat-value">{{ $combinedReportCollection->count() }}</p>
+                    </div>
+                    <div class="aoc-stat-icon"><i class="fa-solid fa-file-lines"></i></div>
+                </div>
+                <p class="aoc-stat-copy">Includes your fire incident submissions and your risk or hazard factors.</p>
+            </div>
+
+            <div class="aoc-stat-card" style="--aoc-stat-glow:rgba(13,148,136,0.12);--aoc-icon-bg:#ecfeff;--aoc-icon-color:#0f766e;">
+                <div class="aoc-stat-top">
+                    <div>
+                        <p class="aoc-stat-label">Risk / Hazard Markers</p>
+                        <p id="areasConcernRiskMarkerCountCard" class="aoc-stat-value">{{ $riskMapCollection->count() }}</p>
+                    </div>
+                    <div class="aoc-stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+                <p class="aoc-stat-copy">Mapped risk and hazard records already approved for display or submitted by you.</p>
+            </div>
+        </section>
+
+        <section class="aoc-panel">
+            <div class="aoc-panel-head">
+                <div class="aoc-panel-head-row">
+                    <div>
+                        <span class="aoc-section-eyebrow"><i class="fa-solid fa-bell"></i> Fire alerts</span>
+                        <h2 class="aoc-section-title">Active Alerts</h2>
+                        <p class="aoc-section-copy">This view only shows fire alerts for citizen awareness. Use search, status, and sorting to narrow the list.</p>
+                    </div>
+                    <div class="aoc-filter-row">
+                        <div class="aoc-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass aoc-search-icon"></i>
+                            <input id="areasConcernAlertSearch" type="search" placeholder="Search address, barangay, or status" class="aoc-input">
+                        </div>
+                        <div class="aoc-filter-control" aria-label="Filter alerts by status">
+                            <button type="button" class="aoc-filter-button" data-aoc-filter-toggle="status" aria-label="Filter by status" aria-expanded="false">
+                                <i class="fa-solid fa-sliders aoc-filter-icon" aria-hidden="true"></i>
+                            </button>
+                            <select id="areasConcernStatusFilter" class="aoc-select">
+                                <option value="all">All statuses</option>
+                                @foreach($initialAlertStatuses as $statusLabel)
+                                    <option value="{{ strtolower($statusLabel) }}">{{ $statusLabel }}</option>
+                                @endforeach
+                            </select>
+                            <div class="aoc-filter-menu" data-aoc-filter-menu="status" hidden>
+                                <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernStatusFilter" data-aoc-filter-value="all">All statuses</button>
+                                @foreach($initialAlertStatuses as $statusLabel)
+                                    <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernStatusFilter" data-aoc-filter-value="{{ strtolower($statusLabel) }}">{{ $statusLabel }}</button>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="aoc-filter-control" aria-label="Sort alerts">
+                            <button type="button" class="aoc-filter-button" data-aoc-filter-toggle="sort" aria-label="Sort alerts" aria-expanded="false">
+                                <i class="fa-solid fa-arrow-down-wide-short aoc-filter-icon" aria-hidden="true"></i>
+                            </button>
+                            <select id="areasConcernSortFilter" class="aoc-select">
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                                <option value="closest">Closest first</option>
+                                <option value="status">Status</option>
+                            </select>
+                            <div class="aoc-filter-menu" data-aoc-filter-menu="sort" hidden>
+                                <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernSortFilter" data-aoc-filter-value="newest">Newest first</button>
+                                <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernSortFilter" data-aoc-filter-value="oldest">Oldest first</button>
+                                <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernSortFilter" data-aoc-filter-value="closest">Closest first</button>
+                                <button type="button" class="aoc-filter-option" data-aoc-filter-target="areasConcernSortFilter" data-aoc-filter-value="status">Status</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="areasConcernAlertsList" class="divide-y divide-slate-100"></div>
+        </section>
+
+        <div class="aoc-map-layout">
+            <section class="aoc-map-card">
+                <div class="aoc-map-head">
+                    <div class="aoc-map-head-row">
+                        <div>
+                            <span class="aoc-section-eyebrow"><i class="fa-solid fa-map-location-dot"></i> Risk intelligence</span>
+                            <h2 class="aoc-section-title">Risk and Hazard Map</h2>
+                            <p class="aoc-section-copy">Mapped non-fire concerns shared through PyroSense. Marker details include category, status, location context, and available image preview.</p>
+                        </div>
+                        <span class="aoc-map-pill">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span id="areasConcernMapMarkerCount">{{ $riskMapCollection->count() }}</span> markers
+                        </span>
+                    </div>
+                </div>
+                <div class="aoc-map-body">
                 <div id="areasConcernMapError" class="hidden rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 mb-4"></div>
                 <div id="areasConcernMapEmpty" class="{{ $riskMapCollection->isEmpty() ? '' : 'hidden' }} rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-slate-500">
                     <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
@@ -138,18 +861,19 @@
             </div>
         </section>
 
-        <aside class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-slate-200 px-5 py-5">
-                <h2 class="text-lg font-bold text-slate-900">My Reports Snapshot</h2>
-                <p class="text-sm text-slate-500">Quick view of what you have submitted before opening the full history modal.</p>
+        <aside class="aoc-snapshot">
+            <div class="aoc-snapshot-head">
+                <span class="aoc-section-eyebrow"><i class="fa-solid fa-folder-open"></i> Report history</span>
+                <h2 class="aoc-section-title">My Reports Snapshot</h2>
+                <p class="aoc-section-copy">Quick view of what you have submitted before opening the full history modal.</p>
             </div>
-            <div class="p-5">
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="rounded-2xl bg-red-50 px-4 py-4">
+            <div class="aoc-snapshot-body">
+                <div class="aoc-mini-grid">
+                    <div class="aoc-mini-card">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">Fire Reports</p>
                         <p id="areasConcernFireReportCount" class="mt-2 text-2xl font-bold text-slate-900">0</p>
                     </div>
-                    <div class="rounded-2xl bg-amber-50 px-4 py-4">
+                    <div class="aoc-mini-card">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Risk / Hazard</p>
                         <p id="areasConcernRiskReportCount" class="mt-2 text-2xl font-bold text-slate-900">0</p>
                     </div>
@@ -157,6 +881,7 @@
                 <div id="areasConcernRecentReports" class="space-y-3"></div>
             </div>
         </aside>
+    </div>
     </div>
 
     <div id="citizenReportsHistoryModal" class="fixed inset-0 z-[4200] hidden items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4">
@@ -393,7 +1118,7 @@
         }
 
         host.innerHTML = records.map((record) => `
-            <button type="button" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-orange-200 hover:bg-orange-50/40" data-concern-report-open="${escapeHtml(String(record.incident_id || record.risk_area_id || ''))}" data-concern-report-kind="${escapeHtml(readReportKind(record))}">
+            <button type="button" class="aoc-recent-report" data-concern-report-open="${escapeHtml(String(record.incident_id || record.risk_area_id || ''))}" data-concern-report-kind="${escapeHtml(readReportKind(record))}">
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-sm font-semibold text-slate-900">${escapeHtml(readReportTypeLabel(record))}</p>
@@ -461,33 +1186,33 @@
             const barangay = [incident.barangay_name, incident.barangay_city_name].filter(Boolean).join(', ');
 
             return `
-                <article class="px-5 py-5 transition hover:bg-slate-50">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <article class="aoc-alert-card">
+                    <div class="aoc-alert-main">
                         <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                            <div class="aoc-alert-identity">
+                                <span class="aoc-alert-icon">
                                     <i class="fa-solid fa-fire"></i>
                                 </span>
                                 <div class="min-w-0">
-                                    <h3 class="text-base font-semibold text-slate-900">Fire Alert</h3>
-                                    <p class="text-sm text-slate-500">${escapeHtml(incident.address || 'No location description available.')}</p>
+                                    <h3 class="aoc-alert-title">Fire Alert</h3>
+                                    <p class="aoc-alert-address">${escapeHtml(incident.address || 'No location description available.')}</p>
                                 </div>
                             </div>
-                            <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                            <div class="aoc-alert-meta mt-4">
                                 <span class="rounded-full ${statusMeta.badge} px-3 py-1 font-semibold">${escapeHtml(statusMeta.label)}</span>
                                 <span><i class="fa-regular fa-clock mr-1"></i>${escapeHtml(formatDate(incident.created_at))}</span>
                                 <span><i class="fa-solid fa-location-crosshairs mr-1"></i>${escapeHtml(distance)}</span>
                                 <span><i class="fa-solid fa-map-pin mr-1"></i>${escapeHtml(barangay || 'Barangay pending')}</span>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-                            <button type="button" class="rounded-2xl bg-orange-100 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-200" data-alert-details="${escapeHtml(String(incident.incident_id || ''))}">
+                        <div class="aoc-alert-actions">
+                            <button type="button" class="aoc-action-btn aoc-action-btn--primary" data-alert-details="${escapeHtml(String(incident.incident_id || ''))}">
                                 <i class="fa-regular fa-eye mr-1"></i>Details
                             </button>
-                            <button type="button" class="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-alert-share="${escapeHtml(String(incident.incident_id || ''))}">
+                            <button type="button" class="aoc-action-btn aoc-action-btn--muted" data-alert-share="${escapeHtml(String(incident.incident_id || ''))}">
                                 <i class="fa-solid fa-share-nodes mr-1"></i>Share
                             </button>
-                            ${incident.lat && incident.lng ? `<button type="button" class="rounded-2xl bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-200" data-alert-map="${escapeHtml(String(incident.incident_id || ''))}"><i class="fa-regular fa-map mr-1"></i>View on Map</button>` : ''}
+                            ${incident.lat && incident.lng ? `<button type="button" class="aoc-action-btn aoc-action-btn--map" data-alert-map="${escapeHtml(String(incident.incident_id || ''))}"><i class="fa-regular fa-map mr-1"></i>View on Map</button>` : ''}
                         </div>
                     </div>
                 </article>
@@ -816,6 +1541,56 @@
     areasConcernStatusFilter?.addEventListener('change', renderAreasConcernAlerts);
     areasConcernSortFilter?.addEventListener('change', renderAreasConcernAlerts);
 
+    function closeAreasConcernFilterMenus(exceptKey = '') {
+        document.querySelectorAll('[data-aoc-filter-menu]').forEach((menu) => {
+            if (exceptKey && menu.dataset.aocFilterMenu === exceptKey) return;
+            menu.hidden = true;
+        });
+        document.querySelectorAll('[data-aoc-filter-toggle]').forEach((button) => {
+            if (exceptKey && button.dataset.aocFilterToggle === exceptKey) return;
+            button.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function syncAreasConcernFilterOptions() {
+        document.querySelectorAll('[data-aoc-filter-target]').forEach((option) => {
+            const select = document.getElementById(option.dataset.aocFilterTarget || '');
+            option.classList.toggle('is-active', Boolean(select && String(select.value) === String(option.dataset.aocFilterValue)));
+        });
+    }
+
+    document.querySelectorAll('[data-aoc-filter-toggle]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const key = button.dataset.aocFilterToggle || '';
+            const menu = document.querySelector(`[data-aoc-filter-menu="${key}"]`);
+            if (!menu) return;
+            const willOpen = menu.hidden;
+            closeAreasConcernFilterMenus(key);
+            menu.hidden = !willOpen;
+            button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            syncAreasConcernFilterOptions();
+        });
+    });
+
+    document.querySelectorAll('[data-aoc-filter-target]').forEach((option) => {
+        option.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const select = document.getElementById(option.dataset.aocFilterTarget || '');
+            if (!select) return;
+            select.value = option.dataset.aocFilterValue || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            closeAreasConcernFilterMenus();
+            syncAreasConcernFilterOptions();
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('#section-alerts .aoc-filter-control')) {
+            closeAreasConcernFilterMenus();
+        }
+    });
+
     reportHistoryModal?.addEventListener('click', (event) => {
         if (event.target === reportHistoryModal) closeReportsHistoryModal();
     });
@@ -826,11 +1601,13 @@
 
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
+        closeAreasConcernFilterMenus();
         if (reportHistoryModal && !reportHistoryModal.classList.contains('hidden')) closeReportsHistoryModal();
         if (concernDetailsModal && !concernDetailsModal.classList.contains('hidden')) closeConcernDetailsModal();
     });
 
     updateAreasConcernSummary();
+    syncAreasConcernFilterOptions();
     renderAreasConcernAlerts();
     renderAreasConcernRecentReports();
     renderReportsHistoryTable();

@@ -56,16 +56,26 @@
   line-height: 1;
   letter-spacing: normal;
   text-transform: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   font-variation-settings:
     "FILL" 1,
     "wght" 500,
     "GRAD" 0,
     "opsz" 24;
+}
+
+.citizen-mobile-panel .material-symbols-rounded,
+.citizen-mobile-insights-panel .material-symbols-rounded {
+  width: 1.25em;
+  height: 1.25em;
+  flex: 0 0 1.25em;
 }
 
 /* Dark mode variables */
@@ -963,9 +973,23 @@
             }
 
             .citizen-mobile-main-pad {
-                max-width: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 padding: 0 0 calc(var(--mobile-bottom-nav-h) + 10px) !important;
                 margin: 0 !important;
+            }
+
+            .content-section:not(#section-overview) {
+                width: min(100% - 28px, 680px);
+                margin: 0 auto !important;
+                padding: 16px 0 28px !important;
+            }
+
+            .content-section:not(#section-overview) > .bg-white,
+            .content-section:not(#section-overview) > .rounded-2xl,
+            .content-section:not(#section-overview) > .grid,
+            .content-section:not(#section-overview) > .space-y-6 {
+                margin-inline: auto;
             }
 
             .citizen-mobile-dock {
@@ -1030,6 +1054,13 @@
                 background: transparent;
             }
 
+            .citizen-mobile-dock__item.nav-item,
+            .citizen-mobile-dock__item.nav-item.active {
+                border-left: 0 !important;
+                background: transparent !important;
+                font-weight: inherit !important;
+            }
+
             .citizen-mobile-dock__item.active {
                 color: #ffffff;
             }
@@ -1048,6 +1079,9 @@
                 width: 20px;
                 height: 20px;
                 font-size: 20px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .citizen-mobile-dock__center-wrap {
@@ -1102,36 +1136,49 @@
             .citizen-mobile-dock__burst {
                 position: absolute;
                 left: 50%;
-                bottom: 78px;
-                width: 0;
-                height: 0;
+                bottom: 76px;
+                width: min(calc(100vw - 32px), 300px);
+                min-height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: clamp(7px, 2vw, 11px);
+                padding: 7px;
+                border-radius: 999px;
+                background: rgba(255, 253, 248, 0.96);
+                border: 1px solid rgba(198, 61, 38, 0.12);
+                box-shadow: 0 20px 44px rgba(88, 43, 20, 0.2);
+                backdrop-filter: blur(16px);
                 opacity: 0;
-                transform: translateX(-50%) scale(0.8);
+                transform: translate(-50%, 14px) scale(0.92);
                 pointer-events: none;
-                transition: opacity 0.22s ease, transform 0.22s ease;
+                transition: opacity 0.2s ease, transform 0.2s ease;
                 z-index: 6;
             }
 
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst {
                 opacity: 1;
-                transform: translateX(-50%) scale(1);
+                transform: translate(-50%, 0) scale(1);
                 pointer-events: auto;
             }
 
             .citizen-mobile-dock__burst-item {
-                position: absolute;
-                width: 46px;
-                height: 46px;
+                position: relative;
+                width: 44px;
+                height: 44px;
+                flex: 0 0 44px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
                 border-radius: 999px;
-                background: rgba(255, 255, 255, 0.96);
-                color: #19515a;
-                border: 1px solid rgba(255, 255, 255, 0.85);
-                box-shadow: 0 16px 28px rgba(15, 23, 42, 0.16);
+                background: #fff7ed;
+                color: #c63d26;
+                border: 1px solid rgba(198, 61, 38, 0.12);
+                box-shadow: 0 12px 24px rgba(198, 61, 38, 0.12);
                 text-decoration: none;
-                backdrop-filter: blur(10px);
+                opacity: 0;
+                transform: translateY(12px) scale(0.9);
+                transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
             }
 
             .citizen-mobile-dock__burst-item::before {
@@ -1143,10 +1190,15 @@
                 pointer-events: none;
             }
 
-            .citizen-mobile-dock__burst-item:nth-child(1) { transform: translate(-78px, -46px); }
-            .citizen-mobile-dock__burst-item:nth-child(2) { transform: translate(0, -112px); }
-            .citizen-mobile-dock__burst-item:nth-child(3) { transform: translate(78px, -46px); }
-            .citizen-mobile-dock__burst-item:nth-child(4) { transform: translate(0, -162px); }
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(2) { transition-delay: 24ms; }
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(3) { transition-delay: 48ms; }
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(4) { transition-delay: 72ms; }
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(5) { transition-delay: 96ms; }
 
             .citizen-mobile-dock__burst-item.active {
                 background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
@@ -1158,6 +1210,9 @@
                 width: 18px;
                 height: 18px;
                 font-size: 18px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .citizen-mobile-welcome-toast {
@@ -1479,43 +1534,43 @@
         <div class="citizen-mobile-dock__shell">
             <div class="citizen-mobile-dock__track">
                 <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" onclick="switchSection('overview')" aria-label="Overview">
-                    <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">home</span>
+                    <i class="fa-solid fa-house citizen-mobile-dock__icon" aria-hidden="true"></i>
                 </button>
 
                 <button type="button" class="citizen-mobile-dock__item" aria-label="Notifications" data-citizen-alerts-open>
-                    <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">notifications</span>
+                    <i class="fa-solid fa-bell citizen-mobile-dock__icon" aria-hidden="true"></i>
                 </button>
 
                 <div class="citizen-mobile-dock__center-wrap" data-citizen-nav-center>
                     <div class="citizen-mobile-dock__burst" data-citizen-nav-burst>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="fsic" onclick="switchSection('fsic')" aria-label="Requests">
-                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">folder_open</span>
+                            <i class="fa-solid fa-folder-open citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" onclick="switchSection('alerts')" aria-label="Areas of Concern">
-                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">warning</span>
+                            <i class="fa-solid fa-triangle-exclamation citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" onclick="switchSection('contacts')" aria-label="Emergency Contacts">
-                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">call</span>
+                            <i class="fa-solid fa-phone citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
-                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">report_problem</span>
+                            <i class="fa-solid fa-bullhorn citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-insights-open aria-label="Charts and Cards">
-                            <span class="material-symbols-rounded citizen-mobile-dock__burst-icon" aria-hidden="true">stacked_bar_chart</span>
+                            <i class="fa-solid fa-chart-column citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
                         </button>
                     </div>
 
-                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--center" data-citizen-nav-trigger onclick="openFireIncidentModal()" aria-label="Report fire incident">
-                        <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">local_fire_department</span>
+                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--center" data-citizen-nav-trigger aria-label="Report fire incident">
+                        <i class="fa-solid fa-fire-flame-curved citizen-mobile-dock__icon" aria-hidden="true"></i>
                     </button>
                 </div>
 
-                <button type="button" class="nav-item citizen-mobile-dock__item" data-citizen-dock-item="announcements" onclick="switchSection('announcements')" aria-label="Announcements">
-                    <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">campaign</span>
+                <button type="button" class="citizen-mobile-dock__item" data-citizen-dock-item="announcements" onclick="switchSection('announcements')" aria-label="Announcements">
+                    <i class="fa-solid fa-bullhorn citizen-mobile-dock__icon" aria-hidden="true"></i>
                 </button>
 
                 <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
-                    <span class="material-symbols-rounded citizen-mobile-dock__icon" aria-hidden="true">settings</span>
+                    <i class="fa-solid fa-gear citizen-mobile-dock__icon" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -1575,28 +1630,28 @@
                 <div class="citizen-map-layer-list">
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="stations" checked>
-                        <span class="citizen-map-layer-item__icon material-symbols-rounded" aria-hidden="true">local_fire_department</span>
+                        <span class="citizen-map-layer-item__icon" aria-hidden="true"><i class="fa-solid fa-building-shield"></i></span>
                         <span class="citizen-map-layer-item__copy">
                             <strong>Stations</strong>
                         </span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="incidents" checked>
-                        <span class="citizen-map-layer-item__icon material-symbols-rounded" aria-hidden="true">crisis_alert</span>
+                        <span class="citizen-map-layer-item__icon" aria-hidden="true"><i class="fa-solid fa-fire-flame-curved"></i></span>
                         <span class="citizen-map-layer-item__copy">
                             <strong>Incidents</strong>
                         </span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="hydrants" checked>
-                        <span class="citizen-map-layer-item__icon material-symbols-rounded" aria-hidden="true">water_drop</span>
+                        <span class="citizen-map-layer-item__icon" aria-hidden="true"><i class="fa-solid fa-droplet"></i></span>
                         <span class="citizen-map-layer-item__copy">
                             <strong>Hydrants</strong>
                         </span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="others" checked>
-                        <span class="citizen-map-layer-item__icon material-symbols-rounded" aria-hidden="true">place</span>
+                        <span class="citizen-map-layer-item__icon" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
                         <span class="citizen-map-layer-item__copy">
                             <strong>Places</strong>
                         </span>
@@ -1643,7 +1698,7 @@
         <div id="citizenWelcomeAlert" class="citizen-welcome-alert" role="status" aria-live="polite">
             <div class="citizen-welcome-alert__row">
                 <div class="citizen-welcome-alert__icon">
-                    <span class="material-symbols-rounded" aria-hidden="true">local_fire_department</span>
+                    <i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i>
                 </div>
                 <div class="citizen-welcome-alert__copy">
                     <strong>Welcome back, {{ $displayName }}</strong>
@@ -1656,7 +1711,7 @@
         </div>
         <div id="citizenMobileWelcomeToast" class="citizen-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
             <div class="citizen-mobile-welcome-toast__icon">
-                <span class="material-symbols-rounded" aria-hidden="true">local_fire_department</span>
+                <i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i>
             </div>
             <div class="citizen-mobile-welcome-toast__copy">
                 <strong>Welcome back, {{ $displayName }}</strong>
@@ -1784,7 +1839,7 @@
                     <div class="relative flex items-start justify-between gap-4">
                         <div class="flex items-start gap-4">
                             <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
-                                <span class="material-symbols-rounded text-[28px]" aria-hidden="true">local_fire_department</span>
+                                <i class="fa-solid fa-fire-flame-curved text-[28px]" aria-hidden="true"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">PyroSense Emergency</p>
@@ -2398,10 +2453,12 @@ if (navigator.geolocation) {
 
             const openBurst = () => {
                 citizenMobileDock.classList.add('is-open');
+                citizenDockTrigger.setAttribute('aria-expanded', 'true');
             };
 
             const closeBurst = () => {
                 citizenMobileDock.classList.remove('is-open');
+                citizenDockTrigger.setAttribute('aria-expanded', 'false');
             };
 
             const startHold = () => {
@@ -2413,17 +2470,24 @@ if (navigator.geolocation) {
                 }, holdDelay);
             };
 
+            citizenDockTrigger.setAttribute('aria-haspopup', 'true');
+            citizenDockTrigger.setAttribute('aria-expanded', 'false');
+
             citizenDockTrigger.addEventListener('pointerdown', startHold);
             citizenDockTrigger.addEventListener('pointerup', clearHoldTimer);
             citizenDockTrigger.addEventListener('pointerleave', clearHoldTimer);
             citizenDockTrigger.addEventListener('pointercancel', clearHoldTimer);
 
-            citizenDockTrigger.addEventListener('click', function () {
+            citizenDockTrigger.addEventListener('click', function (event) {
                 if (holdActivated) {
                     holdActivated = false;
+                    event.preventDefault();
                     return;
                 }
                 closeBurst();
+                if (typeof window.openFireIncidentModal === 'function') {
+                    window.openFireIncidentModal();
+                }
             });
 
             document.addEventListener('click', function (event) {
@@ -2436,6 +2500,12 @@ if (navigator.geolocation) {
                 item.addEventListener('click', () => {
                     closeBurst();
                 });
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeBurst();
+                }
             });
         }
 
@@ -3570,8 +3640,8 @@ function sendCitizenNearbyBrowserNotification(incident = {}) {
             tag: `pyrosense-citizen-alert-${getCitizenNearbyAlertKey(incident)}`,
             renotify: true,
             vibrate: [220, 120, 220],
-            icon: '/icon-192x192.png',
-            badge: '/icon-72x72.png'
+            icon: '/logo.png',
+            badge: '/logo.png'
         });
     } catch (error) {
         console.warn('Unable to show citizen nearby browser notification:', error);

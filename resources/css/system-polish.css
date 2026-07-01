@@ -1,0 +1,415 @@
+/* PyroSense shared UI/UX polish layer.
+   This intentionally targets existing classes/elements so features keep working. */
+
+:root {
+  --ps-surface: #ffffff;
+  --ps-surface-soft: #fff8f1;
+  --ps-page: #fbf7ef;
+  --ps-line: rgba(120, 53, 15, 0.12);
+  --ps-text: #172033;
+  --ps-muted: #64748b;
+  --ps-brand: #c63d26;
+  --ps-brand-strong: #9f2f1d;
+  --ps-warn: #d97706;
+  --ps-ok: #059669;
+  --ps-info: #2563eb;
+  --ps-danger: #dc2626;
+  --ps-radius: 18px;
+  --ps-radius-sm: 12px;
+  --ps-shadow: 0 18px 45px rgba(88, 43, 20, 0.08);
+  --ps-shadow-soft: 0 10px 24px rgba(88, 43, 20, 0.06);
+  --ps-focus: 0 0 0 4px rgba(198, 61, 38, 0.16);
+}
+
+html {
+  scroll-behavior: smooth;
+  text-rendering: geometricPrecision;
+}
+
+body {
+  color: var(--ps-text);
+  background:
+    radial-gradient(circle at top left, rgba(209, 138, 22, 0.1), transparent 32rem),
+    linear-gradient(180deg, #fffaf3 0%, var(--ps-page) 42%, #f8efe6 100%);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  -webkit-font-smoothing: antialiased;
+}
+
+main,
+.main-content,
+.content-container,
+.dashboard-container,
+.analytics-container {
+  min-width: 0;
+}
+
+.content-container,
+.analytics-container {
+  width: min(100%, 1440px);
+  padding-inline: clamp(1rem, 2vw, 1.75rem);
+}
+
+.page-header,
+.content-section > .flex:first-child,
+.analytics-container > div:first-child,
+.content-container > div:first-child {
+  gap: 1rem;
+}
+
+.stat-card,
+.card,
+.dashboard-card,
+.analytics-card,
+.params-card,
+.recommendation-card,
+.content-section > .bg-white,
+.modal-content,
+.modal .bg-white {
+  border: 1px solid var(--ps-line) !important;
+  border-radius: var(--ps-radius) !important;
+  box-shadow: var(--ps-shadow-soft) !important;
+}
+
+.stat-card,
+.card,
+.dashboard-card,
+.analytics-card,
+.params-card,
+.content-section > .bg-white {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 252, 248, 0.94)),
+    var(--ps-surface) !important;
+}
+
+.stat-card h3,
+.card h3,
+.dashboard-card h3,
+.params-header h3,
+.content-section h1,
+.content-section h2 {
+  letter-spacing: -0.02em;
+}
+
+.stat-card h3,
+.dashboard-card h3,
+.params-card h3 {
+  color: #111827;
+}
+
+.dashboard-grid,
+.analytics-grid,
+.charts-grid {
+  align-items: start;
+}
+
+.form-select,
+select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="search"],
+textarea {
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
+  border-radius: 12px !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  min-height: 42px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+select:focus,
+input:focus,
+textarea:focus,
+.form-select:focus {
+  border-color: rgba(198, 61, 38, 0.72) !important;
+  box-shadow: var(--ps-focus) !important;
+  outline: none !important;
+}
+
+button,
+.btn,
+.nav-item,
+a[class*="btn"],
+[role="button"] {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+button:not(:disabled):active,
+.btn:not(:disabled):active,
+a[class*="btn"]:active {
+  transform: translateY(1px);
+}
+
+button:disabled,
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate !important;
+  border-spacing: 0;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(194, 65, 12, 0.16);
+}
+
+tbody td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+tbody tr:hover {
+  background: rgba(255, 247, 237, 0.72);
+}
+
+.table-responsive,
+.overflow-x-auto {
+  border-radius: var(--ps-radius-sm);
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive::after,
+.overflow-x-auto::after {
+  content: '';
+  position: sticky;
+  right: 0;
+  display: block;
+  width: 24px;
+  height: 1px;
+}
+
+.badge,
+[class*="status-badge"],
+[class*="priority-badge"],
+.alerts-status-badge {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.modal,
+[role="dialog"] {
+  overscroll-behavior: contain;
+}
+
+.modal-content,
+.modal .bg-white {
+  max-height: min(86vh, 760px);
+  overflow: auto;
+}
+
+.modal-content > form,
+.modal .bg-white > form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.empty-state,
+[class*="empty-state"],
+[id*="Empty"],
+[id*="empty"] {
+  border: 1px dashed rgba(198, 61, 38, 0.22);
+  border-radius: var(--ps-radius);
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.72), rgba(255, 255, 255, 0.88));
+}
+
+.filter-bar,
+[class*="filter"],
+[class*="search"] {
+  min-width: 0;
+}
+
+.leaflet-control,
+.leaflet-bar,
+.map-legend,
+[class*="legend"] {
+  border-radius: 14px !important;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 16px !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18) !important;
+}
+
+#toast,
+.incident-alert-toast,
+.citizen-mobile-welcome-toast {
+  box-shadow: 0 18px 45px rgba(127, 29, 29, 0.18) !important;
+}
+
+@media (max-width: 1024px) {
+  .content-container,
+  .analytics-container {
+    padding-inline: 1rem;
+  }
+
+  .content-section:not(#section-overview) {
+    max-width: min(100%, 920px);
+    margin-inline: auto;
+  }
+
+  .dashboard-grid,
+  .analytics-grid,
+  .charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --ps-radius: 16px;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  main,
+  .main-content {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .stat-card,
+  .card,
+  .dashboard-card,
+  .analytics-card,
+  .params-card,
+  .content-section > .bg-white {
+    border-radius: 16px !important;
+    padding: 1rem !important;
+  }
+
+  .modal-content,
+  .modal .bg-white {
+    width: min(100% - 1rem, 560px) !important;
+    max-height: calc(100dvh - 1rem - env(safe-area-inset-bottom)) !important;
+    border-radius: 18px !important;
+  }
+
+  .page-header,
+  .content-section > .flex:first-child,
+  .analytics-container > div:first-child,
+  .content-container > div:first-child {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .page-header > *,
+  .content-section > .flex:first-child > *,
+  .analytics-container > div:first-child > *,
+  .content-container > div:first-child > * {
+    width: 100%;
+  }
+
+  button,
+  .btn,
+  a[class*="btn"],
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  table {
+    font-size: 0.88rem;
+  }
+
+  thead th,
+  tbody td {
+    padding: 0.75rem !important;
+  }
+
+  .table-responsive,
+  .overflow-x-auto {
+    margin-inline: -0.25rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .table-responsive table,
+  .overflow-x-auto table {
+    min-width: 680px;
+  }
+
+  #section-fsic .overflow-x-auto table {
+    min-width: 760px;
+  }
+
+  form .flex,
+  .modal .flex,
+  .filter-bar,
+  [class*="filter"] {
+    flex-wrap: wrap;
+  }
+
+  form button,
+  .modal button,
+  .filter-bar button,
+  [class*="filter"] button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .citizen-mobile-dock {
+    padding-inline: 10px !important;
+  }
+
+  .citizen-mobile-dock__track {
+    width: min(100%, 324px) !important;
+    gap: 4px !important;
+    padding-inline: 12px !important;
+  }
+
+  .citizen-mobile-dock__item--center {
+    width: 62px !important;
+    height: 62px !important;
+    min-width: 62px !important;
+    min-height: 62px !important;
+  }
+
+  .citizen-mobile-dock__burst {
+    width: calc(100vw - 24px) !important;
+    gap: 6px !important;
+  }
+
+  .citizen-mobile-dock__burst-item {
+    width: 42px !important;
+    height: 42px !important;
+    flex-basis: 42px !important;
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    min-height: 100dvh;
+  }
+
+  .alerts-fab,
+  .report-fab,
+  .citizen-mobile-nav,
+  [class*="bottom-nav"] {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+}

@@ -459,6 +459,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/risk-reports', [PublicController::class, 'storeCitizenRiskReport'])->name('risk-reports.store');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');
+        Route::put('/profile/email', [PublicController::class, 'updateProfileEmail'])->name('profile.email.update');
+        Route::put('/profile/password', [PublicController::class, 'updateProfilePassword'])->name('profile.password.update');
         Route::resource('incident', IncidentController::class);
         Route::resource('marker', MarkerController::class);
 

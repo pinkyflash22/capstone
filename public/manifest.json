@@ -10,26 +10,26 @@
     "orientation": "natural",
     "icons": [
         {
-            "src": "/icon-72x72.png",
-            "sizes": "72x72",
+            "src": "/logo.png",
+            "sizes": "500x500",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-192x192.png",
-            "sizes": "192x192",
+            "src": "/logo.png",
+            "sizes": "500x500",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-512x512.png",
-            "sizes": "512x512",
+            "src": "/logo.png",
+            "sizes": "500x500",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon-512x512.png",
-            "sizes": "512x512",
+            "src": "/logo.png",
+            "sizes": "500x500",
             "type": "image/png",
             "purpose": "maskable"
         }

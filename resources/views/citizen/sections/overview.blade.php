@@ -91,7 +91,7 @@
                 <div id="citizenMapSearchResults" class="citizen-map-search__results hidden" aria-live="polite"></div>
             </div>
             <button type="button" class="citizen-map-layer-trigger md:hidden" data-citizen-map-layers-open aria-label="Open map filters">
-                <span class="material-symbols-rounded" aria-hidden="true">layers</span>
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
             </button>
             <div id="userMap" style="height:380px; width:100%; border-radius:0;"></div><aside id="citizenMapDetailsHost" class="citizen-map-details-host" aria-live="polite"></aside>
         </div>

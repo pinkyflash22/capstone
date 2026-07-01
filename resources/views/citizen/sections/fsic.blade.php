@@ -1,42 +1,541 @@
+@php
+    $fsicCollection = collect($fsicRequests ?? [])->values();
+    $fsicPendingTotal = $fsicCollection->where('status', 'pending')->count();
+    $fsicApprovedTotal = $fsicCollection->where('status', 'approved')->count();
+    $fsicInspectionTotal = $fsicCollection->filter(fn ($request) => in_array($request->status, ['for_inspection', 'inspected'], true))->count();
+@endphp
+
 {{-- FSIC REQUEST SECTION --}}
-<div id="section-fsic" class="content-section">
+<style>
+    #section-fsic.fsic-page {
+        --fsic-red: #c63d26;
+        --fsic-red-dark: #9f2f1d;
+        --fsic-orange: #e39b17;
+        --fsic-ink: #132033;
+        --fsic-muted: #64748b;
+        width: min(100%, 1240px);
+        margin-inline: auto;
+        padding: clamp(0.85rem, 1.45vw, 1.35rem);
+        padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+        color: var(--fsic-ink);
+    }
 
-    <!-- HEADER -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div>
-            <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Fire Safety Inspection Certificate</h1>
-            <p class="text-sm text-gray-500 mt-1">Request and manage your FSIC applications</p>
-        </div>
+    #section-fsic .fsic-shell {
+        display: grid;
+        gap: clamp(1rem, 2vw, 1.35rem);
+    }
 
-        <div class="flex items-center gap-3 mt-3 sm:mt-0">
-            <span class="bg-orange-100 text-orange-700 text-sm px-4 py-2 rounded-full flex items-center gap-2">
-                <i class="fa-solid fa-file-certificate"></i>
-                <span id="fsicPendingCount">{{ $fsicRequests->where('status', 'pending')->count() ?? 0 }}</span> Pending Requests
-            </span>
+    #section-fsic .fsic-hero,
+    #section-fsic .fsic-card,
+    #section-fsic .fsic-panel {
+        border: 1px solid rgba(120, 53, 15, 0.11);
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 18px 40px rgba(88, 43, 20, 0.075);
+    }
 
-            <button onclick="openNewFsicModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <i class="fa-solid fa-plus"></i> New Request
-            </button>
-        </div>
-    </div>
+    #section-fsic .fsic-hero {
+        position: relative;
+        overflow: hidden;
+        border-color: rgba(198, 61, 38, 0.16);
+        border-radius: 2rem;
+        background:
+            radial-gradient(circle at 92% 12%, rgba(227, 155, 23, 0.24), transparent 16rem),
+            linear-gradient(135deg, rgba(255, 248, 237, 0.98), rgba(255, 255, 255, 0.96));
+        padding: clamp(1.1rem, 3vw, 1.75rem);
+    }
 
-    <!-- TABLE -->
-    <div class="bg-white rounded-xl shadow">
-        <div class="p-5 border-b">
-            <h2 class="font-bold text-gray-800 flex items-center gap-2">
-                <i class="fa-solid fa-list-check text-orange-600"></i>
-                My FSIC Requests
-            </h2>
-        </div>
+    #section-fsic .fsic-hero-grid {
+        position: relative;
+        display: grid;
+        gap: 1rem;
+    }
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="text-xs uppercase bg-gray-50">
+    #section-fsic .fsic-eyebrow {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        background: rgba(198, 61, 38, 0.1);
+        color: var(--fsic-red-dark);
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.7rem;
+    }
+
+    #section-fsic .fsic-title {
+        margin-top: 0.8rem;
+        color: var(--fsic-ink);
+        font-size: clamp(1.85rem, 5vw, 2.85rem);
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -0.055em;
+    }
+
+    #section-fsic .fsic-subtitle {
+        max-width: 44rem;
+        margin-top: 0.75rem;
+        color: var(--fsic-muted);
+        font-size: clamp(0.94rem, 2.4vw, 1.03rem);
+        line-height: 1.7;
+    }
+
+    #section-fsic .fsic-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    #section-fsic .fsic-pill {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+        gap: 0.55rem;
+        border-radius: 999px;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        background: linear-gradient(135deg, #fffbeb, #fff7ed);
+        color: #b45309;
+        padding: 0.72rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 850;
+    }
+
+    #section-fsic .fsic-primary-btn {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.62rem;
+        border: 0;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, var(--fsic-red), var(--fsic-orange));
+        color: #fff;
+        padding: 0.82rem 1.1rem;
+        font-size: 0.92rem;
+        font-weight: 850;
+        box-shadow: 0 16px 34px rgba(198, 61, 38, 0.24);
+    }
+
+    #section-fsic .fsic-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    #section-fsic .fsic-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.6rem;
+        padding: 1.1rem;
+    }
+
+    #section-fsic .fsic-card::after {
+        content: '';
+        position: absolute;
+        inset: auto -2rem -3rem auto;
+        width: 8rem;
+        height: 8rem;
+        border-radius: 999px;
+        background: var(--fsic-glow, rgba(198, 61, 38, 0.08));
+    }
+
+    #section-fsic .fsic-card-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+    }
+
+    #section-fsic .fsic-card-label {
+        color: var(--fsic-muted);
+        font-size: 0.82rem;
+        font-weight: 750;
+    }
+
+    #section-fsic .fsic-card-value {
+        margin-top: 0.42rem;
+        color: var(--fsic-ink);
+        font-size: clamp(2rem, 6vw, 2.65rem);
+        font-weight: 950;
+        letter-spacing: -0.055em;
+        line-height: 1;
+    }
+
+    #section-fsic .fsic-card-icon {
+        display: inline-flex;
+        width: 3rem;
+        height: 3rem;
+        flex: 0 0 3rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1.05rem;
+        background: var(--fsic-icon-bg, #fff7ed);
+        color: var(--fsic-icon-color, #c2410c);
+        font-size: 1.1rem;
+    }
+
+    #section-fsic .fsic-card-copy {
+        position: relative;
+        z-index: 1;
+        margin-top: 0.9rem;
+        color: var(--fsic-muted);
+        font-size: 0.78rem;
+        line-height: 1.55;
+    }
+
+    #section-fsic .fsic-panel {
+        overflow: hidden;
+        border-radius: 1.75rem;
+    }
+
+    #section-fsic .fsic-panel-head {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        background: linear-gradient(135deg, rgba(255, 248, 237, 0.74), rgba(255, 255, 255, 0.96));
+        padding: 1.1rem;
+    }
+
+    #section-fsic .fsic-panel-title {
+        margin-top: 0.55rem;
+        color: var(--fsic-ink);
+        font-size: clamp(1.1rem, 3vw, 1.35rem);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+    }
+
+    #section-fsic .fsic-panel-copy {
+        margin-top: 0.35rem;
+        color: var(--fsic-muted);
+        font-size: 0.88rem;
+        line-height: 1.62;
+    }
+
+    #section-fsic .fsic-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #section-fsic .fsic-mobile-bottom-space {
+        display: none;
+    }
+
+    #section-fsic .fsic-empty-cell {
+        padding-block: 3.5rem !important;
+    }
+
+    #section-fsic .fsic-table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.9rem;
+    }
+
+    #section-fsic .fsic-table th {
+        background: #fff7ed;
+        color: #9a3412;
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    #section-fsic .fsic-table td,
+    #section-fsic .fsic-table th {
+        padding: 0.95rem 1rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    #section-fsic .fsic-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+
+    #section-fsic .fsic-action {
+        border-radius: 999px;
+        background: #fff7ed;
+        padding: 0.45rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #c2410c;
+    }
+
+    #section-fsic .fsic-action--green {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    #section-fsic .fsic-action--blue {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    #section-fsic .fsic-action--red {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    @media (min-width: 760px) {
+        #section-fsic .fsic-hero-grid {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+        }
+    }
+
+    @media (max-width: 520px) {
+        #section-fsic.fsic-page {
+            width: 100%;
+            padding: 1rem;
+            padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #section-fsic .fsic-shell {
+            gap: 1rem;
+        }
+
+        #section-fsic .fsic-hero {
+            border-radius: 1.4rem;
+            box-shadow: none;
+            padding: 1.35rem 1rem 1.05rem;
+        }
+
+        #section-fsic .fsic-title {
+            max-width: 17rem;
+            font-size: 2rem;
+            line-height: 1.05;
+        }
+
+        #section-fsic .fsic-subtitle {
+            max-width: 18rem;
+            font-size: 0.93rem;
+            line-height: 1.58;
+        }
+
+        #section-fsic .fsic-hero-actions,
+        #section-fsic .fsic-primary-btn,
+        #section-fsic .fsic-pill {
+            width: 100%;
+        }
+
+        #section-fsic .fsic-primary-btn,
+        #section-fsic .fsic-pill {
+            justify-content: center;
+            border-radius: 1rem;
+        }
+
+        #section-fsic .fsic-stats {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        #section-fsic .fsic-card {
+            min-height: 8.25rem;
+            border-radius: 1rem;
+            padding: 0.72rem;
+            box-shadow: none;
+        }
+
+        #section-fsic .fsic-card-top {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        #section-fsic .fsic-card-icon {
+            order: -1;
+            width: 2.25rem;
+            height: 2.25rem;
+            flex-basis: 2.25rem;
+            border-radius: 0.78rem;
+            font-size: 0.95rem;
+        }
+
+        #section-fsic .fsic-card-label {
+            font-size: 0.68rem;
+            line-height: 1.18;
+        }
+
+        #section-fsic .fsic-card-value {
+            margin-top: 0.28rem;
+            font-size: 1.7rem;
+        }
+
+        #section-fsic .fsic-card-copy {
+            display: none;
+        }
+
+        #section-fsic .fsic-panel {
+            border-radius: 1.2rem;
+            box-shadow: none;
+        }
+
+        #section-fsic .fsic-panel-head {
+            background: transparent;
+            padding: 1rem 0.95rem;
+        }
+
+        #section-fsic .fsic-table {
+            min-width: 0;
+            table-layout: fixed;
+            font-size: 0.84rem;
+        }
+
+        #section-fsic .fsic-mobile-hide {
+            display: none;
+        }
+
+        #section-fsic .fsic-table th:nth-child(1),
+        #section-fsic .fsic-table td:nth-child(1) {
+            width: 42%;
+        }
+
+        #section-fsic .fsic-table th:nth-child(5),
+        #section-fsic .fsic-table td:nth-child(5) {
+            width: 28%;
+        }
+
+        #section-fsic .fsic-table th:nth-child(6),
+        #section-fsic .fsic-table td:nth-child(6) {
+            width: 30%;
+        }
+
+        #section-fsic .fsic-table-wrap {
+            min-height: 18rem;
+            padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #section-fsic .fsic-table td,
+        #section-fsic .fsic-table th {
+            padding: 0.78rem 0.55rem;
+            white-space: normal;
+            vertical-align: middle;
+        }
+
+        #section-fsic .fsic-table th {
+            font-size: 0.61rem;
+            letter-spacing: 0.055em;
+        }
+
+        #section-fsic .fsic-table td {
+            font-size: 0.76rem;
+        }
+
+        #section-fsic .fsic-table td:first-child {
+            overflow-wrap: anywhere;
+            font-size: 0.74rem;
+            line-height: 1.25;
+        }
+
+        #section-fsic .fsic-table td:nth-child(5) span {
+            display: inline-flex;
+            max-width: 100%;
+            align-items: center;
+            justify-content: center;
+            padding: 0.35rem 0.42rem;
+            font-size: 0.63rem;
+            line-height: 1.1;
+            white-space: normal;
+            text-align: center;
+        }
+
+        #section-fsic .fsic-actions {
+            justify-content: flex-end;
+            gap: 0.3rem;
+        }
+
+        #section-fsic .fsic-action {
+            padding: 0.38rem 0.48rem;
+            font-size: 0.68rem;
+        }
+
+        #section-fsic .fsic-empty-cell {
+            padding-block: 4.75rem !important;
+        }
+
+        #section-fsic .fsic-mobile-bottom-space {
+            display: block;
+            height: calc(2.25rem + env(safe-area-inset-bottom, 0px));
+        }
+    }
+</style>
+
+<div id="section-fsic" class="content-section fsic-page">
+    <div class="fsic-shell">
+        <section class="fsic-hero">
+            <div class="fsic-hero-grid">
+                <div>
+                    <span class="fsic-eyebrow"><i class="fa-solid fa-certificate"></i> Citizen requests</span>
+                    <h1 class="fsic-title">Fire Safety Inspection Certificate</h1>
+                    <p class="fsic-subtitle">Request, track, and manage your FSIC applications from your citizen portal.</p>
+                </div>
+
+                <div class="fsic-hero-actions">
+                    <span class="fsic-pill">
+                        <i class="fa-solid fa-file-circle-exclamation"></i>
+                        <span><span id="fsicPendingCount">{{ $fsicPendingTotal }}</span> Pending Requests</span>
+                    </span>
+
+                    <button type="button" onclick="openNewFsicModal()" class="fsic-primary-btn">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>New Request</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="fsic-stats" aria-label="FSIC request summary">
+            <div class="fsic-card" style="--fsic-glow:rgba(245,158,11,0.14);--fsic-icon-bg:#fffbeb;--fsic-icon-color:#d97706;">
+                <div class="fsic-card-top">
+                    <div>
+                        <p class="fsic-card-label">Pending</p>
+                        <p class="fsic-card-value">{{ $fsicPendingTotal }}</p>
+                    </div>
+                    <div class="fsic-card-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+                </div>
+                <p class="fsic-card-copy">Requests waiting for review or initial processing.</p>
+            </div>
+
+            <div class="fsic-card" style="--fsic-glow:rgba(37,99,235,0.1);--fsic-icon-bg:#eff6ff;--fsic-icon-color:#2563eb;">
+                <div class="fsic-card-top">
+                    <div>
+                        <p class="fsic-card-label">Inspection</p>
+                        <p class="fsic-card-value">{{ $fsicInspectionTotal }}</p>
+                    </div>
+                    <div class="fsic-card-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                </div>
+                <p class="fsic-card-copy">Requests currently scheduled or marked inspected.</p>
+            </div>
+
+            <div class="fsic-card" style="--fsic-glow:rgba(5,150,105,0.12);--fsic-icon-bg:#ecfdf5;--fsic-icon-color:#059669;">
+                <div class="fsic-card-top">
+                    <div>
+                        <p class="fsic-card-label">Approved</p>
+                        <p class="fsic-card-value">{{ $fsicApprovedTotal }}</p>
+                    </div>
+                    <div class="fsic-card-icon"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+                <p class="fsic-card-copy">Approved certificates ready for next actions.</p>
+            </div>
+        </section>
+
+        <section class="fsic-panel">
+            <div class="fsic-panel-head">
+                <span class="fsic-eyebrow"><i class="fa-solid fa-list-check"></i> Applications</span>
+                <h2 class="fsic-panel-title">My FSIC Requests</h2>
+                <p class="fsic-panel-copy">Review your applications, track status updates, and continue pending request actions.</p>
+            </div>
+
+            <div class="fsic-table-wrap">
+            <table class="fsic-table text-left">
+                <thead>
                     <tr>
                         <th class="px-6 py-3">Request Code</th>
-                        <th class="px-6 py-3">Date</th>
-                        <th class="px-6 py-3">Business Name</th>
-                        <th class="px-6 py-3">Owner</th>
+                        <th class="px-6 py-3 fsic-mobile-hide">Date</th>
+                        <th class="px-6 py-3 fsic-mobile-hide">Business Name</th>
+                        <th class="px-6 py-3 fsic-mobile-hide">Owner</th>
                         <th class="px-6 py-3">Status</th>
                         <th class="px-6 py-3">Actions</th>
                     </tr>
@@ -48,13 +547,13 @@
                         <td class="px-6 py-4 font-medium">
                             {{ $request->request_code }}
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 fsic-mobile-hide">
                             {{ $request->date_requested->format('M d, Y') }}
                         </td>
-                        <td class="px-6 py-4 font-medium">
+                        <td class="px-6 py-4 font-medium fsic-mobile-hide">
                             {{ $request->business_name }}
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 fsic-mobile-hide">
                             {{ $request->owner_name }}
                         </td>
                         <td class="px-6 py-4">
@@ -72,21 +571,21 @@
                             </span>
                         </td>
                         <td class="px-6 py-4">
-                            <div class="flex gap-2">
-                                <button class="text-orange-600 text-xs hover:underline" onclick="viewFsicDetails({{ $request->id }})">
+                            <div class="fsic-actions">
+                                <button class="fsic-action" onclick="viewFsicDetails({{ $request->id }})">
                                     View
                                 </button>
                                 @if($request->status == 'approved' && optional($request->approval)->date_issued === null)
-                                <button class="text-green-600 text-xs hover:underline" onclick="claimFsicRequest({{ $request->id }})">
+                                <button class="fsic-action fsic-action--green" onclick="claimFsicRequest({{ $request->id }})">
                                     Claim
                                 </button>
                                 @endif
                                 
                                 @if($request->status == 'pending')
-                                <button class="text-blue-600 text-xs hover:underline" onclick="editFsicRequest({{ $request->id }})">
+                                <button class="fsic-action fsic-action--blue" onclick="editFsicRequest({{ $request->id }})">
                                     Edit
                                 </button>
-                                <button class="text-red-600 text-xs hover:underline" onclick="cancelFsicRequest({{ $request->id }})">
+                                <button class="fsic-action fsic-action--red" onclick="cancelFsicRequest({{ $request->id }})">
                                     Cancel
                                 </button>
                                 @endif
@@ -94,15 +593,17 @@
                         </td>
                     </tr>
                     @empty
-                    <tr>
-                        <td colspan="6" class="text-center py-10 text-gray-500">
-                            No FSIC requests yet. Click "New Request" to apply.
-                        </td>
-                    </tr>
+                        <tr>
+                            <td colspan="6" class="fsic-empty-cell text-center py-10 text-gray-500">
+                                No FSIC requests yet. Click "New Request" to apply.
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
-        </div>
+            </div>
+        </section>
+        <div class="fsic-mobile-bottom-space" aria-hidden="true"></div>
     </div>
 </div>
 
@@ -505,23 +1006,23 @@ function getFsicRowMarkup(request) {
     return `
         <tr class="border-b hover:bg-gray-50" id="request-row-${request.id}">
             <td class="px-6 py-4 font-medium">${escapeHtml(request.request_code || 'N/A')}</td>
-            <td class="px-6 py-4">${formatFsicDate(request.date_requested)}</td>
-            <td class="px-6 py-4 font-medium">${escapeHtml(request.business_name || 'N/A')}</td>
-            <td class="px-6 py-4">${escapeHtml(request.owner_name || 'N/A')}</td>
+            <td class="px-6 py-4 fsic-mobile-hide">${formatFsicDate(request.date_requested)}</td>
+            <td class="px-6 py-4 font-medium fsic-mobile-hide">${escapeHtml(request.business_name || 'N/A')}</td>
+            <td class="px-6 py-4 fsic-mobile-hide">${escapeHtml(request.owner_name || 'N/A')}</td>
             <td class="px-6 py-4">
                 <span class="px-2 py-1 text-xs rounded-full ${getFsicStatusClass(request.status)}">
                     ${escapeHtml(formatFsicStatus(request.status))}
                 </span>
             </td>
             <td class="px-6 py-4">
-                <div class="flex gap-2">
-                    <button type="button" class="text-orange-600 text-xs hover:underline" onclick="viewFsicDetails(${request.id})">View</button>
+                <div class="fsic-actions">
+                    <button type="button" class="fsic-action" onclick="viewFsicDetails(${request.id})">View</button>
                     ${canClaim ? `
-                        <button type="button" class="text-green-600 text-xs hover:underline" onclick="claimFsicRequest(${request.id})">Claim</button>
+                        <button type="button" class="fsic-action fsic-action--green" onclick="claimFsicRequest(${request.id})">Claim</button>
                     ` : ''}
                     ${canEdit ? `
-                        <button type="button" class="text-blue-600 text-xs hover:underline" onclick="editFsicRequest(${request.id})">Edit</button>
-                        <button type="button" class="text-red-600 text-xs hover:underline" onclick="cancelFsicRequest(${request.id})">Cancel</button>
+                        <button type="button" class="fsic-action fsic-action--blue" onclick="editFsicRequest(${request.id})">Edit</button>
+                        <button type="button" class="fsic-action fsic-action--red" onclick="cancelFsicRequest(${request.id})">Cancel</button>
                     ` : ''}
                 </div>
             </td>
@@ -572,13 +1073,13 @@ function ensureFsicEmptyState() {
         return;
     }
 
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center py-10 text-gray-500">
-                No FSIC requests yet. Click "New Request" to apply.
-            </td>
-        </tr>
-    `;
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="fsic-empty-cell text-center py-10 text-gray-500">
+                    No FSIC requests yet. Click "New Request" to apply.
+                </td>
+            </tr>
+        `;
 
     updateFsicPendingCount();
 }

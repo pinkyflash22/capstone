@@ -1,5 +1,5 @@
 @php
-    $pwaLogo = $pwaLogo ?? 'icon-192x192.png';
+    $pwaLogo = $pwaLogo ?? 'logo.png';
     $pwaThemeColor = $pwaThemeColor ?? '#d14b24';
     $browserLogo = \App\Support\MediaPath::url(config('app.brand_logo_path'));
 @endphp

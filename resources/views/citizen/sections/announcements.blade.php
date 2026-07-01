@@ -1,27 +1,83 @@
-<div id="section-announcements" class="content-section">
+<div id="section-announcements" class="content-section announcements-page">
     <div class="citizen-announcements-shell">
-        <div class="citizen-announcements-topbar">
-            <div>
-                <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Announcements</h1>
-                <p class="text-sm text-gray-500 mt-1">View station and community updates, then react and join the discussion.</p>
+        <section class="citizen-announcements-hero">
+            <div class="citizen-announcements-hero-grid">
+                <div>
+                    <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-bullhorn"></i> Community feed</span>
+                    <h1 class="citizen-announcements-title">Announcements</h1>
+                    <p class="citizen-announcements-subtitle">Follow station updates, safety advisories, and community posts in one social-style feed.</p>
+                </div>
+
+                <div class="citizen-announcements-hero-actions">
+                    <span class="citizen-announcements-pill">
+                        <i class="fa-regular fa-newspaper"></i>
+                        <span><span id="citizenAnnouncementsPostCount">0</span> Posts</span>
+                    </span>
+                    <button type="button" class="citizen-announcements-refresh" id="citizenAnnouncementsRefresh">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        Refresh
+                    </button>
+                </div>
             </div>
-            <button type="button" class="citizen-announcements-refresh" id="citizenAnnouncementsRefresh">
-                <i class="fa-solid fa-rotate-right"></i>
-                Refresh
-            </button>
-        </div>
+        </section>
+
+        <section class="citizen-announcements-stats" aria-label="Announcements summary">
+            <div class="citizen-announcements-stat" style="--ann-glow:rgba(239,68,68,0.12);--ann-icon-bg:#fef2f2;--ann-icon-color:#dc2626;">
+                <div class="citizen-announcements-stat-top">
+                    <div>
+                        <p class="citizen-announcements-stat-label">Important</p>
+                        <p class="citizen-announcements-stat-value" id="citizenAnnouncementsImportantCount">0</p>
+                    </div>
+                    <div class="citizen-announcements-stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                </div>
+                <p class="citizen-announcements-stat-copy">Pinned advisories and high-priority updates.</p>
+            </div>
+
+            <div class="citizen-announcements-stat" style="--ann-glow:rgba(245,158,11,0.14);--ann-icon-bg:#fffbeb;--ann-icon-color:#d97706;">
+                <div class="citizen-announcements-stat-top">
+                    <div>
+                        <p class="citizen-announcements-stat-label">Reactions</p>
+                        <p class="citizen-announcements-stat-value" id="citizenAnnouncementsLikeCount">0</p>
+                    </div>
+                    <div class="citizen-announcements-stat-icon"><i class="fa-regular fa-thumbs-up"></i></div>
+                </div>
+                <p class="citizen-announcements-stat-copy">Community likes across visible posts.</p>
+            </div>
+
+            <div class="citizen-announcements-stat" style="--ann-glow:rgba(5,150,105,0.12);--ann-icon-bg:#ecfdf5;--ann-icon-color:#059669;">
+                <div class="citizen-announcements-stat-top">
+                    <div>
+                        <p class="citizen-announcements-stat-label">Comments</p>
+                        <p class="citizen-announcements-stat-value" id="citizenAnnouncementsCommentCount">0</p>
+                    </div>
+                    <div class="citizen-announcements-stat-icon"><i class="fa-regular fa-comment"></i></div>
+                </div>
+                <p class="citizen-announcements-stat-copy">Citizen discussion and feedback count.</p>
+            </div>
+        </section>
 
         <div class="citizen-announcements-toolbar">
             <div class="citizen-announcements-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="citizenAnnouncementsSearch" placeholder="Search by poster name or content">
             </div>
-            <select id="citizenAnnouncementsSort" class="citizen-announcements-sort">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="author">Author A-Z</option>
-                <option value="important">Important first</option>
-            </select>
+            <div class="citizen-announcements-filter-control" aria-label="Sort announcements">
+                <button type="button" class="citizen-announcements-filter-button" data-announcement-filter-toggle="sort" aria-label="Sort announcements" aria-expanded="false">
+                    <i class="fa-solid fa-arrow-down-wide-short citizen-announcements-filter-icon" aria-hidden="true"></i>
+                </button>
+                <select id="citizenAnnouncementsSort" class="citizen-announcements-sort">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="author">Author A-Z</option>
+                    <option value="important">Important first</option>
+                </select>
+                <div class="citizen-announcements-filter-menu" data-announcement-filter-menu="sort" hidden>
+                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="newest">Newest first</button>
+                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="oldest">Oldest first</button>
+                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="author">Author A-Z</button>
+                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="important">Important first</button>
+                </div>
+            </div>
         </div>
 
         <div id="citizenAnnouncementsFeed" class="citizen-announcements-feed">
@@ -30,6 +86,7 @@
                 <p>Loading announcements...</p>
             </div>
         </div>
+        <div class="citizen-announcements-mobile-bottom-space" aria-hidden="true"></div>
     </div>
 </div>
 
@@ -46,42 +103,174 @@
 </div>
 
 <style>
+    #section-announcements.announcements-page {
+        --ann-red: #c63d26;
+        --ann-red-dark: #9f2f1d;
+        --ann-orange: #e39b17;
+        --ann-ink: #132033;
+        --ann-muted: #64748b;
+        width: min(100%, 1180px);
+        margin-inline: auto;
+        padding: clamp(0.85rem, 1.45vw, 1.35rem);
+        padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+        color: var(--ann-ink);
+    }
     .citizen-announcements-shell {
-        max-width: 980px;
+        max-width: 1040px;
         margin: 0 auto;
         display: grid;
-        gap: 1.25rem;
+        gap: clamp(1rem, 2vw, 1.35rem);
     }
-    .citizen-announcements-topbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
+    .citizen-announcements-hero,
+    .citizen-announcements-stat,
+    .citizen-announcements-toolbar,
+    .citizen-announcement-card {
+        border: 1px solid rgba(120, 53, 15, 0.11);
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 18px 40px rgba(88, 43, 20, 0.075);
+    }
+    .citizen-announcements-hero {
+        position: relative;
+        overflow: hidden;
+        border-color: rgba(198, 61, 38, 0.16);
+        border-radius: 2rem;
+        background:
+            radial-gradient(circle at 92% 12%, rgba(227, 155, 23, 0.24), transparent 16rem),
+            linear-gradient(135deg, rgba(255, 248, 237, 0.98), rgba(255, 255, 255, 0.96));
+        padding: clamp(1.1rem, 3vw, 1.75rem);
+    }
+    .citizen-announcements-hero-grid {
+        display: grid;
         gap: 1rem;
-        margin-bottom: 0.25rem;
+    }
+    .citizen-announcements-eyebrow {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        background: rgba(198, 61, 38, 0.1);
+        color: var(--ann-red-dark);
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.7rem;
+    }
+    .citizen-announcements-title {
+        margin-top: 0.8rem;
+        color: var(--ann-ink);
+        font-size: clamp(1.85rem, 5vw, 2.85rem);
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -0.055em;
+    }
+    .citizen-announcements-subtitle {
+        max-width: 44rem;
+        margin-top: 0.75rem;
+        color: var(--ann-muted);
+        font-size: clamp(0.94rem, 2.4vw, 1.03rem);
+        line-height: 1.7;
+    }
+    .citizen-announcements-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .citizen-announcements-pill,
+    .citizen-announcements-refresh {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.62rem;
+        border-radius: 1rem;
+        font-size: 0.9rem;
+        font-weight: 850;
     }
     .citizen-announcements-refresh {
-        border: 1px solid rgba(226, 232, 240, 0.95);
-        background: #fff;
-        color: #334155;
+        border: 0;
+        background: linear-gradient(135deg, var(--ann-red), var(--ann-orange));
+        color: #fff;
+        padding: 0.82rem 1.1rem;
+        box-shadow: 0 16px 34px rgba(198, 61, 38, 0.24);
+        cursor: pointer;
+    }
+    .citizen-announcements-pill {
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        background: linear-gradient(135deg, #fffbeb, #fff7ed);
+        color: #b45309;
+        padding: 0.72rem 1rem;
+    }
+    .citizen-announcements-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+    .citizen-announcements-stat {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.6rem;
+        padding: 1.1rem;
+    }
+    .citizen-announcements-stat::after {
+        content: '';
+        position: absolute;
+        inset: auto -2rem -3rem auto;
+        width: 8rem;
+        height: 8rem;
         border-radius: 999px;
-        padding: 0.8rem 1rem;
-        font-size: 0.875rem;
-        font-weight: 700;
+        background: var(--ann-glow, rgba(198, 61, 38, 0.08));
+    }
+    .citizen-announcements-stat-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+    }
+    .citizen-announcements-stat-label {
+        color: var(--ann-muted);
+        font-size: 0.82rem;
+        font-weight: 750;
+    }
+    .citizen-announcements-stat-value {
+        margin-top: 0.42rem;
+        color: var(--ann-ink);
+        font-size: clamp(2rem, 6vw, 2.65rem);
+        font-weight: 950;
+        letter-spacing: -0.055em;
+        line-height: 1;
+    }
+    .citizen-announcements-stat-icon {
         display: inline-flex;
+        width: 3rem;
+        height: 3rem;
+        flex: 0 0 3rem;
         align-items: center;
-        gap: 0.5rem;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+        justify-content: center;
+        border-radius: 1.05rem;
+        background: var(--ann-icon-bg, #fff7ed);
+        color: var(--ann-icon-color, #c2410c);
+        font-size: 1.1rem;
+    }
+    .citizen-announcements-stat-copy {
+        position: relative;
+        z-index: 1;
+        margin-top: 0.9rem;
+        color: var(--ann-muted);
+        font-size: 0.78rem;
+        line-height: 1.55;
     }
     .citizen-announcements-toolbar {
         display: flex;
         gap: 0.9rem;
         flex-wrap: wrap;
         align-items: center;
-        background: linear-gradient(135deg, #fff8f2 0%, #ffffff 100%);
-        border: 1px solid rgba(226, 232, 240, 0.9);
         border-radius: 1.5rem;
         padding: 1rem;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+        background: linear-gradient(135deg, rgba(255, 248, 237, 0.74), rgba(255, 255, 255, 0.96));
     }
     .citizen-announcements-search {
         flex: 1 1 320px;
@@ -112,14 +301,23 @@
         padding: 0.8rem 1rem;
         box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
     }
+    .citizen-announcements-filter-control {
+        position: relative;
+        min-width: 0;
+    }
+    .citizen-announcements-filter-icon,
+    .citizen-announcements-filter-button,
+    .citizen-announcements-filter-menu {
+        display: none;
+    }
+    .citizen-announcements-filter-option {
+        font: inherit;
+    }
     .citizen-announcements-feed {
         display: grid;
         gap: 1rem;
     }
     .citizen-announcement-card {
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
-        background: #fff;
         border-radius: 1.5rem;
         overflow: hidden;
     }
@@ -135,8 +333,8 @@
         min-width: 0;
     }
     .citizen-announcement-avatar {
-        width: 46px;
-        height: 46px;
+        width: 48px;
+        height: 48px;
         flex-shrink: 0;
         border-radius: 999px;
         display: flex;
@@ -183,7 +381,7 @@
     .citizen-announcement-media {
         display: grid;
         gap: 0.65rem;
-        background: #f8fafc;
+        background: linear-gradient(135deg, #f8fafc, #fff7ed);
         padding: 0.75rem;
         border-radius: 1rem;
     }
@@ -236,6 +434,8 @@
         gap: 1rem;
         color: #64748b;
         font-size: 0.86rem;
+        border-top: 1px solid rgba(226, 232, 240, 0.8);
+        padding-top: 0.75rem;
     }
     .citizen-announcement-actions {
         display: flex;
@@ -290,6 +490,9 @@
         color: #fff;
         font-weight: 700;
         cursor: pointer;
+    }
+    .citizen-announcements-mobile-bottom-space {
+        display: none;
     }
     .citizen-announcement-comment-list {
         display: grid;
@@ -511,15 +714,230 @@
         color: #94a3b8;
         font-size: 0.9rem;
     }
+    @media (min-width: 760px) {
+        .citizen-announcements-hero-grid {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+        }
+    }
     @media (max-width: 640px) {
-        .citizen-announcements-topbar {
-            flex-direction: column;
+        #section-announcements.announcements-page {
+            width: 100%;
+            padding: 1rem;
+            padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+        }
+        .citizen-announcements-shell {
+            gap: 1rem;
+        }
+        .citizen-announcements-hero {
+            border-radius: 1.4rem;
+            box-shadow: none;
+            padding: 1.35rem 1rem 1.05rem;
+        }
+        .citizen-announcements-title {
+            max-width: 17rem;
+            font-size: 2rem;
+            line-height: 1.05;
+        }
+        .citizen-announcements-subtitle {
+            max-width: 18rem;
+            font-size: 0.93rem;
+            line-height: 1.58;
+        }
+        .citizen-announcements-hero-actions,
+        .citizen-announcements-refresh,
+        .citizen-announcements-pill {
+            width: 100%;
+        }
+        .citizen-announcements-stats {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+        .citizen-announcements-stat {
+            min-height: 8.25rem;
+            border-radius: 1rem;
+            padding: 0.72rem;
+            box-shadow: none;
+        }
+        .citizen-announcements-stat-top {
+            display: grid;
+            gap: 0.55rem;
+        }
+        .citizen-announcements-stat-icon {
+            order: -1;
+            width: 2.25rem;
+            height: 2.25rem;
+            flex-basis: 2.25rem;
+            border-radius: 0.78rem;
+            font-size: 0.95rem;
+        }
+        .citizen-announcements-stat-label {
+            font-size: 0.68rem;
+            line-height: 1.18;
+        }
+        .citizen-announcements-stat-value {
+            margin-top: 0.28rem;
+            font-size: 1.7rem;
+        }
+        .citizen-announcements-stat-copy {
+            display: none;
+        }
+        .citizen-announcements-toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.55rem;
+            border-radius: 1.2rem;
+            box-shadow: none;
+            padding: 0.75rem;
+        }
+        .citizen-announcements-search {
+            min-width: 0;
+            flex-basis: auto;
+            padding: 0.72rem 0.8rem;
+        }
+        .citizen-announcements-search input {
+            font-size: 0.84rem;
+        }
+        .citizen-announcements-filter-control {
+            min-height: 46px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 1rem;
+            background: #fff;
+            color: #c2410c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
+        }
+        .citizen-announcements-filter-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        .citizen-announcements-filter-control .citizen-announcements-sort {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            min-width: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .citizen-announcements-filter-button {
+            display: inline-flex;
+            width: 100%;
+            height: 100%;
+            min-height: 46px;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: inherit;
+            background: transparent;
+            color: inherit;
+        }
+        .citizen-announcements-filter-menu {
+            display: block;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.5rem);
+            z-index: 30;
+            width: max-content;
+            min-width: 11.5rem;
+            max-width: calc(100vw - 2rem);
+            border: 1px solid rgba(198, 61, 38, 0.14);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 18px 40px rgba(88, 43, 20, 0.16);
+            padding: 0.35rem;
+        }
+        .citizen-announcements-filter-menu[hidden] {
+            display: none;
+        }
+        .citizen-announcements-filter-option {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            border: 0;
+            border-radius: 0.75rem;
+            background: transparent;
+            color: #334155;
+            padding: 0.68rem 0.78rem;
+            text-align: left;
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+        .citizen-announcements-filter-option.is-active {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+        .citizen-announcement-card {
+            border-radius: 1.2rem;
+            box-shadow: none;
         }
         .citizen-announcement-head {
             flex-direction: column;
+            gap: 0.7rem;
+            padding: 1rem 1rem 0;
+        }
+        .citizen-announcement-avatar {
+            width: 42px;
+            height: 42px;
+        }
+        .citizen-announcement-name {
+            font-size: 0.94rem;
+        }
+        .citizen-announcement-role,
+        .citizen-announcement-meta {
+            font-size: 0.76rem;
         }
         .citizen-announcement-badges {
             justify-content: flex-start;
+        }
+        .citizen-announcement-body {
+            padding: 0.85rem 1rem 1rem;
+            gap: 0.75rem;
+        }
+        .citizen-announcement-text {
+            font-size: 0.9rem;
+            line-height: 1.62;
+        }
+        .citizen-announcement-media {
+            margin-inline: -0.15rem;
+            padding: 0.5rem;
+            border-radius: 0.95rem;
+        }
+        .citizen-announcement-media img,
+        .citizen-announcement-media video {
+            max-height: 320px;
+            border-radius: 0.8rem;
+        }
+        .citizen-announcement-stats {
+            gap: 0.7rem;
+            font-size: 0.78rem;
+        }
+        .citizen-announcement-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+        .citizen-announcement-action,
+        .citizen-announcement-comment-submit {
+            justify-content: center;
+            padding: 0.68rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        .citizen-announcement-comment-form {
+            grid-template-columns: 1fr;
+        }
+        .citizen-announcement-comment-input {
+            border-radius: 1rem;
+            font-size: 0.86rem;
+        }
+        .citizen-announcements-mobile-bottom-space {
+            display: block;
+            height: calc(2.25rem + env(safe-area-inset-bottom, 0px));
         }
     }
     @media (max-width: 980px) {
@@ -536,6 +954,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('citizenAnnouncementsSearch');
     const sortSelect = document.getElementById('citizenAnnouncementsSort');
     const refreshButton = document.getElementById('citizenAnnouncementsRefresh');
+    const postCountNode = document.getElementById('citizenAnnouncementsPostCount');
+    const importantCountNode = document.getElementById('citizenAnnouncementsImportantCount');
+    const likeCountNode = document.getElementById('citizenAnnouncementsLikeCount');
+    const commentCountNode = document.getElementById('citizenAnnouncementsCommentCount');
 
     if (!feed || !searchInput || !sortSelect || !refreshButton) {
         return;
@@ -657,6 +1079,25 @@ document.addEventListener('DOMContentLoaded', function () {
         return new Date(right.created_at || 0) - new Date(left.created_at || 0);
     }
 
+    function updateAnnouncementSummary() {
+        const posts = announcementState.posts;
+        const importantCount = posts.filter((post) => Boolean(post.is_important)).length;
+        const likeCount = posts.reduce((total, post) => total + Number(post.likes_count || 0), 0);
+        const commentCount = posts.reduce((total, post) => total + Number(post.comments_count || 0), 0);
+
+        if (postCountNode) postCountNode.textContent = posts.length;
+        if (importantCountNode) importantCountNode.textContent = importantCount;
+        if (likeCountNode) likeCountNode.textContent = likeCount;
+        if (commentCountNode) commentCountNode.textContent = commentCount;
+    }
+
+    function syncAnnouncementFilterMenus() {
+        document.querySelectorAll('[data-announcement-filter-target]').forEach((option) => {
+            const select = document.getElementById(option.dataset.announcementFilterTarget || '');
+            option.classList.toggle('is-active', Boolean(select && String(select.value) === String(option.dataset.announcementFilterValue)));
+        });
+    }
+
     function applyFilters() {
         const query = searchInput.value.trim().toLowerCase();
         const sortValue = sortSelect.value;
@@ -670,6 +1111,8 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .sort((left, right) => comparePosts(left, right, sortValue));
 
+        updateAnnouncementSummary();
+        syncAnnouncementFilterMenus();
         renderFeed();
     }
 
@@ -964,6 +1407,49 @@ document.addEventListener('DOMContentLoaded', function () {
     searchInput.addEventListener('input', applyFilters);
     sortSelect.addEventListener('change', applyFilters);
     refreshButton.addEventListener('click', loadAnnouncements);
+
+    document.querySelectorAll('[data-announcement-filter-toggle]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const key = button.dataset.announcementFilterToggle || '';
+            const menu = document.querySelector(`[data-announcement-filter-menu="${key}"]`);
+            if (!menu) return;
+            const willOpen = menu.hasAttribute('hidden');
+
+            document.querySelectorAll('[data-announcement-filter-menu]').forEach((otherMenu) => {
+                otherMenu.setAttribute('hidden', '');
+            });
+            document.querySelectorAll('[data-announcement-filter-toggle]').forEach((otherButton) => {
+                otherButton.setAttribute('aria-expanded', 'false');
+            });
+
+            if (willOpen) {
+                menu.removeAttribute('hidden');
+                button.setAttribute('aria-expanded', 'true');
+                syncAnnouncementFilterMenus();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-announcement-filter-target]').forEach((option) => {
+        option.addEventListener('click', () => {
+            const select = document.getElementById(option.dataset.announcementFilterTarget || '');
+            if (!select) return;
+
+            select.value = option.dataset.announcementFilterValue || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            document.querySelectorAll('[data-announcement-filter-menu]').forEach((menu) => menu.setAttribute('hidden', ''));
+            document.querySelectorAll('[data-announcement-filter-toggle]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('#section-announcements .citizen-announcements-filter-control')) {
+            document.querySelectorAll('[data-announcement-filter-menu]').forEach((menu) => menu.setAttribute('hidden', ''));
+            document.querySelectorAll('[data-announcement-filter-toggle]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+        }
+    });
+
     document.getElementById('citizenAnnouncementMediaDrawer')?.addEventListener('click', (event) => {
         if (event.target.id === 'citizenAnnouncementMediaDrawer') {
             closeMediaDrawer();
