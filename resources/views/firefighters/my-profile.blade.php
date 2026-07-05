@@ -33,7 +33,7 @@
         ])->filter()->join(', ');
     @endphp
 
-    <style>
+    <style data-ff-page-style="profile">
         .profile-shell {
             display: grid;
             gap: 24px;
@@ -507,6 +507,7 @@
 <body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'profile'])
 
+    <div data-ff-page-root="profile">
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'My Profile',
@@ -797,6 +798,7 @@
             @endif
         });
     </script>
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

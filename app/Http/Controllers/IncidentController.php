@@ -16,6 +16,7 @@ use App\Support\UserActivityLogger;
 use App\Services\IncidentAutoAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -39,6 +40,7 @@ class IncidentController extends Controller
     private const STATUS_NAME_ON_SCENE = 'on-scene';
     private const STATUS_NAME_CONTROLLED = 'controlled';
     private const STATUS_NAME_CLOSED = 'closed';
+    private const LATEST_INCIDENTS_CACHE_SECONDS = 10;
 
     private function resolveIncidentTypeLabel(?Incident $incident): string
     {
@@ -145,10 +147,12 @@ class IncidentController extends Controller
 
     private function supportsBarangayResolution(): bool
     {
-        return Schema::hasColumn('incidents', 'barangay_id')
-            && Schema::hasColumn('incidents', 'barangay_resolution_status')
-            && Schema::hasColumn('incidents', 'barangay_resolution_source')
-            && Schema::hasColumn('incidents', 'barangay_resolved_at');
+        return Cache::rememberForever('schema:incident:barangay-resolution', function () {
+            return Schema::hasColumn('incidents', 'barangay_id')
+                && Schema::hasColumn('incidents', 'barangay_resolution_status')
+                && Schema::hasColumn('incidents', 'barangay_resolution_source')
+                && Schema::hasColumn('incidents', 'barangay_resolved_at');
+        });
     }
 
     private function serializeIncident(Incident $incident): array
@@ -799,60 +803,96 @@ class IncidentController extends Controller
     
     public function latest()
     {
-        $stationMarkers = Station::with('marker')
-            ->get()
-            ->filter(fn ($station) => $station->marker && $station->marker->lat !== null && $station->marker->lng !== null)
-            ->values();
+        $coord = Cache::remember('incident:latest:v2', now()->addSeconds(self::LATEST_INCIDENTS_CACHE_SECONDS), function () {
+            $stationMarkers = Cache::remember('incident:latest:station-markers:v1', now()->addMinutes(5), function () {
+                return Station::query()
+                    ->select(['station_id', 'station_name', 'marker_id'])
+                    ->with(['marker:marker_id,lat,lng'])
+                    ->get()
+                    ->filter(fn ($station) => $station->marker && $station->marker->lat !== null && $station->marker->lng !== null)
+                    ->values();
+            });
 
-        $coord = Incident::with($this->getIncidentRelations())
-            ->latest()
-            ->get()
-            ->map(function (Incident $incident) use ($stationMarkers) {
-                $nearestStation = null;
-                $nearestStationDistanceMeters = null;
+            return Incident::query()
+                ->select([
+                    'incident_id',
+                    'marker_id',
+                    'team_id',
+                    'reported_by',
+                    'barangay_id',
+                    'barangay_resolution_status',
+                    'barangay_resolution_source',
+                    'barangay_resolved_at',
+                    'status',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->with([
+                    'marker:marker_id,title,description,lat,lng,status,category,image,updated_at,created_at',
+                    'barangay:barangay_id,barangay_name,city_id',
+                ])
+                ->latest('created_at')
+                ->get()
+                ->map(function (Incident $incident) use ($stationMarkers) {
+                    $nearestStation = null;
+                    $nearestStationDistanceMeters = null;
 
-                if ($incident->marker && $incident->marker->lat !== null && $incident->marker->lng !== null) {
-                    foreach ($stationMarkers as $station) {
-                        $distanceMeters = $this->calculateDistanceMeters(
-                            (float) $incident->marker->lat,
-                            (float) $incident->marker->lng,
-                            (float) $station->marker->lat,
-                            (float) $station->marker->lng
-                        );
+                    if ($incident->marker && $incident->marker->lat !== null && $incident->marker->lng !== null) {
+                        foreach ($stationMarkers as $station) {
+                            $distanceMeters = $this->calculateDistanceMeters(
+                                (float) $incident->marker->lat,
+                                (float) $incident->marker->lng,
+                                (float) $station->marker->lat,
+                                (float) $station->marker->lng
+                            );
 
-                        if ($nearestStationDistanceMeters === null || $distanceMeters < $nearestStationDistanceMeters) {
-                            $nearestStationDistanceMeters = $distanceMeters;
-                            $nearestStation = $station;
+                            if ($nearestStationDistanceMeters === null || $distanceMeters < $nearestStationDistanceMeters) {
+                                $nearestStationDistanceMeters = $distanceMeters;
+                                $nearestStation = $station;
+                            }
                         }
                     }
-                }
 
-                return [
-                    'incident_id' => $incident->incident_id,
-                    'marker_id' => $incident->marker_id,
-                    'team_id' => $incident->team_id,
-                    'reported_by' => $incident->reported_by,
-                    'barangay_id' => $incident->barangay_id,
-                    'barangay_name' => $incident->barangay?->barangay_name,
-                    'barangay_resolution_status' => $incident->barangay_resolution_status ?? 'pending',
-                    'barangay_resolution_source' => $incident->barangay_resolution_source,
-                    'barangay_resolved_at' => optional($incident->barangay_resolved_at)->toISOString(),
-                    'status' => $this->resolveIncidentStatusLabel($incident),
-                    'incident_status' => $this->resolveIncidentStatusLabel($incident),
-                    'incident_status_id' => $this->mapStatusNameToId($incident->status),
-                    'incident_type_id' => null,
-                    'incident_type' => $this->resolveIncidentTypeLabel($incident),
-                    'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
-                    'marker' => $incident->marker,
-                    'created_at' => $incident->created_at,
-                    'updated_at' => $incident->updated_at,
-                    'nearest_station_id' => $nearestStation?->station_id,
-                    'nearest_station_name' => $nearestStation?->station_name,
-                    'nearest_station_distance_meters' => $nearestStationDistanceMeters !== null
-                        ? round($nearestStationDistanceMeters)
-                        : null,
-                ];
-            });
+                    return [
+                        'incident_id' => $incident->incident_id,
+                        'marker_id' => $incident->marker_id,
+                        'team_id' => $incident->team_id,
+                        'reported_by' => $incident->reported_by,
+                        'barangay_id' => $incident->barangay_id,
+                        'barangay_name' => $incident->barangay?->barangay_name,
+                        'barangay_resolution_status' => $incident->barangay_resolution_status ?? 'pending',
+                        'barangay_resolution_source' => $incident->barangay_resolution_source,
+                        'barangay_resolved_at' => optional($incident->barangay_resolved_at)->toISOString(),
+                        'status' => $this->resolveIncidentStatusLabel($incident),
+                        'incident_status' => $this->resolveIncidentStatusLabel($incident),
+                        'incident_status_id' => $this->mapStatusNameToId($incident->status),
+                        'incident_type_id' => null,
+                        'incident_type' => $this->resolveIncidentTypeLabel($incident),
+                        'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
+                        'marker' => $incident->marker ? [
+                            'marker_id' => $incident->marker->marker_id,
+                            'title' => $incident->marker->title,
+                            'description' => $incident->marker->description,
+                            'lat' => $incident->marker->lat,
+                            'lng' => $incident->marker->lng,
+                            'status' => $incident->marker->status,
+                            'category' => $incident->marker->category,
+                            'image' => $incident->marker->image,
+                            'updated_at' => optional($incident->marker->updated_at)->toISOString(),
+                            'created_at' => optional($incident->marker->created_at)->toISOString(),
+                        ] : null,
+                        'created_at' => optional($incident->created_at)->toISOString(),
+                        'updated_at' => optional($incident->updated_at)->toISOString(),
+                        'nearest_station_id' => $nearestStation?->station_id,
+                        'nearest_station_name' => $nearestStation?->station_name,
+                        'nearest_station_distance_meters' => $nearestStationDistanceMeters !== null
+                            ? round($nearestStationDistanceMeters)
+                            : null,
+                    ];
+                })
+                ->values()
+                ->all();
+        });
 
         return response()->json([
             'success' => true,

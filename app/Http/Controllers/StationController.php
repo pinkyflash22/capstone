@@ -6,6 +6,7 @@ use App\Models\Station;
 use App\Models\FullAddress;
 use App\Models\Marker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class StationController extends Controller
@@ -23,7 +24,29 @@ class StationController extends Controller
 public function index()
 {
     try {
-        $stations = Station::with(['marker', 'marker', 'address.barangay.city.province'])->get();
+        $stations = Cache::remember('map:stations:index:v2', now()->addSeconds(45), function () {
+            return Station::query()
+                ->select([
+                    'station_id',
+                    'station_name',
+                    'station_code',
+                    'contact_number',
+                    'email',
+                    'address_id',
+                    'marker_id',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->with([
+                    'marker:marker_id,title,description,lat,lng,status,category,image,markerCategory_id,created_at,updated_at',
+                    'address:address_id,street,barangay_id',
+                    'address.barangay:barangay_id,barangay_name,city_id',
+                    'address.barangay.city:city_id,city_name,province_id',
+                    'address.barangay.city.province:province_id,province_name',
+                ])
+                ->orderBy('station_name')
+                ->get();
+        });
         
         if ($stations->isEmpty()) {
             // Return empty array with success status
@@ -75,6 +98,7 @@ public function updateByMarker(Request $request, $markerId)
     }
     
     $station->update($request->only(['station_name', 'station_code', 'contact_number', 'email']));
+    Cache::forget('map:stations:index:v2');
     
     return response()->json(['success' => true, 'data' => $station]);
 }
@@ -93,6 +117,7 @@ public function updateByMarker(Request $request, $markerId)
         ]);
 
        $data = Station::create($validated);
+        Cache::forget('map:stations:index:v2');
         return response()->json(['success'=>true, 'data'=>$data]);
         // return redirect()->route('admin.dashboard')
         //     ->with('success', 'Station created successfully.');
@@ -132,6 +157,7 @@ public function updateByMarker(Request $request, $markerId)
         ]);
 
         $station->update($validated);
+        Cache::forget('map:stations:index:v2');
 
         return redirect()->route('stations.index')
             ->with('success', 'Station updated successfully.');
@@ -146,6 +172,7 @@ public function updateByMarker(Request $request, $markerId)
         }
 
         $station->delete();
+        Cache::forget('map:stations:index:v2');
 
         return redirect()->route('stations.index')
             ->with('success', 'Station deleted successfully.');

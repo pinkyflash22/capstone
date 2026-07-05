@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\staff;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 // use App\Models\Coordinate;
@@ -41,6 +42,10 @@ use App\Support\UserActivityLogger;
 
 class FirefighterController extends Controller
 {
+    private const REGISTRY_CACHE_SECONDS = 15;
+    private const ASSIGNED_INCIDENTS_CACHE_SECONDS = 10;
+    private const DASHBOARD_CACHE_SECONDS = 20;
+    private const ACTIVE_FIREFIGHTER_LOCATIONS_CACHE_SECONDS = 12;
     private const STATUS_REPORTED = 'reported';
     private const STATUS_RESPONDING = 'en-route';
     private const STATUS_ON_SCENE = 'on-scene';
@@ -142,15 +147,17 @@ class FirefighterController extends Controller
 
     private function resolveUserLocationTable(): ?string
     {
-        if (\Illuminate\Support\Facades\Schema::hasTable('user_locations')) {
-            return 'user_locations';
-        }
+        return Cache::rememberForever('schema:user-location-table', function () {
+            if (\Illuminate\Support\Facades\Schema::hasTable('user_locations')) {
+                return 'user_locations';
+            }
 
-        if (\Illuminate\Support\Facades\Schema::hasTable('user_location')) {
-            return 'user_location';
-        }
+            if (\Illuminate\Support\Facades\Schema::hasTable('user_location')) {
+                return 'user_location';
+            }
 
-        return null;
+            return null;
+        });
     }
 
     protected function getStationOfficerForUserId(?int $userId): ?StationOfficer
@@ -159,9 +166,13 @@ class FirefighterController extends Controller
             return null;
         }
 
-        return StationOfficer::with('station')
-            ->where('user_id', $userId)
-            ->first();
+        return Cache::remember(
+            "firefighter:station-officer:{$userId}",
+            now()->addSeconds(60),
+            fn () => StationOfficer::with('station')
+                ->where('user_id', $userId)
+                ->first()
+        );
     }
 
     protected function getIncidentStatusId(?string $status): int
@@ -218,132 +229,200 @@ class FirefighterController extends Controller
             return null;
         }
 
-        $stationOfficerId = StationOfficer::where('user_id', $userId)->value('station_officer_id');
+        return Cache::remember(
+            "firefighter:user-team:{$userId}",
+            now()->addSeconds(60),
+            function () use ($userId) {
+                $stationOfficerId = StationOfficer::where('user_id', $userId)->value('station_officer_id');
 
-        if (!$stationOfficerId) {
-            return null;
+                if (!$stationOfficerId) {
+                    return null;
+                }
+
+                return Team::where('commander_driver', $stationOfficerId)
+                    ->orWhere('pumper', $stationOfficerId)
+                    ->orWhere('team_leader', $stationOfficerId)
+                    ->orWhere('firefighter_officer_1', $stationOfficerId)
+                    ->orWhere('firefighter_officer_2', $stationOfficerId)
+                    ->orWhere('firefighter_officer_3', $stationOfficerId)
+                    ->orWhere('rescue_radio', $stationOfficerId)
+                    ->first();
+            }
+        );
+    }
+
+    protected function getLatestRouteTimestampsForIncidentIds(array $incidentIds): array
+    {
+        if (empty($incidentIds)) {
+            return [];
         }
 
-        return Team::where('commander_driver', $stationOfficerId)
-            ->orWhere('pumper', $stationOfficerId)
-            ->orWhere('team_leader', $stationOfficerId)
-            ->orWhere('firefighter_officer_1', $stationOfficerId)
-            ->orWhere('firefighter_officer_2', $stationOfficerId)
-            ->orWhere('firefighter_officer_3', $stationOfficerId)
-            ->orWhere('rescue_radio', $stationOfficerId)
-            ->first();
+        return DB::table('routes')
+            ->selectRaw('incident_id, MAX(COALESCE(updated_at, last_updated_at, started_at, created_at)) as latest_route_timestamp')
+            ->whereIn('incident_id', $incidentIds)
+            ->groupBy('incident_id')
+            ->pluck('latest_route_timestamp', 'incident_id')
+            ->toArray();
+    }
+
+    protected function loadTeamIncidentsForRegistry(int $teamId, bool $activeOnly = false)
+    {
+        return Incident::query()
+            ->select([
+                'incident_id',
+                'marker_id',
+                'status',
+                'team_id',
+                'reported_by',
+                'created_at',
+                'updated_at',
+            ])
+            ->with([
+                'marker:marker_id,title,description,lat,lng,status,category,image',
+                'reporter:user_id,first_name,last_name',
+                'team:team_id,team_name',
+            ])
+            ->where('team_id', $teamId)
+            ->when($activeOnly, function ($query) {
+                $query->whereNotIn('status', [self::STATUS_DB_CONTROLLED, self::STATUS_DB_CLOSED]);
+            })
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    protected function transformAssignedIncident(Incident $incident): array
+    {
+        $marker = $incident->marker;
+        $reporter = $incident->reporter;
+        $team = $incident->team;
+
+        return [
+            'incident_id' => $incident->incident_id,
+            'status' => $incident->status,
+            'incident_status_id' => $this->getIncidentStatusId($incident->status),
+            'incident_status_name' => $this->getIncidentStatusLabel($incident->status),
+            'incident_type_id' => null,
+            'incident_type_name' => $this->getIncidentTypeLabel($incident),
+            'team_id' => $incident->team_id,
+            'reported_by' => $incident->reported_by,
+            'created_at' => optional($incident->created_at)->toIso8601String(),
+            'updated_at' => optional($incident->updated_at)->toIso8601String(),
+            'team' => $team ? [
+                'team_id' => $team->team_id,
+                'team_name' => $team->team_name ?? ('Team #' . $team->team_id),
+            ] : null,
+            'reporter' => $reporter ? [
+                'user_id' => $reporter->user_id,
+                'first_name' => $reporter->first_name,
+                'last_name' => $reporter->last_name,
+            ] : null,
+            'marker' => $marker ? [
+                'marker_id' => $marker->marker_id,
+                'title' => $marker->title,
+                'description' => $marker->description,
+                'lat' => $marker->lat,
+                'lng' => $marker->lng,
+                'category' => $marker->category,
+                'image' => $this->normalizeStoredMediaPath($marker->image),
+            ] : null,
+        ];
     }
 
     protected function buildFirefighterIncidentRegistryData(int $userId): array
     {
-        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        return Cache::remember(
+            "firefighter:registry:{$userId}",
+            now()->addSeconds(self::REGISTRY_CACHE_SECONDS),
+            function () use ($userId) {
+                $stationOfficer = $this->getStationOfficerForUserId($userId);
+                $userTeam = $this->resolveUserTeam($userId);
+                $incidents = collect();
 
-        $userTeam = $this->resolveUserTeam($userId);
-        $incidents = collect();
+                if ($userTeam) {
+                    $incidents = $this->loadTeamIncidentsForRegistry((int) $userTeam->team_id);
+                }
 
-        if ($userTeam) {
-            $incidents = Incident::with([
-                    'marker',
-                    'reporter',
-                    'team',
-                    'route',
-                ])
-                ->where('team_id', $userTeam->team_id)
-                ->orderByDesc('created_at')
-                ->get();
-        }
+                $routeArrivalMap = $this->getLatestRouteTimestampsForIncidentIds($incidents->pluck('incident_id')->all());
 
-        $completedIncidents = $incidents->map(function ($incident) {
-            $arrivalRoute = $incident->route
-                ? $incident->route
-                    ->filter(fn ($route) => !empty($route->updated_at))
-                    ->sortByDesc('updated_at')
-                    ->first()
-                : null;
+                $responseDurations = [];
+                $stats = [
+                    'total' => $incidents->count(),
+                    'active' => 0,
+                    'controlled' => 0,
+                    'closed' => 0,
+                    'avg_response_minutes' => 0,
+                ];
 
-            if (!$incident->created_at || !$arrivalRoute?->updated_at) {
-                return null;
+                $mappedIncidents = $incidents->map(function ($incident) use (&$stats, &$responseDurations, $routeArrivalMap) {
+                    $marker = $incident->marker;
+                    $arrivalTimestamp = $routeArrivalMap[$incident->incident_id] ?? null;
+                    $arrivalAt = $arrivalTimestamp ? Carbon::parse($arrivalTimestamp) : null;
+                    $reporterName = trim(($incident->reporter?->first_name ?? '') . ' ' . ($incident->reporter?->last_name ?? ''));
+                    $incidentStatusId = $this->getIncidentStatusId($incident->status);
+
+                    if (in_array($incidentStatusId, [2, 3], true)) {
+                        $stats['active']++;
+                    } elseif ($incidentStatusId === 4) {
+                        $stats['controlled']++;
+                    } elseif ($incidentStatusId === 5) {
+                        $stats['closed']++;
+                    }
+
+                    $responseMinutes = null;
+                    if ($incident->created_at && $arrivalAt) {
+                        $responseMinutes = Carbon::parse($incident->created_at)->diffInMinutes($arrivalAt);
+                        $responseDurations[] = $responseMinutes;
+                    }
+
+                    return [
+                        'incident_id' => $incident->incident_id,
+                        'incident_status_id' => $incidentStatusId,
+                        'incident_status_name' => $this->getIncidentStatusLabel($incident->status),
+                        'incident_type_id' => null,
+                        'incident_type_name' => $this->getIncidentTypeLabel($incident),
+                        'team_id' => $incident->team_id,
+                        'team_name' => $incident->team?->team_name ?? ('Team #' . $incident->team_id),
+                        'marker_id' => $incident->marker_id,
+                        'title' => $marker?->title ?? ('Incident #' . $incident->incident_id),
+                        'description' => $marker?->description,
+                        'location' => $marker?->title ?? 'Unnamed location',
+                        'coordinates' => [
+                            'lat' => $marker?->lat,
+                            'lng' => $marker?->lng,
+                        ],
+                        'reported_at' => optional($incident->created_at)->toIso8601String(),
+                        'updated_at' => optional($incident->updated_at)->toIso8601String(),
+                        'created_at' => optional($incident->created_at)->toIso8601String(),
+                        'arrival_at' => $arrivalAt?->toIso8601String(),
+                        'resolved_at' => in_array($incidentStatusId, [4, 5], true)
+                            ? optional($incident->updated_at)->toIso8601String()
+                            : null,
+                        'response_minutes' => $responseMinutes,
+                        'reporter_name' => $reporterName !== '' ? $reporterName : 'Concerned Citizen',
+                        'status' => $incident->status,
+                        'image_url' => $this->normalizeStoredMediaPath($marker?->image),
+                    ];
+                })->values();
+
+                $stats['avg_response_minutes'] = count($responseDurations) > 0
+                    ? round(array_sum($responseDurations) / count($responseDurations), 1)
+                    : 0;
+
+                return [
+                    'station_officer' => $stationOfficer ? [
+                        'station_officer_id' => $stationOfficer->station_officer_id,
+                        'station_name' => $stationOfficer->station?->station_name,
+                        'rank' => $stationOfficer->rank,
+                    ] : null,
+                    'team' => $userTeam ? [
+                        'team_id' => $userTeam->team_id,
+                        'team_name' => $userTeam->team_name ?? ('Team #' . $userTeam->team_id),
+                    ] : null,
+                    'stats' => $stats,
+                    'incidents' => $mappedIncidents,
+                ];
             }
-
-            return [
-                'incident' => $incident,
-                'response_minutes' => Carbon::parse($incident->created_at)
-                    ->diffInMinutes(Carbon::parse($arrivalRoute->updated_at)),
-                'arrival_at' => Carbon::parse($arrivalRoute->updated_at),
-            ];
-        })->filter();
-
-        $averageResponseMinutes = $completedIncidents->count() > 0
-            ? round((float) ($completedIncidents->sum('response_minutes') / $completedIncidents->count()), 1)
-            : 0;
-
-        $stats = [
-            'total' => $incidents->count(),
-            'active' => $incidents->filter(fn ($incident) => in_array($this->getIncidentStatusId($incident->status), [2, 3], true))->count(),
-            'controlled' => $incidents->filter(fn ($incident) => $this->getIncidentStatusId($incident->status) === 4)->count(),
-            'closed' => $incidents->filter(fn ($incident) => $this->getIncidentStatusId($incident->status) === 5)->count(),
-            'avg_response_minutes' => $averageResponseMinutes,
-        ];
-
-        $mappedIncidents = $incidents->map(function ($incident) {
-            $marker = $incident->marker;
-            $arrivalRoute = $incident->route
-                ? $incident->route
-                    ->filter(fn ($route) => !empty($route->updated_at))
-                    ->sortByDesc('updated_at')
-                    ->first()
-                : null;
-            $arrivalAt = $arrivalRoute?->updated_at ? Carbon::parse($arrivalRoute->updated_at) : null;
-
-            $reporterName = trim(($incident->reporter?->first_name ?? '') . ' ' . ($incident->reporter?->last_name ?? ''));
-            $incidentStatusId = $this->getIncidentStatusId($incident->status);
-
-            return [
-                'incident_id' => $incident->incident_id,
-                'incident_status_id' => $incidentStatusId,
-                'incident_status_name' => $this->getIncidentStatusLabel($incident->status),
-                'incident_type_id' => null,
-                'incident_type_name' => $this->getIncidentTypeLabel($incident),
-                'team_id' => $incident->team_id,
-                'team_name' => $incident->team?->team_name ?? ('Team #' . $incident->team_id),
-                'marker_id' => $incident->marker_id,
-                'title' => $marker?->title ?? ('Incident #' . $incident->incident_id),
-                'description' => $marker?->description,
-                'location' => $marker?->title ?? 'Unnamed location',
-                'coordinates' => [
-                    'lat' => $marker?->lat,
-                    'lng' => $marker?->lng,
-                ],
-                'reported_at' => optional($incident->created_at)->toIso8601String(),
-                'updated_at' => optional($incident->updated_at)->toIso8601String(),
-                'created_at' => optional($incident->created_at)->toIso8601String(),
-                'arrival_at' => $arrivalAt?->toIso8601String(),
-                'resolved_at' => in_array($incidentStatusId, [4, 5], true)
-                    ? optional($incident->updated_at)->toIso8601String()
-                    : null,
-                'response_minutes' => $incident->created_at && $arrivalAt
-                    ? Carbon::parse($incident->created_at)->diffInMinutes($arrivalAt)
-                    : null,
-                'reporter_name' => $reporterName !== '' ? $reporterName : 'Concerned Citizen',
-                'status' => $incident->status,
-                'marker' => $marker,
-                'image_url' => $this->normalizeStoredMediaPath($marker?->image),
-            ];
-        })->values();
-
-        return [
-            'station_officer' => $stationOfficer ? [
-                'station_officer_id' => $stationOfficer->station_officer_id,
-                'station_name' => $stationOfficer->station?->station_name,
-                'rank' => $stationOfficer->rank,
-            ] : null,
-            'team' => $userTeam ? [
-                'team_id' => $userTeam->team_id,
-                'team_name' => $userTeam->team_name ?? ('Team #' . $userTeam->team_id),
-            ] : null,
-            'stats' => $stats,
-            'incidents' => $mappedIncidents,
-        ];
+        );
     }
 
     /**
@@ -353,74 +432,16 @@ class FirefighterController extends Controller
     {
         $user = auth()->user();
         $ids = $user->user_id;
-        $userinfo = User::where('user_id', $ids)->with('role', 'address', 'address.barangay', 'address.barangay.city')->get();
+        $userinfo = User::query()
+            ->where('user_id', $ids)
+            ->with('role', 'address', 'address.barangay', 'address.barangay.city')
+            ->first();
         $stationOfficer = $this->getStationOfficerForUserId($ids);
         $userTeam = $this->resolveUserTeam($ids);
-        $incidentCoords = collect();
+        $dashboardPayload = $this->buildFirefighterDashboardMapPayload($ids, $userTeam, $stationOfficer);
 
-        if ($userTeam) {
-            $incidentCoords = Incident::with(['marker', 'team', 'reporter'])
-                ->where('team_id', $userTeam->team_id)
-                ->whereNotIn('status', [self::STATUS_DB_CONTROLLED, self::STATUS_DB_CLOSED])
-                ->orderByDesc('created_at')
-                ->get();
-        }
-
-        $incidents = $incidentCoords;
-        
-        // Get all markers for the map (stations, incidents, etc.)
-        $allMarkers = \App\Models\Marker::all();
-        
-        // Get stations
-        $stations = \App\Models\Station::with('marker')->get();
-        
-        // Get announcements
-        $posts = \App\Models\Post::with('user')->latest()->take(5)->get();
-        // $incidentCoords = Coordinate::with(['marker', 'image'])
-        //             ->latest()
-        //             // ->take(2)
-        //             ->get();
-        // ->get();
-        
-        $thisStation = $stationOfficer?->station_id;
-
-        //all station officer per station
-        $thiscrew = $thisStation
-            ? StationOfficer::where('station_id', $thisStation)->with(['user.role'])->get()
-            : collect();
-
-        // Keep only the 5 nearest stations from the logged-in firefighter station.
-        $currentStation = $stations->firstWhere('station_id', $thisStation);
-        $originLat = optional($currentStation?->marker)->lat;
-        $originLng = optional($currentStation?->marker)->lng;
-
-        if ($originLat !== null && $originLng !== null) {
-            $stations = $stations
-                ->filter(function ($station) use ($thisStation) {
-                    return $station->station_id != $thisStation &&
-                        optional($station->marker)->lat !== null &&
-                        optional($station->marker)->lng !== null;
-                })
-                ->map(function ($station) use ($originLat, $originLng) {
-                    $station->distance = $this->haversineDistance(
-                        (float) $originLat,
-                        (float) $originLng,
-                        (float) $station->marker->lat,
-                        (float) $station->marker->lng
-                    );
-                    return $station;
-                })
-                ->sortBy('distance')
-                ->take(5)
-                ->values();
-        } else {
-            $stations = $stations
-                ->filter(fn($station) => $station->station_id != $thisStation)
-                ->take(5)
-                ->values();
-        }
-
-        $equipments = Equipment::all();
+        extract($dashboardPayload);
+        $equipments = collect();
         return view('firefighters.dashboard', compact('incidentCoords', 'thiscrew', 'posts', 'stations', 'equipments', 'allMarkers', 'userTeam', 'userinfo', 'incidents', 'thisStation'));
     }
 
@@ -721,39 +742,35 @@ class FirefighterController extends Controller
     public function schedule()
     {
         $userId = Auth::user()->user_id;
-
-        $userinfo = User::with(['role', 'address.barangay.city'])
-            ->where('user_id', $userId)
-            ->get();
-
         $stationOfficer = $this->getStationOfficerForUserId($userId);
         $stationId = $stationOfficer?->station_id;
         $stationName = $stationOfficer?->station?->station_name;
 
-        $scheduleEvents = EventActivity::query()
-            ->where(function ($query) use ($stationId, $userId) {
-                if ($stationId) {
-                    $query->where(function ($stationQuery) use ($stationId) {
-                        $stationQuery->where('station_id', $stationId)
-                            ->whereNull('user_id');
-                    });
-                }
-
-                $query->orWhere('user_id', $userId);
-            })
-            ->orderBy('event_date')
-            ->orderBy('start_time')
-            ->get()
-            ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId))
-            ->values();
-
         return view('firefighters.schedule', compact(
-            'userinfo',
             'stationOfficer',
             'stationId',
-            'stationName',
-            'scheduleEvents'
+            'stationName'
         ));
+    }
+
+    public function dashboardData()
+    {
+        $userId = Auth::user()->user_id;
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->buildFirefighterDashboardWidgetPayload($userId),
+        ]);
+    }
+
+    public function scheduleData()
+    {
+        $userId = Auth::user()->user_id;
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->buildFirefighterSchedulePayload($userId),
+        ]);
     }
 
     public function storeScheduleEvent(Request $request)
@@ -941,11 +958,24 @@ public function updateMyProfile(Request $request)
             }
             // Get all online/active firefighters with their last known locations
             
-            $locations = DB::table($userLocationTable)
-                ->join('users', $userLocationTable . '.user_id', '=', 'users.user_id')
-                ->where($userLocationTable . '.updated_at', '>=', Carbon::now()->subMinutes(5))
-                ->select($userLocationTable . '.*', 'users.first_name', 'users.last_name')
-                ->get();
+            $locations = Cache::remember(
+                'firefighter:locations:active',
+                now()->addSeconds(self::ACTIVE_FIREFIGHTER_LOCATIONS_CACHE_SECONDS),
+                function () use ($userLocationTable) {
+                    return DB::table($userLocationTable)
+                        ->join('users', $userLocationTable . '.user_id', '=', 'users.user_id')
+                        ->where($userLocationTable . '.updated_at', '>=', Carbon::now()->subMinutes(5))
+                        ->select([
+                            $userLocationTable . '.user_id',
+                            $userLocationTable . '.latitude',
+                            $userLocationTable . '.longitude',
+                            $userLocationTable . '.updated_at',
+                            'users.first_name',
+                            'users.last_name',
+                        ])
+                        ->get();
+                }
+            );
             
             return response()->json([
                 'success' => true,
@@ -986,6 +1016,17 @@ public function updateLocation(Request $request)
             ], 422);
         }
 
+        $locationSignature = round((float) $validated['latitude'], 6) . ':' . round((float) $validated['longitude'], 6);
+        $locationCacheKey = "firefighter:location:last-write:{$resolvedUserId}";
+        $lastLocationSignature = Cache::get($locationCacheKey);
+
+        if ($lastLocationSignature === $locationSignature) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Location already current'
+            ]);
+        }
+
         DB::table($userLocationTable)->updateOrInsert(
             ['user_id' => $resolvedUserId],
             [
@@ -995,6 +1036,9 @@ public function updateLocation(Request $request)
                 'created_at' => now()
             ]
         );
+
+        Cache::put($locationCacheKey, $locationSignature, now()->addSeconds(90));
+        Cache::forget('firefighter:locations:active');
         
         return response()->json([
             'success' => true,
@@ -1007,39 +1051,38 @@ public function updateLocation(Request $request)
         ]);
     }
 }
-    public function getAssignedIncidents(string $id){
-        $userTeam = $this->resolveUserTeam((int) $id);
-        $incidentCoords = collect();
+public function getAssignedIncidents(string $id){
+        $cacheKey = "firefighter:assigned:{$id}";
+        $incidentCoords = Cache::remember($cacheKey, now()->addSeconds(self::ASSIGNED_INCIDENTS_CACHE_SECONDS), function () use ($id) {
+            $userTeam = $this->resolveUserTeam((int) $id);
+            if (! $userTeam) {
+                return [];
+            }
 
-        if ($userTeam) {
-            $incidentCoords = Incident::with(['marker', 'team', 'reporter'])
-                ->where('team_id', $userTeam->team_id)
-                ->whereNotIn('status', [self::STATUS_DB_CONTROLLED, self::STATUS_DB_CLOSED])
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(function (Incident $incident) {
-                    return [
-                        ...$incident->toArray(),
-                        'incident_status_id' => $this->getIncidentStatusId($incident->status),
-                        'incident_status_name' => $this->getIncidentStatusLabel($incident->status),
-                        'incident_type_id' => null,
-                        'incident_type_name' => $this->getIncidentTypeLabel($incident),
-                    ];
-                })
-                ->values();
-        }
+            return $this->loadTeamIncidentsForRegistry((int) $userTeam->team_id, true)
+                ->map(fn (Incident $incident) => $this->transformAssignedIncident($incident))
+                ->values()
+                ->all();
+        });
 
         return response()->json(['success'=> true, 'data'=>$incidentCoords]);
     }
 
     public function incidentView(){
         $currentUserId = Auth::user()->user_id;
-        $registryData = $this->buildFirefighterIncidentRegistryData($currentUserId);
+        $stationOfficer = $this->getStationOfficerForUserId($currentUserId);
+        $userTeam = $this->resolveUserTeam($currentUserId);
 
         return view('firefighters.incidents', [
-            'stationOfficer' => $registryData['station_officer'],
-            'userTeam' => $registryData['team'],
-            'initialIncidentStats' => $registryData['stats'],
+            'stationOfficer' => $stationOfficer ? [
+                'station_officer_id' => $stationOfficer->station_officer_id,
+                'station_name' => $stationOfficer->station?->station_name,
+                'rank' => $stationOfficer->rank,
+            ] : null,
+            'userTeam' => $userTeam ? [
+                'team_id' => $userTeam->team_id,
+                'team_name' => $userTeam->team_name ?? ('Team #' . $userTeam->team_id),
+            ] : null,
         ]);
     }
 
@@ -1120,5 +1163,180 @@ public function updateLocation(Request $request)
     public function destroy(string $id)
     {
         //
+    }
+
+    protected function buildFirefighterDashboardMapPayload(int $userId, ?Team $userTeam = null, ?StationOfficer $stationOfficer = null): array
+    {
+        $resolvedTeam = $userTeam ?: $this->resolveUserTeam($userId);
+        $resolvedStationOfficer = $stationOfficer ?: $this->getStationOfficerForUserId($userId);
+
+        return Cache::remember(
+            "firefighter:dashboard:map-payload:{$userId}",
+            now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
+            function () use ($resolvedTeam, $resolvedStationOfficer) {
+                $incidentCoords = collect();
+
+                if ($resolvedTeam) {
+                    $incidentCoords = $this->loadTeamIncidentsForRegistry((int) $resolvedTeam->team_id, true);
+                }
+
+                $allMarkers = \App\Models\Marker::query()
+                    ->select(['marker_id', 'title', 'description', 'lat', 'lng', 'status', 'category', 'image'])
+                    ->get();
+
+                $stations = \App\Models\Station::query()
+                    ->select(['station_id', 'station_name', 'marker_id'])
+                    ->with(['marker:marker_id,title,description,lat,lng,status,category,image'])
+                    ->get();
+
+                return [
+                    'incidentCoords' => $incidentCoords,
+                    'incidents' => $incidentCoords,
+                    'allMarkers' => $allMarkers,
+                    'stations' => $stations,
+                    'posts' => collect(),
+                    'thisStation' => $resolvedStationOfficer?->station_id,
+                    'thiscrew' => collect(),
+                ];
+            }
+        );
+    }
+
+    protected function buildFirefighterDashboardWidgetPayload(int $userId): array
+    {
+        return Cache::remember(
+            "firefighter:dashboard:widgets:{$userId}",
+            now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
+            function () use ($userId) {
+                $stationOfficer = $this->getStationOfficerForUserId($userId);
+                $userTeam = $this->resolveUserTeam($userId);
+                $incidentCoords = collect();
+
+                if ($userTeam) {
+                    $incidentCoords = $this->loadTeamIncidentsForRegistry((int) $userTeam->team_id, true);
+                }
+
+                $stations = Station::query()
+                    ->select(['station_id', 'station_name', 'marker_id'])
+                    ->with(['marker:marker_id,lat,lng'])
+                    ->get();
+
+                $thisStation = $stationOfficer?->station_id;
+                $thiscrew = $thisStation
+                    ? StationOfficer::query()
+                        ->select(['station_officer_id', 'station_id', 'user_id', 'rank'])
+                        ->where('station_id', $thisStation)
+                        ->with(['user:user_id,first_name,last_name,role_id', 'user.role:role_id,role'])
+                        ->get()
+                    : collect();
+
+                $currentStation = $stations->firstWhere('station_id', $thisStation);
+                $originLat = optional($currentStation?->marker)->lat;
+                $originLng = optional($currentStation?->marker)->lng;
+
+                if ($originLat !== null && $originLng !== null) {
+                    $stations = $stations
+                        ->filter(function ($station) use ($thisStation) {
+                            return $station->station_id != $thisStation
+                                && optional($station->marker)->lat !== null
+                                && optional($station->marker)->lng !== null;
+                        })
+                        ->map(function ($station) use ($originLat, $originLng) {
+                            $station->distance = $this->haversineDistance(
+                                (float) $originLat,
+                                (float) $originLng,
+                                (float) $station->marker->lat,
+                                (float) $station->marker->lng
+                            );
+
+                            return $station;
+                        })
+                        ->sortBy('distance')
+                        ->take(5)
+                        ->values();
+                } else {
+                    $stations = $stations
+                        ->filter(fn ($station) => $station->station_id != $thisStation)
+                        ->take(5)
+                        ->values();
+                }
+
+                $posts = Post::query()
+                    ->select(['id', 'user_id', 'content', 'likes_count', 'comments_count', 'created_at'])
+                    ->with(['user:user_id,first_name,last_name'])
+                    ->latest()
+                    ->take(5)
+                    ->get();
+
+                return [
+                    'counts' => [
+                        'active_incidents' => $incidentCoords->count(),
+                        'equipment' => 12,
+                        'crew_online' => $thiscrew->count(),
+                    ],
+                    'posts' => $posts->map(function (Post $post) {
+                        return [
+                            'id' => $post->id,
+                            'author_initials' => substr($post->user->first_name ?? 'A', 0, 1) . substr($post->user->last_name ?? 'D', 0, 1),
+                            'author_name' => trim(($post->user->first_name ?? 'Admin') . ' ' . ($post->user->last_name ?? 'Admin')),
+                            'time' => optional($post->created_at)->diffForHumans(),
+                            'content' => $post->content,
+                            'likes_count' => $post->likes_count ?? 0,
+                            'comments_count' => $post->comments_count ?? 0,
+                        ];
+                    })->values(),
+                    'stations' => $stations->map(function (Station $station) {
+                        return [
+                            'station_name' => $station->station_name,
+                            'distance' => number_format((float) ($station->distance ?? 0), 1),
+                        ];
+                    })->values(),
+                    'crew' => $thiscrew->map(function (StationOfficer $crew) {
+                        return [
+                            'initials' => substr($crew->user->first_name ?? 'F', 0, 1) . substr($crew->user->last_name ?? 'F', 0, 1),
+                            'name' => trim(($crew->user->first_name ?? ' ') . ($crew->user->last_name ?? 'Firefighter')),
+                            'role' => ($crew->rank ?? 'Firefighter') . ' · Station ' . $crew->station_id,
+                            'status' => $crew->status ?? 'online',
+                        ];
+                    })->values(),
+                ];
+            }
+        );
+    }
+
+    protected function buildFirefighterSchedulePayload(int $userId): array
+    {
+        return Cache::remember(
+            "firefighter:schedule:{$userId}",
+            now()->addSeconds(20),
+            function () use ($userId) {
+                $stationOfficer = $this->getStationOfficerForUserId($userId);
+                $stationId = $stationOfficer?->station_id;
+                $stationName = $stationOfficer?->station?->station_name;
+
+                $scheduleEvents = EventActivity::query()
+                    ->where(function ($query) use ($stationId, $userId) {
+                        if ($stationId) {
+                            $query->where(function ($stationQuery) use ($stationId) {
+                                $stationQuery->where('station_id', $stationId)
+                                    ->whereNull('user_id');
+                            });
+                        }
+
+                        $query->orWhere('user_id', $userId);
+                    })
+                    ->orderBy('event_date')
+                    ->orderBy('start_time')
+                    ->get()
+                    ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId))
+                    ->values();
+
+                return [
+                    'station_id' => $stationId,
+                    'station_name' => $stationName ?: 'Unassigned Station',
+                    'events' => $scheduleEvents,
+                ];
+            }
+        );
     }
 }

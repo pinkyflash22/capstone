@@ -423,6 +423,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/fsic-requests/{id}', [FirefighterController::class, 'getAssignedFsicRequest'])->name('fsic-requests.show');
         Route::post('/api/fsic-requests/{id}/inspect', [FirefighterController::class, 'submitFsicInspection'])->name('fsic-requests.inspect');
         Route::get('/schedule', [FirefighterController::class, 'schedule'])->name('schedule');
+        Route::get('/api/schedule', [FirefighterController::class, 'scheduleData'])->name('schedule.data');
+        Route::get('/api/dashboard', [FirefighterController::class, 'dashboardData'])->name('dashboard.data');
         Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::put('/schedule/events/{eventActivity}', [FirefighterController::class, 'updateScheduleEvent'])->name('schedule.events.update');
         Route::delete('/schedule/events/{eventActivity}', [FirefighterController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
@@ -450,6 +452,18 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
 
 
     });  
+
+    Route::middleware(['role:firefighter'])->prefix('firefighter-v2')->name('firefighter.v2.')->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'dashboard'])->name('dashboard');
+        Route::get('/incidents', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'incidents'])->name('incidents');
+        Route::get('/api/dashboard', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'dashboardData'])->name('api.dashboard');
+        Route::get('/api/incidents', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'incidentsData'])->name('api.incidents');
+        Route::get('/my-station', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'station'])->name('station');
+        Route::get('/requests', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'requests'])->name('requests');
+        Route::get('/schedule', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'scheduleV2'])->name('schedule');
+        Route::get('/announcements', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'announcements'])->name('announcements');
+        Route::get('/profile', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'profile'])->name('profile');
+    });
 
  Route::middleware(['role:citizen'])->prefix('citizen')->name('citizen.')->group(function () {
         Route::get('/mobile-hub', [PublicController::class, 'mobileHub'])->name('mobile-hub');

@@ -9,42 +9,8 @@ class AnnouncementSystem {
         this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         this.editorPost = null;
         this.activeMediaPostId = null;
-
-        this.init();
-    }
-
-    init() {
-        this.loadPosts(true);
-        this.initializeEventListeners();
-    }
-
-    initializeEventListeners() {
-        window.addEventListener('scroll', () => this.handleInfiniteScroll());
-
-        const postInput = document.getElementById('postContent');
-        if (postInput) {
-            postInput.addEventListener('input', this.autoResizeTextarea);
-        }
-
-        document.getElementById('imageUpload')?.addEventListener('change', (event) => this.handleImageUpload(event));
-        document.getElementById('videoUpload')?.addEventListener('change', (event) => this.handleVideoUpload(event));
-        document.getElementById('togglePollBuilder')?.addEventListener('click', () => {
-            document.getElementById('pollBuilder')?.classList.toggle('active');
-        });
-        document.getElementById('addPollOption')?.addEventListener('click', () => this.addPollOptionField());
-        document.getElementById('closePostEditor')?.addEventListener('click', () => this.closeEditor());
-        document.getElementById('postEditorModal')?.addEventListener('click', (event) => {
-            if (event.target.id === 'postEditorModal') {
-                this.closeEditor();
-            }
-        });
-        document.getElementById('postMediaDrawer')?.addEventListener('click', (event) => {
-            if (event.target.id === 'postMediaDrawer') {
-                this.closeMediaDrawer();
-            }
-        });
-
-        document.addEventListener('click', (event) => {
+        this.handleInfiniteScrollBound = () => this.handleInfiniteScroll();
+        this.documentClickHandler = (event) => {
             const menuTrigger = event.target.closest('[data-post-menu-trigger]');
             if (menuTrigger) {
                 this.togglePostMenu(Number(menuTrigger.dataset.postMenuTrigger));
@@ -70,7 +36,48 @@ class AnnouncementSystem {
             }
 
             this.closeAllMenus();
+        };
+
+        this.init();
+    }
+
+    init() {
+        this.loadPosts(true);
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        window.addEventListener('scroll', this.handleInfiniteScrollBound);
+
+        const postInput = document.getElementById('postContent');
+        if (postInput) {
+            postInput.addEventListener('input', this.autoResizeTextarea);
+        }
+
+        document.getElementById('imageUpload')?.addEventListener('change', (event) => this.handleImageUpload(event));
+        document.getElementById('videoUpload')?.addEventListener('change', (event) => this.handleVideoUpload(event));
+        document.getElementById('togglePollBuilder')?.addEventListener('click', () => {
+            document.getElementById('pollBuilder')?.classList.toggle('active');
         });
+        document.getElementById('addPollOption')?.addEventListener('click', () => this.addPollOptionField());
+        document.getElementById('closePostEditor')?.addEventListener('click', () => this.closeEditor());
+        document.getElementById('postEditorModal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'postEditorModal') {
+                this.closeEditor();
+            }
+        });
+        document.getElementById('postMediaDrawer')?.addEventListener('click', (event) => {
+            if (event.target.id === 'postMediaDrawer') {
+                this.closeMediaDrawer();
+            }
+        });
+
+        document.addEventListener('click', this.documentClickHandler);
+    }
+
+    destroy() {
+        window.removeEventListener('scroll', this.handleInfiniteScrollBound);
+        document.removeEventListener('click', this.documentClickHandler);
     }
 
     autoResizeTextarea() {
@@ -927,6 +934,18 @@ class AnnouncementSystem {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializeAnnouncementSystem() {
+    if (window.announcementSystem?.destroy) {
+        window.announcementSystem.destroy();
+    }
+
     window.announcementSystem = new AnnouncementSystem();
-});
+}
+
+window.initializeAnnouncementSystem = initializeAnnouncementSystem;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeAnnouncementSystem);
+} else {
+    initializeAnnouncementSystem();
+}

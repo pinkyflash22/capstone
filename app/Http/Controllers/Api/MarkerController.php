@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Marker;
@@ -12,10 +13,27 @@ class MarkerController extends Controller
     // GET markers
     public function index()
     {
-        //dito nilalagyan ng laman ung model from database
-        //  $datas = Marker::with('category')->get();
-        
-        return response()->json(Marker::all());
+        $markers = Cache::remember('map:markers:index:v2', now()->addSeconds(20), function () {
+            return Marker::query()
+                ->select([
+                    'marker_id',
+                    'title',
+                    'description',
+                    'lat',
+                    'lng',
+                    'status',
+                    'category',
+                    'image',
+                    'markerCategory_id',
+                    'multimedia_id',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->orderBy('marker_id')
+                ->get();
+        });
+
+        return response()->json($markers);
     }
 
     // SAVE marker
@@ -43,6 +61,8 @@ class MarkerController extends Controller
             'multimedia_id' => $request->input('multimedia_id'),
         ]);
 
+        Cache::forget('map:markers:index:v2');
+
         return response()->json([
             'message' => 'marker saved',
             'marker_id' => $marker->marker_id
@@ -59,11 +79,13 @@ class MarkerController extends Controller
         ]);
 
         $marker->update($request->all());
+        Cache::forget('map:markers:index:v2');
         return redirect()->back()->with('success', 'Marker updated!');
     }
     public function destroy($id){
          $marker = Marker::findOrFail($id);
     $marker->delete();
+    Cache::forget('map:markers:index:v2');
 
     return response()->json([
         'message' => 'Marker deleted successfully'

@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
 
-    <style>
+    <style data-ff-page-style="incidents">
         .incidents-shell { display: grid; gap: 24px; }
         .incidents-summary {
             display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
@@ -194,6 +194,7 @@
 <body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'incidents'])
 
+    <div data-ff-page-root="incidents">
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'Incident Registry',
@@ -214,11 +215,11 @@
             </section>
 
             <section class="stats-grid" id="incidentStatsGrid">
-                <article class="stat-card"><div class="stat-card-label"><span>Total Responded</span><i class="fa-solid fa-list-check"></i></div><div class="stat-card-value" id="statTotal">{{ $initialIncidentStats['total'] ?? 0 }}</div><div class="stat-card-meta">All team incidents tied to your active responder assignment</div></article>
-                <article class="stat-card"><div class="stat-card-label"><span>Active</span><i class="fa-solid fa-bolt"></i></div><div class="stat-card-value" id="statActive">{{ $initialIncidentStats['active'] ?? 0 }}</div><div class="stat-card-meta">Currently responding or on-scene incidents</div></article>
-                <article class="stat-card"><div class="stat-card-label"><span>Controlled</span><i class="fa-solid fa-shield"></i></div><div class="stat-card-value" id="statControlled">{{ $initialIncidentStats['controlled'] ?? 0 }}</div><div class="stat-card-meta">Incidents completed under controlled status</div></article>
-                <article class="stat-card"><div class="stat-card-label"><span>Closed</span><i class="fa-solid fa-folder-check"></i></div><div class="stat-card-value" id="statClosed">{{ $initialIncidentStats['closed'] ?? 0 }}</div><div class="stat-card-meta">Incidents finalized and closed</div></article>
-                <article class="stat-card"><div class="stat-card-label"><span>Avg Response</span><i class="fa-solid fa-stopwatch"></i></div><div class="stat-card-value" id="statAvgResponse">{{ $initialIncidentStats['avg_response_minutes'] ?? 0 }}m</div><div class="stat-card-meta">Based on completed incidents from report time to end time</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Total Responded</span><i class="fa-solid fa-list-check"></i></div><div class="stat-card-value" id="statTotal">--</div><div class="stat-card-meta">All team incidents tied to your active responder assignment</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Active</span><i class="fa-solid fa-bolt"></i></div><div class="stat-card-value" id="statActive">--</div><div class="stat-card-meta">Currently responding or on-scene incidents</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Controlled</span><i class="fa-solid fa-shield"></i></div><div class="stat-card-value" id="statControlled">--</div><div class="stat-card-meta">Incidents completed under controlled status</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Closed</span><i class="fa-solid fa-folder-check"></i></div><div class="stat-card-value" id="statClosed">--</div><div class="stat-card-meta">Incidents finalized and closed</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Avg Response</span><i class="fa-solid fa-stopwatch"></i></div><div class="stat-card-value" id="statAvgResponse">--</div><div class="stat-card-meta">Based on completed incidents from report time to end time</div></article>
             </section>
 
             <section class="list-card">
@@ -270,7 +271,8 @@
 
     <script>
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
-        const incidentState = { incidents: [], filter: 'all', search: '', type: 'all', sort: 'reported_desc', poller: null };
+        const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 30000;
+        const incidentState = { incidents: [], filter: 'all', search: '', type: 'all', sort: 'reported_desc', poller: null, request: null, lastFetchedAt: 0 };
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
         const typeFilter = document.getElementById('incidentTypeFilter');
@@ -443,20 +445,36 @@
         }
 
         async function fetchIncidentRegistry(showLoading = true) {
+            if (document.visibilityState !== 'visible') {
+                return;
+            }
+
+            const now = Date.now();
+            if (!showLoading && incidentState.request) {
+                return incidentState.request;
+            }
+            if (!showLoading && incidentState.lastFetchedAt && (now - incidentState.lastFetchedAt) < INCIDENT_REGISTRY_POLL_INTERVAL_MS) {
+                return;
+            }
+
             if (showLoading) renderShimmerState();
 
             try {
-                const response = await fetch(registryEndpoint, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                incidentState.request = fetch(registryEndpoint, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' });
+                const response = await incidentState.request;
                 const result = await response.json();
                 if (!response.ok || result.success === false) throw new Error(result.message || 'Failed to fetch incident registry.');
 
                 incidentState.incidents = Array.isArray(result.data?.incidents) ? result.data.incidents : [];
+                incidentState.lastFetchedAt = Date.now();
                 updateStats(result.data?.stats || {});
                 buildTypeOptions(incidentState.incidents);
                 renderIncidentList();
             } catch (error) {
                 console.error('Incident registry fetch failed:', error);
                 listState.innerHTML = `<div class="list-empty"><i class="fa-solid fa-triangle-exclamation"></i><div class="text-lg font-semibold text-slate-700">Failed to load incident records.</div><div class="mt-2 text-sm text-slate-500">${escapeHtml(error.message || 'Unknown error')}</div></div>`;
+            } finally {
+                incidentState.request = null;
             }
         }
 
@@ -533,12 +551,24 @@
         document.addEventListener('DOMContentLoaded', () => {
             bindEvents();
             fetchIncidentRegistry(true);
-            incidentState.poller = window.setInterval(() => fetchIncidentRegistry(false), 10000);
+            incidentState.poller = window.setInterval(() => fetchIncidentRegistry(false), INCIDENT_REGISTRY_POLL_INTERVAL_MS);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    fetchIncidentRegistry(false);
+                }
+            });
+            window.__ffCurrentPageCleanup = function () {
+                if (incidentState.poller) {
+                    window.clearInterval(incidentState.poller);
+                    incidentState.poller = null;
+                }
+            };
         });
 
         window.openIncidentDetails = openIncidentDetails;
         window.copyIncidentId = copyIncidentId;
     </script>
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

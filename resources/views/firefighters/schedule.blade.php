@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @include('partials.pwa-head')
 
-    <style>
+    <style data-ff-page-style="schedule">
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
@@ -765,6 +765,7 @@
 <body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'schedule'])
 
+    <div data-ff-page-root="schedule">
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'My Schedule',
@@ -790,11 +791,11 @@
                     </div>
                     <div class="schedule-summary-card">
                         <div class="schedule-summary-label">Visible Activities</div>
-                        <div class="schedule-summary-value" id="scheduleEventCount">0</div>
+                        <div class="schedule-summary-value" id="scheduleEventCount">--</div>
                     </div>
                     <div class="schedule-summary-card">
                         <div class="schedule-summary-label">Personal Blocks</div>
-                        <div class="schedule-summary-value" id="schedulePersonalCount">0</div>
+                        <div class="schedule-summary-value" id="schedulePersonalCount">--</div>
                     </div>
                 </div>
             </section>
@@ -937,11 +938,13 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const scheduleDataUrl = @json(route('firefighter.schedule.data'));
             const scheduleStoreUrl = @json(route('firefighter.schedule.events.store'));
             const scheduleUpdateUrlTemplate = @json(route('firefighter.schedule.events.update', ['eventActivity' => '__EVENT__']));
             const scheduleDeleteUrlTemplate = @json(route('firefighter.schedule.events.destroy', ['eventActivity' => '__EVENT__']));
-            const seedEvents = @json($scheduleEvents ?? []);
-            const stationName = @json($stationName ?: 'Unassigned Station');
+            const scheduleStationLabel = document.getElementById('scheduleStationLabel');
+            let scheduleEventsData = [];
+            let stationName = @json($stationName ?: 'Unassigned Station');
             const monthLabel = document.getElementById('calendarMonthLabel');
             const monthSummary = document.getElementById('scheduleMonthSummary');
             const eventCount = document.getElementById('scheduleEventCount');
@@ -1071,13 +1074,13 @@
             }
 
             function getEventsForDate(dateKey) {
-                return seedEvents
+                return scheduleEventsData
                     .filter(event => event.event_date === dateKey)
                     .sort((a, b) => `${a.event_date} ${a.start_time}`.localeCompare(`${b.event_date} ${b.start_time}`));
             }
 
             function getPersonalEventsForDate(dateKey, ignoreEventId = null) {
-                return seedEvents
+                return scheduleEventsData
                     .filter(event => event.source_type === 'personal')
                     .filter(event => ignoreEventId === null || Number(event.event_id) !== Number(ignoreEventId))
                     .filter(event => event.event_date === dateKey)
@@ -1215,35 +1218,35 @@
             }
 
             function getEventById(eventId) {
-                return seedEvents.find(function (event) {
+                return scheduleEventsData.find(function (event) {
                     return Number(event.event_id) === Number(eventId);
                 }) || null;
             }
 
             function replaceEventInSeed(updatedEvent) {
-                const targetIndex = seedEvents.findIndex(function (event) {
+                const targetIndex = scheduleEventsData.findIndex(function (event) {
                     return Number(event.event_id) === Number(updatedEvent.event_id);
                 });
 
                 if (targetIndex >= 0) {
-                    seedEvents[targetIndex] = updatedEvent;
+                    scheduleEventsData[targetIndex] = updatedEvent;
                 } else {
-                    seedEvents.push(updatedEvent);
+                    scheduleEventsData.push(updatedEvent);
                 }
             }
 
             function removeEventFromSeed(eventId) {
-                const targetIndex = seedEvents.findIndex(function (event) {
+                const targetIndex = scheduleEventsData.findIndex(function (event) {
                     return Number(event.event_id) === Number(eventId);
                 });
 
                 if (targetIndex >= 0) {
-                    seedEvents.splice(targetIndex, 1);
+                    scheduleEventsData.splice(targetIndex, 1);
                 }
             }
 
             function getUpcomingEvents() {
-                return [...seedEvents]
+                return [...scheduleEventsData]
                     .sort((a, b) => `${a.event_date} ${a.start_time}`.localeCompare(`${b.event_date} ${b.start_time}`))
                     .slice(0, 6);
             }
@@ -1322,8 +1325,8 @@
                     </div>
                 `;
 
-                eventCount.textContent = String(seedEvents.length);
-                personalCount.textContent = String(seedEvents.filter(event => event.source_type === 'personal').length);
+                eventCount.textContent = String(scheduleEventsData.length);
+                personalCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'personal').length);
             }
 
             function renderCalendar() {
@@ -1477,6 +1480,50 @@
                 }
             }
 
+            async function loadScheduleData() {
+                try {
+                    const response = await fetch(scheduleDataUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        cache: 'no-store'
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to load schedule data.');
+                    }
+
+                    scheduleEventsData = Array.isArray(data.data?.events) ? data.data.events : [];
+                    stationName = data.data?.station_name || stationName;
+                    if (scheduleStationLabel) {
+                        scheduleStationLabel.value = stationName;
+                    }
+
+                    renderUpcoming();
+                    renderCalendar();
+                    renderSelectedDay();
+                    refreshTimeSelectors(state.selectedDateKey);
+                } catch (error) {
+                    showScheduleToast(error.message || 'Unable to load schedule data.', true);
+                    selectedDayAgenda.innerHTML = `
+                        <div class="agenda-empty">
+                            <i class="fa-regular fa-circle-xmark text-xl mb-3"></i>
+                            <div class="text-sm font-semibold text-slate-600">Unable to load schedule</div>
+                            <div class="text-xs mt-1">Please refresh and try again.</div>
+                        </div>
+                    `;
+                    upcomingScheduleList.innerHTML = `
+                        <div class="agenda-empty">
+                            <i class="fa-regular fa-circle-xmark text-xl mb-3"></i>
+                            <div class="text-sm font-semibold text-slate-600">No schedule data loaded</div>
+                        </div>
+                    `;
+                }
+            }
+
             document.getElementById('prevMonthBtn')?.addEventListener('click', function () {
                 state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() - 1, 1);
                 renderCalendar();
@@ -1584,14 +1631,15 @@
                 }
             });
 
-            renderUpcoming();
             renderCalendar();
             renderSelectedDay();
             scheduleEventDate.value = state.selectedDateKey;
             scheduleEventDate.min = getTodayKey();
             refreshTimeSelectors(state.selectedDateKey);
+            loadScheduleData();
         });
     </script>
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

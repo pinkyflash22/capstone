@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\Route;
 use App\Models\StationOfficer;
 use App\Models\Team;
+use App\Models\Incident;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RouteController extends Controller
@@ -47,6 +49,26 @@ class RouteController extends Controller
                 ->latest('route_id')
                 ->first();
 
+            $authenticatedTeam = $this->resolveAuthenticatedTeam();
+            $requestedIncident = Incident::query()
+                ->select(['incident_id', 'team_id'])
+                ->find($validated['incident_id']);
+
+            $requestedTeamId = $requestedIncident?->team_id ?? $authenticatedTeam?->team_id;
+
+            if ($requestedTeamId) {
+                $conflictingIncidentRoute = $this->findActiveConflictingIncidentRoute((int) $requestedTeamId, (int) $validated['incident_id']);
+                if ($conflictingIncidentRoute) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'The response team is already committed to another active incident.',
+                        'message' => 'Your team is already navigating to an ongoing incident. Finish or clear that incident route before starting another one.',
+                        'active_route_id' => $conflictingIncidentRoute->route_id,
+                        'active_incident_id' => $conflictingIncidentRoute->incident_id,
+                    ], 409);
+                }
+            }
+
             // Add user info (API requests may not always have an authenticated user).
             $authUser = Auth::user();
             $validated['started_by'] = $authUser->name
@@ -75,6 +97,8 @@ class RouteController extends Controller
                     'last_updated_at' => now(),
                 ]);
 
+                $this->flushActiveRouteCaches($validated['incident_id']);
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Route updated successfully',
@@ -83,6 +107,7 @@ class RouteController extends Controller
             }
 
             $route = Route::create($validated);
+            $this->flushActiveRouteCaches($validated['incident_id']);
 
             return response()->json([
                 'success' => true,
@@ -111,11 +136,35 @@ class RouteController extends Controller
     public function getActive()
     {
         try {
-            $activeRoutes = Route::with(['incident.team'])
-                ->whereIn('status', ['active', 'moving'])
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(fn ($route) => $this->transformRouteForFrontend($route));
+            $activeRoutes = Cache::remember('map:routes:active:v2', now()->addSeconds(8), function () {
+                return Route::query()
+                    ->select([
+                        'route_id',
+                        'incident_id',
+                        'coordinates',
+                        'status',
+                        'destination_title',
+                        'destination_lat',
+                        'destination_lng',
+                        'current_position_index',
+                        'current_lat',
+                        'current_lng',
+                        'progress_percentage',
+                        'created_at',
+                        'updated_at',
+                        'last_updated_at',
+                    ])
+                    ->with([
+                        'incident:incident_id,team_id',
+                        'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
+                    ])
+                    ->whereIn('status', ['active', 'moving'])
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                    ->map(fn ($route) => $this->transformRouteForFrontend($route))
+                    ->values()
+                    ->all();
+            });
             
             return response()->json($activeRoutes);
             
@@ -131,12 +180,36 @@ class RouteController extends Controller
     public function getActiveByIncident($incidentId)
     {
         try {
-            $activeRoutes = Route::with(['incident.team'])
-                ->where('incident_id', $incidentId)
-                ->whereIn('status', ['active', 'moving'])
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(fn ($route) => $this->transformRouteForFrontend($route));
+            $activeRoutes = Cache::remember('map:routes:active:incident:' . $incidentId . ':v2', now()->addSeconds(8), function () use ($incidentId) {
+                return Route::query()
+                    ->select([
+                        'route_id',
+                        'incident_id',
+                        'coordinates',
+                        'status',
+                        'destination_title',
+                        'destination_lat',
+                        'destination_lng',
+                        'current_position_index',
+                        'current_lat',
+                        'current_lng',
+                        'progress_percentage',
+                        'created_at',
+                        'updated_at',
+                        'last_updated_at',
+                    ])
+                    ->with([
+                        'incident:incident_id,team_id',
+                        'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
+                    ])
+                    ->where('incident_id', $incidentId)
+                    ->whereIn('status', ['active', 'moving'])
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                    ->map(fn ($route) => $this->transformRouteForFrontend($route))
+                    ->values()
+                    ->all();
+            });
 
             return response()->json($activeRoutes);
         } catch (\Exception $e) {
@@ -197,6 +270,7 @@ class RouteController extends Controller
             }
             
             $route->save();
+            $this->flushActiveRouteCaches($route->incident_id);
             
             return response()->json([
                 'success' => true,
@@ -226,6 +300,7 @@ class RouteController extends Controller
         try {
             $updated = Route::whereIn('status', ['active', 'moving'])
                 ->update(['status' => 'inactive']);
+            $this->flushActiveRouteCaches();
             
             return response()->json([
                 'success' => true,
@@ -394,7 +469,9 @@ class RouteController extends Controller
     {
         try {
             $route = Route::findOrFail($id);
+            $incidentId = $route->incident_id;
             $route->delete();
+            $this->flushActiveRouteCaches($incidentId);
             
             return response()->json([
                 'success' => true,
@@ -415,15 +492,31 @@ class RouteController extends Controller
         }
     }
 
-    private function transformRouteForFrontend(Route $route): Route
+    private function transformRouteForFrontend(Route $route): array
     {
-        $route->formatted_coordinates = $route->getFormattedCoordinates();
-        $route->leaflet_points = $route->getLeafletPoints();
-        $route->remaining_points = $route->getRemainingPoints();
-        $route->route_team_id = $route->incident?->team_id;
-        $route->route_station_id = $this->resolveRouteStationId($route->incident?->team);
-
-        return $route;
+        return [
+            'route_id' => $route->route_id,
+            'incident_id' => $route->incident_id,
+            'coordinates' => $route->coordinates,
+            'formatted_coordinates' => $route->getFormattedCoordinates(),
+            'leaflet_points' => $route->getLeafletPoints(),
+            'remaining_points' => $route->getRemainingPoints(),
+            'status' => $route->status,
+            'destination_title' => $route->destination_title,
+            'destination_lat' => $route->destination_lat,
+            'destination_lng' => $route->destination_lng,
+            'current_position_index' => $route->current_position_index,
+            'current_lat' => $route->current_lat,
+            'current_lng' => $route->current_lng,
+            'progress_percentage' => $route->progress_percentage,
+            'route_team_id' => $route->incident?->team_id,
+            'route_station_id' => $this->resolveRouteStationId($route->incident?->team),
+            'route_team_user_ids' => $this->resolveRouteTeamUserIds($route->incident?->team),
+            'route_primary_user_id' => $this->resolvePrimaryRouteUserId($route->incident?->team),
+            'created_at' => optional($route->created_at)->toISOString(),
+            'updated_at' => optional($route->updated_at)->toISOString(),
+            'last_updated_at' => optional($route->last_updated_at)->toISOString(),
+        ];
     }
 
     private function resolveRouteStationId(?Team $team): ?int
@@ -432,7 +525,53 @@ class RouteController extends Controller
             return null;
         }
 
-        $teamUserIds = array_values(array_filter([
+        $teamUserIds = $this->getTeamStationOfficerIds($team);
+
+        if (empty($teamUserIds)) {
+            return null;
+        }
+
+        return Cache::remember('route:team-station:' . $team->team_id, now()->addSeconds(60), function () use ($teamUserIds) {
+            return StationOfficer::query()
+                ->whereIn('user_id', $teamUserIds)
+                ->value('station_id');
+        });
+    }
+
+    private function resolveRouteTeamUserIds(?Team $team): array
+    {
+        if (!$team) {
+            return [];
+        }
+
+        return Cache::remember('route:team-user-ids:' . $team->team_id, now()->addSeconds(60), function () use ($team) {
+            return StationOfficer::query()
+                ->whereIn('station_officer_id', $this->getTeamStationOfficerIds($team))
+                ->orderBy('station_officer_id')
+                ->pluck('user_id')
+                ->filter()
+                ->map(fn ($userId) => (int) $userId)
+                ->values()
+                ->all();
+        });
+    }
+
+    private function resolvePrimaryRouteUserId(?Team $team): ?int
+    {
+        if (!$team || !$team->commander_driver) {
+            return null;
+        }
+
+        return Cache::remember('route:team-primary-user:' . $team->team_id, now()->addSeconds(60), function () use ($team) {
+            return StationOfficer::query()
+                ->where('station_officer_id', $team->commander_driver)
+                ->value('user_id');
+        });
+    }
+
+    private function getTeamStationOfficerIds(Team $team): array
+    {
+        return array_values(array_filter([
             $team->commander_driver,
             $team->pumper,
             $team->team_leader,
@@ -441,11 +580,57 @@ class RouteController extends Controller
             $team->firefighter_officer_3,
             $team->rescue_radio,
         ]));
+    }
 
-        if (empty($teamUserIds)) {
+    private function flushActiveRouteCaches(?int $incidentId = null): void
+    {
+        Cache::forget('map:routes:active:v2');
+
+        if ($incidentId !== null) {
+            Cache::forget('map:routes:active:incident:' . $incidentId . ':v2');
+        }
+    }
+
+    private function resolveAuthenticatedTeam(): ?Team
+    {
+        $userId = Auth::user()?->user_id;
+        if (!$userId) {
             return null;
         }
 
-        return StationOfficer::whereIn('user_id', $teamUserIds)->value('station_id');
+        $stationOfficerId = Cache::remember('route:auth-user-station-officer:' . $userId, now()->addSeconds(60), function () use ($userId) {
+            return StationOfficer::query()
+                ->where('user_id', $userId)
+                ->value('station_officer_id');
+        });
+
+        if (!$stationOfficerId) {
+            return null;
+        }
+
+        return Cache::remember('route:auth-user-team:' . $userId, now()->addSeconds(30), function () use ($stationOfficerId) {
+            return Team::query()
+                ->where('commander_driver', $stationOfficerId)
+                ->orWhere('pumper', $stationOfficerId)
+                ->orWhere('team_leader', $stationOfficerId)
+                ->orWhere('firefighter_officer_1', $stationOfficerId)
+                ->orWhere('firefighter_officer_2', $stationOfficerId)
+                ->orWhere('firefighter_officer_3', $stationOfficerId)
+                ->orWhere('rescue_radio', $stationOfficerId)
+                ->first();
+        });
+    }
+
+    private function findActiveConflictingIncidentRoute(int $teamId, int $requestedIncidentId): ?Route
+    {
+        return Route::query()
+            ->select(['route_id', 'incident_id', 'status'])
+            ->whereIn('status', ['active', 'moving'])
+            ->where('incident_id', '!=', $requestedIncidentId)
+            ->whereHas('incident', function ($query) use ($teamId) {
+                $query->where('team_id', $teamId);
+            })
+            ->orderByDesc('route_id')
+            ->first();
     }
 }

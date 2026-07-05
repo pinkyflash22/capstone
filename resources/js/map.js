@@ -65,8 +65,15 @@ let markerReferenceCache = {
     hydrants: null,
     schools: null,
     stations: null,
-    loadedAt: 0
+    loadedAt: 0,
+    requestPromise: null
 };
+let latestIncidentsCache = {
+    data: null,
+    loadedAt: 0,
+    requestPromise: null
+};
+const TRUCK_REALTIME_REFRESH_MS = 2000;
 
 // Shape management variables
 let manageShapesMode = false;
@@ -110,18 +117,331 @@ window.thisIncidents = null;
 let routePollingInterval = null;
 let markerStatePollingInterval = null;
 let lastMarkerStateSignature = null;
-const ROUTE_POLL_INTERVAL_MS = 10000;
+let lastMarkersFetchAt = 0;
+let lastStationsFetchAt = 0;
+let lastShapesFetchAt = 0;
+let lastUserLocationSentSignature = null;
+let lastUserLocationSentAt = 0;
+const ROUTE_POLL_INTERVAL_MS = 15000;
 const MARKER_STATE_POLL_INTERVAL_MS = 30000;
-const LIVE_FETCH_TIMEOUT_MS = 10000;
+const FIREFIGHTER_ROUTE_POLL_INTERVAL_MS = 25000;
+const FIREFIGHTER_MARKER_STATE_POLL_INTERVAL_MS = 90000;
+const STATIC_LAYER_REFETCH_INTERVAL_MS = 180000;
+const LOCATION_WRITE_DEDUP_WINDOW_MS = 90000;
+const LATEST_INCIDENTS_CACHE_TTL_MS = 10000;
+const TRUCK_REALTIME_ROUTE_SYNC_MS = 5000;
+const LIVE_FETCH_TIMEOUT_MS = 15000;
+const STATIC_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const liveRequestRegistry = new Map();
 
 function isPageVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
 }
 
+function abortLiveRequestsByPrefix(prefix) {
+    for (const [requestKey, requestEntry] of liveRequestRegistry.entries()) {
+        if (!String(requestKey).startsWith(prefix)) {
+            continue;
+        }
+
+        try {
+            requestEntry?.controller?.abort();
+        } catch (error) {
+            console.warn('Failed to abort live request:', requestKey, error);
+        }
+    }
+}
+
+function destroyPyroMapRuntime(options = {}) {
+    const { removeMap = true } = options;
+
+    if (routePollingInterval) {
+        clearInterval(routePollingInterval);
+        routePollingInterval = null;
+    }
+
+    if (markerStatePollingInterval) {
+        clearInterval(markerStatePollingInterval);
+        markerStatePollingInterval = null;
+    }
+
+    stopAllSimulations();
+    abortLiveRequestsByPrefix('route-active');
+    abortLiveRequestsByPrefix('markers-poll');
+    abortLiveRequestsByPrefix('incident-latest-poll');
+
+    if (removeMap && window.map) {
+        try {
+            window.map.off();
+            window.map.remove();
+        } catch (error) {
+            console.warn('Failed to remove active map instance cleanly:', error);
+        }
+    }
+
+    window.map = null;
+    window.firefighterDashboardMap = null;
+    window.routesGroup = null;
+}
+
+window.destroyPyroMapRuntime = destroyPyroMapRuntime;
+
+function isFirefighterDashboardMapInstance() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    return configuredInstanceKey === 'firefighterDashboard';
+}
+
+function getRoutePollIntervalMs() {
+    return isFirefighterDashboardMapInstance()
+        ? FIREFIGHTER_ROUTE_POLL_INTERVAL_MS
+        : ROUTE_POLL_INTERVAL_MS;
+}
+
+function getMarkerStatePollIntervalMs() {
+    return isFirefighterDashboardMapInstance()
+        ? FIREFIGHTER_MARKER_STATE_POLL_INTERVAL_MS
+        : MARKER_STATE_POLL_INTERVAL_MS;
+}
+
+function shouldSkipStaticLayerRefetch(lastFetchedAt) {
+    return isFirefighterDashboardMapInstance()
+        && lastFetchedAt > 0
+        && (Date.now() - lastFetchedAt) < STATIC_LAYER_REFETCH_INTERVAL_MS;
+}
+
+function buildLookupMap(items, keySelector) {
+    const lookup = new Map();
+
+    if (!Array.isArray(items) || typeof keySelector !== 'function') {
+        return lookup;
+    }
+
+    for (const item of items) {
+        const key = keySelector(item);
+        if (key !== null && key !== undefined && key !== '') {
+            lookup.set(String(key), item);
+        }
+    }
+
+    return lookup;
+}
+
+function buildIncidentLookup(incidents) {
+    const lookup = new Map();
+
+    if (!Array.isArray(incidents)) {
+        return lookup;
+    }
+
+    for (const incident of incidents) {
+        if (incident?.marker_id !== null && incident?.marker_id !== undefined) {
+            lookup.set(`marker:${incident.marker_id}`, incident);
+        }
+
+        if (incident?.incident_id !== null && incident?.incident_id !== undefined) {
+            lookup.set(`incident:${incident.incident_id}`, incident);
+        }
+    }
+
+    return lookup;
+}
+
+function findIncidentInLookup(marker, incidentLookup, fallbackIncident = null) {
+    if (fallbackIncident) {
+        return fallbackIncident;
+    }
+
+    if (!(incidentLookup instanceof Map)) {
+        return null;
+    }
+
+    if (marker?.marker_id !== null && marker?.marker_id !== undefined) {
+        const byMarker = incidentLookup.get(`marker:${marker.marker_id}`);
+        if (byMarker) {
+            return byMarker;
+        }
+    }
+
+    if (marker?.incident_id !== null && marker?.incident_id !== undefined) {
+        const byIncident = incidentLookup.get(`incident:${marker.incident_id}`);
+        if (byIncident) {
+            return byIncident;
+        }
+    }
+
+    return null;
+}
+
+function getTruckRealtimeLocation(truck) {
+    if (!truck || !Array.isArray(truck.routeTeamUserIds) || truck.routeTeamUserIds.length === 0) {
+        return null;
+    }
+
+    const candidateLocations = [];
+
+    for (const userId of truck.routeTeamUserIds) {
+        const location = getUserLocation(userId);
+        if (!location?.ready) {
+            continue;
+        }
+
+        const lat = parseFloat(location.lat);
+        const lng = parseFloat(location.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            continue;
+        }
+
+        candidateLocations.push({
+            userId: Number(userId),
+            lat,
+            lng,
+            lastUpdated: location.lastUpdated || null
+        });
+    }
+
+    if (candidateLocations.length === 0) {
+        return null;
+    }
+
+    const primaryUserId = Number(truck.routePrimaryUserId || 0);
+    if (primaryUserId) {
+        const primaryMatch = candidateLocations.find((entry) => entry.userId === primaryUserId);
+        if (primaryMatch) {
+            return {
+                ...primaryMatch,
+                source: 'primary'
+            };
+        }
+    }
+
+    if (candidateLocations.length === 1) {
+        return {
+            ...candidateLocations[0],
+            source: 'single'
+        };
+    }
+
+    const center = candidateLocations.reduce((carry, entry) => {
+        carry.lat += entry.lat;
+        carry.lng += entry.lng;
+        return carry;
+    }, { lat: 0, lng: 0 });
+
+    return {
+        lat: center.lat / candidateLocations.length,
+        lng: center.lng / candidateLocations.length,
+        source: 'centroid',
+        members: candidateLocations.length
+    };
+}
+
+function getClosestSimulationPointIndex(points = [], lat, lng, fallbackIndex = 0) {
+    if (!Array.isArray(points) || points.length === 0 || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return fallbackIndex;
+    }
+
+    let bestIndex = fallbackIndex;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (let index = 0; index < points.length; index++) {
+        const point = points[index];
+        if (!Array.isArray(point) || point.length < 2) {
+            continue;
+        }
+
+        const distance = calculateDistanceBetweenPoints(lat, lng, point[0], point[1]);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = index;
+        }
+    }
+
+    return bestIndex;
+}
+
+function updateTruckTraveledPath(truck, lat, lng) {
+    if (!truck || !truck.traveledLayer || !Array.isArray(truck.simulationPoints)) {
+        return;
+    }
+
+    const traveledPoints = [];
+    for (let index = 0; index <= truck.currentPointIndex; index++) {
+        if (truck.simulationPoints[index]) {
+            traveledPoints.push(truck.simulationPoints[index]);
+        }
+    }
+
+    traveledPoints.push([lat, lng]);
+
+    if (traveledPoints.length > 1) {
+        truck.traveledLayer.setLatLngs(traveledPoints);
+    }
+}
+
+function updateTruckMarkerFromRealtimeLocation(routeId, location) {
+    const truck = activeTrucks.get(routeId);
+    if (!truck || !truck.animatedVehicle || !location) {
+        return false;
+    }
+
+    const previousLatLng = truck.animatedVehicle.getLatLng();
+    truck.animatedVehicle.setLatLng([location.lat, location.lng]);
+
+    if (previousLatLng && Number.isFinite(previousLatLng.lat) && Number.isFinite(previousLatLng.lng)) {
+        const angle = Math.atan2(location.lng - previousLatLng.lng, location.lat - previousLatLng.lat) * 180 / Math.PI;
+        if (Number.isFinite(angle)) {
+            applyTruckHeading(truck.animatedVehicle, angle);
+        }
+    }
+
+    truck.currentPointIndex = getClosestSimulationPointIndex(
+        truck.simulationPoints,
+        location.lat,
+        location.lng,
+        truck.currentPointIndex || 0
+    );
+    truck.usesRealtimeTracking = true;
+    updateTruckTraveledPath(truck, location.lat, location.lng);
+
+    const progressPercent = truck.simulationPoints?.length
+        ? Math.min((truck.currentPointIndex / Math.max(truck.simulationPoints.length - 1, 1)) * 100, 100)
+        : 0;
+
+    const nextSignature = `${location.lat.toFixed(6)}:${location.lng.toFixed(6)}:${truck.currentPointIndex}`;
+    const shouldSyncRoute = !truck.routeStatusSyncInFlight
+        && (
+            !truck.lastRealtimeRouteSyncAt
+            || (Date.now() - truck.lastRealtimeRouteSyncAt) >= TRUCK_REALTIME_ROUTE_SYNC_MS
+            || truck.lastRealtimeLocationSignature !== nextSignature
+        );
+
+    if (shouldSyncRoute) {
+        truck.lastRealtimeRouteSyncAt = Date.now();
+        truck.lastRealtimeLocationSignature = nextSignature;
+        truck.routeStatusSyncInFlight = true;
+        updateRouteStatus(routeId, 'moving', truck.currentPointIndex, location.lat, location.lng, progressPercent)
+            .catch((error) => {
+                console.error('Failed to sync realtime truck status:', error);
+            })
+            .finally(() => {
+                const latestTruck = activeTrucks.get(routeId);
+                if (latestTruck) {
+                    latestTruck.routeStatusSyncInFlight = false;
+                }
+            });
+    }
+
+    syncTruckArrivalStatus(routeId, location.lat, location.lng).catch((error) => {
+        console.error('Failed to sync realtime truck arrival status:', error);
+    });
+
+    updateRouteInfoCard();
+    return true;
+}
+
 function fetchLiveResponseOnce(key, url, options = {}) {
     if (liveRequestRegistry.has(key)) {
-        return liveRequestRegistry.get(key);
+        return liveRequestRegistry.get(key).promise;
     }
 
     const controller = new AbortController();
@@ -138,7 +458,10 @@ function fetchLiveResponseOnce(key, url, options = {}) {
         liveRequestRegistry.delete(key);
     });
 
-    liveRequestRegistry.set(key, requestPromise);
+    liveRequestRegistry.set(key, {
+        promise: requestPromise,
+        controller
+    });
     return requestPromise;
 }
 
@@ -803,6 +1126,14 @@ async function sendUserLocationToServer(latitude, longitude) {
         console.warn('No current user ID, skipping location update');
         return;
     }
+
+    const nextLocationSignature = `${Number(latitude).toFixed(6)}:${Number(longitude).toFixed(6)}`;
+    if (
+        nextLocationSignature === lastUserLocationSentSignature
+        && (Date.now() - lastUserLocationSentAt) < LOCATION_WRITE_DEDUP_WINDOW_MS
+    ) {
+        return;
+    }
     
     try {
         const response = await fetch('/api/firefighter/location', {
@@ -824,6 +1155,8 @@ async function sendUserLocationToServer(latitude, longitude) {
         console.log('Location API response:', result);
         
         if (result.success) {
+            lastUserLocationSentSignature = nextLocationSignature;
+            lastUserLocationSentAt = Date.now();
             console.log('Location saved to server successfully');
             return result;
         } else {
@@ -936,6 +1269,8 @@ function displayAllFirefighterLocations() {
             window.firefighterMarkers[userId] = marker;
         }
     });
+
+    refreshRealtimeTrackedTrucks();
 }
 
 function getIncidentTypeName(typeId) {
@@ -1290,8 +1625,6 @@ function setAnimationSpeedGlobal(speed) {
 
 async function saveRouteToDatabase(route, destination) {
     try {
-
-
         const response = await fetch('/api/route', {
             method: 'POST',
             headers: {
@@ -1314,6 +1647,9 @@ async function saveRouteToDatabase(route, destination) {
         const result = await response.json();
         if (!response.ok || result.success === false) {
             console.error('Route save API error:', result);
+            if (response.status === 409) {
+                showToast(result.message || 'Your team is already committed to another active incident.', 'warning');
+            }
             return null;
         }
         console.log('Route saved to database:', result);
@@ -1338,6 +1674,9 @@ async function fetchActiveRouteFromDatabase() {
         }
         return null;
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return null;
+        }
         console.error('Failed to fetch active route:', error);
         return null;
     }
@@ -1433,13 +1772,18 @@ document.addEventListener('DOMContentLoaded', function() {
     window.routesGroup = L.layerGroup().addTo(window.map);
     
     initAfterMapReady();
-    fetchCoordinate({ preferSeeded: true, revalidate: true });
+    fetchStations({
+        preferSeeded: true,
+        revalidate: !isFirefighterDashboardMapInstance()
+    });
+    fetchCoordinate({
+        preferSeeded: true,
+        revalidate: !isFirefighterDashboardMapInstance()
+    });
     
     // Ensure the map repaints correctly after layout settles.
     setTimeout(() => window.map?.invalidateSize(), 0);
     setTimeout(() => window.map?.invalidateSize(), 250);
-    
-    fetchStations();
     
     // Start polling for routes from database
     startRoutePolling();
@@ -1497,6 +1841,35 @@ function safeWriteJsonToStorage(key, value) {
     } catch (error) {
         console.warn('Unable to write local storage key:', key, error);
     }
+}
+
+function getStaticMapCacheKey(scope) {
+    return `pyrosense_static_map_${scope}_${window.activeMapInstanceKey || 'default'}`;
+}
+
+function readStaticMapCache(scope, maxAgeMs = STATIC_MAP_CACHE_TTL_MS) {
+    const cachedEntry = safeReadJsonFromStorage(getStaticMapCacheKey(scope), null);
+
+    if (!cachedEntry || !Array.isArray(cachedEntry.data)) {
+        return null;
+    }
+
+    if (!cachedEntry.savedAt || (Date.now() - cachedEntry.savedAt) > maxAgeMs) {
+        return null;
+    }
+
+    return cachedEntry.data;
+}
+
+function writeStaticMapCache(scope, data) {
+    if (!Array.isArray(data)) {
+        return;
+    }
+
+    safeWriteJsonToStorage(getStaticMapCacheKey(scope), {
+        savedAt: Date.now(),
+        data
+    });
 }
 
 function loadIncidentAlertFeed() {
@@ -2828,7 +3201,35 @@ styleElement.textContent = `
         display: block;
         animation: slideInRight 0.3s ease;
     }
-    
+
+    .details-panel.compact-responder {
+        width: 296px;
+        top: 136px;
+        right: 14px;
+    }
+
+    .details-panel.compact-responder .details-body {
+        padding: 10px;
+        max-height: 60vh;
+    }
+
+    .details-panel.compact-responder .details-header {
+        padding: 12px 14px;
+    }
+
+    .details-panel.compact-responder .details-header h3 {
+        font-size: 14px;
+        gap: 6px;
+    }
+
+    .details-panel.compact-responder .details-header h3 i {
+        font-size: 13px;
+    }
+
+    .details-panel.compact-responder .details-close {
+        font-size: 15px;
+    }
+
     .details-header {
         background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
         color: white;
@@ -2927,6 +3328,438 @@ styleElement.textContent = `
         font-size: 14px;
         line-height: 1.6;
         color: #374151;
+    }
+
+    .responder-custom-popup .leaflet-popup-content-wrapper {
+        border-radius: 22px;
+        padding: 0;
+        background: #fffaf8;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+        overflow: hidden;
+    }
+
+    .responder-custom-popup .leaflet-popup-content {
+        margin: 0;
+    }
+
+    .responder-custom-popup .leaflet-popup-tip {
+        background: #fff6f1;
+    }
+
+    .responder-marker-popup {
+        width: 258px;
+        background: linear-gradient(180deg, #fffdfb 0%, #fff7f1 100%);
+        color: #1f2937;
+    }
+
+    .responder-marker-popup-topbar {
+        height: 4px;
+        background: linear-gradient(90deg, #c63d26 0%, #d18a16 100%);
+    }
+
+    .responder-marker-popup.station .responder-marker-popup-topbar {
+        background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+    }
+
+    .responder-marker-popup.hydrant .responder-marker-popup-topbar {
+        background: linear-gradient(90deg, #0891b2 0%, #22d3ee 100%);
+    }
+
+    .responder-marker-popup.incident .responder-marker-popup-topbar {
+        background: linear-gradient(90deg, #dc2626 0%, #f97316 100%);
+    }
+
+    .responder-marker-popup.school .responder-marker-popup-topbar {
+        background: linear-gradient(90deg, #ca8a04 0%, #eab308 100%);
+    }
+
+    .responder-marker-popup.barangay .responder-marker-popup-topbar {
+        background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
+    }
+
+    .responder-marker-popup-header {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 12px 8px;
+    }
+
+    .responder-marker-popup-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: color-mix(in srgb, var(--popup-accent) 14%, white);
+        color: var(--popup-accent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--popup-accent) 20%, white);
+        flex-shrink: 0;
+    }
+
+    .responder-marker-popup-heading {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .responder-marker-popup-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .responder-marker-popup-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #fff1ec;
+        color: #9a3412;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+
+    .responder-marker-popup-chip.status.reported {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .responder-marker-popup-chip.status.responding {
+        background: #fef3c7;
+        color: #b45309;
+    }
+
+    .responder-marker-popup-chip.status.resolved {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .responder-marker-popup-chip.status.closed,
+    .responder-marker-popup-chip.status.default {
+        background: #e5e7eb;
+        color: #4b5563;
+    }
+
+    .responder-marker-popup-title {
+        display: block;
+        font-size: 14px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.3;
+    }
+
+    .responder-marker-popup-subtitle {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #6b7280;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .responder-marker-popup-media {
+        margin: 0 12px;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #f8fafc;
+        min-height: 82px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .responder-marker-popup-image {
+        width: 100%;
+        height: 88px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .responder-marker-popup-media.placeholder {
+        flex-direction: row;
+        gap: 8px;
+        color: #94a3b8;
+        font-size: 11px;
+        border: 1px dashed #fed7aa;
+    }
+
+    .responder-marker-popup-placeholder-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(198, 61, 38, 0.08);
+        color: #c63d26;
+        font-size: 14px;
+    }
+
+    .responder-marker-popup-details {
+        display: grid;
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    .responder-marker-popup-detail-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+    }
+
+    .responder-marker-popup-detail-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9ca3af;
+    }
+
+    .responder-marker-popup-detail-value {
+        flex: 1;
+        text-align: right;
+        font-size: 11px;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.35;
+    }
+
+    .responder-marker-popup-actions {
+        display: grid;
+        gap: 6px;
+        padding: 0 12px 12px;
+    }
+
+    .responder-marker-popup-alert {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
+        color: #9f1239;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+
+    .responder-marker-popup-btn {
+        border: none;
+        border-radius: 12px;
+        min-height: 36px;
+        padding: 8px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+    }
+
+    .responder-marker-popup-btn:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.02);
+    }
+
+    .responder-marker-popup-btn.disabled,
+    .responder-marker-popup-btn:disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+        filter: none;
+    }
+
+    .responder-marker-popup-btn.primary {
+        background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+        color: #fff;
+        box-shadow: 0 14px 28px rgba(198, 61, 38, 0.18);
+    }
+
+    .responder-marker-popup-btn.secondary {
+        background: #fff3ed;
+        color: #9a3412;
+        border: 1px solid rgba(198, 61, 38, 0.14);
+    }
+
+    .responder-marker-popup-btn.danger {
+        background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+        color: #fff;
+        box-shadow: 0 14px 28px rgba(220, 38, 38, 0.18);
+    }
+
+    .responder-map-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10020;
+        display: none;
+        background: rgba(15, 23, 42, 0.46);
+        backdrop-filter: blur(4px);
+        padding: 24px;
+    }
+
+    .responder-map-modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .responder-map-modal-card {
+        width: min(100%, 540px);
+        max-height: calc(100vh - 48px);
+        overflow: hidden;
+        border-radius: 28px;
+        background: linear-gradient(180deg, #fffdfb 0%, #fff6ef 100%);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+        border: 1px solid rgba(198, 61, 38, 0.14);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .responder-map-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 20px 22px 0;
+    }
+
+    .responder-map-modal-kicker {
+        margin: 0 0 6px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #9a3412;
+    }
+
+    .responder-map-modal-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 900;
+        color: #132033;
+    }
+
+    .responder-map-modal-close {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        border: 1px solid rgba(198, 61, 38, 0.12);
+        background: #fff7f2;
+        color: #9a3412;
+        cursor: pointer;
+    }
+
+    .responder-map-modal-body {
+        padding: 18px 22px 22px;
+        overflow-y: auto;
+    }
+
+    .responder-map-detail-panel {
+        display: grid;
+        gap: 14px;
+    }
+
+    .responder-map-detail-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: #fff1ec;
+        color: #9a3412;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .responder-map-detail-badge.danger {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .responder-map-detail-image-wrap {
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: #fff;
+    }
+
+    .responder-map-detail-image {
+        width: 100%;
+        height: 132px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .responder-map-detail-image-placeholder {
+        height: 116px;
+        display: grid;
+        place-items: center;
+        gap: 8px;
+        background: linear-gradient(180deg, #fffaf5 0%, #fff2e8 100%);
+        color: #9a3412;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .responder-map-detail-image-placeholder i {
+        font-size: 22px;
+        opacity: 0.8;
+    }
+
+    .responder-map-detail-grid {
+        display: grid;
+        gap: 8px;
+    }
+
+    .responder-map-detail-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+    }
+
+    .responder-map-detail-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #9ca3af;
+    }
+
+    .responder-map-detail-value {
+        flex: 1;
+        text-align: right;
+        color: #132033;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    @media (max-width: 768px) {
+        .details-panel.compact-responder {
+            width: calc(100vw - 20px);
+            right: 12px;
+            top: 112px;
+        }
     }
     
     .edit-modal {
@@ -3644,6 +4477,7 @@ async function showDetailsPanel(markerData, imagePath = null) {
 function closeDetailsPanel() {
     if (detailsPanel) {
         detailsPanel.classList.remove('visible');
+        detailsPanel.classList.remove('compact-responder');
         currentDetailsMarker = null;
     }
 }
@@ -3921,6 +4755,19 @@ async function fetchCoordinate(options = {}) {
             }
         }
 
+        const cachedMarkers = readStaticMapCache('markers');
+        if ((!Array.isArray(seededMarkers) || seededMarkers.length === 0) && Array.isArray(cachedMarkers) && cachedMarkers.length > 0) {
+            renderMarkersQuick(cachedMarkers);
+
+            if (!revalidate) {
+                return;
+            }
+        }
+
+        if (shouldSkipStaticLayerRefetch(lastMarkersFetchAt)) {
+            return;
+        }
+
         const response = await fetch('/api/markers');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
@@ -3935,13 +4782,15 @@ async function fetchCoordinate(options = {}) {
         }
         if (!coordinates || coordinates.length === 0) return;
         await updateCoordinate(coordinates, { fetchSupplemental: true });
+        lastMarkersFetchAt = Date.now();
+        writeStaticMapCache('markers', coordinates);
     } catch (error) {
         console.error('Fetch error in fetchCoordinate:', error);
         showNotification('Failed to fetch markers: ' + error.message, 'error');
     }
 }
 
-function getIncidentVisibilityState(marker, incidents) {
+function getIncidentVisibilityState(marker, incidents, incidentLookup = null) {
     if (!marker || !isIncidentMarker(marker)) {
         return { visible: true, incident: null };
     }
@@ -3950,7 +4799,8 @@ function getIncidentVisibilityState(marker, incidents) {
         return { visible: false, incident: null };
     }
 
-    const linkedIncident = incidents.find((incident) => Number(incident.marker_id) === Number(marker.marker_id))
+    const linkedIncident = findIncidentInLookup(marker, incidentLookup)
+        || incidents.find((incident) => Number(incident.marker_id) === Number(marker.marker_id))
         || incidents.find((incident) => Number(incident.marker?.marker_id) === Number(marker.marker_id))
         || null;
 
@@ -3969,10 +4819,11 @@ function getIncidentVisibilityState(marker, incidents) {
 
 function buildMarkerStateSignature(coordinates, incidents) {
     const normalizedCoordinates = normalizeCoordinatePayload(coordinates);
+    const incidentLookup = buildIncidentLookup(incidents);
 
     return normalizedCoordinates
         .map((marker) => {
-            const visibility = getIncidentVisibilityState(marker, incidents);
+            const visibility = getIncidentVisibilityState(marker, incidents, incidentLookup);
             const linkedIncident = visibility.incident;
             return [
                 marker.marker_id ?? 'unknown',
@@ -4002,12 +4853,7 @@ async function pollMarkerStateChanges() {
                     'X-CSRF-TOKEN': csrfToken
                 }
             }),
-            fetchLiveResponseOnce('incident-latest-poll', '/api/incident/latest', {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                }
-            })
+            getLatestIncidentsData({ force: true, useLiveRequest: true })
         ]);
 
         if (!markersResponse.ok) {
@@ -4015,8 +4861,8 @@ async function pollMarkerStateChanges() {
         }
 
         const markersPayload = await markersResponse.json();
-        const incidentsPayload = incidentsResponse.ok
-            ? await incidentsResponse.json()
+        const incidentsPayload = Array.isArray(incidentsResponse)
+            ? incidentsResponse
             : (Array.isArray(window.incidentsData) ? window.incidentsData : []);
         const coordinates = normalizeCoordinatePayload(markersPayload);
         const incidents = normalizeCoordinatePayload(incidentsPayload);
@@ -4032,6 +4878,9 @@ async function pollMarkerStateChanges() {
             incidents
         });
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Marker state polling failed:', error);
     }
 }
@@ -4088,38 +4937,96 @@ async function getMarkerReferenceData() {
         return markerReferenceCache;
     }
 
-    const [
-        hydrantsResponse,
-        stationsResponse
-    ] = await Promise.all([
-        fetch('/api/hydrant'),
-        fetch('/api/station')
-    ]);
-
-    let incidentTypes = [];
-    let hydrants = markerReferenceCache.hydrants || [];
-    let schools = [];
-    let stationsData = markerReferenceCache.stations || [];
-
-    if (hydrantsResponse.ok) {
-        const hydrantData = await hydrantsResponse.json();
-        hydrants = hydrantData.data || hydrantData;
+    if (markerReferenceCache.requestPromise) {
+        return markerReferenceCache.requestPromise;
     }
 
-    if (stationsResponse.ok) {
-        const stationData = await stationsResponse.json();
-        stationsData = stationData.data || stationData;
+    markerReferenceCache.requestPromise = (async () => {
+        const [
+            hydrantsResponse,
+            stationsResponse
+        ] = await Promise.all([
+            fetch('/api/hydrant'),
+            fetch('/api/station')
+        ]);
+
+        let incidentTypes = [];
+        let hydrants = markerReferenceCache.hydrants || [];
+        let schools = [];
+        let stationsData = markerReferenceCache.stations || [];
+
+        if (hydrantsResponse.ok) {
+            const hydrantData = await hydrantsResponse.json();
+            hydrants = hydrantData.data || hydrantData;
+        }
+
+        if (stationsResponse.ok) {
+            const stationData = await stationsResponse.json();
+            stationsData = stationData.data || stationData;
+        }
+
+        markerReferenceCache = {
+            incidentTypes,
+            hydrants,
+            schools,
+            stations: stationsData,
+            loadedAt: Date.now(),
+            requestPromise: null
+        };
+
+        return markerReferenceCache;
+    })().catch((error) => {
+        markerReferenceCache.requestPromise = null;
+        throw error;
+    });
+
+    return markerReferenceCache.requestPromise;
+}
+
+async function getLatestIncidentsData(options = {}) {
+    const { force = false, useLiveRequest = false } = options;
+    const cacheIsFresh = !force
+        && Array.isArray(latestIncidentsCache.data)
+        && (Date.now() - latestIncidentsCache.loadedAt) < LATEST_INCIDENTS_CACHE_TTL_MS;
+
+    if (cacheIsFresh) {
+        return latestIncidentsCache.data;
     }
 
-    markerReferenceCache = {
-        incidentTypes,
-        hydrants,
-        schools,
-        stations: stationsData,
-        loadedAt: Date.now()
-    };
+    if (latestIncidentsCache.requestPromise) {
+        return latestIncidentsCache.requestPromise;
+    }
 
-    return markerReferenceCache;
+    latestIncidentsCache.requestPromise = (async () => {
+        const response = useLiveRequest
+            ? await fetchLiveResponseOnce('incident-latest-poll', '/api/incident/latest', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            })
+            : await fetch('/api/incident/latest');
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch latest incidents: ${response.status}`);
+        }
+
+        const incidentData = await response.json();
+        const normalizedIncidents = incidentData.data || incidentData || [];
+
+        latestIncidentsCache = {
+            data: Array.isArray(normalizedIncidents) ? normalizedIncidents : [],
+            loadedAt: Date.now(),
+            requestPromise: null
+        };
+
+        return latestIncidentsCache.data;
+    })().catch((error) => {
+        latestIncidentsCache.requestPromise = null;
+        throw error;
+    });
+
+    return latestIncidentsCache.requestPromise;
 }
 
 async function updateCoordinate(data, options = {}) {
@@ -4136,16 +5043,12 @@ async function updateCoordinate(data, options = {}) {
 
         if (fetchSupplemental) {
             const [incidentResponseResult, markerReferencesResult] = await Promise.allSettled([
-                fetch('/api/incident/latest'),
+                getLatestIncidentsData(),
                 getMarkerReferenceData()
             ]);
 
             if (incidentResponseResult.status === 'fulfilled') {
-                const incidentResponse = incidentResponseResult.value;
-                if (incidentResponse.ok) {
-                    const incidentData = await incidentResponse.json();
-                    incidents = incidentData.data || incidentData;
-                }
+                incidents = incidentResponseResult.value;
             }
 
             if (markerReferencesResult.status === 'fulfilled' && markerReferencesResult.value) {
@@ -4178,6 +5081,12 @@ async function updateCoordinate(data, options = {}) {
         const hydrants = markerReferences.hydrants || [];
         const schools = markerReferences.schools || [];
         const stations = markerReferences.stations || [];
+        const incidentLookup = buildIncidentLookup(incidents);
+        window.incidentsLookup = incidentLookup;
+        const stationByMarkerId = buildLookupMap(stations, (station) => station?.marker_id);
+        const stationByStationId = buildLookupMap(stations, (station) => station?.station_id);
+        const hydrantByMarkerId = buildLookupMap(hydrants, (hydrant) => hydrant?.marker_id);
+        const schoolByMarkerId = buildLookupMap(schools, (school) => school?.marker_id);
         
         const markersToProcess = [];
         
@@ -4186,7 +5095,7 @@ async function updateCoordinate(data, options = {}) {
                 if (!shouldDisplayMarker(item.marker)) {
                     continue;
                 }
-                const visibility = getIncidentVisibilityState(item.marker, incidents);
+                const visibility = getIncidentVisibilityState(item.marker, incidents, incidentLookup);
                 if (!visibility.visible) {
                     continue;
                 }
@@ -4196,10 +5105,10 @@ async function updateCoordinate(data, options = {}) {
                     continue;
                 }
                 if (isStationMarker(item)) {
-                    const station = stations.find(s => s.marker_id == item.marker_id);
+                    const station = stationByMarkerId.get(String(item.marker_id));
                     if (station) item.station = station;
                 } else if (isIncidentMarker(item)) {
-                    const visibility = getIncidentVisibilityState(item, incidents);
+                    const visibility = getIncidentVisibilityState(item, incidents, incidentLookup);
                     const incident = visibility.incident;
                     if (!visibility.visible) {
                         continue;
@@ -4211,16 +5120,16 @@ async function updateCoordinate(data, options = {}) {
                         item.reported_at = incident.created_at;
                     }
                 } else if (isHydrantMarker(item)) {
-                    const hydrant = hydrants.find(h => h.marker_id == item.marker_id);
+                    const hydrant = hydrantByMarkerId.get(String(item.marker_id));
                     if (hydrant) {
                         item.hydrant = hydrant;
                         if (hydrant.station_id) {
-                            const station = stations.find(s => s.station_id == hydrant.station_id);
+                            const station = stationByStationId.get(String(hydrant.station_id));
                             if (station) item.hydrant.station = station;
                         }
                     }
                 } else if (isSchoolMarker(item)) {
-                    const school = schools.find(s => s.marker_id == item.marker_id);
+                    const school = schoolByMarkerId.get(String(item.marker_id));
                     if (school) item.school = school;
                 }
                 markersToProcess.push(item);
@@ -4235,10 +5144,15 @@ async function updateCoordinate(data, options = {}) {
             const lng = parseFloat(marker.lng);
             if (isNaN(lat) || isNaN(lng)) return;
             
-            const popupContent = generatePopupContent({ marker: marker }, incidents);
+            const incident = findIncidentInLookup(marker, incidentLookup);
+            const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
             const tempIcon = getIconByCategoryId(marker.markerCategory_id, '', marker);
             const popupMaxWidth = window.innerWidth <= 768 ? 264 : 300;
-            const newMarker = L.marker([lat, lng], { icon: tempIcon }).bindPopup(popupContent, { minWidth: 100, maxWidth: popupMaxWidth });
+            const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
+            if (window.activeMapInstanceKey === 'firefighterDashboard') {
+                popupOptions.className = 'responder-custom-popup';
+            }
+            const newMarker = L.marker([lat, lng], { icon: tempIcon }).bindPopup(popupContent, popupOptions);
             
             if (isIncidentMarker(marker)) {
                 const circle = L.circle([lat, lng], { radius: 200, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.2 });
@@ -4246,7 +5160,12 @@ async function updateCoordinate(data, options = {}) {
             }
             
             addMarkerToFeatureGroup(marker, newMarker);
-            newMarker.on('popupopen', () => addPopupEventListeners({ marker: marker, image: marker.multimedia || null, created_at: marker.created_at }));
+            newMarker.on('popupopen', () => addPopupEventListeners({
+                marker: marker,
+                incident,
+                image: marker.multimedia || null,
+                created_at: marker.created_at
+            }));
             existingMarkers[marker.marker_id] = newMarker;
         });
 
@@ -4258,8 +5177,46 @@ async function updateCoordinate(data, options = {}) {
     }
 }
 
-async function fetchStations() {
+async function fetchStations(options = {}) {
+    const { preferSeeded = false, revalidate = true } = options;
+
     try {
+        const normalizeStationsPayload = (payload) => {
+            const stationsData = payload?.data || payload || [];
+
+            return stationsData.map(station => ({
+                id: station.station_id || station.id,
+                station_id: station.station_id || station.id,
+                station_name: station.station_name,
+                lat: station.marker?.lat || station.lat,
+                lng: station.marker?.lng || station.lng,
+                marker_id: station.marker_id,
+                marker: station.marker
+            }));
+        };
+
+        const seededStations = window.stationsData;
+        if (preferSeeded && Array.isArray(seededStations) && seededStations.length > 0) {
+            stations = normalizeStationsPayload(seededStations);
+
+            if (!revalidate) {
+                return stations;
+            }
+        }
+
+        const cachedStations = readStaticMapCache('stations');
+        if ((!Array.isArray(seededStations) || seededStations.length === 0) && Array.isArray(cachedStations) && cachedStations.length > 0) {
+            stations = normalizeStationsPayload(cachedStations);
+
+            if (!revalidate) {
+                return stations;
+            }
+        }
+
+        if (shouldSkipStaticLayerRefetch(lastStationsFetchAt)) {
+            return stations;
+        }
+
         const response = await fetch('/api/station', {
             headers: {
                 'Accept': 'application/json',
@@ -4270,18 +5227,9 @@ async function fetchStations() {
         if (!response.ok) throw new Error('Failed to fetch stations');
         
         const data = await response.json();
-        const stationsData = data.data || data;
-        
-        // Normalize station data
-        stations = stationsData.map(station => ({
-            id: station.station_id || station.id,
-            station_id: station.station_id || station.id,
-            station_name: station.station_name,
-            lat: station.marker?.lat || station.lat,
-            lng: station.marker?.lng || station.lng,
-            marker_id: station.marker_id,
-            marker: station.marker
-        }));
+        stations = normalizeStationsPayload(data);
+        lastStationsFetchAt = Date.now();
+        writeStaticMapCache('stations', data.data || data || []);
         
         console.log('Stations loaded:', stations.length);
     } catch (error) {
@@ -4292,7 +5240,8 @@ async function fetchStations() {
 
 function generatePopupContent(coord, incidents) {
     const marker = coord.marker || coord;
-    const incident = incidents.find(inc => inc.marker_id === marker.marker_id);
+    const incident = coord.incident
+        || incidents.find(inc => inc.marker_id === marker.marker_id);
     const imagePath = marker.multimedia?.path ? '/storage/' + marker.multimedia.path : (coord.image?.path ? '/storage/' + coord.image.path : null);
     const sidebarGradient = 'linear-gradient(135deg, #c63d26 0%, #d18a16 100%)';
     const sidebarSoftSurface = 'linear-gradient(135deg, #fff0e8 0%, #fff5dc 100%)';
@@ -4314,6 +5263,10 @@ function generatePopupContent(coord, incidents) {
     const metaFontSize = isMobilePopup ? '10px' : '11px';
     const imageHeight = isMobilePopup ? '48px' : '60px';
     const actionGap = isMobilePopup ? '6px' : '8px';
+
+    if (window.activeMapInstanceKey === 'firefighterDashboard') {
+        return buildResponderPopupContent(marker, incident, imagePath);
+    }
 
     // Special design for fire stations (category_id = 1)
     if (isStationMarker(marker)) {
@@ -4578,6 +5531,438 @@ function generatePopupContent(coord, incidents) {
             </button>
         </div>
     `;
+}
+
+function getResponderPopupPresentation(marker) {
+    if (isIncidentMarker(marker)) {
+        return {
+            label: 'Fire Incident',
+            icon: 'fa-fire',
+            color: '#dc2626',
+            accentClass: 'incident'
+        };
+    }
+
+    if (isStationMarker(marker)) {
+        return {
+            label: 'Fire Station',
+            icon: 'fa-building',
+            color: '#2563eb',
+            accentClass: 'station'
+        };
+    }
+
+    if (isHydrantMarker(marker)) {
+        return {
+            label: 'Fire Hydrant',
+            icon: 'fa-fire-extinguisher',
+            color: '#0891b2',
+            accentClass: 'hydrant'
+        };
+    }
+
+    if (isSchoolMarker(marker)) {
+        return {
+            label: 'School',
+            icon: 'fa-school',
+            color: '#ca8a04',
+            accentClass: 'school'
+        };
+    }
+
+    if (getMarkerCategoryKey(marker) === 'barangay') {
+        return {
+            label: 'Barangay Resource',
+            icon: 'fa-building-flag',
+            color: '#0f766e',
+            accentClass: 'barangay'
+        };
+    }
+
+    return {
+        label: getCategoryName(marker),
+        icon: 'fa-location-dot',
+        color: '#c63d26',
+        accentClass: 'default'
+    };
+}
+
+function getResponderPopupStatusMeta(statusValue) {
+    const statusKey = normalizeIncidentStatus(statusValue || 'reported');
+    switch (statusKey) {
+        case 'en-route':
+            return { className: 'responding', label: 'En Route', icon: 'fa-truck-medical' };
+        case 'on-scene':
+            return { className: 'resolved', label: 'On Scene', icon: 'fa-crosshairs' };
+        case 'controlled':
+            return { className: 'resolved', label: 'Controlled', icon: 'fa-circle-check' };
+        case 'closed':
+            return { className: 'closed', label: 'Closed', icon: 'fa-folder-closed' };
+        case 'reported':
+        default:
+            return { className: 'reported', label: 'Reported', icon: 'fa-bell' };
+    }
+}
+
+function getBlockingIncidentRouteForCurrentTeam(targetIncidentId = null) {
+    const currentTeamId = Number(window.userTeamId || 0);
+    const resolvedIncidentId = targetIncidentId !== null && targetIncidentId !== undefined
+        ? Number(targetIncidentId)
+        : null;
+
+    if (!currentTeamId || !Number.isFinite(currentTeamId)) {
+        return null;
+    }
+
+    return Array.from(activeTrucks.values()).find((truck) => {
+        const truckTeamId = Number(truck?.routeTeamId || 0);
+        const truckIncidentId = truck?.incidentId !== null && truck?.incidentId !== undefined
+            ? Number(truck.incidentId)
+            : null;
+
+        return truckTeamId === currentTeamId
+            && truck?.isSimulating
+            && truckIncidentId !== null
+            && truckIncidentId !== resolvedIncidentId;
+    }) || null;
+}
+
+function getBlockingIncidentRouteLabel(route) {
+    if (!route) {
+        return 'another ongoing incident';
+    }
+
+    const destinationTitle = route?.routeDestination?.title;
+    if (typeof destinationTitle === 'string' && destinationTitle.trim() !== '') {
+        return destinationTitle.trim();
+    }
+
+    const incidentId = route?.incidentId;
+    if (incidentId !== null && incidentId !== undefined) {
+        const incidentLookup = window.incidentsLookup instanceof Map ? window.incidentsLookup : null;
+        const incidentRecord = incidentLookup?.get(`incident:${incidentId}`) || null;
+        const incidentTitle = incidentRecord?.title || incidentRecord?.marker?.title || incidentRecord?.marker_title || null;
+        if (typeof incidentTitle === 'string' && incidentTitle.trim() !== '') {
+            return incidentTitle.trim();
+        }
+
+        return `Incident #${incidentId}`;
+    }
+
+    return 'another ongoing incident';
+}
+
+function buildResponderPopupContent(marker, incident, imagePath = null) {
+    const markerPresentation = getResponderPopupPresentation(marker);
+    const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status);
+    const targetIncidentId = incident?.incident_id ?? marker?.incident_id ?? null;
+    const blockingRoute = isIncidentMarker(marker)
+        ? getBlockingIncidentRouteForCurrentTeam(targetIncidentId)
+        : null;
+    const isIncidentRoutingBlocked = Boolean(blockingRoute);
+    const detailRows = isIncidentMarker(marker)
+        ? [
+            { label: 'Category', value: markerPresentation.label },
+            { label: 'Status', value: statusMeta.label },
+            { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+        ]
+        : isStationMarker(marker)
+            ? [
+                { label: 'Category', value: 'Fire Station' },
+                { label: 'Hotline', value: marker.station?.contact_number || marker.contact_number || 'Not available' },
+                { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+            ]
+            : isHydrantMarker(marker)
+                ? [
+                    { label: 'Category', value: 'Fire Hydrant' },
+                    { label: 'Reference', value: marker.hydrant?.hydrant_code || marker.title || `Hydrant ${marker.marker_id}` },
+                    { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+                ]
+                : [
+                    { label: 'Category', value: markerPresentation.label },
+                    { label: 'Marker ID', value: String(marker.marker_id || 'N/A') },
+                    { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+                ];
+
+    let actionMarkup = '';
+
+    if (isIncidentMarker(marker)) {
+        if (canManageMarkers && normalizeIncidentStatus(marker.incident_status || incident?.status || 'reported') === 'reported') {
+            actionMarkup += `
+                <button id="respond${marker.marker_id}" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" ${isIncidentRoutingBlocked ? 'type="button" disabled title="Your team is already navigating to another incident."' : ''}>
+                    <i class="fas fa-phone-volume"></i>
+                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now'}
+                </button>
+            `;
+        }
+
+        if (isIncidentRoutingBlocked) {
+            actionMarkup += `
+                <div class="responder-marker-popup-alert">
+                    <i class="fas fa-circle-exclamation"></i>
+                    Team already assigned to ${escapeHtml(getBlockingIncidentRouteLabel(blockingRoute))}
+                </div>
+            `;
+        }
+
+        actionMarkup += `
+            <button
+                type="button"
+                class="responder-marker-popup-btn secondary${isIncidentRoutingBlocked ? ' disabled' : ''}"
+                ${isIncidentRoutingBlocked
+                    ? 'disabled title="Finish or clear the active team route before navigating to another incident."'
+                    : `onclick="window.calculateRouteToIncident(${targetIncidentId ?? 'null'}, ${marker.marker_id})"`}
+            >
+                <i class="fas fa-route"></i>
+                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
+            </button>
+        `;
+    } else if (isStationMarker(marker)) {
+        actionMarkup += `
+            <button type="button" class="responder-marker-popup-btn secondary" onclick="window.calculateRouteToStation(${marker.marker_id})">
+                <i class="fas fa-route"></i>
+                Get Directions
+            </button>
+        `;
+    }
+
+    actionMarkup += `
+        <button id="viewDetails${marker.marker_id}" class="responder-marker-popup-btn ${isIncidentMarker(marker) ? 'primary' : 'secondary'}">
+            <i class="fas fa-circle-info"></i>
+            ${isIncidentMarker(marker) ? 'View Incident Details' : 'View Details'}
+        </button>
+    `;
+
+    return `
+        <div class="responder-marker-popup ${markerPresentation.accentClass}">
+            <div class="responder-marker-popup-topbar"></div>
+            <div class="responder-marker-popup-header">
+                <div class="responder-marker-popup-icon" style="--popup-accent:${markerPresentation.color};">
+                    <i class="fas ${markerPresentation.icon}"></i>
+                </div>
+                <div class="responder-marker-popup-heading">
+                    <div class="responder-marker-popup-chip-row">
+                        <span class="responder-marker-popup-chip">${escapeHtml(markerPresentation.label)}</span>
+                        ${isIncidentMarker(marker) ? `
+                            <span class="responder-marker-popup-chip status ${statusMeta.className}">
+                                <i class="fas ${statusMeta.icon}"></i>
+                                ${escapeHtml(statusMeta.label)}
+                            </span>
+                        ` : ''}
+                    </div>
+                    <strong class="responder-marker-popup-title">${escapeHtml(marker.title || `Marker ${marker.marker_id || ''}`)}</strong>
+                    <p class="responder-marker-popup-subtitle">${escapeHtml(marker.description || 'No description provided yet.')}</p>
+                </div>
+            </div>
+            ${imagePath ? `
+                <div class="responder-marker-popup-media">
+                    <img src="${imagePath}" alt="${escapeHtml(marker.title || 'Marker image')}" class="responder-marker-popup-image" />
+                </div>
+            ` : ''}
+            <div class="responder-marker-popup-details">
+                ${detailRows.map((row) => `
+                    <div class="responder-marker-popup-detail-row">
+                        <span class="responder-marker-popup-detail-label">${escapeHtml(row.label)}</span>
+                        <span class="responder-marker-popup-detail-value">${escapeHtml(row.value)}</span>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="responder-marker-popup-actions">
+                ${actionMarkup}
+            </div>
+            <input type="hidden" value="${escapeHtml(String(marker.marker_id || ''))}" id="mid">
+        </div>
+    `;
+}
+
+function findIncidentForMarker(marker, fallbackIncident = null) {
+    if (fallbackIncident) {
+        return fallbackIncident;
+    }
+
+    if (!Array.isArray(window.incidentsData)) {
+        return null;
+    }
+
+    return findIncidentInLookup(
+        marker,
+        window.incidentsLookup instanceof Map ? window.incidentsLookup : buildIncidentLookup(window.incidentsData)
+    );
+}
+
+function ensureResponderMapDetailsModal() {
+    let modal = document.getElementById('responderMapDetailsModal');
+    if (modal) {
+        return modal;
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'responderMapDetailsModal';
+    modal.className = 'responder-map-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div class="responder-map-modal-card" role="dialog" aria-modal="false" aria-labelledby="responderMapDetailsModalTitle">
+            <div class="responder-map-modal-header">
+                <div>
+                    <p class="responder-map-modal-kicker">Map Details</p>
+                    <h2 id="responderMapDetailsModalTitle" class="responder-map-modal-title">Details</h2>
+                </div>
+                <button type="button" id="responderMapDetailsModalClose" class="responder-map-modal-close" aria-label="Close details modal">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div id="responderMapDetailsModalBody" class="responder-map-modal-body"></div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('responderMapDetailsModalClose')?.addEventListener('click', closeResponderMapDetailsModal);
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('show')) {
+            closeResponderMapDetailsModal();
+        }
+    });
+
+    return modal;
+}
+
+function openResponderMapDetailsModal(title, content) {
+    if (!detailsPanel) {
+        initDetailsPanel();
+    }
+
+    const headerElement = detailsPanel?.querySelector('.details-header h3');
+    const detailsContent = document.getElementById('detailsContent');
+
+    if (headerElement) {
+        headerElement.innerHTML = `<i class="fas fa-circle-info"></i> <span>${escapeHtml(title || 'Marker Details')}</span>`;
+    }
+
+    if (detailsContent) {
+        detailsContent.innerHTML = content;
+    }
+
+    detailsPanel?.classList.add('compact-responder');
+    detailsPanel?.classList.add('visible');
+}
+
+function closeResponderMapDetailsModal() {
+    closeDetailsPanel();
+}
+
+function buildResponderMapInfoRows(rows = []) {
+    return rows.map((row) => `
+        <div class="responder-map-detail-row">
+            <span class="responder-map-detail-label">${escapeHtml(row.label)}</span>
+            <span class="responder-map-detail-value">${escapeHtml(row.value)}</span>
+        </div>
+    `).join('');
+}
+
+function showResponderMarkerDetails(marker, coord, imagePath = null) {
+    const presentation = getResponderPopupPresentation(marker);
+    const createdAt = marker.created_at ? new Date(marker.created_at).toLocaleString() : 'Unknown';
+    const updatedAt = marker.updated_at ? new Date(marker.updated_at).toLocaleString() : 'Unknown';
+    const infoRows = [
+        { label: 'Marker ID', value: marker.marker_id ? `#${marker.marker_id}` : 'Unavailable' },
+        { label: 'Type', value: presentation.label },
+        { label: 'Description', value: marker.description || 'No description' },
+        { label: 'Coordinates', value: `${marker.lat}, ${marker.lng}` },
+        { label: 'Created', value: createdAt },
+        { label: 'Updated', value: updatedAt }
+    ];
+
+    if (isStationMarker(marker)) {
+        infoRows.splice(2, 0,
+            { label: 'Station Name', value: marker.station?.station_name || marker.title || 'Not available' },
+            { label: 'Station Code', value: marker.station?.station_code || 'Unavailable' },
+            { label: 'Hotline', value: marker.station?.contact_number || marker.contact_number || 'Not available' },
+            { label: 'Email', value: marker.station?.email || 'Unavailable' }
+        );
+    } else if (isHydrantMarker(marker)) {
+        infoRows.splice(2, 0,
+            { label: 'Hydrant Code', value: marker.hydrant?.hydrant_code || 'Unavailable' },
+            { label: 'Assigned Station', value: marker.hydrant?.station?.station_name || 'Not assigned' }
+        );
+    } else if (isSchoolMarker(marker)) {
+        infoRows.splice(2, 0, { label: 'School Name', value: marker.school?.school_name || marker.title || 'Unavailable' });
+    } else if (getMarkerCategoryKey(marker) === 'barangay') {
+        infoRows.splice(2, 0, { label: 'Resource Type', value: 'Barangay Hall / Resource Marker' });
+    }
+
+    openResponderMapDetailsModal(
+        marker.title || 'Marker Details',
+        `
+            <div class="responder-map-detail-panel">
+                <div class="responder-map-detail-badge">
+                    <i class="fas fa-circle-info"></i>
+                    Location Summary
+                </div>
+                <div class="responder-map-detail-image-wrap">
+                    ${imagePath
+                        ? `<img src="${imagePath}" alt="${escapeHtml(marker.title || 'Marker image')}" class="responder-map-detail-image">`
+                        : `
+                            <div class="responder-map-detail-image-placeholder">
+                                <i class="fas ${presentation.icon}"></i>
+                                <span>No marker image uploaded</span>
+                            </div>
+                        `}
+                </div>
+                <div class="responder-map-detail-grid">
+                    ${buildResponderMapInfoRows(infoRows)}
+                </div>
+            </div>
+        `
+    );
+}
+
+function showResponderIncidentDetails(marker, incident, imagePath = null) {
+    const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status || 'reported');
+    const reportedAt = marker.reported_at
+        ? new Date(marker.reported_at).toLocaleString()
+        : (incident?.created_at ? new Date(incident.created_at).toLocaleString() : 'Unknown');
+    const updatedAt = incident?.updated_at ? new Date(incident.updated_at).toLocaleString() : 'Unknown';
+    const reportedBy = incident?.reporter
+        ? [incident.reporter.first_name, incident.reporter.last_name].filter(Boolean).join(' ') || incident.reporter.email || 'Citizen Reporter'
+        : (incident?.reported_by || 'Citizen Reporter');
+    const assignedTeam = incident?.team?.team_name || incident?.team?.name || (incident?.team?.team_id ? `Team #${incident.team.team_id}` : 'Not yet assigned');
+
+    openResponderMapDetailsModal(
+        'Incident Details',
+        `
+            <div class="responder-map-detail-panel">
+                <div class="responder-map-detail-badge danger">
+                    <i class="fas fa-fire"></i>
+                    Active Incident
+                </div>
+                <div class="responder-map-detail-image-wrap">
+                    ${imagePath
+                        ? `<img src="${imagePath}" alt="${escapeHtml(marker.title || 'Incident image')}" class="responder-map-detail-image">`
+                        : `
+                            <div class="responder-map-detail-image-placeholder">
+                                <i class="fas fa-fire"></i>
+                                <span>No incident image uploaded</span>
+                            </div>
+                        `}
+                </div>
+                <div class="responder-map-detail-grid">
+                    ${buildResponderMapInfoRows([
+                        { label: 'Marker ID', value: marker.marker_id ? `#${marker.marker_id}` : 'Unavailable' },
+                        { label: 'Incident ID', value: incident?.incident_id ? `#${incident.incident_id}` : 'Unavailable' },
+                        { label: 'Type', value: 'Fire Incident' },
+                        { label: 'Status', value: statusMeta.label },
+                        { label: 'Reported', value: reportedAt },
+                        { label: 'Updated', value: updatedAt },
+                        { label: 'Reported By', value: reportedBy },
+                        { label: 'Assigned Team', value: assignedTeam },
+                        { label: 'Description', value: marker.description || incident?.marker?.description || 'No description provided.' },
+                        { label: 'Coordinates', value: `${marker.lat}, ${marker.lng}` }
+                    ])}
+                </div>
+            </div>
+        `
+    );
 }
 
 async function calculateRouteToStation(stationId) {
@@ -5331,6 +6716,8 @@ async function displayAndStartRoute(routeId, route, destination) {
         incidentStatusId: Number(route.incident_status_id ?? destination?.incidentStatusId ?? 1),
         routeStationId: route.route_station_id || null,
         routeTeamId: route.route_team_id || null,
+        routeTeamUserIds: Array.isArray(route.route_team_user_ids) ? route.route_team_user_ids : [],
+        routePrimaryUserId: route.route_primary_user_id || null,
         renderGroup: routeGroup,
         routeLayer: null,
         traveledLayer: null,
@@ -5342,7 +6729,10 @@ async function displayAndStartRoute(routeId, route, destination) {
         onSceneStatusSent: false,
         arrivalHandled: false,
         lastSentIncidentStatus: Number(route.incident_status_id ?? destination?.incidentStatusId ?? 1),
-        statusChangedByRoute: false
+        statusChangedByRoute: false,
+        usesRealtimeTracking: false,
+        lastRealtimeRouteSyncAt: 0,
+        lastRealtimeLocationSignature: null
     };
     
     activeTrucks.set(routeId, truckData);
@@ -5483,9 +6873,16 @@ async function startSimulationForRoute(routeId) {
         weight: 4,
         opacity: 0.6
     }));
-    
-    startSmoothAnimationForTruck(routeId);
+
     startRealTimeLocationUpdatesForTruck(routeId);
+    const realtimeLocation = getTruckRealtimeLocation(truck);
+    if (realtimeLocation) {
+        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+        showToast(`Live responder tracking enabled for truck ${routeId}`, 'success');
+        return;
+    }
+
+    startSmoothAnimationForTruck(routeId);
     showToast(`Movement started for truck ${routeId}!`, 'success');
 }
 
@@ -5719,16 +7116,52 @@ function startRealTimeLocationUpdatesForTruck(routeId) {
     if (truck.realTimeLocationWatch) clearInterval(truck.realTimeLocationWatch);
     
     truck.realTimeLocationWatch = setInterval(() => {
-        if (truck.isSimulating && truck.animatedVehicle) {
-            const position = truck.animatedVehicle.getLatLng();
+        const currentTruck = activeTrucks.get(routeId);
+        if (!currentTruck || !currentTruck.animatedVehicle) {
+            return;
+        }
+
+        const realtimeLocation = getTruckRealtimeLocation(currentTruck);
+        if (realtimeLocation) {
+            if (currentTruck.animationFrame) {
+                cancelAnimationFrame(currentTruck.animationFrame);
+                currentTruck.animationFrame = null;
+            }
+
+            updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+        }
+
+        if (currentTruck.isSimulating && currentTruck.animatedVehicle) {
+            const position = currentTruck.animatedVehicle.getLatLng();
             if (position) {
                 const locationDisplay = document.getElementById('userLocation');
                 if (locationDisplay) {
-                    locationDisplay.innerHTML = `<i class="fa-solid fa-location-dot"></i> Truck ${routeId}: ${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} (Moving)`;
+                    const trackingLabel = realtimeLocation ? 'Live' : 'Moving';
+                    locationDisplay.innerHTML = `<i class="fa-solid fa-location-dot"></i> Truck ${routeId}: ${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} (${trackingLabel})`;
                 }
             }
         }
-    }, 500);
+    }, TRUCK_REALTIME_REFRESH_MS);
+}
+
+function refreshRealtimeTrackedTrucks() {
+    for (const [routeId, truck] of activeTrucks.entries()) {
+        if (!truck?.isSimulating || !truck?.animatedVehicle) {
+            continue;
+        }
+
+        const realtimeLocation = getTruckRealtimeLocation(truck);
+        if (!realtimeLocation) {
+            continue;
+        }
+
+        if (truck.animationFrame) {
+            cancelAnimationFrame(truck.animationFrame);
+            truck.animationFrame = null;
+        }
+
+        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+    }
 }
 
 async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppedToast = true) {
@@ -5830,6 +7263,16 @@ function startRoutePolling() {
                 // Check if we already have this route
                 if (activeTrucks.has(routeData.route_id)) {
                     const existingTruck = activeTrucks.get(routeData.route_id);
+                    existingTruck.routeTeamId = routeData.route_team_id || existingTruck.routeTeamId || null;
+                    existingTruck.routeTeamUserIds = Array.isArray(routeData.route_team_user_ids)
+                        ? routeData.route_team_user_ids
+                        : (existingTruck.routeTeamUserIds || []);
+                    existingTruck.routePrimaryUserId = routeData.route_primary_user_id || existingTruck.routePrimaryUserId || null;
+                    existingTruck.routeDestination = {
+                        title: routeData.destination_title || existingTruck.routeDestination?.title || 'Destination',
+                        lat: routeData.destination_lat ?? existingTruck.routeDestination?.lat ?? null,
+                        lng: routeData.destination_lng ?? existingTruck.routeDestination?.lng ?? null,
+                    };
                     // If route is moving but our local position is behind, update it
                      if (routeData.status === 'moving' && !existingTruck.isSimulating) {
                         const dbIndex = routeData.current_position_index || 0;
@@ -5874,6 +7317,8 @@ function startRoutePolling() {
                     incidentId: routeData.incident_id || null,
                     routeStationId: routeData.route_station_id || null,
                     routeTeamId: routeData.route_team_id || null,
+                    routeTeamUserIds: Array.isArray(routeData.route_team_user_ids) ? routeData.route_team_user_ids : [],
+                    routePrimaryUserId: routeData.route_primary_user_id || null,
                     renderGroup: routeGroup,
                     routeLayer: null,
                     traveledLayer: null,
@@ -5884,7 +7329,10 @@ function startRoutePolling() {
                     endMarker: null,
                     onSceneStatusSent: false,
                     arrivalHandled: false,
-                    lastSentIncidentStatus: null
+                    lastSentIncidentStatus: null,
+                    usesRealtimeTracking: false,
+                    lastRealtimeRouteSyncAt: 0,
+                    lastRealtimeLocationSignature: null
                 };
                 
                 activeTrucks.set(routeData.route_id, truckData);
@@ -5941,13 +7389,16 @@ function startRoutePolling() {
             updateRouteInfoCard();
             
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
             console.error('Error polling routes:', error);
         }
     };
 
     pollRoutes();
     
-    routePollingInterval = setInterval(pollRoutes, ROUTE_POLL_INTERVAL_MS);
+    routePollingInterval = setInterval(pollRoutes, getRoutePollIntervalMs());
 }
 
 async function startSimulationFromPosition(routeId, startIndex) {
@@ -6035,9 +7486,16 @@ async function startSimulationFromPosition(routeId, startIndex) {
         }));
     }
     
+    startRealTimeLocationUpdatesForTruck(routeId);
+    const realtimeLocation = getTruckRealtimeLocation(truck);
+    if (realtimeLocation) {
+        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+        console.log(`Realtime responder tracking resumed for truck ${routeId}`);
+        return;
+    }
+
     // Start animation from current position
     startSmoothAnimationForTruck(routeId);
-    startRealTimeLocationUpdatesForTruck(routeId);
     
     console.log(`Resumed truck ${routeId} from position ${startIndex} (${(startIndex/truck.simulationPoints.length*100).toFixed(1)}%)`);
 }
@@ -6109,6 +7567,17 @@ function addPopupEventListeners(coord) {
                 showToast('Fetching details...', 'info');
                 const imagePath = coord.image?.path ? '/storage/' + coord.image.path : (marker.multimedia?.path ? '/storage/' + marker.multimedia.path : null);
                 const markerData = { ...marker, category: getCategoryName(marker), created_at: coord.created_at || marker.created_at };
+                if (window.activeMapInstanceKey === 'firefighterDashboard') {
+                    const incident = findIncidentForMarker(marker, coord.incident);
+                    if (isIncidentMarker(marker)) {
+                        showResponderIncidentDetails(markerData, incident, imagePath);
+                        return;
+                    }
+
+                    showResponderMarkerDetails(markerData, coord, imagePath);
+                    return;
+                }
+
                 await showDetailsPanel(markerData, imagePath);
             });
         }
@@ -6361,11 +7830,59 @@ function deleteShape(shapeId) {
 
 async function loadShapes() {
     try {
+        if (isFirefighterDashboardMapInstance()) {
+            if (shapeFeatureGroup) {
+                shapeFeatureGroup.clearLayers();
+            }
+            shapeLayers = {};
+            return;
+        }
+
+        if (shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
+            return;
+        }
+
         if (shapeFeatureGroup) shapeFeatureGroup.clearLayers();
         shapeLayers = {};
+        const cachedShapes = readStaticMapCache('shapes');
+
+        if (Array.isArray(cachedShapes) && cachedShapes.length > 0) {
+            cachedShapes.forEach((shape, index) => {
+                let geojson = shape.geojson;
+                if (typeof geojson === "string") {
+                    try { geojson = JSON.parse(geojson); } catch (e) { console.error('Error parsing geojson:', e); return; }
+                }
+                try {
+                    const layer = L.geoJSON(geojson, {
+                        style: { color: colors[index % colors.length], weight: 3, fillOpacity: 0.2, fillColor: colors[index % colors.length] },
+                        interactive: true, pane: 'overlayPane'
+                    });
+                    layer.shapeId = shape.id;
+                    layer.shapeName = shape.name;
+                    layer.shapeBarangayId = shape.barangay_id || null;
+                    layer.shapeBoundaryType = shape.boundary_type || 'custom';
+                    layer.shapeSource = shape.source || 'manual';
+                    layer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(shape.id, layer, e.latlng); } });
+                    if (shapeFeatureGroup) shapeFeatureGroup.addLayer(layer);
+                    shapeLayers[shape.id] = layer;
+                    layer.bindTooltip(shape.name || "Shape", { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
+                } catch (e) { console.error('Error creating cached layer for shape:', e); }
+            });
+
+            if (shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
+                return;
+            }
+        }
+
         const response = await fetch('/api/shapes', { headers: { 'Accept': 'application/json' } });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const shapes = await response.json();
+        const shapesPayload = await response.json();
+        const shapes = Array.isArray(shapesPayload?.data) ? shapesPayload.data : (Array.isArray(shapesPayload) ? shapesPayload : []);
+        writeStaticMapCache('shapes', shapes);
+        if (shapeFeatureGroup) {
+            shapeFeatureGroup.clearLayers();
+        }
+        shapeLayers = {};
         shapes.forEach((shape, index) => {
             let geojson = shape.geojson;
             if (typeof geojson === "string") {
@@ -6387,6 +7904,7 @@ async function loadShapes() {
                 layer.bindTooltip(shape.name || "Shape", { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
             } catch (e) { console.error('Error creating layer for shape:', e); }
         });
+        lastShapesFetchAt = Date.now();
     } catch (error) {
         console.error('Error loading shapes:', error);
         showNotification('Error loading shapes', 'error');
@@ -6489,19 +8007,57 @@ function initAfterMapReady() {
     window.map.addLayer(drawnItems);
     shapeFeatureGroup = L.featureGroup().addTo(window.map);
     
-    var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(window.map);
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
+
+    var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap, &copy; CartoDB',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+    var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    });
+    var hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
+    });
     var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, attribution: 'Tiles © Esri' });
+    var waterReference = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Hydro reference (c) Esri'
+    });
+    (isFirefighterDashboardMap ? cartoLight : street).addTo(window.map);
     window.pyroPwa?.attachMapOfflineNotice?.(window.map);
 
     console.log(roleToken);
     console.log('User Role:', roleName, 'Role ID:', roleToken);
-    routeOverlayControl = L.control.layers({ "Street Map": street, "Satellite": satellite }, {
-        "🚉 Stations": stationFeatureGroup,
-        "🔥 Incidents": incidentFeatureGroup,
-        "💧 Hydrants": hydrantFeatureGroup,
-        "📍 Other Markers": otherFeatureGroup,
-        "🔷 Shapes": shapeFeatureGroup
-    }, { collapsed: true, position: 'topright' });
+    const routeBaseMaps = isFirefighterDashboardMap
+        ? {
+            "Carto Light": cartoLight,
+            "OSM Standard": street,
+            "OSM HOT": hotStreet,
+            "Satellite": satellite
+        }
+        : {
+            "Street Map": street,
+            "Satellite": satellite
+        };
+    const routeOverlays = isFirefighterDashboardMap
+        ? {
+            "Fire Stations": stationFeatureGroup,
+            "Incidents": incidentFeatureGroup,
+            "Fire Hydrants": hydrantFeatureGroup,
+            "Other Markers": otherFeatureGroup,
+            "Water Reference": waterReference
+        }
+        : {
+            "Stations": stationFeatureGroup,
+            "Incidents": incidentFeatureGroup,
+            "Hydrants": hydrantFeatureGroup,
+            "Other Markers": otherFeatureGroup,
+            "Shapes": shapeFeatureGroup
+        };
+    routeOverlayControl = L.control.layers(routeBaseMaps, routeOverlays, { collapsed: true, position: 'topright' });
     routeOverlayControl.addTo(window.map);
 
     // Defense-in-depth: unauthorized roles (e.g. firefighter role 5) cannot see edit/delete controls.
@@ -6660,12 +8216,14 @@ function initAfterMapReady() {
         });
     }
     
-    loadShapes();
-    setTimeout(focusBoundaryEditorContext, 350);
+    if (!isFirefighterDashboardMap) {
+        loadShapes();
+        setTimeout(focusBoundaryEditorContext, 350);
+    }
     if (markerStatePollingInterval) {
         clearInterval(markerStatePollingInterval);
     }
-    markerStatePollingInterval = setInterval(pollMarkerStateChanges, MARKER_STATE_POLL_INTERVAL_MS);
+    markerStatePollingInterval = setInterval(pollMarkerStateChanges, getMarkerStatePollIntervalMs());
     
     if (canManageMarkers) {
         window.map.on('click', function(e) {
@@ -7037,6 +8595,12 @@ async function calculateRouteToIncident(incidentId, markerId = null) {
     );
     
     const resolvedIncidentId = incident?.incident_id ?? markerRecord?.incident_id ?? null;
+    const existingIncidentRoute = getBlockingIncidentRouteForCurrentTeam(resolvedIncidentId);
+
+    if (existingIncidentRoute) {
+        showToast('Your team is already responding to another ongoing incident.', 'warning');
+        return;
+    }
 
     const destination = {
         lat: parseFloat(lat),

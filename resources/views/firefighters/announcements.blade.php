@@ -15,7 +15,7 @@
         $authInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'F', 0, 1));
     @endphp
 
-    <style>
+    <style data-ff-page-style="announcements">
         .main-content {
             max-width: none;
         }
@@ -422,6 +422,7 @@
 <body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'announcements'])
 
+    <div data-ff-page-root="announcements">
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'Announcements',
@@ -539,6 +540,7 @@
     </div>
 
     @vite(['resources/js/firefighter/announcements.js'])
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

@@ -53,22 +53,24 @@
 
             .firefighter-mobile-welcome-toast {
                 position: fixed;
-                top: calc(env(safe-area-inset-top, 0px) + 12px);
-                left: 12px;
-                right: 12px;
+                top: calc(env(safe-area-inset-top, 0px) + 14px);
+                left: 14px;
+                right: 14px;
                 z-index: 320;
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                padding: 14px 16px;
-                border-radius: 22px;
-                background: rgba(255, 251, 235, 0.96);
-                border: 1px solid rgba(245, 158, 11, 0.18);
-                box-shadow: 0 18px 36px rgba(15, 23, 42, 0.10);
+                justify-content: space-between;
+                padding: 14px 15px;
+                border-radius: 24px;
+                background: linear-gradient(135deg, rgba(255, 250, 240, 0.97), rgba(255, 255, 255, 0.94));
+                border: 1px solid rgba(198, 61, 38, 0.12);
+                box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
                 opacity: 0;
                 transform: translateY(-8px);
-                pointer-events: none;
+                pointer-events: auto;
                 transition: opacity 0.24s ease, transform 0.24s ease;
+                cursor: pointer;
             }
 
             .firefighter-mobile-welcome-toast.is-visible {
@@ -93,19 +95,37 @@
                 flex-direction: column;
                 gap: 3px;
                 min-width: 0;
+                flex: 1;
             }
 
             .firefighter-mobile-welcome-toast__copy strong {
-                color: #9a3412;
-                font-size: 0.92rem;
+                color: #7c2d12;
+                font-size: 0.9rem;
                 line-height: 1.2;
                 font-weight: 800;
             }
 
             .firefighter-mobile-welcome-toast__copy span {
-                color: #b45309;
-                font-size: 0.76rem;
+                color: #64748b;
+                font-size: 0.74rem;
                 line-height: 1.35;
+            }
+
+            .firefighter-mobile-welcome-toast::after {
+                content: 'Open brief';
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 34px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+                color: #fff;
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: 0.02em;
+                box-shadow: 0 10px 22px rgba(198, 61, 38, 0.18);
+                flex-shrink: 0;
             }
 
             .firefighter-dashboard-welcome,
@@ -165,10 +185,17 @@
 
             .firefighter-mobile-insights-panel__sheet {
                 position: absolute;
-                inset: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                top: auto;
                 background: linear-gradient(180deg, #fffaf4 0%, #fbf7ef 100%);
-                padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(22px + env(safe-area-inset-bottom, 0px));
+                border-radius: 30px 30px 0 0;
+                padding: 14px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+                min-height: min(64svh, 700px);
+                max-height: min(78svh, 760px);
                 overflow-y: auto;
+                box-shadow: 0 -24px 50px rgba(15, 23, 42, 0.18);
             }
 
             .firefighter-mobile-insights-panel__header {
@@ -176,7 +203,21 @@
                 align-items: flex-start;
                 justify-content: space-between;
                 gap: 16px;
-                margin-bottom: 18px;
+                margin-bottom: 16px;
+                position: relative;
+                padding-top: 14px;
+            }
+
+            .firefighter-mobile-insights-panel__header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 56px;
+                height: 5px;
+                border-radius: 999px;
+                background: rgba(148, 163, 184, 0.45);
             }
 
             .firefighter-mobile-insights-panel__eyebrow {
@@ -190,7 +231,7 @@
 
             .firefighter-mobile-insights-panel__title {
                 margin: 0;
-                font-size: 1.55rem;
+                font-size: 1.45rem;
                 line-height: 1.1;
                 font-weight: 800;
                 color: #1e293b;
@@ -211,10 +252,14 @@
 
             .firefighter-mobile-insights-panel__content [data-ff-insights-source] {
                 display: block !important;
-                margin: 0 0 18px !important;
+                margin: 0 0 14px !important;
             }
 
-            .firefighter-mobile-insights-panel__content .kpi-grid,
+            .firefighter-mobile-insights-panel__content .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 10px !important;
+            }
+
             .firefighter-mobile-insights-panel__content .grid-4,
             .firefighter-mobile-insights-panel__content .grid-2 {
                 grid-template-columns: 1fr !important;
@@ -222,6 +267,15 @@
 
             .firefighter-mobile-insights-panel__content .text-center.text-xs.text-gray-400.mt-8.border-t.pt-4 {
                 margin-top: 0 !important;
+            }
+
+            .firefighter-mobile-insights-panel__content .kpi-card,
+            .firefighter-mobile-insights-panel__content .lector-card,
+            .firefighter-mobile-insights-panel__content .stat-card,
+            .firefighter-mobile-insights-panel__content .assigned-incidents-container,
+            .firefighter-mobile-insights-panel__content .bg-white.rounded-xl.shadow {
+                border-radius: 22px !important;
+                box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08) !important;
             }
         }
 
@@ -234,6 +288,7 @@
         'sidebarId' => 'sidebar',
         'backdropId' => 'sidebarBackdrop',
     ])
+    <div data-ff-page-root="dashboard">
     {{--
         <div class="sidebar-header-gradient px-6 py-8">
             <div class="ff-shell-brand flex items-center gap-3">
@@ -365,7 +420,9 @@
         <!-- Welcome Banner -->
         <div class="bg-red-50 border-l-4 border-red-500 rounded-2xl p-8 mb-8 flex items-start justify-between firefighter-dashboard-welcome" data-ff-insights-source>
             <div>
+                <span class="ff-hero-eyebrow"><i class="fas fa-fire-flame-curved"></i> Responder dashboard</span>
                 <h1 class="text-2xl font-bold text-red-900 mb-2">Welcome back, {{ auth()->user()->first_name }}!</h1>
+                <p class="text-red-700 font-medium ff-hero-subtitle">Monitor incidents, assigned calls, nearby stations, and crew coordination from one live operations view.</p>
                 <p class="text-red-700 font-medium">Station 7 Operations • {{ now()->format('l, F j, Y') }}</p>
             </div>
             <div class="hidden md:flex items-center gap-4 bg-white/50 p-2 rounded-xl border border-red-100">
@@ -386,7 +443,7 @@
                 </div>
                 <div class="kpi-info">
                     <h3>Active Incidents</h3>
-                    <p id="activeIncidentsCount">{{ $incidentCoords->count() }}</p>
+                    <p id="activeIncidentsCount">--</p>
                 </div>
             </div>
 
@@ -406,7 +463,7 @@
                 </div>
                 <div class="kpi-info">
                     <h3>Equipment</h3>
-                    <p>12</p>
+                    <p id="equipmentCount">--</p>
                 </div>
             </div>
 
@@ -416,7 +473,7 @@
                 </div>
                 <div class="kpi-info">
                     <h3>Crew Online</h3>
-                    <p>{{ $onlineCrewCount ?? 8 }}</p>
+                    <p id="crewOnlineCount">--</p>
                 </div>
             </div>
         </div>
@@ -428,11 +485,11 @@
                         <i class="fas fa-map-marked-alt"></i>
                     </div>
                     <div>
-                        <h2 class="text-lg font-bold text-slate-800">Operational Map</h2>
-                        <p class="text-xs text-slate-500 font-medium">Real-time incident response tracking</p>
+                        <h2 class="text-lg font-bold text-slate-800">Operations Map</h2>
+                        <p class="text-xs text-slate-500 font-medium">Live incidents, stations, hydrants, and response markers</p>
                     </div>
                 </div>
-                <button id="refreshIncidents" class="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-red-200 flex items-center gap-2">
+                <button id="refreshIncidents" class="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-red-200 flex items-center gap-2 ff-map-sync-btn">
                     <i class="fas fa-sync-alt"></i> Sync Data
                 </button>
             </div>
@@ -641,31 +698,11 @@
                     </h2>
                     <a href="{{ route('firefighter.announcements') }}" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
-                <div style="max-height: 300px; overflow-y: auto;">
-                    @forelse ($posts ?? [] as $post)
-                        <div class="announcement-item">
-                            <input type="hidden" name="post_id" id='post_id' value="{{ $post->id }}">
-                            <div class="announcement-avatar">{{ substr($post->user->first_name ?? 'A', 0, 1) }}{{ substr($post->user->last_name ?? 'D', 0, 1) }}</div>
-                            <div class="announcement-content">
-                                <div class="announcement-header">
-                                    <span class="announcement-author">{{ $post->user->first_name ?? 'Admin' }} {{ $post->user->last_name ?? 'Admin' }}</span>
-                                    <span class="announcement-time">{{ $post->created_at->diffForHumans() }}</span>
-                                </div>
-                                <div class="announcement-text">
-                                    {{ $post->content }}
-                                </div>
-                                <div class="announcement-stats">
-                                    <span><i class="far fa-thumbs-up"></i> {{ $post->likes_count ?? 0 }}</span>
-                                    <span><i class="far fa-comment"></i> {{ $post->comments_count ?? 0 }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="far fa-comment-dots text-3xl mb-2"></i>
-                            <p>No announcements yet</p>
-                        </div>
-                    @endforelse
+                <div id="dashboardAnnouncementsList" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="far fa-comment-dots text-3xl mb-2"></i>
+                        <p>Loading announcements...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -681,22 +718,10 @@
                     </h2>
                     <a href="#" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
-                <div style="grid-template-columns: 1fr;">
-                    @forelse ($stations ?? [] as $station)
-                        <div class="station-card">
-                            <div class="station-icon">
-                                <i class="fas fa-building"></i>
-                            </div>
-                            <div class="station-info">
-                                <h3>{{ $station->station_name }}</h3>
-                                <p><i class="fas fa-map-marker-alt"></i> {{ number_format($station->distance ?? 1.2, 1) }} km away</p>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="text-center py-8 text-gray-500">
-                            <p>No stations found</p>
-                        </div>
-                    @endforelse
+                <div id="dashboardNearbyStationsList" style="grid-template-columns: 1fr;">
+                    <div class="text-center py-8 text-gray-500">
+                        <p>Loading nearby stations...</p>
+                    </div>
                 </div>
             </div>
 
@@ -818,17 +843,19 @@
     window.incidentCoords = @json($incidentCoords ?? []);
     window.currentFirefighterId = {{ auth()->user()->user_id ?? 'null' }};
     window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
-    const FF_LOCATION_PUSH_INTERVAL_MS = 45000;
-    const FF_LOCATION_PULL_INTERVAL_MS = 45000;
-    const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 60000;
-    const FF_AUTO_ASSIGN_INTERVAL_MS = 60000;
+    const FF_LOCATION_PUSH_INTERVAL_MS = 60000;
+    const FF_LOCATION_PULL_INTERVAL_MS = 90000;
+    const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 30000;
+    const FF_AUTO_ASSIGN_INTERVAL_MS = 300000;
     let ffLocationPushInterval = null;
     let ffLocationPullInterval = null;
     let ffAssignedIncidentsInterval = null;
     let ffAutoAssignInterval = null;
     const FF_FETCH_TIMEOUT_MS = 10000;
+    const FF_ASSIGNED_INCIDENTS_TIMEOUT_MS = 20000;
     let ffAssignedIncidentsRequest = null;
     let ffAutoAssignRequest = null;
+    let ffAssignedIncidentsLastFetchedAt = 0;
 
     function firefighterDashboardIsVisible() {
         return document.visibilityState === 'visible';
@@ -899,10 +926,12 @@
         }
 
         const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), FF_FETCH_TIMEOUT_MS);
+        const timeoutMs = Number(options.timeoutMs || FF_FETCH_TIMEOUT_MS);
+        const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
+        const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
         const requestPromise = fetch(url, {
             cache: 'no-store',
-            ...options,
+            ...fetchOptions,
             signal: controller.signal
         }).finally(() => {
             window.clearTimeout(timeoutId);
@@ -912,11 +941,22 @@
     }
 
     // Function to fetch assigned incidents
-    async function fetchAssignedIncidents() {
+    async function fetchAssignedIncidents(force = false) {
         try {
+            if (!force && !firefighterDashboardIsVisible()) {
+                return Array.isArray(window.assignedIncidentsData) ? window.assignedIncidentsData : [];
+            }
+            const now = Date.now();
+            if (!force && ffAssignedIncidentsRequest) {
+                return ffAssignedIncidentsRequest;
+            }
+            if (!force && ffAssignedIncidentsLastFetchedAt && (now - ffAssignedIncidentsLastFetchedAt) < FF_ASSIGNED_INCIDENTS_INTERVAL_MS) {
+                return Array.isArray(window.assignedIncidentsData) ? window.assignedIncidentsData : [];
+            }
             ffAssignedIncidentsRequest = fetchFirefighterDashboardOnce(
                 ffAssignedIncidentsRequest,
-                `/firefighter/assigned/${window.currentFirefighterId}`
+                `/firefighter/assigned/${window.currentFirefighterId}`,
+                { timeoutMs: FF_ASSIGNED_INCIDENTS_TIMEOUT_MS }
             );
             const response = await ffAssignedIncidentsRequest;
             if (!response.ok) throw new Error('Failed to fetch assigned incidents');
@@ -927,6 +967,7 @@
             const incidents = result.data || [];
             console.log('Incidents data:', incidents);
             window.assignedIncidentsData = incidents;
+            ffAssignedIncidentsLastFetchedAt = Date.now();
             
             displayAssignedIncidents(incidents);
             if (typeof updateChartsWithData === 'function') {
@@ -937,12 +978,16 @@
             
             return incidents;
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                console.warn('Assigned incidents request timed out before completion.');
+                return Array.isArray(window.assignedIncidentsData) ? window.assignedIncidentsData : [];
+            }
             console.error('Error fetching assigned incidents:', error);
             document.getElementById('assignedIncidentsList').innerHTML = `
                 <div class="empty-incidents">
                     <i class="fas fa-exclamation-triangle text-4xl mb-2 opacity-50"></i>
                     <p>Failed to load assigned incidents</p>
-                    <button onclick="fetchAssignedIncidents()" class="btn btn-outline mt-2">Retry</button>
+                    <button onclick="fetchAssignedIncidents(true)" class="btn btn-outline mt-2">Retry</button>
                 </div>
             `;
             return [];
@@ -1428,7 +1473,7 @@ async function respondToIncident(incidentId, currentStatusId) {
         
         if (result.success) {
             showToast(result.message || 'You are now responding to this incident!', 'success');
-            await fetchAssignedIncidents();
+            await fetchAssignedIncidents(true);
             if (typeof window.calculateRouteToIncident === 'function') {
                 await window.calculateRouteToIncident(incidentId);
             }
@@ -1464,7 +1509,7 @@ async function completeIncident(incidentId, currentStatusId) {
         
         if (result.success) {
             showToast(result.message || 'Incident completed and marked as controlled!', 'success');
-            fetchAssignedIncidents(); // Refresh the list
+            fetchAssignedIncidents(true); // Refresh the list
         } else {
             showToast(result.message || 'Failed to update incident', 'error');
         }
@@ -1497,7 +1542,7 @@ async function closeCase(incidentId, currentStatusId) {
         
         if (result.success) {
             showToast(result.message || 'Case closed successfully!', 'success');
-            fetchAssignedIncidents(); // Refresh the list
+            fetchAssignedIncidents(true); // Refresh the list
         } else {
             showToast(result.message || 'Failed to close case', 'error');
         }
@@ -1530,7 +1575,7 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId) {
 
         if (result.success) {
             showToast(result.message || 'Incident tagged as false alarm', 'success');
-            fetchAssignedIncidents();
+            fetchAssignedIncidents(true);
         } else {
             showToast(result.message || 'Failed to tag false alarm', 'error');
         }
@@ -1781,24 +1826,36 @@ if (navigator.geolocation) {
         const refreshBtn = document.getElementById('refreshAssignedIncidents');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                fetchAssignedIncidents();
+                fetchAssignedIncidents(true);
             });
         }
-        
-        fetchAssignedIncidents();
-        window.runPendingIncidentAutoAssignment();
-        startFirefighterDashboardIntervals();
 
-        document.addEventListener('visibilitychange', () => {
+        const firefighterDashboardVisibilityHandler = function () {
             if (firefighterDashboardIsVisible()) {
-                fetchAssignedIncidents();
+                fetchAssignedIncidents(true);
                 fetchAllFirefighterLocations();
                 startFirefighterDashboardIntervals();
                 return;
             }
 
             clearFirefighterDashboardIntervals();
-        });
+        };
+
+        fetchAssignedIncidents(true);
+        window.runPendingIncidentAutoAssignment();
+        startFirefighterDashboardIntervals();
+        window.__ffCurrentPageCleanup = function () {
+            clearFirefighterDashboardIntervals();
+            document.removeEventListener('visibilitychange', firefighterDashboardVisibilityHandler);
+            if (typeof window.destroyPyroMapRuntime === 'function') {
+                window.destroyPyroMapRuntime();
+            }
+            if (typeof window.closeFirefighterInsightsPanel === 'function') {
+                window.closeFirefighterInsightsPanel();
+            }
+        };
+
+        document.addEventListener('visibilitychange', firefighterDashboardVisibilityHandler);
         
         document.querySelectorAll('.status-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -2133,26 +2190,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-window.runPendingIncidentAutoAssignment = async function() {
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (!token) {
-        return;
-    }
+    window.runPendingIncidentAutoAssignment = async function() {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (!token) {
+            return;
+        }
 
-    try {
-        ffAutoAssignRequest = fetchFirefighterDashboardOnce(ffAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': token
-            }
-        });
+        try {
+            ffAutoAssignRequest = fetchFirefighterDashboardOnce(ffAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
+                method: 'POST',
+                timeoutMs: 20000,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token
+                }
+            });
         const response = await ffAutoAssignRequest;
         const result = await response.json().catch(() => ({}));
         if (result?.success && Number(result.assigned) > 0) {
-            await fetchAssignedIncidents();
+            await fetchAssignedIncidents(true);
         }
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            console.warn('Background incident auto-assignment request timed out before completion.');
+            return;
+        }
         console.error('Background incident auto-assignment failed:', error);
     } finally {
         ffAutoAssignRequest = null;
@@ -2231,6 +2293,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (welcomeToast && window.innerWidth <= 768) {
+        welcomeToast.addEventListener('click', function () {
+            openFirefighterInsightsPanel();
+        });
+
         window.setTimeout(function () {
             welcomeToast.classList.add('is-visible');
             window.setTimeout(function () {
@@ -2242,6 +2308,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

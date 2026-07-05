@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class BoundaryLocationController extends Controller
@@ -25,14 +26,24 @@ class BoundaryLocationController extends Controller
             'station_id' => ['nullable', 'exists:stations,station_id'],
         ]);
 
-        $shapes = BoundaryLocation::query()
-            ->with(['station', 'barangay.city'])
-            ->when(! empty($validated['boundary_type']), fn ($query) => $query->where('boundary_type', $validated['boundary_type']))
-            ->when(! empty($validated['barangay_id']), fn ($query) => $query->where('barangay_id', $validated['barangay_id']))
-            ->when(! empty($validated['station_id']), fn ($query) => $query->where('station_id', $validated['station_id']))
-            ->orderBy('name')
-            ->get()
-            ->map(fn (BoundaryLocation $shape) => $this->serializeBoundary($shape));
+        $cacheKey = 'map:shapes:index:' . md5(json_encode($validated));
+
+        $shapes = Cache::remember($cacheKey, now()->addMinutes(3), function () use ($validated) {
+            return BoundaryLocation::query()
+                ->with([
+                    'station:station_id,station_name,marker_id',
+                    'barangay:barangay_id,barangay_name,city_id',
+                    'barangay.city:city_id,city_name,province_id',
+                ])
+                ->when(! empty($validated['boundary_type']), fn ($query) => $query->where('boundary_type', $validated['boundary_type']))
+                ->when(! empty($validated['barangay_id']), fn ($query) => $query->where('barangay_id', $validated['barangay_id']))
+                ->when(! empty($validated['station_id']), fn ($query) => $query->where('station_id', $validated['station_id']))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (BoundaryLocation $shape) => $this->serializeBoundary($shape))
+                ->values()
+                ->all();
+        });
 
         return response()->json($shapes);
     }
