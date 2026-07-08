@@ -480,6 +480,13 @@
             height: 18px;
         }
 
+        .citizen-map-legend-item-sheet .citizen-map-legend-image {
+            width: 18px;
+            height: 18px;
+            object-fit: contain;
+            display: block;
+        }
+
         .citizen-map-legend-item-sheet .citizen-map-legend-marker i {
             font-size: 9px;
         }
@@ -1660,13 +1667,13 @@
                 <p class="citizen-map-sheet-label">Map Legend</p>
                 <div class="citizen-map-legend-list">
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-user"><span class="citizen-map-legend-marker citizen-map-legend-marker-user"><i class="fas fa-user-shield"></i></span></span><span>Your location</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-station"><span class="citizen-map-legend-marker citizen-map-legend-marker-station"><i class="fas fa-building"></i></span></span><span>Fire station</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-barangay"><span class="citizen-map-legend-marker citizen-map-legend-marker-barangay"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"></circle><circle cx="16" cy="9" r="2" fill="none"></circle><circle cx="12" cy="7" r="2" fill="none"></circle><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"></path></svg></span></span><span>Barangay hall</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-incident"><span class="citizen-map-legend-marker citizen-map-legend-marker-incident"><i class="fas fa-fire"></i></span></span><span>Incident marker</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-hydrant"><span class="citizen-map-legend-marker citizen-map-legend-marker-hydrant"><i class="fas fa-fire-extinguisher"></i></span></span><span>Hydrant</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-station"><img class="citizen-map-legend-image" src="{{ asset('station.png') }}" alt="Fire station" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-station" style="display:none;"><i class="fas fa-building"></i></span></span><span>Fire station</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-barangay"><img class="citizen-map-legend-image" src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-barangay" style="display:none;"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"></circle><circle cx="16" cy="9" r="2" fill="none"></circle><circle cx="12" cy="7" r="2" fill="none"></circle><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"></path></svg></span></span><span>Barangay hall</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-incident"><img class="citizen-map-legend-image" src="{{ asset('fire.png') }}" alt="Incident marker" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-incident" style="display:none;"><i class="fas fa-fire"></i></span></span><span>Incident marker</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-hydrant"><img class="citizen-map-legend-image" src="{{ asset('hydrant.png') }}" alt="Hydrant" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-hydrant" style="display:none;"><i class="fas fa-fire-extinguisher"></i></span></span><span>Hydrant</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-other"><span class="citizen-map-legend-marker citizen-map-legend-marker-other"><i class="fas fa-map-marker-alt"></i></span></span><span>Other marker</span></div>
                     <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-route"><span class="citizen-map-legend-route-line"></span></span><span>Route</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-truck"><img src="{{ asset('storage/defaults/firetruck.png') }}" alt="Emergency truck"></span><span>Truck</span></div>
+                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-truck"><img src="{{ asset('truck.png') }}" alt="Emergency truck" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker" style="display:none;color:#f97316;"><i class="fas fa-truck-fast"></i></span></span><span>Truck</span></div>
                 </div>
             </div>
         </div>

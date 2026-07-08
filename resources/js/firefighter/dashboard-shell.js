@@ -1218,10 +1218,28 @@ function showFalseAlarmConfirmationToast() {
 
     function startDeferredMapHydration() {
         const loadState = document.getElementById('firefighterMapLoadState');
+        const mapElement = document.getElementById('firefighterDashboardMap');
+
+        const ensureMapVisible = function () {
+            if (!mapElement || !window.map || typeof window.map.invalidateSize !== 'function') {
+                return;
+            }
+
+            window.map.invalidateSize();
+            window.setTimeout(() => window.map?.invalidateSize?.(), 180);
+            window.setTimeout(() => window.map?.invalidateSize?.(), 420);
+            window.setTimeout(() => window.map?.invalidateSize?.(), 900);
+        };
 
         if (typeof window.initializePyroMapRuntime === 'function') {
             window.initializePyroMapRuntime();
         }
+
+        window.requestAnimationFrame(ensureMapVisible);
+        window.setTimeout(ensureMapVisible, 120);
+        window.setTimeout(ensureMapVisible, 360);
+        window.addEventListener('resize', ensureMapVisible);
+        window.addEventListener('orientationchange', ensureMapVisible);
 
         window.setTimeout(async function () {
             if (loadState) {
@@ -1245,10 +1263,10 @@ function showFalseAlarmConfirmationToast() {
 
     async function bootstrapFirefighterDashboard() {
         hydrateDashboardFromCache();
+        startDeferredMapHydration();
 
         await fetchAssignedIncidents(true);
         loadFirefighterDashboardWidgets();
-        startDeferredMapHydration();
         window.setTimeout(() => {
             loadFirefighterDashboardPosts();
         }, 320);

@@ -40,16 +40,25 @@
         box-shadow: none !important;
     }
 
+    body.firefighter-dashboard-page .firefighter-map-stage__header,
+    body.firefighter-dashboard-page .firefighter-map-stage__legend,
+    body.firefighter-dashboard-page .ff-map-load-note {
+        display: none !important;
+    }
+
     body.firefighter-dashboard-page .firefighter-map-stage .map-container {
         border: 0 !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        overflow: hidden !important;
     }
 
     body.firefighter-dashboard-page #firefighterDashboardMap {
         width: 100vw !important;
         height: calc(100svh - (var(--ff-mobile-bottom-h) + env(safe-area-inset-bottom, 0px))) !important;
         min-height: calc(100svh - (var(--ff-mobile-bottom-h) + env(safe-area-inset-bottom, 0px))) !important;
+        border-radius: 0 !important;
+        background: #eef2f7 !important;
     }
 
     body.firefighter-dashboard-page #firefighterMapLoadState {

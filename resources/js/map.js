@@ -1404,18 +1404,32 @@ function getIncidentTypePresentation(input = {}) {
         label: 'Fire',
         iconClass: 'fa-fire',
         bgColor: '#ef4444',
-        borderColor: '#ffffff'
+        borderColor: '#ef4444'
     };
 
     if (incidentStatus === 'controlled') {
         presentation.label = 'Investigation';
-        presentation.iconClass = 'fa-magnifying-glass';
-        presentation.bgColor = '#0f766e';
+        presentation.iconClass = 'fa-fire';
+        presentation.bgColor = '#10b981';
+        presentation.borderColor = '#10b981';
+        return presentation;
+    }
+
+    if (incidentStatus === 'on-scene') {
+        presentation.bgColor = '#f59e0b';
+        presentation.borderColor = '#facc15';
+        return presentation;
+    }
+
+    if (incidentStatus === 'en-route') {
+        presentation.bgColor = '#f97316';
+        presentation.borderColor = '#fb923c';
         return presentation;
     }
 
     if (incidentTypeLabel.includes('fire')) {
         presentation.bgColor = '#dc2626';
+        presentation.borderColor = '#ef4444';
     }
 
     return presentation;
@@ -1423,31 +1437,36 @@ function getIncidentTypePresentation(input = {}) {
 
 function createIncidentTypeIcon(marker = {}, extraClass = '') {
     const { iconClass, bgColor, borderColor } = getIncidentTypePresentation(marker);
+    const imagePath = inferMarkerImagePath(marker, { id: 'incident' });
+    const markerSize = 42;
+    const markerAnchor = 21;
 
     return L.divIcon({
         className: `custom-fa-icon incident-type-icon ${extraClass}`.trim(),
         html: `
             <div style="
-                width: 34px;
-                height: 34px;
-                background: ${bgColor};
+                width: ${markerSize}px;
+                height: ${markerSize}px;
                 border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.24);
                 border: 3px solid ${borderColor};
+                box-shadow: 0 0 0 4px ${borderColor}33, 0 10px 18px rgba(15, 23, 42, 0.20);
+                overflow: visible;
+                background: transparent;
             ">
-                <i class="fas ${iconClass}" style="
-                    color: white;
-                    font-size: 15px;
-                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22));
-                "></i>
+                ${buildImageBackedMarkerHtml({
+                    width: markerSize,
+                    height: markerSize,
+                    borderRadius: '50%',
+                    imagePath,
+                    fallbackIconClass: iconClass,
+                    bgColor,
+                    iconFontSize: 18
+                })}
             </div>
         `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
+        iconSize: [markerSize, markerSize],
+        iconAnchor: [markerAnchor, markerAnchor],
+        popupAnchor: [0, -24]
     });
 }
 
@@ -1513,11 +1532,14 @@ function createRouteInfoCard() {
 
 const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"/><circle cx="16" cy="9" r="2" fill="none"/><circle cx="12" cy="7" r="2" fill="none"/><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"/></svg>';
 
-function createLegendItemHtml({ iconClass = null, iconHtml = null, bgColor, label, shape = 'circle' }) {
+function createLegendItemHtml({ iconClass = null, iconHtml = null, imagePath = null, bgColor, label, shape = 'circle' }) {
     return `
         <div class="firefighter-map-legend-item">
-            <span class="firefighter-map-legend-icon ${shape === 'square' ? 'is-square' : 'is-circle'}" style="background:${bgColor};">
-                ${iconHtml ? `<span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;">${iconHtml}</span>` : (iconClass ? `<i class="fas ${iconClass}" style="font-size:12px;"></i>` : '')}
+            <span class="firefighter-map-legend-icon ${shape === 'square' ? 'is-square' : 'is-circle'}" style="background:transparent;border:2px solid ${bgColor};box-shadow:none;width:30px;height:30px;">
+                ${imagePath
+                    ? `<img src="${imagePath}" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;width:20px;height:20px;align-items:center;justify-content:center;">${iconHtml ? iconHtml : (iconClass ? `<i class="fas ${iconClass}" style="font-size:14px;color:${bgColor};"></i>` : '')}</span>`
+                    : (iconHtml ? `<span style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;color:${bgColor};">${iconHtml}</span>` : (iconClass ? `<i class="fas ${iconClass}" style="font-size:14px;color:${bgColor};"></i>` : ''))
+                }
             </span>
             <span class="firefighter-map-legend-label">${label}</span>
         </div>
@@ -1537,10 +1559,10 @@ function createFirefighterMapLegend() {
     legendContainer.innerHTML = `
         <div class="firefighter-map-legend-title">Map Legend</div>
         <div class="firefighter-map-legend-items">
-            ${createLegendItemHtml({ iconClass: 'fa-building', bgColor: '#2563eb', label: 'Fire Station' })}
-            ${createLegendItemHtml({ bgColor: '#0f766e', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
-            ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
-            ${createLegendItemHtml(getIncidentTypePresentation('Fire'))}
+            ${createLegendItemHtml({ iconClass: 'fa-building', imagePath: '/station.png', bgColor: '#2563eb', label: 'Fire Station' })}
+            ${createLegendItemHtml({ bgColor: '#0f766e', imagePath: '/hall.png', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
+            ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', imagePath: '/hydrant.png', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
+            ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
         </div>
@@ -1557,28 +1579,28 @@ function createChiefMapLegend() {
         <div class="chief-map-legend-title">Map Legend</div>
         <div class="chief-map-legend-items">
             <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:#2563eb;"><i class="fas fa-building" style="font-size:12px;"></i></span>
+                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #2563eb;box-shadow:none;width:30px;height:30px;"><img src="/station.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas fa-building" style="font-size:14px;color:#2563eb;"></i></span></span>
                 <span class="chief-map-legend-label">Fire Station</span>
             </div>
             <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:#0f766e;"><span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;">${BARANGAY_GROUP_ICON_SVG}</span></span>
+                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #0f766e;box-shadow:none;width:30px;height:30px;"><img src="/hall.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;width:20px;height:20px;align-items:center;justify-content:center;color:#0f766e;">${BARANGAY_GROUP_ICON_SVG}</span></span>
                 <span class="chief-map-legend-label">Barangay Hall</span>
             </div>
             <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon is-square" style="background:#ef4444;"><i class="fas fa-fire-extinguisher" style="font-size:12px;"></i></span>
+                <span class="chief-map-legend-icon is-square" style="background:transparent;border:2px solid #ef4444;box-shadow:none;width:30px;height:30px;"><img src="/hydrant.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas fa-fire-extinguisher" style="font-size:14px;color:#ef4444;"></i></span></span>
                 <span class="chief-map-legend-label">Hydrant</span>
             </div>
             ${[
-                getIncidentTypePresentation('Fire'),
+                { ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' },
               
             ].map(item => `
                 <div class="chief-map-legend-item">
-                    <span class="chief-map-legend-icon" style="background:${item.bgColor};"><i class="fas ${item.iconClass}" style="font-size:12px;"></i></span>
+                    <span class="chief-map-legend-icon" style="background:transparent;border:2px solid ${item.bgColor};box-shadow:none;width:30px;height:30px;"><img src="${item.imagePath || ''}" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas ${item.iconClass}" style="font-size:14px;color:${item.bgColor};"></i></span></span>
                     <span class="chief-map-legend-label">${item.label}</span>
                 </div>
             `).join('')}
             <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:#64748b;"><i class="fas fa-location-dot" style="font-size:12px;"></i></span>
+                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #64748b;box-shadow:none;width:30px;height:30px;"><i class="fas fa-location-dot" style="font-size:14px;color:#64748b;"></i></span>
                 <span class="chief-map-legend-label">Other Marker</span>
             </div>
         </div>
@@ -2965,35 +2987,149 @@ const CATEGORY_ICON_MAP = {
     6: 'evacuation'
 };
 
+const PUBLIC_MARKER_IMAGE_MAP = {
+    station: '/station.png',
+    hydrant: '/hydrant.png',
+    barangay: '/hall.png',
+    evacuation: '/hall.png',
+    incident: '/fire.png',
+    firefighter: '/team.png',
+    firetruck: '/truck.png'
+};
+
 // ============================================================================
 // HELPER FUNCTIONS FOR ICONS (keeping your existing icon functions)
 // ============================================================================
 
-function createFontAwesomeIcon(iconConfig, extraClass = '', customColor = null) {
-    const bgColor = customColor || iconConfig.bgColor;
-    const [width, height] = iconConfig.size;
+function inferMarkerImagePath(marker = null, iconConfig = null) {
+    const explicitCategoryKey = getMarkerCategoryKey(marker);
+    if (explicitCategoryKey && PUBLIC_MARKER_IMAGE_MAP[explicitCategoryKey]) {
+        return PUBLIC_MARKER_IMAGE_MAP[explicitCategoryKey];
+    }
 
-    return L.divIcon({
-        className: `custom-fa-icon ${extraClass}`,
-        html: `
-            <div style="
+    if (iconConfig?.id && PUBLIC_MARKER_IMAGE_MAP[iconConfig.id]) {
+        return PUBLIC_MARKER_IMAGE_MAP[iconConfig.id];
+    }
+
+    const haystack = [
+        marker?.title,
+        marker?.description,
+        marker?.category,
+        marker?.category?.name,
+        marker?.hazard_type,
+        marker?.risk_type,
+        marker?.type
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    if (haystack.includes('fire incident')) return '/fire.png';
+    if (haystack.includes('fire emergency')) return '/fire.png';
+    if (haystack.includes('fire alert')) return '/fire.png';
+    if (haystack.includes('active fire')) return '/fire.png';
+    if (haystack.includes('short circuit')) return '/electric.png';
+    if (haystack.includes('faulty wiring')) return '/electric.png';
+    if (haystack.includes('live wire')) return '/electric.png';
+    if (haystack.includes('octopus')) return '/electric.png';
+    if (haystack.includes('gas leak')) return '/gas.png';
+    if (haystack.includes('gas')) return '/gas.png';
+    if (haystack.includes('flammable')) return '/flammable.png';
+    if (haystack.includes('electric')) return '/electric.png';
+    if (haystack.includes('electrical')) return '/electric.png';
+    if (haystack.includes('block road')) return '/blockroad.png';
+    if (haystack.includes('blocked road')) return '/blockroad.png';
+    if (haystack.includes('road block')) return '/blockroad.png';
+    if (haystack.includes('damaged')) return '/damaged.png';
+    if (haystack.includes('hazard')) return '/hazard.png';
+    if (haystack.includes('risk')) return '/hazard.png';
+    if (haystack.includes('incident')) return '/fire.png';
+    if (haystack.includes('fire')) return '/fire.png';
+    if (haystack.includes('barangay')) return '/hall.png';
+    if (haystack.includes('hydrant')) return '/hydrant.png';
+    if (haystack.includes('station')) return '/station.png';
+
+    return null;
+}
+
+function buildImageBackedMarkerHtml({ width, height, borderRadius, imagePath, fallbackIconClass, bgColor, iconFontSize }) {
+    const safeImagePath = imagePath ? String(imagePath).replace(/"/g, '&quot;') : '';
+
+    return `
+        <div style="
+            width: ${width}px;
+            height: ${height}px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">
+            ${safeImagePath ? `
+                <img
+                    src="${safeImagePath}"
+                    alt=""
+                    draggable="false"
+                    style="
+                        width: ${width}px;
+                        height: ${height}px;
+                        object-fit: contain;
+                        border-radius: 0;
+                        border: 0;
+                        box-shadow: none;
+                        filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.24));
+                        background: transparent;
+                        display: block;
+                    "
+                    onerror="
+                        this.style.display='none';
+                        const fallback = this.parentElement.querySelector('.marker-image-fallback');
+                        if (fallback) fallback.style.display='flex';
+                    "
+                />
+            ` : ''}
+            <div class="marker-image-fallback" style="
                 width: ${width}px;
                 height: ${height}px;
                 background-color: ${bgColor};
-                border-radius: ${iconConfig.id === 'hydrant' ? '4px 4px 8px 8px' : '50%'};
-                display: flex;
+                border-radius: ${borderRadius};
+                display: ${safeImagePath ? 'none' : 'flex'};
                 align-items: center;
                 justify-content: center;
                 box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2);
                 border: 2px solid white;
                 transition: transform 0.2s;
             ">
-                <i class="fas ${iconConfig.icon}" style="
+                <i class="fas ${fallbackIconClass}" style="
                     color: white;
-                    font-size: ${Math.min(width, height) * 0.6}px;
+                    font-size: ${iconFontSize}px;
                     filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
                 "></i>
             </div>
+        </div>
+    `;
+}
+
+function createFontAwesomeIcon(iconConfig, extraClass = '', customColor = null, marker = null) {
+    const bgColor = customColor || iconConfig.bgColor;
+    const imagePath = inferMarkerImagePath(marker, iconConfig);
+    const hasImageMarker = Boolean(imagePath);
+    const [baseWidth, baseHeight] = iconConfig.size;
+    const width = hasImageMarker ? Math.round(baseWidth * 1.35) : baseWidth;
+    const height = hasImageMarker ? Math.round(baseHeight * 1.35) : baseHeight;
+    const borderRadius = iconConfig.id === 'hydrant' ? '4px 4px 8px 8px' : '50%';
+    const iconAnchor = hasImageMarker
+        ? [Math.round(width / 2), Math.round(height / 2)]
+        : iconConfig.anchor;
+
+    return L.divIcon({
+        className: `custom-fa-icon ${extraClass}`,
+        html: `
+            ${buildImageBackedMarkerHtml({
+                width,
+                height,
+                borderRadius,
+                imagePath,
+                fallbackIconClass: iconConfig.icon,
+                bgColor,
+                iconFontSize: Math.min(width, height) * 0.6
+            })}
             ${iconConfig.id === 'firefighter' ? `
                 <div style="
                     position: absolute;
@@ -3013,18 +3149,18 @@ function createFontAwesomeIcon(iconConfig, extraClass = '', customColor = null) 
             ` : ''}
         `,
         iconSize: [width, height],
-        iconAnchor: iconConfig.anchor,
+        iconAnchor: iconAnchor,
         popupAnchor: [0, -height / 2]
     });
 }   
-function getIconById(iconId, extraClass = '') {
+function getIconById(iconId, extraClass = '', marker = null) {
     const iconConfig = ICON_ARRAY.find(icon => icon.id === iconId);
     if (!iconConfig) {
         console.warn(`Icon with id '${iconId}' not found, using default`);
         return getDefaultIcon();
     }
 
-    return createFontAwesomeIcon(iconConfig, extraClass);
+    return createFontAwesomeIcon(iconConfig, extraClass, null, marker);
 }
 // function getIconById(iconId, extraClass = '') {
 //     const iconConfig = ICON_ARRAY.find(icon => icon.id === iconId);
@@ -3044,7 +3180,7 @@ function getIconByCategoryId(categoryId, extraClass = '', marker = null) {
 
     const iconId = CATEGORY_ICON_MAP[normalizedCategoryId];
     if (iconId) {
-        return getIconById(iconId, extraClass);
+        return getIconById(iconId, extraClass, marker);
     }
     return getDefaultIcon();
 }
@@ -3052,7 +3188,15 @@ function getIconByCategoryId(categoryId, extraClass = '', marker = null) {
 function getDefaultIcon() {
     return L.divIcon({
         className: 'default-icon',
-        html: '<div style="width: 24px; height: 24px; background-color: #6b7280; border-radius: 50%; border: 2px solid white;"></div>',
+        html: buildImageBackedMarkerHtml({
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            imagePath: null,
+            fallbackIconClass: 'fa-location-dot',
+            bgColor: '#6b7280',
+            iconFontSize: 12
+        }),
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -3830,6 +3974,103 @@ styleElement.textContent = `
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .responder-map-preview-sheet {
+        position: fixed;
+        inset: 0;
+        z-index: 10018;
+        display: none;
+        pointer-events: none;
+    }
+
+    .responder-map-preview-sheet.show {
+        display: block;
+        pointer-events: auto;
+    }
+
+    .responder-map-preview-sheet__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.34);
+        backdrop-filter: blur(4px);
+    }
+
+    .responder-map-preview-sheet__card {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, #fffdfb 0%, #fff7f1 100%);
+        border-radius: 28px 28px 0 0;
+        box-shadow: 0 -18px 40px rgba(15, 23, 42, 0.18);
+        padding: 14px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+        transform: translateY(100%);
+        transition: transform 0.22s ease;
+        max-height: min(74svh, 620px);
+        overflow: hidden;
+    }
+
+    .responder-map-preview-sheet.show .responder-map-preview-sheet__card {
+        transform: translateY(0);
+    }
+
+    .responder-map-preview-sheet__handle {
+        width: 56px;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.5);
+        margin: 0 auto 12px;
+    }
+
+    .responder-map-preview-sheet__close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 42px;
+        height: 42px;
+        border: 1px solid rgba(251, 191, 36, 0.22);
+        border-radius: 16px;
+        background: rgba(255, 250, 245, 0.96);
+        color: #c2410c;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 24px rgba(198, 61, 38, 0.12);
+    }
+
+    .responder-map-preview-sheet__body {
+        overflow-y: auto;
+        max-height: calc(min(74svh, 620px) - 42px);
+        padding-right: 2px;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup {
+        width: 100%;
+        max-width: none;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup-header {
+        padding-right: 52px;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup-details {
+        gap: 10px;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup-detail-row {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup-detail-value {
+        text-align: left;
+    }
+
+    .responder-map-preview-sheet__body .responder-marker-popup-actions {
+        gap: 10px;
+    }
+
     @media (max-width: 768px) {
         .details-panel.compact-responder {
             left: 10px;
@@ -3860,6 +4101,17 @@ styleElement.textContent = `
         .details-panel.compact-responder .details-body {
             max-height: min(56svh, 480px);
             padding: 12px 14px 16px;
+        }
+
+        .responder-map-preview-sheet {
+            display: block;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .responder-map-preview-sheet.show {
+            opacity: 1;
+            visibility: visible;
         }
     }
     
@@ -5317,6 +5569,7 @@ async function updateCoordinate(data, options = {}) {
             if (useResponderMobileDetailsUi) {
                 newMarker.on('click', () => {
                     const resolvedIncident = findIncidentForMarker(marker, incident);
+                    const popupContent = generatePopupContent({ marker: marker, incident: resolvedIncident }, incidents);
 
                     try {
                         window.map?.closePopup?.();
@@ -5324,12 +5577,12 @@ async function updateCoordinate(data, options = {}) {
                         console.warn('Unable to close existing popup before opening mobile details:', closePopupError);
                     }
 
-                    if (isIncidentMarker(marker)) {
-                        showResponderIncidentDetails(marker, resolvedIncident, markerImagePath);
-                        return;
-                    }
-
-                    showResponderMarkerDetails(marker, { marker, incident: resolvedIncident }, markerImagePath);
+                    openResponderMapPreviewSheet(popupContent, {
+                        marker,
+                        incident: resolvedIncident,
+                        image: marker.multimedia || null,
+                        created_at: marker.created_at || null
+                    });
                 });
             } else {
                 newMarker.on('popupopen', () => addPopupEventListeners({
@@ -6028,7 +6281,81 @@ function ensureResponderMapDetailsModal() {
     return modal;
 }
 
+function ensureResponderMapPreviewSheet() {
+    let sheet = document.getElementById('responderMapPreviewSheet');
+    if (sheet) {
+        return sheet;
+    }
+
+    sheet = document.createElement('div');
+    sheet.id = 'responderMapPreviewSheet';
+    sheet.className = 'responder-map-preview-sheet';
+    sheet.setAttribute('aria-hidden', 'true');
+    sheet.innerHTML = `
+        <div class="responder-map-preview-sheet__backdrop" data-responder-map-preview-close></div>
+        <div class="responder-map-preview-sheet__card" role="dialog" aria-modal="false" aria-label="Map marker preview">
+            <button type="button" id="responderMapPreviewSheetClose" class="responder-map-preview-sheet__close" aria-label="Close preview">
+                <i class="fas fa-xmark"></i>
+            </button>
+            <div class="responder-map-preview-sheet__handle" aria-hidden="true"></div>
+            <div id="responderMapPreviewSheetBody" class="responder-map-preview-sheet__body"></div>
+        </div>
+    `;
+
+    document.body.appendChild(sheet);
+    document.getElementById('responderMapPreviewSheetClose')?.addEventListener('click', closeResponderMapPreviewSheet);
+    sheet.querySelector('[data-responder-map-preview-close]')?.addEventListener('click', closeResponderMapPreviewSheet);
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && sheet.classList.contains('show')) {
+            closeResponderMapPreviewSheet();
+        }
+    });
+
+    return sheet;
+}
+
+function openResponderMapPreviewSheet(content, markerContext = null) {
+    if (!shouldUseResponderMobileDetailsUi()) {
+        return;
+    }
+
+    const sheet = ensureResponderMapPreviewSheet();
+    const body = document.getElementById('responderMapPreviewSheetBody');
+    if (body) {
+        body.innerHTML = content;
+    }
+
+    sheet.classList.add('show');
+    sheet.style.display = 'block';
+    sheet.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    if (markerContext?.marker) {
+        addPopupEventListeners({
+            marker: markerContext.marker,
+            incident: markerContext.incident || null,
+            image: markerContext.image || null,
+            created_at: markerContext.created_at || markerContext.marker.created_at || null
+        });
+    }
+}
+
+function closeResponderMapPreviewSheet() {
+    const sheet = document.getElementById('responderMapPreviewSheet');
+    if (!sheet) {
+        return;
+    }
+
+    sheet.classList.remove('show');
+    sheet.style.display = 'none';
+    sheet.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
 function openResponderMapDetailsModal(title, content) {
+    closeResponderMapPreviewSheet();
+
     if (!detailsPanel) {
         initDetailsPanel();
     }
@@ -7489,13 +7816,25 @@ function stopAllSimulations() {
 }
 
 function createFireTruckIcon(color = '#dc2626') {
-    const dataUrl = '/storage/defaults/firetruck.png';
-    return L.icon({
-        iconUrl: dataUrl,
+    const iconConfig = ICON_ARRAY.find(icon => icon.id === 'firetruck') || {
+        icon: 'fa-truck-fire',
+        bgColor: color
+    };
+
+    return L.divIcon({
+        className: 'custom-fa-icon fire-truck-icon',
+        html: buildImageBackedMarkerHtml({
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            imagePath: PUBLIC_MARKER_IMAGE_MAP.firetruck || '/truck.png',
+            fallbackIconClass: iconConfig.icon,
+            bgColor: color,
+            iconFontSize: 22
+        }),
         iconSize: [48, 48],
         iconAnchor: [24, 24],
-        popupAnchor: [0, -24],
-        className: 'fire-truck-icon'
+        popupAnchor: [0, -24]
     });
 }
 

@@ -501,6 +501,14 @@
             display: inline-block;
         }
 
+        .legend-image {
+            width: 16px;
+            height: 16px;
+            object-fit: contain;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
         .hazard-table {
             width: 100%;
             border-collapse: collapse;
@@ -866,11 +874,11 @@
                     <button type="button" class="map-filter-btn" data-map-filter="hazards">Hazards</button>
                 </div>
                 <div class="map-legend">
-                    <span class="legend-chip"><span class="legend-dot" style="background:#dc2626;"></span> Incidents</span>
-                    <span class="legend-chip"><span class="legend-dot" style="background:#2563eb;"></span> Stations</span>
-                    <span class="legend-chip"><span class="legend-dot" style="background:#0f766e;"></span> Barangay hall</span>
-                    <span class="legend-chip"><span class="legend-dot" style="background:#b91c1c;"></span> Hazard areas</span>
-                    <span class="legend-chip"><span class="legend-dot" style="background:#0f766e;"></span> Support / hydrants</span>
+                    <span class="legend-chip"><img class="legend-image" src="{{ asset('fire.png') }}" alt="Incidents" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#dc2626;display:none;"></span> Incidents</span>
+                    <span class="legend-chip"><img class="legend-image" src="{{ asset('station.png') }}" alt="Stations" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#2563eb;display:none;"></span> Stations</span>
+                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#0f766e;display:none;"></span> Barangay hall</span>
+                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hazard.png') }}" alt="Hazard areas" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#b91c1c;display:none;"></span> Hazard areas</span>
+                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hydrant.png') }}" alt="Support and hydrants" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#0f766e;display:none;"></span> Support / hydrants</span>
                 </div>
             </div>
 
