@@ -194,6 +194,12 @@
         visibility: visible;
     }
 
+    #{{ $backdropId }}.hidden {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
     .ff-route-skeleton__surface {
         width: 100%;
         height: 100%;
@@ -1053,6 +1059,33 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function resetTransientUi() {
+        hideAllRouteSkeletons();
+        closePanels();
+        closeBurstMenu();
+        clearHoldTimer();
+        holdTriggered = false;
+        touchTapPending = false;
+        document.body.classList.remove('menu-open');
+
+        document.getElementById(@json($sidebarId))?.classList.remove('open', 'active');
+        document.getElementById(@json($backdropId))?.classList.add('hidden');
+        document.getElementById('ffUserDropdownMenu')?.classList.remove('show');
+        document.getElementById('userDropdownMenu')?.classList.remove('show');
+
+        const logsModal = document.getElementById('firefighterMyLogsModal');
+        if (logsModal) {
+            logsModal.classList.add('hidden');
+            logsModal.classList.remove('flex');
+        }
+
+        const logoutModal = document.getElementById('firefighterLogoutConfirmModal');
+        if (logoutModal) {
+            logoutModal.classList.remove('active');
+            logoutModal.setAttribute('aria-hidden', 'true');
+        }
+    }
+
     function syncPendingNavState(nextKey) {
         if (!nextKey) {
             return;
@@ -1198,7 +1231,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function scheduleDashboardRoutePrefetch() {
-        if (!canSmartPrefetch() || !isPageVisible()) {
+        const pageIsVisible = typeof window.isPageVisible === 'function'
+            ? window.isPageVisible()
+            : document.visibilityState !== 'hidden';
+
+        if (!canSmartPrefetch() || !pageIsVisible) {
             return;
         }
 
@@ -1214,7 +1251,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const runPrefetch = function () {
-            if (!isPageVisible()) {
+            const stillVisible = typeof window.isPageVisible === 'function'
+                ? window.isPageVisible()
+                : document.visibilityState !== 'hidden';
+
+            if (!stillVisible) {
                 return;
             }
 
@@ -1342,6 +1383,11 @@ document.addEventListener('DOMContentLoaded', function () {
         showRouteSkeleton(activeRouteKey, activeRouteKey);
         closePanels();
         closeBurstMenu();
+        document.body.classList.remove('menu-open');
+        document.getElementById(@json($sidebarId))?.classList.remove('open', 'active');
+        document.getElementById(@json($backdropId))?.classList.add('hidden');
+        document.getElementById('ffUserDropdownMenu')?.classList.remove('show');
+        document.getElementById('userDropdownMenu')?.classList.remove('show');
 
         try {
             const html = prefetchedPages.has(href)
@@ -1407,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = href;
             return;
         } finally {
-            hideAllRouteSkeletons();
+            resetTransientUi();
         }
     }
 
@@ -1451,6 +1497,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function goToFirefighterDashboard() {
         window.location.href = @json(route('firefighter.dashboard'));
     }
+
+    resetTransientUi();
 
     if (dashboardFab) {
         const beginHold = function (event) {
@@ -1591,8 +1639,8 @@ document.addEventListener('DOMContentLoaded', function () {
         navigateFirefighterPartial(link, state.routeKey || '', { pushHistory: false });
     });
 
-    window.addEventListener('pageshow', hideAllRouteSkeletons);
-    window.addEventListener('load', hideAllRouteSkeletons);
+    window.addEventListener('pageshow', resetTransientUi);
+    window.addEventListener('load', resetTransientUi);
     scheduleDashboardRoutePrefetch();
 });
 </script>

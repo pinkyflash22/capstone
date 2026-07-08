@@ -672,4 +672,57 @@
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
     }
+
+    .station-shell-page {
+        gap: 16px;
+    }
+
+    .station-grid,
+    .stat-grid,
+    .station-gallery-grid,
+    .crew-list,
+    .equipment-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .table-wrap {
+        margin-inline: -4px;
+        padding-bottom: 4px;
+    }
+
+    .data-table {
+        min-width: 620px;
+    }
+
+    .table-actions,
+    .report-modal-header,
+    .report-modal-footer,
+    .shell-heading,
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .table-actions .btn,
+    .section-header .btn {
+        width: 100%;
+    }
+
+    .report-modal-panel,
+    .report-modal-panel--manage {
+        max-width: 100%;
+        max-height: min(82dvh, 760px);
+        border-radius: 24px 24px 18px 18px;
+    }
+
+    .report-modal-panel::before,
+    .report-modal-panel--manage::before {
+        content: "";
+        display: block;
+        width: 52px;
+        height: 5px;
+        border-radius: 999px;
+        background: #cbd5e1;
+        margin: 0 auto 14px;
+    }
 }

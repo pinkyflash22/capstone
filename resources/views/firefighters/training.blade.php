@@ -74,13 +74,45 @@
         .btn-primary:hover { background: #2563eb; }
         .btn-outline { background: white; border: 1px solid #e5e7eb; color: #4b5563; }
         .btn-outline:hover { background: #f9fafb; }
-        @media (max-width: 768px) { .grid-4, .grid-2 { grid-template-columns: 1fr; } .training-card { flex-direction: column; } .training-date { display: flex; align-items: center; justify-content: space-between; } }
+        @media (max-width: 768px) {
+            .main-content { padding: 12px 14px calc(112px + env(safe-area-inset-bottom, 0px)); }
+            .grid-4, .grid-2 { grid-template-columns: 1fr; gap: 14px; }
+            .welcome-banner { padding: 20px 18px; border-radius: 22px; }
+            .welcome-title { font-size: 1.9rem; }
+            .section-header { flex-direction: column; align-items: stretch; gap: 12px; }
+            .section-header > * { width: 100%; }
+            .training-card { flex-direction: column; border-radius: 18px; }
+            .training-date { display: flex; align-items: center; justify-content: space-between; }
+            .view-all { display: inline-flex; justify-content: center; }
+            .modal { align-items: flex-end; padding: 10px; }
+            .modal-content {
+                width: 100%;
+                max-width: 100%;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
+                overflow-y: auto;
+            }
+            .modal-content::before {
+                content: "";
+                display: block;
+                width: 52px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                margin: 0 auto 14px;
+            }
+        }
+        @media (max-width: 430px) {
+            .main-content { padding-left: 12px; padding-right: 12px; }
+            .welcome-banner { padding: 18px 16px; }
+            .stat-card { padding: 16px; }
+        }
         .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; z-index: 9999; display: none; }
         .toast-success { background: #22c55e; }
         .stat-trend { font-size: 12px; color: #6b7280; margin-top: 8px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: white; border-radius: 16px; padding: 24px; width: 500px; max-width: 90%; }
+        .modal-content { background: white; border-radius: 16px; padding: 24px; width: 500px; max-width: min(100%, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; }
         .form-group { margin-bottom: 16px; }
         .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
         .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; }

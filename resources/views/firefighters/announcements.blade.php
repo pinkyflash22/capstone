@@ -416,6 +416,84 @@
                 grid-template-rows: minmax(280px, 44vh) 1fr;
             }
         }
+
+        @media (max-width: 768px) {
+            .page-shell {
+                width: min(100%, 760px);
+                display: grid;
+                gap: 14px;
+            }
+
+            .composer-card,
+            .post-card {
+                border-radius: 0;
+                box-shadow: none;
+                border-left: 0;
+                border-right: 0;
+                margin-inline: -14px;
+            }
+
+            .composer-card {
+                padding: 16px;
+            }
+
+            .composer-header,
+            .post-header-main,
+            .post-author-meta,
+            .post-actions {
+                gap: 10px;
+            }
+
+            .post-author-meta,
+            .post-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .post-actions .btn,
+            .action-buttons .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .post-media img,
+            .post-media video {
+                max-height: 260px;
+            }
+
+            .editor-modal,
+            .media-drawer {
+                align-items: flex-end;
+                padding: 10px;
+            }
+
+            .editor-panel,
+            .media-drawer-panel {
+                width: 100%;
+                max-width: 100%;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
+            }
+
+            .editor-panel::before,
+            .media-drawer-panel::before {
+                content: "";
+                display: block;
+                width: 52px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                margin: 14px auto 0;
+            }
+
+            .editor-header,
+            .editor-body,
+            .editor-footer,
+            .media-drawer-side {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+        }
     </style>
     @include('partials.pwa-head')
 </head>

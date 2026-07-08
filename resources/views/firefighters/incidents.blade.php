@@ -184,9 +184,42 @@
         }
         @media (max-width: 720px) {
             .stats-grid, .detail-grid, .incident-meta { grid-template-columns: 1fr; }
-            .main-content { padding: 18px; }
+            .main-content { padding: 12px 14px calc(112px + env(safe-area-inset-bottom, 0px)); }
+            .incidents-shell { gap: 16px; }
+            .incidents-summary,
+            .list-card {
+                border-radius: 20px;
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .incidents-summary h1 { font-size: 1.72rem; }
+            .incidents-summary p { font-size: .9rem; }
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+            .stat-card { padding: 16px; border-radius: 18px; }
+            .stat-card-value { font-size: 1.5rem; }
+            .toolbar-card { padding: 14px 16px; gap: 10px; }
+            .filter-tabs { padding: 0 16px 16px; overflow-x: auto; flex-wrap: nowrap; }
+            .filter-tab { white-space: nowrap; }
+            .list-card-header { padding: 18px 16px 14px; }
+            .incident-list,
+            .shimmer-grid { padding: 12px 16px 18px; }
+            .incident-item { grid-template-columns: 1fr; padding: 16px; border-radius: 18px; }
             .incident-item { grid-template-columns: 1fr; }
             .incident-image { width: 56px; height: 56px; }
+            .incident-actions, .shimmer-actions { flex-direction: column; }
+            .action-btn { width: 100%; }
+            .incident-modal { padding: 10px; align-items: flex-end; }
+            .incident-modal-panel {
+                width: 100%;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
+            }
+            .incident-modal-body { padding: 16px; max-height: calc(84dvh - 118px); }
+        }
+        @media (max-width: 430px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .summary-pills { width: 100%; }
+            .summary-pill { width: 100%; justify-content: center; }
         }
     </style>
     @include('partials.pwa-head')

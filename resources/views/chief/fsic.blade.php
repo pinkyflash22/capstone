@@ -1440,6 +1440,44 @@
                 padding: 0 16px;
                 border-radius: 20px;
             }
+
+            .fsic-content-shell {
+                width: min(100%, 760px);
+                max-width: 760px;
+                padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
+            }
+
+            .requests-card,
+            .tabs-container {
+                border-radius: 0;
+                margin-inline: -14px;
+            }
+
+            .requests-card .p-5 {
+                padding: 16px;
+            }
+
+            .modal {
+                align-items: flex-end;
+                padding: 10px;
+            }
+
+            .modal-content {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: min(84dvh, 760px) !important;
+                border-radius: 24px 24px 18px 18px !important;
+            }
+
+            .modal-content::before {
+                content: "";
+                display: block;
+                width: 52px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                margin: 14px auto 0;
+            }
         }
     </style>
 </head>

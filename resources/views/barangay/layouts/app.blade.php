@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
@@ -14,16 +14,29 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        :root {
+            --barangay-safe-top: env(safe-area-inset-top, 0px);
+            --barangay-safe-bottom: env(safe-area-inset-bottom, 0px);
+            --barangay-mobile-bottom-h: calc(84px + var(--barangay-safe-bottom));
+        }
+
+        html,
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
             overflow-x: hidden;
+            min-height: 100dvh;
         }
 
         .main-content {
             margin-left: 280px;
-            min-height: 100vh;
+            min-height: 100dvh;
             padding: 20px 24px 32px;
+        }
+
+        body.barangay-portal-shell.menu-open {
+            overflow: hidden;
+            touch-action: none;
         }
 
         .portal-top-bar {
@@ -325,6 +338,174 @@
             display: flex;
             flex-direction: column;
             gap: 24px;
+        }
+
+        .barangay-mobile-dock {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            padding: 10px 12px calc(10px + var(--barangay-safe-bottom));
+            pointer-events: none;
+        }
+
+        .barangay-mobile-dock__shell {
+            display: flex;
+            justify-content: center;
+        }
+
+        .barangay-mobile-dock__track {
+            position: relative;
+            width: min(100%, 344px);
+            min-height: 72px;
+            padding: 10px 16px;
+            border-radius: 30px;
+            background: linear-gradient(180deg, rgba(24, 78, 86, 0.98) 0%, rgba(20, 93, 104, 0.98) 100%);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .barangay-mobile-dock__track::before {
+            content: '';
+            position: absolute;
+            inset: 1px;
+            border-radius: 29px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            pointer-events: none;
+        }
+
+        .barangay-mobile-dock__item,
+        .barangay-mobile-dock__burst-item {
+            position: relative;
+            border: 0;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.82);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .barangay-mobile-dock__item {
+            width: 100%;
+            min-height: 50px;
+            border-radius: 18px;
+        }
+
+        .barangay-mobile-dock__item.active {
+            color: #ffffff;
+        }
+
+        .barangay-mobile-dock__item.active:not(.barangay-mobile-dock__item--center)::before {
+            content: '';
+            position: absolute;
+            inset: 6px 12px;
+            border-radius: 999px;
+            background: rgba(52, 211, 153, 0.16);
+            box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.12);
+            z-index: -1;
+        }
+
+        .barangay-mobile-dock__icon {
+            font-size: 1.45rem;
+            font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 24;
+        }
+
+        .barangay-mobile-dock__center-wrap {
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+
+        .barangay-mobile-dock__item--center {
+            width: 74px;
+            height: 74px;
+            margin-top: -28px;
+            border-radius: 999px;
+            color: #ffffff;
+            background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+            box-shadow:
+                0 16px 34px rgba(22, 163, 74, 0.34),
+                0 0 0 6px rgba(255, 255, 255, 0.16),
+                0 0 0 12px rgba(255, 255, 255, 0.08);
+        }
+
+        .barangay-mobile-dock__item--center::before,
+        .barangay-mobile-dock__item--center::after {
+            content: '';
+            position: absolute;
+            inset: 7px;
+            border-radius: 999px;
+        }
+
+        .barangay-mobile-dock__item--center::before {
+            border: 2px solid rgba(255, 255, 255, 0.92);
+        }
+
+        .barangay-mobile-dock__item--center::after {
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+
+        .barangay-mobile-dock__center-wrap.is-open .barangay-mobile-dock__item--center {
+            transform: scale(1.02);
+        }
+
+        .barangay-mobile-dock__burst {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 20px);
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 8px 10px;
+            width: max-content;
+            max-width: calc(100vw - 28px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        .barangay-mobile-dock__center-wrap.is-open .barangay-mobile-dock__burst {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(-4px);
+        }
+
+        .barangay-mobile-dock__burst-item {
+            width: 52px;
+            height: 52px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.98);
+            color: #145d68;
+            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
+            border: 1px solid rgba(20, 93, 104, 0.08);
+        }
+
+        .barangay-mobile-dock__burst-item.active {
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            color: #fff;
+        }
+
+        .barangay-mobile-dock__burst-icon {
+            font-size: 1.35rem;
+            font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 20;
+        }
+
+        .barangay-mobile-bottom-spacer {
+            display: none;
+            height: calc(var(--barangay-mobile-bottom-h) + 22px);
+            flex-shrink: 0;
         }
 
         .hero-card {
@@ -722,11 +903,21 @@
 
         @media (max-width: 768px) {
             .main-content {
-                padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+                min-height: 100dvh;
+                padding: max(6px, var(--barangay-safe-top)) 12px calc(var(--barangay-mobile-bottom-h) + 18px);
             }
 
             .portal-top-bar {
                 display: none;
+            }
+
+            .portal-shell {
+                width: min(100%, 760px);
+                gap: 14px;
+            }
+
+            .portal-shell > * {
+                margin-top: 0 !important;
             }
 
             .two-col {
@@ -734,13 +925,55 @@
             }
 
             .hero-card,
-            .panel-card {
-                padding: 20px;
+            .panel-card,
+            .metric-card,
+            .list-item,
+            .map-card {
+                border-radius: 24px;
+                padding: 18px;
+                box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+            }
+
+            .hero-card {
+                padding: 20px 18px;
+            }
+
+            .hero-card h1 {
+                font-size: clamp(2rem, 9vw, 2.75rem);
+            }
+
+            .hero-card p,
+            .panel-copy,
+            .list-item p {
+                font-size: 0.9rem;
+                line-height: 1.55;
+            }
+
+            .table-wrap {
+                margin-inline: -4px;
+                padding-inline: 4px;
+            }
+
+            .table-wrap table {
+                min-width: 640px;
+            }
+
+            .barangay-mobile-bottom-spacer {
+                display: block;
+            }
+
+            #barangayOperationsMap {
+                height: min(54svh, 420px) !important;
+            }
+
+            #barangayRiskAreaMap,
+            #hazardsRiskPickerMap {
+                height: 260px !important;
             }
         }
     </style>
 </head>
-<body>
+<body class="barangay-portal-shell">
     @php
         $initialBarangayNotifications = auth()->check()
             ? auth()->user()->notifications()->latest()->limit(8)->get()

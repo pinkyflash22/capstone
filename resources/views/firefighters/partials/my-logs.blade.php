@@ -1,3 +1,41 @@
+<style>
+    @media (max-width: 768px) {
+        #firefighterMyLogsModal {
+            align-items: flex-end;
+            padding: 10px;
+        }
+
+        #firefighterMyLogsModal > div {
+            width: 100%;
+            max-width: 100%;
+            max-height: min(84dvh, 760px);
+            border-radius: 24px 24px 18px 18px;
+        }
+
+        #firefighterMyLogsModal > div::before {
+            content: "";
+            display: block;
+            width: 52px;
+            height: 5px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            margin: 14px auto 0;
+        }
+
+        #firefighterMyLogsModal .px-6,
+        #firefighterMyLogsModal .py-5,
+        #firefighterMyLogsModal .py-4 {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+        }
+
+        #firefighterMyLogsModal #firefighterMyLogsContainer {
+            max-height: min(62dvh, 560px);
+            padding: 16px !important;
+        }
+    }
+</style>
+
 <div id="firefighterMyLogsModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm hidden items-center justify-center z-[4000] p-4">
     <div class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
         <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-slate-50">
@@ -147,6 +185,7 @@
             if (myLogsModal) {
                 myLogsModal.classList.remove('hidden');
                 myLogsModal.classList.add('flex');
+                document.body.classList.add('menu-open');
             }
             loadMyLogs();
         }
@@ -156,6 +195,7 @@
                 myLogsModal.classList.add('hidden');
                 myLogsModal.classList.remove('flex');
             }
+            document.body.classList.remove('menu-open');
         }
 
         window.openMyLogsModal = openMyLogsModal;

@@ -646,9 +646,9 @@
             }
 
             .chief-checklist-main {
-                padding: 18px 16px 110px;
+                width: min(100%, 760px);
+                padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
                 margin-left: 0;
-                width: 100%;
             }
 
             .chief-checklist-topbar,
@@ -661,6 +661,43 @@
 
             .chief-filter-actions {
                 flex-direction: column;
+            }
+
+            .chief-checklist-topbar,
+            .chief-summary-card,
+            .chief-filter-card,
+            .chief-checklist-card {
+                border-radius: 0;
+                box-shadow: none;
+                margin-inline: -14px;
+            }
+
+            .chief-filter-actions .chief-btn,
+            .chief-modal__footer .chief-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .chief-modal {
+                align-items: flex-end;
+                padding: 10px;
+            }
+
+            .chief-modal__card {
+                width: 100%;
+                max-width: 100%;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
+            }
+
+            .chief-modal__card::before {
+                content: "";
+                display: block;
+                width: 52px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                margin: 14px auto 0;
             }
         }
     </style>

@@ -50,6 +50,42 @@
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
     }
+
+    @media (max-width: 768px) {
+        #chiefLogsModal {
+            align-items: flex-end;
+            padding: 10px;
+        }
+
+        #chiefLogsModal > div {
+            width: 100%;
+            max-width: 100%;
+            max-height: min(84dvh, 760px);
+            border-radius: 24px 24px 18px 18px;
+        }
+
+        #chiefLogsModal > div::before {
+            content: "";
+            display: block;
+            width: 52px;
+            height: 5px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            margin: 14px auto 0;
+        }
+
+        #chiefLogsModal .px-6,
+        #chiefLogsModal .py-5,
+        #chiefLogsModal .py-4 {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+        }
+
+        #chiefLogsContainer {
+            max-height: min(62dvh, 560px);
+            padding: 16px !important;
+        }
+    }
 </style>
 
 <div id="chiefLogsModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm hidden items-center justify-center z-[5000] p-4">

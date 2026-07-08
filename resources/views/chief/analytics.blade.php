@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
     
-    <title>PyroSense Â· AI Predictive Analytics</title>
+    <title>PyroSense · AI Predictive Analytics</title>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -402,10 +402,429 @@
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; margin-bottom: 24px; }
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
 
+        .analytics-stack { display: flex; flex-direction: column; gap: 22px; }
+        .analytics-hero {
+            position: relative;
+            overflow: hidden;
+            padding: 28px 30px;
+            border-radius: 24px;
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            background:
+                radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 38%),
+                radial-gradient(circle at bottom left, rgba(220, 38, 38, 0.12), transparent 40%),
+                linear-gradient(135deg, rgba(255,255,255,0.98), rgba(255,251,235,0.96));
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+        }
+        .analytics-hero__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.75);
+            border: 1px solid rgba(251,191,36,0.28);
+            color: #9a3412;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .analytics-hero__title {
+            margin-top: 14px;
+            font-size: clamp(2rem, 4vw, 3.25rem);
+            line-height: 1.04;
+            letter-spacing: -0.05em;
+            font-weight: 900;
+            color: #0f172a;
+            max-width: 11ch;
+        }
+        .analytics-hero__subtitle {
+            margin-top: 14px;
+            max-width: 70ch;
+            color: #475569;
+            font-size: 1rem;
+            line-height: 1.75;
+        }
+        .analytics-hero__meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .analytics-hero__meta-card {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.78);
+            border: 1px solid rgba(226,232,240,0.8);
+        }
+        .analytics-hero__meta-label {
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .analytics-hero__meta-value {
+            margin-top: 8px;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .analytics-shell-card {
+            border-radius: 24px;
+            border: 1px solid rgba(226,232,240,0.85);
+            background: rgba(255,255,255,0.96);
+            box-shadow: 0 14px 32px rgba(15,23,42,0.05);
+        }
+        .analytics-section {
+            padding: 24px 26px;
+        }
+        .analytics-section__head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+        .analytics-section__title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .analytics-section__copy {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.65;
+            max-width: 70ch;
+        }
+
+        .analytics-control-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 14px;
+            align-items: end;
+        }
+        .analytics-control-field {
+            grid-column: span 3;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .analytics-control-field--wide { grid-column: span 4; }
+        .analytics-control-label {
+            color: #334155;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .analytics-input,
+        .analytics-select {
+            min-height: 48px;
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid #dbe3ef;
+            background: #fff;
+            color: #0f172a;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 0 14px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .analytics-input[readonly] {
+            background: #f8fafc;
+            color: #475569;
+        }
+        .analytics-input:focus,
+        .analytics-select:focus {
+            outline: none;
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+        }
+        .analytics-actions {
+            display: grid;
+            grid-column: span 12;
+            grid-template-columns: 1.6fr 1fr 1fr;
+            gap: 12px;
+            margin-top: 6px;
+        }
+        .analytics-btn {
+            min-height: 52px;
+            border: none;
+            border-radius: 18px;
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            text-align: left;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+        .analytics-btn:hover { transform: translateY(-1px); }
+        .analytics-btn__copy strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 800;
+        }
+        .analytics-btn__copy span {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            line-height: 1.45;
+            opacity: 0.86;
+        }
+        .analytics-btn--primary {
+            background: linear-gradient(135deg, #dc2626, #f59e0b);
+            color: #fff;
+            box-shadow: 0 16px 32px rgba(220,38,38,0.22);
+        }
+        .analytics-btn--secondary {
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid rgba(249, 115, 22, 0.16);
+        }
+        .analytics-btn--teal {
+            background: #ecfeff;
+            color: #115e59;
+            border: 1px solid rgba(13, 148, 136, 0.16);
+        }
+
+        .prediction-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .prediction-card {
+            grid-column: span 3;
+            padding: 18px;
+            border-radius: 22px;
+            border: 1px solid rgba(226,232,240,0.9);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+            box-shadow: 0 10px 24px rgba(15,23,42,0.04);
+        }
+        .prediction-card--wide { grid-column: span 6; }
+        .prediction-card__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .prediction-card__icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 15px;
+            box-shadow: 0 10px 20px rgba(15,23,42,0.08);
+        }
+        .prediction-card__label {
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .prediction-card__value {
+            margin-top: 12px;
+            color: #0f172a;
+            font-size: clamp(1.5rem, 2vw, 2.2rem);
+            line-height: 1.05;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+        }
+        .prediction-card__copy {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .prediction-card__trend {
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            font-size: 12px;
+            font-weight: 800;
+            color: #334155;
+        }
+        .prediction-drivers {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .prediction-driver-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(251, 146, 60, 0.18);
+        }
+
+        .analytics-empty-state {
+            border-radius: 22px;
+            border: 1px dashed rgba(148,163,184,0.45);
+            background: linear-gradient(135deg, #fff, #f8fafc);
+            padding: 28px 24px;
+        }
+        .analytics-empty-state__title {
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+        }
+        .analytics-empty-state__copy {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.94rem;
+            line-height: 1.7;
+            max-width: 64ch;
+        }
+        .analytics-empty-state__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .analytics-empty-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid rgba(251, 146, 60, 0.18);
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .analytics-dual-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 22px;
+        }
+        .analytics-chart-wrap {
+            position: relative;
+            min-width: 0;
+            overflow: hidden;
+            border-radius: 20px;
+            border: 1px solid rgba(226,232,240,0.9);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+            padding: 18px;
+        }
+        .analytics-chart-canvas {
+            position: relative;
+            min-height: 320px;
+        }
+        .analytics-insight-list {
+            margin-top: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .analytics-insight {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .analytics-insight i { color: #ea580c; margin-top: 2px; }
+
+        .analytics-panel-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .analytics-ops-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+        .analytics-ops-card {
+            padding: 18px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+            border: 1px solid rgba(226,232,240,0.9);
+        }
+        .analytics-ops-card__title {
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .analytics-ops-card__value {
+            margin-top: 10px;
+            color: #0f172a;
+            font-size: 1.8rem;
+            font-weight: 900;
+        }
+        .analytics-progress {
+            margin-top: 14px;
+            height: 10px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #e2e8f0;
+        }
+        .analytics-progress > span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+        }
+        .analytics-legend-note {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .analytics-legend-note span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .analytics-legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+        }
+
         @media (max-width: 1024px) {
             .mobile-menu-btn { display: block; }
             .mobile-logo { display: flex; }
             .charts-grid { grid-template-columns: 1fr; }
+            .analytics-dual-grid { grid-template-columns: 1fr; }
+            .analytics-actions { grid-template-columns: 1fr; }
+            .analytics-control-field,
+            .analytics-control-field--wide,
+            .prediction-card,
+            .prediction-card--wide { grid-column: span 6; }
         }
         @media (max-width: 768px) {
             .legacy-chief-sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
@@ -505,6 +924,23 @@
                 font-size: 0.68rem;
                 padding: 4px 6px;
             }
+
+            .analytics-hero,
+            .analytics-shell-card,
+            .analytics-chart-wrap,
+            .prediction-card,
+            .analytics-ops-card { border-radius: 18px; }
+            .analytics-section { padding: 18px; }
+            .analytics-hero { padding: 20px 18px; }
+            .analytics-hero__subtitle { font-size: 0.92rem; }
+            .analytics-control-grid,
+            .prediction-summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+            .analytics-control-field,
+            .analytics-control-field--wide,
+            .prediction-card,
+            .prediction-card--wide { grid-column: span 6; }
+            .analytics-chart-canvas { min-width: 620px; min-height: 300px; }
+            .analytics-section__head { margin-bottom: 14px; }
         }
     </style>
 </head>
@@ -523,7 +959,7 @@
                     <div class="user-details">
                         <h4>{{ auth()->user()->first_name ?? 'John' }} {{ auth()->user()->last_name ?? 'Doe' }}</h4>
                         <span><i class="fa-solid fa-circle"></i> {{ auth()->user()->role->role ?? 'Station Admin' }}</span>
-                        <span style="font-size: 11px; opacity: 0.6; margin-top: 2px;"><i class="fa-regular fa-clock"></i> {{ now()->format('H:i Â· d M Y') }}</span>
+                        <span style="font-size: 11px; opacity: 0.6; margin-top: 2px;"><i class="fa-regular fa-clock"></i> {{ now()->format('H:i') }} · {{ now()->format('d M Y') }}</span>
                     </div>
                 </div>
             </div>
@@ -554,7 +990,7 @@
                 </button>
                 <div class="hidden lg:block">
                     <h1 class="text-xl font-bold text-slate-800">AI Predictive Analytics</h1>
-                    <p class="text-xs text-slate-500 font-medium">Station intelligence and AI forecasting â€¢ {{ now()->format('l, F j') }}</p>
+                    <p class="text-xs text-slate-500 font-medium">Station intelligence and AI forecasting · {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
 
@@ -599,132 +1035,322 @@
         </nav>
 
         <div class="content-container">
-            <div style="margin-bottom: 24px;">
-                <h1 style="font-size: 28px; font-weight: 700;">ðŸ¤– AI-Powered Predictive Analytics</h1>
-                <p style="color: #6b7280; margin-top: 4px;">Real-time AI analysis using your actual incident data</p>
-            </div>
-
-            <div class="stat-card" style="margin-bottom: 24px;">
-                <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-user"></i> Select Location for Analysis</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: stretch;">
-                    <select id="stationSelect" class="form-select">
-                        <option value="">Loading locations...</option>
-                    </select>
-                    <select id="barangaySelect" class="form-select">
-                        <option value="all">All barangays in forecast</option>
-                    </select>
-                    <button id="analyzeBtn" style="background: #dc2626; color: white; padding: 10px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                        <i class="fa-solid fa-chart-line"></i> Run AI Analysis
-                    </button>
-                    <button id="predictNextMonthBtn" style="background: #f59e0b; color: white; padding: 10px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                        <i class="fa-solid fa-calendar-plus"></i> Predict Next Month
-                    </button>
-                    <button id="retrainModelBtn" type="button" style="background: #0f766e; color: white; padding: 10px 18px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                        <i class="fa-solid fa-rotate"></i> Retrain Model
-                    </button>
-                </div>
-                <div style="margin-top: 16px;">
-                    <select id="periodSelect" class="form-select" style="width: 200px;">
-                        <option value="7">Last 7 days</option>
-                        <option value="30" selected>Last 30 days</option>
-                        <option value="90">Last 3 months</option>
-                        <option value="365">Last year</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="stat-card mb-2">
-                <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="color: #dc2626;"></i>
-                    AI Prediction
-                    <span style="font-size: 11px; font-weight: normal; color: #6b7280; margin-left: auto;">Incidents, officers, and weather-based outlook</span>
-                </h3>
-                <div id="predictionScopeLabel" style="margin-top: 8px; display: none; font-size: 12px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 999px; padding: 6px 10px; width: fit-content;">
-                    Prediction scope
-                </div>
-                <div id="aiPrediction" style="margin-top: 16px;">
-                    <div class="text-center py-8 text-gray-500">Click "Run AI Analysis" for this month or "Predict Next Month" for the next calendar month forecast</div>
-                </div>
-            </div>
-
-            <div class="stat-card mb-2">
-                <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
-                    Top Predicted Barangays
-                    <span style="font-size: 11px; font-weight: normal; color: #6b7280; margin-left: auto;">Barangay-level hotspot ranking for the target month</span>
-                </h3>
-                <div id="barangayPredictionPanel" style="margin-top: 16px;">
-                    <div class="text-center py-8 text-gray-500">Run AI analysis to load barangay hotspot forecasts.</div>
-                </div>
-            </div>
-
-            <div class="stat-card mb-2">
-                <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-lightbulb" style="color: #f59e0b;"></i> 
-                    AI-Powered Recommendations
-                    <span style="font-size: 11px; font-weight: normal; color: #6b7280; margin-left: auto;">Prioritized by urgency</span>
-                </h3>
-                <div id="recommendationScopeLabel" style="margin-top: 8px; display: none; font-size: 12px; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 999px; padding: 6px 10px; width: fit-content;">
-                    Recommendation scope
-                </div>
-                <div id="recommendations" style="margin-top: 16px;">
-                    <div class="text-center py-8 text-gray-500">Click "Run AI Analysis" to get recommendations</div>
-                </div>
-                <div id="aiExplanation" style="margin-top: 20px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 13px; color: #475569; display: none;"></div>
-            </div>
-            <div class="stat-card mb-2">
-                <h3 style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-list-check" style="color: #2563eb;"></i>
-                    BFP Action Plan Checklist
-                    <span style="font-size: 11px; font-weight: normal; color: #6b7280; margin-left: auto;">Confirm each recommendation one by one</span>
-                </h3>
-                <div id="actionPlanChecklistPanel" style="margin-top: 16px;">
-                    <div class="text-center py-8 text-gray-500">Run AI analysis to load saved checklist rows.</div>
-                </div>
-            </div>
-            <br>
-            <div class="dashboard-grid">
-                <div class="stat-card" id="riskCard">
-                    <h3><i class="fa-solid fa-gauge-high"></i> AI Risk Assessment</h3>
-                    <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 48px; font-weight: 800;" id="riskScore">--</div>
-                        <div id="riskLabel" style="font-size: 14px; margin-top: 8px;">Loading...</div>
-                        <div id="confidenceScore" style="font-size: 12px; margin-top: 4px;">AI Confidence: --%</div>
+            <div class="analytics-stack">
+                <section class="analytics-hero">
+                    <div class="analytics-hero__eyebrow">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span>Command Forecasting Suite</span>
                     </div>
-                    <div id="riskFactors" style="margin-top: 16px;"></div>
-                </div>
-
-                <div class="stat-card">
-                    <h3><i class="fa-solid fa-fire"></i> Real Incident Statistics</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-                        <div><small>Total Incidents</small><div style="font-size: 28px; font-weight: 700;" id="totalIncidents">--</div></div>
-                        <div><small>Fire Incidents</small><div style="font-size: 28px; font-weight: 700;" id="fireIncidents">--</div></div>
-                        <div><small>Avg Response Time</small><div style="font-size: 20px; font-weight: 700;" id="avgResponse">--</div></div>
-                        <div><small>Peak Hour</small><div style="font-size: 20px; font-weight: 700;" id="peakHour">--</div></div>
+                    <h1 class="analytics-hero__title">AI-Powered Predictive Analytics</h1>
+                    <p class="analytics-hero__subtitle">Compare historical incidents, current station conditions, and predicted fire-risk outlooks in one command-ready dashboard built for station-level decision making.</p>
+                    <div class="analytics-hero__meta">
+                        <div class="analytics-hero__meta-card">
+                            <div class="analytics-hero__meta-label">Analysis Scope</div>
+                            <div class="analytics-hero__meta-value" id="analyticsHeroScope">Waiting for station context</div>
+                        </div>
+                        <div class="analytics-hero__meta-card">
+                            <div class="analytics-hero__meta-label">Forecast Target</div>
+                            <div class="analytics-hero__meta-value" id="analyticsHeroTarget">Current month</div>
+                        </div>
+                        <div class="analytics-hero__meta-card">
+                            <div class="analytics-hero__meta-label">Active Model</div>
+                            <div class="analytics-hero__meta-value" id="analyticsHeroModel">Loading latest saved model</div>
+                        </div>
                     </div>
-                    <div id="incidentTypes" style="margin-top: 16px; font-size: 13px;"></div>
-                </div>
+                </section>
 
-                <div class="stat-card">
-                    <h3><i class="fa-solid fa-truck"></i> Resources & Readiness</h3>
-                    <div style="margin-top: 16px;">
-                        <div><span>Available Personnel</span> <span id="availablePersonnel" style="float: right; font-weight: 700;">--</span></div>
-                        <div style="background: #e5e7eb; height: 8px; border-radius: 4px; margin: 8px 0;"><div id="personnelBar" style="background: #10b981; height: 8px; border-radius: 4px; width: 0%;"></div></div>
-                        <div><span>Available Equipment</span> <span id="availableEquipment" style="float: right; font-weight: 700;">--</span></div>
-                        <div style="background: #e5e7eb; height: 8px; border-radius: 4px; margin: 8px 0;"><div id="equipmentBar" style="background: #3b82f6; height: 8px; border-radius: 4px; width: 0%;"></div></div>
+                <section class="analytics-shell-card analytics-section">
+                    <div class="analytics-section__head">
+                        <div>
+                            <div class="analytics-section__title"><i class="fa-solid fa-sliders"></i> Filter and AI Actions</div>
+                            <p class="analytics-section__copy">Choose the station context, narrow to a barangay when needed, set the comparison range, and then decide whether to run a fresh analysis, generate a next-month forecast, or retrain the model on the latest database export.</p>
+                        </div>
                     </div>
-                </div>
-            </div>
+                    <div class="analytics-control-grid">
+                        <div class="analytics-control-field">
+                            <label class="analytics-control-label" for="stationSelect">Station</label>
+                            <select id="stationSelect" class="analytics-select">
+                                <option value="">Loading locations...</option>
+                            </select>
+                        </div>
+                        <div class="analytics-control-field">
+                            <label class="analytics-control-label" for="barangaySelect">Barangay</label>
+                            <select id="barangaySelect" class="analytics-select">
+                                <option value="all">All barangays in forecast</option>
+                            </select>
+                        </div>
+                        <div class="analytics-control-field">
+                            <label class="analytics-control-label" for="periodSelect">Date Range</label>
+                            <select id="periodSelect" class="analytics-select">
+                                <option value="7">Last 7 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 3 months</option>
+                                <option value="365">Last year</option>
+                            </select>
+                        </div>
+                        <div class="analytics-control-field">
+                            <label class="analytics-control-label" for="targetMonthDisplay">Target Month</label>
+                            <input id="targetMonthDisplay" class="analytics-input" type="text" value="Current month forecast" readonly>
+                        </div>
+                        <div class="analytics-actions">
+                            <button id="analyzeBtn" class="analytics-btn analytics-btn--primary" type="button">
+                                <div class="analytics-btn__copy">
+                                    <strong><i class="fa-solid fa-chart-line"></i> Run AI Analysis</strong>
+                                    <span>Runs the full command analysis using the selected station, barangay, and date range.</span>
+                                </div>
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                            <button id="predictNextMonthBtn" class="analytics-btn analytics-btn--secondary" type="button">
+                                <div class="analytics-btn__copy">
+                                    <strong><i class="fa-solid fa-calendar-plus"></i> Predict Next Month</strong>
+                                    <span>Generates a forward-looking risk outlook for the next calendar month.</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                            <button id="retrainModelBtn" class="analytics-btn analytics-btn--teal" type="button">
+                                <div class="analytics-btn__copy">
+                                    <strong><i class="fa-solid fa-rotate"></i> Retrain Model</strong>
+                                    <span>Rebuilds the station forecasting model using the latest exported training dataset.</span>
+                                </div>
+                                <i class="fa-solid fa-gears"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
 
-            <div class="charts-grid">
-                <div class="stat-card">
-                    <h3><i class="fa-solid fa-chart-line"></i> Hourly Incident Pattern</h3>
-                    <canvas id="hourlyChart" height="200"></canvas>
-                </div>
-                <div class="stat-card">
-                    <h3><i class="fa-solid fa-calendar-week"></i> Daily Trend (Last 7 Days)</h3>
-                    <canvas id="dailyChart" height="200"></canvas>
-                </div>
+                <section class="analytics-shell-card analytics-section">
+                    <div class="analytics-section__head">
+                        <div>
+                            <div class="analytics-section__title"><i class="fa-solid fa-bolt"></i> Prediction Summary</div>
+                            <p class="analytics-section__copy">A compact command summary of probability, forecasted load, confidence, and hotspot signals derived from the latest analysis response.</p>
+                        </div>
+                        <div id="predictionScopeLabel" class="analytics-empty-pill" style="display:none;">Prediction scope</div>
+                    </div>
+                    <div class="prediction-summary-grid">
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Predicted Probability</div>
+                                    <div id="summaryProbability" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #dc2626, #f59e0b);"><i class="fa-solid fa-wave-square"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Station-wide forecast probability for the selected prediction window.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Predicted Incident Count</div>
+                                    <div id="summaryIncidentCount" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #ef4444, #f97316);"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Projected possible fire incidents in the active forecast period.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Risk Level</div>
+                                    <div id="riskLabel" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #0f172a, #475569);"><i class="fa-solid fa-shield-heart"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Current command risk classification after mitigation context is applied.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Confidence Score</div>
+                                    <div id="confidenceScore" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #2563eb, #38bdf8);"><i class="fa-solid fa-crosshairs"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Confidence reported by the current analysis response and model context.</div>
+                        </article>
+                        <article class="prediction-card prediction-card--wide">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Trend Direction</div>
+                                    <div id="summaryTrendDirection" class="prediction-card__value">Waiting for analysis</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #7c3aed, #ec4899);"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                            </div>
+                            <div id="summaryTrendCopy" class="prediction-card__copy">The page will compare the current seven-day pattern against the previous seven-day period once analysis data is loaded.</div>
+                            <div id="summaryTrendIndicator" class="prediction-card__trend"><i class="fa-solid fa-chart-simple"></i><span>No comparison yet</span></div>
+                        </article>
+                        <article class="prediction-card prediction-card--wide">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Highest-Risk Barangay and Main Drivers</div>
+                                    <div id="summaryTopBarangay" class="prediction-card__value">No hotspot yet</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #059669, #14b8a6);"><i class="fa-solid fa-location-dot"></i></div>
+                            </div>
+                            <div id="summaryTopBarangayCopy" class="prediction-card__copy">Run an analysis to identify which barangay is currently carrying the strongest forecast pressure.</div>
+                            <div id="summaryDrivers" class="prediction-drivers"></div>
+                        </article>
+                    </div>
+                    <div id="riskScore" style="display:none;">--</div>
+                    <div id="riskFactors" style="display:none;"></div>
+                </section>
+
+                <section class="analytics-shell-card analytics-section">
+                    <div class="analytics-section__head">
+                        <div>
+                            <div class="analytics-section__title"><i class="fa-solid fa-wand-magic-sparkles"></i> Forecast Narrative</div>
+                            <p class="analytics-section__copy">Readable command summary that explains the current forecast window, hotspot context, and key drivers behind the AI response.</p>
+                        </div>
+                    </div>
+                    <div id="aiPrediction">
+                        <div class="analytics-empty-state">
+                            <div class="analytics-empty-state__title">No prediction has been generated for this selection yet.</div>
+                            <p class="analytics-empty-state__copy">Select a station and optional barangay, choose a comparison range, and run AI analysis to produce a fire-risk forecast using historical incidents, current conditions, and model output.</p>
+                            <div class="analytics-empty-state__meta">
+                                <span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> <span id="predictionEmptyStation">Selected station will appear here</span></span>
+                                <span class="analytics-empty-pill"><i class="fa-solid fa-map"></i> <span id="predictionEmptyBarangay">All barangays</span></span>
+                                <span class="analytics-empty-pill"><i class="fa-solid fa-calendar-days"></i> <span id="predictionEmptyRange">Last 30 days</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="analytics-dual-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-calendar-week"></i> Daily Trend — 7 Days</div>
+                                <p class="analytics-section__copy">Compares previous-period actuals, current seven-day incident activity, and the forecast probability signal returned by the backend.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="dailyChart"></canvas>
+                            </div>
+                            <div class="analytics-legend-note">
+                                <span><i class="analytics-legend-swatch" style="background:#94a3b8;"></i> Previous period actual incidents</span>
+                                <span><i class="analytics-legend-swatch" style="background:#dc2626;"></i> Current seven-day actual incidents</span>
+                                <span><i class="analytics-legend-swatch" style="background:#f59e0b;"></i> Predicted probability (%)</span>
+                            </div>
+                        </div>
+                        <div id="dailyTrendInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Insights will appear after the first analysis response is loaded.</span></div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-clock"></i> Hourly Incident Pattern</div>
+                                <p class="analytics-section__copy">Shows previous-month hourly activity, the current-month hourly pattern, and predicted peak-hour emphasis when the model returns hourly watch windows.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="hourlyChart"></canvas>
+                            </div>
+                            <div class="analytics-legend-note">
+                                <span><i class="analytics-legend-swatch" style="background:#475569;"></i> Previous month baseline</span>
+                                <span><i class="analytics-legend-swatch" style="background:#2563eb;"></i> Current month hourly actuals</span>
+                                <span><i class="analytics-legend-swatch" style="background:#ea580c;"></i> Predicted peak-hour probability</span>
+                            </div>
+                        </div>
+                        <div id="hourlyPatternInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Hourly insights will appear after the first analysis response is loaded.</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="analytics-dual-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-location-dot"></i> Barangay Forecast Ranking</div>
+                                <p class="analytics-section__copy">Barangay-level hotspot ranking for the current target month using the backend prediction payload only.</p>
+                            </div>
+                        </div>
+                        <div id="barangayPredictionPanel">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No barangay forecast ranking yet.</div>
+                                <p class="analytics-empty-state__copy">Run AI analysis to score each covered barangay and identify the current hotspot order for command review.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-fire"></i> Operational Snapshot</div>
+                                <p class="analytics-section__copy">Current incident load, readiness, and response indicators supporting the forecast interpretation.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-ops-grid">
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Total Incidents</div>
+                                <div class="analytics-ops-card__value" id="totalIncidents">--</div>
+                                <div class="prediction-card__copy">All incidents included in the active comparison range.</div>
+                            </article>
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Fire Incidents</div>
+                                <div class="analytics-ops-card__value" id="fireIncidents">--</div>
+                                <div class="prediction-card__copy">Fire-related incidents within the same filtered range.</div>
+                            </article>
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Average Response</div>
+                                <div class="analytics-ops-card__value" id="avgResponse">--</div>
+                                <div class="prediction-card__copy">Average time from alarm to completed response, when available.</div>
+                            </article>
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Peak Hour</div>
+                                <div class="analytics-ops-card__value" id="peakHour">--</div>
+                                <div class="prediction-card__copy">Observed hour with the strongest current activity concentration.</div>
+                            </article>
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Personnel Readiness</div>
+                                <div class="analytics-ops-card__value" id="availablePersonnel">--</div>
+                                <div class="analytics-progress"><span id="personnelBar" style="width:0%; background:linear-gradient(135deg, #10b981, #14b8a6);"></span></div>
+                                <div class="prediction-card__copy">Available responders versus the total personnel roster.</div>
+                            </article>
+                            <article class="analytics-ops-card">
+                                <div class="analytics-ops-card__title">Equipment Readiness</div>
+                                <div class="analytics-ops-card__value" id="availableEquipment">--</div>
+                                <div class="analytics-progress"><span id="equipmentBar" style="width:0%; background:linear-gradient(135deg, #2563eb, #38bdf8);"></span></div>
+                                <div class="prediction-card__copy">Available station equipment compared with total assigned inventory.</div>
+                            </article>
+                        </div>
+                        <div id="incidentTypes" class="prediction-card__copy" style="margin-top:14px;"></div>
+                    </div>
+                </section>
+
+                <section class="analytics-panel-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> AI Recommendations</div>
+                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings.</p>
+                            </div>
+                            <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
+                        </div>
+                        <div id="recommendations">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No AI recommendations yet.</div>
+                                <p class="analytics-empty-state__copy">Run the station analysis first to generate recommendation cards and workflow-ready action items.</p>
+                            </div>
+                        </div>
+                        <div id="aiExplanation" style="margin-top: 20px; padding: 14px 16px; background: #f8fafc; border-radius: 16px; font-size: 13px; color: #475569; display: none;"></div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-list-check"></i> Action Plan Checklist</div>
+                                <p class="analytics-section__copy">Saved checklist rows generated from the recommendations and prepared for review-to-mitigation handoff.</p>
+                            </div>
+                        </div>
+                        <div id="actionPlanChecklistPanel">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No checklist rows have been created yet.</div>
+                                <p class="analytics-empty-state__copy">Once an analysis is stored, this section will show workflow-ready checklist items and mitigation handoff links.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </main>
@@ -767,7 +1393,7 @@
     <div id="loadingOverlay" class="loading-overlay">
         <div style="text-align: center;">
             <div class="loading-spinner"></div>
-            <p style="margin-top: 16px;">ðŸ¤– AI is analyzing real incident data...</p>
+            <p style="margin-top: 16px;">AI is analyzing real incident data...</p>
         </div>
     </div>
 
@@ -836,7 +1462,7 @@
                     return;
                 }
                 
-                select.innerHTML = '<option value="all">ðŸ“ All Locations</option>';
+                select.innerHTML = '<option value="all">All Locations</option>';
                 stations.forEach(station => {
                     select.innerHTML += `<option value="${station.id}">${station.name}</option>`;
                 });
@@ -845,6 +1471,9 @@
                     select.value = String(stations[0].id);
                     populateBarangaySelectFromStation(stations[0].id);
                 }
+
+                updateTargetMonthDisplay('current_month', null);
+                updateRecommendationScopeLabel();
 
                 await loadLatestAnalysisSnapshot();
             } catch (error) {
@@ -871,7 +1500,7 @@
                 const option = document.createElement('option');
                 option.value = String(barangay.barangay_id ?? '');
                 option.textContent = barangay.city_name
-                    ? `${barangay.barangay_name} Â· ${barangay.city_name}`
+                    ? `${barangay.barangay_name} · ${barangay.city_name}`
                     : (barangay.barangay_name || `Barangay ${barangay.barangay_id}`);
                 barangaySelect.appendChild(option);
             });
@@ -931,9 +1560,9 @@
                                         </div>
                                     </div>
                                     ${(targetLabel || updatedAt) ? `
-                                        <div style="margin-top:12px; font-size:12px; color:#64748b;">
-                                            ${targetLabel ? `Target period: <strong>${escapeHtml(targetLabel)}</strong>` : ''}
-                                            ${targetLabel && updatedAt ? ' Â· ' : ''}
+                                            <div style="margin-top:12px; font-size:12px; color:#64748b;">
+                                                ${targetLabel ? `Target period: <strong>${escapeHtml(targetLabel)}</strong>` : ''}
+                                            ${targetLabel && updatedAt ? ' · ' : ''}
                                             ${updatedAt ? `Saved: <strong>${escapeHtml(updatedAt)}</strong>` : ''}
                                         </div>
                                     ` : ''}
@@ -960,6 +1589,8 @@
                     return;
                 }
 
+                updateTargetMonthDisplay(result.data?.prediction_scope || 'current_month', result.data?.prediction_context || null);
+                updateHeroModelLabel(formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction) || result.data?.model_metadata?.dataset_kind || 'Latest saved model');
                 updateDashboardWithAIData(result);
                 const latestModelLabel = formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction);
                 document.getElementById('selectedStationBadge').innerHTML = `<i class="fa-solid fa-location-dot"></i> ${result.location_name || 'Latest Saved Analysis'} · Latest Saved Snapshot${latestModelLabel ? ` · <i class="fa-solid fa-microchip"></i> ${latestModelLabel}` : ''}`;
@@ -986,17 +1617,29 @@
 
             if (recommendationLabel) {
                 recommendationLabel.textContent = selectedBarangayId !== 'all'
-                    ? `Recommendation scope: ${selectedBarangayName} Â· ${stationName}`
+                    ? `Recommendation scope: ${selectedBarangayName} · ${stationName}`
                     : `Recommendation scope: All barangays under ${stationName}`;
                 recommendationLabel.style.display = 'inline-flex';
             }
 
             if (predictionLabel) {
                 predictionLabel.textContent = selectedBarangayId !== 'all'
-                    ? `Prediction focus: ${selectedBarangayName} Â· ${stationName}`
+                    ? `Prediction focus: ${selectedBarangayName} · ${stationName}`
                     : `Prediction focus: All barangays under ${stationName}`;
                 predictionLabel.style.display = 'inline-flex';
             }
+
+            const scopeLabel = selectedBarangayId !== 'all'
+                ? `${selectedBarangayName} · ${stationName}`
+                : stationName;
+
+            const heroScope = document.getElementById('analyticsHeroScope');
+            const emptyStation = document.getElementById('predictionEmptyStation');
+            const emptyBarangay = document.getElementById('predictionEmptyBarangay');
+
+            if (heroScope) heroScope.textContent = scopeLabel || 'Selected station scope';
+            if (emptyStation) emptyStation.textContent = stationName || 'Selected station';
+            if (emptyBarangay) emptyBarangay.textContent = selectedBarangayId !== 'all' ? selectedBarangayName : 'All barangays';
         }
 
         function formatAiModelLabel(model) {
@@ -1007,6 +1650,309 @@
                 .replace(/-/g, ' ');
         }
 
+        function getSelectedScopeMeta() {
+            const stationSelect = document.getElementById('stationSelect');
+            const barangaySelect = document.getElementById('barangaySelect');
+            return {
+                stationId: stationSelect?.value || '',
+                stationName: stationSelect?.options?.[stationSelect.selectedIndex]?.text || 'Selected station',
+                barangayId: barangaySelect?.value || 'all',
+                barangayName: barangaySelect?.options?.[barangaySelect.selectedIndex]?.text || 'All barangays',
+                dateRangeLabel: document.getElementById('periodSelect')?.options?.[document.getElementById('periodSelect').selectedIndex]?.text || 'Last 30 days',
+            };
+        }
+
+        function updateTargetMonthDisplay(predictionScope = 'current_month', predictionContext = null) {
+            const targetMonthDisplay = document.getElementById('targetMonthDisplay');
+            const heroTarget = document.getElementById('analyticsHeroTarget');
+            const emptyRange = document.getElementById('predictionEmptyRange');
+
+            const fallbackLabel = predictionScope === 'next_month' ? 'Next month forecast' : 'Current month forecast';
+            const targetLabel = predictionContext?.target_month_label || fallbackLabel;
+
+            if (targetMonthDisplay) targetMonthDisplay.value = targetLabel;
+            if (heroTarget) heroTarget.textContent = targetLabel;
+            if (emptyRange) emptyRange.textContent = getSelectedScopeMeta().dateRangeLabel;
+        }
+
+        function updateHeroModelLabel(label) {
+            const heroModel = document.getElementById('analyticsHeroModel');
+            if (heroModel) {
+                heroModel.textContent = label || 'Waiting for model metadata';
+            }
+        }
+
+        function setInsightList(containerId, insights = [], fallback = 'No insight available yet.') {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const items = Array.isArray(insights) ? insights.filter(Boolean) : [];
+            if (!items.length) {
+                container.innerHTML = `<div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>${escapeHtml(fallback)}</span></div>`;
+                return;
+            }
+
+            container.innerHTML = items.map((insight) => `
+                <div class="analytics-insight">
+                    <i class="fa-solid fa-sparkles"></i>
+                    <span>${escapeHtml(insight)}</span>
+                </div>
+            `).join('');
+        }
+
+        function setPredictionEmptyState(messageTitle, messageCopy) {
+            const predictionContainer = document.getElementById('aiPrediction');
+            if (!predictionContainer) return;
+
+            const scope = getSelectedScopeMeta();
+            predictionContainer.innerHTML = `
+                <div class="analytics-empty-state">
+                    <div class="analytics-empty-state__title">${escapeHtml(messageTitle)}</div>
+                    <p class="analytics-empty-state__copy">${escapeHtml(messageCopy)}</p>
+                    <div class="analytics-empty-state__meta">
+                        <span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(scope.stationName)}</span>
+                        <span class="analytics-empty-pill"><i class="fa-solid fa-map"></i> ${escapeHtml(scope.barangayId !== 'all' ? scope.barangayName : 'All barangays')}</span>
+                        <span class="analytics-empty-pill"><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(scope.dateRangeLabel)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPredictionSummary(analysisData) {
+            const prediction = analysisData.predictions || null;
+            const chartContext = analysisData.chart_context || {};
+            const dailyContext = chartContext.daily || {};
+            const previousSeries = Array.isArray(dailyContext.previous_period) ? dailyContext.previous_period : [];
+            const currentSeries = Array.isArray(dailyContext.current_period) ? dailyContext.current_period : [];
+            const previousTotal = previousSeries.reduce((sum, value) => sum + Number(value || 0), 0);
+            const currentTotal = currentSeries.reduce((sum, value) => sum + Number(value || 0), 0);
+            const trendDelta = previousTotal > 0 ? (((currentTotal - previousTotal) / previousTotal) * 100) : null;
+
+            const hotspot = analysisData.selected_barangay_prediction
+                || (Array.isArray(analysisData.barangay_predictions)
+                    ? [...analysisData.barangay_predictions].sort((a, b) => Number(b.probability_percent || 0) - Number(a.probability_percent || 0))[0]
+                    : null);
+
+            const probability = hotspot?.probability_percent ?? prediction?.model_prediction?.probability_percent ?? null;
+            const predictedCount = prediction?.predicted_fire_incidents ?? hotspot?.predicted_fire_incidents ?? prediction?.model_prediction?.predicted_incident_count ?? null;
+            const confidenceScore = analysisData.confidence_score ?? prediction?.model_prediction?.confidence_band ?? null;
+            const drivers = Array.isArray(prediction?.drivers) ? prediction.drivers : [];
+
+            document.getElementById('summaryProbability').textContent = probability !== null ? `${Number(probability).toFixed(1)}%` : 'Unavailable';
+            document.getElementById('summaryIncidentCount').textContent = predictedCount !== null ? String(predictedCount) : 'Unavailable';
+            document.getElementById('riskLabel').textContent = analysisData.risk_level || prediction?.outlook || 'Unavailable';
+            document.getElementById('confidenceScore').textContent = confidenceScore !== null
+                ? (typeof confidenceScore === 'number' ? `${confidenceScore}%` : String(confidenceScore))
+                : 'Unavailable';
+
+            const trendDirection = document.getElementById('summaryTrendDirection');
+            const trendCopy = document.getElementById('summaryTrendCopy');
+            const trendIndicator = document.getElementById('summaryTrendIndicator');
+            if (trendDirection && trendCopy && trendIndicator) {
+                if (trendDelta === null || !Number.isFinite(trendDelta)) {
+                    trendDirection.textContent = 'Comparison unavailable';
+                    trendCopy.textContent = 'A previous seven-day comparison will appear once the backend has both current and previous actual incident periods available.';
+                    trendIndicator.innerHTML = '<i class="fa-solid fa-chart-simple"></i><span>No previous period data available</span>';
+                } else {
+                    const directionLabel = trendDelta > 0 ? 'Rising against previous period' : (trendDelta < 0 ? 'Lower than previous period' : 'Holding steady');
+                    trendDirection.textContent = directionLabel;
+                    trendCopy.textContent = `Current seven-day activity totals ${currentTotal} incidents, compared with ${previousTotal} incidents in the previous seven-day period.`;
+                    trendIndicator.innerHTML = `<i class="fa-solid ${trendDelta > 0 ? 'fa-arrow-trend-up' : (trendDelta < 0 ? 'fa-arrow-trend-down' : 'fa-equals')}"></i><span>${trendDelta > 0 ? '+' : ''}${trendDelta.toFixed(1)}% versus previous period</span>`;
+                }
+            }
+
+            document.getElementById('summaryTopBarangay').textContent = hotspot?.barangay_name || 'No hotspot yet';
+            document.getElementById('summaryTopBarangayCopy').textContent = hotspot
+                ? `Forecast probability ${Number(hotspot.probability_percent || 0).toFixed(1)}%${hotspot.prediction_target_label ? ` for ${hotspot.prediction_target_label}` : ''}.`
+                : 'Run an analysis to identify the highest-risk barangay in the current station coverage.';
+
+            const driverContainer = document.getElementById('summaryDrivers');
+            if (driverContainer) {
+                const items = drivers.slice(0, 4);
+                driverContainer.innerHTML = items.length
+                    ? items.map((driver) => `<span class="prediction-driver-chip"><i class="fa-solid fa-circle-nodes"></i>${escapeHtml(typeof driver === 'string' ? driver : (driver?.summary || 'Driver'))}</span>`).join('')
+                    : '<span class="prediction-driver-chip"><i class="fa-solid fa-circle-info"></i>No main contributing factors returned yet.</span>';
+            }
+        }
+
+        function renderCharts(analysisData) {
+            const chartContext = analysisData.chart_context || {};
+            const daily = chartContext.daily || {};
+            const hourly = chartContext.hourly || {};
+
+            if (hourlyChart) hourlyChart.destroy();
+            if (dailyChart) dailyChart.destroy();
+
+            const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+            dailyChart = new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: daily.labels || [],
+                    datasets: [
+                        {
+                            label: 'Previous period actual',
+                            data: daily.previous_period || [],
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'rgba(148,163,184,0.12)',
+                            borderDash: [6, 6],
+                            tension: 0.35,
+                            pointRadius: 3,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Current actual',
+                            data: daily.current_period || [],
+                            borderColor: '#dc2626',
+                            backgroundColor: 'rgba(220,38,38,0.12)',
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#dc2626',
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Predicted probability (%)',
+                            data: daily.predicted_probability || [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.14)',
+                            tension: 0.2,
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                            spanGaps: true,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true } },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    return context.dataset.yAxisID === 'y1'
+                                        ? `${label}: ${Number(value || 0).toFixed(1)}%`
+                                        : `${label}: ${value}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Incident count' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Predicted probability (%)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Date' }
+                        }
+                    }
+                }
+            });
+
+            const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+            hourlyChart = new Chart(hourlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: hourly.labels || [],
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Previous month baseline',
+                            data: hourly.historical_baseline || [],
+                            borderColor: '#475569',
+                            backgroundColor: 'rgba(71,85,105,0.12)',
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            yAxisID: 'y',
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Current month actual',
+                            data: hourly.current_period || [],
+                            backgroundColor: 'rgba(37,99,235,0.78)',
+                            borderRadius: 6,
+                            yAxisID: 'y',
+                        },
+                        {
+                            type: 'line',
+                            label: 'Predicted peak-hour probability (%)',
+                            data: hourly.predicted_probability || [],
+                            borderColor: '#ea580c',
+                            backgroundColor: 'rgba(234,88,12,0.12)',
+                            tension: 0,
+                            spanGaps: true,
+                            pointRadius: 4,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true } },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    return context.dataset.yAxisID === 'y1'
+                                        ? `${label}: ${Number(value || 0).toFixed(1)}%`
+                                        : `${label}: ${value}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Incident frequency' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Predicted probability (%)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Hour of day' }
+                        }
+                    }
+                }
+            });
+
+            const chartInsights = Array.isArray(chartContext.insights) ? chartContext.insights : [];
+            setInsightList(
+                'dailyTrendInsights',
+                [
+                    chartInsights[0],
+                    daily?.missing?.predicted_probability ? 'Predicted probability series is unavailable for this selection, so only actual incident patterns are shown.' : null,
+                    chartInsights[2],
+                ].filter(Boolean),
+                'Daily comparison insight is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'hourlyPatternInsights',
+                [
+                    chartInsights[3],
+                    hourly?.missing?.historical_baseline ? 'Historical baseline data is unavailable for the hourly comparison chart.' : null,
+                    hourly?.missing?.predicted_probability ? 'Predicted peak-hour probability data is unavailable for the current selection.' : null,
+                ].filter(Boolean),
+                'Hourly pattern insight is unavailable for the current dataset.'
+            );
+        }
+
         function showPredictionApiError(message, details = null) {
             const predictionContainer = document.getElementById('aiPrediction');
             const fallbackMessage = message || 'Prediction could not be completed right now.';
@@ -1015,13 +1961,7 @@
                 : '';
 
             if (predictionContainer) {
-                predictionContainer.innerHTML = `
-                    <div style="border:1px solid rgba(220,38,38,0.18); background:#fef2f2; color:#991b1b; border-radius:16px; padding:18px 20px;">
-                        <div style="font-weight:800; font-size:15px;">Prediction service unavailable</div>
-                        <div style="margin-top:6px; font-size:14px; line-height:1.5;">${fallbackMessage}</div>
-                        ${detailHtml}
-                    </div>
-                `;
+                predictionContainer.innerHTML = `<div style="border:1px solid rgba(220,38,38,0.18); background:#fef2f2; color:#991b1b; border-radius:16px; padding:18px 20px;"><div style="font-weight:800; font-size:15px;">Prediction service unavailable</div><div style="margin-top:6px; font-size:14px; line-height:1.5;">${fallbackMessage}</div>${detailHtml}</div>`;
             }
 
             alert(details ? `${fallbackMessage}\n\n${details}` : fallbackMessage);
@@ -1043,6 +1983,7 @@
                     },
                     body: JSON.stringify({
                         location_id: locationId,
+                        barangay_id: document.getElementById('barangaySelect')?.value || 'all',
                         days: parseInt(periodDays),
                         prediction_scope: predictionScope
                     })
@@ -1071,6 +2012,7 @@
                 console.log('AI Analysis Result:', result);
                 
                 if (result.success) {
+                    updateTargetMonthDisplay(predictionScope, result.data?.prediction_context || null);
                     updateDashboardWithAIData(result);
                     const scopeLabel = predictionScope === 'next_month' ? 'Next Month Forecast' : 'Current Month Forecast';
                     const aiModelLabel = formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction);
@@ -1400,7 +2342,7 @@
                         ${focusBarangayLabel ? `
                             <div style="margin-top:12px; display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:#fff; border:1px solid rgba(220,38,38,0.12); color:#7f1d1d; font-size:12px; font-weight:700;">
                                 <span>${escapeHtml(focusBarangayContext || 'Barangay')}</span>
-                                <span>â€¢</span>
+                                <span>&bull;</span>
                                 <span>${escapeHtml(focusBarangayLabel)}</span>
                             </div>
                         ` : ''}
@@ -1596,153 +2538,111 @@
             renderBarangayPredictionPanel(currentBarangayPredictions);
             const predictionContainer = document.getElementById('aiPrediction');
             const prediction = analysisData.predictions || null;
+            updateTargetMonthDisplay(analysisData.prediction_scope || 'current_month', analysisData.prediction_context || null);
+            updateHeroModelLabel(formatAiModelLabel(analysisData?.ai_models?.recommendation || analysisData?.ai_models?.prediction) || analysisData?.model_metadata?.dataset_kind || 'Latest saved model');
 
             if (predictionContainer) {
                 if (!prediction || !prediction.summary) {
-                    predictionContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No prediction available for this dataset</div>';
+                    setPredictionEmptyState(
+                        'No prediction has been generated for this dataset yet.',
+                        'Historical, current, and predicted values stay separated on this page. Run the analysis to load a forecast narrative, command summary, and chart comparisons.'
+                    );
                 } else {
-                    const primaryDriver = Array.isArray(prediction.drivers) && prediction.drivers.length
-                        ? prediction.drivers[0]
-                        : null;
+                    const primaryDriver = Array.isArray(prediction.drivers) && prediction.drivers.length ? prediction.drivers[0] : null;
                     const scopeCaption = prediction.prediction_context?.target_period_label || prediction.forecast_window || 'Forecast window';
                     const selectedBarangay = analysisData.selected_barangay_prediction || null;
                     const topHotspot = !selectedBarangay && Array.isArray(currentBarangayPredictions) && currentBarangayPredictions.length
                         ? [...currentBarangayPredictions].sort((a, b) => Number(b.probability_percent ?? 0) - Number(a.probability_percent ?? 0))[0]
                         : null;
-                    const focusBarangayLabel = selectedBarangay?.barangay_name
-                        ? selectedBarangay.barangay_name
-                        : (topHotspot?.barangay_name || null);
-                    const focusBarangayContext = selectedBarangay?.barangay_name
-                        ? 'Selected barangay'
-                        : (topHotspot?.barangay_name ? 'Top hotspot' : null);
-                    const possibleIncidents = prediction.predicted_fire_incidents !== undefined && prediction.predicted_fire_incidents !== null
-                        ? escapeHtml(String(prediction.predicted_fire_incidents))
-                        : 'N/A';
-                    const damageValue = prediction.predicted_damage !== undefined && prediction.predicted_damage !== null
-                        ? `PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`
-                        : 'N/A';
+                    const focusBarangayLabel = selectedBarangay?.barangay_name ? selectedBarangay.barangay_name : (topHotspot?.barangay_name || null);
                     const recommendationCount = Array.isArray(currentRecommendations) ? currentRecommendations.length : 0;
                     const modelMetadata = analysisData.model_metadata || null;
-                    const summaryText = prediction.summary.length > 180
-                        ? `${escapeHtml(prediction.summary.slice(0, 180))}...`
-                        : escapeHtml(prediction.summary);
 
                     predictionContainer.innerHTML = `
-                        <div style="padding: 18px; border-radius: 18px; background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(245,158,11,0.12)); border: 1px solid rgba(245,158,11,0.25);">
-                            <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+                        <div style="padding:22px; border-radius:22px; background:linear-gradient(135deg, rgba(220,38,38,0.08), rgba(245,158,11,0.12)); border:1px solid rgba(245,158,11,0.22);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
                                 <div>
-                                    <div style="font-size: 12px; font-weight: 800; color: #9a3412; text-transform: uppercase; letter-spacing: 0.08em;">Forecast Window</div>
-                                    <div style="font-size: 22px; font-weight: 900; color: #1f2937; margin-top: 4px;">${escapeHtml(scopeCaption)}</div>
+                                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase; letter-spacing:0.08em;">Forecast window</div>
+                                    <div style="font-size:24px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(scopeCaption)}</div>
                                 </div>
-                                <div style="padding: 8px 14px; border-radius: 999px; background: rgba(220,38,38,0.12); color: #b91c1c; font-size: 12px; font-weight: 800; text-transform: uppercase;">
-                                    ${escapeHtml(prediction.outlook || 'Medium')} Outlook
+                                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-shield-heart"></i> ${escapeHtml(prediction.outlook || 'Forecast Outlook')}</span>
+                                    ${focusBarangayLabel ? `<span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(focusBarangayLabel)}</span>` : ''}
                                 </div>
                             </div>
-                            ${focusBarangayLabel ? `
-                                <div style="margin-top: 12px; display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.7); border:1px solid rgba(220,38,38,0.12); color:#7f1d1d; font-size:12px; font-weight:800;">
-                                    <span>${escapeHtml(focusBarangayContext || 'Barangay')}</span>
-                                    <span>â€¢</span>
-                                    <span>${escapeHtml(focusBarangayLabel)}</span>
+                            <p style="margin-top:16px; font-size:14px; line-height:1.8; color:#334155;">${escapeHtml(prediction.summary)}</p>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:18px;">
+                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(220,38,38,0.12);">
+                                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase;">Predicted incidents</div>
+                                    <div style="font-size:28px; font-weight:900; color:#7f1d1d; margin-top:8px;">${prediction.predicted_fire_incidents ?? 'N/A'}</div>
                                 </div>
-                            ` : ''}
-                            <p style="margin-top: 14px; font-size: 14px; line-height: 1.7; color: #334155;">${summaryText}</p>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px;">
-                                <div style="padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.55); border: 1px solid rgba(220,38,38,0.12);">
-                                    <div style="font-size: 11px; font-weight: 800; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.08em;">Possible Incidents</div>
-                                    <div style="font-size: 30px; font-weight: 900; color: #7f1d1d; margin-top: 6px;">${possibleIncidents}</div>
+                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(234,88,12,0.12);">
+                                    <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase;">Estimated damage</div>
+                                    <div style="font-size:20px; font-weight:900; color:#9a3412; margin-top:8px;">${prediction.predicted_damage !== undefined && prediction.predicted_damage !== null ? `PHP ${Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Unavailable'}</div>
                                 </div>
-                                <div style="padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.55); border: 1px solid rgba(249,115,22,0.12);">
-                                    <div style="font-size: 11px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.08em;">Estimated Damage</div>
-                                    <div style="font-size: 20px; font-weight: 900; color: #9a3412; margin-top: 6px;">${damageValue}</div>
-                                </div>
-                                <div style="padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.55); border: 1px solid rgba(148,163,184,0.16);">
-                                    <div style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.08em;">AI Recommendations</div>
-                                    <div style="font-size: 30px; font-weight: 900; color: #0f172a; margin-top: 6px;">${recommendationCount}</div>
+                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(148,163,184,0.16);">
+                                    <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase;">Recommendation count</div>
+                                    <div style="font-size:28px; font-weight:900; color:#0f172a; margin-top:8px;">${recommendationCount}</div>
                                 </div>
                             </div>
                             <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px;">
-                                <div style="font-size:13px; color:#475569; max-width:70%;">
-                                    ${primaryDriver ? `<strong style="color:#9a3412;">Top driver:</strong> ${escapeHtml(primaryDriver)}` : 'Open the detailed forecast to review drivers, weather context, and saved AI recommendations.'}
+                                <div style="font-size:13px; color:#475569; max-width:72%;">
+                                    ${primaryDriver ? `<strong style="color:#9a3412;">Main contributing factor:</strong> ${escapeHtml(typeof primaryDriver === 'string' ? primaryDriver : (primaryDriver?.summary || 'Driver'))}` : 'Open the detailed forecast to review model drivers, weather context, and stored AI recommendations.'}
                                 </div>
                                 <button type="button" onclick="openPredictionDetailModal()" style="padding: 10px 16px; background: #fff; color: #b91c1c; border: 1px solid rgba(220,38,38,0.16); border-radius: 12px; cursor: pointer; font-weight: 800;">
-                                    View Details
+                                    View Forecast Details
                                 </button>
                             </div>
                             ${modelMetadata ? `
                                 <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-                                    <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.7); border:1px solid rgba(15,23,42,0.08); color:#334155; font-size:12px; font-weight:800;">
-                                        <i class="fa-solid fa-microchip" style="color:#2563eb;"></i>${escapeHtml(modelMetadata.dataset_kind || 'model')}
-                                    </span>
-                                    <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.7); border:1px solid rgba(15,23,42,0.08); color:#334155; font-size:12px; font-weight:800;">
-                                        <i class="fa-solid fa-database" style="color:#0f766e;"></i>${escapeHtml(String(modelMetadata.records_used || 'N/A'))} records
-                                    </span>
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-microchip"></i> ${escapeHtml(modelMetadata.dataset_kind || 'model')}</span>
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-database"></i> ${escapeHtml(String(modelMetadata.records_used || 'N/A'))} records used</span>
                                 </div>
                             ` : ''}
                         </div>
                     `;
                 }
             }
-            
-            // Risk assessment
-            const riskScore = analysisData.risk_score || 0;
-            const riskCard = document.getElementById('riskCard');
-            riskCard.className = 'stat-card ' + (riskScore >= 70 ? 'risk-high' : (riskScore >= 40 ? 'risk-medium' : 'risk-low'));
-            document.getElementById('riskScore').innerHTML = riskScore + '/100';
-            document.getElementById('riskLabel').innerHTML = analysisData.risk_level || 'Not Available';
-            document.getElementById('confidenceScore').innerHTML = `AI Confidence: ${analysisData.confidence_score || 85}%`;
-            
-            let riskFactorsHtml = '<strong>AI-Identified Risk Factors:</strong><ul style="margin-top:8px;margin-left:16px;">';
-            (analysisData.risk_factors || ['No risk factors identified']).forEach(factor => {
-                riskFactorsHtml += `<li style="font-size:13px;margin-bottom:4px;">â€¢ ${factor}</li>`;
-            });
-            riskFactorsHtml += '</ul>';
-            document.getElementById('riskFactors').innerHTML = riskFactorsHtml;
 
-            // Incident stats
-            document.getElementById('totalIncidents').innerHTML = analysisData.total_incidents || 0;
-            document.getElementById('fireIncidents').innerHTML = analysisData.fire_incidents || 0;
-            document.getElementById('avgResponse').innerHTML = (analysisData.avg_response_time || 'N/A') + (analysisData.avg_response_time ? ' min' : '');
-            document.getElementById('peakHour').innerHTML = analysisData.peak_hour ? analysisData.peak_hour + ':00' : 'N/A';
-            
-            // Resources
+            document.getElementById('riskScore').textContent = `${analysisData.risk_score || 0}/100`;
+            document.getElementById('totalIncidents').textContent = analysisData.total_incidents || 0;
+            document.getElementById('fireIncidents').textContent = analysisData.fire_incidents || 0;
+            document.getElementById('avgResponse').textContent = analysisData.avg_response_time ? `${analysisData.avg_response_time} min` : 'Unavailable';
+            document.getElementById('peakHour').textContent = analysisData.peak_hour !== null && analysisData.peak_hour !== undefined ? `${String(analysisData.peak_hour).padStart(2, '0')}:00` : 'Unavailable';
+
             const personnelPercent = analysisData.total_personnel > 0 ? (analysisData.available_personnel / analysisData.total_personnel) * 100 : 0;
-            document.getElementById('availablePersonnel').innerHTML = `${analysisData.available_personnel || 0}/${analysisData.total_personnel || 0}`;
-            document.getElementById('personnelBar').style.width = personnelPercent + '%';
-            
+            document.getElementById('availablePersonnel').textContent = `${analysisData.available_personnel || 0}/${analysisData.total_personnel || 0}`;
+            document.getElementById('personnelBar').style.width = `${personnelPercent}%`;
+
             const equipPercent = analysisData.total_equipment > 0 ? (analysisData.available_equipment / analysisData.total_equipment) * 100 : 0;
-            document.getElementById('availableEquipment').innerHTML = `${analysisData.available_equipment || 0}/${analysisData.total_equipment || 0}`;
-            document.getElementById('equipmentBar').style.width = equipPercent + '%';
+            document.getElementById('availableEquipment').textContent = `${analysisData.available_equipment || 0}/${analysisData.total_equipment || 0}`;
+            document.getElementById('equipmentBar').style.width = `${equipPercent}%`;
 
-            // Charts
-            if (hourlyChart) hourlyChart.destroy();
-            if (dailyChart) dailyChart.destroy();
+            const incidentTypes = analysisData.incidents_by_type || {};
+            const incidentTypeEntries = Object.entries(incidentTypes);
+            document.getElementById('incidentTypes').innerHTML = incidentTypeEntries.length
+                ? `<strong style="color:#334155;">Incident type mix:</strong> ${incidentTypeEntries.map(([type, count]) => `${escapeHtml(String(type))}: <strong>${escapeHtml(String(count))}</strong>`).join(' · ')}`
+                : 'Incident type breakdown is unavailable for this selection.';
 
-            const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
-            hourlyChart = new Chart(hourlyCtx, {
-                type: 'line',
-                data: {
-                    labels: analysisData.hourly_labels || Array.from({length: 24}, (_, i) => i + ':00'),
-                    datasets: [{ label: 'Incidents by Hour', data: analysisData.hourly_data || new Array(24).fill(0), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
-            });
+            const hiddenRiskFactors = document.getElementById('riskFactors');
+            hiddenRiskFactors.innerHTML = Array.isArray(analysisData.risk_factors)
+                ? analysisData.risk_factors.map((factor) => `<div>${escapeHtml(factor)}</div>`).join('')
+                : '';
 
-            const dailyCtx = document.getElementById('dailyChart').getContext('2d');
-            dailyChart = new Chart(dailyCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                    datasets: [{ label: 'Incidents', data: analysisData.daily_data || [0,0,0,0,0,0,0], backgroundColor: '#ef4444', borderRadius: 6 }]
-                },
-                options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
-            });
+            renderPredictionSummary(analysisData);
+            renderCharts(analysisData);
 
             // Recommendations with Explore button
             const recommendations = analysisData.recommendations || [];
             const recContainer = document.getElementById('recommendations');
             
             if (recommendations.length === 0) {
-                recContainer.innerHTML = '<div class="text-center py-8 text-gray-500">No recommendations available</div>';
+                recContainer.innerHTML = `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">No recommendations returned from this analysis.</div>
+                        <p class="analytics-empty-state__copy">The backend returned the prediction context, but there are no recommendation rows available for the current dataset.</p>
+                    </div>
+                `;
             } else {
                 let recHtml = '<div>';
                 recommendations.forEach((rec, idx) => {
@@ -1755,7 +2655,7 @@
                     const evidenceLine = evidenceParts.length
                         ? `<div style="font-size:12px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <i class="fa-solid fa-magnifying-glass-chart" style="color:${meta.accent};"></i>
-                                <span><strong style="color:#475569;">Based on:</strong> ${escapeHtml(evidenceParts.join(' â€¢ '))}</span>
+                                <span><strong style="color:#475569;">Based on:</strong> ${escapeHtml(evidenceParts.join(' • '))}</span>
                            </div>`
                         : '';
                     let priorityClass = 'medium';

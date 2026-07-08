@@ -256,6 +256,52 @@
         gap: 1.25rem;
     }
 
+    .fire-report-form__section {
+        border-radius: 24px;
+        border: 1px solid rgba(251, 191, 36, 0.18);
+        background: linear-gradient(180deg, #fffef9 0%, #ffffff 100%);
+        padding: 1rem;
+    }
+
+    .fire-report-form__section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .fire-report-form__eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 34px;
+        padding: 0 0.85rem;
+        border-radius: 999px;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .fire-report-form__hint {
+        margin: 0.5rem 0 0;
+        color: #64748b;
+        font-size: 0.82rem;
+        line-height: 1.5;
+    }
+
+    .fire-report-required {
+        margin-left: 0.35rem;
+        color: #c2410c;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
     .fire-report-form__grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -356,6 +402,11 @@
     }
 
     @media (max-width: 768px) {
+        .fire-report-form__section {
+            border-radius: 22px;
+            padding: 0.9rem;
+        }
+
         .fire-report-form__grid {
             grid-template-columns: 1fr;
         }
@@ -365,14 +416,31 @@
         }
 
         .fire-report-modal {
-            padding: 0.75rem;
+            align-items: flex-end;
+            padding: 0;
         }
 
         .fire-report-modal__dialog {
-            padding: 1rem;
+            width: 100%;
+            max-height: min(92dvh, 100dvh - 0.5rem);
+            border-radius: 28px 28px 0 0;
+            padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
         }
 
         .fire-report-modal__actions {
+            flex-direction: column-reverse;
+        }
+
+        .fire-report-modal__actions .fire-report-primary-btn,
+        .fire-report-modal__actions .fire-report-secondary-btn,
+        .fire-report-location-btn,
+        .fire-report-filterbar__actions .fire-report-primary-btn,
+        .fire-report-filterbar__actions .fire-report-secondary-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .fire-report-filterbar__actions {
             flex-direction: column-reverse;
         }
     }

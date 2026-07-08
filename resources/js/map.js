@@ -88,6 +88,7 @@ let notificationPanel = null;
 // Details panel
 let detailsPanel = null;
 let currentDetailsMarker = null;
+let currentDetailsIncident = null;
 
 // Edit modal
 let editModal = null;
@@ -189,6 +190,26 @@ window.destroyPyroMapRuntime = destroyPyroMapRuntime;
 function isFirefighterDashboardMapInstance() {
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     return configuredInstanceKey === 'firefighterDashboard';
+}
+
+function isChiefCommandMapContext() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    const currentPath = String(window.location?.pathname || '');
+    const roleMeta = String(document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '').toLowerCase().trim();
+
+    return configuredInstanceKey === 'chiefDashboard'
+        || configuredInstanceKey === 'chiefIncidentMap'
+        || currentPath.startsWith('/station-admin/')
+        || roleMeta === 'chief'
+        || roleMeta === 'station admin';
+}
+
+function shouldUseResponderPopupUi() {
+    return isFirefighterDashboardMapInstance() || isChiefCommandMapContext();
+}
+
+function shouldUseResponderMobileDetailsUi() {
+    return shouldUseResponderPopupUi() && window.innerWidth <= 768;
 }
 
 function getRoutePollIntervalMs() {
@@ -1743,10 +1764,35 @@ function initializePyroMapRuntime() {
         return;
     }
 
+    const existingMapInstance = window.mapInstances?.[configuredInstanceKey];
+    if (existingMapInstance) {
+        const existingContainer = existingMapInstance._container;
+        const isSameContainer = existingContainer === mapContainer;
+        const isExistingContainerMounted = !!(existingContainer && existingContainer.isConnected);
+
+        if (!isSameContainer || !isExistingContainerMounted) {
+            try {
+                existingMapInstance.remove();
+            } catch (error) {
+                console.warn('Unable to remove stale map instance cleanly:', error);
+            }
+
+            delete window.mapInstances[configuredInstanceKey];
+
+            if (window.activeMapInstanceKey === configuredInstanceKey) {
+                window.map = null;
+                window.activeMapInstanceKey = null;
+            }
+        }
+    }
+
     if (window.mapInstances?.[configuredInstanceKey]) {
         window.map = window.mapInstances[configuredInstanceKey];
         window.activeMapInstanceKey = configuredInstanceKey;
+
         setTimeout(() => window.map?.invalidateSize(), 0);
+        setTimeout(() => window.map?.invalidateSize(), 180);
+        setTimeout(() => window.map?.invalidateSize(), 420);
         return window.map;
     }
     
@@ -1791,6 +1837,7 @@ function initializePyroMapRuntime() {
     // Ensure the map repaints correctly after layout settles.
     setTimeout(() => window.map?.invalidateSize(), 0);
     setTimeout(() => window.map?.invalidateSize(), 250);
+    setTimeout(() => window.map?.invalidateSize(), 600);
     
     // Start polling for routes from database
     startRoutePolling();
@@ -3774,11 +3821,45 @@ styleElement.textContent = `
         line-height: 1.35;
     }
 
+    .responder-map-detail-actions {
+        display: grid;
+        gap: 8px;
+    }
+
+    .responder-map-detail-actions.split {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     @media (max-width: 768px) {
         .details-panel.compact-responder {
-            width: calc(100vw - 20px);
-            right: 12px;
-            top: 112px;
+            left: 10px;
+            right: 10px;
+            top: auto;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+            width: auto;
+            max-width: none;
+            border-radius: 28px;
+            box-shadow: 0 24px 44px rgba(15, 23, 42, 0.2);
+            z-index: 10020;
+        }
+
+        .details-panel.compact-responder::before {
+            content: "";
+            display: block;
+            width: 54px;
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.45);
+            margin: 12px auto 0;
+        }
+
+        .details-panel.compact-responder .details-header {
+            padding: 12px 14px;
+        }
+
+        .details-panel.compact-responder .details-body {
+            max-height: min(56svh, 480px);
+            padding: 12px 14px 16px;
         }
     }
     
@@ -4499,6 +4580,49 @@ function closeDetailsPanel() {
         detailsPanel.classList.remove('visible');
         detailsPanel.classList.remove('compact-responder');
         currentDetailsMarker = null;
+        currentDetailsIncident = null;
+    }
+}
+
+function openCurrentMapDetailEditor() {
+    if (!currentDetailsMarker) {
+        return;
+    }
+
+    openEditModal(currentDetailsMarker);
+}
+
+function deleteCurrentMapDetailMarker() {
+    if (!currentDetailsMarker?.marker_id) {
+        return;
+    }
+
+    deleteMarker(currentDetailsMarker.marker_id);
+}
+
+function respondCurrentMapDetail() {
+    if (!currentDetailsMarker) {
+        return;
+    }
+
+    respondIncident(currentDetailsMarker);
+}
+
+function routeCurrentMapDetail() {
+    if (!currentDetailsMarker) {
+        return;
+    }
+
+    if (isIncidentMarker(currentDetailsMarker)) {
+        window.calculateRouteToIncident(
+            currentDetailsIncident?.incident_id ?? currentDetailsMarker.incident_id ?? null,
+            currentDetailsMarker.marker_id
+        );
+        return;
+    }
+
+    if (isStationMarker(currentDetailsMarker)) {
+        window.calculateRouteToStation(currentDetailsMarker.marker_id);
     }
 }
 
@@ -5165,14 +5289,20 @@ async function updateCoordinate(data, options = {}) {
             if (isNaN(lat) || isNaN(lng)) return;
             
             const incident = findIncidentInLookup(marker, incidentLookup);
-            const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
             const tempIcon = getIconByCategoryId(marker.markerCategory_id, '', marker);
-            const popupMaxWidth = window.innerWidth <= 768 ? 264 : 300;
-            const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
-            if (window.activeMapInstanceKey === 'firefighterDashboard') {
-                popupOptions.className = 'responder-custom-popup';
+            const useResponderMobileDetailsUi = shouldUseResponderMobileDetailsUi();
+            const newMarker = L.marker([lat, lng], { icon: tempIcon });
+
+            if (!useResponderMobileDetailsUi) {
+                const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
+                const popupMaxWidth = window.innerWidth <= 768 ? 264 : 300;
+                const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
+                if (shouldUseResponderPopupUi()) {
+                    popupOptions.className = 'responder-custom-popup';
+                }
+
+                newMarker.bindPopup(popupContent, popupOptions);
             }
-            const newMarker = L.marker([lat, lng], { icon: tempIcon }).bindPopup(popupContent, popupOptions);
             
             if (isIncidentMarker(marker)) {
                 const circle = L.circle([lat, lng], { radius: 200, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.2 });
@@ -5180,12 +5310,35 @@ async function updateCoordinate(data, options = {}) {
             }
             
             addMarkerToFeatureGroup(marker, newMarker);
-            newMarker.on('popupopen', () => addPopupEventListeners({
-                marker: marker,
-                incident,
-                image: marker.multimedia || null,
-                created_at: marker.created_at
-            }));
+            const markerImagePath = marker.multimedia?.path
+                ? '/storage/' + marker.multimedia.path
+                : null;
+
+            if (useResponderMobileDetailsUi) {
+                newMarker.on('click', () => {
+                    const resolvedIncident = findIncidentForMarker(marker, incident);
+
+                    try {
+                        window.map?.closePopup?.();
+                    } catch (closePopupError) {
+                        console.warn('Unable to close existing popup before opening mobile details:', closePopupError);
+                    }
+
+                    if (isIncidentMarker(marker)) {
+                        showResponderIncidentDetails(marker, resolvedIncident, markerImagePath);
+                        return;
+                    }
+
+                    showResponderMarkerDetails(marker, { marker, incident: resolvedIncident }, markerImagePath);
+                });
+            } else {
+                newMarker.on('popupopen', () => addPopupEventListeners({
+                    marker: marker,
+                    incident,
+                    image: marker.multimedia || null,
+                    created_at: marker.created_at
+                }));
+            }
             existingMarkers[marker.marker_id] = newMarker;
         });
 
@@ -5284,7 +5437,7 @@ function generatePopupContent(coord, incidents) {
     const imageHeight = isMobilePopup ? '48px' : '60px';
     const actionGap = isMobilePopup ? '6px' : '8px';
 
-    if (window.activeMapInstanceKey === 'firefighterDashboard') {
+    if (shouldUseResponderPopupUi()) {
         return buildResponderPopupContent(marker, incident, imagePath);
     }
 
@@ -5704,6 +5857,21 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                     { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
                 ];
 
+    const managementMarkup = canManageMarkers
+        ? `
+            <div class="responder-map-detail-actions split">
+                <button id="edit${marker.marker_id}" class="responder-marker-popup-btn secondary">
+                    <i class="fas fa-pen-to-square"></i>
+                    Edit
+                </button>
+                <button id="delete${marker.marker_id}" class="responder-marker-popup-btn danger">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+            </div>
+        `
+        : '';
+
     let actionMarkup = '';
 
     if (isIncidentMarker(marker)) {
@@ -5737,6 +5905,8 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                 ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
             </button>
         `;
+
+        actionMarkup += managementMarkup;
     } else if (isStationMarker(marker)) {
         actionMarkup += `
             <button type="button" class="responder-marker-popup-btn secondary" onclick="window.calculateRouteToStation(${marker.marker_id})">
@@ -5744,6 +5914,10 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                 Get Directions
             </button>
         `;
+
+        actionMarkup += managementMarkup;
+    } else {
+        actionMarkup += managementMarkup;
     }
 
     actionMarkup += `
@@ -5778,7 +5952,14 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                 <div class="responder-marker-popup-media">
                     <img src="${imagePath}" alt="${escapeHtml(marker.title || 'Marker image')}" class="responder-marker-popup-image" />
                 </div>
-            ` : ''}
+            ` : `
+                <div class="responder-marker-popup-media placeholder">
+                    <div class="responder-marker-popup-placeholder-icon">
+                        <i class="fas ${markerPresentation.icon}"></i>
+                    </div>
+                    <span>No photo attached</span>
+                </div>
+            `}
             <div class="responder-marker-popup-details">
                 ${detailRows.map((row) => `
                     <div class="responder-marker-popup-detail-row">
@@ -5880,7 +6061,82 @@ function buildResponderMapInfoRows(rows = []) {
     `).join('');
 }
 
+function buildResponderDetailsActionMarkup(marker, incident = null) {
+    if (!marker) {
+        return '';
+    }
+
+    const actions = [];
+    const incidentId = incident?.incident_id ?? marker?.incident_id ?? null;
+    const incidentStatus = normalizeIncidentStatus(marker.incident_status || incident?.status || 'reported');
+    const blockingRoute = isIncidentMarker(marker)
+        ? getBlockingIncidentRouteForCurrentTeam(incidentId)
+        : null;
+    const isIncidentRoutingBlocked = Boolean(blockingRoute);
+
+    if (isIncidentMarker(marker)) {
+        if (canManageMarkers && incidentStatus === 'reported') {
+            actions.push(`
+                <button type="button" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.respondCurrentMapDetail()" ${isIncidentRoutingBlocked ? 'disabled title="Your team is already navigating to another incident."' : ''}>
+                    <i class="fas fa-phone-volume"></i>
+                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now'}
+                </button>
+            `);
+        }
+
+        if (isIncidentRoutingBlocked) {
+            actions.push(`
+                <div class="responder-marker-popup-alert">
+                    <i class="fas fa-circle-exclamation"></i>
+                    Team already assigned to ${escapeHtml(getBlockingIncidentRouteLabel(blockingRoute))}
+                </div>
+            `);
+        }
+
+        actions.push(`
+            <button type="button" class="responder-marker-popup-btn secondary${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.routeCurrentMapDetail()" ${isIncidentRoutingBlocked ? 'disabled title="Finish or clear the active team route before navigating to another incident."' : ''}>
+                <i class="fas fa-route"></i>
+                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
+            </button>
+        `);
+    } else if (isStationMarker(marker)) {
+        actions.push(`
+            <button type="button" class="responder-marker-popup-btn secondary" onclick="window.routeCurrentMapDetail()">
+                <i class="fas fa-route"></i>
+                Get Directions
+            </button>
+        `);
+    }
+
+    if (canManageMarkers) {
+        actions.push(`
+            <div class="responder-map-detail-actions split">
+                <button type="button" class="responder-marker-popup-btn secondary" onclick="window.openCurrentMapDetailEditor()">
+                    <i class="fas fa-pen-to-square"></i>
+                    Edit
+                </button>
+                <button type="button" class="responder-marker-popup-btn danger" onclick="window.deleteCurrentMapDetailMarker()">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+            </div>
+        `);
+    }
+
+    if (!actions.length) {
+        return '';
+    }
+
+    return `
+        <div class="responder-map-detail-actions">
+            ${actions.join('')}
+        </div>
+    `;
+}
+
 function showResponderMarkerDetails(marker, coord, imagePath = null) {
+    currentDetailsMarker = marker;
+    currentDetailsIncident = null;
     const presentation = getResponderPopupPresentation(marker);
     const createdAt = marker.created_at ? new Date(marker.created_at).toLocaleString() : 'Unknown';
     const updatedAt = marker.updated_at ? new Date(marker.updated_at).toLocaleString() : 'Unknown';
@@ -5932,12 +6188,15 @@ function showResponderMarkerDetails(marker, coord, imagePath = null) {
                 <div class="responder-map-detail-grid">
                     ${buildResponderMapInfoRows(infoRows)}
                 </div>
+                ${buildResponderDetailsActionMarkup(marker, null)}
             </div>
         `
     );
 }
 
 function showResponderIncidentDetails(marker, incident, imagePath = null) {
+    currentDetailsMarker = marker;
+    currentDetailsIncident = incident || null;
     const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status || 'reported');
     const reportedAt = marker.reported_at
         ? new Date(marker.reported_at).toLocaleString()
@@ -5980,6 +6239,7 @@ function showResponderIncidentDetails(marker, incident, imagePath = null) {
                         { label: 'Coordinates', value: `${marker.lat}, ${marker.lng}` }
                     ])}
                 </div>
+                ${buildResponderDetailsActionMarkup(marker, incident)}
             </div>
         `
     );
@@ -7587,7 +7847,7 @@ function addPopupEventListeners(coord) {
                 showToast('Fetching details...', 'info');
                 const imagePath = coord.image?.path ? '/storage/' + coord.image.path : (marker.multimedia?.path ? '/storage/' + marker.multimedia.path : null);
                 const markerData = { ...marker, category: getCategoryName(marker), created_at: coord.created_at || marker.created_at };
-                if (window.activeMapInstanceKey === 'firefighterDashboard') {
+                if (shouldUseResponderPopupUi()) {
                     const incident = findIncidentForMarker(marker, coord.incident);
                     if (isIncidentMarker(marker)) {
                         showResponderIncidentDetails(markerData, incident, imagePath);
@@ -8695,6 +8955,10 @@ window.emergencyCall = function() {
 window.openEditModal = function(marker) {
     openEditModal(marker);
 };
+window.openCurrentMapDetailEditor = openCurrentMapDetailEditor;
+window.deleteCurrentMapDetailMarker = deleteCurrentMapDetailMarker;
+window.respondCurrentMapDetail = respondCurrentMapDetail;
+window.routeCurrentMapDetail = routeCurrentMapDetail;
 
 // ============================================================================
 // EXPOSE FUNCTIONS GLOBALLY FOR BLADE FILES

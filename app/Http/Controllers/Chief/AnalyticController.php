@@ -685,6 +685,13 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
     $mitigationContext = $this->buildMitigationContext($stationId);
     $recommendationContext = $this->buildRecommendationContext($stationId, $selectedBarangayPrediction, $barangayPredictions);
+    $chartContext = $this->buildAnalyticsChartContext(
+        $teamIds,
+        $predictionContext,
+        $modelPrediction,
+        $selectedBarangayPrediction,
+        $barangayPredictions
+    );
 
     // Calculate risk score
     $riskScore = $this->calculateRiskScore($incidents, $fireIncidents, $days);
@@ -721,6 +728,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         'barangay_predictions' => $barangayPredictions,
         'mitigation_context' => $mitigationContext,
         'recommendation_context' => $recommendationContext,
+        'chart_context' => $chartContext,
     ];
 }
 
@@ -2355,6 +2363,7 @@ private function getOpenRouterModelCandidates(): array
             'barangay_predictions' => $data['barangay_predictions'] ?? [],
             'prediction_scope' => $data['prediction_scope'] ?? 'current_month',
             'prediction_context' => $data['prediction_context'] ?? null,
+            'chart_context' => $data['chart_context'] ?? null,
             'predictions' => $predictions,
             'recommendations' => $recommendations,
             'ai_explanation' => $explanation,
@@ -2407,6 +2416,7 @@ private function getOpenRouterModelCandidates(): array
             'barangay_predictions' => $data['barangay_predictions'] ?? [],
             'prediction_scope' => $data['prediction_scope'] ?? 'current_month',
             'prediction_context' => $data['prediction_context'] ?? null,
+            'chart_context' => $data['chart_context'] ?? null,
             'predictions' => $predictions,
             'recommendations' => array_slice($recommendations, 0, 6),
             'ai_explanation' => substr($predictionAiContent, 0, 300) . "\n\n" . substr($recommendationAiContent, 0, 300)
@@ -2445,7 +2455,7 @@ private function getOpenRouterModelCandidates(): array
                 continue;
             }
 
-            if ((preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) || preg_match('/^[â€¢\-*]\s+(.+)/', $line, $matches)) && !$currentRecommendation) {
+            if ((preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) || preg_match('/^[•\-*]\s+(.+)/', $line, $matches)) && !$currentRecommendation) {
                 $content = isset($matches[2]) ? $matches[2] : $matches[1];
                 $recommendations[] = [
                     'title' => substr($content, 0, 80),
@@ -2508,7 +2518,8 @@ private function getOpenRouterModelCandidates(): array
                     'barangay_predictions' => $rawData['barangay_predictions'] ?? [],
                     'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
                     'prediction_context' => $rawData['prediction_context'] ?? null,
-                    'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month'
+                    'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                    'chart_context' => $rawData['chart_context'] ?? null,
                 ],
                 'ai_analysis' => $analysis['ai_explanation'] ?? null,
                 'generated_at' => now()->toISOString(),
@@ -2691,6 +2702,7 @@ private function getOpenRouterModelCandidates(): array
                 'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
                 'prediction_context' => $rawData['prediction_context'] ?? null,
                 'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                'chart_context' => $rawData['chart_context'] ?? null,
                 'recommendations' => is_array($latestAnalysis->recommendations) ? $latestAnalysis->recommendations : [],
                 'predictions' => is_array($latestAnalysis->predictions) ? $latestAnalysis->predictions : null,
                 'risk_level' => $latestAnalysis->risk_level ?? ($analysisSummary['risk_level'] ?? null),
@@ -3562,11 +3574,20 @@ private function getOpenRouterModelCandidates(): array
         $currentMonthIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $currentMonthStart, $now->copy()->endOfDay());
         $previousMonthIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $previousMonthStart, $previousMonthEnd);
         $currentMonthHourlyData = array_fill(0, 24, 0);
+        $previousMonthHourlyData = array_fill(0, 24, 0);
 
         foreach ($currentMonthIncidents as $incident) {
             try {
                 $hour = (int) Carbon::parse($incident->created_at)->format('H');
                 $currentMonthHourlyData[$hour]++;
+            } catch (\Throwable $e) {
+            }
+        }
+
+        foreach ($previousMonthIncidents as $incident) {
+            try {
+                $hour = (int) Carbon::parse($incident->created_at)->format('H');
+                $previousMonthHourlyData[$hour]++;
             } catch (\Throwable $e) {
             }
         }
@@ -3588,7 +3609,126 @@ private function getOpenRouterModelCandidates(): array
             'previous_month_total_incidents' => $previousMonthIncidents->count(),
             'previous_month_fire_incidents' => $previousMonthIncidents->where('incident_type_id', 1)->count(),
             'current_month_hourly_data' => array_values($currentMonthHourlyData),
+            'previous_month_hourly_data' => array_values($previousMonthHourlyData),
             'likely_peak_hours' => $likelyPeakHours,
+        ];
+    }
+
+    private function buildAnalyticsChartContext(
+        array $teamIds,
+        array $predictionContext,
+        ?array $modelPrediction,
+        ?array $selectedBarangayPrediction,
+        array $barangayPredictions
+    ): array {
+        $now = Carbon::now();
+        $currentStart = $now->copy()->subDays(6)->startOfDay();
+        $currentEnd = $now->copy()->endOfDay();
+        $previousStart = $currentStart->copy()->subDays(7)->startOfDay();
+        $previousEnd = $currentStart->copy()->subDay()->endOfDay();
+
+        $currentIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $currentStart, $currentEnd);
+        $previousIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $previousStart, $previousEnd);
+
+        $dailyLabels = [];
+        $currentDailySeries = [];
+        $previousDailySeries = [];
+
+        for ($offset = 0; $offset < 7; $offset++) {
+            $currentDay = $currentStart->copy()->addDays($offset);
+            $previousDay = $previousStart->copy()->addDays($offset);
+
+            $dailyLabels[] = $currentDay->format('M j');
+            $currentDailySeries[] = $currentIncidents->filter(fn ($incident) => optional($incident->created_at)->isSameDay($currentDay))->count();
+            $previousDailySeries[] = $previousIncidents->filter(fn ($incident) => optional($incident->created_at)->isSameDay($previousDay))->count();
+        }
+
+        $predictedProbability = null;
+        if (is_array($selectedBarangayPrediction) && isset($selectedBarangayPrediction['probability_percent'])) {
+            $predictedProbability = (float) $selectedBarangayPrediction['probability_percent'];
+        } elseif (is_array($modelPrediction) && isset($modelPrediction['output']['probability_percent'])) {
+            $predictedProbability = (float) $modelPrediction['output']['probability_percent'];
+        } else {
+            $topHotspot = collect($barangayPredictions)->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))->first();
+            if (!empty($topHotspot['probability_percent'])) {
+                $predictedProbability = (float) $topHotspot['probability_percent'];
+            }
+        }
+
+        $predictedDailyProbabilitySeries = $predictedProbability !== null
+            ? array_fill(0, 7, round($predictedProbability, 2))
+            : [];
+
+        $predictedPeakHours = collect($selectedBarangayPrediction['likely_peak_hours'] ?? ($modelPrediction['output']['likely_peak_hours'] ?? []))
+            ->filter()
+            ->values()
+            ->all();
+
+        $predictedHourlySeries = array_fill(0, 24, null);
+        if ($predictedProbability !== null && !empty($predictedPeakHours)) {
+            foreach ($predictedPeakHours as $label) {
+                $hour = (int) explode(':', (string) $label)[0];
+                if ($hour >= 0 && $hour <= 23) {
+                    $predictedHourlySeries[$hour] = round($predictedProbability, 2);
+                }
+            }
+        }
+
+        $hourlyLabels = collect(range(0, 23))
+            ->map(fn ($hour) => str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':00')
+            ->all();
+
+        $insights = [];
+        $currentTotal = array_sum($currentDailySeries);
+        $previousTotal = array_sum($previousDailySeries);
+        if ($previousTotal > 0) {
+            $deltaPercent = round((($currentTotal - $previousTotal) / $previousTotal) * 100, 1);
+            $insights[] = $deltaPercent >= 0
+                ? "Current seven-day incident volume is {$deltaPercent}% higher than the previous seven-day period."
+                : "Current seven-day incident volume is " . abs($deltaPercent) . "% lower than the previous seven-day period.";
+        }
+
+        if ($predictedProbability !== null) {
+            $insights[] = "Station-wide predicted fire-risk probability for the selected forecast window is {$predictedProbability}%.";
+        }
+
+        $highestRiskBarangay = collect($barangayPredictions)
+            ->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))
+            ->first();
+        if (!empty($highestRiskBarangay['barangay_name'])) {
+            $insights[] = "{$highestRiskBarangay['barangay_name']} shows the highest forecast probability in the current station coverage.";
+        }
+
+        if (!empty($predictedPeakHours)) {
+            $insights[] = 'Peak incident probability is concentrated around ' . implode(', ', array_slice($predictedPeakHours, 0, 3)) . '.';
+        }
+
+        return [
+            'daily' => [
+                'labels' => $dailyLabels,
+                'previous_period' => $previousDailySeries,
+                'current_period' => $currentDailySeries,
+                'predicted_probability' => $predictedDailyProbabilitySeries,
+                'predicted_probability_available' => $predictedProbability !== null,
+                'missing' => [
+                    'previous_period' => empty(array_filter($previousDailySeries)),
+                    'current_period' => empty(array_filter($currentDailySeries)),
+                    'predicted_probability' => $predictedProbability === null,
+                ],
+            ],
+            'hourly' => [
+                'labels' => $hourlyLabels,
+                'historical_baseline' => $predictionContext['previous_month_hourly_data'] ?? array_fill(0, 24, 0),
+                'current_period' => $predictionContext['current_month_hourly_data'] ?? array_fill(0, 24, 0),
+                'predicted_probability' => $predictedHourlySeries,
+                'predicted_peak_hours' => $predictedPeakHours,
+                'missing' => [
+                    'historical_baseline' => empty(array_filter($predictionContext['previous_month_hourly_data'] ?? [])),
+                    'current_period' => empty(array_filter($predictionContext['current_month_hourly_data'] ?? [])),
+                    'predicted_probability' => $predictedProbability === null || empty($predictedPeakHours),
+                ],
+            ],
+            'insights' => $insights,
         ];
     }
 

@@ -62,46 +62,47 @@
     </div>
 </aside>
 
-<nav class="mobile-bottom-nav chief-mobile-dock block fixed bottom-0 left-0 right-0 z-[9999] md:hidden" aria-label="Mobile primary navigation">
-    <div class="chief-mobile-dock__shell">
-        <div class="chief-mobile-dock__track">
-            <a href="{{ route($mobileDockItems[0]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[0]['mobile_icon'] }}</span>
+<nav class="barangay-mobile-dock md:hidden" aria-label="Barangay mobile navigation">
+    <div class="barangay-mobile-dock__shell">
+        <div class="barangay-mobile-dock__track">
+            <a href="{{ route($mobileDockItems[0]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
+                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[0]['mobile_icon'] }}</span>
             </a>
 
-            <a href="{{ route($mobileDockItems[1]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[1]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[1]['label'] }}">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
+            <a href="{{ route($mobileDockItems[1]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[1]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[1]['label'] }}">
+                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
             </a>
 
-            <div class="chief-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-barangay-nav-center>
-                <div class="chief-mobile-dock__burst" data-barangay-nav-burst>
+            <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-barangay-nav-center>
+                <div class="barangay-mobile-dock__burst" data-barangay-nav-burst>
                     @foreach ($mobileCenterActions as $action)
-                        <a href="{{ route($action['route']) }}" class="chief-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
-                            <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                        <a href="{{ route($action['route']) }}" class="barangay-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
+                            <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
                         </a>
                     @endforeach
                 </div>
 
                 <a
                     href="{{ route($mobileCenterItem['route']) }}"
-                    class="chief-mobile-dock__item chief-mobile-dock__item--center {{ $active === $mobileCenterItem['active'] ? 'active' : '' }}"
+                    class="barangay-mobile-dock__item barangay-mobile-dock__item--center {{ $active === $mobileCenterItem['active'] ? 'active' : '' }}"
                     aria-label="{{ $mobileCenterItem['label'] }}"
                     data-barangay-nav-trigger
                 >
-                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileCenterItem['mobile_icon'] }}</span>
+                    <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileCenterItem['mobile_icon'] }}</span>
                 </a>
             </div>
 
-            <a href="{{ route($mobileDockItems[2]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[2]['mobile_icon'] }}</span>
+            <a href="{{ route($mobileDockItems[2]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
+                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[2]['mobile_icon'] }}</span>
             </a>
 
-            <button type="button" class="chief-mobile-dock__item {{ $active === 'profile' ? 'active' : '' }}" aria-label="Settings" data-barangay-settings-open>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">settings</span>
+            <button type="button" class="barangay-mobile-dock__item {{ $active === 'profile' ? 'active' : '' }}" aria-label="Settings" data-barangay-settings-open>
+                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">settings</span>
             </button>
         </div>
     </div>
 </nav>
+<div class="barangay-mobile-bottom-spacer md:hidden" aria-hidden="true"></div>
 <div class="chief-mobile-panel md:hidden" data-barangay-settings-panel aria-hidden="true">
     <div class="chief-mobile-panel__backdrop" data-barangay-panel-close></div>
     <div class="chief-mobile-panel__sheet">
@@ -154,6 +155,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const dock = document.querySelector('[data-barangay-nav-center]');
         const trigger = document.querySelector('[data-barangay-nav-trigger]');
+        const burst = document.querySelector('[data-barangay-nav-burst]');
         const settingsPanel = document.querySelector('[data-barangay-settings-panel]');
         const settingsOpen = document.querySelector('[data-barangay-settings-open]');
         const logsOpen = document.querySelector('[data-barangay-open-logs]');
@@ -165,6 +167,7 @@
         let holdTimer = null;
         let holdActivated = false;
         const holdDelay = 360;
+        let lastTouchMove = null;
 
         const clearHoldTimer = () => {
             if (holdTimer) {
@@ -191,6 +194,7 @@
             panel.classList.add('is-open');
             panel.setAttribute('aria-hidden', 'false');
             document.body.classList.add('menu-open');
+            closeBurst();
         };
 
         const closePanel = (panel) => {
@@ -212,16 +216,32 @@
             clearHoldTimer();
         };
 
-        trigger.addEventListener('touchstart', startHold, { passive: true });
+        const handleTouchStart = (event) => {
+            lastTouchMove = null;
+            startHold();
+        };
+
+        const handleTouchMove = (event) => {
+            lastTouchMove = event.touches?.[0] ? {
+                x: event.touches[0].clientX,
+                y: event.touches[0].clientY,
+            } : null;
+            endHold();
+        };
+
+        trigger.addEventListener('touchstart', handleTouchStart, { passive: true });
         trigger.addEventListener('mousedown', startHold);
         trigger.addEventListener('touchend', endHold);
         trigger.addEventListener('touchcancel', endHold);
+        trigger.addEventListener('touchmove', handleTouchMove, { passive: true });
         trigger.addEventListener('mouseleave', endHold);
         trigger.addEventListener('mouseup', endHold);
+        trigger.addEventListener('contextmenu', (event) => event.preventDefault());
 
         trigger.addEventListener('click', (event) => {
             if (holdActivated) {
                 event.preventDefault();
+                closeBurst();
             }
         });
 
@@ -231,8 +251,13 @@
             }
         });
 
+        document.addEventListener('touchstart', (event) => {
+            if (!dock.contains(event.target) && !settingsPanel?.contains(event.target)) {
+                closeBurst();
+            }
+        }, { passive: true });
+
         settingsOpen?.addEventListener('click', () => {
-            closeBurst();
             openPanel(settingsPanel);
         });
 
@@ -254,10 +279,28 @@
             }
         });
 
-        dock.querySelectorAll('.chief-mobile-dock__burst-item').forEach((item) => {
+        dock.querySelectorAll('.barangay-mobile-dock__burst-item').forEach((item) => {
             item.addEventListener('click', () => {
                 closeBurst();
             });
         });
+
+        const closeTransientUi = () => {
+            closeBurst();
+            closePanel(settingsPanel);
+        };
+
+        window.addEventListener('popstate', closeTransientUi);
+        window.addEventListener('orientationchange', closeTransientUi);
+        window.addEventListener('pagehide', closeTransientUi);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                closeTransientUi();
+            }
+        });
+
+        burst?.addEventListener('touchmove', (event) => {
+            event.preventDefault();
+        }, { passive: false });
     });
 </script>

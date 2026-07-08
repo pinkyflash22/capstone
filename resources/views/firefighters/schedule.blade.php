@@ -729,19 +729,64 @@
 
         @media (max-width: 768px) {
             .main-content {
-                padding-left: 16px;
-                padding-right: 16px;
+                padding-left: 14px;
+                padding-right: 14px;
+                padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+            }
+
+            .schedule-shell {
+                gap: 16px;
+            }
+
+            .schedule-hero,
+            .calendar-card,
+            .agenda-card {
+                border-radius: 22px;
+            }
+
+            .schedule-hero {
+                padding: 20px 18px;
+            }
+
+            .schedule-hero h1 {
+                font-size: clamp(1.7rem, 7vw, 2.15rem);
+                line-height: 1.05;
+            }
+
+            .schedule-hero p {
+                font-size: 0.92rem;
+            }
+
+            .schedule-summary-grid,
+            .schedule-layout {
+                gap: 14px;
+            }
+
+            .calendar-toolbar {
+                padding: 18px 16px 16px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .calendar-toolbar-actions {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .calendar-btn {
+                width: 100%;
             }
 
             .schedule-modal {
                 padding: 12px;
-                align-items: flex-start;
+                align-items: flex-end;
             }
 
             .schedule-modal-card {
                 width: 100%;
-                max-height: calc(100vh - 24px);
-                border-radius: 24px;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
                 margin: 0 auto;
             }
 
@@ -751,6 +796,10 @@
                 padding-right: 18px;
             }
 
+            .schedule-modal-body {
+                max-height: calc(84dvh - 118px);
+            }
+
             .schedule-form-grid {
                 grid-template-columns: 1fr;
             }
@@ -758,6 +807,37 @@
             .calendar-weekdays,
             .calendar-grid {
                 gap: 8px;
+            }
+
+            .calendar-grid-wrap {
+                overflow-x: auto;
+                padding: 16px;
+            }
+
+            .calendar-weekdays,
+            .calendar-grid {
+                min-width: 620px;
+            }
+
+            .calendar-day {
+                min-height: 132px;
+                padding: 12px;
+                border-radius: 18px;
+            }
+        }
+
+        @media (max-width: 430px) {
+            .main-content {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .schedule-summary-card {
+                padding: 16px;
+            }
+
+            .calendar-toolbar-actions {
+                grid-template-columns: 1fr;
             }
         }
     </style>

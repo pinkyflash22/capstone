@@ -30,6 +30,38 @@
             }
         }
 
+        @media (max-width: 768px) {
+            .main-content {
+                padding: calc(12px + env(safe-area-inset-top, 0px)) 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
+            }
+
+            .max-w-7xl {
+                max-width: 760px !important;
+            }
+
+            .grid.grid-cols-1.lg\:grid-cols-3.gap-6,
+            .space-y-6 {
+                gap: 16px !important;
+            }
+
+            .bg-white.rounded-3xl.shadow-lg {
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                margin-inline: -14px;
+                padding: 16px !important;
+            }
+
+            #chiefProfileSaveBtn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            #chiefProfileLoadingOverlay > div {
+                width: calc(100vw - 28px);
+                max-width: 360px;
+            }
+        }
+
         .lector-top-bar {
             background: rgba(255, 255, 255, 0.84);
             backdrop-filter: blur(12px);

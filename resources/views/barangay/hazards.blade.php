@@ -318,6 +318,66 @@
             box-shadow: 0 12px 24px rgba(234, 88, 12, 0.18);
         }
 
+        .risk-flow-cues {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .risk-flow-cue {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 36px;
+            padding: 0 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(251, 191, 36, 0.18);
+            background: #fffaf0;
+            color: #9a3412;
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+
+        .risk-review-card {
+            margin-top: 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(251, 191, 36, 0.18);
+            background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+            padding: 14px;
+        }
+
+        .risk-review-card__grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .risk-review-card__item {
+            border-radius: 16px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            background: rgba(255, 255, 255, 0.88);
+            padding: 12px;
+        }
+
+        .risk-review-card__item span {
+            display: block;
+            color: #64748b;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .risk-review-card__item strong {
+            display: block;
+            margin-top: 6px;
+            color: #0f172a;
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
+
         .risk-mode-section {
             display: none;
         }
@@ -574,9 +634,9 @@
         @media (max-width: 768px) {
             .risk-modal-panel {
                 width: calc(100vw - 16px);
-                max-height: calc(100vh - 16px);
+                max-height: calc(100dvh - 16px);
                 margin: 8px auto;
-                border-radius: 24px;
+                border-radius: 24px 24px 20px 20px;
             }
 
             .risk-modal-header,
@@ -585,14 +645,33 @@
                 padding-right: 18px;
             }
 
+            .risk-modal-header {
+                padding-top: 18px;
+                padding-bottom: 16px;
+            }
+
+            .risk-modal-body {
+                padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+            }
+
             .risk-form-fields,
-            .risk-chip-grid {
+            .risk-chip-grid,
+            .risk-review-card__grid {
                 grid-template-columns: 1fr;
             }
 
             .risk-form-actions {
                 flex-direction: column;
                 align-items: stretch;
+            }
+
+            .risk-flow-cues {
+                gap: 8px;
+            }
+
+            .risk-flow-cue {
+                width: 100%;
+                justify-content: flex-start;
             }
         }
     </style>
@@ -853,6 +932,12 @@
                     <button type="button" class="risk-mode-btn" data-risk-mode="risk">Risk</button>
                 </div>
 
+                <div class="risk-flow-cues" aria-hidden="true">
+                    <span class="risk-flow-cue"><i class="fa-solid fa-pen"></i> Basic details</span>
+                    <span class="risk-flow-cue"><i class="fa-solid fa-layer-group"></i> Type-specific fields</span>
+                    <span class="risk-flow-cue"><i class="fa-solid fa-location-dot"></i> Pin exact location</span>
+                </div>
+
                 <form method="POST" action="{{ route('barangay.risk-map.store') }}" enctype="multipart/form-data" class="mt-5">
                     @csrf
                     <input type="hidden" id="riskReportMethodInput" name="_method" value="{{ old('form_mode') === 'edit' ? 'PUT' : 'POST' }}">
@@ -1054,6 +1139,25 @@
                             <div class="risk-form-actions">
                                 <div class="risk-form-note"><i class="fa-regular fa-circle-info"></i> Saved entries go to review and verification.</div>
                                 <button type="submit" id="riskReportSubmitButton" class="risk-form-submit">Save Hazard / Risk Report</button>
+                            </div>
+
+                            <div class="risk-review-card">
+                                <div class="tiny-label">Review before submit</div>
+                                <p class="risk-form-note !mt-2">Check the chosen mode, the pinned point, and the photo evidence before saving.</p>
+                                <div class="risk-review-card__grid">
+                                    <div class="risk-review-card__item">
+                                        <span>Mode</span>
+                                        <strong>Hazard or risk only</strong>
+                                    </div>
+                                    <div class="risk-review-card__item">
+                                        <span>Pin</span>
+                                        <strong>Latitude and longitude are saved from the picker</strong>
+                                    </div>
+                                    <div class="risk-review-card__item">
+                                        <span>Review</span>
+                                        <strong>The record goes to barangay verification flow</strong>
+                                    </div>
+                                </div>
                             </div>
                         </aside>
                     </div>

@@ -14,6 +14,10 @@
   --ff-border: rgba(31, 41, 55, 0.08);
   --ff-shadow: 0 14px 34px rgba(198, 61, 38, 0.16);
   --ff-sidebar-w: 300px;
+  --ff-safe-top: env(safe-area-inset-top, 0px);
+  --ff-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ff-mobile-header-h: calc(72px + var(--ff-safe-top));
+  --ff-mobile-bottom-h: calc(84px + var(--ff-safe-bottom));
 }
 
 *,
@@ -27,11 +31,19 @@ html,
 body {
   background: var(--ff-bg) !important;
   color: var(--ff-text);
+  min-height: 100dvh;
+  width: 100%;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
+}
+
+body.firefighter-portal-shell {
+  min-height: 100dvh;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .sidebar {
@@ -259,10 +271,12 @@ body {
 
 .main-content {
   margin-left: var(--ff-sidebar-w) !important;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 28px !important;
   max-width: none !important;
+  width: calc(100% - var(--ff-sidebar-w));
   background: transparent !important;
+  overflow-x: clip;
 }
 
 .mobile-bottom-nav {
@@ -651,6 +665,63 @@ select:focus,
   border-top-color: var(--ff-primary) !important;
 }
 
+.table-wrap,
+.overflow-x-auto,
+.overflow-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  max-width: 100%;
+}
+
+#map,
+.leaflet-container,
+[id*='map'] {
+  max-width: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  max-width: min(88vw, 360px);
+}
+
+.leaflet-popup-content {
+  max-width: min(80vw, 320px);
+  word-break: break-word;
+}
+
+.modal,
+.incident-modal,
+.report-modal {
+  padding: 16px;
+}
+
+.modal-content,
+.incident-modal-panel,
+.report-modal-panel,
+.report-modal-panel--manage,
+.chief-modal__card {
+  width: min(100%, calc(100vw - 28px)) !important;
+  max-width: min(100%, calc(100vw - 28px)) !important;
+  max-height: calc(100dvh - 32px) !important;
+}
+
+.incident-modal-body,
+.report-modal-body,
+.modal-body {
+  overscroll-behavior: contain;
+}
+
+.action-row,
+.table-actions,
+.calendar-toolbar-actions,
+.section-header,
+.card-header {
+  max-width: 100%;
+}
+
 @media (max-width: 1024px) {
   .sidebar {
     transform: translateX(-100%);
@@ -665,6 +736,7 @@ select:focus,
   .main-content {
     margin-left: 0 !important;
     padding: 18px !important;
+    width: 100% !important;
   }
 
   .ff-sidebar-shell {
@@ -678,20 +750,67 @@ select:focus,
 }
 
 @media (max-width: 768px) {
-  .sidebar,
-  .ff-sidebar-shell,
-  #sidebarBackdrop,
-  #ffSidebarBackdrop {
-    display: none !important;
+  body.firefighter-portal-shell {
+    min-height: 100dvh;
   }
 
-  .lector-top-bar #openSidebar,
-  .ff-topbar-shell #ffOpenSidebar {
+  .firefighter-portal-shell .main-content > * {
+    width: min(100%, 760px);
+    margin-inline: auto;
+  }
+
+  .firefighter-portal-shell .main-content > [data-ff-page-root],
+  .firefighter-portal-shell .main-content > .page-shell,
+  .firefighter-portal-shell .main-content > .schedule-shell,
+  .firefighter-portal-shell .main-content > .profile-shell,
+  .firefighter-portal-shell .main-content > .dashboard-shell,
+  .firefighter-portal-shell .main-content > .station-shell,
+  .firefighter-portal-shell .main-content > .requests-shell,
+  .firefighter-portal-shell .main-content > .logs-shell {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    align-self: start;
+  }
+
+  .firefighter-portal-shell .main-content > [data-ff-page-root] > :first-child,
+  .firefighter-portal-shell .main-content > .page-shell > :first-child,
+  .firefighter-portal-shell .main-content > .schedule-shell > :first-child,
+  .firefighter-portal-shell .main-content > .profile-shell > :first-child {
+    margin-top: 0 !important;
+  }
+
+  .sidebar,
+  .ff-sidebar-shell {
+    display: flex !important;
+    width: min(86vw, 320px) !important;
+    max-width: min(86vw, 320px) !important;
+    height: 100dvh !important;
+    padding-bottom: calc(16px + var(--ff-safe-bottom));
+    transform: translateX(-104%);
+  }
+
+  .sidebar.open,
+  .sidebar.active,
+  .ff-sidebar-shell.open,
+  .ff-sidebar-shell.active {
+    transform: translateX(0) !important;
+  }
+
+  #sidebarBackdrop,
+  #ffSidebarBackdrop {
+    display: block !important;
+  }
+
+  .ff-topbar-shell,
+  .lector-top-bar,
+  .top-bar,
+  main nav.bg-white.shadow-sm.sticky {
     display: none !important;
   }
 
   .main-content {
-    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
+    min-height: 100dvh;
+    padding: max(6px, var(--ff-safe-top)) 14px calc(var(--ff-mobile-bottom-h) + 18px) !important;
   }
 
   .mobile-bottom-nav {
@@ -699,10 +818,10 @@ select:focus,
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 12px calc(10px + var(--ff-safe-bottom));
     background: linear-gradient(180deg, rgba(251, 247, 239, 0.92), #fbf7ef);
     backdrop-filter: blur(12px);
-    z-index: 90;
+    z-index: 200;
   }
 
   .mobile-bottom-nav__list {
@@ -765,6 +884,43 @@ select:focus,
     border-radius: 16px !important;
   }
 
+  .welcome-banner,
+  .page-header,
+  .profile-header,
+  .incidents-summary,
+  .schedule-hero,
+  .station-hero,
+  .section-card,
+  .section-shell-card,
+  .list-card,
+  .calendar-card,
+  .agenda-card {
+    border-radius: 22px !important;
+  }
+
+  .welcome-banner,
+  .page-header,
+  .profile-header,
+  .incidents-summary,
+  .schedule-hero,
+  .station-hero {
+    padding: 18px !important;
+  }
+
+  .welcome-title,
+  .page-title h1,
+  .station-title {
+    font-size: clamp(1.72rem, 7vw, 2.15rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .welcome-subtitle,
+  .page-title p,
+  .station-subtitle {
+    font-size: 0.92rem !important;
+    line-height: 1.65 !important;
+  }
+
   .grid-4,
   .grid-3,
   .grid-2,
@@ -772,9 +928,129 @@ select:focus,
     grid-template-columns: 1fr !important;
   }
 
+  .section-header,
+  .calendar-toolbar,
+  .list-card-header,
+  .action-row,
+  .table-actions {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .section-header > *,
+  .calendar-toolbar-actions,
+  .action-row > *,
+  .table-actions > * {
+    width: 100%;
+  }
+
+  .toolbar-card,
+  .incident-meta,
+  .profile-grid,
+  .station-grid,
+  .calendar-grid-wrap {
+    min-width: 0;
+  }
+
+  .training-card,
+  .cert-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .modal,
+  .incident-modal,
+  .report-modal {
+    align-items: flex-end !important;
+    padding: 10px;
+  }
+
+  .modal-content,
+  .incident-modal-panel,
+  .report-modal-panel,
+  .report-modal-panel--manage {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: min(82dvh, 760px) !important;
+    border-radius: 24px 24px 18px 18px !important;
+  }
+
+  .incident-modal-panel::before,
+  .report-modal-panel::before,
+  .modal-content::before {
+    content: "";
+    display: block;
+    width: 52px;
+    height: 5px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    margin: 0 auto 14px;
+  }
+
+  .incident-modal-header,
+  .report-modal-header,
+  .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+  }
+
+  .incident-modal-close,
+  .modal-close {
+    align-self: flex-start;
+  }
+
+  #map,
+  .leaflet-container,
+  [id*='map'] {
+    min-height: min(52dvh, 420px) !important;
+  }
+
+  .leaflet-popup-content-wrapper {
+    max-width: min(82vw, 280px) !important;
+  }
+
+  .leaflet-popup-content {
+    max-width: min(74vw, 248px) !important;
+    margin: 10px 12px !important;
+    font-size: 0.78rem !important;
+    line-height: 1.4 !important;
+  }
+
   .status-bar {
     flex-direction: column;
     align-items: flex-start;
     gap: 14px;
+  }
+}
+
+@media (max-width: 430px) {
+  .main-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .firefighter-portal-shell .main-content > * {
+    width: min(100%, 100%);
+  }
+
+  .ff-topbar-shell {
+    padding-inline: 14px !important;
+    border-radius: 18px;
+  }
+
+  .user-dropdown-menu {
+    width: min(92vw, 290px);
+    right: 0;
+  }
+
+  .mobile-bottom-nav__item {
+    min-width: 68px;
+    padding-inline: 6px;
+  }
+
+  .mobile-bottom-nav__label {
+    font-size: 9px;
   }
 }

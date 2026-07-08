@@ -361,7 +361,7 @@
     --}}
     @include('partials.pwa-head')
 </head>
-<body>
+<body class="firefighter-portal-shell firefighter-dashboard-page">
     @include('firefighters.partials.shell-sidebar', [
         'active' => 'dashboard',
         'sidebarId' => 'sidebar',

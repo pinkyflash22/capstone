@@ -501,6 +501,112 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        @media (max-width: 768px) {
+            .profile-shell {
+                gap: 16px;
+            }
+
+            .profile-hero,
+            .profile-summary-card,
+            .profile-card,
+            .stack-card {
+                border-radius: 0;
+                box-shadow: none;
+                margin-inline: -14px;
+            }
+
+            .profile-hero,
+            .profile-summary-card,
+            .profile-body,
+            .stack-card {
+                padding: 16px;
+            }
+
+            .profile-hero-title,
+            .profile-name {
+                font-size: clamp(1.75rem, 8vw, 2.15rem);
+                line-height: 1.02;
+            }
+
+            .profile-hero-subtitle {
+                font-size: 0.92rem;
+                line-height: 1.65;
+            }
+
+            .profile-avatar {
+                width: 88px;
+                height: 88px;
+                font-size: 2rem;
+                border-width: 4px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .stat-block,
+            .hero-detail,
+            .info-item,
+            .mini-card,
+            .activity-item {
+                border-radius: 16px;
+                padding: 12px;
+            }
+
+            .stat-value,
+            .mini-card-value {
+                font-size: 1.5rem;
+            }
+
+            .profile-actions {
+                justify-content: stretch;
+            }
+
+            .profile-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .profile-modal {
+                align-items: flex-end;
+                padding: 10px;
+            }
+
+            .profile-modal-card {
+                width: 100%;
+                max-width: 100%;
+                max-height: min(84dvh, 760px);
+                border-radius: 24px 24px 18px 18px;
+            }
+
+            .profile-modal-card::before {
+                content: "";
+                display: block;
+                width: 52px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                margin: 14px auto 0;
+            }
+
+            .profile-modal-header,
+            .profile-modal-body,
+            .profile-modal-footer {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .profile-modal-footer {
+                flex-direction: column-reverse;
+            }
+
+            .profile-modal-footer .btn {
+                width: 100%;
+                min-width: 0;
+            }
+        }
     </style>
     @include('partials.pwa-head')
 </head>

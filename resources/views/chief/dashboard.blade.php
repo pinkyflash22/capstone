@@ -1501,6 +1501,10 @@
     bindAddressSelectors('barangayHall');
     
     var marker = @json($mapmarker) || [];
+    window.mapInstanceConfig = {
+        containerId: 'map',
+        instanceKey: 'chiefDashboard'
+    };
     window.mapData = {
         marker: @json($mapmarker) || []
     };
