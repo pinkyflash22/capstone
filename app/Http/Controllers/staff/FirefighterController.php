@@ -160,18 +160,30 @@ class FirefighterController extends Controller
         });
     }
 
-    protected function getStationOfficerForUserId(?int $userId): ?StationOfficer
+    protected function getStationOfficerForUserId(?int $userId, bool $withStation = false): ?StationOfficer
     {
         if (!$userId) {
             return null;
         }
 
+        $cacheKey = $withStation
+            ? "firefighter:station-officer:{$userId}:with-station"
+            : "firefighter:station-officer:{$userId}";
+
         return Cache::remember(
-            "firefighter:station-officer:{$userId}",
+            $cacheKey,
             now()->addSeconds(60),
-            fn () => StationOfficer::with('station')
-                ->where('user_id', $userId)
-                ->first()
+            function () use ($userId, $withStation) {
+                $query = StationOfficer::query()
+                    ->select(['station_officer_id', 'station_id', 'user_id', 'rank'])
+                    ->where('user_id', $userId);
+
+                if ($withStation) {
+                    $query->with('station');
+                }
+
+                return $query->first();
+            }
         );
     }
 
@@ -223,7 +235,7 @@ class FirefighterController extends Controller
         return MediaPath::url($normalizedPath);
     }
 
-    protected function resolveUserTeam(?int $userId): ?Team
+    protected function resolveUserTeam(?int $userId, ?StationOfficer $stationOfficer = null): ?Team
     {
         if (!$userId) {
             return null;
@@ -232,8 +244,9 @@ class FirefighterController extends Controller
         return Cache::remember(
             "firefighter:user-team:{$userId}",
             now()->addSeconds(60),
-            function () use ($userId) {
-                $stationOfficerId = StationOfficer::where('user_id', $userId)->value('station_officer_id');
+            function () use ($userId, $stationOfficer) {
+                $resolvedStationOfficer = $stationOfficer ?: $this->getStationOfficerForUserId($userId);
+                $stationOfficerId = $resolvedStationOfficer?->station_officer_id;
 
                 if (!$stationOfficerId) {
                     return null;
@@ -328,13 +341,571 @@ class FirefighterController extends Controller
         ];
     }
 
+    protected function resolveIncidentPrimaryLocation(?string $markerTitle, ?string $markerDescription): ?string
+    {
+        $markerTitle = trim((string) $markerTitle);
+        $markerDescription = trim((string) $markerDescription);
+
+        $genericIncidentMarkerTitles = ['help emergency', 'fire emergency', 'emergency', 'incident'];
+        $genericIncidentMarkerDescriptions = [
+            'fire emergency reported by citizen.',
+            'fire emergency reported by citizen',
+            'reported by citizen',
+            'emergency reported by citizen',
+        ];
+
+        $normalizedTitle = strtolower($markerTitle);
+        $normalizedDescription = strtolower($markerDescription);
+        $hasGenericTitle = in_array($normalizedTitle, $genericIncidentMarkerTitles, true);
+        $hasGenericDescription = in_array($normalizedDescription, $genericIncidentMarkerDescriptions, true);
+
+        if ($hasGenericTitle && $hasGenericDescription) {
+            return null;
+        }
+
+        if ($hasGenericTitle) {
+            return $markerDescription ?: null;
+        }
+
+        return $markerTitle ?: ($markerDescription ?: null);
+    }
+
+    protected function buildIncidentReferenceLabel(?string $primaryLocation, ?string $barangayName, ?string $cityName, $timestamp, string $fallbackLabel = 'Reported incident'): string
+    {
+        $locationLabel = trim((string) $primaryLocation) ?: $fallbackLabel;
+        $localityLabel = collect([$barangayName, $cityName])->filter()->join(', ') ?: 'Barangay not assigned';
+
+        $dateLabel = 'Date unavailable';
+        if ($timestamp instanceof Carbon) {
+            $dateLabel = $timestamp->format('M d, Y h:i A');
+        } elseif ($timestamp) {
+            try {
+                $dateLabel = Carbon::parse($timestamp)->format('M d, Y h:i A');
+            } catch (\Throwable $exception) {
+                $dateLabel = 'Date unavailable';
+            }
+        }
+
+        return collect([$locationLabel, $localityLabel, $dateLabel])->join(' | ');
+    }
+
+    protected function getCurrentOfficerName(?StationOfficer $stationOfficer): string
+    {
+        return trim((string) (($stationOfficer?->user?->first_name ?? '') . ' ' . ($stationOfficer?->user?->last_name ?? '')))
+            ?: 'Current Station Officer';
+    }
+
+    protected function buildStationAddress(?Station $station): string
+    {
+        return collect([
+            $station?->address?->street,
+            $station?->address?->barangay?->barangay_name,
+            $station?->address?->barangay?->city?->city_name,
+        ])->filter()->join(', ');
+    }
+
+    protected function getStationShellContext(int $userId): array
+    {
+        $cacheKey = "firefighter:station-shell:{$userId}";
+
+        return Cache::remember($cacheKey, now()->addSeconds(45), function () use ($userId) {
+            $user = User::query()
+                ->select(['user_id', 'first_name', 'last_name', 'email', 'contact_number', 'role_id', 'address_id'])
+                ->with([
+                    'role:role_id,role',
+                    'address:address_id,street,barangay_id',
+                    'address.barangay:barangay_id,barangay_name,city_id',
+                    'address.barangay.city:city_id,city_name',
+                ])
+                ->where('user_id', $userId)
+                ->firstOrFail();
+
+            $stationOfficer = StationOfficer::query()
+                ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
+                ->with([
+                    'user:user_id,first_name,last_name,email,contact_number,role_id',
+                    'user.role:role_id,role',
+                    'station:station_id,station_name,station_code,contact_number,email,address_id,marker_id',
+                    'station.marker:marker_id,title,image',
+                    'station.profileMedia:station_media_id,station_id,path,caption',
+                    'station.address:address_id,street,barangay_id',
+                    'station.address.barangay:barangay_id,barangay_name,city_id',
+                    'station.address.barangay.city:city_id,city_name',
+                ])
+                ->where('user_id', $userId)
+                ->firstOrFail();
+
+            $station = $stationOfficer->station;
+            $stationImagePath = $station?->profileMedia?->path
+                ?? $station?->marker?->image;
+
+            return [
+                'user' => $user,
+                'stationOfficer' => $stationOfficer,
+                'station' => $station,
+                'stationId' => $stationOfficer->station_id,
+                'currentOfficerName' => $this->getCurrentOfficerName($stationOfficer),
+                'stationAddress' => $this->buildStationAddress($station),
+                'stationImageUrl' => $stationImagePath ? MediaPath::url($stationImagePath) : null,
+            ];
+        });
+    }
+
+    protected function getStationOfficerIdsForStation(int $stationId)
+    {
+        return Cache::remember("firefighter:station-officer-ids:{$stationId}", now()->addSeconds(45), function () use ($stationId) {
+            return StationOfficer::query()
+                ->where('station_id', $stationId)
+                ->pluck('station_officer_id');
+        });
+    }
+
+    protected function getStationTeamIdsForOfficerIds($stationOfficerIds)
+    {
+        $officerIds = collect($stationOfficerIds)->filter()->values()->all();
+
+        if (empty($officerIds)) {
+            return collect();
+        }
+
+        $cacheKey = 'firefighter:station-team-ids:' . md5(json_encode($officerIds));
+
+        return Cache::remember($cacheKey, now()->addSeconds(45), function () use ($officerIds) {
+            return Team::query()
+                ->where(function ($query) use ($officerIds) {
+                    foreach ([
+                        'commander_driver',
+                        'pumper',
+                        'team_leader',
+                        'firefighter_officer_1',
+                        'firefighter_officer_2',
+                        'firefighter_officer_3',
+                        'rescue_radio',
+                    ] as $column) {
+                        $query->orWhereIn($column, $officerIds);
+                    }
+                })
+                ->pluck('team_id');
+        });
+    }
+
+    protected function loadStationOfficerRoster(int $stationId)
+    {
+        return StationOfficer::query()
+            ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
+            ->with([
+                'user:user_id,first_name,last_name,email,contact_number,role_id',
+                'user.role:role_id,role',
+            ])
+            ->where('station_id', $stationId)
+            ->orderBy('rank')
+            ->orderBy('station_officer_id')
+            ->get();
+    }
+
+    protected function loadCrewMembersForTeam(?Team $userTeam)
+    {
+        if (! $userTeam) {
+            return collect();
+        }
+
+        $teamMemberColumns = [
+            'commander_driver' => 'Commander / Driver',
+            'pumper' => 'Pumper',
+            'team_leader' => 'Team Leader',
+            'firefighter_officer_1' => 'Firefighter Officer 1',
+            'firefighter_officer_2' => 'Firefighter Officer 2',
+            'firefighter_officer_3' => 'Firefighter Officer 3',
+            'rescue_radio' => 'Rescue Radio',
+        ];
+
+        $teamOfficerIds = collect(array_keys($teamMemberColumns))
+            ->map(fn ($column) => $userTeam->{$column})
+            ->filter()
+            ->values();
+
+        if ($teamOfficerIds->isEmpty()) {
+            return collect();
+        }
+
+        $membersById = StationOfficer::query()
+            ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
+            ->with([
+                'user:user_id,first_name,last_name,role_id',
+                'user.role:role_id,role',
+            ])
+            ->whereIn('station_officer_id', $teamOfficerIds)
+            ->get()
+            ->keyBy('station_officer_id');
+
+        return collect($teamMemberColumns)
+            ->map(function ($label, $column) use ($userTeam, $membersById) {
+                $memberOfficerId = $userTeam->{$column};
+                if (! $memberOfficerId) {
+                    return null;
+                }
+
+                $member = $membersById->get($memberOfficerId);
+                if (! $member?->user) {
+                    return null;
+                }
+
+                return (object) [
+                    'user_id' => $member->user->user_id,
+                    'station_officer_id' => $member->station_officer_id,
+                    'name' => trim(($member->user->first_name ?? '') . ' ' . ($member->user->last_name ?? '')) ?: ('Officer #' . $memberOfficerId),
+                    'role_label' => $label,
+                    'role_name' => $member->user->role?->role,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    protected function loadStationEquipmentAssignments(int $stationId)
+    {
+        return EquipmentToStation::query()
+            ->select([
+                'equipment_station_id',
+                'station_id',
+                'equipment_id',
+                'available_quantity',
+                'maintenance_quantity',
+                'damaged_quantity',
+            ])
+            ->with([
+                'equipment:equipment_id,equipment_name,category_id',
+                'equipment.category:equipment_category_id,category_name',
+            ])
+            ->where('station_id', $stationId)
+            ->orderBy('equipment_station_id')
+            ->get();
+    }
+
+    protected function loadSpotReportsPaginator($stationOfficerIds, int $perPage = 10)
+    {
+        return SpotInvestigationReport::query()
+            ->with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user'])
+            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    protected function loadProgressReportsPaginator($stationOfficerIds, int $perPage = 10)
+    {
+        return ProgressInvestigationReport::query()
+            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation'])
+            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    protected function loadFinalReportsPaginator($stationOfficerIds, int $perPage = 10)
+    {
+        return FinalInvestigationReport::query()
+            ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])
+            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    protected function mapSpotReportStore($reports, string $currentOfficerName): array
+    {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+            $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
+                $this->resolveIncidentPrimaryLocation(
+                    $report->incident?->marker?->title,
+                    $report->incident?->marker?->description
+                ),
+                $report->incident?->resolved_dropdown_barangay_name ?? $report->incident?->barangay?->barangay_name,
+                $report->incident?->resolved_dropdown_city_name ?? $report->incident?->barangay?->city?->city_name,
+                $report->fire_started ?? $report->incident?->created_at ?? $report->created_at,
+                'Reported incident'
+            );
+
+            return [
+                $report->spot_investigation_report_id => [
+                    'id' => $report->spot_investigation_report_id,
+                    'type' => 'spot',
+                    'incident_id' => $report->incident_id,
+                    'incident_location' => $incidentReferenceLabel,
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
+                    'fire_started' => optional($report->fire_started)->toIso8601String(),
+                    'fire_out' => optional($report->fire_out)->toIso8601String(),
+                    'estimated_damage' => $report->estimated_damage,
+                    'occupancy' => $report->occupancy,
+                    'estimated_area' => $report->estimated_area,
+                    'dead' => $report->dead,
+                    'injured' => $report->injured,
+                    'owner' => $report->owner,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'memorandum_for' => $report->memorandum_for,
+                    'place_of_occurrence' => $report->place_of_occurrence,
+                    'involved_structure' => $report->involved_structure,
+                    'establishment_name' => $report->establishment_name,
+                    'occupant' => $report->occupant,
+                    'highest_alarm_level' => $report->highest_alarm_level,
+                    'affected_establishments_count' => $report->affected_establishments_count,
+                    'description' => $report->description,
+                    'fatality_details' => $report->fatality_details,
+                    'details_of_investigation' => $report->details_of_investigation,
+                    'disposition' => $report->disposition,
+                    'noted_by_name' => trim(($report->notedBy?->user?->first_name ?? '') . ' ' . ($report->notedBy?->user?->last_name ?? '')),
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'has_progress' => (bool) $report->progressInvestigation,
+                ],
+            ];
+        })->all();
+    }
+
+    protected function mapProgressReportStore($reports, string $currentOfficerName): array
+    {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+            $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
+                $this->resolveIncidentPrimaryLocation(
+                    $report->spotInvestigation?->incident?->marker?->title,
+                    $report->spotInvestigation?->incident?->marker?->description
+                ),
+                $report->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->spotInvestigation?->incident?->barangay?->barangay_name,
+                $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
+                $report->report_completed_at ?? $report->created_at ?? $report->spotInvestigation?->fire_started,
+                'Spot investigation'
+            );
+
+            return [
+                $report->progress_investigation_report_id => [
+                    'id' => $report->progress_investigation_report_id,
+                    'type' => 'progress',
+                    'spot_investigation_id' => $report->spot_investigation_id,
+                    'incident_location' => $incidentReferenceLabel,
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
+                    'fire_origin_id' => $report->fire_origin_id,
+                    'fire_origin_name' => $report->fireOrigin?->origin,
+                    'fire_cause' => $report->fire_cause,
+                    'responsible_arson' => $report->responsible_arson,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'memorandum_for' => $report->memorandum_for,
+                    'mission_order_number' => $report->mission_order_number,
+                    'mission_order_date' => optional($report->mission_order_date)->format('Y-m-d'),
+                    'facts_of_case' => $report->facts_of_case,
+                    'disposition' => $report->disposition,
+                    'noted_by_name' => trim(($report->notedBy?->user?->first_name ?? '') . ' ' . ($report->notedBy?->user?->last_name ?? '')),
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'has_final' => (bool) $report->finalInvestigation,
+                ],
+            ];
+        })->all();
+    }
+
+    protected function mapFinalReportStore($reports, string $currentOfficerName): array
+    {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+            $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
+                $this->resolveIncidentPrimaryLocation(
+                    $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title,
+                    $report->progressInvestigation?->spotInvestigation?->incident?->marker?->description
+                ),
+                $report->progressInvestigation?->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->progressInvestigation?->spotInvestigation?->incident?->barangay?->barangay_name,
+                $report->progressInvestigation?->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->progressInvestigation?->spotInvestigation?->incident?->barangay?->city?->city_name,
+                $report->created_at ?? $report->progressInvestigation?->report_completed_at,
+                'Progress investigation'
+            );
+
+            return [
+                $report->final_investigation_report_id => [
+                    'id' => $report->final_investigation_report_id,
+                    'type' => 'final',
+                    'progress_investigation_id' => $report->progress_investigation_id,
+                    'incident_location' => $incidentReferenceLabel,
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'memorandum_for' => $report->memorandum_for,
+                    'exact_address' => $report->exact_address,
+                    'office_address' => $report->office_address,
+                    'alarm_at' => optional($report->alarm_at)->toIso8601String(),
+                    'establishment_burned' => $report->establishment_burned,
+                    'fire_victims' => $report->fire_victims,
+                    'origin_of_fire' => $report->origin_of_fire,
+                    'cause_of_fire' => $report->cause_of_fire,
+                    'total_damage' => $report->total_damage,
+                    'created_at' => optional($report->created_at)->toIso8601String(),
+                    'fire_origin_name' => $report->progressInvestigation?->fireOrigin?->origin,
+                    'fire_cause' => $report->progressInvestigation?->fire_cause,
+                    'substantiating_documents' => $report->substantiating_documents ?? [],
+                    'facts_of_case' => $report->facts_of_case,
+                    'discussion' => $report->discussion,
+                    'findings' => $report->findings,
+                    'recommendation' => $report->recommendation,
+                    'noted_by_name' => trim(($report->notedBy?->user?->first_name ?? '') . ' ' . ($report->notedBy?->user?->last_name ?? '')),
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                ],
+            ];
+        })->all();
+    }
+
+    protected function loadAvailableSpotIncidents($stationTeamIds, BoundaryMatcherService $boundaryMatcherService)
+    {
+        return Incident::with(['marker', 'barangay.city'])
+            ->where(function ($query) {
+                $query->whereIn('status', [
+                    self::STATUS_CONTROLLED,
+                    'controlled',
+                    'Controlled',
+                    'completed',
+                    'Completed',
+                ]);
+            })
+            ->whereIn('team_id', $stationTeamIds)
+            ->whereNotIn('incident_id', function ($query) {
+                $query->select('incident_id')->from('spot_investigation_report');
+            })
+            ->latest()
+            ->get()
+            ->map(function ($incident) use ($boundaryMatcherService) {
+                $resolvedBarangayName = $incident->barangay?->barangay_name;
+                $resolvedCityName = $incident->barangay?->city?->city_name;
+
+                if ((! $resolvedBarangayName || ! $resolvedCityName) && $incident->marker?->lat !== null && $incident->marker?->lng !== null) {
+                    $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
+                        (float) $incident->marker->lat,
+                        (float) $incident->marker->lng
+                    );
+
+                    $resolvedBarangayName = $resolvedBarangayName ?: $matchedBoundary?->barangay?->barangay_name;
+                    $resolvedCityName = $resolvedCityName ?: $matchedBoundary?->barangay?->city?->city_name;
+                }
+
+                $incident->resolved_dropdown_barangay_name = $resolvedBarangayName;
+                $incident->resolved_dropdown_city_name = $resolvedCityName;
+
+                return $incident;
+            });
+    }
+
+    protected function buildOfficerOptions($stationOfficers): array
+    {
+        return collect($stationOfficers)->map(function ($officer) {
+            return [
+                'id' => $officer->station_officer_id,
+                'label' => trim(($officer->user?->first_name ?? '') . ' ' . ($officer->user?->last_name ?? ''))
+                    ?: ('Officer #' . $officer->station_officer_id),
+            ];
+        })->values()->all();
+    }
+
+    protected function buildSpotIncidentOptions($incidents): array
+    {
+        return collect($incidents)->map(function ($incident) {
+            $label = $this->buildIncidentReferenceLabel(
+                $this->resolveIncidentPrimaryLocation(
+                    $incident->marker?->title,
+                    $incident->marker?->description
+                ),
+                $incident->resolved_dropdown_barangay_name ?? $incident->barangay?->barangay_name,
+                $incident->resolved_dropdown_city_name ?? $incident->barangay?->city?->city_name,
+                $incident->created_at ?? $incident->updated_at,
+                'Reported incident'
+            );
+
+            return [
+                'id' => $incident->incident_id,
+                'label' => $label,
+                'updated_at' => optional($incident->updated_at)->format('Y-m-d\TH:i'),
+            ];
+        })->values()->all();
+    }
+
+    protected function buildSpotReportOptions($reports): array
+    {
+        return collect($reports)->map(function ($report) {
+            return [
+                'id' => $report->spot_investigation_report_id,
+                'label' => $this->buildIncidentReferenceLabel(
+                    $this->resolveIncidentPrimaryLocation(
+                        $report->incident?->marker?->title,
+                        $report->incident?->marker?->description
+                    ),
+                    $report->incident?->resolved_dropdown_barangay_name ?? $report->incident?->barangay?->barangay_name,
+                    $report->incident?->resolved_dropdown_city_name ?? $report->incident?->barangay?->city?->city_name,
+                    $report->incident?->created_at ?? $report->created_at,
+                    'Reported incident'
+                ),
+            ];
+        })->values()->all();
+    }
+
+    protected function buildProgressReportOptions($reports): array
+    {
+        return collect($reports)->map(function ($report) {
+            return [
+                'id' => $report->progress_investigation_report_id,
+                'label' => $this->buildIncidentReferenceLabel(
+                    $this->resolveIncidentPrimaryLocation(
+                        $report->spotInvestigation?->incident?->marker?->title,
+                        $report->spotInvestigation?->incident?->marker?->description
+                    ),
+                    $report->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->spotInvestigation?->incident?->barangay?->barangay_name,
+                    $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
+                    $report->spotInvestigation?->incident?->created_at ?? $report->created_at,
+                    'Spot investigation'
+                ),
+            ];
+        })->values()->all();
+    }
+
+    protected function buildFireOriginOptions(): array
+    {
+        return Cache::remember('firefighter:fire-origin-options', now()->addMinutes(5), function () {
+            return FireOrigin::query()
+                ->orderBy('fire_origin_id')
+                ->get()
+                ->map(fn ($origin) => [
+                    'id' => $origin->fire_origin_id,
+                    'label' => $origin->origin ?? ('Origin #' . $origin->fire_origin_id),
+                ])
+                ->values()
+                ->all();
+        });
+    }
+
+    protected function getStationOverviewCounts(int $stationId, ?Team $userTeam, $stationOfficerIds): array
+    {
+        $crewCount = collect([
+            $userTeam?->commander_driver,
+            $userTeam?->pumper,
+            $userTeam?->team_leader,
+            $userTeam?->firefighter_officer_1,
+            $userTeam?->firefighter_officer_2,
+            $userTeam?->firefighter_officer_3,
+            $userTeam?->rescue_radio,
+        ])->filter()->unique()->count();
+
+        return [
+            'station_officers' => StationOfficer::query()->where('station_id', $stationId)->count(),
+            'crew_members' => $crewCount,
+            'equipment_lines' => EquipmentToStation::query()->where('station_id', $stationId)->count(),
+            'spot_reports' => SpotInvestigationReport::query()->whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'progress_reports' => ProgressInvestigationReport::query()->whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'final_reports' => FinalInvestigationReport::query()->whereIn('station_officer_id', $stationOfficerIds)->count(),
+        ];
+    }
+
     protected function buildFirefighterIncidentRegistryData(int $userId): array
     {
         return Cache::remember(
             "firefighter:registry:{$userId}",
             now()->addSeconds(self::REGISTRY_CACHE_SECONDS),
             function () use ($userId) {
-                $stationOfficer = $this->getStationOfficerForUserId($userId);
+                $stationOfficer = $this->getStationOfficerForUserId($userId, true);
                 $userTeam = $this->resolveUserTeam($userId);
                 $incidents = collect();
 
@@ -430,19 +1001,11 @@ class FirefighterController extends Controller
      */
     public function index()
     {
-        $user = auth()->user();
-        $ids = $user->user_id;
-        $userinfo = User::query()
-            ->where('user_id', $ids)
-            ->with('role', 'address', 'address.barangay', 'address.barangay.city')
-            ->first();
-        $stationOfficer = $this->getStationOfficerForUserId($ids);
-        $userTeam = $this->resolveUserTeam($ids);
-        $dashboardPayload = $this->buildFirefighterDashboardMapPayload($ids, $userTeam, $stationOfficer);
+        $userId = auth()->user()->user_id;
+        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        $thisStation = $stationOfficer?->station_id;
 
-        extract($dashboardPayload);
-        $equipments = collect();
-        return view('firefighters.dashboard', compact('incidentCoords', 'thiscrew', 'posts', 'stations', 'equipments', 'allMarkers', 'userTeam', 'userinfo', 'incidents', 'thisStation'));
+        return view('firefighters.dashboard', compact('thisStation'));
     }
 
     public function equipments(){
@@ -564,185 +1127,204 @@ class FirefighterController extends Controller
         ]);
     }
 
-    public function myStation(BoundaryMatcherService $boundaryMatcherService){
+    public function myStation()
+    {
         $userId = Auth::user()->user_id;
-        $user = User::with(['role', 'address.barangay.city'])->where('user_id', $userId)->firstOrFail();
-        $stationOfficer = StationOfficer::with([
-                'user.role',
-                'station.marker',
-                'station.profileMedia',
-                'station.galleryMedia',
-                'station.address.barangay.city',
+        $context = $this->getStationShellContext($userId);
+
+        return view('firefighters.mystation', [
+            'user' => $context['user'],
+            'stationOfficer' => $context['stationOfficer'],
+            'station' => $context['station'],
+            'stationId' => $context['stationId'],
+            'stationAddress' => $context['stationAddress'],
+            'stationImageUrl' => $context['stationImageUrl'],
+            'currentOfficerName' => $context['currentOfficerName'],
+            'activeReportTab' => request('report_tab', 'spot'),
+            'finalSubstantiatingDocumentOptions' => [
+                'Spot Investigation Report',
+                'Progress Investigation Report',
+                'Affidavit of loss (itemized and duly notarized)',
+                'Sworn statement of loss submitted to insurance adjusters / companies',
+                'Latest complete inventory of stocks prior to the fire incident',
+                'Complete inventory of salvaged items after the fire incident',
+                'Complete copies of insurance policies to include co-insurances',
+                'Sworn statements of witnesses',
+                'Income Tax Return (ITR) for the last three (3) years',
+                'Financial statements for the last three (3) years',
+                'Balance sheets for the last three (3) years',
+                'Mayor\'s permit and Business license',
+                'Occupancy permit',
+                'Department of Trade and Industry (DTI) registration',
+                'Securities and Exchange Commission (SEC) registration',
+                'Latest Fire Safety Inspection Certificate (FSIC)',
+                'Complete list of employees',
+                'Approved Floor, Building and Electrical Plans',
+                'Copy of lease contract agreement',
+                'Land title / tax declaration',
+                'Fire Laboratory Services Report',
+                'Photographs of the fire scene',
+            ],
+        ]);
+    }
+
+    public function myStationOverviewData()
+    {
+        $userId = Auth::user()->user_id;
+        $context = $this->getStationShellContext($userId);
+        $station = Station::query()
+            ->select(['station_id'])
+            ->with(['galleryMedia:station_media_id,station_id,path,caption'])
+            ->where('station_id', $context['stationId'])
+            ->first();
+
+        $stationGallery = collect($station?->galleryMedia ?? [])
+            ->map(fn ($media) => [
+                'id' => $media->station_media_id,
+                'caption' => $media->caption,
+                'url' => MediaPath::url($media->path),
             ])
-            ->where('user_id', $userId)
-            ->firstOrFail();
+            ->values();
 
-        $station = $stationOfficer->station;
-        $stationId = $stationOfficer->station_id;
-        $stationOfficerIds = StationOfficer::where('station_id', $stationId)->pluck('station_officer_id');
-        $stationTeamIds = Team::query()
-            ->where(function ($query) use ($stationOfficerIds) {
-                foreach ([
-                    'commander_driver',
-                    'pumper',
-                    'team_leader',
-                    'firefighter_officer_1',
-                    'firefighter_officer_2',
-                    'firefighter_officer_3',
-                    'rescue_radio',
-                ] as $column) {
-                    $query->orWhereIn($column, $stationOfficerIds);
-                }
-            })
-            ->pluck('team_id');
+        $userTeam = $this->resolveUserTeam($userId, $context['stationOfficer']);
+        $stationOfficerIds = $this->getStationOfficerIdsForStation($context['stationId']);
+        $counts = $this->getStationOverviewCounts($context['stationId'], $userTeam, $stationOfficerIds);
 
-        $stationOfficers = StationOfficer::with(['user.role'])
-            ->where('station_id', $stationId)
-            ->orderBy('rank')
-            ->orderBy('station_officer_id')
-            ->get();
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'counts' => $counts,
+                'html' => view('firefighters.mystation-overview', [
+                    'stationGallery' => $stationGallery,
+                    'counts' => $counts,
+                ])->render(),
+            ],
+        ]);
+    }
 
-        $userTeam = $this->resolveUserTeam($userId);
-        $teamMemberColumns = [
-            'commander_driver' => 'Commander / Driver',
-            'pumper' => 'Pumper',
-            'team_leader' => 'Team Leader',
-            'firefighter_officer_1' => 'Firefighter Officer 1',
-            'firefighter_officer_2' => 'Firefighter Officer 2',
-            'firefighter_officer_3' => 'Firefighter Officer 3',
-            'rescue_radio' => 'Rescue Radio',
-        ];
+    public function myStationPersonnelData()
+    {
+        $userId = Auth::user()->user_id;
+        $context = $this->getStationShellContext($userId);
+        $stationOfficers = $this->loadStationOfficerRoster($context['stationId']);
+        $userTeam = $this->resolveUserTeam($userId, $context['stationOfficer']);
+        $crewMembers = $this->loadCrewMembersForTeam($userTeam);
 
-        $crewMembers = collect();
-        if ($userTeam) {
-            $teamOfficerIds = collect(array_keys($teamMemberColumns))
-                ->map(fn ($column) => $userTeam->{$column})
-                ->filter()
-                ->values();
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'html' => view('firefighters.mystation-personnel', [
+                    'stationOfficers' => $stationOfficers,
+                    'crewMembers' => $crewMembers,
+                ])->render(),
+            ],
+        ]);
+    }
 
-            $membersById = StationOfficer::with(['user.role'])
-                ->whereIn('station_officer_id', $teamOfficerIds)
-                ->get()
-                ->keyBy('station_officer_id');
+    public function myStationEquipmentData()
+    {
+        $userId = Auth::user()->user_id;
+        $context = $this->getStationShellContext($userId);
+        $equipmentAssignments = $this->loadStationEquipmentAssignments($context['stationId']);
 
-            foreach ($teamMemberColumns as $column => $label) {
-                $memberOfficerId = $userTeam->{$column};
-                if (!$memberOfficerId) {
-                    continue;
-                }
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'html' => view('firefighters.mystation-equipment', [
+                    'equipmentAssignments' => $equipmentAssignments,
+                ])->render(),
+            ],
+        ]);
+    }
 
-                $member = $membersById->get($memberOfficerId);
-                if (!$member?->user) {
-                    continue;
-                }
+    public function myStationReportsData(Request $request)
+    {
+        $tab = $request->validate([
+            'tab' => ['nullable', Rule::in(['spot', 'progress', 'final'])],
+        ])['tab'] ?? 'spot';
 
-                $crewMembers->push((object) [
-                    'user_id' => $member->user->user_id,
-                    'station_officer_id' => $member->station_officer_id,
-                    'name' => trim(($member->user->first_name ?? '') . ' ' . ($member->user->last_name ?? '')) ?: ('Officer #' . $memberOfficerId),
-                    'role_label' => $label,
-                    'role_name' => $member->user->role?->role,
-                ]);
-            }
+        $userId = Auth::user()->user_id;
+        $context = $this->getStationShellContext($userId);
+        $stationOfficerIds = $this->getStationOfficerIdsForStation($context['stationId']);
+        $currentOfficerName = $context['currentOfficerName'];
+
+        if ($tab === 'progress') {
+            $reports = $this->loadProgressReportsPaginator($stationOfficerIds);
+            $store = $this->mapProgressReportStore($reports->items(), $currentOfficerName);
+        } elseif ($tab === 'final') {
+            $reports = $this->loadFinalReportsPaginator($stationOfficerIds);
+            $store = $this->mapFinalReportStore($reports->items(), $currentOfficerName);
+        } else {
+            $reports = $this->loadSpotReportsPaginator($stationOfficerIds);
+            $store = $this->mapSpotReportStore($reports->items(), $currentOfficerName);
         }
 
-        $equipmentAssignments = EquipmentToStation::with(['equipment.category'])
-            ->where('station_id', $stationId)
-            ->orderBy('equipment_station_id')
-            ->get();
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'tab' => $tab,
+                'store' => $store,
+                'html' => view('firefighters.mystation-reports-table', [
+                    'tab' => $tab,
+                    'reports' => $reports,
+                ])->render(),
+            ],
+        ]);
+    }
 
-        $spotReports = SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
-            ->paginate(10, ['*'], 'spot_page')
-            ->withQueryString();
+    public function myStationModalData(Request $request, BoundaryMatcherService $boundaryMatcherService)
+    {
+        $scope = $request->validate([
+            'scope' => ['required', Rule::in(['spot', 'progress', 'final', 'common'])],
+        ])['scope'];
 
-        $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
-            ->paginate(10, ['*'], 'progress_page')
-            ->withQueryString();
+        $userId = Auth::user()->user_id;
+        $context = $this->getStationShellContext($userId);
+        $stationOfficerIds = $this->getStationOfficerIdsForStation($context['stationId']);
+        $stationOfficers = $this->loadStationOfficerRoster($context['stationId']);
 
-        $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
-            ->paginate(10, ['*'], 'final_page')
-            ->withQueryString();
+        $payload = [
+            'officers' => $this->buildOfficerOptions($stationOfficers),
+        ];
 
-        $availableSpotIncidents = Incident::with(['marker', 'barangay.city'])
-            ->where(function ($query) {
-                $query->whereIn('status', [
-                    self::STATUS_CONTROLLED,
-                    'controlled',
-                    'Controlled',
-                    'completed',
-                    'Completed',
-                ]);
-            })
-            ->whereIn('team_id', $stationTeamIds)
-            ->whereNotIn('incident_id', function ($query) {
-                $query->select('incident_id')->from('spot_investigation_report');
-            })
-            ->latest()
-            ->get()
-            ->map(function ($incident) use ($boundaryMatcherService) {
-                $resolvedBarangayName = $incident->barangay?->barangay_name;
-                $resolvedCityName = $incident->barangay?->city?->city_name;
+        if ($scope === 'spot') {
+            $stationTeamIds = $this->getStationTeamIdsForOfficerIds($stationOfficerIds);
+            $payload['incidents'] = $this->buildSpotIncidentOptions(
+                $this->loadAvailableSpotIncidents($stationTeamIds, $boundaryMatcherService)
+            );
+        }
 
-                if ((! $resolvedBarangayName || ! $resolvedCityName) && $incident->marker?->lat !== null && $incident->marker?->lng !== null) {
-                    $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
-                        (float) $incident->marker->lat,
-                        (float) $incident->marker->lng
-                    );
+        if ($scope === 'progress') {
+            $availableSpotReports = SpotInvestigationReport::with(['incident.marker', 'incident.barangay.city'])
+                ->whereDoesntHave('progressInvestigation')
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->latest()
+                ->get();
 
-                    $resolvedBarangayName = $resolvedBarangayName ?: $matchedBoundary?->barangay?->barangay_name;
-                    $resolvedCityName = $resolvedCityName ?: $matchedBoundary?->barangay?->city?->city_name;
-                }
+            $payload['spot_reports'] = $this->buildSpotReportOptions($availableSpotReports);
+            $payload['fire_origins'] = $this->buildFireOriginOptions();
+        }
 
-                $incident->resolved_dropdown_barangay_name = $resolvedBarangayName;
-                $incident->resolved_dropdown_city_name = $resolvedCityName;
+        if ($scope === 'final') {
+            $availableProgressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city'])
+                ->whereDoesntHave('finalInvestigation')
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->latest()
+                ->get();
 
-                return $incident;
-            });
+            $payload['progress_reports'] = $this->buildProgressReportOptions($availableProgressReports);
+        }
 
-        $availableSpotReports = SpotInvestigationReport::with(['incident.marker', 'incident.barangay.city'])
-            ->whereDoesntHave('progressInvestigation')
-            ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
-            ->get();
-
-        $availableProgressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city'])
-            ->whereDoesntHave('finalInvestigation')
-            ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
-            ->get();
-
-        $fireOrigins = FireOrigin::orderBy('fire_origin_id')->get();
-        $provinces = Province::all();
-
-        return view('firefighters.mystation', compact(
-            'user',
-            'stationOfficer',
-            'station',
-            'stationOfficers',
-            'userTeam',
-            'crewMembers',
-            'equipmentAssignments',
-            'spotReports',
-            'progressReports',
-            'finalReports',
-            'availableSpotIncidents',
-            'availableSpotReports',
-            'availableProgressReports',
-            'fireOrigins',
-            'provinces'
-        ));
+        return response()->json([
+            'success' => true,
+            'data' => $payload,
+        ]);
     }
 
     public function schedule()
     {
         $userId = Auth::user()->user_id;
-        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        $stationOfficer = $this->getStationOfficerForUserId($userId, true);
         $stationId = $stationOfficer?->station_id;
         $stationName = $stationOfficer?->station?->station_name;
 
@@ -760,6 +1342,16 @@ class FirefighterController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->buildFirefighterDashboardWidgetPayload($userId),
+        ]);
+    }
+
+    public function dashboardPostsData()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'posts' => $this->loadFirefighterDashboardRecentPosts(),
+            ],
         ]);
     }
 
@@ -1070,7 +1662,7 @@ public function getAssignedIncidents(string $id){
 
     public function incidentView(){
         $currentUserId = Auth::user()->user_id;
-        $stationOfficer = $this->getStationOfficerForUserId($currentUserId);
+        $stationOfficer = $this->getStationOfficerForUserId($currentUserId, true);
         $userTeam = $this->resolveUserTeam($currentUserId);
 
         return view('firefighters.incidents', [
@@ -1209,44 +1801,63 @@ public function getAssignedIncidents(string $id){
             now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
             function () use ($userId) {
                 $stationOfficer = $this->getStationOfficerForUserId($userId);
-                $userTeam = $this->resolveUserTeam($userId);
-                $incidentCoords = collect();
-
-                if ($userTeam) {
-                    $incidentCoords = $this->loadTeamIncidentsForRegistry((int) $userTeam->team_id, true);
-                }
-
-                $stations = Station::query()
-                    ->select(['station_id', 'station_name', 'marker_id'])
-                    ->with(['marker:marker_id,lat,lng'])
-                    ->get();
+                $userTeam = $this->resolveUserTeam($userId, $stationOfficer);
 
                 $thisStation = $stationOfficer?->station_id;
                 $thiscrew = $thisStation
                     ? StationOfficer::query()
-                        ->select(['station_officer_id', 'station_id', 'user_id', 'rank'])
-                        ->where('station_id', $thisStation)
-                        ->with(['user:user_id,first_name,last_name,role_id', 'user.role:role_id,role'])
+                        ->select([
+                            'station_officers.station_officer_id',
+                            'station_officers.station_id',
+                            'station_officers.user_id',
+                            'station_officers.rank',
+                            'users.first_name',
+                            'users.last_name',
+                        ])
+                        ->join('users', 'users.user_id', '=', 'station_officers.user_id')
+                        ->where('station_officers.station_id', $thisStation)
                         ->get()
                     : collect();
 
+                $activeIncidentCount = $userTeam
+                    ? Incident::query()
+                        ->where('team_id', $userTeam->team_id)
+                        ->whereNotIn('status', [self::STATUS_DB_CONTROLLED, self::STATUS_DB_CLOSED])
+                        ->count()
+                    : 0;
+
+                $stations = Cache::remember(
+                    'firefighter:dashboard:nearby-stations:reference',
+                    now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
+                    fn () => Station::query()
+                        ->leftJoin('markers', 'markers.marker_id', '=', 'stations.marker_id')
+                        ->select([
+                            'stations.station_id',
+                            'stations.station_name',
+                            'stations.marker_id',
+                            'markers.lat as marker_lat',
+                            'markers.lng as marker_lng',
+                        ])
+                        ->get()
+                );
+
                 $currentStation = $stations->firstWhere('station_id', $thisStation);
-                $originLat = optional($currentStation?->marker)->lat;
-                $originLng = optional($currentStation?->marker)->lng;
+                $originLat = $currentStation?->marker_lat;
+                $originLng = $currentStation?->marker_lng;
 
                 if ($originLat !== null && $originLng !== null) {
                     $stations = $stations
                         ->filter(function ($station) use ($thisStation) {
                             return $station->station_id != $thisStation
-                                && optional($station->marker)->lat !== null
-                                && optional($station->marker)->lng !== null;
+                                && $station->marker_lat !== null
+                                && $station->marker_lng !== null;
                         })
                         ->map(function ($station) use ($originLat, $originLng) {
                             $station->distance = $this->haversineDistance(
                                 (float) $originLat,
                                 (float) $originLng,
-                                (float) $station->marker->lat,
-                                (float) $station->marker->lng
+                                (float) $station->marker_lat,
+                                (float) $station->marker_lng
                             );
 
                             return $station;
@@ -1261,20 +1872,48 @@ public function getAssignedIncidents(string $id){
                         ->values();
                 }
 
-                $posts = Post::query()
+                return [
+                    'context' => [
+                        'station_id' => $thisStation,
+                        'user_team_id' => $userTeam?->team_id,
+                    ],
+                    'counts' => [
+                        'active_incidents' => $activeIncidentCount,
+                        'equipment' => 12,
+                        'crew_online' => $thiscrew->count(),
+                    ],
+                    'stations' => $stations->map(function (Station $station) {
+                        return [
+                            'station_name' => $station->station_name,
+                            'distance' => number_format((float) ($station->distance ?? 0), 1),
+                        ];
+                    })->values(),
+                    'crew' => $thiscrew->map(function ($crew) {
+                        return [
+                            'initials' => substr($crew->first_name ?? 'F', 0, 1) . substr($crew->last_name ?? 'F', 0, 1),
+                            'name' => trim(($crew->first_name ?? ' ') . ' ' . ($crew->last_name ?? 'Firefighter')),
+                            'role' => ($crew->rank ?? 'Firefighter') . ' · Station ' . $crew->station_id,
+                            'status' => 'online',
+                        ];
+                    })->values(),
+                ];
+            }
+        );
+    }
+
+    protected function loadFirefighterDashboardRecentPosts(): array
+    {
+        return Cache::remember(
+            Post::FIREFIGHTER_DASHBOARD_RECENT_POSTS_CACHE_KEY,
+            now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
+            function () {
+                return Post::query()
                     ->select(['id', 'user_id', 'content', 'likes_count', 'comments_count', 'created_at'])
                     ->with(['user:user_id,first_name,last_name'])
                     ->latest()
                     ->take(5)
-                    ->get();
-
-                return [
-                    'counts' => [
-                        'active_incidents' => $incidentCoords->count(),
-                        'equipment' => 12,
-                        'crew_online' => $thiscrew->count(),
-                    ],
-                    'posts' => $posts->map(function (Post $post) {
+                    ->get()
+                    ->map(function (Post $post) {
                         return [
                             'id' => $post->id,
                             'author_initials' => substr($post->user->first_name ?? 'A', 0, 1) . substr($post->user->last_name ?? 'D', 0, 1),
@@ -1284,22 +1923,9 @@ public function getAssignedIncidents(string $id){
                             'likes_count' => $post->likes_count ?? 0,
                             'comments_count' => $post->comments_count ?? 0,
                         ];
-                    })->values(),
-                    'stations' => $stations->map(function (Station $station) {
-                        return [
-                            'station_name' => $station->station_name,
-                            'distance' => number_format((float) ($station->distance ?? 0), 1),
-                        ];
-                    })->values(),
-                    'crew' => $thiscrew->map(function (StationOfficer $crew) {
-                        return [
-                            'initials' => substr($crew->user->first_name ?? 'F', 0, 1) . substr($crew->user->last_name ?? 'F', 0, 1),
-                            'name' => trim(($crew->user->first_name ?? ' ') . ($crew->user->last_name ?? 'Firefighter')),
-                            'role' => ($crew->rank ?? 'Firefighter') . ' · Station ' . $crew->station_id,
-                            'status' => $crew->status ?? 'online',
-                        ];
-                    })->values(),
-                ];
+                    })
+                    ->values()
+                    ->all();
             }
         );
     }
@@ -1310,7 +1936,7 @@ public function getAssignedIncidents(string $id){
             "firefighter:schedule:{$userId}",
             now()->addSeconds(20),
             function () use ($userId) {
-                $stationOfficer = $this->getStationOfficerForUserId($userId);
+                $stationOfficer = $this->getStationOfficerForUserId($userId, true);
                 $stationId = $stationOfficer?->station_id;
                 $stationName = $stationOfficer?->station?->station_name;
 

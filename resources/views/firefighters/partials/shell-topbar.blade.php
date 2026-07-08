@@ -9,19 +9,21 @@
         </div>
     </div>
 
-    <div class="flex items-center gap-6">
-        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span class="text-[11px] font-bold text-green-700 uppercase tracking-wider">On Duty</span>
+    <div class="flex items-center gap-4 sm:gap-5">
+        <div class="hidden sm:flex ff-topbar-status-pill">
+            <span>On Duty</span>
         </div>
 
         <div class="user-dropdown">
-            <button id="ffUserDropdownBtn" class="user-dropdown-toggle">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-red-200">
+            <button id="ffUserDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="ffUserDropdownMenu">
+                <div class="ff-topbar-profile-avatar">
                     {{ substr(auth()->user()->first_name ?? 'F', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'R', 0, 1) }}
                 </div>
-                <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</span>
-                <i class="fas fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+                <span class="ff-topbar-profile-copy hidden sm:flex">
+                    <span class="ff-topbar-profile-name">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</span>
+                    <span class="ff-topbar-profile-role">Firefighter</span>
+                </span>
+                <i class="fas fa-chevron-down text-[10px] text-slate-400"></i>
             </button>
 
             <div id="ffUserDropdownMenu" class="user-dropdown-menu">
@@ -76,11 +78,13 @@ document.addEventListener('DOMContentLoaded', function () {
         dropdownBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             dropdownMenu.classList.toggle('show');
+            dropdownBtn.setAttribute('aria-expanded', dropdownMenu.classList.contains('show') ? 'true' : 'false');
         });
 
         document.addEventListener('click', function (e) {
             if (!dropdownBtn.contains(e.target)) {
                 dropdownMenu.classList.remove('show');
+                dropdownBtn.setAttribute('aria-expanded', 'false');
             }
         });
     }

@@ -7,12 +7,14 @@ use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistItem;
 use App\Models\AiRecommendationSuggestion;
 use App\Models\Analysis;
+use App\Models\MitigationAction;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
 use App\Models\User;
 use App\Services\BarangayPredictionService;
 use App\Services\ForecastModelService;
+use App\Services\PredictionFeedbackSignalService;
 use App\Support\BarangayNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -30,14 +32,17 @@ class AnalyticController extends Controller
     private ?string $lastAiModelUsed = null;
     private BarangayPredictionService $barangayPredictionService;
     private ForecastModelService $forecastModelService;
+    private PredictionFeedbackSignalService $predictionFeedbackSignalService;
     
     public function __construct(
         ForecastModelService $forecastModelService,
-        BarangayPredictionService $barangayPredictionService
+        BarangayPredictionService $barangayPredictionService,
+        PredictionFeedbackSignalService $predictionFeedbackSignalService
     )
     {
         $this->forecastModelService = $forecastModelService;
         $this->barangayPredictionService = $barangayPredictionService;
+        $this->predictionFeedbackSignalService = $predictionFeedbackSignalService;
         // Load API key from .env file
         $this->apiKey = env('OPENROUTER_API_KEY');
         
@@ -272,6 +277,9 @@ class AnalyticController extends Controller
                     'recommendation' => $recommendationAiModel,
                 ];
             }
+
+            $structuredAnalysis['model_metadata'] = $this->buildModelMetadataContext();
+            $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
             
             // Store analysis in database (optional, catch errors)
             $analysisId = null;
@@ -288,6 +296,7 @@ class AnalyticController extends Controller
                         $structuredAnalysis['recommendations'] ?? [],
                         $structuredAnalysis['action_plan_checklists'] ?? []
                     );
+                    $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
                 }
             } catch (\Exception $storeError) {
                 Log::warning('Failed to store analysis: ' . $storeError->getMessage());
@@ -726,11 +735,28 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         $checklists = AiActionPlanChecklist::query()
             ->where('station_id', $stationId)
-            ->get(['priority_level', 'status']);
+            ->with('items')
+            ->get(['ai_action_plan_checklist_id', 'priority_level', 'status', 'target_date', 'confirmed_at', 'created_at']);
+
+        $barangayIds = $this->resolveStationBarangays($stationId)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $mitigationActions = MitigationAction::query()
+            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->get(['mitigation_action_id', 'ai_action_plan_checklist_id', 'status', 'priority_level', 'created_at', 'completed_at']);
 
         $totalWeight = 0;
         $confirmedWeight = 0;
         $pendingWeight = 0;
+        $itemTotal = 0;
+        $itemFollowed = 0;
+        $itemNotFollowed = 0;
 
         foreach ($checklists as $checklist) {
             $weight = $priorityWeights[strtolower($checklist->priority_level ?? 'medium')] ?? 2;
@@ -741,20 +767,94 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             } elseif (in_array(strtolower($checklist->status ?? ''), ['pending', 'in_progress', 'submitted', 'rejected'], true)) {
                 $pendingWeight += $weight;
             }
+
+            $items = $checklist->items ?? collect();
+            $itemTotal += $items->count();
+            $itemFollowed += $items->where('status', 'followed')->count();
+            $itemNotFollowed += $items->where('status', 'not_followed')->count();
         }
 
-        $completionRatio = $totalWeight > 0 ? round($confirmedWeight / $totalWeight, 4) : 0.0;
-        $riskReductionPercent = $totalWeight > 0 ? round(min(0.25, $completionRatio * 0.25) * 100, 2) : 0.0;
+        $checklistCompletionRatio = $totalWeight > 0 ? round($confirmedWeight / $totalWeight, 4) : 0.0;
+        $itemFollowedRatio = $itemTotal > 0 ? round($itemFollowed / $itemTotal, 4) : 0.0;
+        $mitigationTotal = $mitigationActions->count();
+        $completedMitigations = $mitigationActions->where('status', 'completed')->count();
+        $blockedMitigations = $mitigationActions->where('status', 'blocked')->count();
+        $mitigationCompletionRatio = $mitigationTotal > 0 ? round($completedMitigations / $mitigationTotal, 4) : 0.0;
+        $avgCompletionDays = round((float) $mitigationActions
+            ->where('status', 'completed')
+            ->filter(fn ($action) => ! empty($action->created_at) && ! empty($action->completed_at))
+            ->avg(function ($action) {
+                return Carbon::parse($action->created_at)->diffInDays(Carbon::parse($action->completed_at));
+            }), 1);
+        $riskReductionPercent = round(min(
+            35,
+            (($checklistCompletionRatio * 18) + ($mitigationCompletionRatio * 12) + ($itemFollowedRatio * 5))
+        ), 2);
+        $feedbackSummary = $itemTotal > 0
+            ? "{$itemFollowed} of {$itemTotal} checklist steps are marked followed, and {$completedMitigations} mitigation action(s) are completed."
+            : 'No checklist item review feedback has been submitted yet.';
 
         return [
             'total_checklists' => $checklists->count(),
+            'total_mitigation_actions' => $mitigationTotal,
             'confirmed_weight' => $confirmedWeight,
             'pending_weight' => $pendingWeight,
-            'completion_ratio' => $completionRatio,
+            'completion_ratio' => $checklistCompletionRatio,
+            'mitigation_completion_ratio' => $mitigationCompletionRatio,
+            'item_total' => $itemTotal,
+            'item_followed' => $itemFollowed,
+            'item_not_followed' => $itemNotFollowed,
+            'item_followed_ratio' => $itemFollowedRatio,
+            'completed_mitigations' => $completedMitigations,
+            'blocked_mitigations' => $blockedMitigations,
+            'avg_completion_days' => $avgCompletionDays > 0 ? $avgCompletionDays : null,
             'risk_reduction_percent' => $riskReductionPercent,
             'summary' => $totalWeight > 0
-                ? "{$checklists->count()} mitigation checklist(s) tracked, with " . round($completionRatio * 100, 1) . "% weighted completion."
+                ? "{$checklists->count()} mitigation checklist(s) tracked, with " . round($checklistCompletionRatio * 100, 1) . "% weighted completion."
                 : 'No confirmed mitigation checklist actions yet.',
+            'effectiveness_summary' => $mitigationTotal > 0
+                ? "{$completedMitigations} of {$mitigationTotal} mitigation action(s) are completed" . ($avgCompletionDays > 0 ? " with an average completion time of {$avgCompletionDays} day(s)." : '.')
+                : 'No mitigation action records are linked to the current station coverage yet.',
+            'feedback_summary' => $feedbackSummary,
+        ];
+    }
+
+    private function buildModelMetadataContext(): array
+    {
+        $summary = $this->forecastModelService->readMetadataSummary();
+        $summary['prediction_runtime'] = [
+            'python_binary' => config('services.ai_prediction.python_binary', 'python'),
+            'prediction_script' => config('services.ai_prediction.prediction_script', 'capstone-ai/predict_event.py'),
+        ];
+
+        return $summary;
+    }
+
+    private function buildWorkflowContext(array $analysis, array $rawData): array
+    {
+        $recommendationCount = count($analysis['recommendations'] ?? []);
+        $checklistCount = count($analysis['action_plan_checklists'] ?? []);
+        $selectedBarangay = $rawData['selected_barangay_prediction']['barangay_name'] ?? null;
+        $topHotspot = collect($rawData['barangay_predictions'] ?? [])
+            ->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))
+            ->first();
+
+        return [
+            'prediction_stage' => 'Prediction',
+            'recommendation_stage' => 'Recommendation',
+            'mitigation_stage' => 'Mitigation Action Plan',
+            'recommendation_count' => $recommendationCount,
+            'generated_checklist_count' => $checklistCount,
+            'focus_barangay' => $selectedBarangay ?: ($topHotspot['barangay_name'] ?? null),
+            'focus_probability_percent' => $selectedBarangay
+                ? ($rawData['selected_barangay_prediction']['probability_percent'] ?? null)
+                : ($topHotspot['probability_percent'] ?? null),
+            'next_actions' => [
+                'Review the recommendation evidence and hotspot drivers.',
+                'Confirm or revise the generated action-plan checklist.',
+                'Convert approved checklist items into mitigation actions with owners and target dates.',
+                'Track completion outcomes so the next forecast reflects verified follow-through.',
+            ],
         ];
     }
 
@@ -1271,8 +1371,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         );
 
         $nearWater = (int) ($riskAreaSignals->near_water ?? $stationHistoricalRow->near_water ?? 0);
+        $feedbackSignals = $this->predictionFeedbackSignalService->snapshotForBarangay(
+            (int) $barangay->barangay_id,
+            $targetMonth->copy()->endOfMonth()
+        );
 
-        return [
+        return array_merge([
             'station_id' => $stationId,
             'barangay_id' => (int) $barangay->barangay_id,
             'barangay_name' => $barangay->barangay_name,
@@ -1305,7 +1409,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'accesibility' => $accessibility,
             'type_incident' => $typeIncident,
             'occupancy' => $occupancy,
-        ];
+        ], $feedbackSignals);
     }
 
     private function deriveBarangayPeakHours($barangayIncidents, string $fallback): string
@@ -2399,6 +2503,8 @@ private function getOpenRouterModelCandidates(): array
                     'mitigation_context' => $rawData['mitigation_context'] ?? null,
                     'recommendation_context' => $rawData['recommendation_context'] ?? null,
                     'model_prediction' => $rawData['model_prediction'] ?? null,
+                    'model_metadata' => $analysis['model_metadata'] ?? null,
+                    'workflow_context' => $analysis['workflow_context'] ?? null,
                     'barangay_predictions' => $rawData['barangay_predictions'] ?? [],
                     'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
                     'prediction_context' => $rawData['prediction_context'] ?? null,
@@ -2578,6 +2684,8 @@ private function getOpenRouterModelCandidates(): array
                 'risk_factors' => $rawData['risk_factors'] ?? ($analysisSummary['risk_factors'] ?? []),
                 'weather_context' => $rawData['weather_context'] ?? null,
                 'mitigation_context' => $rawData['mitigation_context'] ?? null,
+                'model_metadata' => $rawData['model_metadata'] ?? ($analysisSummary['model_metadata'] ?? null),
+                'workflow_context' => $rawData['workflow_context'] ?? ($analysisSummary['workflow_context'] ?? null),
                 'model_prediction' => $rawData['model_prediction'] ?? null,
                 'barangay_predictions' => array_values($latestPerBarangay),
                 'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
@@ -2630,9 +2738,35 @@ private function getOpenRouterModelCandidates(): array
                 $query->where('analysis_id', $request->integer('analysis_id'));
             }
 
+            $checklists = $query->get();
+            $linkedMitigationCounts = MitigationAction::query()
+                ->selectRaw('ai_action_plan_checklist_id, COUNT(*) as aggregate_count')
+                ->whereNotNull('ai_action_plan_checklist_id')
+                ->whereIn('ai_action_plan_checklist_id', $checklists->pluck('ai_action_plan_checklist_id')->all())
+                ->groupBy('ai_action_plan_checklist_id')
+                ->pluck('aggregate_count', 'ai_action_plan_checklist_id');
+
             return response()->json([
                 'success' => true,
-                'data' => $query->get(),
+                'data' => $checklists->map(function (AiActionPlanChecklist $item) use ($linkedMitigationCounts) {
+                    $payload = $item->toArray();
+                    $payload['checklist_progress'] = $item->checklist_progress;
+                    $payload['linked_mitigation_count'] = (int) ($linkedMitigationCounts[$item->ai_action_plan_checklist_id] ?? 0);
+                    $payload['mitigation_draft_url'] = route('station-admin.mitigations', [
+                        'draft_ai_action_plan_checklist_id' => $item->ai_action_plan_checklist_id,
+                        'analysis_id' => $item->analysis_id,
+                    ]);
+                    $payload['workflow_labels'] = [
+                        'prediction' => 'Prediction',
+                        'recommendation' => 'Recommendation',
+                        'mitigation' => 'Mitigation Action Plan',
+                    ];
+                    $payload['effectiveness_hint'] = $payload['linked_mitigation_count'] > 0
+                        ? $payload['linked_mitigation_count'] . ' mitigation action(s) already linked to this checklist.'
+                        : 'No mitigation action linked yet. Convert this checklist into an operational mitigation draft next.';
+
+                    return $payload;
+                })->values(),
             ]);
         } catch (\Throwable $e) {
             Log::error('Error fetching action plan checklists: ' . $e->getMessage());

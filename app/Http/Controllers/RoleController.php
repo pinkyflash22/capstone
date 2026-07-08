@@ -26,6 +26,7 @@ class RoleController extends Controller
         ]);
 
         Role::create($validated);
+        Role::flushDefinitionCache();
 
         return redirect()->route('roles.index')
             ->with('success', 'Role created successfully.');
@@ -54,6 +55,7 @@ class RoleController extends Controller
         ]);
 
         $role->update($validated);
+        Role::flushDefinitionCache();
 
         return redirect()->route('roles.index')
             ->with('success', 'Role updated successfully.');
@@ -66,6 +68,7 @@ class RoleController extends Controller
         }
 
         $role->delete();
+        Role::flushDefinitionCache();
 
         return redirect()->route('roles.index')
             ->with('success', 'Role deleted successfully.');

@@ -1,0 +1,198 @@
+{
+    "dashboard_shell_first": {
+        "uri": "/firefighter/dashboard",
+        "status": 200,
+        "elapsed_ms": 4204.66,
+        "bytes": 140043,
+        "query_count": 2,
+        "slowest_query": {
+            "sql": "select `station_officer_id`, `station_id`, `user_id`, `rank` from `station_officers` where `user_id` = ? limit 1",
+            "time_ms": 498.88
+        },
+        "duplicates": [],
+        "queries": [
+            {
+                "sql": "select `role_id`, `role` from `roles`",
+                "time_ms": 488.95
+            },
+            {
+                "sql": "select `station_officer_id`, `station_id`, `user_id`, `rank` from `station_officers` where `user_id` = ? limit 1",
+                "time_ms": 498.88
+            }
+        ],
+        "payload": null
+    },
+    "dashboard_shell_second": {
+        "uri": "/firefighter/dashboard",
+        "status": 200,
+        "elapsed_ms": 22.73,
+        "bytes": 140043,
+        "query_count": 0,
+        "slowest_query": null,
+        "duplicates": [],
+        "queries": [],
+        "payload": null
+    },
+    "dashboard_api_first": {
+        "uri": "/firefighter/api/dashboard",
+        "status": 200,
+        "elapsed_ms": 3947.62,
+        "bytes": 555,
+        "query_count": 4,
+        "slowest_query": {
+            "sql": "select count(*) as aggregate from `incidents` where `team_id` = ? and `status` not in (?, ?)",
+            "time_ms": 1210.7
+        },
+        "duplicates": [],
+        "queries": [
+            {
+                "sql": "select * from `teams` where `commander_driver` = ? or `pumper` = ? or `team_leader` = ? or `firefighter_officer_1` = ? or `firefighter_officer_2` = ? or `firefighter_officer_3` = ? or `rescue_radio` = ? limit 1",
+                "time_ms": 992.46
+            },
+            {
+                "sql": "select `station_officers`.`station_officer_id`, `station_officers`.`station_id`, `station_officers`.`user_id`, `station_officers`.`rank`, `users`.`first_name`, `users`.`last_name` from `station_officers` inner join `users` on `users`.`user_id` = `station_officers`.`user_id` where `station_officers`.`station_id` = ?",
+                "time_ms": 1182.68
+            },
+            {
+                "sql": "select count(*) as aggregate from `incidents` where `team_id` = ? and `status` not in (?, ?)",
+                "time_ms": 1210.7
+            },
+            {
+                "sql": "select `stations`.`station_id`, `stations`.`station_name`, `stations`.`marker_id`, `markers`.`lat` as `marker_lat`, `markers`.`lng` as `marker_lng` from `stations` left join `markers` on `markers`.`marker_id` = `stations`.`marker_id`",
+                "time_ms": 541.14
+            }
+        ],
+        "payload": {
+            "success": true,
+            "data": {
+                "context": {
+                    "station_id": 1,
+                    "user_team_id": 1
+                },
+                "counts": {
+                    "active_incidents": 0,
+                    "equipment": 12,
+                    "crew_online": 4
+                },
+                "stations": [],
+                "crew": [
+                    {
+                        "initials": "CC",
+                        "name": "Carlos Cruz",
+                        "role": "Fire Chief Inspector \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "MS",
+                        "name": "Marco Santos",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "LM",
+                        "name": "Luis Morales",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "JC",
+                        "name": "Jose Castro",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    }
+                ]
+            }
+        }
+    },
+    "dashboard_api_second": {
+        "uri": "/firefighter/api/dashboard",
+        "status": 200,
+        "elapsed_ms": 1.99,
+        "bytes": 555,
+        "query_count": 0,
+        "slowest_query": null,
+        "duplicates": [],
+        "queries": [],
+        "payload": {
+            "success": true,
+            "data": {
+                "context": {
+                    "station_id": 1,
+                    "user_team_id": 1
+                },
+                "counts": {
+                    "active_incidents": 0,
+                    "equipment": 12,
+                    "crew_online": 4
+                },
+                "stations": [],
+                "crew": [
+                    {
+                        "initials": "CC",
+                        "name": "Carlos Cruz",
+                        "role": "Fire Chief Inspector \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "MS",
+                        "name": "Marco Santos",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "LM",
+                        "name": "Luis Morales",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    },
+                    {
+                        "initials": "JC",
+                        "name": "Jose Castro",
+                        "role": "Fire Officer 1 \u00b7 Station 1",
+                        "status": "online"
+                    }
+                ]
+            }
+        }
+    },
+    "dashboard_posts_first": {
+        "uri": "/firefighter/api/dashboard/posts",
+        "status": 200,
+        "elapsed_ms": 504.7,
+        "bytes": 36,
+        "query_count": 1,
+        "slowest_query": {
+            "sql": "select `id`, `user_id`, `content`, `likes_count`, `comments_count`, `created_at` from `posts` where `posts`.`deleted_at` is null order by `created_at` desc limit 5",
+            "time_ms": 500.58
+        },
+        "duplicates": [],
+        "queries": [
+            {
+                "sql": "select `id`, `user_id`, `content`, `likes_count`, `comments_count`, `created_at` from `posts` where `posts`.`deleted_at` is null order by `created_at` desc limit 5",
+                "time_ms": 500.58
+            }
+        ],
+        "payload": {
+            "success": true,
+            "data": {
+                "posts": []
+            }
+        }
+    },
+    "dashboard_posts_second": {
+        "uri": "/firefighter/api/dashboard/posts",
+        "status": 200,
+        "elapsed_ms": 1.8,
+        "bytes": 36,
+        "query_count": 0,
+        "slowest_query": null,
+        "duplicates": [],
+        "queries": [],
+        "payload": {
+            "success": true,
+            "data": {
+                "posts": []
+            }
+        }
+    }
+}

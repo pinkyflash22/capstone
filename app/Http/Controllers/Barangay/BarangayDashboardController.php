@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Barangay;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiActionPlanChecklist;
 use App\Models\Barangay;
 use App\Models\BarangayFireRecord;
 use App\Models\BarangayHall;
@@ -441,6 +442,7 @@ class BarangayDashboardController extends Controller
 
         $historicalIncidents = collect();
         $predictionChecklists = collect();
+        $aiActionPlanChecklists = collect();
         $fireRecords = collect();
         $riskAreas = collect();
         $mitigationActions = collect();
@@ -458,6 +460,14 @@ class BarangayDashboardController extends Controller
 
             $predictionChecklists = BarangayPredictionChecklist::query()
                 ->with(['assignee', 'reviewer'])
+                ->where('barangay_id', $barangay->barangay_id)
+                ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+                ->orderBy('target_date')
+                ->limit(12)
+                ->get();
+
+            $aiActionPlanChecklists = AiActionPlanChecklist::query()
+                ->with(['assignee', 'confirmer', 'items.reviewer', 'suggestions'])
                 ->where('barangay_id', $barangay->barangay_id)
                 ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
                 ->orderBy('target_date')
@@ -599,6 +609,7 @@ class BarangayDashboardController extends Controller
         return array_merge($context, [
             'historicalIncidents' => $historicalIncidents,
             'predictionChecklists' => $predictionChecklists,
+            'aiActionPlanChecklists' => $aiActionPlanChecklists,
             'fireRecords' => $fireRecords,
             'riskAreas' => $riskAreas,
             'mitigationActions' => $mitigationActions,
@@ -617,14 +628,15 @@ class BarangayDashboardController extends Controller
             'portalStats' => [
                 'historical_total' => $historicalIncidents->count(),
                 'open_actions' => $predictionChecklists->whereIn('status', ['pending', 'in_progress'])->count(),
-                'critical_actions' => $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
+                'critical_actions' => $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->count() + $aiActionPlanChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
                 'mitigation_open' => $mitigationActions->whereIn('status', ['planned', 'in_progress', 'blocked'])->count(),
                 'recorded_reports' => $fireRecords->count(),
                 'risk_markers' => $riskAreas->count(),
                 'total_hazards_reported' => (int) $historicalIncidents->sum(function (HistoricalFireIncident $incident) {
                     return max(1, (int) ($incident->incident_count ?? 1));
                 }),
-                'pending_inspections' => $predictionChecklists->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count(),
+                'pending_inspections' => $predictionChecklists->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count()
+                    + $aiActionPlanChecklists->whereIn('status', ['pending', 'in_progress', 'submitted'])->count(),
             ],
             'riskTypeOptions' => $this->riskTypeOptions(),
             'riskTypeGroups' => $this->riskTypeGroups(),

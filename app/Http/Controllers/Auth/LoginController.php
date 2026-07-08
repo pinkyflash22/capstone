@@ -34,6 +34,7 @@ class StationLoginController extends Controller
             'station_id' => $request->station_id, 
             'password' => $request->password
         ], $request->filled('remember'))) {
+            $request->session()->regenerate();
             
             // Success - update last login info
             $station = Auth::guard('station')->user();
@@ -66,6 +67,7 @@ class StationLoginController extends Controller
     {
         Auth::guard('station')->logout();
         $request->session()->invalidate();
+        $request->session()->regenerateToken();
         return redirect('/');
     }
 }

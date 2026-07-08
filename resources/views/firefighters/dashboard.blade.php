@@ -8,7 +8,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
-    <meta name="user-role" content="{{ auth()->user()->role->role ?? 'firefighter' }}">
+    <meta name="user-role" content="firefighter">
     <meta name="user-role-id" content="{{ auth()->user()->role_id ?? '' }}">
     <meta name="station-id" content="{{ $thisStation ?? '' }}">
     
@@ -17,8 +17,8 @@
     
     <title>PyroSense · Firefighter Dashboard</title>
     
-    @vite(['resources/css/app.css', 'resources/css/firefighters/dashboard.css'])
-    
+    @vite(['resources/css/app.css', 'resources/css/firefighters/dashboard.css', 'resources/css/firefighters/dashboard-shell.css'])
+    {{--
     <style>
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
@@ -30,6 +30,84 @@
             margin-right: 8px;
             width: 14px;
             display: inline-block;
+        }
+
+        .ff-shell-section-state {
+            display: grid;
+            gap: 12px;
+        }
+
+        .ff-shell-skeleton {
+            position: relative;
+            overflow: hidden;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+
+        .ff-shell-skeleton::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent);
+            animation: ff-shell-shimmer 1.4s infinite;
+        }
+
+        .ff-shell-skeleton-line {
+            height: 14px;
+            border-radius: 999px;
+        }
+
+        .ff-shell-skeleton-card {
+            height: 86px;
+        }
+
+        .ff-shell-skeleton-list {
+            height: 74px;
+        }
+
+        .ff-shell-section-error {
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(239, 68, 68, 0.12);
+            background: linear-gradient(135deg, #fff5f5 0%, #fffaf5 100%);
+            color: #9a3412;
+            font-size: 0.9rem;
+        }
+
+        .ff-shell-section-error button {
+            margin-top: 10px;
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #fff;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            cursor: pointer;
+        }
+
+        .ff-map-load-note {
+            margin-top: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255, 247, 237, 0.9);
+            border: 1px solid rgba(198, 61, 38, 0.12);
+            color: #9a3412;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        @keyframes ff-shell-shimmer {
+            100% { transform: translateX(100%); }
+        }
+
+        #dashboardCrewList[data-shell-loading="true"] > .crew-item {
+            display: none;
         }
         
         .leaflet-div-icon {
@@ -280,6 +358,7 @@
         }
 
     </style>
+    --}}
     @include('partials.pwa-head')
 </head>
 <body>
@@ -373,21 +452,23 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-4 sm:gap-5">
                 <!-- Status Pill -->
-                <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100">
-                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    <span class="text-[11px] font-bold text-green-700 uppercase tracking-wider">On Duty</span>
+                <div class="hidden sm:flex ff-topbar-status-pill">
+                    <span>On Duty</span>
                 </div>
 
                 <!-- User Profile Dropdown -->
                 <div class="user-dropdown">
-                    <button id="userDropdownBtn" class="user-dropdown-toggle">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-red-200">
+                    <button id="userDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="userDropdownMenu">
+                        <div class="ff-topbar-profile-avatar">
                             {{ substr(auth()->user()->first_name ?? 'F', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'R', 0, 1) }}
                         </div>
-                        <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
-                        <i class="fas fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+                        <span class="ff-topbar-profile-copy hidden sm:flex">
+                            <span class="ff-topbar-profile-name">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</span>
+                            <span class="ff-topbar-profile-role">Firefighter</span>
+                        </span>
+                        <i class="fas fa-chevron-down text-[10px] text-slate-400"></i>
                     </button>
 
                     <div id="userDropdownMenu" class="user-dropdown-menu">
@@ -495,6 +576,10 @@
             </div>
             <div class="map-container overflow-hidden rounded-2xl border border-slate-200">
                 <div id="firefighterDashboardMap" class="bg-gray-200" style="height: 500px;"></div>
+            </div>
+            <div id="firefighterMapLoadState" class="ff-map-load-note">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading live map layers...</span>
             </div>
             <div id="firefighterMapLegend" class="firefighter-map-legend-panel firefighter-map-stage__legend"></div>
         </div>
@@ -699,9 +784,10 @@
                     <a href="{{ route('firefighter.announcements') }}" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
                 <div id="dashboardAnnouncementsList" style="max-height: 300px; overflow-y: auto;">
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="far fa-comment-dots text-3xl mb-2"></i>
-                        <p>Loading announcements...</p>
+                    <div class="ff-shell-section-state">
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
                     </div>
                 </div>
             </div>
@@ -719,8 +805,10 @@
                     <a href="#" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
                 <div id="dashboardNearbyStationsList" style="grid-template-columns: 1fr;">
-                    <div class="text-center py-8 text-gray-500">
-                        <p>Loading nearby stations...</p>
+                    <div class="ff-shell-section-state">
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
                     </div>
                 </div>
             </div>
@@ -734,8 +822,14 @@
                     </h2>
                     <a href="#" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
-                <div class="bg-white rounded-xl shadow p-5">
-                    @forelse ($thiscrew as $crew)
+                <div id="dashboardCrewList" class="bg-white rounded-xl shadow p-5" data-shell-loading="true">
+                    <div id="dashboardCrewShell" class="ff-shell-section-state">
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                    </div>
+                    {{-- Crew list hydrates after the shell renders. --}}
+                    @if(false)
                         <div class="crew-item">
                             <div class="crew-avatar">
                                 {{ substr($crew->user->first_name ?? 'F', 0, 1) }}{{ substr($crew->user->last_name ?? 'F', 0, 1) }}
@@ -747,7 +841,7 @@
                             </div>
                             <i class="fas fa-chevron-right" style="color: #9ca3af;"></i>
                         </div>
-                    @empty
+                    @else
                         <div class="crew-item">
                             <div class="crew-avatar">
                                 JD
@@ -770,7 +864,7 @@
                             </div>
                             <i class="fas fa-chevron-right" style="color: #9ca3af;"></i>
                         </div>
-                    @endforelse
+                    @endif
                 </div>
             </div>
         </div>
@@ -823,6 +917,27 @@
 
     <!-- Toast Container -->
     <div id="toast" class="toast"></div>
+    <script>
+        window.firefighterDashboardConfig = {
+            csrfToken: @json(csrf_token()),
+            geoapifyKey: @json(env('GEOAPIFY_KEY')),
+            userId: @json(auth()->user()->user_id ?? null),
+            currentFirefighterId: @json(auth()->user()->user_id ?? null),
+            currentUserId: @json(auth()->user()->user_id ?? null),
+            userTeamId: @json(isset($userTeam) ? $userTeam->team_id : null),
+            userStationId: @json(isset($thisStation) ? $thisStation : null),
+            dashboardDataUrl: @json(route('firefighter.dashboard.data')),
+            dashboardPostsUrl: @json(route('firefighter.dashboard.posts')),
+            mapInstanceConfig: {
+                containerId: 'firefighterDashboardMap',
+                instanceKey: 'firefighterDashboard'
+            }
+        };
+    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    @vite(['resources/js/map.js', 'resources/js/firefighter/dashboard-shell.js'])
+    {{--
     @vite(['resources/js/map.js'])
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -833,24 +948,33 @@
         containerId: 'firefighterDashboardMap',
         instanceKey: 'firefighterDashboard'
     };
+    window.deferPyroMapInit = true;
+    window.__ffAllowDashboardPrefetch = false;
     window.geoapifyKey = '{{ env("GEOAPIFY_KEY") }}';
     window.userId = {{ auth()->user()->user_id ?? 'null' }};
     window.userTeamId = {{ isset($userTeam) ? $userTeam->team_id : 'null' }};
     window.userStationId = {{ isset($thisStation) ? $thisStation : 'null' }};
-    window.allMarkers = @json($allMarkers ?? []);
+    const dashboardDataUrl = @json(route('firefighter.dashboard.data'));
+    const dashboardPostsUrl = @json(route('firefighter.dashboard.posts'));
+    window.allMarkers = [];
     window.mapData = { marker: window.allMarkers };
-    window.stationsData = @json($stations ?? []);
-    window.incidentCoords = @json($incidentCoords ?? []);
+    window.stationsData = [];
+    window.incidentCoords = [];
     window.currentFirefighterId = {{ auth()->user()->user_id ?? 'null' }};
     window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
     const FF_LOCATION_PUSH_INTERVAL_MS = 60000;
     const FF_LOCATION_PULL_INTERVAL_MS = 90000;
     const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 30000;
     const FF_AUTO_ASSIGN_INTERVAL_MS = 300000;
+    const FF_WIDGET_CACHE_KEY = `ff_dashboard_widgets_${window.currentFirefighterId}`;
+    const FF_POSTS_CACHE_KEY = `ff_dashboard_posts_${window.currentFirefighterId}`;
+    const FF_ASSIGNED_CACHE_KEY = `ff_dashboard_assigned_${window.currentFirefighterId}`;
     let ffLocationPushInterval = null;
     let ffLocationPullInterval = null;
     let ffAssignedIncidentsInterval = null;
     let ffAutoAssignInterval = null;
+    let ffDashboardWidgetsRequest = null;
+    let ffDashboardPostsRequest = null;
     const FF_FETCH_TIMEOUT_MS = 10000;
     const FF_ASSIGNED_INCIDENTS_TIMEOUT_MS = 20000;
     let ffAssignedIncidentsRequest = null;
@@ -940,6 +1064,216 @@
         return requestPromise;
     }
 
+    function readDashboardCache(key, fallback = null) {
+        try {
+            const raw = window.localStorage?.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (error) {
+            console.warn('Unable to read dashboard cache:', key, error);
+            return fallback;
+        }
+    }
+
+    function writeDashboardCache(key, value) {
+        try {
+            window.localStorage?.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            console.warn('Unable to write dashboard cache:', key, error);
+        }
+    }
+
+    function renderSectionError(targetId, message, retryHandler) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        target.innerHTML = `
+            <div class="ff-shell-section-error">
+                <div>${escapeHtml(message)}</div>
+                <button type="button" data-retry-action="${escapeHtml(retryHandler)}">Retry</button>
+            </div>
+        `;
+
+        target.querySelector('[data-retry-action]')?.addEventListener('click', function () {
+            const actionName = this.getAttribute('data-retry-action');
+            if (actionName && typeof window[actionName] === 'function') {
+                window[actionName](true);
+            }
+        });
+    }
+
+    function renderDashboardAnnouncements(posts = []) {
+        const container = document.getElementById('dashboardAnnouncementsList');
+        if (!container) return;
+
+        if (!Array.isArray(posts) || posts.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="far fa-comment-dots text-3xl mb-2"></i>
+                    <p>No announcements yet.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = posts.map((post) => `
+            <article class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 mb-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">${escapeHtml(post.author_name || 'Station Update')}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">${escapeHtml(post.time || 'Just now')}</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-orange-700 border border-orange-100">
+                        <i class="fas fa-bullhorn"></i> Feed
+                    </span>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-slate-600">${escapeHtml(post.content || 'No content')}</p>
+            </article>
+        `).join('');
+    }
+
+    function renderDashboardNearbyStations(stations = []) {
+        const container = document.getElementById('dashboardNearbyStationsList');
+        if (!container) return;
+
+        if (!Array.isArray(stations) || stations.length === 0) {
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5 text-center text-gray-500">
+                    <p>No nearby stations available.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = stations.map((station) => `
+            <div class="bg-white rounded-xl shadow p-5 mb-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">${escapeHtml(station.station_name || 'Station')}</p>
+                        <p class="text-xs text-slate-500 font-medium">Estimated distance ${escapeHtml(station.distance || '0.0')} km</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-100">
+                        <i class="fas fa-location-arrow"></i> Nearby
+                    </span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderDashboardCrew(crew = []) {
+        const shell = document.getElementById('dashboardCrewShell');
+        const container = shell?.parentElement || document.getElementById('dashboardCrewList');
+        if (!container) return;
+
+        container.removeAttribute('data-shell-loading');
+
+        if (!Array.isArray(crew) || crew.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <p>No crew records available.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = crew.map((member) => `
+            <div class="crew-item">
+                <div class="crew-avatar">
+                    ${escapeHtml(member.initials || 'FF')}
+                    <span class="crew-status ${escapeHtml(member.status || 'online')}"></span>
+                </div>
+                <div class="crew-info">
+                    <div class="crew-name">${escapeHtml(member.name || 'Firefighter')}</div>
+                    <div class="crew-role">${escapeHtml(member.role || 'Responder')}</div>
+                </div>
+                <i class="fas fa-chevron-right" style="color: #9ca3af;"></i>
+            </div>
+        `).join('');
+    }
+
+    function applyDashboardWidgetPayload(payload = {}) {
+        const counts = payload.counts || {};
+        const context = payload.context || {};
+        if (context.station_id !== undefined && context.station_id !== null) {
+            window.userStationId = context.station_id;
+        }
+        if (context.user_team_id !== undefined && context.user_team_id !== null) {
+            window.userTeamId = context.user_team_id;
+        }
+        document.getElementById('activeIncidentsCount').textContent = counts.active_incidents ?? '--';
+        document.getElementById('equipmentCount').textContent = counts.equipment ?? '--';
+        document.getElementById('crewOnlineCount').textContent = counts.crew_online ?? '--';
+
+        renderDashboardNearbyStations(payload.stations || []);
+        renderDashboardCrew(payload.crew || []);
+    }
+
+    async function loadFirefighterDashboardWidgets(force = false) {
+        try {
+            if (!force && ffDashboardWidgetsRequest) {
+                return ffDashboardWidgetsRequest;
+            }
+
+            ffDashboardWidgetsRequest = fetchFirefighterDashboardOnce(
+                ffDashboardWidgetsRequest,
+                dashboardDataUrl,
+                { timeoutMs: 15000 }
+            );
+
+            const response = await ffDashboardWidgetsRequest;
+            if (!response.ok) {
+                throw new Error('Failed to load dashboard widgets');
+            }
+
+            const result = await response.json();
+            const payload = result?.data || {};
+            applyDashboardWidgetPayload(payload);
+            writeDashboardCache(FF_WIDGET_CACHE_KEY, payload);
+            return payload;
+        } catch (error) {
+            console.error('Error loading firefighter dashboard widgets:', error);
+            renderSectionError('dashboardNearbyStationsList', 'Unable to refresh nearby stations right now.', 'loadFirefighterDashboardWidgets');
+            renderSectionError('dashboardCrewList', 'Unable to refresh crew details right now.', 'loadFirefighterDashboardWidgets');
+            return null;
+        } finally {
+            ffDashboardWidgetsRequest = null;
+        }
+    }
+
+    window.loadFirefighterDashboardWidgets = loadFirefighterDashboardWidgets;
+
+    async function loadFirefighterDashboardPosts(force = false) {
+        try {
+            if (!force && ffDashboardPostsRequest) {
+                return ffDashboardPostsRequest;
+            }
+
+            ffDashboardPostsRequest = fetchFirefighterDashboardOnce(
+                ffDashboardPostsRequest,
+                dashboardPostsUrl,
+                { timeoutMs: 15000 }
+            );
+
+            const response = await ffDashboardPostsRequest;
+            if (!response.ok) {
+                throw new Error('Failed to load dashboard posts');
+            }
+
+            const result = await response.json();
+            const posts = Array.isArray(result?.data?.posts) ? result.data.posts : [];
+            renderDashboardAnnouncements(posts);
+            writeDashboardCache(FF_POSTS_CACHE_KEY, posts);
+            return posts;
+        } catch (error) {
+            console.error('Error loading firefighter dashboard posts:', error);
+            renderSectionError('dashboardAnnouncementsList', 'Unable to refresh announcements right now.', 'loadFirefighterDashboardPosts');
+            return [];
+        } finally {
+            ffDashboardPostsRequest = null;
+        }
+    }
+
+    window.loadFirefighterDashboardPosts = loadFirefighterDashboardPosts;
+
     // Function to fetch assigned incidents
     async function fetchAssignedIncidents(force = false) {
         try {
@@ -968,6 +1302,7 @@
             console.log('Incidents data:', incidents);
             window.assignedIncidentsData = incidents;
             ffAssignedIncidentsLastFetchedAt = Date.now();
+            writeDashboardCache(FF_ASSIGNED_CACHE_KEY, incidents);
             
             displayAssignedIncidents(incidents);
             if (typeof updateChartsWithData === 'function') {
@@ -983,13 +1318,7 @@
                 return Array.isArray(window.assignedIncidentsData) ? window.assignedIncidentsData : [];
             }
             console.error('Error fetching assigned incidents:', error);
-            document.getElementById('assignedIncidentsList').innerHTML = `
-                <div class="empty-incidents">
-                    <i class="fas fa-exclamation-triangle text-4xl mb-2 opacity-50"></i>
-                    <p>Failed to load assigned incidents</p>
-                    <button onclick="fetchAssignedIncidents(true)" class="btn btn-outline mt-2">Retry</button>
-                </div>
-            `;
+            renderSectionError('assignedIncidentsList', 'Failed to load assigned incidents.', 'refreshFirefighterAssignedIncidents');
             return [];
         } finally {
             ffAssignedIncidentsRequest = null;
@@ -1094,6 +1423,60 @@
             || incident?.incidentType?.type
             || incident?.incident_type?.type
             || (incident?.marker?.category === 'fire' ? 'Fire' : 'Incident');
+    }
+
+    function setIncidentActionPendingState(incidentId, options = {}) {
+        const card = document.querySelector(`.incident-card [data-incident-id="${incidentId}"]`)?.closest('.incident-card')
+            || document.querySelector(`.incident-card .view-incident-details[data-incident-id="${incidentId}"]`)?.closest('.incident-card');
+        if (!card) return null;
+
+        const buttons = Array.from(card.querySelectorAll('button[data-incident-id]'));
+        const statusBadge = card.querySelector('.incident-status-badge');
+        const previous = {
+            buttonStates: buttons.map((button) => ({
+                button,
+                disabled: button.disabled,
+                html: button.innerHTML,
+            })),
+            statusText: statusBadge?.textContent || null,
+            statusClass: statusBadge?.className || null,
+        };
+
+        buttons.forEach((button) => {
+            button.disabled = true;
+            button.dataset.pending = 'true';
+            if (!button.classList.contains('view-incident-details')) {
+                button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${options.buttonLabel || 'Updating...'}`;
+            }
+        });
+
+        if (statusBadge) {
+            statusBadge.textContent = options.badgeLabel || 'UPDATING';
+            statusBadge.classList.add('opacity-80');
+        }
+
+        card.dataset.pendingIncidentAction = 'true';
+        return previous;
+    }
+
+    function restoreIncidentActionPendingState(incidentId, previousState) {
+        const card = document.querySelector(`.incident-card [data-incident-id="${incidentId}"]`)?.closest('.incident-card')
+            || document.querySelector(`.incident-card .view-incident-details[data-incident-id="${incidentId}"]`)?.closest('.incident-card');
+        if (!card || !previousState) return;
+
+        previousState.buttonStates.forEach(({ button, disabled, html }) => {
+            button.disabled = disabled;
+            button.innerHTML = html;
+            delete button.dataset.pending;
+        });
+
+        const statusBadge = card.querySelector('.incident-status-badge');
+        if (statusBadge && previousState.statusClass) {
+            statusBadge.className = previousState.statusClass;
+            statusBadge.textContent = previousState.statusText || statusBadge.textContent;
+        }
+
+        delete card.dataset.pendingIncidentAction;
     }
 
     function displayAssignedIncidents(incidents) {
@@ -1265,7 +1648,7 @@
         btn.addEventListener('click', async () => {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
-            await respondToIncident(incidentId, currentStatus);
+            await respondToIncident(incidentId, currentStatus, btn);
         });
     });
 
@@ -1274,7 +1657,7 @@
         btn.addEventListener('click', async () => {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
-            await completeIncident(incidentId, currentStatus);
+            await completeIncident(incidentId, currentStatus, btn);
         });
     });
     
@@ -1283,7 +1666,7 @@
         btn.addEventListener('click', async () => {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
-            await closeCase(incidentId, currentStatus);
+            await closeCase(incidentId, currentStatus, btn);
         });
     });
 
@@ -1291,7 +1674,7 @@
         btn.addEventListener('click', async () => {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
-            await markIncidentFalseAlarm(incidentId, currentStatus);
+            await markIncidentFalseAlarm(incidentId, currentStatus, btn);
         });
     });
 }
@@ -1450,13 +1833,17 @@
         document.body.style.overflow = 'hidden';
     }
     
-async function respondToIncident(incidentId, currentStatusId) {
+async function respondToIncident(incidentId, currentStatusId, triggerButton = null) {
     if (currentStatusId != 1) {
         showToast('Cannot respond to this incident - invalid status', 'error');
         return;
     }
     
     if (!confirm('Confirm responding to this incident? Your status will be updated to RESPONDING.')) return;
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Sending...',
+        badgeLabel: 'RESPONDING...'
+    });
     
     try {
         const newStatusId = 2;
@@ -1478,21 +1865,27 @@ async function respondToIncident(incidentId, currentStatusId) {
                 await window.calculateRouteToIncident(incidentId);
             }
         } else {
+            restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to update incident status', 'error');
         }
     } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error responding to incident:', error);
         showToast('Failed to update incident status', 'error');
     }
 }
 
-async function completeIncident(incidentId, currentStatusId) {
+async function completeIncident(incidentId, currentStatusId, triggerButton = null) {
     if (currentStatusId != 3) {
         showToast('Cannot mark controlled until the team is on scene', 'error');
         return;
     }
     
     if (!confirm('Complete this incident and mark it as controlled?')) return;
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Submitting...',
+        badgeLabel: 'MARKING CONTROLLED...'
+    });
     
     try {
         const newStatusId = 4;
@@ -1511,21 +1904,27 @@ async function completeIncident(incidentId, currentStatusId) {
             showToast(result.message || 'Incident completed and marked as controlled!', 'success');
             fetchAssignedIncidents(true); // Refresh the list
         } else {
+            restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to update incident', 'error');
         }
     } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error completing incident:', error);
         showToast('Failed to update incident', 'error');
     }
 }
 
-async function closeCase(incidentId, currentStatusId) {
+async function closeCase(incidentId, currentStatusId, triggerButton = null) {
     if (currentStatusId != 4) {
         showToast('Cannot close this case until the incident is controlled', 'error');
         return;
     }
     
     if (!confirm('Close this case? This action will archive the incident.')) return;
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Closing...',
+        badgeLabel: 'CLOSING...'
+    });
     
     try {
         const newStatusId = 5;
@@ -1544,15 +1943,17 @@ async function closeCase(incidentId, currentStatusId) {
             showToast(result.message || 'Case closed successfully!', 'success');
             fetchAssignedIncidents(true); // Refresh the list
         } else {
+            restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to close case', 'error');
         }
     } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error closing case:', error);
         showToast('Failed to close case', 'error');
     }
 }
 
-async function markIncidentFalseAlarm(incidentId, currentStatusId) {
+async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton = null) {
     if (![1, 2].includes(currentStatusId)) {
         showToast('False alarm can only be set while the incident is still active', 'error');
         return;
@@ -1560,6 +1961,10 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId) {
 
     const confirmed = await showFalseAlarmConfirmationToast();
     if (!confirmed) return;
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Tagging...',
+        badgeLabel: 'FLAGGING...'
+    });
 
     try {
         const response = await fetch(`/api/incidents/${incidentId}/false-alarm`, {
@@ -1577,9 +1982,11 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId) {
             showToast(result.message || 'Incident tagged as false alarm', 'success');
             fetchAssignedIncidents(true);
         } else {
+            restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to tag false alarm', 'error');
         }
     } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error tagging false alarm:', error);
         showToast('Failed to tag false alarm', 'error');
     }
@@ -1665,6 +2072,145 @@ function showFalseAlarmConfirmationToast() {
         }, 3000);
     }
     
+    function paintCurrentUserLocation(lat, lng) {
+        if (!window.map || typeof L === 'undefined') {
+            return;
+        }
+
+        if (window.userMarker) {
+            window.map.removeLayer(window.userMarker);
+        }
+
+        window.userMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'user-location-marker',
+                html: `<div style="
+                    width: 24px;
+                    height: 24px;
+                    background-color: #3b82f6;
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                    animation: pulse 2s infinite;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    <i class="fas fa-user" style="color: white; font-size: 12px;"></i>
+                </div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            })
+        }).bindPopup("You are here").addTo(window.map);
+
+        if (window.userAccuracyCircle) {
+            window.map.removeLayer(window.userAccuracyCircle);
+        }
+
+        window.userAccuracyCircle = L.circle([lat, lng], {
+            color: '#3b82f6',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.1,
+            radius: 50
+        }).addTo(window.map);
+    }
+
+    function initializeFirefighterGeolocation() {
+        if (!navigator.geolocation) {
+            console.warn("Geolocation not supported");
+            updateUserLocation(window.currentUserId, 15.8222, 120.3297);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                updateUserLocation(window.currentUserId, lat, lng);
+                paintCurrentUserLocation(lat, lng);
+                sendUserLocationToServer(lat, lng);
+                document.dispatchEvent(new Event("locationReady"));
+            },
+            function(error) {
+                console.error("Location error:", error);
+                updateUserLocation(window.currentUserId, 15.8222, 120.3297);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    function hydrateDashboardFromCache() {
+        const cachedWidgets = readDashboardCache(FF_WIDGET_CACHE_KEY, null);
+        if (cachedWidgets) {
+            applyDashboardWidgetPayload(cachedWidgets);
+        }
+
+        const cachedAssigned = readDashboardCache(FF_ASSIGNED_CACHE_KEY, null);
+        if (Array.isArray(cachedAssigned) && cachedAssigned.length > 0) {
+            window.assignedIncidentsData = cachedAssigned;
+            displayAssignedIncidents(cachedAssigned);
+            document.getElementById('assignedIncidentsCount').textContent = cachedAssigned.length;
+            if (typeof updateChartsWithData === 'function') {
+                updateChartsWithData(cachedAssigned);
+            }
+        }
+
+        const cachedPosts = readDashboardCache(FF_POSTS_CACHE_KEY, null);
+        if (Array.isArray(cachedPosts)) {
+            renderDashboardAnnouncements(cachedPosts);
+        }
+    }
+
+    function startDeferredMapHydration() {
+        const loadState = document.getElementById('firefighterMapLoadState');
+
+        if (typeof window.initializePyroMapRuntime === 'function') {
+            window.initializePyroMapRuntime();
+        }
+
+        window.setTimeout(async function () {
+            if (loadState) {
+                loadState.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Refreshing map layers...</span>';
+            }
+
+            try {
+                initializeFirefighterGeolocation();
+                await Promise.allSettled([
+                    typeof fetchAllFirefighterLocations === 'function' ? fetchAllFirefighterLocations() : Promise.resolve(),
+                    typeof loadShapes === 'function' ? loadShapes() : Promise.resolve(),
+                ]);
+            } finally {
+                if (loadState) {
+                    loadState.innerHTML = '<i class="fas fa-check-circle"></i><span>Map layers synced.</span>';
+                    window.setTimeout(() => loadState.style.display = 'none', 2200);
+                }
+            }
+        }, 180);
+    }
+
+    async function bootstrapFirefighterDashboard() {
+        hydrateDashboardFromCache();
+
+        await fetchAssignedIncidents(true);
+        loadFirefighterDashboardWidgets();
+        startDeferredMapHydration();
+        window.setTimeout(() => {
+            loadFirefighterDashboardPosts();
+        }, 320);
+
+        window.setTimeout(() => {
+            window.__ffAllowDashboardPrefetch = true;
+            if (typeof scheduleDashboardRoutePrefetch === 'function') {
+                scheduleDashboardRoutePrefetch();
+            }
+        }, 1500);
+
+        window.setTimeout(() => {
+            window.runPendingIncidentAutoAssignment();
+            startFirefighterDashboardIntervals();
+        }, 2200);
+    }
+
     // Sidebar toggle and location initialization
     document.addEventListener('DOMContentLoaded', function() {
         window.userCoords = {
@@ -1672,130 +2218,7 @@ function showFalseAlarmConfirmationToast() {
             currentLongitude: null,
             ready: false
         };
-        // ============================================================================
-// GEOLOCATION INITIALIZATION - REPLACE THIS SECTION
-// ============================================================================
-
-// Get current user ID from meta tag or blade
-window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
-
-if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-        function(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            // Update for current userlive
-            updateUserLocation(window.currentUserId, lat, lng);
-            
-            console.log("Location loaded for user:", window.currentUserId);
-            console.log("Location:", lat, lng);
-            
-            // Display user location on map
-            if (window.map) {
-                // Remove existing user marker if any
-                if (window.userMarker) {
-                    window.map.removeLayer(window.userMarker);
-                }
-                
-                // Add user marker
-                window.userMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({
-                        className: 'user-location-marker',
-                        html: `<div style="
-                            width: 24px;
-                            height: 24px;
-                            background-color: #3b82f6;
-                            border: 3px solid white;
-                            border-radius: 50%;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                            animation: pulse 2s infinite;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                        ">
-                            <i class="fas fa-user" style="color: white; font-size: 12px;"></i>
-                        </div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    })
-                }).bindPopup("You are here").addTo(window.map);
-                
-                // Add accuracy circle
-                L.circle([lat, lng], {
-                    color: '#3b82f6',
-                    fillColor: '#3b82f6',
-                    fillOpacity: 0.1,
-                    radius: 50
-                }).addTo(window.map);
-            }
-            
-            // Send location to server for other users to see
-            sendUserLocationToServer(lat, lng);
-            
-            document.dispatchEvent(new Event("locationReady"));
-        },
-        function(error) {
-            console.error("Location error:", error);
-            // Fallback to default location
-            const defaultLat = 15.8222;
-            const defaultLng = 120.3297;
-            updateUserLocation(window.currentUserId, defaultLat, defaultLng);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
-    
-    // Initial fetch
-    setTimeout(() => {
-        fetchAllFirefighterLocations();
-    }, 2000);
-    
-} else {
-    console.warn("Geolocation not supported");
-    const defaultLat = 15.8222;
-    const defaultLng = 120.3297;
-    updateUserLocation(window.currentUserId, defaultLat, defaultLng);
-}
-        // if (navigator.geolocation) {
-        //     navigator.geolocation.getCurrentPosition(
-        //         function(position) {
-        //             window.userCoords.currentLatitude = position.coords.latitude;
-        //             window.userCoords.currentLongitude = position.coords.longitude;
-        //             window.userCoords.ready = true;
-                    
-        //             console.log("Location loaded:", window.userCoords.currentLatitude, window.userCoords.currentLongitude);
-                    
-        //             if (window.map) {
-        //                 L.marker([window.userCoords.currentLatitude, window.userCoords.currentLongitude])
-        //                     .addTo(window.map)
-        //                     .bindPopup("You are here")
-        //                     .openPopup();
-                        
-        //                 L.circle([window.userCoords.currentLatitude, window.userCoords.currentLongitude], {
-        //                     color: 'red',
-        //                     fillColor: '#f03',
-        //                     fillOpacity: 0.3,
-        //                     radius: 500
-        //                 }).addTo(window.map);
-        //             }
-                    
-        //             document.dispatchEvent(new Event("locationReady"));
-        //         },
-        //         function(error) {
-        //             console.error("Location error:", error);
-        //             window.userCoords.currentLatitude = 15.8222;
-        //             window.userCoords.currentLongitude = 120.3297;
-        //             window.userCoords.ready = true;
-        //         },
-        //         { enableHighAccuracy: true, timeout: 10000 }
-        //     );
-        // } else {
-        //     window.userCoords.currentLatitude = 15.8222;
-        //     window.userCoords.currentLongitude = 120.3297;
-        //     window.userCoords.ready = true;
-        // }
-        
-        window.incidentsData = @json($incidents) || [];
+        window.incidentsData = [];
         
         const sidebar = document.querySelector('.sidebar');
         const openBtn = document.getElementById('openSidebar');
@@ -1833,7 +2256,9 @@ if (navigator.geolocation) {
         const firefighterDashboardVisibilityHandler = function () {
             if (firefighterDashboardIsVisible()) {
                 fetchAssignedIncidents(true);
-                fetchAllFirefighterLocations();
+                if (typeof fetchAllFirefighterLocations === 'function') {
+                    fetchAllFirefighterLocations();
+                }
                 startFirefighterDashboardIntervals();
                 return;
             }
@@ -1841,12 +2266,11 @@ if (navigator.geolocation) {
             clearFirefighterDashboardIntervals();
         };
 
-        fetchAssignedIncidents(true);
-        window.runPendingIncidentAutoAssignment();
-        startFirefighterDashboardIntervals();
+        bootstrapFirefighterDashboard();
         window.__ffCurrentPageCleanup = function () {
             clearFirefighterDashboardIntervals();
             document.removeEventListener('visibilitychange', firefighterDashboardVisibilityHandler);
+            window.__ffAllowDashboardPrefetch = false;
             if (typeof window.destroyPyroMapRuntime === 'function') {
                 window.destroyPyroMapRuntime();
             }
@@ -2162,12 +2586,14 @@ document.addEventListener('DOMContentLoaded', function() {
         userDropdownBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             userDropdownMenu.classList.toggle('show');
+            userDropdownBtn.setAttribute('aria-expanded', userDropdownMenu.classList.contains('show') ? 'true' : 'false');
         });
         
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!userDropdownBtn.contains(e.target)) {
                 userDropdownMenu.classList.remove('show');
+                userDropdownBtn.setAttribute('aria-expanded', 'false');
             }
         });
     }
@@ -2308,6 +2734,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    --}}
     </div>
     @include('partials.pwa-body')
 </body>

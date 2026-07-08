@@ -1,27 +1,87 @@
 @php
-    $totalChecklistItems = (int) $predictionChecklists->count();
-    $pendingChecklistItems = $predictionChecklists->where('status', 'pending');
-    $inProgressChecklistItems = $predictionChecklists->where('status', 'in_progress');
-    $completedChecklistItems = $predictionChecklists->where('status', 'complied');
-    $highPriorityChecklistItems = $predictionChecklists->whereIn('priority_level', ['critical', 'high']);
-    $openMitigationActions = $mitigationActions->whereIn('status', ['planned', 'in_progress', 'blocked']);
-    $completedMitigationActions = $mitigationActions->where('status', 'completed');
-    $highPriorityMitigations = $mitigationActions->whereIn('priority_level', ['critical', 'high']);
-    $mitigationCountByChecklist = $mitigationActions
+    $legacyMitigationCountByChecklist = $mitigationActions
         ->whereNotNull('barangay_prediction_checklist_id')
         ->groupBy('barangay_prediction_checklist_id')
         ->map(fn ($group) => $group->count());
+
+    $aiMitigationCountByChecklist = $mitigationActions
+        ->whereNotNull('ai_action_plan_checklist_id')
+        ->groupBy('ai_action_plan_checklist_id')
+        ->map(fn ($group) => $group->count());
+
+    $legacyChecklistRecords = $predictionChecklists->map(function ($item) use ($legacyMitigationCountByChecklist) {
+        return (object) [
+            'source' => 'legacy',
+            'source_label' => 'Legacy Prediction Checklist',
+            'workflow_label' => 'Recommendation',
+            'title' => $item->title,
+            'detail' => $item->planning_notes ?: $item->ai_output ?: 'No checklist guidance available.',
+            'priority_level' => $item->priority_level,
+            'status_key' => $item->status,
+            'status_family' => in_array($item->status, ['complied'], true) ? 'completed' : (in_array($item->status, ['in_progress'], true) ? 'in_progress' : 'pending'),
+            'target_date' => $item->target_date,
+            'assignment' => $item->assignee?->full_name ?? 'Unassigned',
+            'reviewer' => $item->reviewer?->full_name ?? 'Not yet reviewed',
+            'completion_note' => $item->compliance_remarks ?: 'No compliance remarks yet.',
+            'linked_mitigation_count' => (int) ($legacyMitigationCountByChecklist[$item->barangay_prediction_checklist_id] ?? 0),
+            'progress_percent' => $item->status === 'complied' ? 100 : ($item->status === 'in_progress' ? 55 : 0),
+        ];
+    });
+
+    $aiChecklistRecords = $aiActionPlanChecklists->map(function ($item) use ($aiMitigationCountByChecklist) {
+        $progress = $item->checklist_progress;
+
+        return (object) [
+            'source' => 'ai_action_plan',
+            'source_label' => 'AI Action-Plan Checklist',
+            'workflow_label' => 'Mitigation Action Plan',
+            'title' => $item->plan_title,
+            'detail' => $item->plan_description ?: $item->source_description ?: 'No AI action-plan description available.',
+            'priority_level' => $item->priority_level,
+            'status_key' => $item->status,
+            'status_family' => in_array($item->status, ['confirmed'], true) ? 'completed' : (in_array($item->status, ['in_progress', 'submitted'], true) ? 'in_progress' : 'pending'),
+            'target_date' => $item->target_date,
+            'assignment' => $item->assignee?->full_name ?? 'Station command',
+            'reviewer' => $item->confirmer?->full_name ?? 'Awaiting command confirmation',
+            'completion_note' => $item->confirmation_notes ?: ($progress['followed'] ?? 0) . ' of ' . ($progress['total'] ?? 0) . ' checklist steps followed.',
+            'linked_mitigation_count' => (int) ($aiMitigationCountByChecklist[$item->ai_action_plan_checklist_id] ?? 0),
+            'progress_percent' => (int) ($progress['percent'] ?? 0),
+        ];
+    });
+
+    $unifiedChecklistRecords = $legacyChecklistRecords
+        ->concat($aiChecklistRecords)
+        ->sortBy([
+            fn ($item) => match ($item->priority_level) {
+                'critical' => 1,
+                'high' => 2,
+                'medium' => 3,
+                default => 4,
+            },
+            fn ($item) => $item->target_date?->timestamp ?? PHP_INT_MAX,
+            fn ($item) => $item->title,
+        ])
+        ->values();
+
+    $totalChecklistItems = (int) $unifiedChecklistRecords->count();
+    $pendingChecklistItems = $unifiedChecklistRecords->where('status_family', 'pending');
+    $inProgressChecklistItems = $unifiedChecklistRecords->where('status_family', 'in_progress');
+    $completedChecklistItems = $unifiedChecklistRecords->where('status_family', 'completed');
+    $highPriorityChecklistItems = $unifiedChecklistRecords->whereIn('priority_level', ['critical', 'high']);
+    $openMitigationActions = $mitigationActions->whereIn('status', ['planned', 'in_progress', 'blocked']);
+    $completedMitigationActions = $mitigationActions->where('status', 'completed');
+    $highPriorityMitigations = $mitigationActions->whereIn('priority_level', ['critical', 'high']);
 @endphp
 
 <div class="checklist-center-stack" data-checklist-center-content>
     <section class="checklist-summary-grid">
         <article class="checklist-summary-card">
             <div class="checklist-summary-head">
-                <div class="checklist-summary-label">Total Checklist Items</div>
-                <span class="checklist-summary-icon"><i class="bi bi-list-check"></i></span>
+                <div class="checklist-summary-label">Unified Register</div>
+                <span class="checklist-summary-icon"><i class="bi bi-diagram-3"></i></span>
             </div>
             <div class="checklist-summary-value">{{ $totalChecklistItems }}</div>
-            <div class="checklist-summary-copy">All prediction-linked barangay checklist items currently available in the system.</div>
+            <div class="checklist-summary-copy">Combined legacy checklist items and AI action-plan checklists visible to the barangay.</div>
         </article>
 
         <article class="checklist-summary-card">
@@ -30,7 +90,7 @@
                 <span class="checklist-summary-icon"><i class="bi bi-hourglass-top"></i></span>
             </div>
             <div class="checklist-summary-value">{{ $pendingChecklistItems->count() }}</div>
-            <div class="checklist-summary-copy">Checklist items that have not yet started and should be reviewed by the barangay team.</div>
+            <div class="checklist-summary-copy">Checklist records still waiting for barangay review or station confirmation.</div>
         </article>
 
         <article class="checklist-summary-card">
@@ -39,7 +99,7 @@
                 <span class="checklist-summary-icon"><i class="bi bi-arrow-repeat"></i></span>
             </div>
             <div class="checklist-summary-value">{{ $inProgressChecklistItems->count() }}</div>
-            <div class="checklist-summary-copy">Operational actions or inspections currently being worked on in the field.</div>
+            <div class="checklist-summary-copy">Operational work already moving from recommendation into concrete field execution.</div>
         </article>
 
         <article class="checklist-summary-card">
@@ -48,7 +108,7 @@
                 <span class="checklist-summary-icon"><i class="bi bi-exclamation-triangle"></i></span>
             </div>
             <div class="checklist-summary-value">{{ $highPriorityChecklistItems->count() }}</div>
-            <div class="checklist-summary-copy">Critical and high-priority items that should remain visible during barangay coordination.</div>
+            <div class="checklist-summary-copy">Critical and high-priority records that should remain visible during barangay coordination.</div>
         </article>
 
         <article class="checklist-summary-card">
@@ -65,49 +125,48 @@
         <div class="checklist-panel-heading">
             <div>
                 <h3>Main Checklist Register</h3>
-                <p>This is the primary page for all prediction checklist data tied to the barangay. Use it as the single central reference for inspection, awareness, and action tracking.</p>
+                <p>This is now the central checklist register for the barangay. It combines prediction-generated checklist records and the newer AI action-plan checklist flow in one operational view.</p>
             </div>
-            <span class="tag medium"><i class="bi bi-diagram-3"></i> Central view</span>
+            <span class="tag medium"><i class="bi bi-diagram-3"></i> Unified view</span>
         </div>
 
-        @if($predictionChecklists->isEmpty())
-            <div class="empty-state">No prediction checklist data is available for this barangay yet.</div>
+        @if($unifiedChecklistRecords->isEmpty())
+            <div class="empty-state">No checklist data is available for this barangay yet.</div>
         @else
             <table class="checklist-table">
                 <thead>
                     <tr>
                         <th>Checklist Item</th>
-                        <th>Type</th>
+                        <th>Flow Stage</th>
                         <th>Priority</th>
                         <th>Status</th>
                         <th>Target Date</th>
                         <th>Assignment</th>
-                        <th>Compliance Notes</th>
+                        <th>Completion / Links</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($predictionChecklists as $item)
-                        @php
-                            $linkedMitigationCount = (int) ($mitigationCountByChecklist[$item->barangay_prediction_checklist_id] ?? 0);
-                        @endphp
+                    @foreach($unifiedChecklistRecords as $item)
                         <tr>
                             <td>
                                 <strong>{{ $item->title }}</strong>
-                                <div class="checklist-inline-note">{{ $item->planning_notes ?: $item->ai_output ?: 'No checklist guidance available.' }}</div>
+                                <div class="checklist-inline-note">{{ $item->detail }}</div>
+                                <div class="checklist-inline-note">{{ $item->source_label }}</div>
                             </td>
-                            <td>{{ strtoupper(str_replace('_', ' ', $item->checklist_type ?? 'recommendation')) }}</td>
+                            <td>
+                                <span class="tag medium">{{ strtoupper($item->workflow_label) }}</span>
+                            </td>
                             <td><span class="tag {{ $item->priority_level }}">{{ strtoupper($item->priority_level) }}</span></td>
-                            <td><span class="tag {{ $item->status }}">{{ str_replace('_', ' ', strtoupper($item->status)) }}</span></td>
+                            <td><span class="tag {{ $item->status_family === 'completed' ? 'completed' : $item->status_key }}">{{ str_replace('_', ' ', strtoupper($item->status_key)) }}</span></td>
                             <td>{{ $item->target_date?->format('M d, Y') ?? 'No target date' }}</td>
                             <td>
-                                <strong>{{ $item->assignee?->full_name ?? 'Unassigned' }}</strong>
-                                <div class="checklist-inline-note">Reviewer: {{ $item->reviewer?->full_name ?? 'Not yet reviewed' }}</div>
+                                <strong>{{ $item->assignment }}</strong>
+                                <div class="checklist-inline-note">Reviewer: {{ $item->reviewer }}</div>
                             </td>
                             <td>
-                                {{ $item->compliance_remarks ?: 'No compliance remarks yet.' }}
-                                <div class="checklist-inline-note">
-                                    {{ $linkedMitigationCount }} linked mitigation {{ \Illuminate\Support\Str::plural('action', $linkedMitigationCount) }}
-                                </div>
+                                {{ $item->completion_note }}
+                                <div class="checklist-inline-note">{{ $item->linked_mitigation_count }} linked mitigation {{ \Illuminate\Support\Str::plural('action', $item->linked_mitigation_count) }}</div>
+                                <div class="checklist-inline-note">Progress: {{ $item->progress_percent }}%</div>
                             </td>
                         </tr>
                     @endforeach
@@ -154,10 +213,13 @@
                                 @if($action->checklist)
                                     <div class="checklist-inline-note"><strong>Checklist:</strong> {{ $action->checklist->title }}</div>
                                 @endif
+                                @if($action->aiActionPlanChecklist)
+                                    <div class="checklist-inline-note"><strong>AI Action Plan:</strong> {{ $action->aiActionPlanChecklist->plan_title }}</div>
+                                @endif
                                 @if($action->riskArea)
                                     <div class="checklist-inline-note"><strong>Risk / Hazard:</strong> {{ $action->riskArea->marker?->title ?? 'Linked field record' }}</div>
                                 @endif
-                                @if(! $action->checklist && ! $action->riskArea)
+                                @if(! $action->checklist && ! $action->aiActionPlanChecklist && ! $action->riskArea)
                                     <div class="checklist-inline-note">Direct station mitigation action.</div>
                                 @endif
                             </td>
@@ -241,69 +303,66 @@
         <div class="checklist-panel-heading">
             <div>
                 <h3>Operational Checklist Lanes</h3>
-                <p>Quick grouped view so the barangay can see which items still need action, which are underway, and which are already completed.</p>
+                <p>Quick grouped view so the barangay can see which records still need action, which are underway, and which are already completed.</p>
             </div>
         </div>
 
         <div class="checklist-columns">
             <div class="checklist-lane">
                 <h4>Pending</h4>
-                <p>Items waiting for assignment, validation, or first action.</p>
+                <p>Records waiting for assignment, validation, or first action.</p>
                 <div class="checklist-lane-list">
                     @forelse($pendingChecklistItems->take(6) as $item)
-                        @php
-                            $linkedMitigationCount = (int) ($mitigationCountByChecklist[$item->barangay_prediction_checklist_id] ?? 0);
-                        @endphp
                         <div class="checklist-lane-item">
                             <strong>{{ $item->title }}</strong>
-                            <span>{{ $item->planning_notes ?: $item->ai_output ?: 'No detail provided.' }}</span>
+                            <span>{{ $item->detail }}</span>
                             <div class="tag-row">
                                 <span class="tag {{ $item->priority_level }}">{{ strtoupper($item->priority_level) }}</span>
+                                <span class="tag medium">{{ strtoupper($item->workflow_label) }}</span>
                             </div>
-                            <div class="checklist-inline-note">{{ $linkedMitigationCount }} linked mitigation {{ \Illuminate\Support\Str::plural('action', $linkedMitigationCount) }}</div>
+                            <div class="checklist-inline-note">{{ $item->linked_mitigation_count }} linked mitigation {{ \Illuminate\Support\Str::plural('action', $item->linked_mitigation_count) }}</div>
                         </div>
                     @empty
-                        <div class="empty-state !mt-0">No pending checklist items.</div>
+                        <div class="empty-state !mt-0">No pending checklist records.</div>
                     @endforelse
                 </div>
             </div>
 
             <div class="checklist-lane">
                 <h4>In Progress</h4>
-                <p>Items currently being worked on by the barangay team.</p>
+                <p>Records currently being worked on by the barangay or station side.</p>
                 <div class="checklist-lane-list">
                     @forelse($inProgressChecklistItems->take(6) as $item)
-                        @php
-                            $linkedMitigationCount = (int) ($mitigationCountByChecklist[$item->barangay_prediction_checklist_id] ?? 0);
-                        @endphp
                         <div class="checklist-lane-item">
                             <strong>{{ $item->title }}</strong>
-                            <span>{{ $item->planning_notes ?: $item->ai_output ?: 'No detail provided.' }}</span>
+                            <span>{{ $item->detail }}</span>
                             <div class="tag-row">
                                 <span class="tag {{ $item->priority_level }}">{{ strtoupper($item->priority_level) }}</span>
+                                <span class="tag medium">{{ strtoupper($item->workflow_label) }}</span>
                             </div>
-                            <div class="checklist-inline-note">{{ $linkedMitigationCount }} linked mitigation {{ \Illuminate\Support\Str::plural('action', $linkedMitigationCount) }}</div>
+                            <div class="checklist-inline-note">Progress: {{ $item->progress_percent }}%</div>
                         </div>
                     @empty
-                        <div class="empty-state !mt-0">No checklist items are currently in progress.</div>
+                        <div class="empty-state !mt-0">No checklist records are currently in progress.</div>
                     @endforelse
                 </div>
             </div>
 
             <div class="checklist-lane">
-                <h4>Completed / Complied</h4>
-                <p>Items already completed and marked complied by the barangay.</p>
+                <h4>Completed</h4>
+                <p>Records already complied with or confirmed through the workflow.</p>
                 <div class="checklist-lane-list">
                     @forelse($completedChecklistItems->take(6) as $item)
                         <div class="checklist-lane-item">
                             <strong>{{ $item->title }}</strong>
-                            <span>{{ $item->compliance_remarks ?: 'Completed with no added compliance note.' }}</span>
+                            <span>{{ $item->completion_note }}</span>
                             <div class="tag-row">
-                                <span class="tag complied">COMPLIED</span>
+                                <span class="tag completed">COMPLETED</span>
+                                <span class="tag medium">{{ strtoupper($item->workflow_label) }}</span>
                             </div>
                         </div>
                     @empty
-                        <div class="empty-state !mt-0">No checklist items have been marked complied yet.</div>
+                        <div class="empty-state !mt-0">No checklist records have been completed yet.</div>
                     @endforelse
                 </div>
             </div>

@@ -12,6 +12,8 @@ class Post extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const FIREFIGHTER_DASHBOARD_RECENT_POSTS_CACHE_KEY = 'firefighter:dashboard:recent-posts';
+
     protected $fillable = [
         'user_id',
         'content',
@@ -136,5 +138,10 @@ public function getImageUrlsAttribute()
     public function scopeRecent($query)
     {
         return $query->orderBy('is_pinned', 'desc')->orderBy('created_at', 'desc');
+    }
+
+    public static function flushDashboardRecentPostsCache(): void
+    {
+        cache()->forget(self::FIREFIGHTER_DASHBOARD_RECENT_POSTS_CACHE_KEY);
     }
 }

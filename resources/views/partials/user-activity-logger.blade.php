@@ -6,7 +6,6 @@
 
     window.__userActivityLoggerInitialized = true;
 
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const userRole = (document.querySelector('meta[name="user-role"]')?.getAttribute('content') || 'user')
         .trim()
         .toLowerCase();
@@ -26,6 +25,7 @@
 
     function send(action) {
         const normalized = toAction(action);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
         if (!normalized || !csrfToken) {
             return;
@@ -40,7 +40,9 @@
 
         recentActions.set(normalized, now);
 
-        fetch(endpoint, {
+        const request = window.pyroFetch || window.fetch.bind(window);
+
+        request(endpoint, {
             method: 'POST',
             credentials: 'same-origin',
             keepalive: true,

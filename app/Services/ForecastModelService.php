@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Arr;
 
 class ForecastModelService
 {
@@ -60,6 +61,66 @@ class ForecastModelService
         }
 
         return $latestDataUpdate > $metadataMtime;
+    }
+
+    public function readMetadataSummary(): array
+    {
+        if (! File::exists($this->metadataPath)) {
+            return [
+                'model_ready' => false,
+                'model_path' => $this->modelPath,
+                'metadata_path' => $this->metadataPath,
+            ];
+        }
+
+        try {
+            $decoded = json_decode(File::get($this->metadataPath), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable $e) {
+            Log::warning('Unable to read forecast model metadata: ' . $e->getMessage());
+
+            return [
+                'model_ready' => File::exists($this->modelPath),
+                'model_path' => $this->modelPath,
+                'metadata_path' => $this->metadataPath,
+                'metadata_error' => $e->getMessage(),
+            ];
+        }
+
+        $metrics = Arr::get($decoded, 'metrics', []);
+
+        return [
+            'model_ready' => File::exists($this->modelPath),
+            'dataset_kind' => Arr::get($decoded, 'dataset_kind'),
+            'dataset_path' => Arr::get($decoded, 'dataset_path'),
+            'target_column' => Arr::get($decoded, 'target_column'),
+            'target_description' => Arr::get($decoded, 'target_description'),
+            'records_used' => Arr::get($decoded, 'records_used'),
+            'trained_at' => Arr::get($decoded, 'trained_at'),
+            'feature_count' => count(Arr::get($decoded, 'feature_columns', [])),
+            'top_global_signals' => collect(Arr::get($decoded, 'global_feature_importance', []))
+                ->take(5)
+                ->map(function ($item) {
+                    return [
+                        'feature' => $item['feature'] ?? null,
+                        'importance' => isset($item['importance']) ? round((float) $item['importance'], 4) : null,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'metrics' => [
+                'accuracy' => Arr::get($metrics, 'accuracy'),
+                'roc_auc' => Arr::get($metrics, 'roc_auc'),
+                'precision' => Arr::get($metrics, 'precision'),
+                'recall' => Arr::get($metrics, 'recall'),
+                'f1_score' => Arr::get($metrics, 'f1_score'),
+                'brier_score' => Arr::get($metrics, 'brier_score'),
+                'cross_val_roc_auc_mean' => Arr::get($metrics, 'cross_val_roc_auc_mean'),
+            ],
+            'regression_metrics' => Arr::get($metrics, 'regression_metrics', []),
+            'notes' => Arr::get($decoded, 'notes', []),
+            'model_path' => $this->modelPath,
+            'metadata_path' => $this->metadataPath,
+        ];
     }
 
     private function resolveLatestDataUpdateTimestamp(): ?int

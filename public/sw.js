@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260701-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260708-1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -6,11 +6,17 @@ const TILE_CACHE = `${CACHE_VERSION}-tiles`;
 const OFFLINE_URL = '/offline.html';
 const LANDING_URL = '/';
 
+const NO_CACHE_HTML_PATTERNS = [
+    /^\/auth(?:\/.*)?$/i,
+    /^\/login$/i,
+    /^\/logout$/i,
+    /^\/firefighter(?:\/.*)?$/i,
+    /^\/admin(?:\/.*)?$/i,
+    /^\/chief(?:\/.*)?$/i
+];
+
 const APP_SHELL_URLS = [
     LANDING_URL,
-    '/dashboard',
-    '/citizen/dashboard',
-    '/citizen/mobile-hub',
     '/pwa/start',
     '/pwa/quick-report',
     '/manifest.json',
@@ -77,6 +83,7 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
     const isSameOrigin = url.origin === self.location.origin;
     const isNavigation = request.mode === 'navigate';
+    const isProtectedHtmlRoute = isSameOrigin && NO_CACHE_HTML_PATTERNS.some((pattern) => pattern.test(url.pathname));
     const isTileRequest = url.hostname.includes('tile.openstreetmap.org')
         || url.pathname.includes('/MapServer/tile/');
     const isStaticAsset = request.destination === 'style'
@@ -104,7 +111,8 @@ self.addEventListener('fetch', (event) => {
         || url.pathname.startsWith('/barangay/')
     );
     const isAuthRequest = isSameOrigin && (
-        url.pathname === '/login'
+        url.pathname === '/auth'
+        || url.pathname === '/login'
         || url.pathname === '/logout'
         || url.pathname.startsWith('/auth/')
         || url.pathname === '/check-auth'
@@ -125,6 +133,11 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (isNavigation) {
+        if (isProtectedHtmlRoute || isAuthRequest) {
+            event.respondWith(handleProtectedNavigationRequest(request));
+            return;
+        }
+
         event.respondWith(handleNavigationRequest(request));
         return;
     }
@@ -135,9 +148,31 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (isSameOrigin) {
+        if (isProtectedHtmlRoute || isAuthRequest) {
+            event.respondWith(fetch(request));
+            return;
+        }
+
         event.respondWith(networkFirst(request, DYNAMIC_CACHE));
     }
 });
+
+async function handleProtectedNavigationRequest(request) {
+    try {
+        return await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
+    } catch (error) {
+        const offlinePage = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+        if (offlinePage) {
+            return offlinePage;
+        }
+
+        return new Response('Offline', {
+            status: 503,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'text/plain' }
+        });
+    }
+}
 
 async function handleNavigationRequest(request) {
     try {

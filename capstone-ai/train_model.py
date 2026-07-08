@@ -82,6 +82,19 @@ STATION_BARANGAY_MONTHLY_COLUMNS = [
     "poor_access_count",
     "affected_households",
     "risk_area_pressure_signal",
+    "ai_checklist_total",
+    "ai_checklist_confirmed_count",
+    "ai_checklist_active_count",
+    "ai_checklist_completion_ratio",
+    "ai_checklist_item_total",
+    "ai_checklist_item_followed_ratio",
+    "linked_mitigation_total",
+    "linked_mitigation_completed_count",
+    "linked_mitigation_blocked_count",
+    "linked_mitigation_open_count",
+    "mitigation_completion_ratio",
+    "avg_mitigation_completion_days",
+    "mitigation_readiness_signal",
     "density",
     "materials",
     "peak_hours",
@@ -104,6 +117,22 @@ RISK_AREA_SIGNAL_COLUMNS = [
     "poor_access_count",
     "affected_households",
     "risk_area_pressure_signal",
+]
+
+CHECKLIST_SIGNAL_COLUMNS = [
+    "ai_checklist_total",
+    "ai_checklist_confirmed_count",
+    "ai_checklist_active_count",
+    "ai_checklist_completion_ratio",
+    "ai_checklist_item_total",
+    "ai_checklist_item_followed_ratio",
+    "linked_mitigation_total",
+    "linked_mitigation_completed_count",
+    "linked_mitigation_blocked_count",
+    "linked_mitigation_open_count",
+    "mitigation_completion_ratio",
+    "avg_mitigation_completion_days",
+    "mitigation_readiness_signal",
 ]
 
 MERGED_INCIDENT_REQUIRED_COLUMNS = [
@@ -274,7 +303,7 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
 
     missing_columns = [
         column for column in STATION_BARANGAY_MONTHLY_COLUMNS
-        if column not in df.columns and column not in RISK_AREA_SIGNAL_COLUMNS
+        if column not in df.columns and column not in RISK_AREA_SIGNAL_COLUMNS and column not in CHECKLIST_SIGNAL_COLUMNS
     ]
     if missing_columns:
         raise ValueError(f"station_barangay_monthly dataset is missing required fields: {', '.join(missing_columns)}")
@@ -304,6 +333,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "poor_access_count",
         "affected_households",
         "risk_area_pressure_signal",
+        "ai_checklist_total",
+        "ai_checklist_confirmed_count",
+        "ai_checklist_active_count",
+        "ai_checklist_completion_ratio",
+        "ai_checklist_item_total",
+        "ai_checklist_item_followed_ratio",
+        "linked_mitigation_total",
+        "linked_mitigation_completed_count",
+        "linked_mitigation_blocked_count",
+        "linked_mitigation_open_count",
+        "mitigation_completion_ratio",
+        "avg_mitigation_completion_days",
+        "mitigation_readiness_signal",
     ]
     for column in numeric_columns:
         df[column] = pd.to_numeric(df[column], errors="coerce")
@@ -319,6 +361,11 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
 
     for column in RISK_AREA_SIGNAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = 0
+        df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
+
+    for column in CHECKLIST_SIGNAL_COLUMNS:
         if column not in df.columns:
             df[column] = 0
         df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
@@ -365,6 +412,9 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         + df["risk_area_pressure_signal"] * 0.9
         + df["high_assessment_count"] * 1.1
         + df["blocked_hydrant_count"] * 0.8
+        - df["mitigation_readiness_signal"] * 0.6
+        - df["mitigation_completion_ratio"] * 1.5
+        - df["ai_checklist_item_followed_ratio"] * 1.0
     )
 
     df["target_high_risk_barangay_month"] = (
@@ -394,6 +444,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "poor_access_count",
         "affected_households",
         "risk_area_pressure_signal",
+        "ai_checklist_total",
+        "ai_checklist_confirmed_count",
+        "ai_checklist_active_count",
+        "ai_checklist_completion_ratio",
+        "ai_checklist_item_total",
+        "ai_checklist_item_followed_ratio",
+        "linked_mitigation_total",
+        "linked_mitigation_completed_count",
+        "linked_mitigation_blocked_count",
+        "linked_mitigation_open_count",
+        "mitigation_completion_ratio",
+        "avg_mitigation_completion_days",
+        "mitigation_readiness_signal",
         "month_sin",
         "month_cos",
         "is_dry_season",
@@ -449,6 +512,19 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "poor_access_count",
             "affected_households",
             "risk_area_pressure_signal",
+            "ai_checklist_total",
+            "ai_checklist_confirmed_count",
+            "ai_checklist_active_count",
+            "ai_checklist_completion_ratio",
+            "ai_checklist_item_total",
+            "ai_checklist_item_followed_ratio",
+            "linked_mitigation_total",
+            "linked_mitigation_completed_count",
+            "linked_mitigation_blocked_count",
+            "linked_mitigation_open_count",
+            "mitigation_completion_ratio",
+            "avg_mitigation_completion_days",
+            "mitigation_readiness_signal",
             "month_sin",
             "month_cos",
             "is_dry_season",

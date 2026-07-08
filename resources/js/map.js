@@ -1734,13 +1734,20 @@ async function clearActiveRoute() {
 // MAP INITIALIZATION
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', function() {
+function initializePyroMapRuntime() {
     const configuredContainerId = window.mapInstanceConfig?.containerId || 'map';
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || 'default';
     const mapContainer = document.getElementById(configuredContainerId);
     if (!mapContainer) {
         console.error('Map container not found!');
         return;
+    }
+
+    if (window.mapInstances?.[configuredInstanceKey]) {
+        window.map = window.mapInstances[configuredInstanceKey];
+        window.activeMapInstanceKey = configuredInstanceKey;
+        setTimeout(() => window.map?.invalidateSize(), 0);
+        return window.map;
     }
     
     const initializedMap = L.map(configuredContainerId, {
@@ -1787,6 +1794,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Start polling for routes from database
     startRoutePolling();
+    return initializedMap;
+}
+
+window.initializePyroMapRuntime = initializePyroMapRuntime;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || 'default';
+
+    if (window.deferPyroMapInit === true && configuredInstanceKey === 'firefighterDashboard') {
+        return;
+    }
+
+    initializePyroMapRuntime();
 });
 
 // Colors for shapes

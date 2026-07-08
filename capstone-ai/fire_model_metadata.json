@@ -4,7 +4,7 @@
   "dataset_kind": "station_barangay_monthly",
   "target_column": "target_high_risk_barangay_month",
   "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
-  "records_used": 384,
+  "records_used": 432,
   "feature_columns": [
     "station_id",
     "barangay_id",
@@ -26,6 +26,19 @@
     "poor_access_count",
     "affected_households",
     "risk_area_pressure_signal",
+    "ai_checklist_total",
+    "ai_checklist_confirmed_count",
+    "ai_checklist_active_count",
+    "ai_checklist_completion_ratio",
+    "ai_checklist_item_total",
+    "ai_checklist_item_followed_ratio",
+    "linked_mitigation_total",
+    "linked_mitigation_completed_count",
+    "linked_mitigation_blocked_count",
+    "linked_mitigation_open_count",
+    "mitigation_completion_ratio",
+    "avg_mitigation_completion_days",
+    "mitigation_readiness_signal",
     "month_sin",
     "month_cos",
     "is_dry_season",
@@ -47,48 +60,48 @@
   "global_feature_importance": [
     {
       "feature": "materials",
-      "importance": 0.1547
-    },
-    {
-      "feature": "occupancy",
-      "importance": 0.1419
-    },
-    {
-      "feature": "density",
-      "importance": 0.1285
-    },
-    {
-      "feature": "peak_hours",
-      "importance": 0.1165
-    },
-    {
-      "feature": "barangay_pressure_signal",
-      "importance": 0.0926
-    },
-    {
-      "feature": "accesibility",
-      "importance": 0.084
+      "importance": 0.1666
     },
     {
       "feature": "type_incident",
-      "importance": 0.0765
+      "importance": 0.1393
+    },
+    {
+      "feature": "occupancy",
+      "importance": 0.1192
+    },
+    {
+      "feature": "barangay_pressure_signal",
+      "importance": 0.0923
+    },
+    {
+      "feature": "accesibility",
+      "importance": 0.0757
+    },
+    {
+      "feature": "peak_hours",
+      "importance": 0.07
+    },
+    {
+      "feature": "density",
+      "importance": 0.0653
+    },
+    {
+      "feature": "average_temperature",
+      "importance": 0.0447
     },
     {
       "feature": "barangay_name",
-      "importance": 0.0386
-    },
-    {
-      "feature": "barangay_id",
-      "importance": 0.029
+      "importance": 0.0376
     },
     {
       "feature": "temperature_signal",
-      "importance": 0.0287
+      "importance": 0.0371
     }
   ],
   "reference_profile": {
     "station_id": 1.0,
-    "barangay_id": 259.0,
+    "barangay_id": 257.0,
     "year": 2024.5,
     "average_temperature": 30.0,
     "average_humidity": 0.0,
@@ -107,6 +120,19 @@
     "poor_access_count": 0.0,
     "affected_households": 0.0,
     "risk_area_pressure_signal": 0.0,
+    "ai_checklist_total": 0.0,
+    "ai_checklist_confirmed_count": 0.0,
+    "ai_checklist_active_count": 0.0,
+    "ai_checklist_completion_ratio": 0.0,
+    "ai_checklist_item_total": 0.0,
+    "ai_checklist_item_followed_ratio": 0.0,
+    "linked_mitigation_total": 0.0,
+    "linked_mitigation_completed_count": 0.0,
+    "linked_mitigation_blocked_count": 0.0,
+    "linked_mitigation_open_count": 0.0,
+    "mitigation_completion_ratio": 0.0,
+    "avg_mitigation_completion_days": 0.0,
+    "mitigation_readiness_signal": 0.0,
     "month_sin": -0.0,
     "month_cos": -0.0,
     "is_dry_season": 0.5,
@@ -115,7 +141,7 @@
     "humidity_signal": 0.0,
     "wind_signal": 0.0,
     "barangay_pressure_signal": 10.5,
-    "barangay_name": "Angatel",
+    "barangay_name": "Poblacion",
     "weather_condition": "unknown",
     "season": "dry",
     "density": "medium",
@@ -126,28 +152,28 @@
     "occupancy": "mixed-use"
   },
   "metrics": {
-    "train_rows": 288,
-    "test_rows": 96,
-    "accuracy": 0.9688,
-    "roc_auc": 0.957,
+    "train_rows": 324,
+    "test_rows": 108,
+    "accuracy": 0.9722,
+    "roc_auc": 0.8921,
     "precision": 0.0,
     "recall": 0.0,
     "f1_score": 0.0,
-    "brier_score": 0.0248,
-    "cross_val_roc_auc_mean": 0.9557,
+    "brier_score": 0.0242,
+    "cross_val_roc_auc_mean": 0.9273,
     "cross_val_roc_auc_scores": [
-      0.96,
-      0.92,
-      0.9505,
-      0.955,
-      0.9932
+      0.9365,
+      0.9286,
+      0.9464,
+      0.8571,
+      0.9679
     ],
     "classification_report": {
       "0": {
-        "precision": 0.96875,
+        "precision": 0.9722222222222222,
         "recall": 1.0,
-        "f1-score": 0.9841269841269841,
-        "support": 93.0
+        "f1-score": 0.9859154929577465,
+        "support": 105.0
       },
       "1": {
         "precision": 0.0,
@@ -155,40 +181,40 @@
         "f1-score": 0.0,
         "support": 3.0
       },
-      "accuracy": 0.96875,
+      "accuracy": 0.9722222222222222,
       "macro avg": {
-        "precision": 0.484375,
+        "precision": 0.4861111111111111,
         "recall": 0.5,
-        "f1-score": 0.49206349206349204,
-        "support": 96.0
+        "f1-score": 0.49295774647887325,
+        "support": 108.0
       },
       "weighted avg": {
-        "precision": 0.9384765625,
-        "recall": 0.96875,
-        "f1-score": 0.9533730158730158,
-        "support": 96.0
+        "precision": 0.945216049382716,
+        "recall": 0.9722222222222222,
+        "f1-score": 0.9585289514866979,
+        "support": 108.0
       }
     },
     "regression_metrics": {
       "predicted_incident_count": {
         "target_column": "incident_count",
-        "train_rows": 288,
-        "test_rows": 96,
-        "mae": 0.0215,
-        "rmse": 0.1335,
-        "r2_score": 0.1269
+        "train_rows": 324,
+        "test_rows": 108,
+        "mae": 0.0228,
+        "rmse": 0.092,
+        "r2_score": 0.6867
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
-        "train_rows": 288,
-        "test_rows": 96,
-        "mae": 1022.2417,
-        "rmse": 5880.382,
-        "r2_score": -0.2954
+        "train_rows": 324,
+        "test_rows": 108,
+        "mae": 13053.9029,
+        "rmse": 134516.7359,
+        "r2_score": -0.0064
       }
     }
   },
-  "trained_at": "2026-06-30T23:38:10.575441+00:00",
+  "trained_at": "2026-07-08T08:19:59.830247+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

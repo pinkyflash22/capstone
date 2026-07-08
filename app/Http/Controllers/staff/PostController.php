@@ -106,6 +106,7 @@ public function index()
             ]);
 
             DB::commit();
+            Post::flushDashboardRecentPostsCache();
             UserActivityLogger::log('created post', auth()->user()?->user_id, $request);
 
             $post->load(['user.role', 'comments.user', 'likes']);
@@ -221,6 +222,7 @@ public function index()
             ]);
 
             DB::commit();
+            Post::flushDashboardRecentPostsCache();
             UserActivityLogger::log('updated post', auth()->user()?->user_id, $request);
 
             $post->refresh()->load(['user.role', 'comments.user', 'likes']);
@@ -352,6 +354,7 @@ public function index()
             }
 
             DB::commit();
+            Post::flushDashboardRecentPostsCache();
             UserActivityLogger::log($liked ? 'liked post' : 'unliked post', auth()->user()?->user_id, request());
 
             return response()->json([
@@ -389,6 +392,7 @@ public function index()
             Post::where('id', $postId)->increment('comments_count');
 
             DB::commit();
+            Post::flushDashboardRecentPostsCache();
             UserActivityLogger::log('commented post', auth()->user()?->user_id, $request);
 
             $comment->load('user');
@@ -438,6 +442,7 @@ public function index()
             $post->delete();
 
             DB::commit();
+            Post::flushDashboardRecentPostsCache();
             UserActivityLogger::log('deleted post', auth()->user()?->user_id, request());
 
             return response()->json([

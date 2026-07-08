@@ -415,6 +415,11 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard', [FirefighterController::class, 'index'])->name('dashboard');
         Route::get('/incident-view', [FirefighterController::class, 'incidentView'])->name('view-this-page');
         Route::get('/my-station', [FirefighterController::class, 'myStation'])->name('my-station');
+        Route::get('/api/my-station/overview', [FirefighterController::class, 'myStationOverviewData'])->name('my-station.overview');
+        Route::get('/api/my-station/personnel', [FirefighterController::class, 'myStationPersonnelData'])->name('my-station.personnel');
+        Route::get('/api/my-station/equipment', [FirefighterController::class, 'myStationEquipmentData'])->name('my-station.equipment');
+        Route::get('/api/my-station/reports', [FirefighterController::class, 'myStationReportsData'])->name('my-station.reports');
+        Route::get('/api/my-station/modal-data', [FirefighterController::class, 'myStationModalData'])->name('my-station.modal-data');
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
         Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
@@ -425,6 +430,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/schedule', [FirefighterController::class, 'schedule'])->name('schedule');
         Route::get('/api/schedule', [FirefighterController::class, 'scheduleData'])->name('schedule.data');
         Route::get('/api/dashboard', [FirefighterController::class, 'dashboardData'])->name('dashboard.data');
+        Route::get('/api/dashboard/posts', [FirefighterController::class, 'dashboardPostsData'])->name('dashboard.posts');
         Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::put('/schedule/events/{eventActivity}', [FirefighterController::class, 'updateScheduleEvent'])->name('schedule.events.update');
         Route::delete('/schedule/events/{eventActivity}', [FirefighterController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');

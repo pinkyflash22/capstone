@@ -976,6 +976,28 @@
     </div>
 </div>
 
+<div class="ff-route-skeleton" data-ff-route-skeleton="station" aria-hidden="true">
+    <div class="ff-route-skeleton__surface">
+        <div class="ff-route-skeleton__content">
+            <div class="ff-route-skeleton__topbar">
+                <div style="display:grid; gap:10px; min-width:0;">
+                    <div class="ff-route-skeleton__line ff-route-skeleton__line--title"></div>
+                    <div class="ff-route-skeleton__line ff-route-skeleton__line--subtitle"></div>
+                </div>
+                <div class="ff-route-skeleton__topbar-actions">
+                    <div class="ff-route-skeleton__pill"></div>
+                </div>
+            </div>
+            <div class="ff-route-skeleton__panel" style="min-height: 260px;"></div>
+            <div class="ff-route-skeleton__layout-two">
+                <div class="ff-route-skeleton__panel" style="min-height: 250px;"></div>
+                <div class="ff-route-skeleton__panel" style="min-height: 250px;"></div>
+            </div>
+            <div class="ff-route-skeleton__panel" style="min-height: 380px;"></div>
+        </div>
+    </div>
+</div>
+
 <div id="{{ $backdropId }}" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden transition-opacity duration-300"></div>
 
 <script>
@@ -994,9 +1016,10 @@ document.addEventListener('DOMContentLoaded', function () {
         incidents: document.querySelector('[data-ff-route-skeleton="incidents"]'),
         announcements: document.querySelector('[data-ff-route-skeleton="announcements"]'),
         profile: document.querySelector('[data-ff-route-skeleton="profile"]'),
-        schedule: document.querySelector('[data-ff-route-skeleton="schedule"]')
+        schedule: document.querySelector('[data-ff-route-skeleton="schedule"]'),
+        station: document.querySelector('[data-ff-route-skeleton="station"]')
     };
-    const partialRouteKeys = new Set(['incidents', 'announcements', 'profile', 'schedule']);
+    const partialRouteKeys = new Set(['incidents', 'announcements', 'profile', 'schedule', 'station']);
     const prefetchedRoutes = new Set();
     const prefetchedPages = new Map();
     const pendingPrefetchTimers = new Map();
@@ -1183,6 +1206,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const routeKey = currentPageRoot?.dataset?.ffPageRoot || '';
 
         if (routeKey !== 'dashboard') {
+            return;
+        }
+
+        if (window.__ffAllowDashboardPrefetch !== true) {
             return;
         }
 

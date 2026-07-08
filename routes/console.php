@@ -2,6 +2,7 @@
 
 use App\Models\HistoricalFireIncident;
 use App\Models\Incident;
+use App\Services\PredictionFeedbackSignalService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -136,6 +137,18 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
         $barangayCoverageByStation[(int) $stationId] = $stationBarangays->unique('barangay_id')->values();
     }
 
+    $coveredBarangayIds = collect($barangayCoverageByStation)
+        ->flatten(1)
+        ->pluck('barangay_id')
+        ->map(fn ($id) => (int) $id)
+        ->filter(fn ($id) => $id > 0)
+        ->unique()
+        ->values();
+
+    /** @var PredictionFeedbackSignalService $predictionFeedbackSignals */
+    $predictionFeedbackSignals = app(PredictionFeedbackSignalService::class);
+    $predictionFeedbackSignals->warmForBarangays($coveredBarangayIds);
+
     $allHistoricalIncidents = DB::table('historical_fire_incidents')
         ->select([
             'barangay_id',
@@ -178,6 +191,12 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
         }
 
         foreach ($barangays as $barangay) {
+            try {
+                $snapshotDate = Carbon::createFromFormat('F Y', trim((string) $row->month) . ' ' . (int) $row->year)->endOfMonth();
+            } catch (\Throwable $e) {
+                $snapshotDate = Carbon::create((int) $row->year, 12, 31)->endOfDay();
+            }
+
             $incidentKey = implode('|', [
                 (int) $barangay->barangay_id,
                 (int) $row->year,
@@ -280,6 +299,8 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
                 $riskLevel = 'medium';
             }
 
+            $feedbackSignals = $predictionFeedbackSignals->snapshotForBarangay((int) $barangay->barangay_id, $snapshotDate);
+
             $records[] = [
                 'station_id' => $stationId,
                 'barangay_id' => (int) $barangay->barangay_id,
@@ -310,6 +331,19 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
                 'poor_access_count' => $poorAccessCount,
                 'affected_households' => $affectedHouseholds,
                 'risk_area_pressure_signal' => $riskAreaPressureSignal,
+                'ai_checklist_total' => (int) ($feedbackSignals['ai_checklist_total'] ?? 0),
+                'ai_checklist_confirmed_count' => (int) ($feedbackSignals['ai_checklist_confirmed_count'] ?? 0),
+                'ai_checklist_active_count' => (int) ($feedbackSignals['ai_checklist_active_count'] ?? 0),
+                'ai_checklist_completion_ratio' => (float) ($feedbackSignals['ai_checklist_completion_ratio'] ?? 0),
+                'ai_checklist_item_total' => (int) ($feedbackSignals['ai_checklist_item_total'] ?? 0),
+                'ai_checklist_item_followed_ratio' => (float) ($feedbackSignals['ai_checklist_item_followed_ratio'] ?? 0),
+                'linked_mitigation_total' => (int) ($feedbackSignals['linked_mitigation_total'] ?? 0),
+                'linked_mitigation_completed_count' => (int) ($feedbackSignals['linked_mitigation_completed_count'] ?? 0),
+                'linked_mitigation_blocked_count' => (int) ($feedbackSignals['linked_mitigation_blocked_count'] ?? 0),
+                'linked_mitigation_open_count' => (int) ($feedbackSignals['linked_mitigation_open_count'] ?? 0),
+                'mitigation_completion_ratio' => (float) ($feedbackSignals['mitigation_completion_ratio'] ?? 0),
+                'avg_mitigation_completion_days' => (float) ($feedbackSignals['avg_mitigation_completion_days'] ?? 0),
+                'mitigation_readiness_signal' => (float) ($feedbackSignals['mitigation_readiness_signal'] ?? 0),
                 'density' => $row->density ?: 'medium',
                 'materials' => $row->materials ?: 'mixed',
                 'peak_hours' => $peakHours ?: ($row->peak_hours ?: 'unknown'),
@@ -357,6 +391,19 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
             'poor_access_count',
             'affected_households',
             'risk_area_pressure_signal',
+            'ai_checklist_total',
+            'ai_checklist_confirmed_count',
+            'ai_checklist_active_count',
+            'ai_checklist_completion_ratio',
+            'ai_checklist_item_total',
+            'ai_checklist_item_followed_ratio',
+            'linked_mitigation_total',
+            'linked_mitigation_completed_count',
+            'linked_mitigation_blocked_count',
+            'linked_mitigation_open_count',
+            'mitigation_completion_ratio',
+            'avg_mitigation_completion_days',
+            'mitigation_readiness_signal',
             'density',
             'materials',
             'peak_hours',

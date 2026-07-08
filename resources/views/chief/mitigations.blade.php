@@ -211,6 +211,18 @@
                 </div>
 
                 <div class="mitigation-stack">
+                    @if(!empty($mitigationDraft))
+                        <section class="panel" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>Draft Ready From AI Action Plan</h3>
+                                    <p>The create form has been prefilled from <strong>{{ $mitigationDraft['source_title'] ?? ($mitigationDraft['title'] ?? 'the selected checklist') }}</strong>. This keeps the workflow aligned as Prediction -> Recommendation -> Checklist -> Mitigation Action Plan.</p>
+                                </div>
+                                <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-wand-magic-sparkles"></i><span>Open Draft</span></button>
+                            </div>
+                        </section>
+                    @endif
+
                     <section class="summary-grid">
                         <article class="card"><div class="card-label">Total Actions</div><div class="card-value">{{ $mitigationActions->count() }}</div><div class="card-copy">All mitigation records currently managed by station command.</div></article>
                         <article class="card"><div class="card-label">Open Actions</div><div class="card-value">{{ $openMitigations->count() }}</div><div class="card-copy">Planned, in-progress, and blocked actions needing command follow-through.</div></article>
@@ -495,6 +507,10 @@
             }
 
             @if($errors->any())
+                openModal(createModal);
+            @endif
+
+            @if(!empty($autoOpenCreateModal))
                 openModal(createModal);
             @endif
         });

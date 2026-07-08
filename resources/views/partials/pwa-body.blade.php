@@ -345,10 +345,95 @@
         const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue`;
         const STATUS_KEY = `${STORAGE_PREFIX}:status`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
+        const AUTH_URL = @json(url('/auth'));
         const pill = document.getElementById('pyrosenseConnectionPill');
         const pillIcon = document.getElementById('pyrosenseConnectionPillIcon');
         const pillTitle = document.getElementById('pyrosenseConnectionPillTitle');
         const pillText = document.getElementById('pyrosenseConnectionPillText');
+        const nativeFetch = window.fetch.bind(window);
+        let sessionExpiredPromptOpen = false;
+        let sessionExpiredDetected = false;
+
+        function getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        }
+
+        function isWriteMethod(method) {
+            const normalized = String(method || 'GET').toUpperCase();
+            return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalized);
+        }
+
+        function isSameOriginRequest(input) {
+            try {
+                const requestUrl = typeof input === 'string'
+                    ? input
+                    : (input instanceof Request ? input.url : String(input?.url || ''));
+
+                const resolved = new URL(requestUrl, window.location.origin);
+                return resolved.origin === window.location.origin;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function handleSessionExpired() {
+            if (sessionExpiredPromptOpen) {
+                return;
+            }
+
+            sessionExpiredPromptOpen = true;
+            sessionExpiredDetected = true;
+
+            const confirmed = window.confirm('Your session expired. Please sign in again.');
+            sessionExpiredPromptOpen = false;
+
+            if (confirmed) {
+                window.location.assign(AUTH_URL);
+            }
+        }
+
+        async function pyroFetch(input, init = {}) {
+            const method = String(
+                init.method
+                || (input instanceof Request ? input.method : 'GET')
+            ).toUpperCase();
+            const sameOrigin = isSameOriginRequest(input);
+            const requestInit = { ...init };
+
+            if (sameOrigin) {
+                requestInit.credentials = requestInit.credentials || 'same-origin';
+            }
+
+            if (sameOrigin && isWriteMethod(method)) {
+                const headers = new Headers(requestInit.headers || (input instanceof Request ? input.headers : undefined) || {});
+                headers.set('Accept', 'application/json');
+                headers.set('X-Requested-With', 'XMLHttpRequest');
+
+                const csrfToken = getCsrfToken();
+                if (csrfToken) {
+                    headers.set('X-CSRF-TOKEN', csrfToken);
+                }
+
+                requestInit.headers = headers;
+            }
+
+            const response = await nativeFetch(input, requestInit);
+
+            if (sameOrigin && isWriteMethod(method) && response.status === 419) {
+                handleSessionExpired();
+            }
+
+            return response;
+        }
+
+        window.pyroFetch = pyroFetch;
+
+        if (!window.__pyroFetchWrapped) {
+            window.fetch = function (input, init) {
+                return pyroFetch(input, init);
+            };
+            window.__pyroFetchWrapped = true;
+        }
 
         function safeReadJson(key, fallback) {
             try {
@@ -445,6 +530,10 @@
                 return { synced: 0, remaining: getQueue().length };
             }
 
+            if (sessionExpiredDetected) {
+                return { synced: 0, remaining: getQueue().length };
+            }
+
             const queue = getQueue();
             if (!queue.length) {
                 updateConnectionState(true);
@@ -456,11 +545,16 @@
 
             for (const item of queue) {
                 try {
-                    const response = await fetch(item.url, {
+                    const response = await pyroFetch(item.url, {
                         method: item.method || 'POST',
                         headers: item.headers || {},
                         body: item.body || null
                     });
+
+                    if (response.status === 419) {
+                        remaining.push(item);
+                        break;
+                    }
 
                     if (!response.ok) {
                         remaining.push(item);

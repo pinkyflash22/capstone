@@ -1372,6 +1372,8 @@
             const drivers = Array.isArray(prediction?.drivers) ? prediction.drivers : [];
             const likelyPeakHours = Array.isArray(prediction?.likely_peak_hours) ? prediction.likely_peak_hours : [];
             const focusLabel = currentPredictionDetails.prediction_context?.target_period_label || prediction?.prediction_context?.target_period_label || prediction?.forecast_window || 'Forecast window';
+            const modelMetadata = currentPredictionDetails.model_metadata || null;
+            const workflowContext = currentPredictionDetails.workflow_context || null;
             const selectedBarangay = currentPredictionDetails.selected_barangay_prediction || null;
             const topHotspot = !selectedBarangay && Array.isArray(currentBarangayPredictions) && currentBarangayPredictions.length
                 ? [...currentBarangayPredictions].sort((a, b) => Number(b.probability_percent ?? 0) - Number(a.probability_percent ?? 0))[0]
@@ -1436,6 +1438,36 @@
                         </div>
                     ` : ''}
 
+                    ${modelMetadata ? `
+                        <div style="padding:16px; border-radius:16px; background:#f8fafc; border:1px solid #e2e8f0;">
+                            <div style="font-size:12px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">Model Evidence</div>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+                                <div>
+                                    <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">Dataset</div>
+                                    <div style="font-size:14px; color:#0f172a; font-weight:800; margin-top:4px;">${escapeHtml(modelMetadata.dataset_kind || 'Unknown')}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">Records Used</div>
+                                    <div style="font-size:14px; color:#0f172a; font-weight:800; margin-top:4px;">${escapeHtml(String(modelMetadata.records_used || 'N/A'))}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">Last Trained</div>
+                                    <div style="font-size:14px; color:#0f172a; font-weight:800; margin-top:4px;">${escapeHtml(modelMetadata.trained_at || 'Unavailable')}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">Top Signals</div>
+                                    <div style="font-size:13px; color:#334155; line-height:1.6; margin-top:4px;">${escapeHtml((modelMetadata.top_global_signals || []).map((signal) => signal.feature).join(', ') || 'Unavailable')}</div>
+                                </div>
+                            </div>
+                            ${workflowContext?.next_actions?.length ? `
+                                <div style="margin-top:14px; padding-top:14px; border-top:1px solid #e2e8f0;">
+                                    <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:800;">Workflow</div>
+                                    <div style="font-size:13px; color:#334155; line-height:1.7; margin-top:6px;">${escapeHtml((workflowContext.next_actions || []).join(' | '))}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+
                     <div style="padding:16px; border-radius:16px; background:#fff; border:1px solid #e2e8f0;">
                         <div style="font-size:12px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.08em;">AI Recommendations</div>
                         <div style="font-size:13px; color:#64748b; margin-top:4px; margin-bottom:12px;">Open a recommendation to see deeper implementation steps, suggestions, and planning guidance.</div>
@@ -1489,6 +1521,8 @@
                     const status = item.status || 'pending';
                     const checklistItems = Array.isArray(item.checklist_items) ? item.checklist_items : [];
                     const suggestions = Array.isArray(item.suggestions) ? item.suggestions : [];
+                    const progress = item.checklist_progress || {};
+                    const linkedMitigationCount = Number(item.linked_mitigation_count || 0);
 
                     return `
                         <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-bottom: 14px; background: #fff;">
@@ -1502,6 +1536,16 @@
                                 </span>
                             </div>
                             ${item.plan_description ? `<p style="margin-top:10px; font-size:13px; color:#475569;">${escapeHtml(item.plan_description)}</p>` : ''}
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-top:12px;">
+                                <div style="padding:12px; border-radius:12px; background:#fff7ed; border:1px solid #fed7aa;">
+                                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase;">Checklist Progress</div>
+                                    <div style="font-size:22px; font-weight:900; color:#7c2d12; margin-top:6px;">${escapeHtml(String(progress.percent ?? 0))}%</div>
+                                </div>
+                                <div style="padding:12px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0;">
+                                    <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase;">Linked Mitigation</div>
+                                    <div style="font-size:22px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(String(linkedMitigationCount))}</div>
+                                </div>
+                            </div>
                             ${checklistItems.length ? `
                                 <ul style="margin-top:12px; padding-left:18px; color:#334155; font-size:13px;">
                                     ${checklistItems.map((check) => `<li style="margin-bottom:6px;">${escapeHtml(check)}</li>`).join('')}
@@ -1518,6 +1562,16 @@
                                     `).join('')}
                                 </div>
                             ` : ''}
+                            <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                                <a href="${escapeHtml(item.mitigation_draft_url || '#')}" style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:linear-gradient(135deg, #dc2626, #f59e0b); color:#fff; font-size:12px; font-weight:800; text-decoration:none;">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                    <span>Create Mitigation Draft</span>
+                                </a>
+                                <span style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; color:#475569; font-size:12px; font-weight:700;">
+                                    <i class="fa-solid fa-arrows-spin"></i>
+                                    ${escapeHtml(item.effectiveness_hint || 'Ready for workflow handoff.')}
+                                </span>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -1568,6 +1622,7 @@
                         ? `PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`
                         : 'N/A';
                     const recommendationCount = Array.isArray(currentRecommendations) ? currentRecommendations.length : 0;
+                    const modelMetadata = analysisData.model_metadata || null;
                     const summaryText = prediction.summary.length > 180
                         ? `${escapeHtml(prediction.summary.slice(0, 180))}...`
                         : escapeHtml(prediction.summary);
@@ -1613,6 +1668,16 @@
                                     View Details
                                 </button>
                             </div>
+                            ${modelMetadata ? `
+                                <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+                                    <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.7); border:1px solid rgba(15,23,42,0.08); color:#334155; font-size:12px; font-weight:800;">
+                                        <i class="fa-solid fa-microchip" style="color:#2563eb;"></i>${escapeHtml(modelMetadata.dataset_kind || 'model')}
+                                    </span>
+                                    <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.7); border:1px solid rgba(15,23,42,0.08); color:#334155; font-size:12px; font-weight:800;">
+                                        <i class="fa-solid fa-database" style="color:#0f766e;"></i>${escapeHtml(String(modelMetadata.records_used || 'N/A'))} records
+                                    </span>
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }

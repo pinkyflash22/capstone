@@ -16,6 +16,7 @@ use App\Models\City;
 use App\Models\Barangay;
 use App\Models\BarangayOfficer;
 use App\Models\BarangayPredictionChecklist;
+use App\Models\AiActionPlanChecklist;
 use App\Models\FullAddress;
 use App\Models\FsicRequest;
 use App\Models\FsicApproval;
@@ -30,6 +31,7 @@ use App\Models\EventActivity;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\Rule;
@@ -401,6 +403,93 @@ class StationAdminController extends Controller
             ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
             ->whereIn('barangay_id', $allowedBarangayIds)
             ->findOrFail($mitigationActionId);
+    }
+
+    protected function buildMitigationDraftFromActionPlanChecklist(int $checklistId, array $allowedBarangayIds): ?array
+    {
+        $checklist = AiActionPlanChecklist::query()
+            ->with(['analysis', 'barangay', 'suggestions'])
+            ->whereIn('barangay_id', $allowedBarangayIds)
+            ->find($checklistId);
+
+        if (! $checklist) {
+            return null;
+        }
+
+        $firstSuggestion = $checklist->suggestions->sortByDesc('created_at')->first();
+        $steps = collect($firstSuggestion?->steps ?: $checklist->checklist_items ?: [])
+            ->filter()
+            ->map(fn ($step) => '- ' . trim((string) $step))
+            ->values()
+            ->all();
+
+        $resources = collect($firstSuggestion?->resources_needed ?: [])
+            ->filter()
+            ->map(fn ($resource) => '- ' . trim((string) $resource))
+            ->values()
+            ->all();
+
+        $descriptionParts = array_filter([
+            $checklist->plan_description ?: $checklist->source_description,
+            ! empty($steps) ? "Suggested steps:\n" . implode("\n", $steps) : null,
+            ! empty($resources) ? "Resources needed:\n" . implode("\n", $resources) : null,
+            $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
+        ]);
+
+        return [
+            'barangay_id' => $checklist->barangay_id,
+            'title' => $checklist->plan_title,
+            'category' => $this->inferMitigationCategoryFromChecklist($checklist),
+            'priority_level' => $checklist->priority_level ?: 'medium',
+            'status' => 'planned',
+            'target_date' => optional($checklist->target_date)->format('Y-m-d'),
+            'description' => implode("\n\n", $descriptionParts),
+            'remarks' => $firstSuggestion?->estimated_timeline
+                ? 'Drafted from AI action-plan checklist. Timeline suggestion: ' . $firstSuggestion->estimated_timeline
+                : 'Drafted from AI action-plan checklist.',
+            'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+            'source_title' => $checklist->source_title,
+            'workflow_note' => 'Prediction -> Recommendation -> Checklist -> Mitigation Action Plan',
+        ];
+    }
+
+    protected function inferMitigationCategoryFromChecklist(AiActionPlanChecklist $checklist): string
+    {
+        $haystack = Str::lower(trim(implode(' ', array_filter([
+            $checklist->plan_title,
+            $checklist->plan_description,
+            $checklist->source_title,
+            $checklist->source_description,
+        ]))));
+
+        return match (true) {
+            str_contains($haystack, 'inspect') || str_contains($haystack, 'inspection') => 'inspection',
+            str_contains($haystack, 'awareness') || str_contains($haystack, 'brief') || str_contains($haystack, 'campaign') => 'community_awareness',
+            str_contains($haystack, 'route') || str_contains($haystack, 'access') || str_contains($haystack, 'dispatch') => 'response_readiness',
+            str_contains($haystack, 'hydrant') || str_contains($haystack, 'water') || str_contains($haystack, 'equipment') => 'infrastructure',
+            default => 'other',
+        };
+    }
+
+    protected function syncLinkedActionPlanAfterMitigation(MitigationAction $action): void
+    {
+        if (! $action->ai_action_plan_checklist_id) {
+            return;
+        }
+
+        $checklist = AiActionPlanChecklist::query()->find($action->ai_action_plan_checklist_id);
+        if (! $checklist) {
+            return;
+        }
+
+        if ($action->status === 'completed' && ! in_array($checklist->status, ['confirmed', 'rejected'], true)) {
+            $checklist->update(['status' => 'submitted']);
+            return;
+        }
+
+        if (in_array($action->status, ['planned', 'in_progress', 'blocked'], true) && $checklist->status === 'pending') {
+            $checklist->update(['status' => 'in_progress']);
+        }
     }
 
     protected function storeMitigationAttachments(MitigationAction $action, Request $request): void
@@ -807,6 +896,7 @@ class StationAdminController extends Controller
     {
         $managedBarangays = $this->getManagedBarangaysForStationAdmin();
         $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+        $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
 
         $mitigationActions = MitigationAction::query()
             ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
@@ -841,12 +931,18 @@ class StationAdminController extends Controller
             ->orderByDesc('created_at')
             ->get(['ai_action_plan_checklist_id', 'barangay_id', 'plan_title', 'priority_level', 'status']);
 
+        $mitigationDraft = $draftActionPlanChecklistId
+            ? $this->buildMitigationDraftFromActionPlanChecklist($draftActionPlanChecklistId, $barangayIds)
+            : null;
+
         return view('chief.mitigations', [
             'managedBarangays' => $managedBarangays,
             'mitigationActions' => $mitigationActions,
             'riskAreas' => $riskAreas,
             'predictionChecklists' => $predictionChecklists,
             'aiActionPlanOptions' => $aiActionPlanOptions,
+            'mitigationDraft' => $mitigationDraft,
+            'autoOpenCreateModal' => (bool) $mitigationDraft,
             'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
             'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
             'mitigationStatusOptions' => $this->mitigationStatusOptions(),
@@ -880,6 +976,7 @@ class StationAdminController extends Controller
             ]);
 
             $this->storeMitigationAttachments($action, $request);
+            $this->syncLinkedActionPlanAfterMitigation($action);
             UserActivityLogger::log('created station mitigation action', Auth::user()?->user_id, $request);
         });
 
@@ -918,6 +1015,7 @@ class StationAdminController extends Controller
             ]);
 
             $this->storeMitigationAttachments($action, $request);
+            $this->syncLinkedActionPlanAfterMitigation($action->fresh());
             UserActivityLogger::log('updated station mitigation action', Auth::user()?->user_id, $request);
         });
 
