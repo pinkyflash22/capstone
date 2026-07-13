@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -194,7 +195,7 @@
     <div class="mitigation-shell">
         <main class="mitigation-main">
             <div class="dashboard-container chief-dashboard-container">
-            <div class="mitigation-wrap">
+            <div class="mitigation-wrap chief-theme-shell">
                 <div class="top-bar">
                     <div class="flex items-center gap-4">
                         <div>
@@ -223,12 +224,16 @@
                     </div>
                 </div>
 
-                <div class="mitigation-banner">
+                <section class="mitigation-banner chief-theme-hero">
                     <div>
-                        <h2 class="mitigation-banner__title">Coordinate station-led mitigation work across covered barangays.</h2>
-                        <p class="mitigation-banner__copy">Use this module to assign, track, and close mitigation actions connected to checklist findings, reported hazards, and mapped risk records. Barangays can monitor progress, but station command owns the operational decisions and completion workflow.</p>
+                        <span class="chief-theme-hero__eyebrow">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            Command Mitigation Workflow
+                        </span>
+                        <h2 class="mitigation-banner__title chief-theme-hero__title">Coordinate station-led mitigation work across covered barangays.</h2>
+                        <p class="mitigation-banner__copy chief-theme-hero__copy">Use this module to assign, track, and close mitigation actions connected to checklist findings, reported hazards, and mapped risk records. Barangays can monitor progress, but station command owns the operational decisions and completion workflow.</p>
                     </div>
-                    <div class="mitigation-banner__meta">
+                    <div class="mitigation-banner__meta chief-theme-summary-grid">
                         <div class="mitigation-banner__meta-card">
                             <div class="mitigation-banner__meta-label">Coverage Area</div>
                             <div class="mitigation-banner__meta-value">{{ $managedBarangays->count() }} barangay coverage area(s)</div>
@@ -246,7 +251,7 @@
                             <div class="mitigation-banner__meta-value">{{ $criticalMitigations->count() }} critical / high item(s)</div>
                         </div>
                     </div>
-                </div>
+                </section>
 
                 <div class="mitigation-stack">
                     @if(!empty($mitigationDraft))

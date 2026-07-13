@@ -83,10 +83,74 @@ class MarkerController extends Controller
         return 'active';
     }
 
+    private function publicValue(mixed $value): ?string
+    {
+        $normalized = trim((string) ($value ?? ''));
+
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function formatFullAddress($address): ?string
+    {
+        if (! $address) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $this->publicValue($address->street ?? null),
+            $this->publicValue($address->barangay?->barangay_name ?? null),
+            $this->publicValue($address->barangay?->city?->city_name ?? null),
+        ]);
+
+        return $parts ? implode(', ', $parts) : null;
+    }
+
+    private function publicDisplayName($user): ?string
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $name = trim(implode(' ', array_filter([
+            $this->publicValue($user->first_name ?? null),
+            $this->publicValue($user->last_name ?? null),
+        ])));
+
+        return $name !== '' ? $name : $this->publicValue($user->name ?? null);
+    }
+
+    private function resolveStationChiefName($station): ?string
+    {
+        if (! $station?->stationOfficers) {
+            return null;
+        }
+
+        $chiefOfficer = $station->stationOfficers
+            ->filter(function ($officer) {
+                $role = strtolower((string) ($officer->user?->role?->role ?? ''));
+                $rank = strtolower((string) ($officer->rank ?? ''));
+                $status = strtolower((string) ($officer->status ?? ''));
+
+                $isChief = $role === 'chief' || str_contains($rank, 'chief');
+                $isActive = $status === '' || in_array($status, ['active', 'available', 'on duty', 'on-duty'], true);
+
+                return $isChief && $isActive;
+            })
+            ->sortByDesc(function ($officer) {
+                return strtolower((string) ($officer->user?->role?->role ?? '')) === 'chief' ? 1 : 0;
+            })
+            ->first();
+
+        return $this->publicDisplayName($chiefOfficer?->user);
+    }
+
     public function index()
     {
         $markers = Marker::with([
-                'stations',
+                'stations.address.barangay.city',
+                'stations.stationOfficers.user.role',
+                'barangayHall.address.barangay.city',
+                'barangayHall.barangay.city',
                 'hydrants.station',
             ])
             ->get();
@@ -107,8 +171,34 @@ class MarkerController extends Controller
               
                 'image' => $marker->image,
               
-                'station' => $station,
-                'hydrant' => $hydrant,
+                'station' => $station ? [
+                    'station_name' => $this->publicValue($station->station_name),
+                    'contact_number' => $this->publicValue($station->contact_number),
+                ] : null,
+                'station_public' => $station ? [
+                    'name' => $this->publicValue($station->station_name),
+                    'address' => $this->formatFullAddress($station->address),
+                    'contact_number' => $this->publicValue($station->contact_number),
+                    'operating_hours' => $this->publicValue($station->operating_hours ?? $station->office_hours ?? null),
+                    'chief_name' => $this->resolveStationChiefName($station),
+                ] : null,
+                'hydrant' => $hydrant ? [
+                    'hydrant_code' => $this->publicValue($hydrant->hydrant_code),
+                    'type' => $this->publicValue($hydrant->type),
+                ] : null,
+                'hydrant_public' => $hydrant ? [
+                    'code' => $this->publicValue($hydrant->hydrant_code),
+                    'type' => $this->publicValue($hydrant->type),
+                    'station_name' => $this->publicValue($hydrant->station?->station_name),
+                ] : null,
+                'barangay_public' => $marker->barangayHall ? [
+                    'name' => $this->publicValue($marker->barangayHall->hall_name)
+                        ?: $this->publicValue($marker->barangayHall->barangay?->barangay_name),
+                    'address' => $this->formatFullAddress($marker->barangayHall->address),
+                    'contact_number' => $this->publicValue($marker->barangayHall->contact_number),
+                    'office_hours' => $this->publicValue($marker->barangayHall->office_hours ?? $marker->barangayHall->operating_hours ?? null),
+                    'barangay_name' => $this->publicValue($marker->barangayHall->barangay?->barangay_name),
+                ] : null,
                 'created_at' => $marker->created_at,
                 'updated_at' => $marker->updated_at,
             ];

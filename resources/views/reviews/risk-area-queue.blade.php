@@ -624,10 +624,35 @@
             </div>
         </div>
 
-        <div class="review-page">
+        <div class="review-page chief-theme-shell">
             @if (session('status'))
                 <div class="review-alert">{{ session('status') }}</div>
             @endif
+
+            <section class="chief-theme-hero">
+                <div>
+                    <span class="chief-theme-hero__eyebrow">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        Operations Review Queue
+                    </span>
+                    <h2 class="chief-theme-hero__title">{{ $pageTitle }}</h2>
+                    <p class="chief-theme-hero__copy">{{ $pageSubtitle }} Review barangay-submitted hazard and risk requests before they become part of station operations.</p>
+                </div>
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Total Requests</div>
+                        <div class="chief-theme-summary-value">{{ $summaryCounts['all'] }}</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Pending</div>
+                        <div class="chief-theme-summary-value">{{ $summaryCounts['pending'] }}</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Approved</div>
+                        <div class="chief-theme-summary-value">{{ $summaryCounts['approved'] }}</div>
+                    </article>
+                </div>
+            </section>
 
             <section class="summary-grid">
                 <article class="summary-card">

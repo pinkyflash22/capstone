@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -11,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
     
-    <title>PyroSense · AI Predictive Analytics</title>
+    <title>PyroSense · Fire Risk Forecast</title>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -969,7 +970,7 @@
                 <div class="nav-section-title">MAIN</div>
                 <a href="{{ route('station-admin.dashboard') }}" class="nav-item"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
                 <a href="{{ route('station-admin.fsic') }}" class="nav-item"><i class="fa-solid fa-file-certificate"></i><span>FSIC Management</span></a>
-                <a href="{{ route('station-admin.analytics') }}" class="nav-item active"><i class="fa-solid fa-chart-line"></i><span>Predictive Analytics</span></a>
+                <a href="{{ route('station-admin.analytics') }}" class="nav-item active"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
                 <a href="{{ route('station-admin.announcements') }}" class="nav-item"><i class="fa-solid fa-bullhorn"></i><span>Announcements</span></a>
                 <a href="{{ route('station-admin.management') }}" class="nav-item"><i class="fa-solid fa-users"></i><span>Management</span></a>
                 <a href="{{ route('station-admin.resource-management.index') }}" class="nav-item"><i class="fa-solid fa-toolbox"></i><span>Resources</span></a>
@@ -989,8 +990,8 @@
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
                 <div class="hidden lg:block">
-                    <h1 class="text-xl font-bold text-slate-800">AI Predictive Analytics</h1>
-                    <p class="text-xs text-slate-500 font-medium">Station intelligence and AI forecasting · {{ now()->format('l, F j') }}</p>
+                    <h1 class="text-xl font-bold text-slate-800">Fire Risk Forecast</h1>
+                    <p class="text-xs text-slate-500 font-medium">Station intelligence and fire-risk forecasting · {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
 
@@ -1034,16 +1035,18 @@
             </div>
         </nav>
 
-        <div class="content-container">
+        <div class="content-container chief-theme-shell">
             <div class="analytics-stack">
-                <section class="analytics-hero">
-                    <div class="analytics-hero__eyebrow">
-                        <i class="fa-solid fa-microchip"></i>
-                        <span>Command Forecasting Suite</span>
+                <section class="analytics-hero chief-theme-hero">
+                    <div>
+                        <div class="analytics-hero__eyebrow chief-theme-hero__eyebrow">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span>Command Forecasting Suite</span>
+                        </div>
+                        <h1 class="analytics-hero__title chief-theme-hero__title">Fire Risk Forecast</h1>
+                        <p class="analytics-hero__subtitle chief-theme-hero__copy">Compare historical incidents, current station conditions, and predicted fire-risk outlooks in one command-ready dashboard built for station-level decision making.</p>
                     </div>
-                    <h1 class="analytics-hero__title">AI-Powered Predictive Analytics</h1>
-                    <p class="analytics-hero__subtitle">Compare historical incidents, current station conditions, and predicted fire-risk outlooks in one command-ready dashboard built for station-level decision making.</p>
-                    <div class="analytics-hero__meta">
+                    <div class="analytics-hero__meta chief-theme-summary-grid">
                         <div class="analytics-hero__meta-card">
                             <div class="analytics-hero__meta-label">Analysis Scope</div>
                             <div class="analytics-hero__meta-value" id="analyticsHeroScope">Waiting for station context</div>
@@ -1059,7 +1062,7 @@
                     </div>
                 </section>
 
-                <section class="analytics-shell-card analytics-section">
+                <section class="analytics-shell-card analytics-section chief-theme-panel">
                     <div class="analytics-section__head">
                         <div>
                             <div class="analytics-section__title"><i class="fa-solid fa-sliders"></i> Filter and AI Actions</div>
@@ -1118,7 +1121,7 @@
                     </div>
                 </section>
 
-                <section class="analytics-shell-card analytics-section">
+                <section class="analytics-shell-card analytics-section chief-theme-panel">
                     <div class="analytics-section__head">
                         <div>
                             <div class="analytics-section__title"><i class="fa-solid fa-bolt"></i> Prediction Summary</div>

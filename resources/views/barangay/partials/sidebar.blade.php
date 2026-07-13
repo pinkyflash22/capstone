@@ -78,6 +78,7 @@
                     @foreach ($mobileCenterActions as $action)
                         <a href="{{ route($action['route']) }}" class="barangay-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
                             <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                            <span class="barangay-mobile-dock__burst-label">{{ $action['label'] }}</span>
                         </a>
                     @endforeach
                 </div>

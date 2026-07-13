@@ -16,7 +16,7 @@
                 ['label' => 'Resources', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>'],
                 ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
                 ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
-                ['label' => 'Analytics', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
+                ['label' => 'Fire Risk Forecast', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
                 ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'icon' => '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>'],
                 ['label' => 'Executive Reports', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
                 ['label' => 'Activity Schedule', 'route' => 'station-admin.schedule', 'active' => 'schedule', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3v4"/><path d="M17 3v4"/><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M13 14h3"/><path d="M8 17h3"/></svg>'],
@@ -32,7 +32,7 @@
     $mobileDockItems = [
         ['label' => 'Activity Schedule', 'route' => 'station-admin.schedule', 'active' => 'schedule', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3v4"/><path d="M17 3v4"/><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M13 14h3"/><path d="M8 17h3"/></svg>', 'mobile_icon' => 'event'],
         ['label' => 'Notifications', 'active' => 'notifications', 'mobile_icon' => 'notifications'],
-        ['label' => 'Analytics', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>', 'mobile_icon' => 'monitoring'],
+        ['label' => 'Fire Risk Forecast', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>', 'mobile_icon' => 'monitoring'],
         ['label' => 'Settings', 'active' => 'settings', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3.75l1.12 2.26 2.5.37-1.81 1.77.43 2.5L12 9.47l-2.24 1.18.43-2.5-1.81-1.77 2.5-.37L12 3.75z"/><circle cx="12" cy="12" r="3.25"/><path d="M4.8 14.2l1.92.34.67 1.63-1.11 1.61 1.53 1.53 1.61-1.11 1.63.67.34 1.92h2.16l.34-1.92 1.63-.67 1.61 1.11 1.53-1.53-1.11-1.61.67-1.63 1.92-.34v-2.16l-1.92-.34-.67-1.63 1.11-1.61-1.53-1.53-1.61 1.11-1.63-.67-.34-1.92h-2.16l-.34 1.92-1.63.67-1.61-1.11-1.53 1.53 1.11 1.61-.67 1.63-1.92.34z"/></svg>', 'mobile_icon' => 'settings'],
     ];
     $mobileCenterItem = ['label' => 'Operations Room', 'route' => 'station-admin.dashboard', 'active' => 'dashboard', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>', 'mobile_icon' => 'dashboard'];
@@ -108,10 +108,12 @@
                         @if (!empty($action['route']))
                             <a href="{{ route($action['route']) }}" class="chief-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
                                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                                <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </a>
                         @else
                             <button type="button" class="chief-mobile-dock__burst-item" aria-label="{{ $action['label'] }}" data-chief-insights-open>
                                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                                <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </button>
                         @endif
                     @endforeach

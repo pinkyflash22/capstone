@@ -46,7 +46,7 @@
             :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --mobile-bottom-nav-h: calc(64px + var(--safe-bottom));
+  --mobile-bottom-nav-h: calc(88px + var(--safe-bottom));
 }
 
 .material-symbols-rounded {
@@ -159,10 +159,6 @@
             transition: transform 0.22s ease;
         }
 
-        [data-citizen-map-layers-panel] .citizen-mobile-panel__sheet {
-            padding-top: 0.65rem;
-        }
-
         .citizen-mobile-panel.is-open .citizen-mobile-panel__sheet {
             transform: translateY(0);
         }
@@ -173,11 +169,6 @@
             justify-content: space-between;
             gap: 1rem;
             margin-bottom: 1rem;
-        }
-
-        [data-citizen-map-layers-panel] .citizen-mobile-panel__header {
-            margin-bottom: 0.55rem;
-            min-height: 24px;
         }
 
         .citizen-mobile-panel__eyebrow {
@@ -205,18 +196,6 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-        }
-
-        [data-citizen-map-layers-panel] .citizen-mobile-panel__close {
-            width: 30px;
-            height: 30px;
-            background: #fff7ed;
-            color: #c2410c;
-            box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.18);
-        }
-
-        [data-citizen-map-layers-panel] .citizen-mobile-panel__close .material-symbols-rounded {
-            font-size: 18px;
         }
 
         .citizen-mobile-panel__menu,
@@ -362,44 +341,121 @@
             gap: 1rem;
         }
 
-        .citizen-map-sheet-section {
-            display: grid;
-            gap: 0.5rem;
+        [data-citizen-map-layers-panel] {
+            align-items: flex-end;
+            justify-content: stretch;
+            z-index: 210;
         }
 
-        .citizen-map-layer-list,
-        .citizen-map-legend-list {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.45rem;
-            padding: 0;
+        [data-citizen-map-layers-panel].is-open {
+            pointer-events: none;
         }
 
-        .citizen-map-sheet-label {
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__backdrop {
+            background: transparent;
+            pointer-events: none;
+        }
+
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__sheet {
+            width: 100vw;
+            max-width: 100vw;
+            min-height: 0;
+            max-height: calc(45vh + var(--mobile-bottom-nav-h));
+            margin: 0;
+            padding: 6px 16px calc(var(--mobile-bottom-nav-h) + 12px);
+            border-radius: 24px 24px 0 0;
+            background: #ffffff;
+            box-shadow: none;
+            filter: none;
+            -webkit-filter: none;
+            overflow: hidden;
+            pointer-events: auto;
+        }
+
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__sheet:has(.citizen-map-legend-disclosure[open]) {
+            max-height: min(60vh, 430px);
+            overflow-y: auto;
+        }
+
+        .citizen-map-sheet-handle {
+            width: 42px;
+            height: 4px;
+            margin: 0 auto 4px;
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__header {
+            align-items: center;
+            gap: 12px;
+            min-height: 44px;
+            margin: 0 0 4px;
+        }
+
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.15;
+        }
+
+        .citizen-map-sheet-subtitle {
+            margin: 2px 0 0;
             color: #64748b;
-            font-size: 0.62rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            margin: 0 0 0.1rem;
+            font-size: 0.76rem;
+            line-height: 1.2;
         }
 
-        .citizen-map-layer-item {
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__close {
+            flex: 0 0 44px;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #475569;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+        }
+
+        [data-citizen-map-layers-panel] .citizen-mobile-panel__close .material-symbols-rounded {
+            font-size: 20px;
+        }
+
+        .citizen-map-sheet-section {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.24rem;
-            min-height: 58px;
-            padding: 0.3rem 0.1rem 0.2rem;
-            border-radius: 14px;
-            background: transparent;
-            border: none;
+            gap: 6px;
+        }
+
+        .citizen-map-base-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0;
+            padding: 2px;
+            border-radius: 12px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+        }
+
+        .citizen-map-base-item,
+        .citizen-map-layer-item {
             position: relative;
-            text-align: center;
+            min-width: 0;
             cursor: pointer;
         }
 
+        .citizen-map-base-item {
+            min-height: 34px;
+            border-radius: 10px;
+            color: #64748b;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+
+        .citizen-map-base-item__toggle,
         .citizen-map-layer-item__toggle {
             appearance: none;
             position: absolute;
@@ -410,68 +466,153 @@
             cursor: pointer;
         }
 
+        .citizen-map-base-item:has(.citizen-map-base-item__toggle:checked) {
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+
+        .citizen-map-layer-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            padding: 0;
+        }
+
+        .citizen-map-layer-item {
+            min-height: 44px;
+            padding: 0 10px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #64748b;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-align: left;
+        }
+
         .citizen-map-layer-item__icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 9px;
-            background: #e5e7eb;
-            color: #6b7280;
+            width: 18px;
+            height: 18px;
+            flex: 0 0 18px;
+            border-radius: 0;
+            background: transparent;
+            color: #64748b;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 15px;
-            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
-            transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-        }
-
-        .citizen-map-layer-item__copy {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-size: 0.88rem;
+            box-shadow: none;
         }
 
         .citizen-map-layer-item__copy strong {
             color: #64748b;
-            font-size: 0.56rem;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: 800;
             line-height: 1.1;
-            transition: color 0.18s ease;
         }
 
-        .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) .citizen-map-layer-item__icon {
-            background: #dbeafe;
+        .citizen-map-layer-item__check {
+            margin-left: auto;
             color: #2563eb;
-            box-shadow: 0 0 0 2px #fde68a, inset 0 0 0 1px rgba(37, 99, 235, 0.14);
-            transform: scale(1.06);
+            display: none;
+            font-size: 0.68rem;
         }
 
+        .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) {
+            background: #eff6ff;
+            border-color: rgba(37, 99, 235, 0.32);
+            color: #2563eb;
+        }
+
+        .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) .citizen-map-layer-item__icon,
         .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) .citizen-map-layer-item__copy strong {
             color: #2563eb;
         }
 
-        .citizen-map-legend-item-sheet {
+        .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) .citizen-map-layer-item__check {
+            display: inline-flex;
+        }
+
+        .citizen-map-legend-disclosure {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 4px;
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+        }
+
+        .citizen-map-legend-disclosure summary {
+            min-height: 34px;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 0.24rem;
-            min-height: 58px;
-            padding: 0.3rem 0.1rem 0.2rem;
-            border-radius: 14px;
+            justify-content: space-between;
+            gap: 12px;
+            color: #0f172a;
+            font-size: 0.84rem;
+            font-weight: 800;
+            list-style: none;
+            cursor: pointer;
+        }
+
+        .citizen-map-legend-disclosure summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .citizen-map-legend-disclosure summary i {
+            color: #64748b;
+            transition: transform 0.18s ease;
+        }
+
+        .citizen-map-legend-disclosure[open] summary i {
+            transform: rotate(180deg);
+        }
+
+        .citizen-map-legend-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 10px;
+            padding: 4px 2px 6px;
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+        }
+
+        .citizen-map-legend-item-sheet {
+            min-height: 30px;
+            padding: 0 2px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            border: 0;
             background: transparent;
-            border: none;
-            color: #334155;
-            font-size: 0.54rem;
-            line-height: 1.1;
-            text-align: center;
+            color: #475569;
+            font-size: 0.74rem;
+            font-weight: 700;
+            line-height: 1.2;
+            text-align: left;
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+        }
+
+        .citizen-map-legend-disclosure,
+        .citizen-map-legend-disclosure *,
+        .citizen-map-legend-disclosure::before,
+        .citizen-map-legend-disclosure::after {
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-swatch {
-            width: 28px;
-            height: 28px;
-            min-width: 28px;
-            border-radius: 9px;
-            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            border-radius: 8px;
+            box-shadow: none;
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-marker,
@@ -485,6 +626,36 @@
             height: 18px;
             object-fit: contain;
             display: block;
+        }
+
+        .citizen-map-legend-item-sheet .marker-legend-icon {
+            width: 18px;
+            height: 18px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .citizen-map-legend-disclosure .incident-marker__pulse,
+        .citizen-map-legend-disclosure .incident-pulse {
+            display: none !important;
+            animation: none !important;
+        }
+
+        .citizen-map-legend-item-sheet .incident-marker {
+            width: 24px !important;
+            height: 24px !important;
+        }
+
+        .citizen-map-legend-item-sheet .incident-marker__icon,
+        .citizen-map-legend-item-sheet .incident-marker__icon > div,
+        .citizen-map-legend-item-sheet .incident-marker__icon img {
+            width: 24px !important;
+            height: 24px !important;
+        }
+
+        .citizen-map-legend-item-sheet .incident-marker__pulse {
+            inset: 1px;
+            border-width: 2px;
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-marker i {
@@ -501,7 +672,6 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
         }
 
         .citizen-map-legend-marker-barangay svg {
@@ -520,16 +690,9 @@
         }
 
         .citizen-map-legend-item-sheet span:last-child {
-            font-weight: 600;
-            color: #64748b;
-        }
-
-        @media (max-width: 380px) {
-            .citizen-map-layer-list,
-            .citizen-map-legend-list {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-                gap: 0.35rem;
-            }
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #475569;
         }
 
         .citizen-map-stage > .flex.flex-col.sm\:flex-row.sm\:items-center.justify-between {
@@ -640,7 +803,7 @@
             padding: 0 14px;
             border-radius: 18px;
             background: #fff;
-            border: 1px solid #e5e7eb;
+            border: 1px solid transparent;
             box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
         }
 
@@ -651,11 +814,29 @@
 
         .citizen-map-search__input {
             flex: 1;
-            border: 0;
-            outline: 0;
-            background: transparent;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
             font-size: 14px;
             color: #111827;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .citizen-map-search__input:focus,
+        .citizen-map-search__input:focus-visible {
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .citizen-map-search__input::-webkit-search-cancel-button,
+        .citizen-map-search__input::-webkit-search-decoration,
+        .citizen-map-search__input::-webkit-search-results-button,
+        .citizen-map-search__input::-webkit-search-results-decoration {
+            display: none;
+            -webkit-appearance: none;
         }
 
         .citizen-map-search__input::placeholder {
@@ -792,9 +973,9 @@
 
         @media (max-width: 768px) {
             .citizen-map-search--overlay {
-                top: 10px;
-                left: 10px;
-                right: 10px;
+                top: 18px;
+                left: 14px;
+                right: 14px;
                 width: auto;
                 transform: none;
             }
@@ -810,7 +991,7 @@
             }
 
             .citizen-map-shell .leaflet-top {
-                top: 72px;
+                top: 84px;
             }
 
             .citizen-map-shell .leaflet-left {
@@ -827,8 +1008,8 @@
 
             .citizen-map-layer-trigger {
                 display: inline-flex;
-                top: 66px;
-                right: 10px;
+                top: 78px;
+                right: 14px;
             }
 
             .citizen-map-stage .leaflet-control-layers-list,
@@ -928,17 +1109,17 @@
 
             .citizen-map-stage #userMap {
                 width: 100vw !important;
-                min-height: calc(100svh - var(--mobile-bottom-nav-h) + var(--safe-top)) !important;
-                height: calc(100svh - var(--mobile-bottom-nav-h) + var(--safe-top)) !important;
+                min-height: calc(100svh + var(--safe-top)) !important;
+                height: calc(100svh + var(--safe-top)) !important;
                 border-radius: 0 !important;
             }
 
             .citizen-map-stage .leaflet-top {
-                top: 68px;
+                top: 84px;
             }
 
             .citizen-map-stage .leaflet-right {
-                right: 10px;
+                right: 14px;
                 left: auto !important;
             }
 
@@ -1003,10 +1184,10 @@
                 position: fixed;
                 left: 0;
                 right: 0;
-                bottom: 0;
+                bottom: calc(12px + var(--safe-bottom));
                 display: block;
                 min-height: 0;
-                padding: 0 14px calc(8px + var(--safe-bottom));
+                padding: 0 14px;
                 background: linear-gradient(180deg, rgba(251, 247, 239, 0) 0%, rgba(251, 247, 239, 0.58) 46%, rgba(251, 247, 239, 0.94) 100%);
                 backdrop-filter: blur(8px);
                 z-index: 220;
@@ -1312,6 +1493,11 @@
           
           var user = @json($usermarker)|| [];
           
+   window.mapInstanceConfig = {
+        containerId: 'userMap',
+        instanceKey: 'citizenDashboard'
+    };
+
    window.mapData = {
         usermark: @json($usermarker) || []
     };
@@ -1626,14 +1812,28 @@
     <div class="citizen-mobile-panel md:hidden" data-citizen-map-layers-panel aria-hidden="true">
         <div class="citizen-mobile-panel__backdrop" data-citizen-map-layers-close></div>
         <div class="citizen-mobile-panel__sheet">
+            <div class="citizen-map-sheet-handle" aria-hidden="true"></div>
             <div class="citizen-mobile-panel__header">
-                <div></div>
+                <div>
+                    <h2 class="citizen-mobile-panel__title">Map options</h2>
+                    <p class="citizen-map-sheet-subtitle">Show or hide details on the map</p>
+                </div>
                 <button type="button" class="citizen-mobile-panel__close" data-citizen-map-layers-close aria-label="Close map filters and legend">
                     <span class="material-symbols-rounded" aria-hidden="true">close</span>
                 </button>
             </div>
             <div class="citizen-mobile-panel__body citizen-map-sheet-section">
-                <p class="citizen-map-sheet-label">Map Filter</p>
+                <div class="citizen-map-base-list" role="radiogroup" aria-label="Map layer">
+                    <label class="citizen-map-base-item">
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Street Map" checked>
+                        <span>Street Map</span>
+                    </label>
+                    <label class="citizen-map-base-item">
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Satellite">
+                        <span>Satellite</span>
+                    </label>
+                </div>
+
                 <div class="citizen-map-layer-list">
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="stations" checked>
@@ -1641,6 +1841,7 @@
                         <span class="citizen-map-layer-item__copy">
                             <strong>Stations</strong>
                         </span>
+                        <span class="citizen-map-layer-item__check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="incidents" checked>
@@ -1648,6 +1849,7 @@
                         <span class="citizen-map-layer-item__copy">
                             <strong>Incidents</strong>
                         </span>
+                        <span class="citizen-map-layer-item__check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="hydrants" checked>
@@ -1655,6 +1857,7 @@
                         <span class="citizen-map-layer-item__copy">
                             <strong>Hydrants</strong>
                         </span>
+                        <span class="citizen-map-layer-item__check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                     </label>
                     <label class="citizen-map-layer-item">
                         <input type="checkbox" class="citizen-map-layer-item__toggle" data-citizen-map-layer-toggle="others" checked>
@@ -1662,19 +1865,25 @@
                         <span class="citizen-map-layer-item__copy">
                             <strong>Places</strong>
                         </span>
+                        <span class="citizen-map-layer-item__check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                     </label>
                 </div>
-                <p class="citizen-map-sheet-label">Map Legend</p>
-                <div class="citizen-map-legend-list">
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-user"><span class="citizen-map-legend-marker citizen-map-legend-marker-user"><i class="fas fa-user-shield"></i></span></span><span>Your location</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-station"><img class="citizen-map-legend-image" src="{{ asset('station.png') }}" alt="Fire station" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-station" style="display:none;"><i class="fas fa-building"></i></span></span><span>Fire station</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-barangay"><img class="citizen-map-legend-image" src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-barangay" style="display:none;"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"></circle><circle cx="16" cy="9" r="2" fill="none"></circle><circle cx="12" cy="7" r="2" fill="none"></circle><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"></path></svg></span></span><span>Barangay hall</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-incident"><img class="citizen-map-legend-image" src="{{ asset('fire.png') }}" alt="Incident marker" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-incident" style="display:none;"><i class="fas fa-fire"></i></span></span><span>Incident marker</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-hydrant"><img class="citizen-map-legend-image" src="{{ asset('hydrant.png') }}" alt="Hydrant" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-hydrant" style="display:none;"><i class="fas fa-fire-extinguisher"></i></span></span><span>Hydrant</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-other"><span class="citizen-map-legend-marker citizen-map-legend-marker-other"><i class="fas fa-map-marker-alt"></i></span></span><span>Other marker</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-route"><span class="citizen-map-legend-route-line"></span></span><span>Route</span></div>
-                    <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-truck"><img src="{{ asset('truck.png') }}" alt="Emergency truck" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker" style="display:none;color:#f97316;"><i class="fas fa-truck-fast"></i></span></span><span>Truck</span></div>
-                </div>
+                <details class="citizen-map-legend-disclosure">
+                    <summary>
+                        <span>Map legend</span>
+                        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    </summary>
+                    <div class="citizen-map-legend-list">
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-user"><span class="citizen-map-legend-marker citizen-map-legend-marker-user"><i class="fas fa-user-shield"></i></span></span><span>Your location</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-station"><img class="citizen-map-legend-image" src="{{ asset('station.png') }}" alt="Fire station" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-station" style="display:none;"><i class="fas fa-building"></i></span></span><span>Fire station</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-barangay"><img class="citizen-map-legend-image" src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-barangay" style="display:none;"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="2" fill="none"></circle><circle cx="16" cy="9" r="2" fill="none"></circle><circle cx="12" cy="7" r="2" fill="none"></circle><path d="M4 18a4 4 0 0 1 8 0M12 18a4 4 0 0 1 8 0M8 16a4 4 0 0 1 8 0"></path></svg></span></span><span>Barangay hall</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-incident"><img class="marker-legend-icon marker-legend-icon--incident" src="{{ asset('fire.png') }}" alt="Incident" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-incident" style="display:none;"><i class="fas fa-fire"></i></span></span><span>Incident</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-hydrant"><img class="citizen-map-legend-image" src="{{ asset('hydrant.png') }}" alt="Hydrant" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker citizen-map-legend-marker-hydrant" style="display:none;"><i class="fas fa-fire-extinguisher"></i></span></span><span>Hydrant</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-other"><span class="citizen-map-legend-marker citizen-map-legend-marker-other"><i class="fas fa-map-marker-alt"></i></span></span><span>Other location</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-route"><span class="citizen-map-legend-route-line"></span></span><span>Route</span></div>
+                        <div class="citizen-map-legend-item-sheet"><span class="citizen-map-legend-swatch citizen-map-legend-swatch-truck"><img src="{{ asset('truck.png') }}" alt="Responding unit" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span class="citizen-map-legend-marker" style="display:none;color:#f97316;"><i class="fas fa-truck-fast"></i></span></span><span>Responding unit</span></div>
+                    </div>
+                </details>
             </div>
         </div>
     </div>
@@ -2445,6 +2654,102 @@ if (navigator.geolocation) {
             parent: node.parentElement,
             next: node.nextElementSibling
         }));
+        const citizenMapLayerToggles = document.querySelectorAll('[data-citizen-map-layer-toggle]');
+        const citizenMapBaseToggles = document.querySelectorAll('[data-citizen-map-base-toggle]');
+        const citizenMapLayerBadges = document.querySelectorAll('[data-citizen-map-layer-badge]');
+        const citizenOverlayLayerLabels = {
+            stations: ['Stations', 'Fire Stations'],
+            incidents: ['Incidents'],
+            hydrants: ['Hydrants', 'Fire Hydrants'],
+            others: ['Other Markers']
+        };
+
+        const findLeafletLayerInput = (labels, groupSelector) => {
+            const labelAliases = {
+                'Street Map': ['Street Map', 'OSM', 'OSM Standard'],
+                Stations: ['Stations', 'Fire Stations'],
+                Hydrants: ['Hydrants', 'Fire Hydrants'],
+                others: ['Other Markers', 'Other Locations']
+            };
+            const wantedLabels = (Array.isArray(labels) ? labels : [labels]).flatMap((label) => labelAliases[label] || [label]);
+            const layerLabels = document.querySelectorAll(`${groupSelector} label`);
+
+            for (const label of layerLabels) {
+                const input = label.querySelector('input');
+                const text = label.textContent.replace(/\s+/g, ' ').trim();
+
+                if (input && wantedLabels.some((wanted) => text === wanted || text.endsWith(wanted))) {
+                    return input;
+                }
+            }
+
+            return null;
+        };
+
+        const updateCitizenMapLayerBadge = () => {
+            const activeCount = Array.from(citizenMapLayerToggles).filter((toggle) => toggle.checked).length;
+
+            citizenMapLayerBadges.forEach((badge) => {
+                badge.hidden = activeCount === 0;
+                badge.textContent = String(activeCount);
+            });
+        };
+
+        const syncCitizenMapLayerControls = () => {
+            citizenMapLayerToggles.forEach((toggle) => {
+                const layerInput = findLeafletLayerInput(
+                    citizenOverlayLayerLabels[toggle.dataset.citizenMapLayerToggle] || [],
+                    '.leaflet-control-layers-overlays'
+                );
+
+                if (layerInput) {
+                    toggle.checked = layerInput.checked;
+                }
+            });
+
+            citizenMapBaseToggles.forEach((toggle) => {
+                const baseInput = findLeafletLayerInput(toggle.dataset.citizenMapBaseToggle, '.leaflet-control-layers-base');
+
+                if (baseInput) {
+                    toggle.checked = baseInput.checked;
+                }
+            });
+
+            updateCitizenMapLayerBadge();
+        };
+
+        window.syncCitizenMapLayerControls = syncCitizenMapLayerControls;
+
+        citizenMapLayerToggles.forEach((toggle) => {
+            toggle.addEventListener('change', () => {
+                const layerInput = findLeafletLayerInput(
+                    citizenOverlayLayerLabels[toggle.dataset.citizenMapLayerToggle] || [],
+                    '.leaflet-control-layers-overlays'
+                );
+
+                if (layerInput && layerInput.checked !== toggle.checked) {
+                    layerInput.click();
+                }
+
+                updateCitizenMapLayerBadge();
+            });
+        });
+
+        citizenMapBaseToggles.forEach((toggle) => {
+            toggle.addEventListener('change', () => {
+                if (!toggle.checked) {
+                    return;
+                }
+
+                const baseInput = findLeafletLayerInput(toggle.dataset.citizenMapBaseToggle, '.leaflet-control-layers-base');
+
+                if (baseInput && !baseInput.checked) {
+                    baseInput.click();
+                }
+            });
+        });
+
+        window.setTimeout(syncCitizenMapLayerControls, 0);
 
         if (citizenMobileDock && citizenDockTrigger) {
             let holdTimer = null;
@@ -2529,14 +2834,22 @@ if (navigator.geolocation) {
         const openCitizenMapLayersPanel = () => {
             citizenMapLayersPanel?.classList.add('is-open');
             citizenMapLayersPanel?.setAttribute('aria-hidden', 'false');
+            citizenMapLayersPanel._lastTrigger = document.activeElement;
             if (typeof window.syncCitizenMapLayerControls === 'function') {
                 window.syncCitizenMapLayerControls();
             }
         };
 
         const closeCitizenMapLayersPanel = () => {
+            if (citizenMapLayersPanel?.contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
             citizenMapLayersPanel?.classList.remove('is-open');
             citizenMapLayersPanel?.setAttribute('aria-hidden', 'true');
+            const lastTrigger = citizenMapLayersPanel?._lastTrigger;
+            if (lastTrigger && typeof lastTrigger.focus === 'function') {
+                window.setTimeout(() => lastTrigger.focus({ preventScroll: true }), 0);
+            }
         };
 
         window.openCitizenMapLayersPanel = openCitizenMapLayersPanel;

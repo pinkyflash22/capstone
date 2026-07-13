@@ -60,6 +60,9 @@ const CITIZEN_MARKER_WATCH_INTERVAL_MS = 30000;
 const CITIZEN_ROUTE_POLL_INTERVAL_MS = 10000;
 const CITIZEN_LIVE_FETCH_TIMEOUT_MS = 10000;
 const citizenLiveRequestRegistry = new Map();
+let citizenRouteDiscoveryFailureCount = 0;
+let citizenRouteDiscoveryPausedUntil = 0;
+let citizenMapPreviewPreviousFocus = null;
 
 function citizenPageIsVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -215,6 +218,11 @@ function buildCitizenMapSearchIndex(markers = [], incidents = []) {
         const incidentType = incident?.incident_type?.type || incident?.incident_type_name || incident?.incident_type || '';
         const incidentStatus = incident?.incident_status || incident?.status || '';
         const categoryLabel = getCitizenSearchCategoryLabel(categoryKey, incident);
+        const locationLabel = getCitizenUsefulValue(marker?.address, marker?.location, marker?.barangay, marker?.barangay_name, incident?.address);
+        const safeSearchTitle = getCitizenUsefulValue(marker?.title, marker?.name, incidentType)
+            || (incident
+                ? (locationLabel ? `Fire incident - ${locationLabel}` : 'Fire incident')
+                : (locationLabel ? `${categoryLabel} - ${locationLabel}` : categoryLabel));
         const aliasWords = [
             categoryKey,
             categoryLabel,
@@ -237,7 +245,7 @@ function buildCitizenMapSearchIndex(markers = [], incidents = []) {
             incident_id: incident?.incident_id ?? null,
             lat: Number(marker.lat),
             lng: Number(marker.lng),
-            title: marker.title || (incident ? `Incident #${incident.incident_id}` : `Marker #${marker.marker_id}`),
+            title: safeSearchTitle,
             description: marker.description || incident?.address || 'No description provided',
             meta: categoryLabel,
             icon: getCitizenSearchIcon(categoryKey, incident),
@@ -589,6 +597,84 @@ function bindCitizenMobileLayerControlTrigger() {
     controlContainer.dataset.mobileTriggerBound = 'true';
 }
 
+function enhanceCitizenLeafletLayerControl() {
+    if (!citizenLayerControl) {
+        return;
+    }
+
+    const control = citizenLayerControl.getContainer?.();
+    const base = control?.querySelector('.leaflet-control-layers-base');
+    const overlays = control?.querySelector('.leaflet-control-layers-overlays');
+
+    if (!control || !base || !overlays || control.dataset.citizenLabelsEnhanced === 'true') {
+        return;
+    }
+
+    const normalizeLayerLabel = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const displayLabelMap = {
+        'Carto Light': 'Carto',
+        'OSM Standard': 'OSM',
+        'OSM HOT': 'OSM HOT',
+        Satellite: 'Satellite',
+        'Fire Stations': 'Fire stations',
+        Incidents: 'Incidents',
+        'Fire Hydrants': 'Hydrants',
+        'Other Markers': 'Other locations',
+        'Water Reference': 'Water'
+    };
+    const iconMap = {
+        'Fire stations': 'fa-building-shield',
+        Incidents: 'fa-fire-flame-curved',
+        Hydrants: 'fa-droplet',
+        'Other locations': 'fa-location-dot',
+        Water: 'fa-water'
+    };
+
+    base.querySelectorAll('label').forEach((label) => {
+        const input = label.querySelector('input');
+        const span = label.querySelector('span');
+        if (!input || !span) return;
+
+        const rawLabel = normalizeLayerLabel(span.textContent);
+        const displayLabel = displayLabelMap[rawLabel] || rawLabel;
+        label.title = rawLabel;
+        label.setAttribute('aria-label', rawLabel);
+        span.textContent = '';
+        span.appendChild(input);
+
+        const text = document.createElement('span');
+        text.textContent = displayLabel;
+        text.title = rawLabel;
+        span.appendChild(text);
+    });
+
+    overlays.querySelectorAll('label').forEach((label) => {
+        const input = label.querySelector('input');
+        const span = label.querySelector('span');
+        if (!input || !span) return;
+
+        const rawLabel = normalizeLayerLabel(span.textContent);
+        const displayLabel = displayLabelMap[rawLabel] || rawLabel;
+        label.title = rawLabel;
+        label.setAttribute('aria-label', rawLabel);
+        span.textContent = '';
+
+        const icon = document.createElement('i');
+        icon.className = `fa-solid ${iconMap[displayLabel] || 'fa-location-dot'} citizen-layer-row-icon`;
+        icon.setAttribute('aria-hidden', 'true');
+
+        const text = document.createElement('span');
+        text.textContent = displayLabel;
+        text.title = rawLabel;
+
+        span.appendChild(icon);
+        span.appendChild(text);
+        span.appendChild(input);
+    });
+
+    control.dataset.citizenLabelsEnhanced = 'true';
+}
+
 window.syncCitizenMapLayerControls = syncCitizenMapLayerControls;
 
 function ensureCitizenMarkerStyles() {
@@ -600,12 +686,14 @@ function ensureCitizenMarkerStyles() {
     style.id = 'citizen-marker-style-overrides';
     style.textContent = `
         .leaflet-marker-icon.citizen-fa-icon,
-        .leaflet-marker-icon.custom-fa-icon {
+        .leaflet-marker-icon.custom-fa-icon,
+        .leaflet-marker-icon.shared-map-div-icon,
+        .leaflet-div-icon.shared-map-div-icon {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            width: 34px !important;
-            height: 34px !important;
+            padding: 0 !important;
+            overflow: visible !important;
         }
 
         .citizen-fa-icon,
@@ -632,6 +720,25 @@ function ensureCitizenMarkerStyles() {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .shared-map-marker,
+        .shared-map-marker__icon {
+            position: relative;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            overflow: visible;
+        }
+
+        .shared-map-marker__icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.24));
         }
     `;
 
@@ -709,25 +816,28 @@ function ensureCitizenLegendControl() {
     return citizenLegendControl;
 }
 
-function buildLegendSwatch({ color, icon = null, iconHtml = null, shape = 'circle', pulse = false, size = 18, borderWidth = 2, shadow = '0 3px 10px rgba(15,23,42,0.18)', iconSize = 9 }) {
+function buildLegendSwatch({ color, icon = null, iconHtml = null, imagePath = null, shape = 'circle', pulse = false, size = 18, borderWidth = 2, shadow = '0 3px 10px rgba(15,23,42,0.18)', iconSize = 9 }) {
     const radius = shape === 'square' ? '4px 4px 8px 8px' : '9999px';
-    const animation = pulse ? 'animation:pulse 1.5s infinite;' : '';
+    const animation = pulse && !imagePath ? 'animation:pulse 1.5s infinite;' : '';
+    const safeImagePath = imagePath ? String(imagePath).replace(/"/g, '&quot;') : '';
     const glyph = iconHtml
         ? `<span style="display:inline-flex;width:${iconSize + 6}px;height:${iconSize + 6}px;align-items:center;justify-content:center;">${iconHtml}</span>`
-        : (icon ? `<i class="fas ${icon}" data-inline-fa-processed="1"></i>` : '');
+        : safeImagePath
+            ? `<img src="${safeImagePath}" alt="" style="width:${size + 6}px;height:${size + 6}px;object-fit:contain;display:block;">`
+            : (icon ? `<i class="fas ${icon}" data-inline-fa-processed="1"></i>` : '');
 
     return `
         <span style="
             width: ${size}px;
             height: ${size}px;
             border-radius: ${radius};
-            background: ${color};
+            background: transparent;
             color: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: ${borderWidth}px solid #fff;
-            box-shadow: ${shadow};
+            border: ${safeImagePath ? 0 : borderWidth}px solid #fff;
+            box-shadow: ${safeImagePath ? 'none' : shadow};
             font-size: ${iconSize}px;
             flex-shrink: 0;
             ${animation}
@@ -983,6 +1093,7 @@ document.addEventListener('DOMContentLoaded', function(){
             collapsed: false,
             position: 'topright'
         }).addTo(window.usermap);
+        enhanceCitizenLeafletLayerControl();
         
         // Set all layers visible by default
         stationLayerGroup.addTo(window.usermap);
@@ -1191,168 +1302,140 @@ function getIncidentColor(incidentTypeId, incidentTypeName = '') {
     return getIncidentTypePresentation(incidentTypeId, incidentTypeName).color;
 }
 
-// Get icon based on incident type
-function getIncidentIcon(incidentTypeId, incidentTypeName = '') {
-    const incidentType = getIncidentTypePresentation(incidentTypeId, incidentTypeName);
-    ensureCitizenMarkerStyles();
+function normalizeCitizenIncidentStatus(input = '') {
+    const numericStatus = Number(input);
+    if (Number.isFinite(numericStatus)) {
+        if (numericStatus === 2) return 'en-route';
+        if (numericStatus === 3) return 'on-scene';
+        if (numericStatus === 4) return 'controlled';
+        if (numericStatus === 5) return 'closed';
+        if (numericStatus === 1) return 'reported';
+    }
+
+    const normalized = String(input || '').trim().toLowerCase();
+    if (normalized === 'en-route' || normalized === 'responding') return 'en-route';
+    if (normalized === 'on scene' || normalized === 'on-scene') return 'on-scene';
+    if (normalized === 'controlled' || normalized === 'resolved' || normalized === 'completed') return 'controlled';
+    if (normalized === 'closed') return 'closed';
+    return 'reported';
+}
+
+function isCitizenActiveFireIncident(incident = null, marker = {}) {
+    if (!incident && !marker) {
+        return false;
+    }
+
+    const status = normalizeCitizenIncidentStatus(
+        incident?.incident_status_id
+        ?? incident?.status_id
+        ?? incident?.incident_status
+        ?? incident?.status
+        ?? marker?.incident_status
+        ?? marker?.status
+        ?? 'reported'
+    );
+
+    return ['reported', 'en-route', 'on-scene'].includes(status);
+}
+
+function inferCitizenSharedMarkerAsset(categoryKey, marker = {}) {
+    const haystack = [
+        marker?.title,
+        marker?.description,
+        marker?.category,
+        marker?.hazard_type,
+        marker?.risk_type,
+        marker?.type
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    if (categoryKey === 'station') return '/station.png';
+    if (categoryKey === 'hydrant') return '/hydrant.png';
+    if (categoryKey === 'barangay') return '/hall.png';
+    if (categoryKey === 'fire') return '/fire.png';
+    if (haystack.includes('gas')) return '/gas.png';
+    if (haystack.includes('electric') || haystack.includes('wiring') || haystack.includes('octopus')) return '/electric.png';
+    if (haystack.includes('flammable')) return '/flammable.png';
+    if (haystack.includes('block')) return '/blockroad.png';
+    if (haystack.includes('damaged')) return '/damaged.png';
+    if (haystack.includes('hazard') || haystack.includes('risk')) return '/hazard.png';
+
+    return null;
+}
+
+function createCitizenStaticImageIcon(categoryInput, marker = {}) {
+    const categoryKey = getCitizenMarkerCategoryKey(categoryInput) || 'default';
+    const imagePath = inferCitizenSharedMarkerAsset(categoryKey, marker);
+    const size = imagePath ? (categoryKey === 'fire' ? 42 : 36) : 24;
+    const fallback = getCitizenMarkerPresentation(categoryKey);
+    const safeImagePath = imagePath ? String(imagePath).replace(/"/g, '&quot;') : '';
 
     return L.divIcon({
-        className: 'custom-fa-icon incident-type-icon citizen-incident-icon',
+        className: 'shared-map-div-icon citizen-shared-map-icon',
         html: `
-            <div style="
-                width: 34px;
-                height: 34px;
-                background: ${incidentType.color};
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.24);
-                border: 3px solid #ffffff;
-            ">
-                <i class="fas ${incidentType.icon}" data-inline-fa-processed="1" style="
-                    color: white;
-                    font-size: 15px;
-                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22));
-                "></i>
-            </div>
+            <span class="shared-map-marker" style="width:${size}px;height:${size}px;">
+                <span class="shared-map-marker__icon" style="width:${size}px;height:${size}px;">
+                    ${safeImagePath
+                        ? `<img src="${safeImagePath}" alt="" draggable="false">`
+                        : `<i class="fas ${fallback.icon}" style="color:${fallback.color};font-size:${Math.round(size * 0.58)}px;"></i>`}
+                </span>
+            </span>
         `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2]
     });
+}
+
+function getCitizenSharedMarkerIcon(categoryInput, marker = {}, incident = null) {
+    ensureCitizenMarkerStyles();
+
+    const categoryKey = getCitizenMarkerCategoryKey(categoryInput) || 'default';
+    const sharedType = categoryKey === 'fire' ? 'fire' : categoryKey;
+    const status = incident?.incident_status_id
+        ?? incident?.status_id
+        ?? incident?.incident_status
+        ?? incident?.status
+        ?? marker?.incident_status
+        ?? marker?.status
+        ?? null;
+
+    if (typeof window.createSharedMapMarkerIcon === 'function') {
+        return window.createSharedMapMarkerIcon(sharedType, {
+            marker: {
+                ...marker,
+                category: sharedType,
+                markerCategory_id: marker?.markerCategory_id
+            },
+            status,
+            isActive: categoryKey === 'fire' ? isCitizenActiveFireIncident(incident, marker) : false
+        });
+    }
+
+    return createCitizenStaticImageIcon(categoryKey, marker);
+}
+
+// Get icon based on incident type
+function getIncidentIcon(incidentTypeId, incidentTypeName = '', marker = {}, incident = null) {
+    return getCitizenSharedMarkerIcon('fire', marker, incident);
 }
 
 // Get station icon
-function getStationIcon() {
-    ensureCitizenMarkerStyles();
-    return L.divIcon({
-        className: 'custom-fa-icon citizen-station-icon',
-        html: `
-            <div style="
-                width: 32px;
-                height: 32px;
-                background-color: #2563eb;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2);
-                border: 2px solid white;
-                transition: transform 0.2s;
-            ">
-                <i class="fas fa-building" data-inline-fa-processed="1" style="
-                    color: white;
-                    font-size: 19px;
-                    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
-                "></i>
-            </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16]
-    });
+function getStationIcon(marker = {}) {
+    return getCitizenSharedMarkerIcon('station', marker);
 }
 
 // Get hydrant icon
-function getHydrantIcon() {
-    ensureCitizenMarkerStyles();
-    return L.divIcon({
-        className: 'custom-fa-icon citizen-hydrant-icon',
-        html: `
-            <div style="
-                width: 28px;
-                height: 28px;
-                background-color: #ef4444;
-                border-radius: 4px 4px 8px 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2);
-                border: 2px solid white;
-                transition: transform 0.2s;
-            ">
-                <i class="fas fa-fire-extinguisher" data-inline-fa-processed="1" style="
-                    color: white;
-                    font-size: 16px;
-                    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
-                "></i>
-            </div>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -14]
-    });
+function getHydrantIcon(marker = {}) {
+    return getCitizenSharedMarkerIcon('hydrant', marker);
 }
 
-function getCitizenCategoryIcon(categoryInput) {
-    const markerPresentation = getCitizenMarkerPresentation(categoryInput);
-
-    if (markerPresentation.key === 'station') {
-        return getStationIcon();
-    }
-
-    if (markerPresentation.key === 'hydrant') {
-        return getHydrantIcon();
-    }
-
-    ensureCitizenMarkerStyles();
-
-    const glyph = markerPresentation.key === 'barangay'
-        ? `<span style="display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;">${BARANGAY_GROUP_ICON_SVG}</span>`
-        : `<i class="fas ${markerPresentation.icon}" data-inline-fa-processed="1" style="
-                    color: white;
-                    font-size: 15px;
-                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22));
-                "></i>`;
-
-    return L.divIcon({
-        className: 'custom-fa-icon citizen-category-icon',
-        html: `
-            <div style="
-                width: 34px;
-                height: 34px;
-                background: ${markerPresentation.color};
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.24);
-                border: 3px solid #ffffff;
-            ">
-                ${glyph}
-            </div>
-        `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
-    });
+function getCitizenCategoryIcon(categoryInput, marker = {}, incident = null) {
+    return getCitizenSharedMarkerIcon(categoryInput, marker, incident);
 }
 
 // Get default marker icon
-function getDefaultIcon() {
-    return L.divIcon({
-        className: 'default-icon',
-        html: `
-            <div style="
-                width: 24px;
-                height: 24px;
-                background-color: #6b7280;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                border: 2px solid white;
-                cursor: pointer;
-            ">
-                <i class="fas fa-map-marker-alt" data-inline-fa-processed="1" style="color: white; font-size: 12px;"></i>
-            </div>
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -12]
-    });
+function getDefaultIcon(marker = {}) {
+    return getCitizenSharedMarkerIcon('default', marker);
 }
 
 function getCitizenReferenceLocation() {
@@ -1459,6 +1542,11 @@ function getOwnReportedIncidentIds() {
 }
 
 async function syncCitizenRouteDisplay() {
+    const now = Date.now();
+    if (citizenRouteDiscoveryPausedUntil > now) {
+        return;
+    }
+
     const ownIncidentIds = getOwnReportedIncidentIds();
 
     if (ownIncidentIds.size === 0) {
@@ -1478,8 +1566,13 @@ async function syncCitizenRouteDisplay() {
         });
 
         if (!response.ok) {
+            citizenRouteDiscoveryFailureCount += 1;
+            citizenRouteDiscoveryPausedUntil = Date.now() + Math.min(60000, 5000 * citizenRouteDiscoveryFailureCount);
             return;
         }
+
+        citizenRouteDiscoveryFailureCount = 0;
+        citizenRouteDiscoveryPausedUntil = 0;
 
         const activeRoutes = await response.json();
         const matchingRoute = activeRoutes.find((route) => ownIncidentIds.has(parseInt(route.incident_id)));
@@ -1503,6 +1596,8 @@ async function syncCitizenRouteDisplay() {
         if (error?.name === 'AbortError') {
             return;
         }
+        citizenRouteDiscoveryFailureCount += 1;
+        citizenRouteDiscoveryPausedUntil = Date.now() + Math.min(60000, 5000 * citizenRouteDiscoveryFailureCount);
         console.error('Error syncing citizen route display:', error);
     }
 }
@@ -1595,6 +1690,234 @@ function startCitizenMarkerWatcher() {
     }, CITIZEN_MARKER_WATCH_INTERVAL_MS);
 }
 
+function getCitizenUsefulValue(...values) {
+    for (const value of values) {
+        if (value === null || value === undefined) continue;
+        const normalized = String(value).replace(/\s+/g, ' ').trim();
+        if (!normalized || /^n\/?a$/i.test(normalized) || /^null$/i.test(normalized) || /^undefined$/i.test(normalized)) {
+            continue;
+        }
+        return normalized;
+    }
+
+    return '';
+}
+
+function formatCitizenPopupDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+}
+
+function formatCitizenPopupCoords(marker) {
+    const lat = Number(marker?.lat);
+    const lng = Number(marker?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return '';
+    }
+
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function sanitizeCitizenPhoneHref(value) {
+    const phone = getCitizenUsefulValue(value);
+    if (!phone) return '';
+    return phone.replace(/[^\d+]/g, '');
+}
+
+function getCitizenStatusMeta(statusLabel = '', incident = null) {
+    const normalized = String(statusLabel || '').toLowerCase();
+
+    if (incident || ['restricted', 'unavailable', 'emergency'].some((token) => normalized.includes(token))) {
+        return { className: 'danger', icon: 'fa-circle' };
+    }
+
+    if (['warning', 'limited', 'pending', 'reported', 'responding'].some((token) => normalized.includes(token))) {
+        return { className: 'warning', icon: 'fa-circle' };
+    }
+
+    if (['active', 'available', 'operational', 'verified', 'resolved'].some((token) => normalized.includes(token))) {
+        return { className: 'ok', icon: 'fa-circle' };
+    }
+
+    return { className: 'neutral', icon: 'fa-circle' };
+}
+
+function getCitizenPopupStatusLabel(incident, marker = null) {
+    const rawStatus = getCitizenUsefulValue(
+        incident?.status,
+        incident?.incident_status,
+        marker?.status,
+        marker?.verification_status,
+        marker?.is_verified ? 'Verified' : ''
+    );
+
+    if (!rawStatus) return '';
+    return rawStatus
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getCitizenPopupTitle(marker, incident, markerPresentation, markerCategory) {
+    const explicitTitle = getCitizenUsefulValue(
+        marker?.station_public?.name,
+        marker?.barangay_public?.name,
+        marker?.hydrant_public?.code,
+        marker?.title,
+        marker?.name,
+        marker?.station_name,
+        marker?.barangay_name,
+        marker?.hydrant_name,
+        marker?.place_name,
+        incident?.title,
+        incident?.incident_type,
+        incident?.type
+    );
+
+    if (explicitTitle && !/^marker\s*#?\d+$/i.test(explicitTitle)) {
+        return explicitTitle;
+    }
+
+    const location = getCitizenUsefulValue(
+        marker?.station_public?.address,
+        marker?.barangay_public?.address,
+        marker?.location_name,
+        marker?.barangay,
+        marker?.barangay_name,
+        marker?.street
+    );
+
+    if (incident) {
+        return location ? `Active Fire Incident - ${location}` : 'Active Fire Incident';
+    }
+
+    if (isCitizenStationCategory(markerCategory)) {
+        return location ? `${location} Fire Station` : 'Fire Station';
+    }
+
+    if (isCitizenHydrantCategory(markerCategory)) {
+        return location ? `Fire Hydrant - ${location}` : 'Fire Hydrant';
+    }
+
+    if (markerCategory === 'barangay') {
+        return location ? `${location} Barangay Hall` : 'Barangay Hall';
+    }
+
+    return location ? `${markerPresentation.label} - ${location}` : markerPresentation.label;
+}
+
+function appendCitizenPopupRow(rows, label, ...values) {
+    const value = getCitizenUsefulValue(...values);
+    if (value) {
+        rows.push({ label, value });
+    }
+}
+
+function appendCitizenPopupLinkRow(rows, label, value, href) {
+    const normalizedValue = getCitizenUsefulValue(value);
+    const normalizedHref = getCitizenUsefulValue(href);
+    if (normalizedValue && normalizedHref) {
+        rows.push({ label, value: normalizedValue, href: normalizedHref });
+    } else if (normalizedValue) {
+        rows.push({ label, value: normalizedValue });
+    }
+}
+
+function buildCitizenPopupRows(marker, incident, markerPresentation, markerCategory) {
+    const rows = [];
+
+    if (incident) {
+        appendCitizenPopupRow(rows, 'Incident type', incident?.incident_type?.type, incident?.incident_type_name, incident?.incident_type, markerPresentation.label);
+        appendCitizenPopupRow(rows, 'Reported', formatCitizenPopupDate(incident.alarmdatetime || incident.created_at || marker?.created_at));
+        appendCitizenPopupRow(rows, 'Location', incident?.address, marker?.location, marker?.barangay, marker?.barangay_name);
+        appendCitizenPopupRow(rows, 'Advisory', marker?.public_advisory, incident?.public_advisory, 'Keep a safe distance and follow official instructions.');
+    } else if (isCitizenStationCategory(markerCategory)) {
+        appendCitizenPopupRow(rows, 'Address', marker?.station_public?.address);
+        appendCitizenPopupRow(rows, 'Station chief', marker?.station_public?.chief_name);
+        appendCitizenPopupLinkRow(
+            rows,
+            'Contact',
+            marker?.station_public?.contact_number,
+            sanitizeCitizenPhoneHref(marker?.station_public?.contact_number) ? `tel:${sanitizeCitizenPhoneHref(marker?.station_public?.contact_number)}` : ''
+        );
+        appendCitizenPopupRow(rows, 'Hours', marker?.station_public?.operating_hours);
+        appendCitizenPopupRow(rows, 'Last updated', formatCitizenPopupDate(marker?.updated_at));
+    } else if (isCitizenHydrantCategory(markerCategory)) {
+        appendCitizenPopupRow(rows, 'Hydrant code', marker?.hydrant_public?.code);
+        appendCitizenPopupRow(rows, 'Type', marker?.hydrant_public?.type);
+        appendCitizenPopupRow(rows, 'Location', marker?.location, marker?.address);
+        appendCitizenPopupRow(rows, 'Condition', marker?.operational_status, marker?.condition);
+        appendCitizenPopupRow(rows, 'Access', marker?.accessibility, marker?.access);
+        appendCitizenPopupRow(rows, 'Last checked', formatCitizenPopupDate(marker?.last_inspection_at || marker?.inspected_at || marker?.updated_at));
+    } else if (markerCategory === 'barangay') {
+        appendCitizenPopupRow(rows, 'Address', marker?.barangay_public?.address);
+        appendCitizenPopupLinkRow(
+            rows,
+            'Contact',
+            marker?.barangay_public?.contact_number,
+            sanitizeCitizenPhoneHref(marker?.barangay_public?.contact_number) ? `tel:${sanitizeCitizenPhoneHref(marker?.barangay_public?.contact_number)}` : ''
+        );
+        appendCitizenPopupRow(rows, 'Office hours', marker?.barangay_public?.office_hours);
+        appendCitizenPopupRow(rows, 'Barangay', marker?.barangay_public?.barangay_name);
+    } else {
+        appendCitizenPopupRow(rows, 'Address', marker?.address, marker?.location);
+        appendCitizenPopupRow(rows, 'Barangay', marker?.barangay, marker?.barangay_name);
+        appendCitizenPopupRow(rows, 'City', marker?.city, marker?.municipality);
+        appendCitizenPopupLinkRow(
+            rows,
+            'Contact',
+            getCitizenUsefulValue(marker?.contact_number, marker?.phone, marker?.mobile),
+            sanitizeCitizenPhoneHref(getCitizenUsefulValue(marker?.contact_number, marker?.phone, marker?.mobile))
+                ? `tel:${sanitizeCitizenPhoneHref(getCitizenUsefulValue(marker?.contact_number, marker?.phone, marker?.mobile))}`
+                : ''
+        );
+        appendCitizenPopupRow(rows, 'Hours', marker?.office_hours, marker?.operating_hours, marker?.hours);
+    }
+
+    appendCitizenPopupRow(rows, 'Coordinates', formatCitizenPopupCoords(marker));
+
+    return rows;
+}
+
+function buildCitizenPopupAction(marker) {
+    const lat = Number(marker?.lat);
+    const lng = Number(marker?.lng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return '';
+    }
+
+    return `
+        <button type="button" class="citizen-marker-popup-btn primary" onclick="window.centerCitizenMarkerPopup(${lat}, ${lng})" aria-label="Center map on this marker">
+            <i class="fas fa-crosshairs"></i>
+            Center on map
+        </button>
+    `;
+}
+
+window.centerCitizenMarkerPopup = function centerCitizenMarkerPopup(lat, lng) {
+    const targetLat = Number(lat);
+    const targetLng = Number(lng);
+
+    if (!window.usermap || !Number.isFinite(targetLat) || !Number.isFinite(targetLng)) {
+        return;
+    }
+
+    const targetZoom = Math.max(window.usermap.getZoom() || 15, 17);
+    if (typeof window.usermap.flyTo === 'function') {
+        window.usermap.flyTo([targetLat, targetLng], targetZoom, { duration: 0.55 });
+    } else {
+        window.usermap.setView([targetLat, targetLng], targetZoom);
+    }
+};
+
 export async function loadMarkers() {
     // Check if map exists
     if (!window.usermap) {
@@ -1664,39 +1987,39 @@ export async function loadMarkers() {
             
             if (isCitizenStationCategory(markerCategory)) {
                 // Fire Station
-                icon = getStationIcon();
+                icon = getStationIcon(usermark);
                 targetLayer = stationLayerGroup;
                 registerLegendEntry({
                     key: 'fire-station',
                     label: 'Fire Station',
-                    swatch: buildLegendSwatch({ color: '#2563eb', icon: 'fa-building', size: 18, borderWidth: 2, iconSize: 11 })
+                    swatch: buildLegendSwatch({ imagePath: '/station.png', color: '#2563eb', size: 20 })
                 });
             } 
             else if (isCitizenHydrantCategory(markerCategory)) {
                 // Fire Hydrant
-                icon = getHydrantIcon();
+                icon = getHydrantIcon(usermark);
                 targetLayer = hydrantLayerGroup;
                 registerLegendEntry({
                     key: 'hydrant',
                     label: 'Fire Hydrant',
-                    swatch: buildLegendSwatch({ color: '#ef4444', icon: 'fa-fire-extinguisher', shape: 'square', size: 16, borderWidth: 2, iconSize: 10 })
+                    swatch: buildLegendSwatch({ imagePath: '/hydrant.png', color: '#ef4444', shape: 'square', size: 20 })
                 });
             }
             else if (isCitizenIncidentCategory(markerCategory) || incident) {
                 // Fire incident marker based on markers.category
                 const incidentMarkerPresentation = getCitizenMarkerPresentation('fire');
-                icon = getCitizenCategoryIcon('fire');
+                icon = getCitizenCategoryIcon('fire', usermark, incident);
                 targetLayer = incidentLayerGroup;
                 registerLegendEntry({
                     key: 'incident-fire',
                     label: incidentMarkerPresentation.label,
-                    swatch: buildLegendSwatch({ color: incidentMarkerPresentation.color, icon: incidentMarkerPresentation.icon, pulse: true, size: 18, borderWidth: 3, shadow: '0 6px 14px rgba(15, 23, 42, 0.24)', iconSize: 9 })
+                    swatch: buildLegendSwatch({ imagePath: '/fire.png', color: incidentMarkerPresentation.color, size: 22 })
                 });
             }
             else {
                 // Other markers
                 const markerLegend = getCitizenMarkerPresentation(markerCategory);
-                icon = getCitizenCategoryIcon(markerCategory) || getDefaultIcon();
+                icon = getCitizenCategoryIcon(markerCategory, usermark) || getDefaultIcon(usermark);
                 targetLayer = otherLayerGroup;
                 registerLegendEntry({
                     key: `marker-${markerLegend.key}`,
@@ -1704,6 +2027,7 @@ export async function loadMarkers() {
                     swatch: buildLegendSwatch({
                         color: markerLegend.color,
                         icon: markerLegend.icon,
+                        imagePath: inferCitizenSharedMarkerAsset(markerLegend.key, usermark),
                         iconHtml: markerLegend.key === 'barangay' ? BARANGAY_GROUP_ICON_SVG : null
                     })
                 });
@@ -1712,57 +2036,35 @@ export async function loadMarkers() {
             // Create popup content
             const markerPresentation = getCitizenMarkerPresentation(markerCategory);
             const incidentStatus = String(incident?.status || 'reported').toLowerCase();
-            const statusLabel = incident?.status ? incident.status.charAt(0).toUpperCase() + incident.status.slice(1) : 'Reported';
-            const statusMeta = {
-                reported: { className: 'reported', icon: 'fa-bell' },
-                responding: { className: 'responding', icon: 'fa-truck-medical' },
-                resolved: { className: 'resolved', icon: 'fa-circle-check' },
-                closed: { className: 'closed', icon: 'fa-lock' }
-            }[incidentStatus] || { className: 'default', icon: 'fa-circle-info' };
-            const detailRows = incident
-                ? [
-                    { label: 'Category', value: markerPresentation.label },
-                    { label: 'Status', value: statusLabel },
-                    { label: 'Reported', value: incident.alarmdatetime ? new Date(incident.alarmdatetime).toLocaleString() : 'Unavailable' },
-                    { label: 'Location', value: `${Number(usermark.lat).toFixed(5)}, ${Number(usermark.lng).toFixed(5)}` }
-                ]
-                : isCitizenStationCategory(markerCategory)
-                    ? [
-                        { label: 'Category', value: 'Fire Station' },
-                        { label: 'Hotline', value: usermark.contact_number || 'Not available' },
-                        { label: 'Location', value: `${Number(usermark.lat).toFixed(5)}, ${Number(usermark.lng).toFixed(5)}` }
-                    ]
-                    : isCitizenHydrantCategory(markerCategory)
-                        ? [
-                            { label: 'Category', value: 'Fire Hydrant' },
-                            { label: 'Reference', value: usermark.title || `Hydrant ${usermark.marker_id}` },
-                            { label: 'Location', value: `${Number(usermark.lat).toFixed(5)}, ${Number(usermark.lng).toFixed(5)}` }
-                        ]
-                        : [
-                            { label: 'Category', value: markerPresentation.label },
-                            { label: 'Marker ID', value: String(usermark.marker_id) },
-                            { label: 'Location', value: `${Number(usermark.lat).toFixed(5)}, ${Number(usermark.lng).toFixed(5)}` }
-                        ];
+            const statusLabel = getCitizenPopupStatusLabel(incident, usermark) || (incident ? 'Reported' : '');
+            const statusMeta = getCitizenStatusMeta(statusLabel || incidentStatus, incident);
+            const popupTitle = getCitizenPopupTitle(usermark, incident, markerPresentation, markerCategory);
+            const popupDescription = getCitizenUsefulValue(
+                incident?.public_description,
+                incident?.description,
+                usermark.public_description,
+                usermark.description
+            );
+            const detailRows = buildCitizenPopupRows(usermark, incident, markerPresentation, markerCategory);
+            const popupAction = buildCitizenPopupAction(usermark);
 
             let popupContent = `
                 <div class="citizen-marker-popup ${markerPresentation.accentClass}">
-                    <div class="citizen-marker-popup-topbar"></div>
                     <div class="citizen-marker-popup-header">
                         <div class="citizen-marker-popup-icon" style="--popup-accent:${markerPresentation.color};">
                             <i class="fas ${markerPresentation.icon}"></i>
                         </div>
                         <div class="citizen-marker-popup-heading">
+                            <strong class="citizen-marker-popup-title">${escapeCitizenModalHtml(popupTitle)}</strong>
                             <div class="citizen-marker-popup-chip-row">
-                                <span class="citizen-marker-popup-chip">${escapeCitizenModalHtml(markerPresentation.label)}</span>
-                                ${incident ? `
+                                <span class="citizen-marker-popup-chip">${escapeCitizenModalHtml(incident ? 'Fire incident' : markerPresentation.label)}</span>
+                                ${statusLabel ? `
                                     <span class="citizen-marker-popup-chip status ${statusMeta.className}">
                                         <i class="fas ${statusMeta.icon}"></i>
                                         ${escapeCitizenModalHtml(statusLabel)}
                                     </span>
                                 ` : ''}
                             </div>
-                            <strong class="citizen-marker-popup-title">${escapeCitizenModalHtml(usermark.title || ('Marker ' + usermark.marker_id))}</strong>
-                            <p class="citizen-marker-popup-subtitle">${escapeCitizenModalHtml(usermark.description || 'No description provided yet.')}</p>
                         </div>
                     </div>
             `;
@@ -1773,14 +2075,11 @@ export async function loadMarkers() {
                         <img src="${usermark.image}" alt="${escapeCitizenModalHtml(usermark.title || 'Marker image')}" class="citizen-marker-popup-image" />
                     </div>
                 `;
-            } else {
+            }
+
+            if (popupDescription) {
                 popupContent += `
-                    <div class="citizen-marker-popup-media placeholder">
-                        <div class="citizen-marker-popup-placeholder-icon">
-                            <i class="fas ${markerPresentation.icon}"></i>
-                        </div>
-                        <span>No photo attached</span>
-                    </div>
+                    <p class="citizen-marker-popup-subtitle">${escapeCitizenModalHtml(popupDescription)}</p>
                 `;
             }
 
@@ -1789,31 +2088,22 @@ export async function loadMarkers() {
                         ${detailRows.map((row) => `
                             <div class="citizen-marker-popup-detail-row">
                                 <span class="citizen-marker-popup-detail-label">${escapeCitizenModalHtml(row.label)}</span>
-                                <span class="citizen-marker-popup-detail-value">${escapeCitizenModalHtml(row.value)}</span>
+                                <span class="citizen-marker-popup-detail-value">
+                                    ${row.href
+                                        ? `<a href="${escapeCitizenModalHtml(row.href)}">${escapeCitizenModalHtml(row.value)}</a>`
+                                        : escapeCitizenModalHtml(row.value)}
+                                </span>
                             </div>
                         `).join('')}
                     </div>
-                    <div class="citizen-marker-popup-actions">
+                    ${popupAction ? `
+                        <div class="citizen-marker-popup-actions">
+                            ${popupAction}
+                        </div>
+                    ` : ''}
             `;
 
-            if (incident && incident.status !== 'resolved') {
-                popupContent += `
-                    <button id="viewIncident${usermark.marker_id}" class="citizen-marker-popup-btn primary">
-                        <i class="fas fa-circle-info"></i>
-                        View Incident Details
-                    </button>
-                `;
-            } else {
-                popupContent += `
-                    <button id="viewDetails${usermark.marker_id}" class="citizen-marker-popup-btn ${isCitizenStationCategory(markerCategory) ? 'primary' : 'secondary'}">
-                        <i class="fas fa-circle-info"></i>
-                        View Details
-                    </button>
-                `;
-            }
-
             popupContent += `
-                    </div>
                 </div>
             `;
             
@@ -1832,9 +2122,9 @@ export async function loadMarkers() {
                                 : 0
             })
                 .bindPopup(popupContent, {
-                    minWidth: 250,
-                    maxWidth: 300,
-                    className: 'custom-popup'
+                    minWidth: 260,
+                    maxWidth: 320,
+                    className: 'custom-popup citizen-marker-leaflet-popup'
                 });
 
             marker.citizenPreviewData = {
@@ -1875,9 +2165,6 @@ export async function loadMarkers() {
                     return;
                 }
 
-                setTimeout(() => {
-                    bindCitizenMarkerActionButtons(usermark, incident);
-                }, 100);
             });
 
             marker.on('preclick', function () {
@@ -2116,25 +2403,6 @@ function closeCitizenMapDetailsModal() {
     modalHost?.classList.remove('show');
 }
 
-function bindCitizenMarkerActionButtons(marker, incident) {
-    const viewBtn = document.getElementById('viewDetails' + marker.marker_id);
-    const incidentBtn = document.getElementById('viewIncident' + marker.marker_id);
-
-    if (viewBtn && viewBtn.dataset.boundCitizenAction !== 'true') {
-        viewBtn.addEventListener('click', function () {
-            showMarkerDetails(marker, incident);
-        });
-        viewBtn.dataset.boundCitizenAction = 'true';
-    }
-
-    if (incidentBtn && incidentBtn.dataset.boundCitizenAction !== 'true') {
-        incidentBtn.addEventListener('click', function () {
-            showIncidentDetails(incident);
-        });
-        incidentBtn.dataset.boundCitizenAction = 'true';
-    }
-}
-
 function bindCitizenMapPreviewSheetInteractions(sheet) {
     if (!sheet || sheet.dataset.dragBound === 'true') {
         return;
@@ -2275,17 +2543,12 @@ function openCitizenMapPreviewSheet(content, markerContext = null) {
 
     const sheet = ensureCitizenMapPreviewSheet();
     const body = document.getElementById('citizenMapPreviewSheetBody');
+    citizenMapPreviewPreviousFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
 
     if (body) {
         body.innerHTML = content;
-
-        const primaryAction = body.querySelector('.citizen-marker-popup-btn');
-        if (primaryAction) {
-            primaryAction.innerHTML = `
-                <i class="fas fa-arrow-up-right-from-square"></i>
-                Open details
-            `;
-        }
     }
 
     sheet.classList.add('show');
@@ -2293,9 +2556,6 @@ function openCitizenMapPreviewSheet(content, markerContext = null) {
     sheet.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
 
-    if (markerContext?.marker) {
-        bindCitizenMarkerActionButtons(markerContext.marker, markerContext.incident);
-    }
 }
 
 function closeCitizenMapPreviewSheet() {
@@ -2304,10 +2564,19 @@ function closeCitizenMapPreviewSheet() {
         return;
     }
 
+    if (sheet.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+
     sheet.classList.remove('show');
     sheet.style.display = 'none';
     sheet.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+
+    if (citizenMapPreviewPreviousFocus && document.contains(citizenMapPreviewPreviousFocus)) {
+        citizenMapPreviewPreviousFocus.focus({ preventScroll: true });
+    }
+    citizenMapPreviewPreviousFocus = null;
 }
 
 function suppressCitizenMobilePopup(marker) {
@@ -2407,131 +2676,138 @@ style.textContent = `
         }
     }
     
-    .custom-popup .leaflet-popup-content-wrapper {
-        border-radius: 22px;
+    .citizen-marker-leaflet-popup .leaflet-popup-content-wrapper {
+        border-radius: 16px;
         padding: 0;
-        background: #fffaf8;
-        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
         overflow: hidden;
     }
     
-    .custom-popup .leaflet-popup-content {
+    .citizen-marker-leaflet-popup .leaflet-popup-content {
         margin: 0;
+        width: min(330px, calc(100vw - 32px)) !important;
+        max-height: 55vh;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
 
-    .custom-popup .leaflet-popup-tip {
-        background: #fff6f1;
+    .citizen-marker-leaflet-popup .leaflet-popup-tip {
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: none;
+    }
+
+    .citizen-marker-leaflet-popup .leaflet-popup-close-button {
+        width: 32px;
+        height: 32px;
+        line-height: 31px;
+        color: #64748b;
+        font-size: 18px;
+        font-weight: 700;
     }
 
     .citizen-marker-popup {
-        width: 290px;
-        background: linear-gradient(180deg, #fffdfb 0%, #fff7f1 100%);
+        width: min(330px, calc(100vw - 32px));
+        background: #ffffff;
         color: #1f2937;
-    }
-
-    .citizen-marker-popup-topbar {
-        height: 4px;
-        background: linear-gradient(90deg, #c63d26 0%, #d18a16 100%);
-    }
-
-    .citizen-marker-popup.station .citizen-marker-popup-topbar {
-        background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
-    }
-
-    .citizen-marker-popup.hydrant .citizen-marker-popup-topbar {
-        background: linear-gradient(90deg, #0891b2 0%, #22d3ee 100%);
-    }
-
-    .citizen-marker-popup.incident .citizen-marker-popup-topbar {
-        background: linear-gradient(90deg, #dc2626 0%, #f97316 100%);
+        border-top: 4px solid var(--popup-accent, #c63d26);
     }
 
     .citizen-marker-popup-header {
-        display: flex;
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
         gap: 12px;
-        align-items: flex-start;
-        padding: 14px 14px 10px;
+        align-items: start;
+        padding: 16px 16px 12px;
     }
 
     .citizen-marker-popup-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         background: color-mix(in srgb, var(--popup-accent) 14%, white);
         color: var(--popup-accent);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--popup-accent) 20%, white);
-        flex-shrink: 0;
+        font-size: 16px;
     }
 
     .citizen-marker-popup-heading {
         min-width: 0;
         display: grid;
-        gap: 6px;
-        flex: 1;
+        gap: 7px;
+        padding-right: 20px;
     }
 
     .citizen-marker-popup-chip-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 5px;
     }
 
     .citizen-marker-popup-chip {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 4px 8px;
+        gap: 4px;
+        padding: 3px 7px;
         border-radius: 999px;
         background: rgba(148, 163, 184, 0.12);
         color: #64748b;
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 800;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
     }
 
-    .citizen-marker-popup-chip.status.reported {
-        background: #fef3c7;
-        color: #a16207;
+    .citizen-marker-popup-chip.status i {
+        font-size: 7px;
     }
 
-    .citizen-marker-popup-chip.status.responding {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .citizen-marker-popup-chip.status.resolved {
+    .citizen-marker-popup-chip.status.ok {
         background: #dcfce7;
         color: #15803d;
     }
 
-    .citizen-marker-popup-chip.status.closed,
-    .citizen-marker-popup-chip.status.default {
+    .citizen-marker-popup-chip.status.warning {
+        background: #fef3c7;
+        color: #a16207;
+    }
+
+    .citizen-marker-popup-chip.status.danger {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .citizen-marker-popup-chip.status.neutral {
         background: #e5e7eb;
         color: #4b5563;
     }
 
     .citizen-marker-popup-title {
+        display: block;
         font-size: 15px;
         font-weight: 800;
-        line-height: 1.3;
+        line-height: 1.25;
         color: #0f172a;
+        overflow-wrap: anywhere;
     }
 
     .citizen-marker-popup-subtitle {
-        margin: 0;
+        margin: 0 16px 14px;
         font-size: 12px;
-        line-height: 1.5;
-        color: #64748b;
+        line-height: 1.45;
+        color: #475569;
+        overflow-wrap: anywhere;
     }
 
     .citizen-marker-popup-media {
-        margin: 0 14px;
-        height: 110px;
-        border-radius: 16px;
+        margin: 0 16px 14px;
+        height: 120px;
+        border-radius: 12px;
         overflow: hidden;
         background: #f1f5f9;
         border: 1px solid rgba(148, 163, 184, 0.16);
@@ -2544,95 +2820,70 @@ style.textContent = `
         display: block;
     }
 
-    .citizen-marker-popup-media.placeholder {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        color: #94a3b8;
-        font-size: 11px;
-        font-weight: 700;
-        background:
-            linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(241,245,249,0.92) 100%);
-    }
-
-    .citizen-marker-popup-placeholder-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(148, 163, 184, 0.14);
-        color: #64748b;
-    }
-
     .citizen-marker-popup-details {
         display: grid;
-        gap: 8px;
-        padding: 12px 14px 0;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px 12px;
+        padding: 14px 16px 16px;
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
     }
 
     .citizen-marker-popup-detail-row {
-        display: grid;
-        gap: 4px;
-        padding: 9px 10px;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.82);
-        border: 1px solid rgba(148, 163, 184, 0.14);
+        display: contents;
     }
 
     .citizen-marker-popup-detail-label {
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
+        min-width: 0;
         color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.35;
     }
 
     .citizen-marker-popup-detail-value {
-        font-size: 12px;
-        line-height: 1.45;
+        font-size: 13px;
+        line-height: 1.35;
         font-weight: 700;
-        color: #1f2937;
-        word-break: break-word;
+        color: #334155;
+        overflow-wrap: anywhere;
+    }
+
+    .citizen-marker-popup-detail-value a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 800;
     }
 
     .citizen-marker-popup-actions {
         display: grid;
         gap: 8px;
-        padding: 12px 14px 14px;
+        padding: 0 16px 16px;
     }
 
     .citizen-marker-popup-btn {
         width: 100%;
-        border: 0;
-        border-radius: 14px;
-        min-height: 40px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        border-radius: 12px;
+        min-height: 44px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
         font-size: 12px;
         font-weight: 800;
+        text-decoration: none;
         cursor: pointer;
-        transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        transition: background 0.16s ease, color 0.16s ease;
     }
 
     .citizen-marker-popup-btn:hover {
-        transform: translateY(-1px);
+        text-decoration: none;
     }
 
     .citizen-marker-popup-btn.primary {
         color: #fff;
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
-    }
-
-    .citizen-marker-popup.incident .citizen-marker-popup-btn.primary {
-        background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
-        box-shadow: 0 10px 22px rgba(198, 61, 38, 0.24);
+        background: #2563eb;
+        box-shadow: none;
     }
 
     .citizen-marker-popup-btn.secondary {
@@ -2677,6 +2928,7 @@ style.textContent = `
         display: none;
         width: 100%;
         pointer-events: none;
+        --citizen-preview-nav-offset: var(--mobile-nav-height, var(--mobile-bottom-nav-h, 0px));
     }
 
     .citizen-map-preview-sheet.show {
@@ -2686,8 +2938,9 @@ style.textContent = `
     .citizen-map-preview-sheet__backdrop {
         position: absolute;
         inset: 0;
-        background: rgba(15, 23, 42, 0.34);
-        backdrop-filter: blur(6px);
+        background: transparent;
+        backdrop-filter: none;
+        pointer-events: none;
     }
 
     .citizen-map-preview-sheet__card {
@@ -2697,9 +2950,9 @@ style.textContent = `
         margin: 0 auto;
         background: linear-gradient(180deg, rgba(255,255,255,0.985) 0%, rgba(255,250,244,0.98) 100%);
         backdrop-filter: blur(16px);
-        border-radius: 28px 28px 0 0;
+        border-radius: 24px 24px 0 0;
         border: 1px solid rgba(198, 61, 38, 0.12);
-        box-shadow: 0 -10px 32px rgba(15, 23, 42, 0.12), 0 22px 48px rgba(15, 23, 42, 0.18);
+        box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
         overflow: hidden;
         pointer-events: auto;
         transform: translateY(18px);
@@ -2724,18 +2977,19 @@ style.textContent = `
         position: absolute;
         top: 12px;
         right: 12px;
-        width: 28px;
-        height: 28px;
+        width: 44px;
+        height: 44px;
         border: 0;
-        border-radius: 999px;
-        background: rgba(255, 247, 237, 0.95);
-        color: #c2410c;
-        box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.18), 0 6px 16px rgba(15, 23, 42, 0.1);
+        border-radius: 14px;
+        background: rgba(248, 250, 252, 0.96);
+        color: #334155;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
         z-index: 2;
     }
 
     .citizen-map-preview-sheet__body {
-        padding: 0 0 14px;
+        padding: 0;
+        min-height: 0;
     }
 
     .citizen-map-preview-sheet__body .citizen-marker-popup {
@@ -2750,7 +3004,7 @@ style.textContent = `
     }
 
     .citizen-map-preview-sheet__body .citizen-marker-popup-header {
-        padding: 4px 46px 12px 16px;
+        padding: 4px 64px 12px 16px;
         align-items: flex-start;
         gap: 12px;
     }
@@ -2797,6 +3051,8 @@ style.textContent = `
     }
 
     .citizen-map-preview-sheet__body .citizen-marker-popup-details {
+        display: grid;
+        grid-template-columns: 1fr;
         gap: 0;
         padding: 14px 16px 0;
         border-top: 1px solid rgba(226, 232, 240, 0.9);
@@ -2811,7 +3067,7 @@ style.textContent = `
         border: 0;
         border-bottom: 1px solid rgba(226, 232, 240, 0.82);
         display: grid;
-        grid-template-columns: minmax(0, 88px) minmax(0, 1fr);
+        grid-template-columns: minmax(82px, 92px) minmax(0, 1fr);
         gap: 10px;
         align-items: start;
     }
@@ -2821,11 +3077,15 @@ style.textContent = `
         letter-spacing: 0.14em;
         color: #94a3b8;
         padding-top: 2px;
+        white-space: nowrap;
     }
 
     .citizen-map-preview-sheet__body .citizen-marker-popup-detail-value {
         font-size: 12px;
         color: #334155;
+        min-width: 0;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     .citizen-map-preview-sheet__body .citizen-marker-popup-actions {
@@ -3005,51 +3265,79 @@ style.textContent = `
         }
 
         .citizen-map-preview-sheet.show {
-            pointer-events: auto;
+            pointer-events: none;
         }
 
         .citizen-map-preview-sheet__card {
-            max-height: min(54vh, 430px);
+            inset: auto 0 calc(var(--citizen-preview-nav-offset) + env(safe-area-inset-bottom, 0px)) 0;
+            width: 100vw;
+            max-width: 100vw;
+            max-height: min(56vh, calc(60vh - var(--citizen-preview-nav-offset)), 430px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding-bottom: calc(var(--citizen-preview-nav-offset) + env(safe-area-inset-bottom));
+            border-radius: 24px 24px 0 0;
+        }
+
+        .citizen-map-preview-sheet__body {
             overflow-y: auto;
-            padding-bottom: calc(12px + var(--safe-bottom));
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .citizen-map-preview-sheet__body .citizen-marker-popup-details {
+            display: grid;
+            grid-template-columns: 1fr;
+            padding: 10px 16px 0;
+            margin-top: 10px;
         }
 
         .citizen-map-preview-sheet__body .citizen-marker-popup-header {
             padding-top: 2px;
+            padding-bottom: 10px;
         }
 
         .citizen-map-preview-sheet__body .citizen-marker-popup {
             padding-bottom: 2px;
         }
 
+        .citizen-map-preview-sheet__body .citizen-marker-popup-subtitle {
+            margin: 0 16px 10px;
+            -webkit-line-clamp: 2;
+        }
+
         .citizen-map-preview-sheet__body .citizen-marker-popup-media {
-            height: 118px;
+            height: 104px;
+            margin-left: 16px;
+            margin-right: 16px;
             margin-top: 2px;
+            margin-bottom: 10px;
             background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(241, 245, 249, 0.96) 100%);
             border: 1px solid rgba(226, 232, 240, 0.82);
             box-shadow: none;
         }
 
-        .citizen-map-preview-sheet__body .citizen-marker-popup-media.placeholder {
-            color: #94a3b8;
-            font-size: 10px;
-            font-weight: 700;
-        }
-
-        .citizen-map-preview-sheet__body .citizen-marker-popup-placeholder-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 10px;
-            background: rgba(148, 163, 184, 0.1);
-            color: #64748b;
+        .citizen-map-preview-sheet__body .citizen-marker-popup-detail-row {
+            grid-template-columns: minmax(82px, 92px) minmax(0, 1fr);
+            gap: 10px;
+            padding: 10px 0;
         }
 
         .citizen-map-preview-sheet__body .citizen-marker-popup-detail-row:last-child {
             border-bottom: 0;
         }
 
-        .citizen-map-preview-sheet__body .citizen-marker-popup-detail-row:nth-child(n+3) {
-            display: none;
+        .citizen-map-preview-sheet__body .citizen-marker-popup-detail-label {
+            font-size: 9px;
+            white-space: nowrap;
+        }
+
+        .citizen-map-preview-sheet__body .citizen-marker-popup-detail-value {
+            font-size: 12px;
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
 
         .citizen-map-preview-sheet__body .citizen-marker-popup-chip {
@@ -3066,9 +3354,9 @@ style.textContent = `
 
         .citizen-map-preview-sheet__body .citizen-marker-popup-actions {
             position: sticky;
-            bottom: calc(-1 * (12px + var(--safe-bottom)));
+            bottom: 0;
             margin-top: 2px;
-            padding-bottom: calc(12px + var(--safe-bottom));
+            padding: 10px 16px 14px;
             background: linear-gradient(180deg, rgba(255,250,244,0) 0%, rgba(255,250,244,0.96) 24%, rgba(255,250,244,1) 100%);
         }
     }
@@ -3985,7 +4273,7 @@ function userStartRoutePollingForIncident(incidentId) {
                     await userDisplayAndStartRoute(
                         normalizedRouteId,
                         primaryRoute,
-                        { title: `Incident #${incidentId}` },
+                        { title: 'Incident location' },
                         incidentId
                     );
                 }

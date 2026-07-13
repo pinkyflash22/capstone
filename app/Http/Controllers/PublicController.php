@@ -499,7 +499,8 @@ class PublicController extends Controller
         $userReports = Incident::where('reported_by', $accountId)->count();
         $countReport = Incident::where('reported_by', $accountId)->count();
         $userinfo = User::where('user_id', $accountId)->with('role','address','address.barangay','address.barangay.city')->get();
-        $usermarker =  Marker::all();
+        $markerResponse = app(MarkerController::class)->index()->getData(true);
+        $usermarker = $markerResponse['data'] ?? [];
         $provinces = Province::with('cities.barangays')->get();
         $cities = City::with('barangays')->orderBy('city_name')->get(['city_id', 'city_name']);
         $citizenUser = User::with(['role', 'address.barangay.city'])->findOrFail($accountId);

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -761,19 +762,34 @@
                 </div>
             </nav>
 
-            <div class="chief-checklist-topbar">
+            <section class="chief-theme-hero">
                 <div>
-                    <span class="chief-checklist-kicker">
+                    <span class="chief-theme-hero__eyebrow">
                         <i class="fa-solid fa-list-check"></i>
                         Compliance Review
                     </span>
-                    <h1 class="chief-checklist-title">Barangay Action Plans</h1>
-                    <p class="chief-checklist-copy">Review submitted actions, verify field compliance, and record the result per step.</p>
+                    <h1 class="chief-theme-hero__title">Course Checklists</h1>
+                    <p class="chief-theme-hero__copy">Review submitted action plans, verify field compliance, and record the result per step using the same visual language as Activity Schedule.</p>
+                    <div class="chief-theme-badges">
+                        <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('l, F j') }}</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-user-shield"></i> {{ auth()->user()->first_name ?? 'Chief' }} · Chief</span>
+                    </div>
                 </div>
-                <div class="chief-checklist-badge">
-                    {{ auth()->user()->first_name ?? 'Chief' }} · Chief
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Plans</div>
+                        <div class="chief-theme-summary-value">{{ $summary['total'] }}</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Open</div>
+                        <div class="chief-theme-summary-value">{{ $summary['open'] }}</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Submitted</div>
+                        <div class="chief-theme-summary-value">{{ $summary['submitted'] }}</div>
+                    </article>
                 </div>
-            </div>
+            </section>
 
             <section class="chief-checklist-summary">
                 <article class="chief-summary-card">

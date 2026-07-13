@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -8,7 +9,7 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
-    <title>PyroSense · Investigation Reports</title>
+    <title>PyroSense · Executive Reports</title>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
     @vite(['resources/js/admin/reports.js'])
 
@@ -719,7 +720,7 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">ANALYTICS</div>
-                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Predictive Analytics</span></a>
+                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
             </div>
         </nav>
         <div class="logout-container">
@@ -780,25 +781,33 @@
             </div>
         </nav>
 
-        <div class="reports-container">
-            <!-- Page Header -->
-            <div class="page-header">
-                <h1>
-                    <i class="fa-solid fa-clipboard-list"></i>
-                    Investigation Reports
-                </h1>
-                <div class="date">
-                    <i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs
+        <div class="reports-container chief-theme-shell">
+            <section class="chief-theme-hero">
+                <div>
+                    <span class="chief-theme-hero__eyebrow">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        Command Reporting
+                    </span>
+                    <h1 class="chief-theme-hero__title">Executive Reports</h1>
+                    <p class="chief-theme-hero__copy">Generate spot, progress, and final investigation reports from one station-ready command reporting workspace.</p>
+                    <div class="chief-theme-badges">
+                        <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-file-waveform"></i> Investigation export suite</span>
+                    </div>
                 </div>
-            </div>
-
-            <!-- Alert Banner -->
-            <div class="alert-banner">
-                <i class="fa-solid fa-circle-info"></i>
-                <div class="content">
-                    <strong>Investigation Suite:</strong> Generate Spot Investigation Reports, Progress Reports, and Final Investigation Reports.
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Stations</div>
+                        <div class="chief-theme-summary-value">{{ ($stations ?? collect())->count() }}</div>
+                        <div class="chief-theme-summary-copy">Available station records for report filtering and export.</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Report Types</div>
+                        <div class="chief-theme-summary-value">3</div>
+                        <div class="chief-theme-summary-copy">Spot, progress, and final investigation report formats.</div>
+                    </article>
                 </div>
-            </div>
+            </section>
 
             <!-- Report Generator Card -->
             <div class="report-generator-card">

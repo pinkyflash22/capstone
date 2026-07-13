@@ -602,7 +602,12 @@
             </div>
         </div>
 <div id="routeInfoCard" style="display: none;">
-        <h4><i class="fas fa-route"></i> Route Information</h4>
+        <div class="route-card-header">
+            <h4><i class="fas fa-route"></i> Route Information</h4>
+            <span id="routeSourceBadge" class="route-source-badge live">
+                <i class="fas fa-location-crosshairs"></i><span>LIVE</span>
+            </span>
+        </div>
         <div class="info-row">
             <strong>Destination:</strong> <span id="destinationTitle">Loading...</span>
         </div>
@@ -1839,7 +1844,17 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         return;
     }
     
-    if (!confirm('Confirm responding to this incident? Your status will be updated to RESPONDING.')) return;
+    const routeMode = typeof window.promptRouteSourceSelection === 'function'
+        ? await window.promptRouteSourceSelection({
+            title: 'Choose how to start this response',
+            description: 'Use your live device location for a real dispatch, or switch to demo mode for a simulated route.'
+        })
+        : 'real';
+
+    if (!routeMode) return;
+
+    const routeModeLabel = routeMode === 'demo' ? 'DEMO ROUTE' : 'LIVE GPS';
+    if (!confirm(`Confirm responding to this incident? Your status will be updated to RESPONDING and navigation will use ${routeModeLabel}.`)) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Sending...',
         badgeLabel: 'RESPONDING...'
@@ -1862,7 +1877,7 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
             showToast(result.message || 'You are now responding to this incident!', 'success');
             await fetchAssignedIncidents(true);
             if (typeof window.calculateRouteToIncident === 'function') {
-                await window.calculateRouteToIncident(incidentId);
+                await window.calculateRouteToIncident(incidentId, null, { source: routeMode });
             }
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);

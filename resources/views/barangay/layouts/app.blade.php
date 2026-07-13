@@ -467,10 +467,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            padding: 8px 10px;
-            width: max-content;
+            gap: 8px;
+            flex-wrap: nowrap;
+            padding: 10px 12px;
+            width: min(calc(100vw - 28px), 420px);
             max-width: calc(100vw - 28px);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(20, 93, 104, 0.08);
+            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.22s ease, transform 0.22s ease;
@@ -483,23 +488,35 @@
         }
 
         .barangay-mobile-dock__burst-item {
-            width: 52px;
-            height: 52px;
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.98);
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 48px;
+            padding: 0 12px;
+            gap: 8px;
+            border-radius: 14px;
+            background: transparent;
             color: #145d68;
-            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.16);
-            border: 1px solid rgba(20, 93, 104, 0.08);
+            border: 1px solid rgba(20, 93, 104, 0.1);
         }
 
         .barangay-mobile-dock__burst-item.active {
             background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
             color: #fff;
+            border-color: transparent;
         }
 
         .barangay-mobile-dock__burst-icon {
-            font-size: 1.35rem;
+            font-size: 1.2rem;
             font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 20;
+        }
+
+        .barangay-mobile-dock__burst-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .barangay-mobile-bottom-spacer {

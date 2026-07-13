@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -1623,29 +1624,41 @@
         </nav>
 
         <!-- MAIN CONTENT AREA -->
-        <div class="fsic-content-shell">
-            <!-- Header with Add Request Button -->
-            <div class="fsic-toolbar">
-                <div class="fsic-page-header">
-                    <h1 class="fsic-page-title">Fire Safety Inspection Certificate</h1>
-                    <p class="fsic-page-copy">Manage, inspect, approve, and issue FSIC requests with a live station workflow.</p>
-                </div>
-                <div class="flex items-center gap-3 mt-3 sm:mt-0">
-                    <div class="fsic-summary-pills">
-                        <span class="fsic-summary-pill pending">
-                            <i class="fa-solid fa-clock"></i>
-                            Pending: {{ $pendingCount ?? 0 }}
-                        </span>
-                        <span class="fsic-summary-pill inspect">
-                            <i class="fa-solid fa-clipboard-list"></i>
-                            For Inspection: {{ $forInspectionCount ?? 0 }}
-                        </span>
+        <div class="fsic-content-shell chief-theme-shell">
+            <section class="chief-theme-hero">
+                <div>
+                    <span class="chief-theme-hero__eyebrow">
+                        <i class="fa-solid fa-file-certificate"></i>
+                        FSIC Command Desk
+                    </span>
+                    <h1 class="chief-theme-hero__title">Fire Safety Inspection Certificate</h1>
+                    <p class="chief-theme-hero__copy">Manage, inspect, approve, and issue FSIC requests with the same command-first workflow style used in Activity Schedule.</p>
+                    <div class="chief-theme-badges">
+                        <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('l, F j') }}</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-building-shield"></i> Live station review queue</span>
                     </div>
-                    <button onclick="openNewRequestModal()" class="btn-primary flex items-center gap-2">
-                        <i class="fa-solid fa-plus"></i> New Request
-                    </button>
                 </div>
-            </div>
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Pending</div>
+                        <div class="chief-theme-summary-value">{{ $pendingCount ?? 0 }}</div>
+                        <div class="chief-theme-summary-copy">Requests waiting for command review.</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">For Inspection</div>
+                        <div class="chief-theme-summary-value">{{ $forInspectionCount ?? 0 }}</div>
+                        <div class="chief-theme-summary-copy">Filed requests already moving into inspection work.</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Actions</div>
+                        <div class="chief-theme-actions">
+                            <button onclick="openNewRequestModal()" class="btn-primary flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> New Request
+                            </button>
+                        </div>
+                    </article>
+                </div>
+            </section>
 
             <!-- Tabs -->
             <div class="tabs">

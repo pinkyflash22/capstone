@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    @include('partials.pyrosense-favicon')
     <title>Weather Data for Fire Risk</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -1089,7 +1090,7 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">ANALYTICS</div>
-                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Predictive Analytics</span></a>
+                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
                 {{-- <a href="#" class="nav-item"><i class="fa-solid fa-clock-rotate-left"></i><span>History</span></a>
                 <a href="#" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alerts</span></a> --}}
             </div>
@@ -1154,7 +1155,7 @@
         </nav>
 
         <!-- MANAGEMENT CONTENT -->
-        <div class="management-container">
+        <div class="management-container chief-theme-shell">
             @if(session('success'))
                 <div class="station-flash success">{{ session('success') }}</div>
             @endif
@@ -1162,33 +1163,42 @@
                 <div class="station-flash error">{{ $errors->first() }}</div>
             @endif
 
-            <div class="management-station-hero">
-                <div class="management-station-copy">
-                    <p class="management-eyebrow">Current Command Station</p>
-                    <h2>{{ $currentStation?->station_name ?? 'Station Not Assigned' }}</h2>
-                    <p class="management-station-subcopy">
+            <section class="chief-theme-hero">
+                <div>
+                    <span class="chief-theme-hero__eyebrow">
+                        <i class="fa-solid fa-building-shield"></i>
+                        Current Command Station
+                    </span>
+                    <h2 class="chief-theme-hero__title">{{ $currentStation?->station_name ?? 'Station Not Assigned' }}</h2>
+                    <p class="chief-theme-hero__copy">
                         {{ $currentStation?->station_code ? 'Code: '.$currentStation->station_code.' • ' : '' }}
                         {{ $currentStationMarker?->title ?? 'No mapped station location available yet.' }}
                     </p>
-                    <div class="management-station-meta">
-                        <span><i class="fa-solid fa-phone"></i> {{ $currentStation?->contact_number ?? 'No contact number' }}</span>
-                        <span><i class="fa-solid fa-envelope"></i> {{ $currentStation?->email ?? 'No email registered' }}</span>
-                        <span><i class="fa-solid fa-users"></i> {{ $personnel->count() }} personnel records loaded</span>
+                    <div class="chief-theme-badges">
+                        <span class="chief-theme-badge"><i class="fa-solid fa-phone"></i> {{ $currentStation?->contact_number ?? 'No contact number' }}</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-envelope"></i> {{ $currentStation?->email ?? 'No email registered' }}</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-users"></i> {{ $personnel->count() }} personnel records loaded</span>
                     </div>
                 </div>
-                <div class="management-station-badge">
-                    <span class="management-station-badge-label">Station Status</span>
-                    <strong>Operational</strong>
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Station Status</div>
+                        <div class="chief-theme-summary-value">Operational</div>
+                        <div class="chief-theme-summary-copy">Profile, contact details, media, and roster are managed here.</div>
+                    </article>
                     @if($currentRoleName === 'chief' && $currentStation)
-                        <div class="management-station-actions">
-                            <button type="button" class="btn-outline" id="editStationBtn">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                                Edit Station
-                            </button>
-                        </div>
+                        <article class="chief-theme-summary-card">
+                            <div class="chief-theme-summary-label">Command Action</div>
+                            <div class="chief-theme-actions">
+                                <button type="button" class="btn-outline" id="editStationBtn">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                    Edit Station
+                                </button>
+                            </div>
+                        </article>
                     @endif
                 </div>
-            </div>
+            </section>
 
             @if($currentStation && in_array($currentRoleName, ['chief', 'station admin'], true))
                 <section class="station-media-panel">

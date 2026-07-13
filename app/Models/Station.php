@@ -100,6 +100,11 @@ class Station extends Model
                 ->withTimestamps();
 }
 
+    public function stationOfficers()
+    {
+        return $this->hasMany(StationOfficer::class, 'station_id', 'station_id');
+    }
+
     public function media()
     {
         return $this->hasMany(StationMedia::class, 'station_id', 'station_id')

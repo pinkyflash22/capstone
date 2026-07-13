@@ -38,9 +38,12 @@ class RouteController extends Controller
                 'total_distance' => 'required|numeric',
                 'estimated_time' => 'required|numeric',
                 'status' => 'required|in:active,moving,inactive',
+                'route_source' => 'nullable|in:real,demo',
                 'destination_title' => 'nullable|string|max:255',
                 'destination_lat' => 'nullable|numeric',
                 'destination_lng' => 'nullable|numeric',
+                'origin_lat' => 'nullable|numeric',
+                'origin_lng' => 'nullable|numeric',
                 'incident_id'=>'required|exists:incidents,incident_id'
             ]);
 
@@ -75,6 +78,7 @@ class RouteController extends Controller
                 ?? $authUser->email
                 ?? $request->input('started_by')
                 ?? 'Unknown';
+            $validated['route_source'] = $validated['route_source'] ?? 'real';
             $validated['current_position_index'] = 0;
             $validated['progress_percentage'] = 0;
             $validated['last_updated_at'] = now();
@@ -85,9 +89,12 @@ class RouteController extends Controller
                     'total_distance' => $validated['total_distance'],
                     'estimated_time' => $validated['estimated_time'],
                     'status' => 'active',
+                    'route_source' => $validated['route_source'] ?? $existingRoute->route_source ?? 'real',
                     'destination_title' => $validated['destination_title'] ?? $existingRoute->destination_title,
                     'destination_lat' => $validated['destination_lat'] ?? $existingRoute->destination_lat,
                     'destination_lng' => $validated['destination_lng'] ?? $existingRoute->destination_lng,
+                    'origin_lat' => $validated['origin_lat'] ?? $existingRoute->origin_lat,
+                    'origin_lng' => $validated['origin_lng'] ?? $existingRoute->origin_lng,
                     'current_position_index' => 0,
                     'current_lat' => null,
                     'current_lng' => null,
@@ -143,9 +150,12 @@ class RouteController extends Controller
                         'incident_id',
                         'coordinates',
                         'status',
+                        'route_source',
                         'destination_title',
                         'destination_lat',
                         'destination_lng',
+                        'origin_lat',
+                        'origin_lng',
                         'current_position_index',
                         'current_lat',
                         'current_lng',
@@ -187,9 +197,12 @@ class RouteController extends Controller
                         'incident_id',
                         'coordinates',
                         'status',
+                        'route_source',
                         'destination_title',
                         'destination_lat',
                         'destination_lng',
+                        'origin_lat',
+                        'origin_lng',
                         'current_position_index',
                         'current_lat',
                         'current_lng',
@@ -429,9 +442,12 @@ class RouteController extends Controller
                 'total_distance' => 'sometimes|numeric',
                 'estimated_time' => 'sometimes|numeric',
                 'status' => 'sometimes|in:active,moving,inactive',
+                'route_source' => 'nullable|in:real,demo',
                 'destination_title' => 'nullable|string|max:255',
                 'destination_lat' => 'nullable|numeric',
                 'destination_lng' => 'nullable|numeric',
+                'origin_lat' => 'nullable|numeric',
+                'origin_lng' => 'nullable|numeric',
                 'current_position_index' => 'nullable|integer|min:0',
                 'current_lat' => 'nullable|numeric',
                 'current_lng' => 'nullable|numeric',
@@ -502,9 +518,12 @@ class RouteController extends Controller
             'leaflet_points' => $route->getLeafletPoints(),
             'remaining_points' => $route->getRemainingPoints(),
             'status' => $route->status,
+            'route_source' => $route->route_source ?: 'real',
             'destination_title' => $route->destination_title,
             'destination_lat' => $route->destination_lat,
             'destination_lng' => $route->destination_lng,
+            'origin_lat' => $route->origin_lat,
+            'origin_lng' => $route->origin_lng,
             'current_position_index' => $route->current_position_index,
             'current_lat' => $route->current_lat,
             'current_lng' => $route->current_lng,

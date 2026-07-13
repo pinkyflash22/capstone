@@ -208,6 +208,16 @@ function shouldUseResponderPopupUi() {
     return isFirefighterDashboardMapInstance() || isChiefCommandMapContext();
 }
 
+function isCitizenDashboardMapContext() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    const currentPath = String(window.location?.pathname || '');
+    const roleMeta = String(document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '').toLowerCase().trim();
+
+    return configuredInstanceKey === 'citizenDashboard'
+        || currentPath.startsWith('/citizen/')
+        || roleMeta === 'citizen';
+}
+
 function shouldUseResponderMobileDetailsUi() {
     return shouldUseResponderPopupUi() && window.innerWidth <= 768;
 }
@@ -294,6 +304,10 @@ function findIncidentInLookup(marker, incidentLookup, fallbackIncident = null) {
 }
 
 function getTruckRealtimeLocation(truck) {
+    if (truck?.routeSource && isDemoRouteSource(truck.routeSource)) {
+        return null;
+    }
+
     if (!truck || !Array.isArray(truck.routeTeamUserIds) || truck.routeTeamUserIds.length === 0) {
         return null;
     }
@@ -505,6 +519,196 @@ window.userCoords = {
     currentLongitude: null,
     ready: false
 };
+
+const DEMO_ROUTE_FALLBACK_ORIGIN = {
+    lat: 15.8222,
+    lng: 120.3297,
+    title: 'Demo dispatch origin'
+};
+
+function buildRouteOrigin(lat, lng, options = {}) {
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+
+    return {
+        currentLatitude: numericLat,
+        currentLongitude: numericLng,
+        ready: Number.isFinite(numericLat) && Number.isFinite(numericLng),
+        routeSource: options.routeSource || 'real',
+        routeSourceLabel: options.routeSourceLabel || (options.routeSource === 'demo' ? 'Demo Route' : 'Live GPS'),
+        suppressLiveTracking: Boolean(options.suppressLiveTracking),
+        meta: options.meta || null
+    };
+}
+
+function getRouteSourceBadgeMeta(routeSource) {
+    return String(routeSource || 'real').toLowerCase() === 'demo'
+        ? { label: 'DEMO', className: 'demo', icon: 'fa-flask' }
+        : { label: 'LIVE', className: 'live', icon: 'fa-location-crosshairs' };
+}
+
+function updateRouteSourceBadge(routeSource = 'real') {
+    const badge = document.getElementById('routeSourceBadge');
+    if (!badge) {
+        return;
+    }
+
+    const meta = getRouteSourceBadgeMeta(routeSource);
+    badge.className = `route-source-badge ${meta.className}`;
+    badge.innerHTML = `<i class="fas ${meta.icon}"></i><span>${meta.label}</span>`;
+}
+
+function getCurrentRouteSource() {
+    return String(
+        window.activeRoute?.route_source
+        || window.activeRoute?.routeSource
+        || window.routeDestination?.routeSource
+        || 'real'
+    ).toLowerCase();
+}
+
+function isDemoRouteSource(routeSource) {
+    return String(routeSource || '').toLowerCase() === 'demo';
+}
+
+async function getFreshRealRouteOrigin() {
+    if (window.userCoords?.ready) {
+        return buildRouteOrigin(window.userCoords.currentLatitude, window.userCoords.currentLongitude, {
+            routeSource: 'real',
+            routeSourceLabel: 'Live GPS'
+        });
+    }
+
+    if (!navigator.geolocation) {
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = Number(position.coords.latitude);
+                const lng = Number(position.coords.longitude);
+                updateUserLocation(window.currentUserId, lat, lng);
+                window.userCoords = {
+                    currentLatitude: lat,
+                    currentLongitude: lng,
+                    ready: true
+                };
+                resolve(buildRouteOrigin(lat, lng, {
+                    routeSource: 'real',
+                    routeSourceLabel: 'Live GPS'
+                }));
+            },
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    });
+}
+
+async function getDemoRouteOrigin(destination = null) {
+    try {
+        await fetchStations({ preferSeeded: true });
+    } catch (error) {
+        console.warn('Unable to refresh stations for demo route origin:', error);
+    }
+
+    const preferredStationId = Number(window.userStationId || 0);
+    const preferredStation = Array.isArray(stations)
+        ? stations.find((station) => Number(station.station_id) === preferredStationId)
+        : null;
+
+    const candidateStation = preferredStation
+        || (Array.isArray(stations) ? stations.find((station) => Number.isFinite(Number(station.lat)) && Number.isFinite(Number(station.lng))) : null);
+
+    if (candidateStation) {
+        return buildRouteOrigin(candidateStation.lat, candidateStation.lng, {
+            routeSource: 'demo',
+            routeSourceLabel: 'Demo Route',
+            suppressLiveTracking: true,
+            meta: {
+                title: candidateStation.station_name || 'Demo dispatch origin'
+            }
+        });
+    }
+
+    if (destination && Number.isFinite(Number(destination.lat)) && Number.isFinite(Number(destination.lng))) {
+        return buildRouteOrigin(Number(destination.lat) - 0.0125, Number(destination.lng) - 0.0095, {
+            routeSource: 'demo',
+            routeSourceLabel: 'Demo Route',
+            suppressLiveTracking: true,
+            meta: {
+                title: DEMO_ROUTE_FALLBACK_ORIGIN.title
+            }
+        });
+    }
+
+    return buildRouteOrigin(DEMO_ROUTE_FALLBACK_ORIGIN.lat, DEMO_ROUTE_FALLBACK_ORIGIN.lng, {
+        routeSource: 'demo',
+        routeSourceLabel: 'Demo Route',
+        suppressLiveTracking: true,
+        meta: {
+            title: DEMO_ROUTE_FALLBACK_ORIGIN.title
+        }
+    });
+}
+
+async function resolveRouteOrigin(mode = 'real', destination = null) {
+    if (isDemoRouteSource(mode)) {
+        return getDemoRouteOrigin(destination);
+    }
+
+    return getFreshRealRouteOrigin();
+}
+
+function promptRouteSourceSelection(options = {}) {
+    const title = options.title || 'Choose route source';
+    const description = options.description || 'Pick whether to start navigation from your live GPS or from a demo dispatch origin.';
+
+    return new Promise((resolve) => {
+        const existing = document.getElementById('routeSourceSelectionModal');
+        if (existing) {
+            existing.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'routeSourceSelectionModal';
+        modal.className = 'route-source-modal';
+        modal.innerHTML = `
+            <div class="route-source-modal__backdrop"></div>
+            <div class="route-source-modal__dialog" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+                <div class="route-source-modal__eyebrow">Route Source</div>
+                <h3>${escapeHtml(title)}</h3>
+                <p>${escapeHtml(description)}</p>
+                <div class="route-source-modal__options">
+                    <button type="button" class="route-source-option" data-mode="real">
+                        <span class="route-source-option__badge live"><i class="fas fa-location-crosshairs"></i> Live</span>
+                        <strong>Use real GPS</strong>
+                        <small>Starts the route from your current device location.</small>
+                    </button>
+                    <button type="button" class="route-source-option" data-mode="demo">
+                        <span class="route-source-option__badge demo"><i class="fas fa-flask"></i> Demo</span>
+                        <strong>Use demo route</strong>
+                        <small>Starts from a demo dispatch origin and keeps route playback simulated.</small>
+                    </button>
+                </div>
+                <button type="button" class="route-source-modal__cancel">Cancel</button>
+            </div>
+        `;
+
+        const cleanup = (value = null) => {
+            modal.remove();
+            resolve(value);
+        };
+
+        modal.querySelector('.route-source-modal__backdrop')?.addEventListener('click', () => cleanup(null));
+        modal.querySelector('.route-source-modal__cancel')?.addEventListener('click', () => cleanup(null));
+        modal.querySelectorAll('[data-mode]').forEach((button) => {
+            button.addEventListener('click', () => cleanup(button.getAttribute('data-mode')));
+        });
+
+        document.body.appendChild(modal);
+    });
+}
 
 function readBoundaryEditorContext() {
     try {
@@ -1376,6 +1580,20 @@ function getMarkerStatusValue(marker = {}) {
     return String(marker?.status || '').trim().toLowerCase() || 'active';
 }
 
+function isActiveFireIncidentMarker(marker = {}) {
+    if (!isIncidentMarker(marker)) {
+        return false;
+    }
+
+    if (getMarkerStatusValue(marker) === 'inactive') {
+        return false;
+    }
+
+    const incidentStatus = normalizeIncidentStatus(marker?.incident_status || marker?.status || 'reported');
+
+    return ['reported', 'en-route', 'on-scene'].includes(incidentStatus);
+}
+
 function shouldDisplayMarker(marker = {}) {
     const status = getMarkerStatusValue(marker);
 
@@ -1387,6 +1605,15 @@ function shouldDisplayMarker(marker = {}) {
 }
 
 function normalizeIncidentStatus(input = '') {
+    const numericStatus = Number(input);
+    if (Number.isFinite(numericStatus)) {
+        if (numericStatus === 2) return 'en-route';
+        if (numericStatus === 3) return 'on-scene';
+        if (numericStatus === 4) return 'controlled';
+        if (numericStatus === 5) return 'closed';
+        if (numericStatus === 1) return 'reported';
+    }
+
     const normalized = String(input || '').trim().toLowerCase();
 
     if (normalized === 'en-route' || normalized === 'responding') return 'en-route';
@@ -1436,23 +1663,20 @@ function getIncidentTypePresentation(input = {}) {
 }
 
 function createIncidentTypeIcon(marker = {}, extraClass = '') {
-    const { iconClass, bgColor, borderColor } = getIncidentTypePresentation(marker);
+    const { iconClass, bgColor } = getIncidentTypePresentation(marker);
     const imagePath = inferMarkerImagePath(marker, { id: 'incident' });
     const markerSize = 42;
     const markerAnchor = 21;
+    const isActiveIncident = isActiveFireIncidentMarker(marker);
 
     return L.divIcon({
-        className: `custom-fa-icon incident-type-icon ${extraClass}`.trim(),
+        className: `custom-fa-icon pyro-map-marker-icon incident-type-icon ${isActiveIncident ? 'incident-type-icon--active' : ''} ${extraClass}`.trim(),
         html: `
-            <div style="
-                width: ${markerSize}px;
-                height: ${markerSize}px;
-                border-radius: 50%;
-                border: 3px solid ${borderColor};
-                box-shadow: 0 0 0 4px ${borderColor}33, 0 10px 18px rgba(15, 23, 42, 0.20);
-                overflow: visible;
-                background: transparent;
-            ">
+            <div class="incident-marker ${isActiveIncident ? 'incident-marker--active' : ''}" style="width:${markerSize}px;height:${markerSize}px;">
+                ${isActiveIncident ? `
+                    <span class="incident-marker__pulse"></span>
+                    <span class="incident-marker__pulse incident-marker__pulse--delay"></span>
+                ` : ''}
                 ${buildImageBackedMarkerHtml({
                     width: markerSize,
                     height: markerSize,
@@ -1460,7 +1684,8 @@ function createIncidentTypeIcon(marker = {}, extraClass = '') {
                     imagePath,
                     fallbackIconClass: iconClass,
                     bgColor,
-                    iconFontSize: 18
+                    iconFontSize: 18,
+                    wrapperClass: 'incident-marker__icon'
                 })}
             </div>
         `,
@@ -1666,8 +1891,9 @@ function setAnimationSpeedGlobal(speed) {
 // ROUTE DATABASE FUNCTIONS
 // ============================================================================
 
-async function saveRouteToDatabase(route, destination) {
+async function saveRouteToDatabase(route, destination, origin = null) {
     try {
+        const routeSource = origin?.routeSource || destination?.routeSource || 'real';
         const response = await fetch('/api/route', {
             method: 'POST',
             headers: {
@@ -1680,9 +1906,12 @@ async function saveRouteToDatabase(route, destination) {
                 total_distance: route.properties.distance,
                 estimated_time: route.properties.time,
                 status: 'active',
+                route_source: routeSource,
                 destination_title: destination.title,
                 destination_lat: destination.lat,
                 destination_lng: destination.lng,
+                origin_lat: origin?.currentLatitude ?? null,
+                origin_lng: origin?.currentLongitude ?? null,
                 incident_id: window.thisIncidents ?? destination?.incidentId ?? null
             })
         });
@@ -3049,11 +3278,11 @@ function inferMarkerImagePath(marker = null, iconConfig = null) {
     return null;
 }
 
-function buildImageBackedMarkerHtml({ width, height, borderRadius, imagePath, fallbackIconClass, bgColor, iconFontSize }) {
+function buildImageBackedMarkerHtml({ width, height, borderRadius, imagePath, fallbackIconClass, bgColor, iconFontSize, wrapperClass = '' }) {
     const safeImagePath = imagePath ? String(imagePath).replace(/"/g, '&quot;') : '';
 
     return `
-        <div style="
+        <div class="${wrapperClass}" style="
             width: ${width}px;
             height: ${height}px;
             position: relative;
@@ -3119,7 +3348,7 @@ function createFontAwesomeIcon(iconConfig, extraClass = '', customColor = null, 
         : iconConfig.anchor;
 
     return L.divIcon({
-        className: `custom-fa-icon ${extraClass}`,
+        className: `custom-fa-icon pyro-map-marker-icon ${extraClass}`,
         html: `
             ${buildImageBackedMarkerHtml({
                 width,
@@ -3182,25 +3411,49 @@ function getIconByCategoryId(categoryId, extraClass = '', marker = null) {
     if (iconId) {
         return getIconById(iconId, extraClass, marker);
     }
-    return getDefaultIcon();
+    return getDefaultIcon(marker, extraClass);
 }
 
-function getDefaultIcon() {
+function getDefaultIcon(marker = null, extraClass = '') {
+    const imagePath = inferMarkerImagePath(marker, null);
+    const markerSize = imagePath ? 36 : 24;
+
     return L.divIcon({
-        className: 'default-icon',
+        className: `default-icon pyro-map-marker-icon ${extraClass}`.trim(),
         html: buildImageBackedMarkerHtml({
-            width: 24,
-            height: 24,
+            width: markerSize,
+            height: markerSize,
             borderRadius: '50%',
-            imagePath: null,
+            imagePath,
             fallbackIconClass: 'fa-location-dot',
             bgColor: '#6b7280',
-            iconFontSize: 12
+            iconFontSize: imagePath ? 18 : 12
         }),
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        iconSize: [markerSize, markerSize],
+        iconAnchor: [markerSize / 2, markerSize / 2],
+        popupAnchor: [0, -markerSize / 2]
     });
 }
+
+function createSharedMapMarkerIcon(markerType, options = {}) {
+    const marker = {
+        ...(options.marker || {}),
+        category: options.marker?.category || markerType
+    };
+
+    if (options.status !== undefined && options.status !== null) {
+        marker.incident_status = options.status;
+        marker.status = options.status;
+    }
+
+    if (options.isActive === false && isIncidentMarker(marker) && !marker.incident_status) {
+        marker.incident_status = 'controlled';
+    }
+
+    return getIconByCategoryId(marker.markerCategory_id ?? null, options.extraClass || '', marker);
+}
+
+window.createSharedMapMarkerIcon = createSharedMapMarkerIcon;
 
 function getFirefighterIconWithSpeed(speed = 0) {
     const iconConfig = ICON_ARRAY.find(icon => icon.id === 'firefighter');
@@ -3273,6 +3526,72 @@ styleElement.textContent = `
     
     .custom-fa-icon {
         transition: all 0.3s ease;
+    }
+
+    .leaflet-div-icon.pyro-map-marker-icon,
+    .leaflet-marker-icon.pyro-map-marker-icon,
+    .pyro-map-marker-icon {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .incident-marker {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .incident-marker__icon {
+        position: relative;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .incident-marker__pulse {
+        position: absolute;
+        inset: 3px;
+        z-index: 1;
+        border-radius: 999px;
+        border: 3px solid rgba(220, 38, 38, 0.72);
+        background: rgba(239, 68, 68, 0.16);
+        animation: incidentMarkerPulse 2s ease-out infinite;
+        pointer-events: none;
+    }
+
+    .incident-marker__pulse--delay {
+        animation-delay: 0.7s;
+    }
+
+    @keyframes incidentMarkerPulse {
+        0% {
+            opacity: 0.78;
+            transform: scale(0.72);
+        }
+        72% {
+            opacity: 0;
+            transform: scale(2.05);
+        }
+        100% {
+            opacity: 0;
+            transform: scale(2.05);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .incident-marker__pulse {
+            animation: none;
+            opacity: 0.28;
+            transform: scale(1.25);
+        }
     }
     
     .custom-fa-icon:hover {
@@ -3811,6 +4130,147 @@ styleElement.textContent = `
         background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
         color: #fff;
         box-shadow: 0 14px 28px rgba(220, 38, 38, 0.18);
+    }
+
+    .responder-marker-popup-btn.demo {
+        background: #fff;
+        color: #9a3412;
+        border: 1px dashed rgba(198, 61, 38, 0.38);
+    }
+
+    .responder-marker-popup-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: rgba(251, 146, 60, 0.16);
+        color: #9a3412;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+    }
+
+    .route-source-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10040;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .route-source-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.56);
+        backdrop-filter: blur(4px);
+    }
+
+    .route-source-modal__dialog {
+        position: relative;
+        width: min(440px, calc(100vw - 24px));
+        border-radius: 22px;
+        background: linear-gradient(180deg, #fffaf5 0%, #ffffff 26%);
+        border: 1px solid rgba(251, 146, 60, 0.18);
+        box-shadow: 0 28px 64px rgba(15, 23, 42, 0.24);
+        padding: 22px;
+        color: #1f2937;
+    }
+
+    .route-source-modal__eyebrow {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #c2410c;
+        margin-bottom: 8px;
+    }
+
+    .route-source-modal__dialog h3 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+    .route-source-modal__dialog p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .route-source-modal__options {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+    }
+
+    .route-source-option {
+        text-align: left;
+        border: 1px solid rgba(251, 146, 60, 0.16);
+        border-radius: 18px;
+        background: #ffffff;
+        padding: 16px;
+        cursor: pointer;
+        display: grid;
+        gap: 6px;
+        transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .route-source-option:hover {
+        transform: translateY(-1px);
+        border-color: rgba(249, 115, 22, 0.34);
+        box-shadow: 0 16px 30px rgba(251, 146, 60, 0.12);
+    }
+
+    .route-source-option strong {
+        font-size: 14px;
+        color: #111827;
+    }
+
+    .route-source-option small {
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.45;
+    }
+
+    .route-source-option__badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: fit-content;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .route-source-option__badge.live {
+        background: rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+    }
+
+    .route-source-option__badge.demo {
+        background: rgba(249, 115, 22, 0.12);
+        color: #c2410c;
+    }
+
+    .route-source-modal__cancel {
+        width: 100%;
+        margin-top: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        border-radius: 14px;
+        background: #f8fafc;
+        color: #475569;
+        padding: 11px 14px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
     }
 
     .responder-map-modal {
@@ -4860,7 +5320,7 @@ function respondCurrentMapDetail() {
     respondIncident(currentDetailsMarker);
 }
 
-function routeCurrentMapDetail() {
+function routeCurrentMapDetail(source = 'real') {
     if (!currentDetailsMarker) {
         return;
     }
@@ -4868,7 +5328,8 @@ function routeCurrentMapDetail() {
     if (isIncidentMarker(currentDetailsMarker)) {
         window.calculateRouteToIncident(
             currentDetailsIncident?.incident_id ?? currentDetailsMarker.incident_id ?? null,
-            currentDetailsMarker.marker_id
+            currentDetailsMarker.marker_id,
+            { source }
         );
         return;
     }
@@ -5836,9 +6297,14 @@ function generatePopupContent(coord, incidents) {
                 </div>
                 ` : ''}
 
-                <button class="btn btn-sm btn-outline mt-2" onclick="window.calculateRouteToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id})" style="width: 100%; background: #10b981; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer; margin-bottom: 8px;">
-                    <i class="fa-solid fa-route"></i> Get Directions to Incident
-                </button>
+                <div style="display:flex; gap:${actionGap}; margin-bottom: 8px;">
+                    <button class="btn btn-sm btn-outline mt-2" onclick="window.calculateRouteToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id})" style="flex:1; background: #10b981; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
+                        <i class="fa-solid fa-route"></i> Get Directions
+                    </button>
+                    <button class="btn btn-sm btn-outline mt-2" onclick="window.calculateRouteToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id}, { source: 'demo' })" style="flex:1; background: #fff7ed; color: #9a3412; border: 1px dashed rgba(198, 61, 38, 0.35); padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 700; cursor: pointer;">
+                        <i class="fa-solid fa-flask"></i> Demo
+                    </button>
+                </div>
                 <button id="viewDetails${marker.marker_id}" style="width: 100%; background: #3b82f6; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
                     <i class="fas fa-info-circle"></i> View Full Details
                 </button>
@@ -6159,6 +6625,20 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
             </button>
         `;
 
+        actionMarkup += `
+            <button
+                type="button"
+                class="responder-marker-popup-btn demo${isIncidentRoutingBlocked ? ' disabled' : ''}"
+                ${isIncidentRoutingBlocked
+                    ? 'disabled title="Finish or clear the active team route before navigating to another incident."'
+                    : `onclick="window.calculateRouteToIncident(${targetIncidentId ?? 'null'}, ${marker.marker_id}, { source: 'demo' })"`}
+            >
+                <i class="fas fa-flask"></i>
+                Demo Route
+                <span class="responder-marker-popup-badge">DEMO</span>
+            </button>
+        `;
+
         actionMarkup += managementMarkup;
     } else if (isStationMarker(marker)) {
         actionMarkup += `
@@ -6426,6 +6906,14 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
                 ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
             </button>
         `);
+
+        actions.push(`
+            <button type="button" class="responder-marker-popup-btn demo${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.routeCurrentMapDetail('demo')" ${isIncidentRoutingBlocked ? 'disabled title="Finish or clear the active team route before navigating to another incident."' : ''}>
+                <i class="fas fa-flask"></i>
+                Demo Route
+                <span class="responder-marker-popup-badge">DEMO</span>
+            </button>
+        `);
     } else if (isStationMarker(marker)) {
         actions.push(`
             <button type="button" class="responder-marker-popup-btn secondary" onclick="window.routeCurrentMapDetail()">
@@ -6623,11 +7111,15 @@ async function calculateRouteWithGeoapify(origin, destination) {
         
         if (data.features && data.features.length > 0) {
             const route = data.features[0];
+            const routeSource = origin?.routeSource || destination?.routeSource || 'real';
+            route.route_source = routeSource;
+            route.origin_lat = origin?.currentLatitude ?? null;
+            route.origin_lng = origin?.currentLongitude ?? null;
             window.activeRoute = route;
 
             if (window.thisIncidents) {
                 // SAVE TO DATABASE FOR ALL USERS TO SEE
-                const savedRoute = await saveRouteToDatabase(route, destination);
+                const savedRoute = await saveRouteToDatabase(route, destination, origin);
                 console.log("displaying route data1: ", savedRoute);
                 
                 // Add to multi-truck system
@@ -6636,6 +7128,7 @@ async function calculateRouteWithGeoapify(origin, destination) {
                     const matchedIncident = window.incidentsData?.find(inc => inc.incident_id == window.thisIncidents);
                     const persistedRoute = {
                         ...savedRoute.data,
+                        route_source: savedRoute.data.route_source || routeSource,
                         route_team_id: matchedIncident?.team_id ?? null,
                         route_station_id: savedRoute.data.route_station_id ?? null
                     };
@@ -6658,7 +7151,10 @@ async function calculateRouteWithGeoapify(origin, destination) {
             const routeCard = document.getElementById('routeInfoCard');
             if (routeCard) routeCard.style.display = 'block';
             
-            window.routeDestination = destination;
+            window.routeDestination = {
+                ...destination,
+                routeSource
+            };
         }
         
     } catch (error) {
@@ -7106,6 +7602,7 @@ function updateRouteInfoFromGeoapify(route) {
     
     if (distanceEl) distanceEl.textContent = `${distance.toFixed(1)} km`;
     if (durationEl) durationEl.textContent = durationText;
+    updateRouteSourceBadge(route?.route_source || getCurrentRouteSource());
     
     if (etaEl) {
         const eta = new Date(Date.now() + (time * 60 * 1000));
@@ -7311,6 +7808,7 @@ async function displayAndStartRoute(routeId, route, destination) {
 
     clearExistingRouteRendering(routeId);
     const routeGroup = getRouteStationLayer(route);
+    updateRouteSourceBadge(route.route_source || destination?.routeSource || 'real');
     
     const truckData = {
         routeId: routeId,
@@ -7318,9 +7816,13 @@ async function displayAndStartRoute(routeId, route, destination) {
         originalSimulationPoints: [...latlngs],
         currentPointIndex: 0,
         isSimulating: false,
-        routeDestination: destination,
+        routeDestination: {
+            ...destination,
+            routeSource: route.route_source || destination?.routeSource || 'real'
+        },
         incidentId: route.incident_id || null,
         incidentStatusId: Number(route.incident_status_id ?? destination?.incidentStatusId ?? 1),
+        routeSource: route.route_source || destination?.routeSource || 'real',
         routeStationId: route.route_station_id || null,
         routeTeamId: route.route_team_id || null,
         routeTeamUserIds: Array.isArray(route.route_team_user_ids) ? route.route_team_user_ids : [],
@@ -7481,7 +7983,10 @@ async function startSimulationForRoute(routeId) {
         opacity: 0.6
     }));
 
-    startRealTimeLocationUpdatesForTruck(routeId);
+    if (!isDemoRouteSource(truck.routeSource)) {
+        startRealTimeLocationUpdatesForTruck(routeId);
+    }
+
     const realtimeLocation = getTruckRealtimeLocation(truck);
     if (realtimeLocation) {
         updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
@@ -7490,7 +7995,12 @@ async function startSimulationForRoute(routeId) {
     }
 
     startSmoothAnimationForTruck(routeId);
-    showToast(`Movement started for truck ${routeId}!`, 'success');
+    showToast(
+        isDemoRouteSource(truck.routeSource)
+            ? `Demo movement started for truck ${routeId}!`
+            : `Movement started for truck ${routeId}!`,
+        'success'
+    );
 }
 
 function startSmoothAnimationForTruck(routeId) {
@@ -7720,6 +8230,7 @@ window.testAnimation = async function(routeId) {
 function startRealTimeLocationUpdatesForTruck(routeId) {
     const truck = activeTrucks.get(routeId);
     if (!truck) return;
+    if (isDemoRouteSource(truck.routeSource)) return;
     if (truck.realTimeLocationWatch) clearInterval(truck.realTimeLocationWatch);
     
     truck.realTimeLocationWatch = setInterval(() => {
@@ -7887,10 +8398,12 @@ function startRoutePolling() {
                         ? routeData.route_team_user_ids
                         : (existingTruck.routeTeamUserIds || []);
                     existingTruck.routePrimaryUserId = routeData.route_primary_user_id || existingTruck.routePrimaryUserId || null;
+                    existingTruck.routeSource = routeData.route_source || existingTruck.routeSource || 'real';
                     existingTruck.routeDestination = {
                         title: routeData.destination_title || existingTruck.routeDestination?.title || 'Destination',
                         lat: routeData.destination_lat ?? existingTruck.routeDestination?.lat ?? null,
                         lng: routeData.destination_lng ?? existingTruck.routeDestination?.lng ?? null,
+                        routeSource: routeData.route_source || existingTruck.routeDestination?.routeSource || 'real',
                     };
                     // If route is moving but our local position is behind, update it
                      if (routeData.status === 'moving' && !existingTruck.isSimulating) {
@@ -7932,8 +8445,10 @@ function startRoutePolling() {
                         title: routeData.destination_title || 'Destination',
                         lat: routeData.destination_lat ?? latlngs[latlngs.length - 1]?.[0] ?? null,
                         lng: routeData.destination_lng ?? latlngs[latlngs.length - 1]?.[1] ?? null,
+                        routeSource: routeData.route_source || 'real',
                     },
                     incidentId: routeData.incident_id || null,
+                    routeSource: routeData.route_source || 'real',
                     routeStationId: routeData.route_station_id || null,
                     routeTeamId: routeData.route_team_id || null,
                     routeTeamUserIds: Array.isArray(routeData.route_team_user_ids) ? routeData.route_team_user_ids : [],
@@ -8586,6 +9101,131 @@ function closeModal() {
     if (successModal) document.body.removeChild(successModal);
 }
 
+function enhanceCitizenDesktopLayerControl() {
+    if (!isCitizenDashboardMapContext()) {
+        return;
+    }
+
+    const control = document.querySelector('.leaflet-control-layers');
+    const list = control?.querySelector('.leaflet-control-layers-list');
+    const toggle = control?.querySelector('.leaflet-control-layers-toggle');
+    const base = control?.querySelector('.leaflet-control-layers-base');
+    const overlays = control?.querySelector('.leaflet-control-layers-overlays');
+
+    if (!control || !list || !toggle || !base || !overlays || control.dataset.pyroEnhanced === 'true') {
+        return;
+    }
+
+    control.dataset.pyroEnhanced = 'true';
+    control.classList.add('pyro-citizen-layer-control');
+    toggle.setAttribute('aria-label', 'Open map layers');
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'citizen-map-layer-count';
+    toggle.appendChild(countBadge);
+
+    const header = document.createElement('div');
+    header.className = 'citizen-layer-panel-header';
+    header.innerHTML = `
+        <span>Map layers</span>
+        <button type="button" class="citizen-layer-panel-close" aria-label="Close map layers">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+    `;
+    list.prepend(header);
+    header.querySelector('.citizen-layer-panel-close')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        control.classList.remove('leaflet-control-layers-expanded');
+        toggle.setAttribute('aria-expanded', 'false');
+    });
+
+    const styleTitle = document.createElement('div');
+    styleTitle.className = 'citizen-layer-section-title';
+    styleTitle.textContent = 'Map style';
+    base.before(styleTitle);
+
+    const overlayTitle = document.createElement('div');
+    overlayTitle.className = 'citizen-layer-section-title';
+    overlayTitle.textContent = 'Show on map';
+    overlays.before(overlayTitle);
+
+    const normalizeLayerLabel = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const displayLabelMap = {
+        'Carto Light': 'Carto',
+        'Street Map': 'OSM',
+        'OSM Standard': 'OSM',
+        'OSM HOT': 'OSM HOT',
+        Satellite: 'Satellite',
+        Stations: 'Fire stations',
+        'Fire Stations': 'Fire stations',
+        Incidents: 'Incidents',
+        Hydrants: 'Fire hydrants',
+        'Fire Hydrants': 'Fire hydrants',
+        'Other Markers': 'Other locations',
+        'Water Reference': 'Water references',
+        Shapes: 'Boundaries'
+    };
+    const iconMap = {
+        'Fire stations': 'fa-building-shield',
+        Incidents: 'fa-fire-flame-curved',
+        'Fire hydrants': 'fa-droplet',
+        'Other locations': 'fa-location-dot',
+        'Water references': 'fa-water',
+        Boundaries: 'fa-draw-polygon'
+    };
+
+    base.querySelectorAll('label').forEach((label) => {
+        const input = label.querySelector('input');
+        const span = label.querySelector('span');
+        if (!input || !span) return;
+
+        const rawLabel = normalizeLayerLabel(span.textContent);
+        const displayLabel = displayLabelMap[rawLabel] || rawLabel;
+        label.title = rawLabel;
+        label.setAttribute('aria-label', rawLabel);
+        span.textContent = '';
+        span.appendChild(input);
+
+        const text = document.createElement('span');
+        text.textContent = displayLabel;
+        text.title = rawLabel;
+        span.appendChild(text);
+    });
+
+    overlays.querySelectorAll('label').forEach((label) => {
+        const input = label.querySelector('input');
+        const span = label.querySelector('span');
+        if (!input || !span) return;
+
+        const rawLabel = normalizeLayerLabel(span.textContent);
+        const displayLabel = displayLabelMap[rawLabel] || rawLabel;
+        label.title = displayLabel;
+        label.setAttribute('aria-label', displayLabel);
+        span.textContent = '';
+
+        const icon = document.createElement('i');
+        icon.className = `fa-solid ${iconMap[displayLabel] || 'fa-location-dot'} citizen-layer-row-icon`;
+        icon.setAttribute('aria-hidden', 'true');
+
+        const text = document.createElement('span');
+        text.textContent = displayLabel;
+
+        span.appendChild(icon);
+        span.appendChild(text);
+        span.appendChild(input);
+    });
+
+    const updateBadge = () => {
+        const activeCount = Array.from(overlays.querySelectorAll('input')).filter((input) => input.checked).length;
+        countBadge.hidden = activeCount === 0;
+        countBadge.textContent = String(activeCount);
+    };
+
+    control.addEventListener('change', updateBadge);
+    updateBadge();
+}
+
 // ============================================================================
 // INITIALIZATION AFTER MAP IS READY
 // ============================================================================
@@ -8650,6 +9290,7 @@ function initAfterMapReady() {
 
     console.log(roleToken);
     console.log('User Role:', roleName, 'Role ID:', roleToken);
+    const isCitizenDashboardMap = isCitizenDashboardMapContext();
     const routeBaseMaps = isFirefighterDashboardMap
         ? {
             "Carto Light": cartoLight,
@@ -8657,6 +9298,12 @@ function initAfterMapReady() {
             "OSM HOT": hotStreet,
             "Satellite": satellite
         }
+        : isCitizenDashboardMap
+            ? {
+                "Carto Light": cartoLight,
+                "OSM": street,
+                "Satellite": satellite
+            }
         : {
             "Street Map": street,
             "Satellite": satellite
@@ -8669,6 +9316,15 @@ function initAfterMapReady() {
             "Other Markers": otherFeatureGroup,
             "Water Reference": waterReference
         }
+        : isCitizenDashboardMap
+            ? {
+                "Fire Stations": stationFeatureGroup,
+                "Incidents": incidentFeatureGroup,
+                "Fire Hydrants": hydrantFeatureGroup,
+                "Other Markers": otherFeatureGroup,
+                "Water Reference": waterReference,
+                "Shapes": shapeFeatureGroup
+            }
         : {
             "Stations": stationFeatureGroup,
             "Incidents": incidentFeatureGroup,
@@ -8678,6 +9334,9 @@ function initAfterMapReady() {
         };
     routeOverlayControl = L.control.layers(routeBaseMaps, routeOverlays, { collapsed: true, position: 'topright' });
     routeOverlayControl.addTo(window.map);
+    enhanceCitizenDesktopLayerControl();
+    window.setTimeout(enhanceCitizenDesktopLayerControl, 100);
+    window.setTimeout(enhanceCitizenDesktopLayerControl, 350);
 
     // Defense-in-depth: unauthorized roles (e.g. firefighter role 5) cannot see edit/delete controls.
     window.map.on('popupopen', () => {
@@ -9127,7 +9786,7 @@ setTimeout(() => {
 }, 1000);
 
 //incident
-async function calculateRouteToIncident(incidentId, markerId = null) {
+async function calculateRouteToIncident(incidentId, markerId = null, options = {}) {
     console.log('calculateRouteToIncident called with ID:', incidentId, 'marker:', markerId);
     
     //update natin ung incident to incident_status_id pag nag stop na ung truck to number 2 -responding
@@ -9194,12 +9853,6 @@ async function calculateRouteToIncident(incidentId, markerId = null) {
         return;
     }
     
-    console.log(window.userCoords);
-    if (!window.userCoords || !window.userCoords.ready) {
-        showToast('Getting your location... Please wait.', 'warning');
-        return;
-    }
-    
     // Get incident type name for better display
     let incidentType = 'Fire';
     const incidentStatusId = Number(
@@ -9226,11 +9879,20 @@ async function calculateRouteToIncident(incidentId, markerId = null) {
         lng: parseFloat(lng),
         title: `${incidentType} - ${incident?.title || markerRecord?.title || 'Emergency'}`,
         incidentStatusId,
-        incidentId: resolvedIncidentId
+        incidentId: resolvedIncidentId,
+        routeSource: options?.source || 'real'
     };
     
     console.log('Calculating route to incident:', destination);
-    const origin = window.userCoords;
+    const preferredSource = options?.source || 'real';
+    const origin = await resolveRouteOrigin(preferredSource, destination);
+
+    if (!origin?.ready) {
+        showToast(preferredSource === 'demo'
+            ? 'Demo route origin is not available right now.'
+            : 'Getting your location... Please wait.', 'warning');
+        return;
+    }
 
     window.thisIncidents = resolvedIncidentId;
     console.log('thisincidents: ', window.thisIncidents);
@@ -9305,12 +9967,16 @@ window.routeCurrentMapDetail = routeCurrentMapDetail;
 
 // Make sure these are available globally
 window.calculateRouteToIncident = calculateRouteToIncident;
+window.calculateDemoRouteToIncident = (incidentId, markerId = null) => calculateRouteToIncident(incidentId, markerId, { source: 'demo' });
 window.calculateRouteToStation = calculateRouteToStation;
 window.calculateRouteWithGeoapify = calculateRouteWithGeoapify;
 window.displayAndStartRoute = displayAndStartRoute;
 window.startSimulationForRoute = startSimulationForRoute;
 window.stopSimulationForRoute = stopSimulationForRoute;
 window.stopAllSimulations = stopAllSimulations;
+window.promptRouteSourceSelection = promptRouteSourceSelection;
+window.resolveRouteOrigin = resolveRouteOrigin;
+window.updateRouteSourceBadge = updateRouteSourceBadge;
 window.updateUserLocation = updateUserLocation;
 window.getUserLocation = getUserLocation;
 window.getAllUserLocations = getAllUserLocations;

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -1289,7 +1290,7 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">ANALYTICS</div>
-                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Predictive Analytics</span></a>
+                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
                 {{-- <a href="#" class="nav-item"><i class="fa-solid fa-clock-rotate-left"></i><span>History</span></a>
                 <a href="#" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alerts</span></a> --}}
             </div>
@@ -1350,16 +1351,38 @@
             </div>
         </nav>
 
-        <div class="management-container">
-            <div class="page-header">
-                <h1><i class="fa-solid fa-toolbox"></i> Resource Management</h1>
-                <div class="date"><i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs</div>
-            </div>
-
-            <div class="alert-banner">
-                <i class="fa-solid fa-circle-info"></i>
-                <div class="content"><strong>Resource Dashboard:</strong> Manage personnel, teams, and equipment across all stations.</div>
-            </div>
+        <div class="management-container chief-theme-shell">
+            <section class="chief-theme-hero">
+                <div>
+                    <span class="chief-theme-hero__eyebrow">
+                        <i class="fa-solid fa-toolbox"></i>
+                        Station Resource Desk
+                    </span>
+                    <h1 class="chief-theme-hero__title">Resource Management</h1>
+                    <p class="chief-theme-hero__copy">Manage personnel, teams, equipment, and covered barangay boundaries with the same command dashboard feel used in Activity Schedule.</p>
+                    <div class="chief-theme-badges">
+                        <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-circle-info"></i> Multi-station resource registry</span>
+                    </div>
+                </div>
+                <div class="chief-theme-summary-grid">
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Personnel</div>
+                        <div class="chief-theme-summary-value">{{ $stationOfficers->count() }}</div>
+                        <div class="chief-theme-summary-copy">{{ $stationOfficers->where('status','available')->count() }} currently active.</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Equipment</div>
+                        <div class="chief-theme-summary-value">{{ $equipments->count() }}</div>
+                        <div class="chief-theme-summary-copy">Tracked equipment units in the command inventory.</div>
+                    </article>
+                    <article class="chief-theme-summary-card">
+                        <div class="chief-theme-summary-label">Active Stations</div>
+                        <div class="chief-theme-summary-value">{{ $activeStations->count() }}</div>
+                        <div class="chief-theme-summary-copy">Station records available for assignment and support.</div>
+                    </article>
+                </div>
+            </section>
 
             @php
                 $syncedBoundaryCount = $boundaryBarangays->where('boundary_status', 'synced')->count();
