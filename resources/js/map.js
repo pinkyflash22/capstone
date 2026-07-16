@@ -79,6 +79,7 @@ const TRUCK_REALTIME_REFRESH_MS = 2000;
 let manageShapesMode = false;
 let selectedShapeForEdit = null;
 let shapeFeatureGroup = null;
+let fireRiskAreaLayerGroup = null;
 let boundaryEditorContext = null;
 
 // Notification system
@@ -512,9 +513,9 @@ window.activeRoute = null;
 // };
 // WITH this multi-user location storage:
 // window.userLocations = {}; // Store all users' locations by user ID
-window.currentUserId = null; // Will be set from backend
+window.currentUserId = window.currentUserId || null; // Will be set from backend
 
-window.userCoords = {
+window.userCoords = window.userCoords || {
     currentLatitude: null,
     currentLongitude: null,
     ready: false
@@ -1527,6 +1528,8 @@ function getMarkerCategoryKey(markerOrCategory = null) {
             if (relationCategory.includes('school')) return 'school';
             if (relationCategory.includes('barangay')) return 'barangay';
             if (relationCategory.includes('bridge')) return 'bridge';
+            if (relationCategory.includes('hazard')) return 'hazard';
+            if (relationCategory.includes('risk')) return 'risk';
         }
 
         if (marker.markerCategory_id !== undefined && marker.markerCategory_id !== null) {
@@ -1542,6 +1545,8 @@ function getMarkerCategoryKey(markerOrCategory = null) {
         case 4: return 'hydrant';
         case 5: return 'school';
         case 6: return 'barangay';
+        case 8: return 'risk';
+        case 9: return 'hazard';
         default: return 'other';
     }
 }
@@ -1554,6 +1559,8 @@ function getNormalizedCategoryId(markerOrCategory = null) {
         school: 5,
         barangay: 6,
         bridge: 6,
+        risk: null,
+        hazard: null,
         other: null
     };
 
@@ -1790,6 +1797,14 @@ function createFirefighterMapLegend() {
             ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
+            <div class="firefighter-map-legend-item">
+                <span class="firefighter-map-legend-icon is-square" style="background:rgba(245,158,11,0.28);border:2px solid #d97706;box-shadow:none;width:30px;height:30px;"></span>
+                <span class="firefighter-map-legend-label">Medium Fire Risk</span>
+            </div>
+            <div class="firefighter-map-legend-item">
+                <span class="firefighter-map-legend-icon is-square" style="background:rgba(239,68,68,0.3);border:2px solid #b91c1c;box-shadow:none;width:30px;height:30px;"></span>
+                <span class="firefighter-map-legend-label">High Fire Risk</span>
+            </div>
         </div>
     `;
 }
@@ -1827,6 +1842,14 @@ function createChiefMapLegend() {
             <div class="chief-map-legend-item">
                 <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #64748b;box-shadow:none;width:30px;height:30px;"><i class="fas fa-location-dot" style="font-size:14px;color:#64748b;"></i></span>
                 <span class="chief-map-legend-label">Other Marker</span>
+            </div>
+            <div class="chief-map-legend-item">
+                <span class="chief-map-legend-icon is-square" style="background:rgba(245,158,11,0.28);border:2px solid #d97706;box-shadow:none;width:30px;height:30px;"></span>
+                <span class="chief-map-legend-label">Medium Fire Risk</span>
+            </div>
+            <div class="chief-map-legend-item">
+                <span class="chief-map-legend-icon is-square" style="background:rgba(239,68,68,0.3);border:2px solid #b91c1c;box-shadow:none;width:30px;height:30px;"></span>
+                <span class="chief-map-legend-label">High Fire Risk</span>
             </div>
         </div>
     `;
@@ -3204,6 +3227,26 @@ const ICON_ARRAY = [
         bgColor: '#22c55e',
         size: [32, 32],
         anchor: [16, 16]
+    },
+    {
+        id: 'risk',
+        name: 'Risk Marker',
+        category: 'emergency',
+        icon: 'fa-triangle-exclamation',
+        color: '#075985',
+        bgColor: '#0284c7',
+        size: [34, 34],
+        anchor: [17, 17]
+    },
+    {
+        id: 'hazard',
+        name: 'Hazard Marker',
+        category: 'emergency',
+        icon: 'fa-radiation',
+        color: '#92400e',
+        bgColor: '#d97706',
+        size: [34, 34],
+        anchor: [17, 17]
     }
 ];
 
@@ -3222,6 +3265,8 @@ const PUBLIC_MARKER_IMAGE_MAP = {
     barangay: '/hall.png',
     evacuation: '/hall.png',
     incident: '/fire.png',
+    risk: '/hazard.png',
+    hazard: '/hazard.png',
     firefighter: '/team.png',
     firetruck: '/truck.png'
 };
@@ -8726,6 +8771,8 @@ function getCategoryName(categoryInput) {
         case 'school': return 'School';
         case 'barangay': return 'Barangay';
         case 'bridge': return 'Bridge';
+        case 'risk': return 'Risk Marker';
+        case 'hazard': return 'Hazard Marker';
         default: return 'Unknown';
     }
 }
@@ -8740,6 +8787,8 @@ function getMarkerCategoryEnumValue(categoryInput) {
         case 'school': return 'school';
         case 'barangay': return 'barangay';
         case 'bridge': return 'bridge';
+        case 'risk': return 'risk';
+        case 'hazard': return 'hazard';
         default: return null;
     }
 }
@@ -9045,6 +9094,135 @@ async function loadShapes() {
     }
 }
 
+function normalizeFireRiskAreaGeojson(rawGeojson) {
+    if (!rawGeojson) {
+        return null;
+    }
+
+    if (typeof rawGeojson === 'string') {
+        try {
+            return JSON.parse(rawGeojson);
+        } catch (error) {
+            console.warn('Unable to parse fire-risk area geojson:', error);
+            return null;
+        }
+    }
+
+    return rawGeojson;
+}
+
+function getFireRiskAreaStyle(area = {}) {
+    const level = String(area.risk_level || '').toLowerCase();
+
+    if (level === 'high') {
+        return {
+            color: '#b91c1c',
+            fillColor: '#ef4444',
+            fillOpacity: 0.28,
+            opacity: 0.94,
+            weight: 3,
+            pane: 'overlayPane'
+        };
+    }
+
+    return {
+        color: '#d97706',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.24,
+        opacity: 0.9,
+        weight: 2.5,
+        pane: 'overlayPane'
+    };
+}
+
+function buildFireRiskAreaPopup(area = {}) {
+    const metrics = area.metrics || {};
+    const drivers = Array.isArray(area.drivers) && area.drivers.length
+        ? area.drivers.map((driver) => `<li>${escapeHtml(String(driver))}</li>`).join('')
+        : '<li>Verified field data matched the medium/high risk threshold.</li>';
+    const level = String(area.risk_level || 'medium').toUpperCase();
+    const score = area.risk_score !== null && area.risk_score !== undefined
+        ? Number(area.risk_score).toFixed(2)
+        : 'N/A';
+
+    return `
+        <div class="fire-risk-area-popup">
+            <div style="font-weight:800;color:#0f172a;font-size:15px;">${escapeHtml(area.name || 'Fire-risk area')}</div>
+            <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(area.city_name || 'Mapped barangay boundary')}</div>
+            <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:${area.risk_level === 'high' ? '#fee2e2' : '#fef3c7'};color:${area.risk_level === 'high' ? '#991b1b' : '#92400e'};font-weight:800;font-size:12px;">
+                ${level} FIRE RISK · ${score}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;font-size:12px;color:#334155;">
+                <span><strong>${Number(metrics.verified_records || 0)}</strong><br>verified records</span>
+                <span><strong>${Number(metrics.hazards || 0)}</strong><br>hazards</span>
+                <span><strong>${Number(metrics.risks || 0)}</strong><br>risks</span>
+                <span><strong>${Number(metrics.affected_households || 0)}</strong><br>households</span>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:#334155;">
+                <strong>Why highlighted</strong>
+                <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45;">${drivers}</ul>
+            </div>
+        </div>
+    `;
+}
+
+async function loadFireRiskAreas() {
+    if (!window.map || !fireRiskAreaLayerGroup) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/fire-risk-areas?levels=medium,high', {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const areas = Array.isArray(payload?.data) ? payload.data : [];
+        fireRiskAreaLayerGroup.clearLayers();
+
+        areas.forEach((area) => {
+            const geojson = normalizeFireRiskAreaGeojson(area.geojson);
+            if (!geojson) {
+                return;
+            }
+
+            try {
+                const layer = L.geoJSON(geojson, {
+                    style: getFireRiskAreaStyle(area),
+                    interactive: true,
+                    pane: 'overlayPane'
+                });
+
+                layer.bindTooltip(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk`, {
+                    permanent: false,
+                    direction: 'top',
+                    sticky: true,
+                    opacity: 0.92
+                });
+                layer.bindPopup(buildFireRiskAreaPopup(area), {
+                    maxWidth: 320,
+                    className: 'fire-risk-area-popup-shell'
+                });
+                layer.addTo(fireRiskAreaLayerGroup);
+            } catch (error) {
+                console.warn('Unable to render fire-risk area overlay:', { area, error });
+            }
+        });
+
+        console.log('Fire risk areas loaded:', areas.length);
+    } catch (error) {
+        console.error('Error loading fire risk areas:', error);
+        showNotification?.('Unable to load fire risk areas', 'warning');
+    }
+}
+
 function showLoadingModal(message) {
     if (document.getElementById('loadingModal')) return;
     const modal = document.createElement('div');
@@ -9265,6 +9443,7 @@ function initAfterMapReady() {
     drawnItems = new L.FeatureGroup();
     window.map.addLayer(drawnItems);
     shapeFeatureGroup = L.featureGroup().addTo(window.map);
+    fireRiskAreaLayerGroup = L.featureGroup().addTo(window.map);
     
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
@@ -9314,6 +9493,7 @@ function initAfterMapReady() {
             "Incidents": incidentFeatureGroup,
             "Fire Hydrants": hydrantFeatureGroup,
             "Other Markers": otherFeatureGroup,
+            "Fire Risk Areas": fireRiskAreaLayerGroup,
             "Water Reference": waterReference
         }
         : isCitizenDashboardMap
@@ -9330,6 +9510,7 @@ function initAfterMapReady() {
             "Incidents": incidentFeatureGroup,
             "Hydrants": hydrantFeatureGroup,
             "Other Markers": otherFeatureGroup,
+            "Fire Risk Areas": fireRiskAreaLayerGroup,
             "Shapes": shapeFeatureGroup
         };
     routeOverlayControl = L.control.layers(routeBaseMaps, routeOverlays, { collapsed: true, position: 'topright' });
@@ -9497,6 +9678,9 @@ function initAfterMapReady() {
     if (!isFirefighterDashboardMap) {
         loadShapes();
         setTimeout(focusBoundaryEditorContext, 350);
+    }
+    if (!isCitizenDashboardMap) {
+        loadFireRiskAreas();
     }
     if (markerStatePollingInterval) {
         clearInterval(markerStatePollingInterval);

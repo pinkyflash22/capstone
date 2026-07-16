@@ -26,6 +26,7 @@
             box-shadow: 0 14px 32px rgba(198, 61, 38, 0.28);
             font-weight: 800;
             font-size: 14px;
+            white-space: nowrap;
             cursor: pointer;
         }
 
@@ -111,18 +112,29 @@
 
         @media (max-width: 640px) {
             .pyrosense-pwa-install {
-                right: 14px;
+                left: 50%;
+                right: auto;
                 bottom: calc(14px + env(safe-area-inset-bottom));
-                left: 14px;
+                transform: translateX(-50%);
                 justify-content: center;
+                gap: 8px;
+                width: min(calc(100vw - 28px), 320px);
+                min-height: 46px;
+                padding: 10px 14px;
+                font-size: 13px;
+                box-shadow: 0 12px 24px rgba(198, 61, 38, 0.2);
+            }
+
+            .pyrosense-pwa-install__icon {
+                width: 26px;
+                height: 26px;
+                font-size: 13px;
             }
         }
     </style>
 
-    @pwaInstallButton
-
     <button id="pyrosense-pwa-install" class="pyrosense-pwa-install" type="button" aria-haspopup="dialog" aria-controls="pyrosense-pwa-sheet">
-        <span class="pyrosense-pwa-install__icon">+</span>
+        <span class="pyrosense-pwa-install__icon"><i class="fa-solid fa-download" aria-hidden="true"></i></span>
         <span>Install PyroSense</span>
     </button>
 
@@ -144,14 +156,9 @@
             const fallbackSheet = document.getElementById('pyrosense-pwa-sheet');
             const fallbackBody = document.getElementById('pyrosense-pwa-sheet-body');
             const fallbackClose = document.getElementById('pyrosense-pwa-close');
-            const packageBtn = document.getElementById('pwa-install-btn');
 
             if (!installBtn || !fallbackSheet || !fallbackBody || !fallbackClose) {
                 return;
-            }
-
-            if (packageBtn) {
-                packageBtn.style.display = 'none';
             }
 
             const isStandalone = function () {

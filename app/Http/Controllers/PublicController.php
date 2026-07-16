@@ -24,6 +24,7 @@ use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Support\RiskAreaFollowUpDispatcher;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -573,6 +574,8 @@ class PublicController extends Controller
                 'dense_fire_prone_area',
                 'unsure',
             ])],
+            'condition_detail' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string', 'max:500'],
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'user_lat' => ['nullable', 'numeric', 'between:-90,90'],
@@ -642,9 +645,28 @@ class PublicController extends Controller
         }
 
         $riskArea = DB::transaction(function () use ($validated, $template, $hall, $user, $targetLat, $targetLng) {
+            $citizenDetail = ! empty($validated['condition_detail'])
+                ? $this->formatCitizenLabel((string) $validated['condition_detail'], '')
+                : null;
+            $citizenNotes = trim((string) ($validated['notes'] ?? ''));
+            $remarks = 'Citizen quick report submitted from the dashboard guided flow. Initial citizen selection is subject to BFP verification and may be reclassified during review.';
+            $reviewNotes = $template['review_notes'];
+
+            if ($citizenDetail) {
+                $remarks .= ' Citizen detail: ' . $citizenDetail . '.';
+                $reviewNotes .= ' Citizen detail: ' . $citizenDetail . '.';
+            }
+
+            if ($citizenNotes !== '') {
+                $remarks .= ' Citizen note: ' . $citizenNotes;
+                $reviewNotes .= ' Citizen note: ' . $citizenNotes;
+            }
+
             $marker = Marker::create([
                 'title' => $template['title'],
-                'description' => $template['location_description'],
+                'description' => $citizenNotes !== ''
+                    ? $template['location_description'] . ' Citizen note: ' . $citizenNotes
+                    : $template['location_description'],
                 'lat' => $targetLat,
                 'lng' => $targetLng,
                 'status' => 'active',
@@ -664,16 +686,17 @@ class PublicController extends Controller
                 'condition_code' => $template['condition_code'],
                 'condition_label' => $template['condition_label'],
                 'hazard_type' => $template['hazard_type'],
-                'remarks' => 'Citizen quick report submitted from the dashboard confirmation dialog. Initial citizen selection is subject to BFP verification and may be reclassified during review.',
+                'remarks' => $remarks,
                 'status' => 'pending',
                 'review_status' => 'pending',
                 'review_type' => 'create',
-                'review_notes' => $template['review_notes'],
+                'review_notes' => $reviewNotes,
                 'reported_by' => $user->user_id,
             ]);
         });
 
         $riskArea->loadMissing(['marker', 'barangayHall.barangay']);
+        Cache::forget('map:markers:index:v2');
         RiskAreaFollowUpDispatcher::dispatchFor($riskArea);
         UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
 

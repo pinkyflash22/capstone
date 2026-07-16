@@ -8,7 +8,7 @@
         display: none;
         align-items: center;
         justify-content: center;
-        padding: 1.5rem;
+        padding: 1rem;
     }
 
     .firefighter-logout-modal-backdrop.active {
@@ -16,11 +16,12 @@
     }
 
     .firefighter-logout-modal {
-        width: min(100%, 29rem);
+        position: relative;
+        width: min(100%, 22rem);
         background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);
         border: 1px solid rgba(245, 158, 11, 0.14);
-        border-radius: 1.75rem;
-        box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 44px rgba(15, 23, 42, 0.18);
         overflow: hidden;
     }
 
@@ -29,7 +30,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: 1.25rem 1.5rem;
+        padding: 1rem 1.1rem;
         background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);
         border-bottom: 1px solid rgba(245, 158, 11, 0.12);
     }
@@ -37,25 +38,25 @@
     .firefighter-logout-modal-title {
         display: flex;
         align-items: center;
-        gap: 0.9rem;
+        gap: 0.75rem;
     }
 
     .firefighter-logout-modal-icon {
-        width: 3rem;
-        height: 3rem;
-        border-radius: 1rem;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.9rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
         color: #fff;
-        box-shadow: 0 12px 28px rgba(249, 115, 22, 0.28);
+        box-shadow: none;
         font-size: 1.1rem;
     }
 
     .firefighter-logout-modal-close {
-        width: 2.4rem;
-        height: 2.4rem;
+        width: 2.75rem;
+        height: 2.75rem;
         border-radius: 999px;
         border: 1px solid rgba(148, 163, 184, 0.25);
         background: rgba(255, 255, 255, 0.9);
@@ -70,38 +71,30 @@
     }
 
     .firefighter-logout-modal-body {
-        padding: 1.5rem;
+        padding: 1.1rem 1.25rem 0.25rem;
     }
 
     .firefighter-logout-modal-copy {
         color: #475569;
-        font-size: 0.96rem;
-        line-height: 1.7;
-    }
-
-    .firefighter-logout-modal-panel {
-        margin-top: 1rem;
-        border-radius: 1rem;
-        padding: 1rem 1.1rem;
-        background: #fff7ed;
-        border: 1px solid rgba(251, 146, 60, 0.18);
-        color: #9a3412;
-        font-size: 0.88rem;
-        line-height: 1.6;
+        font-size: 1rem;
+        line-height: 1.55;
+        text-align: center;
     }
 
     .firefighter-logout-modal-footer {
         display: flex;
-        justify-content: flex-end;
+        justify-content: center;
         gap: 0.75rem;
-        padding: 1.25rem 1.5rem 1.5rem;
+        padding: 1rem 1.25rem 1.25rem;
     }
 
     .firefighter-logout-cancel,
     .firefighter-logout-confirm {
         border: none;
         border-radius: 999px;
-        padding: 0.8rem 1.25rem;
+        min-width: 7.5rem;
+        min-height: 2.75rem;
+        padding: 0.75rem 1rem;
         font-size: 0.92rem;
         font-weight: 700;
         cursor: pointer;
@@ -128,6 +121,48 @@
         transform: translateY(-1px);
         box-shadow: 0 18px 34px rgba(220, 38, 38, 0.3);
     }
+
+    @media (max-width: 480px) {
+        .firefighter-logout-modal-backdrop {
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .firefighter-logout-modal {
+            width: min(100%, 20.5rem);
+            border-radius: 1.35rem;
+        }
+
+        .firefighter-logout-modal-header {
+            justify-content: center;
+            padding: 1.1rem 3.75rem 0.75rem 1.1rem;
+        }
+
+        .firefighter-logout-modal-title {
+            text-align: center;
+        }
+
+        .firefighter-logout-modal-title > div:last-child p {
+            display: none;
+        }
+
+        .firefighter-logout-modal-close {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+        }
+
+        .firefighter-logout-modal-footer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .firefighter-logout-cancel,
+        .firefighter-logout-confirm {
+            width: 100%;
+            min-width: 0;
+        }
+    }
 </style>
 
 <div id="firefighterLogoutConfirmModal" class="firefighter-logout-modal-backdrop" aria-hidden="true">
@@ -138,8 +173,8 @@
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </div>
                 <div>
-                    <h2 id="firefighterLogoutConfirmTitle" class="text-lg font-bold text-slate-800">Confirm Logout</h2>
-                    <p class="text-sm text-slate-500">Securely end this responder session.</p>
+                    <h2 id="firefighterLogoutConfirmTitle" class="text-lg font-bold text-slate-800">Log out?</h2>
+                    <p class="text-sm text-slate-500">End this session.</p>
                 </div>
             </div>
             <button type="button" id="firefighterLogoutConfirmClose" class="firefighter-logout-modal-close" aria-label="Close logout confirmation">
@@ -148,15 +183,12 @@
         </div>
         <div class="firefighter-logout-modal-body">
             <p class="firefighter-logout-modal-copy">
-                You are about to sign out of your firefighter dashboard. Make sure any incident updates or response notes have been saved before you continue.
+                Are you sure you want to log out?
             </p>
-            <div class="firefighter-logout-modal-panel">
-                Logging out will close access to assigned incidents, station tools, and responder updates until you sign in again.
-            </div>
         </div>
         <div class="firefighter-logout-modal-footer">
-            <button type="button" id="firefighterLogoutCancelBtn" class="firefighter-logout-cancel">Stay Signed In</button>
-            <button type="button" id="firefighterLogoutConfirmBtn" class="firefighter-logout-confirm">Yes, Logout</button>
+            <button type="button" id="firefighterLogoutCancelBtn" class="firefighter-logout-cancel">No</button>
+            <button type="button" id="firefighterLogoutConfirmBtn" class="firefighter-logout-confirm">Yes, log out</button>
         </div>
     </div>
 </div>

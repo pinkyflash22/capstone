@@ -341,6 +341,121 @@
             gap: 1rem;
         }
 
+        @media (max-width: 768px) {
+            #myLogsModal {
+                align-items: flex-end !important;
+                justify-content: center !important;
+                padding: 0 !important;
+                background: rgba(15, 23, 42, 0.28) !important;
+                backdrop-filter: blur(4px) !important;
+                z-index: 680 !important;
+            }
+
+            #myLogsModal > div {
+                width: 100% !important;
+                max-width: 430px !important;
+                max-height: min(78svh, 640px) !important;
+                margin: 0 !important;
+                border-radius: 24px 24px 0 0 !important;
+                border: 1px solid rgba(226, 232, 240, 0.9) !important;
+                border-bottom: 0 !important;
+                box-shadow: 0 -18px 42px rgba(15, 23, 42, 0.18) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+            }
+
+            #myLogsModal > div::before {
+                content: "";
+                width: 42px;
+                height: 4px;
+                margin: 8px auto 0;
+                border-radius: 999px;
+                background: #cbd5e1;
+                flex: 0 0 auto;
+            }
+
+            #myLogsModal > div > div:first-child {
+                padding: 12px 16px 10px !important;
+                background: #fffdfa !important;
+                border-bottom: 1px solid #f1f5f9 !important;
+            }
+
+            #myLogsModal h2 {
+                font-size: 1.05rem !important;
+                line-height: 1.2 !important;
+            }
+
+            #myLogsModal h2 + p {
+                font-size: 0.78rem !important;
+                line-height: 1.25 !important;
+                margin-top: 2px !important;
+            }
+
+            #closeMyLogsModal {
+                width: 44px !important;
+                height: 44px !important;
+                min-width: 44px !important;
+                border-radius: 14px !important;
+                color: #475569 !important;
+                background: #f8fafc !important;
+            }
+
+            #myLogsModal > div > div:nth-child(2) {
+                padding: 10px 16px !important;
+                gap: 10px !important;
+                background: #ffffff !important;
+                flex: 0 0 auto !important;
+            }
+
+            #myLogsSummary {
+                font-size: 0.78rem !important;
+                line-height: 1.25 !important;
+            }
+
+            #refreshMyLogsBtn {
+                min-height: 38px !important;
+                padding: 0 12px !important;
+                border-radius: 12px !important;
+                font-size: 0.78rem !important;
+                white-space: nowrap !important;
+            }
+
+            #myLogsContainer {
+                max-height: none !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                padding: 12px 14px calc(14px + var(--safe-bottom)) !important;
+                overflow-y: auto !important;
+            }
+
+            #myLogsContainer .my-log-card {
+                border-radius: 16px !important;
+                padding: 12px !important;
+                box-shadow: none !important;
+            }
+
+            #myLogsContainer .my-log-card > .flex {
+                gap: 10px !important;
+            }
+
+            #myLogsContainer .my-log-card__icon {
+                width: 36px !important;
+                height: 36px !important;
+                border-radius: 12px !important;
+            }
+
+            #myLogsContainer .my-log-card p {
+                font-size: 0.8rem !important;
+                line-height: 1.35 !important;
+            }
+
+            #myLogsContainer .my-log-card .text-sm {
+                font-size: 0.76rem !important;
+                line-height: 1.35 !important;
+            }
+        }
+
         [data-citizen-map-layers-panel] {
             align-items: flex-end;
             justify-content: stretch;
@@ -430,7 +545,7 @@
         .citizen-map-base-list {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0;
+            gap: 2px;
             padding: 2px;
             border-radius: 12px;
             background: #f1f5f9;
@@ -445,14 +560,15 @@
         }
 
         .citizen-map-base-item {
-            min-height: 34px;
+            min-height: 32px;
             border-radius: 10px;
             color: #64748b;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             font-weight: 800;
+            line-height: 1;
         }
 
         .citizen-map-base-item__toggle,
@@ -475,49 +591,50 @@
         .citizen-map-layer-list {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 6px;
+            gap: 5px;
             padding: 0;
         }
 
         .citizen-map-layer-item {
-            min-height: 44px;
-            padding: 0 10px;
-            border-radius: 12px;
+            min-height: 38px;
+            padding: 0 8px;
+            border-radius: 11px;
             border: 1px solid #e2e8f0;
             background: #ffffff;
             color: #64748b;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             text-align: left;
         }
 
         .citizen-map-layer-item__icon {
-            width: 18px;
-            height: 18px;
-            flex: 0 0 18px;
+            width: 15px;
+            height: 15px;
+            flex: 0 0 15px;
             border-radius: 0;
             background: transparent;
             color: #64748b;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.88rem;
+            font-size: 0.74rem;
             box-shadow: none;
         }
 
         .citizen-map-layer-item__copy strong {
             color: #64748b;
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             font-weight: 800;
             line-height: 1.1;
+            white-space: nowrap;
         }
 
         .citizen-map-layer-item__check {
             margin-left: auto;
             color: #2563eb;
             display: none;
-            font-size: 0.68rem;
+            font-size: 0.56rem;
         }
 
         .citizen-map-layer-item:has(.citizen-map-layer-item__toggle:checked) {
@@ -572,7 +689,7 @@
         .citizen-map-legend-list {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px 10px;
+            gap: 6px 8px;
             padding: 4px 2px 6px;
             box-shadow: none !important;
             filter: none !important;
@@ -580,14 +697,15 @@
         }
 
         .citizen-map-legend-item-sheet {
-            min-height: 30px;
+            min-height: 26px;
             padding: 0 2px;
             display: flex;
             align-items: center;
             justify-content: flex-start;
             gap: 8px;
             border: 0;
-            background: transparent;
+            background: transparent !important;
+            border-radius: 0 !important;
             color: #475569;
             font-size: 0.74rem;
             font-weight: 700;
@@ -608,31 +726,37 @@
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-swatch {
-            width: 24px;
-            height: 24px;
-            min-width: 24px;
-            border-radius: 8px;
-            box-shadow: none;
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            border-radius: 6px;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-marker,
         .citizen-map-legend-item-sheet .citizen-map-legend-swatch-truck {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
+            box-shadow: none !important;
         }
 
         .citizen-map-legend-item-sheet .citizen-map-legend-image {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             object-fit: contain;
             display: block;
+            filter: none !important;
         }
 
         .citizen-map-legend-item-sheet .marker-legend-icon {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             object-fit: contain;
             display: block;
+            filter: none !important;
         }
 
         .citizen-map-legend-disclosure .incident-marker__pulse,
@@ -642,15 +766,15 @@
         }
 
         .citizen-map-legend-item-sheet .incident-marker {
-            width: 24px !important;
-            height: 24px !important;
+            width: 20px !important;
+            height: 20px !important;
         }
 
         .citizen-map-legend-item-sheet .incident-marker__icon,
         .citizen-map-legend-item-sheet .incident-marker__icon > div,
         .citizen-map-legend-item-sheet .incident-marker__icon img {
-            width: 24px !important;
-            height: 24px !important;
+            width: 20px !important;
+            height: 20px !important;
         }
 
         .citizen-map-legend-item-sheet .incident-marker__pulse {
@@ -1124,23 +1248,8 @@
             }
 
             .citizen-map-stage .leaflet-control-layers {
-                min-width: 44px;
-                max-width: 44px;
-                margin-left: auto !important;
-                float: right !important;
-            }
-
-            .citizen-map-stage .leaflet-control-layers-toggle {
-                width: 44px;
-                height: 44px;
-                background-size: 18px 18px;
-            }
-
-            .citizen-map-stage .leaflet-control-layers-expanded {
-                width: 44px !important;
-                padding: 0;
-                border-radius: 14px;
-                box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+                display: none !important;
+                pointer-events: none !important;
             }
 
             .citizen-top-nav {
@@ -1191,6 +1300,7 @@
                 background: linear-gradient(180deg, rgba(251, 247, 239, 0) 0%, rgba(251, 247, 239, 0.58) 46%, rgba(251, 247, 239, 0.94) 100%);
                 backdrop-filter: blur(8px);
                 z-index: 220;
+                pointer-events: none;
             }
 
             .citizen-mobile-dock__shell {
@@ -1198,6 +1308,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: flex-end;
+                pointer-events: none;
             }
 
             .citizen-mobile-dock__track {
@@ -1214,6 +1325,7 @@
                 background: linear-gradient(180deg, rgba(18, 53, 60, 0.95) 0%, rgba(22, 73, 82, 0.96) 100%);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__track::before {
@@ -1240,6 +1352,7 @@
                 z-index: 1;
                 border: none;
                 background: transparent;
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__item.nav-item,
@@ -1270,6 +1383,12 @@
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                flex-shrink: 0;
             }
 
             .citizen-mobile-dock__center-wrap {
@@ -1278,6 +1397,7 @@
                 justify-content: center;
                 align-self: start;
                 overflow: visible;
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__item--center {
@@ -1296,6 +1416,7 @@
                 flex-shrink: 0;
                 box-shadow: 0 18px 34px rgba(34, 197, 94, 0.34), 0 0 0 8px rgba(255, 255, 255, 0.22);
                 z-index: 3;
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__item--center::before,
@@ -1367,6 +1488,7 @@
                 opacity: 0;
                 transform: translateY(12px) scale(0.9);
                 transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__burst-item::before {
@@ -1401,6 +1523,12 @@
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                flex-shrink: 0;
             }
 
             .citizen-mobile-welcome-toast {
@@ -1460,6 +1588,60 @@
                 line-height: 1.35;
             }
 
+            .citizen-mobile-nav-snackbar {
+                position: fixed;
+                left: 50%;
+                bottom: calc(var(--mobile-bottom-nav-h) + 18px);
+                z-index: 340;
+                min-width: min(260px, calc(100vw - 40px));
+                max-width: calc(100vw - 32px);
+                min-height: 44px;
+                padding: 10px 14px;
+                border-radius: 14px;
+                background: rgba(15, 23, 42, 0.94);
+                color: #ffffff;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                font-size: 0.86rem;
+                font-weight: 800;
+                box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
+                opacity: 0;
+                transform: translate(-50%, 12px);
+                pointer-events: none;
+                transition: opacity 0.18s ease, transform 0.18s ease;
+            }
+
+            .citizen-mobile-nav-snackbar.is-visible {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+
+            .citizen-mobile-nav-snackbar__spinner {
+                width: 16px;
+                height: 16px;
+                border-radius: 999px;
+                border: 2px solid rgba(255, 255, 255, 0.32);
+                border-top-color: #ffffff;
+                animation: citizenNavSnackbarSpin 0.72s linear infinite;
+                flex: 0 0 16px;
+            }
+
+            @keyframes citizenNavSnackbarSpin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .citizen-mobile-nav-snackbar,
+                .citizen-mobile-nav-snackbar__spinner {
+                    transition: none;
+                    animation: none;
+                }
+            }
+
             [data-citizen-insights-source] {
                 display: none !important;
             }
@@ -1468,8 +1650,171 @@
                 display: block !important;
             }
 
+            #fireIncidentModal,
+            #concernReportModal {
+                align-items: center !important;
+                justify-content: center !important;
+                padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)) !important;
+            }
+
+            #fireIncidentModal > div,
+            #concernReportModal > div {
+                width: min(100%, 360px) !important;
+                max-height: min(74svh, 520px) !important;
+                margin: 0 auto !important;
+                border-radius: 22px !important;
+                box-shadow: 0 18px 42px rgba(15, 23, 42, 0.24) !important;
+            }
+
+            #fireIncidentModal > div > div:first-child,
+            #concernReportModal > div > div:first-child {
+                padding: 12px 14px !important;
+            }
+
+            #fireIncidentModal > div > div:first-child .h-11,
+            #concernReportModal > div > div:first-child .h-12 {
+                display: none !important;
+            }
+
+            #fireIncidentModal h2,
+            #concernReportModal h2 {
+                font-size: 1.04rem !important;
+                line-height: 1.18 !important;
+                margin-top: 0 !important;
+            }
+
+            #fireIncidentModal h2 + p,
+            #concernReportModal h2 + p,
+            #concernReportModal .citizen-concern-intro-card {
+                display: none !important;
+            }
+
+            #concernReportModal .tracking-\[0\.22em\] {
+                display: none !important;
+            }
+
+            #closeFireModal,
+            #closeConcernModal {
+                width: 38px !important;
+                height: 38px !important;
+                min-width: 38px !important;
+                min-height: 38px !important;
+                flex: 0 0 38px !important;
+                padding: 0 !important;
+            }
+
+            #fireIncidentModal form,
+            #concernReportModal form {
+                padding: 12px 14px !important;
+            }
+
+            #fireLocationPanel,
+            #hazardLocationPanel,
+            #concernReportModal form .rounded-3xl,
+            #concernReportModal form .rounded-2xl {
+                border-radius: 16px !important;
+                padding: 11px !important;
+                box-shadow: none !important;
+            }
+
+            #fireLocationPanel .mt-3,
+            #hazardLocationPanel .mt-4,
+            #concernReportModal .mt-4,
+            #concernReportModal .mt-3 {
+                margin-top: 8px !important;
+            }
+
+            #fireLocationPanel > .flex,
+            #hazardLocationPanel > .flex {
+                align-items: center !important;
+            }
+
+            #fireLocationPanel p,
+            #hazardLocationPanel p {
+                line-height: 1.25 !important;
+            }
+
+            #fireLocationPanel .grid,
+            #hazardLocationPanel .flex.flex-wrap {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 8px !important;
+            }
+
+            #fireUseCurrentLocationButton,
+            #firePickOnMapButton,
+            #hazardUseCurrentLocationButton,
+            #hazardPickOnMapButton {
+                min-height: 42px !important;
+                width: 100% !important;
+                justify-content: center !important;
+                border-radius: 12px !important;
+                padding: 8px 9px !important;
+                font-size: 0.76rem !important;
+                line-height: 1.15 !important;
+            }
+
+            #fireUseCurrentLocationButton .material-symbols-rounded,
+            #firePickOnMapButton .material-symbols-rounded,
+            #hazardUseCurrentLocationButton .material-symbols-rounded,
+            #hazardPickOnMapButton .material-symbols-rounded {
+                font-size: 16px !important;
+            }
+
+            #fireLocationStatus,
+            #hazardLocationStatus {
+                font-size: 0.74rem !important;
+                line-height: 1.22 !important;
+            }
+
+            #fireIncidentModal form > .mt-4,
+            #concernReportModal form > .mt-4 {
+                margin-top: 10px !important;
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 8px !important;
+            }
+
+            #fireIncidentModal form > .mt-4 button,
+            #concernReportModal form > .mt-4 button {
+                width: 100% !important;
+                min-height: 42px !important;
+                justify-content: center !important;
+                border-radius: 12px !important;
+                padding: 8px 10px !important;
+                font-size: 0.82rem !important;
+            }
+
+            .citizen-concern-chip {
+                min-height: 38px !important;
+                border-radius: 13px !important;
+                padding: 7px 8px !important;
+                font-size: 0.7rem !important;
+                line-height: 1.12 !important;
+            }
+
+            .citizen-concern-chip .material-symbols-rounded {
+                font-size: 15px !important;
+                margin-right: 2px !important;
+            }
+
+            .citizen-concern-detail-chip {
+                min-height: 30px !important;
+                padding: 6px 9px !important;
+                font-size: 0.68rem !important;
+            }
+
+            #concernNotesInput {
+                min-height: 40px !important;
+                height: 40px !important;
+                border-radius: 14px !important;
+                font-size: 0.78rem !important;
+                padding: 8px 10px !important;
+            }
+
             [data-citizen-settings-panel] {
                 align-items: stretch;
+                z-index: 620;
             }
 
             [data-citizen-settings-panel] .citizen-mobile-panel__sheet {
@@ -1652,40 +1997,40 @@
                 <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">MAIN MENU</p>
                 <ul class="space-y-1">
                     <li>
-                        <a onclick="switchSection('overview')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="overview">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="overview" data-citizen-switch-section="overview">
                             <i class="fa-solid fa-gauge-high w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Overview</span>
                             <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">live</span>
                         </a>
                     </li>
                     <li>
-                        <a onclick="switchSection('alerts')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts" data-citizen-switch-section="alerts">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Areas of Concern</span>
                             <span id="citizenNavAlertsBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $activeAlerts ?? 0 }}</span>
                         </a>
                     </li>
                     <li>
-                        <a onclick="switchSection('fsic')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="fsic">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="fsic" data-citizen-switch-section="fsic">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Requests</span>
                             <span id="citizenNavRequestsBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $fsicRequests->count() }}</span>
                         </a>
                     </li>
                     <li>
-                        <a onclick="switchSection('contacts')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="contacts">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="contacts" data-citizen-switch-section="contacts">
                             <i class="fa-solid fa-phone-volume w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Emergency Contacts</span>
                         </a>
                     </li>
                     <li>
-                        <a onclick="switchSection('announcements')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="announcements">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="announcements" data-citizen-switch-section="announcements">
                             <i class="fa-solid fa-bullhorn w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Announcements</span>
                         </a>
                     </li>
                     {{-- <li>
-                        <a  onclick="switchSection('safety')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="safety">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="safety" data-citizen-switch-section="safety">
                             <i class="fa-solid fa-book-open w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Safety Guide</span>
                         </a>
@@ -1695,20 +2040,20 @@
                 <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-6 mb-2">COMMUNITY</p>
                 <ul class="space-y-1">
                     {{-- <li>
-                        <a onclick="switchSection('neighborhood')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="neighborhood">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="neighborhood" data-citizen-switch-section="neighborhood">
                             <i class="fa-solid fa-people-group w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Neighborhood Watch</span>
                             <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">8 online</span>
                         </a>
                     </li> --}}
                     {{-- <li>
-                        <a onclick="switchSection('events')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="events">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="events" data-citizen-switch-section="events">
                             <i class="fa-solid fa-calendar-check w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Drills & Events</span>
                         </a>
                     </li> --}}
                     {{-- <li>
-                        <a onclick="switchSection('news')" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="news">
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="news" data-citizen-switch-section="news">
                             <i class="fa-solid fa-newspaper w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">News & Updates</span>
                         </a>
@@ -1726,44 +2071,79 @@
     <nav class="citizen-mobile-dock md:hidden" aria-label="Citizen mobile navigation">
         <div class="citizen-mobile-dock__shell">
             <div class="citizen-mobile-dock__track">
-                <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" onclick="switchSection('overview')" aria-label="Overview">
-                    <i class="fa-solid fa-house citizen-mobile-dock__icon" aria-hidden="true"></i>
+                <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" data-citizen-switch-section="overview" aria-label="Overview">
+                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m3 10.8 9-7 9 7"></path>
+                        <path d="M5.5 9.5V20h13V9.5"></path>
+                        <path d="M9.5 20v-6h5v6"></path>
+                    </svg>
                 </button>
 
                 <button type="button" class="citizen-mobile-dock__item" aria-label="Notifications" data-citizen-alerts-open>
-                    <i class="fa-solid fa-bell citizen-mobile-dock__icon" aria-hidden="true"></i>
+                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                        <path d="M10 21h4"></path>
+                    </svg>
                 </button>
 
                 <div class="citizen-mobile-dock__center-wrap" data-citizen-nav-center>
                     <div class="citizen-mobile-dock__burst" data-citizen-nav-burst>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="fsic" onclick="switchSection('fsic')" aria-label="Requests">
-                            <i class="fa-solid fa-folder-open citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="fsic" data-citizen-switch-section="fsic" aria-label="Requests">
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M3.5 7.5h6l2 2h9v8.5a2 2 0 0 1-2 2h-15z"></path>
+                                <path d="M3.5 7.5V5.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2"></path>
+                            </svg>
                         </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" onclick="switchSection('alerts')" aria-label="Areas of Concern">
-                            <i class="fa-solid fa-triangle-exclamation citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" data-citizen-switch-section="alerts" aria-label="Areas of Concern">
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 3 22 20H2z"></path>
+                                <path d="M12 9v5"></path>
+                                <path d="M12 17h.01"></path>
+                            </svg>
                         </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" onclick="switchSection('contacts')" aria-label="Emergency Contacts">
-                            <i class="fa-solid fa-phone citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" data-citizen-switch-section="contacts" aria-label="Emergency Contacts">
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3A19.2 19.2 0 0 1 5.4 13 19.6 19.6 0 0 1 2.4 4.5 2 2 0 0 1 4.4 2.3h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L8.1 10a15.5 15.5 0 0 0 5.9 5.9l1.2-1.2a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 2 2.3z"></path>
+                            </svg>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
-                            <i class="fa-solid fa-bullhorn citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 13h3l10 5V6L7 11H4z"></path>
+                                <path d="M7 13v5"></path>
+                                <path d="M18 9.5a3 3 0 0 1 0 5"></path>
+                            </svg>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-insights-open aria-label="Charts and Cards">
-                            <i class="fa-solid fa-chart-column citizen-mobile-dock__burst-icon" aria-hidden="true"></i>
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 20h16"></path>
+                                <path d="M7 16V9"></path>
+                                <path d="M12 16V5"></path>
+                                <path d="M17 16v-6"></path>
+                            </svg>
                         </button>
                     </div>
 
                     <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--center" data-citizen-nav-trigger aria-label="Report fire incident">
-                        <i class="fa-solid fa-fire-flame-curved citizen-mobile-dock__icon" aria-hidden="true"></i>
+                        <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12.4 21c4.1 0 6.8-2.7 6.8-6.5 0-2.4-1.2-4.5-3.1-5.8.1 2.1-.8 3.5-2.2 4.1.4-3.3-1.1-6.8-4.4-9.8.2 3.3-1.6 5.3-3 7.2-1 1.3-1.7 2.6-1.7 4.3C4.8 18.3 7.9 21 12.4 21z"></path>
+                            <path d="M12 21c1.7 0 3-1.2 3-2.9 0-1.2-.7-2.2-1.8-3 .1 1.2-.4 2-1.2 2.4.2-1.8-.6-3.4-2.1-4.8.1 2-.9 3-1.5 4-.4.6-.6 1.1-.6 1.8 0 1.5 1.4 2.5 4.2 2.5z"></path>
+                        </svg>
                     </button>
                 </div>
 
-                <button type="button" class="citizen-mobile-dock__item" data-citizen-dock-item="announcements" onclick="switchSection('announcements')" aria-label="Announcements">
-                    <i class="fa-solid fa-bullhorn citizen-mobile-dock__icon" aria-hidden="true"></i>
+                <button type="button" class="citizen-mobile-dock__item" data-citizen-dock-item="announcements" data-citizen-switch-section="announcements" aria-label="Announcements">
+                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 13h3l10 5V6L7 11H4z"></path>
+                        <path d="M7 13v5"></path>
+                        <path d="M18 9.5a3 3 0 0 1 0 5"></path>
+                    </svg>
                 </button>
 
                 <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
-                    <i class="fa-solid fa-gear citizen-mobile-dock__icon" aria-hidden="true"></i>
+                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
+                        <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2.1 2.1 0 0 1-3 3l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21a2.1 2.1 0 0 1-4.2 0v-.1a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1a2.1 2.1 0 0 1-3-3l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2a2.1 2.1 0 0 1 0-4.2h.1a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1a2.1 2.1 0 0 1 3-3l.1.1a1.8 1.8 0 0 0 2 .4 1.8 1.8 0 0 0 1.1-1.7V2a2.1 2.1 0 0 1 4.2 0v.1a1.8 1.8 0 0 0 1.1 1.7 1.8 1.8 0 0 0 2-.4l.1-.1a2.1 2.1 0 0 1 3 3l-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.1a2.1 2.1 0 0 1 0 4.2h-.1a1.8 1.8 0 0 0-1.7 1.3z"></path>
+                    </svg>
                 </button>
             </div>
         </div>
@@ -1782,14 +2162,14 @@
                 </button>
             </div>
             <div class="citizen-mobile-panel__menu">
-                <button type="button" class="citizen-mobile-panel__action" onclick="switchSection('profile')" data-citizen-panel-close>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-switch-section="profile" data-citizen-panel-close>
                     <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">person</span>
                     <span class="citizen-mobile-panel__action-copy">
                         <strong>Profile</strong>
                         <small>Manage your citizen account</small>
                     </span>
                 </button>
-                <button type="button" class="citizen-mobile-panel__action" data-citizen-open-logs data-citizen-panel-close>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-open-logs>
                     <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">history</span>
                     <span class="citizen-mobile-panel__action-copy">
                         <strong>My Logs</strong>
@@ -1809,7 +2189,7 @@
             </div>
         </div>
     </div>
-    <div class="citizen-mobile-panel md:hidden" data-citizen-map-layers-panel aria-hidden="true">
+    <div class="citizen-mobile-panel md:hidden" data-citizen-map-layers-panel aria-hidden="true" inert>
         <div class="citizen-mobile-panel__backdrop" data-citizen-map-layers-close></div>
         <div class="citizen-mobile-panel__sheet">
             <div class="citizen-map-sheet-handle" aria-hidden="true"></div>
@@ -1825,8 +2205,16 @@
             <div class="citizen-mobile-panel__body citizen-map-sheet-section">
                 <div class="citizen-map-base-list" role="radiogroup" aria-label="Map layer">
                     <label class="citizen-map-base-item">
-                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Street Map" checked>
-                        <span>Street Map</span>
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Carto Light" checked>
+                        <span>Carto</span>
+                    </label>
+                    <label class="citizen-map-base-item">
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="OSM Standard">
+                        <span>OSM</span>
+                    </label>
+                    <label class="citizen-map-base-item">
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="OSM HOT">
+                        <span>OSM HOT</span>
                     </label>
                     <label class="citizen-map-base-item">
                         <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Satellite">
@@ -1903,6 +2291,186 @@
         </div>
     </div>
 
+    <script>
+        (() => {
+            if (window.__citizenMobileNavGuardBound) {
+                return;
+            }
+
+            window.__citizenMobileNavGuardBound = true;
+
+            const buildSectionUrl = (sectionId) => {
+                const baseUrl = (window.citizenDashboardBaseUrl || '/citizen/dashboard').replace(/\/$/, '');
+                return sectionId === 'overview' ? baseUrl : `${baseUrl}/${sectionId}`;
+            };
+
+            const closeMobileBurst = () => {
+                const center = document.querySelector('[data-citizen-nav-center]');
+                const trigger = document.querySelector('[data-citizen-nav-trigger]');
+                center?.classList.remove('is-open');
+                trigger?.setAttribute('aria-expanded', 'false');
+            };
+
+            const closeSettingsPanel = () => {
+                const panel = document.querySelector('[data-citizen-settings-panel]');
+                panel?.classList.remove('is-open');
+                panel?.setAttribute('aria-hidden', 'true');
+            };
+
+            const openSettingsPanel = () => {
+                const panel = document.querySelector('[data-citizen-settings-panel]');
+                panel?.classList.add('is-open');
+                panel?.setAttribute('aria-hidden', 'false');
+            };
+
+            const showMobileNavSnackbar = (message = 'Loading page...', duration = 900) => {
+                if (window.innerWidth > 768) {
+                    return;
+                }
+
+                const snackbar = document.getElementById('citizenMobileNavSnackbar');
+                const snackbarText = document.getElementById('citizenMobileNavSnackbarText');
+                if (!snackbar) {
+                    return;
+                }
+
+                if (snackbarText) {
+                    snackbarText.textContent = message;
+                }
+
+                if (snackbar._hideTimer) {
+                    window.clearTimeout(snackbar._hideTimer);
+                }
+
+                snackbar.classList.add('is-visible');
+                snackbar._hideTimer = window.setTimeout(() => {
+                    snackbar.classList.remove('is-visible');
+                }, duration);
+            };
+
+            window.showCitizenMobileNavSnackbar = showMobileNavSnackbar;
+
+            const openAlertsPanelWhenReady = (attempt = 0) => {
+                if (typeof window.openCitizenAlertsPanel === 'function') {
+                    window.openCitizenAlertsPanel();
+                    return;
+                }
+
+                if (attempt < 20) {
+                    window.setTimeout(() => openAlertsPanelWhenReady(attempt + 1), 50);
+                }
+            };
+
+            const openConcernReportWhenReady = (attempt = 0) => {
+                if (typeof window.openConcernReportModal === 'function') {
+                    window.openConcernReportModal();
+                    return;
+                }
+
+                if (attempt < 20) {
+                    window.setTimeout(() => openConcernReportWhenReady(attempt + 1), 50);
+                }
+            };
+
+            const fallbackSwitchSection = (sectionId, options = {}) => {
+                if (!sectionId) {
+                    return;
+                }
+
+                document.querySelectorAll('.content-section').forEach((section) => {
+                    section.classList.remove('active');
+                });
+
+                document.getElementById(`section-${sectionId}`)?.classList.add('active');
+
+                document.querySelectorAll('.nav-item, .citizen-mobile-dock__item, .citizen-mobile-dock__burst-item').forEach((item) => {
+                    item.classList.remove('active');
+                });
+
+                document.querySelectorAll(`[data-section="${sectionId}"], [data-citizen-dock-item="${sectionId}"]`).forEach((item) => {
+                    item.classList.add('active');
+                });
+
+                if (options.updateHistory !== false) {
+                    const targetUrl = buildSectionUrl(sectionId);
+                    if (window.location.pathname !== new URL(targetUrl, window.location.origin).pathname) {
+                        window.history.pushState({ section: sectionId }, '', targetUrl);
+                    }
+                }
+            };
+
+            window.switchSection = window.switchSection || fallbackSwitchSection;
+
+            document.addEventListener('click', (event) => {
+                const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+                const trigger = eventTarget?.closest(
+                    '[data-citizen-switch-section], [data-citizen-alerts-open], [data-citizen-settings-open], [data-citizen-panel-close], [data-citizen-insights-open], [data-citizen-insights-close], [data-citizen-risk-hazard-open]'
+                );
+
+                if (!trigger) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                const sectionId = trigger.dataset.citizenSwitchSection;
+                if (sectionId) {
+                    showMobileNavSnackbar('Loading page...');
+                    closeMobileBurst();
+                    closeSettingsPanel();
+                    (window.switchSection || fallbackSwitchSection)(sectionId);
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-settings-open]')) {
+                    showMobileNavSnackbar('Opening settings...');
+                    closeMobileBurst();
+                    openSettingsPanel();
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-panel-close]')) {
+                    closeSettingsPanel();
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-alerts-open]')) {
+                    showMobileNavSnackbar('Loading alerts...');
+                    closeMobileBurst();
+                    (window.switchSection || fallbackSwitchSection)('overview');
+                    window.setTimeout(openAlertsPanelWhenReady, 20);
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-insights-open]')) {
+                    showMobileNavSnackbar('Loading charts...');
+                    closeMobileBurst();
+                    if (typeof window.openCitizenInsightsPanel === 'function') {
+                        window.openCitizenInsightsPanel();
+                    } else {
+                        (window.switchSection || fallbackSwitchSection)('overview');
+                    }
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-insights-close]')) {
+                    document.querySelector('[data-citizen-insights-panel]')?.classList.remove('is-open');
+                    document.querySelector('[data-citizen-insights-panel]')?.setAttribute('aria-hidden', 'true');
+                    return;
+                }
+
+                if (trigger.matches('[data-citizen-risk-hazard-open]')) {
+                    showMobileNavSnackbar('Opening report...');
+                    closeMobileBurst();
+                    openConcernReportWhenReady();
+                    return;
+                }
+
+            }, true);
+        })();
+    </script>
+
     <!-- MAIN CONTENT -->
     <main class="flex-1 min-w-0 bg-gray-50">
         {{-- sessioning --}}
@@ -1933,6 +2501,10 @@
                 <strong>Welcome back, {{ $displayName }}</strong>
                 <span>Citizen portal is ready with your alerts, map, and reports.</span>
             </div>
+        </div>
+        <div id="citizenMobileNavSnackbar" class="citizen-mobile-nav-snackbar md:hidden" role="status" aria-live="polite" aria-atomic="true">
+            <span class="citizen-mobile-nav-snackbar__spinner" aria-hidden="true"></span>
+            <span id="citizenMobileNavSnackbarText">Loading page...</span>
         </div>
         <!-- top bar -->
         
@@ -1980,7 +2552,7 @@
                                     <p class="text-sm font-bold text-gray-800">{{ $displayName }}</p>
                                     <p class="text-xs text-gray-500 truncate">{{ Auth::user()->email }}</p>
                                 </div>
-                                <a onclick="switchSection('profile')" class="user-dropdown-item">
+                                <a class="user-dropdown-item" data-citizen-switch-section="profile">
                                     <i class="fa-solid fa-user"></i>
                                     <span>My Profile</span>
                                 </a>
@@ -2048,73 +2620,60 @@
         </div>
 
         <!-- Fire Report Modal -->
-        <div id="fireIncidentModal" class="modal fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center z-50 justify-center hidden p-4">
-            <div class="w-full max-w-xl overflow-hidden rounded-[2rem] border border-orange-100 bg-white shadow-[0_32px_90px_rgba(15,23,42,0.24)]">
-                <div class="relative overflow-hidden bg-gradient-to-r from-[#c63d26] via-[#d45a1a] to-[#e39b17] px-6 py-6 text-white">
-                    <div class="absolute inset-y-0 right-0 w-40 bg-white/10 blur-2xl"></div>
-                    <div class="relative flex items-start justify-between gap-4">
-                        <div class="flex items-start gap-4">
-                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
-                                <i class="fa-solid fa-fire-flame-curved text-[28px]" aria-hidden="true"></i>
+        <div id="fireIncidentModal" class="modal fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center z-50 justify-center hidden p-3 sm:p-4">
+            <div class="w-full max-w-md max-h-[88vh] overflow-y-auto rounded-[1.5rem] border border-orange-100 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+                <div class="relative overflow-hidden bg-gradient-to-r from-[#c63d26] via-[#d45a1a] to-[#e39b17] px-4 py-4 text-white sm:px-5">
+                    <div class="absolute inset-y-0 right-0 w-32 bg-white/10 blur-2xl"></div>
+                    <div class="relative flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur">
+                                <i class="fa-solid fa-fire-flame-curved text-[22px]" aria-hidden="true"></i>
                             </div>
                             <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-white/75">PyroSense Emergency</p>
-                                <h2 class="mt-1 text-2xl font-bold leading-tight">Report Fire Incident</h2>
-                                <p class="mt-2 max-w-md text-sm text-white/85">Send an emergency fire report right away. BFP can begin processing immediately while station assignment continues in the background.</p>
+                                <h2 class="text-xl font-bold leading-tight">Report fire incident</h2>
+                                <p class="mt-1 text-sm text-white/85">Choose how to set the fire location.</p>
                             </div>
                         </div>
-                        <button type="button" id="closeFireModal" class="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/12 text-white transition hover:bg-white/20" aria-label="Close fire report modal">
+                        <button type="button" id="closeFireModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/12 text-white transition hover:bg-white/20" aria-label="Close fire report modal">
                             <i class="fa-solid fa-xmark text-lg"></i>
                         </button>
                     </div>
                 </div>
 
-                <form id="fireIncidentForm" action="" method="POST" class="px-6 py-6">
+                <form id="fireIncidentForm" action="" method="POST" class="px-4 py-4 sm:px-5">
                     @csrf
-                    <div class="grid gap-4">
-                        <div class="rounded-3xl border border-red-100 bg-gradient-to-br from-red-50 via-orange-50 to-white p-5 text-sm text-slate-700">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="font-semibold text-slate-900">Emergency fire report</p>
-                                    <p class="mt-1">Use this only for an actual fire emergency. The incident is saved first so the citizen gets instant feedback.</p>
-                                </div>
-                                <span class="rounded-full bg-red-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-red-700">Priority</span>
-                            </div>
-                            <p class="mt-3 text-xs text-slate-500">You can use your live location or choose a map point within 100 meters if the fire is slightly away from your exact GPS position.</p>
-                        </div>
-
-                        <div id="fireLocationPanel" class="rounded-3xl border border-orange-100 bg-[#fffaf4] p-5 text-sm text-slate-700 shadow-sm">
-                            <div class="flex items-start justify-between gap-3">
+                    <div class="grid gap-3">
+                        <div id="fireLocationPanel" class="rounded-2xl border border-orange-100 bg-[#fffaf4] p-4 text-sm text-slate-700">
+                            <div class="flex items-center justify-between gap-3">
                                 <div>
                                     <p class="font-semibold text-slate-900">Incident location</p>
-                                    <p class="mt-1 text-slate-600">Pick the exact fire point within a 100-meter radius of your current location.</p>
+                                    <p class="mt-0.5 text-xs text-slate-500">Use GPS or pick within 100m.</p>
                                 </div>
-                                <span class="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-orange-700">100m radius</span>
+                                <span class="shrink-0 rounded-full bg-orange-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-orange-700">100m</span>
                             </div>
 
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <button type="button" id="fireUseCurrentLocationButton" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            <div class="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+                                <button type="button" id="fireUseCurrentLocationButton" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#c63d26] to-[#e39b17] px-3 py-2.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(198,61,38,0.22)] transition hover:brightness-105">
                                     <span class="material-symbols-rounded text-[18px]" aria-hidden="true">my_location</span>
-                                    Use My Location
+                                    Use my location
                                 </button>
-                                <button type="button" id="firePickOnMapButton" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700">
+                                <button type="button" id="firePickOnMapButton" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700">
                                     <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
-                                    Choose Location (100m)
+                                    Pick within 100m
                                 </button>
                             </div>
 
-                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location status</p>
-                                <p id="fireLocationStatus" class="mt-2 text-sm text-slate-700">Your current location will be used for this fire report.</p>
+                            <div class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                                <p id="fireLocationStatus" class="text-xs font-medium text-slate-600">Current location will be used.</p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-6 flex flex-wrap justify-end gap-3">
-                        <button type="button" class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-fire-modal-close>Cancel</button>
-                        <button type="button" class="js-citizen-report-action inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#c63d26] to-[#e39b17] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(198,61,38,0.28)] transition hover:brightness-105" data-report-kind="fire">
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                        <button type="button" class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-fire-modal-close>Cancel</button>
+                        <button type="button" class="js-citizen-report-action inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#c63d26] to-[#e39b17] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(198,61,38,0.24)] transition hover:brightness-105" data-report-kind="fire">
                             <span class="material-symbols-rounded text-[18px]" aria-hidden="true">bolt</span>
-                            Report Fire Incident
+                            Report
                         </button>
                     </div>
                 </form>
@@ -2156,7 +2715,7 @@
                             </div>
                         @endif
 
-                        <div class="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-4 text-sm text-slate-700">
+                        <div class="citizen-concern-intro-card rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-4 text-sm text-slate-700">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="font-semibold text-slate-900">Non-fire safety concern</p>
@@ -2167,9 +2726,9 @@
                         </div>
 
                         <div class="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
-                            <label for="concernTypeSelect" class="block text-sm font-semibold text-slate-900">Risk / Hazard type</label>
-                            <p class="mt-1 text-xs text-slate-500">Required by the current citizen reporting flow. If unsure, keep the default option.</p>
-                            <select id="concernTypeSelect" class="mt-3 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-700 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100">
+                            <label class="block text-sm font-semibold text-slate-900">What are you seeing?</label>
+                            <p class="mt-1 text-xs text-slate-500">Pick the closest match. BFP can reclassify it after review.</p>
+                            <select id="concernTypeSelect" class="sr-only" aria-label="Risk or hazard type">
                                 <option value="unsure">I am not sure yet</option>
                                 <option value="electrical_issue">Electrical issue</option>
                                 <option value="unsafe_cooking_lpg">Unsafe cooking or LPG use</option>
@@ -2177,6 +2736,55 @@
                                 <option value="combustible_clutter">Combustible clutter or open burning</option>
                                 <option value="dense_fire_prone_area">Dense fire-prone area</option>
                             </select>
+                            <div class="mt-3 grid grid-cols-2 gap-2">
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-800 transition" data-concern-type="unsure">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">help</span>
+                                    Not sure
+                                </button>
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition" data-concern-type="electrical_issue">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">bolt</span>
+                                    Electrical
+                                </button>
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition" data-concern-type="unsafe_cooking_lpg">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">local_fire_department</span>
+                                    LPG / cooking
+                                </button>
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition" data-concern-type="blocked_hydrant_access">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">water_drop</span>
+                                    Blocked access
+                                </button>
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition" data-concern-type="combustible_clutter">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">delete</span>
+                                    Clutter / burning
+                                </button>
+                                <button type="button" class="citizen-concern-chip min-h-11 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition" data-concern-type="dense_fire_prone_area">
+                                    <span class="material-symbols-rounded mr-1 align-middle text-[17px]" aria-hidden="true">holiday_village</span>
+                                    Dense area
+                                </button>
+                            </div>
+
+                            <input type="hidden" id="concernConditionDetail" value="">
+                            <div class="mt-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Add quick detail</p>
+                                <div class="mt-2 flex flex-wrap gap-2" data-concern-detail-options>
+                                    <button type="button" class="citizen-concern-detail-chip rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="unsure" data-condition-detail="needs_verification">Needs verification</button>
+                                    <button type="button" class="citizen-concern-detail-chip rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="unsure" data-condition-detail="possible_fire_risk">Possible fire risk</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="electrical_issue" data-condition-detail="exposed_wire">Exposed wire</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="electrical_issue" data-condition-detail="sparking_outlet">Sparking outlet</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="electrical_issue" data-condition-detail="overloaded_extension">Overloaded extension</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="unsafe_cooking_lpg" data-condition-detail="leaking_lpg">Possible LPG leak</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="unsafe_cooking_lpg" data-condition-detail="open_flame_near_fuel">Open flame near fuel</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="blocked_hydrant_access" data-condition-detail="blocked_hydrant">Blocked hydrant</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="blocked_hydrant_access" data-condition-detail="narrow_access">Narrow access</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="combustible_clutter" data-condition-detail="waste_buildup">Waste buildup</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="combustible_clutter" data-condition-detail="open_burning">Open burning</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="dense_fire_prone_area" data-condition-detail="houses_too_close">Houses too close</button>
+                                    <button type="button" class="citizen-concern-detail-chip hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600" data-condition-for="dense_fire_prone_area" data-condition-detail="crowded_escape_path">Crowded escape path</button>
+                                </div>
+                            </div>
+
+                            <label for="concernNotesInput" class="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Optional note</label>
+                            <textarea id="concernNotesInput" rows="2" maxlength="500" class="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100" placeholder="Example: near sari-sari store, wires are exposed"></textarea>
                         </div>
 
                         <div id="hazardLocationPanel" class="rounded-3xl border border-amber-100 bg-[#fffaf4] p-4 text-sm text-slate-700 shadow-sm">
@@ -2217,7 +2825,7 @@
         <input type="hidden" id="reported_by" value="{{ $accountId }}">
         <input type="hidden" id="latitude" value="">
         <input type="hidden" id="longitude" value="">
-    <div id="incidentReportLoadingOverlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm hidden items-center justify-center z-[120]">
+    <div id="incidentReportLoadingOverlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm hidden items-center justify-center z-[5000]">
         <div class="bg-white rounded-2xl shadow-xl px-6 py-5 flex items-center gap-3 text-slate-700">
             <span class="inline-fa-icon icon-spin text-orange-600" style="width: 1.25rem; height: 1.25rem;">
                 <svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8" fill="none"></path></svg>
@@ -2228,7 +2836,7 @@
             </div>
         </div>
     </div>
-    <div id="myLogsModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm hidden items-center justify-center z-[4000] p-4">
+    <div id="myLogsModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm hidden items-center justify-center z-[4000] p-4" aria-hidden="true">
         <div class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
             <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-slate-50">
                 <div>
@@ -2401,10 +3009,18 @@
                 function(position) {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
+                    console.log('[CitizenLocation] interval GPS success', {
+                        userId: window.currentUserId,
+                        lat,
+                        lng,
+                        accuracy: position.coords.accuracy,
+                        timestamp: new Date().toISOString(),
+                    });
                     updateUserLocation(window.currentUserId, lat, lng);
                     window.userCoords.currentLatitude = lat;
                     window.userCoords.currentLongitude = lng;
                     window.userCoords.ready = true;
+                    console.log('[CitizenLocation] interval userCoords updated', window.userCoords);
                     if (window.refreshCitizenMapData) {
                         window.refreshCitizenMapData();
                     }
@@ -2415,12 +3031,16 @@
                     sendUserLocationToServer(lat, lng);
 
                     if (typeof window.currentLoc === 'function') {
+                        console.log('[CitizenLocation] interval rendering marker via currentLoc');
                         window.currentLoc(lat, lng);
+                    } else {
+                        console.warn('[CitizenLocation] interval currentLoc not ready, queueing marker render');
+                        window.__pendingCitizenLocation = { lat, lng };
                     }
                     updateCitizenResolvedLocation(lat, lng);
                 },
                 function(error) {
-                    console.error("Location update error:", error);
+                    console.error('[CitizenLocation] interval GPS error', error);
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
@@ -2481,11 +3101,91 @@
                     console.error('Failed to resolve citizen sidebar location:', error);
                 }
             };
+
+            window.requestCitizenLocationNow = function(options = {}) {
+                const { silent = false } = options;
+
+                if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude) {
+                    console.log('[CitizenLocation] requestCitizenLocationNow using cached userCoords', window.userCoords);
+                    return Promise.resolve(window.userCoords);
+                }
+
+                if (!navigator.geolocation) {
+                    if (!silent) {
+                        window.showCitizenToast?.('Location is not supported on this device.', true);
+                    }
+                    return Promise.reject(new Error('Geolocation is not supported.'));
+                }
+
+                if (window.__citizenLocationRequest) {
+                    console.log('[CitizenLocation] requestCitizenLocationNow reusing in-flight request');
+                    return window.__citizenLocationRequest;
+                }
+
+                console.log('[CitizenLocation] requestCitizenLocationNow requesting browser GPS', {
+                    silent,
+                    timestamp: new Date().toISOString(),
+                });
+                window.__citizenLocationRequest = new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            console.log('[CitizenLocation] on-demand GPS success', {
+                                userId: window.currentUserId,
+                                lat,
+                                lng,
+                                accuracy: position.coords.accuracy,
+                                timestamp: new Date().toISOString(),
+                            });
+
+                            updateUserLocation(window.currentUserId, lat, lng);
+                            window.userCoords.currentLatitude = lat;
+                            window.userCoords.currentLongitude = lng;
+                            window.userCoords.ready = true;
+                            console.log('[CitizenLocation] on-demand userCoords updated', window.userCoords);
+
+                            window.refreshCitizenMapData?.();
+                            window.refreshCitizenOverviewData?.();
+                            if (typeof window.currentLoc === 'function') {
+                                console.log('[CitizenLocation] on-demand rendering marker via currentLoc');
+                                window.currentLoc(lat, lng);
+                            } else {
+                                console.warn('[CitizenLocation] on-demand currentLoc not ready, queueing marker render');
+                                window.__pendingCitizenLocation = { lat, lng };
+                            }
+                            updateCitizenResolvedLocation(lat, lng);
+                            sendUserLocationToServer(lat, lng);
+                            document.dispatchEvent(new Event("locationReady"));
+                            resolve(window.userCoords);
+                        },
+                        function(error) {
+                            console.error('[CitizenLocation] on-demand GPS error', error);
+                            if (!silent) {
+                                window.showCitizenToast?.('Location is still loading. Please allow location access and try again.', true, 4200);
+                            }
+                            reject(error);
+                        },
+                        { enableHighAccuracy: true, timeout: 7000, maximumAge: 15000 }
+                    );
+                }).finally(() => {
+                    window.__citizenLocationRequest = null;
+                });
+
+                return window.__citizenLocationRequest;
+            };
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
         function(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
+            console.log('[CitizenLocation] initial GPS success', {
+                userId: window.currentUserId,
+                lat,
+                lng,
+                accuracy: position.coords.accuracy,
+                timestamp: new Date().toISOString(),
+            });
             // const lat = 15.232331;
             // const lng = 120.232331;
 
@@ -2494,6 +3194,7 @@ if (navigator.geolocation) {
             window.userCoords.currentLatitude = lat;
             window.userCoords.currentLongitude = lng;
             window.userCoords.ready = true;
+            console.log('[CitizenLocation] initial userCoords updated', window.userCoords);
             if (window.refreshCitizenMapData) {
                 window.refreshCitizenMapData();
             }
@@ -2509,7 +3210,11 @@ if (navigator.geolocation) {
             
             // Display user location on the citizen-only map
             if (typeof window.currentLoc === 'function') {
+                console.log('[CitizenLocation] initial rendering marker via currentLoc');
                 window.currentLoc(lat, lng);
+            } else {
+                console.warn('[CitizenLocation] initial currentLoc not ready, queueing marker render');
+                window.__pendingCitizenLocation = { lat, lng };
             }
             updateCitizenResolvedLocation(lat, lng);
             
@@ -2519,7 +3224,7 @@ if (navigator.geolocation) {
             document.dispatchEvent(new Event("locationReady"));
         },
         function(error) {
-            console.error("Location error:", error);
+            console.error('[CitizenLocation] initial GPS error, using fallback location', error);
             // Fallback to default location
             const defaultLat = 15.8222;
             const defaultLng = 120.3297;
@@ -2527,6 +3232,7 @@ if (navigator.geolocation) {
             window.userCoords.currentLatitude = defaultLat;
             window.userCoords.currentLongitude = defaultLng;
             window.userCoords.ready = true;
+            console.log('[CitizenLocation] fallback userCoords updated', window.userCoords);
             if (window.refreshCitizenMapData) {
                 window.refreshCitizenMapData();
             }
@@ -2534,7 +3240,11 @@ if (navigator.geolocation) {
                 window.refreshCitizenOverviewData();
             }
             if (typeof window.currentLoc === 'function') {
+                console.log('[CitizenLocation] fallback rendering marker via currentLoc');
                 window.currentLoc(defaultLat, defaultLng);
+            } else {
+                console.warn('[CitizenLocation] fallback currentLoc not ready, queueing marker render');
+                window.__pendingCitizenLocation = { lat: defaultLat, lng: defaultLng };
             }
             updateCitizenResolvedLocation(defaultLat, defaultLng);
         },
@@ -2550,10 +3260,16 @@ if (navigator.geolocation) {
     console.warn("Geolocation not supported");
     const defaultLat = 15.8222;
     const defaultLng = 120.3297;
+    console.log('[CitizenLocation] geolocation unsupported, using fallback location', {
+        userId: window.currentUserId,
+        lat: defaultLat,
+        lng: defaultLng,
+    });
     updateUserLocation(window.currentUserId, defaultLat, defaultLng);
     window.userCoords.currentLatitude = defaultLat;
     window.userCoords.currentLongitude = defaultLng;
     window.userCoords.ready = true;
+    console.log('[CitizenLocation] unsupported fallback userCoords updated', window.userCoords);
     if (window.refreshCitizenMapData) {
         window.refreshCitizenMapData();
     }
@@ -2562,7 +3278,11 @@ if (navigator.geolocation) {
     }
     updateCitizenResolvedLocation(defaultLat, defaultLng);
     if (typeof window.currentLoc === 'function') {
+        console.log('[CitizenLocation] unsupported fallback rendering marker via currentLoc');
         window.currentLoc(defaultLat, defaultLng);
+    } else {
+        console.warn('[CitizenLocation] unsupported fallback currentLoc not ready, queueing marker render');
+        window.__pendingCitizenLocation = { lat: defaultLat, lng: defaultLng };
     }
      
             
@@ -2592,6 +3312,10 @@ if (navigator.geolocation) {
         function switchSection(sectionId, options = {}) {
             const { updateHistory = true } = options;
 
+            if (window.innerWidth <= 768) {
+                window.showCitizenMobileNavSnackbar?.('Loading page...');
+            }
+
             // Hide all sections
             document.querySelectorAll('.content-section').forEach(section => {
                 section.classList.remove('active');
@@ -2604,7 +3328,7 @@ if (navigator.geolocation) {
             }
             
             // Update active nav item
-            document.querySelectorAll('.nav-item').forEach(item => {
+            document.querySelectorAll('.nav-item, .citizen-mobile-dock__item, .citizen-mobile-dock__burst-item').forEach(item => {
                 item.classList.remove('active');
             });
 
@@ -2628,6 +3352,18 @@ if (navigator.geolocation) {
         }
 
         window.switchSection = switchSection;
+
+        document.querySelectorAll('[data-citizen-switch-section]').forEach((trigger) => {
+            trigger.addEventListener('click', function (event) {
+                const sectionId = this.dataset.citizenSwitchSection;
+                if (!sectionId) {
+                    return;
+                }
+
+                event.preventDefault();
+                switchSection(sectionId);
+            });
+        });
 
         window.addEventListener('popstate', function (event) {
             const sectionId = event.state?.section || getCitizenSectionFromPath();
@@ -2666,7 +3402,11 @@ if (navigator.geolocation) {
 
         const findLeafletLayerInput = (labels, groupSelector) => {
             const labelAliases = {
-                'Street Map': ['Street Map', 'OSM', 'OSM Standard'],
+                'Street Map': ['Street Map', 'Carto Light', 'Carto'],
+                'Carto Light': ['Carto Light', 'Carto'],
+                'OSM Standard': ['OSM Standard', 'OSM'],
+                'OSM HOT': ['OSM HOT'],
+                Satellite: ['Satellite'],
                 Stations: ['Stations', 'Fire Stations'],
                 Hydrants: ['Hydrants', 'Fire Hydrants'],
                 others: ['Other Markers', 'Other Locations']
@@ -2707,9 +3447,17 @@ if (navigator.geolocation) {
                 }
             });
 
-            citizenMapBaseToggles.forEach((toggle) => {
-                const baseInput = findLeafletLayerInput(toggle.dataset.citizenMapBaseToggle, '.leaflet-control-layers-base');
+            const activeBaseLabel = typeof window.getCitizenActiveBaseLayer === 'function'
+                ? window.getCitizenActiveBaseLayer()
+                : '';
 
+            citizenMapBaseToggles.forEach((toggle) => {
+                if (activeBaseLabel) {
+                    toggle.checked = toggle.dataset.citizenMapBaseToggle === activeBaseLabel;
+                    return;
+                }
+
+                const baseInput = findLeafletLayerInput(toggle.dataset.citizenMapBaseToggle, '.leaflet-control-layers-base');
                 if (baseInput) {
                     toggle.checked = baseInput.checked;
                 }
@@ -2741,6 +3489,12 @@ if (navigator.geolocation) {
                     return;
                 }
 
+                if (typeof window.setCitizenBaseLayer === 'function') {
+                    window.setCitizenBaseLayer(toggle.dataset.citizenMapBaseToggle);
+                    syncCitizenMapLayerControls();
+                    return;
+                }
+
                 const baseInput = findLeafletLayerInput(toggle.dataset.citizenMapBaseToggle, '.leaflet-control-layers-base');
 
                 if (baseInput && !baseInput.checked) {
@@ -2754,7 +3508,7 @@ if (navigator.geolocation) {
         if (citizenMobileDock && citizenDockTrigger) {
             let holdTimer = null;
             let holdActivated = false;
-            const holdDelay = 360;
+            const holdDelay = 620;
 
             const clearHoldTimer = () => {
                 if (holdTimer) {
@@ -2797,6 +3551,7 @@ if (navigator.geolocation) {
                     return;
                 }
                 closeBurst();
+                window.showCitizenMobileNavSnackbar?.('Opening report...');
                 if (typeof window.openFireIncidentModal === 'function') {
                     window.openFireIncidentModal();
                 }
@@ -2821,35 +3576,47 @@ if (navigator.geolocation) {
             });
         }
 
+        const blurFocusedChild = (container) => {
+            if (container?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+        };
+
         const openCitizenSettingsPanel = () => {
             citizenSettingsPanel?.classList.add('is-open');
             citizenSettingsPanel?.setAttribute('aria-hidden', 'false');
         };
 
         const closeCitizenSettingsPanel = () => {
+            blurFocusedChild(citizenSettingsPanel);
             citizenSettingsPanel?.classList.remove('is-open');
             citizenSettingsPanel?.setAttribute('aria-hidden', 'true');
         };
 
         const openCitizenMapLayersPanel = () => {
+            if (citizenMapLayersPanel) {
+                citizenMapLayersPanel._lastTrigger = document.activeElement;
+            }
+            citizenMapLayersPanel?.removeAttribute('inert');
             citizenMapLayersPanel?.classList.add('is-open');
             citizenMapLayersPanel?.setAttribute('aria-hidden', 'false');
-            citizenMapLayersPanel._lastTrigger = document.activeElement;
             if (typeof window.syncCitizenMapLayerControls === 'function') {
                 window.syncCitizenMapLayerControls();
             }
         };
 
         const closeCitizenMapLayersPanel = () => {
+            const lastTrigger = citizenMapLayersPanel?._lastTrigger;
             if (citizenMapLayersPanel?.contains(document.activeElement)) {
-                document.activeElement.blur();
+                if (lastTrigger && typeof lastTrigger.focus === 'function') {
+                    lastTrigger.focus({ preventScroll: true });
+                } else if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
             }
             citizenMapLayersPanel?.classList.remove('is-open');
             citizenMapLayersPanel?.setAttribute('aria-hidden', 'true');
-            const lastTrigger = citizenMapLayersPanel?._lastTrigger;
-            if (lastTrigger && typeof lastTrigger.focus === 'function') {
-                window.setTimeout(() => lastTrigger.focus({ preventScroll: true }), 0);
-            }
+            citizenMapLayersPanel?.setAttribute('inert', '');
         };
 
         window.openCitizenMapLayersPanel = openCitizenMapLayersPanel;
@@ -2870,9 +3637,13 @@ if (navigator.geolocation) {
         });
 
         citizenOpenLogsButtons.forEach((button) => {
-            button.addEventListener('click', function () {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
                 closeCitizenSettingsPanel();
-                openMyLogsModal();
+                window.requestAnimationFrame(() => {
+                    openMyLogsModal();
+                });
             });
         });
 
@@ -2924,10 +3695,14 @@ if (navigator.geolocation) {
                 return;
             }
 
+            blurFocusedChild(citizenInsightsPanel);
             citizenInsightsPanel.classList.remove('is-open');
             citizenInsightsPanel.setAttribute('aria-hidden', 'true');
             restoreCitizenInsightsSources();
         };
+
+        window.openCitizenInsightsPanel = openCitizenInsightsPanel;
+        window.closeCitizenInsightsPanel = closeCitizenInsightsPanel;
 
         citizenInsightsOpenButtons.forEach((button) => {
             button.addEventListener('click', function () {
@@ -3040,9 +3815,9 @@ if (navigator.geolocation) {
             myLogsContainer.innerHTML = `
                 <div class="space-y-3">
                     ${logs.map((log) => `
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 shadow-sm">
+                        <div class="my-log-card rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 shadow-sm">
                             <div class="flex items-start gap-4">
-                                <div class="w-11 h-11 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
+                                <div class="my-log-card__icon w-11 h-11 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
                                     <i class="fa-solid fa-clock-rotate-left"></i>
                                 </div>
                                 <div class="min-w-0 flex-1">
@@ -3111,14 +3886,21 @@ if (navigator.geolocation) {
             if (myLogsModal) {
                 myLogsModal.classList.remove('hidden');
                 myLogsModal.classList.add('flex');
+                myLogsModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
             }
             loadMyLogs();
         }
 
         function closeMyLogsModal() {
             if (myLogsModal) {
+                if (myLogsModal.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
                 myLogsModal.classList.add('hidden');
                 myLogsModal.classList.remove('flex');
+                myLogsModal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
             }
         }
 
@@ -3238,16 +4020,16 @@ if (navigator.geolocation) {
             }
 
             if (citizenHazardDraft.picking) {
-                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the safety concern point.';
+                statusNode.textContent = 'Tap within 100m on the map.';
                 return;
             }
 
             if (citizenHazardDraft.mode === 'picked' && citizenHazardDraft.selectedLat !== null && citizenHazardDraft.selectedLng !== null) {
-                statusNode.textContent = `Selected map point: ${citizenHazardDraft.selectedLat.toFixed(6)}, ${citizenHazardDraft.selectedLng.toFixed(6)}.`;
+                statusNode.textContent = 'Map point selected.';
                 return;
             }
 
-            statusNode.textContent = 'Safety concern reports will use your current location unless you pick another point on the map.';
+            statusNode.textContent = 'Current location will be used.';
         }
 
         function updateCitizenFireLocationUi() {
@@ -3278,21 +4060,21 @@ if (navigator.geolocation) {
             }
 
             if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
-                statusNode.textContent = 'Getting your current location now...';
+                statusNode.textContent = 'Getting current location...';
                 return;
             }
 
             if (citizenFireDraft.picking) {
-                statusNode.textContent = 'Tap the map within 100 meters of your current location to place the fire incident point.';
+                statusNode.textContent = 'Tap within 100m on the map.';
                 return;
             }
 
             if (citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
-                statusNode.textContent = `Selected fire point: ${citizenFireDraft.selectedLat.toFixed(6)}, ${citizenFireDraft.selectedLng.toFixed(6)}.`;
+                statusNode.textContent = 'Fire point selected.';
                 return;
             }
 
-            statusNode.textContent = `Current location ready: ${Number(window.userCoords.currentLatitude).toFixed(6)}, ${Number(window.userCoords.currentLongitude).toFixed(6)}.`;
+            statusNode.textContent = 'Current location ready.';
         }
 
         function setCitizenHazardCurrentLocation() {
@@ -3330,7 +4112,7 @@ if (navigator.geolocation) {
             citizenHazardDraft.mode = 'picked';
             citizenHazardDraft.picking = true;
 
-            document.getElementById('concernReportModal').style.display = 'none';
+            hideCitizenModal(document.getElementById('concernReportModal'));
             window.switchSection?.('overview');
 
             window.setTimeout(() => {
@@ -3408,7 +4190,7 @@ if (navigator.geolocation) {
             citizenFireDraft.mode = 'picked';
             citizenFireDraft.picking = true;
 
-            document.getElementById('fireIncidentModal').style.display = 'none';
+            hideCitizenModal(document.getElementById('fireIncidentModal'));
             window.switchSection?.('overview');
 
             window.setTimeout(() => {
@@ -3477,36 +4259,139 @@ if (navigator.geolocation) {
             }, 200);
         }
 
+        function showCitizenModal(modal) {
+            if (!modal) {
+                return;
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function hideCitizenModal(modal) {
+            if (!modal) {
+                return;
+            }
+
+            if (modal.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
         function openFireIncidentModal() {
             const fireModal = document.getElementById('fireIncidentModal');
 
-            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null) {
+            if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null) {
                 citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            } else {
+                window.requestCitizenLocationNow?.({ silent: true })
+                    .then(() => {
+                        if (citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null && window.userCoords?.ready) {
+                            citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                            citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                        }
+                        updateCitizenFireLocationUi();
+                    })
+                    .catch(() => updateCitizenFireLocationUi());
             }
 
             updateCitizenFireLocationUi();
-            fireModal.style.display = 'flex';
+            showCitizenModal(fireModal);
         }
 
         function openConcernReportModal() {
-            if (window.userCoords.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
+            if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+            } else {
+                window.requestCitizenLocationNow?.({ silent: true })
+                    .then(() => {
+                        if (citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null && window.userCoords?.ready) {
+                            citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
+                            citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                        }
+                        updateCitizenHazardLocationUi();
+                    })
+                    .catch(() => updateCitizenHazardLocationUi());
             }
             updateCitizenHazardLocationUi();
-            document.getElementById('concernReportModal').style.display = 'flex';
+            showCitizenModal(document.getElementById('concernReportModal'));
         }
+
+        function setCitizenConcernType(type) {
+            const select = document.getElementById('concernTypeSelect');
+            const detailInput = document.getElementById('concernConditionDetail');
+            const selectedType = type || 'unsure';
+
+            if (select) {
+                select.value = selectedType;
+            }
+
+            if (detailInput) {
+                detailInput.value = '';
+            }
+
+            document.querySelectorAll('.citizen-concern-chip').forEach((chip) => {
+                const active = chip.dataset.concernType === selectedType;
+                chip.classList.toggle('border-amber-200', active);
+                chip.classList.toggle('bg-amber-50', active);
+                chip.classList.toggle('text-amber-800', active);
+                chip.classList.toggle('border-slate-200', !active);
+                chip.classList.toggle('bg-white', !active);
+                chip.classList.toggle('text-slate-700', !active);
+                chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+
+            document.querySelectorAll('.citizen-concern-detail-chip').forEach((chip) => {
+                const visible = chip.dataset.conditionFor === selectedType;
+                chip.classList.toggle('hidden', !visible);
+                chip.classList.remove('border-amber-300', 'bg-amber-50', 'text-amber-800');
+                chip.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+                chip.setAttribute('aria-pressed', 'false');
+            });
+        }
+
+        function setCitizenConcernDetail(detail) {
+            const detailInput = document.getElementById('concernConditionDetail');
+
+            if (detailInput) {
+                detailInput.value = detail || '';
+            }
+
+            document.querySelectorAll('.citizen-concern-detail-chip:not(.hidden)').forEach((chip) => {
+                const active = chip.dataset.conditionDetail === detail;
+                chip.classList.toggle('border-amber-300', active);
+                chip.classList.toggle('bg-amber-50', active);
+                chip.classList.toggle('text-amber-800', active);
+                chip.classList.toggle('border-slate-200', !active);
+                chip.classList.toggle('bg-slate-50', !active);
+                chip.classList.toggle('text-slate-600', !active);
+                chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+        }
+
+        window.openFireIncidentModal = openFireIncidentModal;
+        window.openConcernReportModal = openConcernReportModal;
+        window.showCitizenModal = showCitizenModal;
+        window.hideCitizenModal = hideCitizenModal;
 
         document.querySelectorAll('[data-fire-modal-close], #closeFireModal').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
-                document.getElementById('fireIncidentModal').style.display = 'none';
+                hideCitizenModal(document.getElementById('fireIncidentModal'));
             });
         });
 
         document.querySelectorAll('[data-concern-modal-close], #closeConcernModal').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
-                document.getElementById('concernReportModal').style.display = 'none';
+                hideCitizenModal(document.getElementById('concernReportModal'));
             });
         });
 
@@ -3517,6 +4402,23 @@ if (navigator.geolocation) {
         document.getElementById('hazardPickOnMapButton')?.addEventListener('click', function() {
             startCitizenHazardMapPick();
         });
+
+        document.querySelectorAll('.citizen-concern-chip').forEach((chip) => {
+            chip.addEventListener('click', function() {
+                setCitizenConcernType(this.dataset.concernType || 'unsure');
+            });
+        });
+
+        document.querySelectorAll('.citizen-concern-detail-chip').forEach((chip) => {
+            chip.addEventListener('click', function() {
+                const nextDetail = this.getAttribute('aria-pressed') === 'true'
+                    ? ''
+                    : (this.dataset.conditionDetail || '');
+                setCitizenConcernDetail(nextDetail);
+            });
+        });
+
+        setCitizenConcernType(document.getElementById('concernTypeSelect')?.value || 'unsure');
 
         document.getElementById('fireUseCurrentLocationButton')?.addEventListener('click', function() {
             setCitizenFireCurrentLocation();
@@ -3641,6 +4543,199 @@ function addPendingCitizenOfflineReport(reportKind, payload) {
     window.citizenRiskMapReports.unshift(pendingConcern);
     window.refreshCitizenAreasOfConcernReports?.(window.citizenCombinedReports);
     window.refreshCitizenRiskConcernMap?.(window.citizenRiskMapReports);
+    window.loadMarkers?.();
+}
+
+function addOptimisticCitizenFireMarker(lat, lng, reporter) {
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) {
+        return null;
+    }
+
+    const optimisticId = `optimistic-fire-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const markerRecord = {
+        marker_id: optimisticId,
+        markerCategory_id: 2,
+        category: 'fire',
+        title: 'Citizen Fire Emergency',
+        description: 'Fire report is being submitted.',
+        status: 'reported',
+        lat: numericLat,
+        lng: numericLng,
+        created_at: createdAt,
+        is_optimistic: true
+    };
+    const incidentRecord = {
+        incident_id: optimisticId,
+        incident_type_id: 1,
+        incident_type: 'Fire Incident',
+        incident_type_name: 'Fire Incident',
+        incident_status_id: 1,
+        incident_status: 'Reported',
+        status: 'reported',
+        reported_by: reporter,
+        marker_id: optimisticId,
+        marker: markerRecord,
+        lat: numericLat,
+        lng: numericLng,
+        created_at: createdAt,
+        created_at_human: 'Submitting now',
+        is_optimistic: true
+    };
+
+    window.mapData = window.mapData || {};
+    window.mapData.usermark = Array.isArray(window.mapData.usermark) ? window.mapData.usermark : [];
+    window.incidentsData = Array.isArray(window.incidentsData) ? window.incidentsData : [];
+    window.myReportedIncidents = Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : [];
+
+    window.mapData.usermark = window.mapData.usermark.filter((marker) => marker?.marker_id !== optimisticId);
+    window.incidentsData = window.incidentsData.filter((incident) => incident?.incident_id !== optimisticId);
+    window.myReportedIncidents = window.myReportedIncidents.filter((incident) => incident?.incident_id !== optimisticId);
+
+    window.mapData.usermark.unshift(markerRecord);
+    window.incidentsData.unshift(incidentRecord);
+    window.myReportedIncidents.unshift(incidentRecord);
+    window.refreshCitizenMapSearchIndex?.();
+
+    if (window.usermap && typeof window.loadMarkers === 'function') {
+        window.loadMarkers();
+    }
+
+    return optimisticId;
+}
+
+function removeOptimisticCitizenFireMarker(optimisticId) {
+    if (!optimisticId) {
+        return;
+    }
+
+    if (Array.isArray(window.mapData?.usermark)) {
+        window.mapData.usermark = window.mapData.usermark.filter((marker) => marker?.marker_id !== optimisticId);
+    }
+
+    if (Array.isArray(window.incidentsData)) {
+        window.incidentsData = window.incidentsData.filter((incident) => incident?.incident_id !== optimisticId && incident?.marker_id !== optimisticId);
+    }
+
+    if (Array.isArray(window.myReportedIncidents)) {
+        window.myReportedIncidents = window.myReportedIncidents.filter((incident) => incident?.incident_id !== optimisticId && incident?.marker_id !== optimisticId);
+    }
+
+    window.refreshCitizenMapSearchIndex?.();
+
+    if (window.usermap && typeof window.loadMarkers === 'function') {
+        window.loadMarkers();
+    }
+}
+
+function getCitizenConcernOptimisticMeta(concernType = 'unsure') {
+    const normalized = String(concernType || 'unsure');
+    const hazardTypes = ['electrical_issue', 'unsafe_cooking_lpg'];
+    const labels = {
+        unsure: 'General safety concern',
+        electrical_issue: 'Possible electrical hazard',
+        unsafe_cooking_lpg: 'Possible LPG or cooking hazard',
+        blocked_hydrant_access: 'Possible hydrant or access risk',
+        combustible_clutter: 'Possible combustible clutter',
+        dense_fire_prone_area: 'Possible fire-prone area'
+    };
+
+    return {
+        category: hazardTypes.includes(normalized) ? 'hazard' : 'risk',
+        label: labels[normalized] || labels.unsure
+    };
+}
+
+function addOptimisticCitizenConcernMarker(lat, lng, concernType, concernDetail = '', notes = '') {
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) {
+        return null;
+    }
+
+    const optimisticId = `optimistic-concern-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const meta = getCitizenConcernOptimisticMeta(concernType);
+    const readableDetail = concernDetail
+        ? String(concernDetail).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+        : '';
+    const description = notes || readableDetail || 'Submitted for BFP verification.';
+    const pendingConcern = {
+        id: optimisticId,
+        risk_area_id: optimisticId,
+        marker_id: optimisticId,
+        report_kind: meta.category,
+        entry_type: meta.category,
+        category: meta.category,
+        type: meta.category === 'hazard' ? 'Hazard' : 'Risk',
+        report_type: meta.category,
+        report_type_label: 'Risk/Hazard Factor',
+        type_label: meta.category === 'hazard' ? 'Hazard Factor' : 'Risk Factor',
+        category_label: meta.label,
+        title: 'Citizen Safety Concern',
+        description,
+        condition_label: readableDetail || meta.label,
+        status: 'pending',
+        status_label: 'Pending',
+        review_status: 'pending',
+        review_status_label: 'Pending Verification',
+        lat: numericLat,
+        lng: numericLng,
+        marker_category: meta.category,
+        hazard_type: meta.category === 'hazard' ? concernType : 'none',
+        risk_type: meta.category === 'risk' ? concernType : null,
+        created_at: createdAt,
+        created_at_human: 'Submitting now',
+        is_optimistic: true
+    };
+
+    window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
+    window.citizenRiskMapReports = Array.isArray(window.citizenRiskMapReports) ? window.citizenRiskMapReports : [];
+    window.citizenCombinedReports = window.citizenCombinedReports.filter((report) => report?.id !== optimisticId && report?.risk_area_id !== optimisticId);
+    window.citizenRiskMapReports = window.citizenRiskMapReports.filter((report) => report?.id !== optimisticId && report?.risk_area_id !== optimisticId);
+    window.citizenCombinedReports.unshift(pendingConcern);
+    window.citizenRiskMapReports.unshift(pendingConcern);
+    window.refreshCitizenAreasOfConcernReports?.(window.citizenCombinedReports);
+    window.refreshCitizenRiskConcernMap?.(window.citizenRiskMapReports);
+
+    if (window.usermap && typeof window.loadMarkers === 'function') {
+        window.loadMarkers();
+    }
+
+    return optimisticId;
+}
+
+function removeOptimisticCitizenConcernMarker(optimisticId) {
+    if (!optimisticId) {
+        return;
+    }
+
+    const isNotOptimisticConcern = (report) => {
+        if (!report?.is_optimistic) {
+            return true;
+        }
+
+        return ![report.id, report.risk_area_id, report.marker_id].some((value) => String(value) === String(optimisticId));
+    };
+
+    if (Array.isArray(window.citizenCombinedReports)) {
+        window.citizenCombinedReports = window.citizenCombinedReports.filter(isNotOptimisticConcern);
+    }
+
+    if (Array.isArray(window.citizenRiskMapReports)) {
+        window.citizenRiskMapReports = window.citizenRiskMapReports.filter(isNotOptimisticConcern);
+    }
+
+    window.refreshCitizenAreasOfConcernReports?.(window.citizenCombinedReports || []);
+    window.refreshCitizenRiskConcernMap?.(window.citizenRiskMapReports || []);
+
+    if (window.usermap && typeof window.loadMarkers === 'function') {
+        window.loadMarkers();
+    }
 }
 
 async function submitCitizenQuickReport(reportKind) {
@@ -3648,6 +4743,8 @@ async function submitCitizenQuickReport(reportKind) {
     const incidentTypeId = 1;
     const reporter = document.getElementById('reported_by').value;
     const concernType = document.getElementById('concernTypeSelect')?.value || 'unsure';
+    const concernDetail = document.getElementById('concernConditionDetail')?.value || '';
+    const concernNotes = document.getElementById('concernNotesInput')?.value?.trim() || '';
     const loadingOverlay = document.getElementById('incidentReportLoadingOverlay');
     const loadingTitle = document.getElementById('incidentReportLoadingTitle');
     const loadingMessage = document.getElementById('incidentReportLoadingMessage');
@@ -3692,6 +4789,8 @@ async function submitCitizenQuickReport(reportKind) {
     const concernLng = reportKind === 'concern' && citizenHazardDraft.mode === 'picked'
         ? Number(citizenHazardDraft.selectedLng)
         : Number(window.userCoords.currentLongitude);
+    let optimisticFireMarkerId = null;
+    let optimisticConcernMarkerId = null;
 
     if (window.pyroPwa?.isOffline?.()) {
         const firePayload = {
@@ -3706,6 +4805,8 @@ async function submitCitizenQuickReport(reportKind) {
         const concernPayload = {
             report_kind: reportKind,
             concern_type: concernType,
+            condition_detail: concernDetail,
+            notes: concernNotes,
             lat: concernLat,
             lng: concernLng,
             user_lat: Number(window.userCoords.currentLatitude),
@@ -3742,13 +4843,16 @@ async function submitCitizenQuickReport(reportKind) {
 
         window.pyroPwa?.enqueueOfflineReport?.(queuePayload);
         addPendingCitizenOfflineReport(reportKind, reportKind === 'fire' ? firePayload : concernPayload);
-        document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal').style.display = 'none';
+        if (reportKind === 'fire') {
+            optimisticFireMarkerId = addOptimisticCitizenFireMarker(fireLat, fireLng, reporter);
+        }
+        hideCitizenModal(document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal'));
         showIncidentToast?.(`${reportLabels[reportKind] || 'Report'} saved offline. Pending sync.`, false, 4200);
         return;
     }
 
     // Close modal early for better UX
-    document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal').style.display = 'none';
+    hideCitizenModal(document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal'));
 
     // Show loading state
     actionButtons.forEach((button) => {
@@ -3763,6 +4867,14 @@ async function submitCitizenQuickReport(reportKind) {
         : 'Saving your safety concern...';
     loadingOverlay?.classList.remove('hidden');
     loadingOverlay?.classList.add('flex');
+
+    if (reportKind === 'fire') {
+        optimisticFireMarkerId = addOptimisticCitizenFireMarker(fireLat, fireLng, reporter);
+        showIncidentToast?.('Fire report received. Marker placed while we submit it.', false, 2600);
+    } else if (reportKind === 'concern') {
+        optimisticConcernMarkerId = addOptimisticCitizenConcernMarker(concernLat, concernLng, concernType, concernDetail, concernNotes);
+        showIncidentToast?.('Safety concern pinned. Sending for verification...', false, 2600);
+    }
 
     try {
         let success = false;
@@ -3790,6 +4902,8 @@ async function submitCitizenQuickReport(reportKind) {
                 body: JSON.stringify({
                     report_kind: reportKind,
                     concern_type: concernType,
+                    condition_detail: concernDetail,
+                    notes: concernNotes,
                     lat: concernLat,
                     lng: concernLng,
                     user_lat: Number(window.userCoords.currentLatitude),
@@ -3805,6 +4919,7 @@ async function submitCitizenQuickReport(reportKind) {
 
             success = Boolean(payload?.success);
             successMessage = payload?.message || `${reportKind.charAt(0).toUpperCase() + reportKind.slice(1)} report submitted successfully.`;
+            removeOptimisticCitizenConcernMarker(optimisticConcernMarkerId);
             window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
             if (payload?.data?.report) {
                 window.citizenCombinedReports.unshift(payload.data.report);
@@ -3819,6 +4934,9 @@ async function submitCitizenQuickReport(reportKind) {
             if (typeof window.refreshCitizenRiskConcernMap === 'function') {
                 window.refreshCitizenRiskConcernMap(window.citizenRiskMapReports);
             }
+            if (window.usermap && typeof window.loadMarkers === 'function') {
+                window.loadMarkers();
+            }
         }
 
         if (success) {
@@ -3831,6 +4949,8 @@ async function submitCitizenQuickReport(reportKind) {
                 updateCitizenFireLocationUi();
             } else {
                 document.getElementById('concernIncidentForm')?.reset();
+                setCitizenConcernType('unsure');
+                setCitizenConcernDetail('');
             }
             if (reportKind === 'concern') {
                 citizenHazardDraft.mode = 'current';
@@ -3841,6 +4961,11 @@ async function submitCitizenQuickReport(reportKind) {
             }
             showIncidentToast(successMessage);
             window.latestIncidentSubmitMessage = null;
+            if (reportKind === 'fire' && typeof window.refreshCitizenMarkersIfChanged === 'function') {
+                window.refreshCitizenMarkersIfChanged(true).catch((refreshError) => {
+                    console.error('Citizen marker refresh failed after fire report submit:', refreshError);
+                });
+            }
             if (typeof window.refreshCitizenOverviewData === 'function') {
                 window.refreshCitizenOverviewData().catch((refreshError) => {
                     console.error('Citizen dashboard refresh failed after report submit:', refreshError);
@@ -3850,6 +4975,20 @@ async function submitCitizenQuickReport(reportKind) {
         
     } catch (error) {
         console.error('Error:', error);
+        if (reportKind === 'fire') {
+            const stillProcessing = String(error?.message || '').toLowerCase().includes('still processing');
+            if (!stillProcessing) {
+                removeOptimisticCitizenFireMarker(optimisticFireMarkerId);
+            } else if (typeof window.refreshCitizenMarkersIfChanged === 'function') {
+                window.setTimeout(() => {
+                    window.refreshCitizenMarkersIfChanged(true).catch((refreshError) => {
+                        console.error('Delayed citizen marker refresh failed after fire report timeout:', refreshError);
+                    });
+                }, 3500);
+            }
+        } else if (reportKind === 'concern') {
+            removeOptimisticCitizenConcernMarker(optimisticConcernMarkerId);
+        }
         showIncidentToast(`Failed to submit ${reportLabels[reportKind] || 'report'}: ${error.message}`, true);
     } finally {
         originalButtonLabels.forEach(({ button, text }) => {
@@ -4174,6 +5313,10 @@ window.applyCitizenOverviewData = function(data = {}, options = {}) {
         window.refreshCitizenRiskConcernMap(riskMapReports);
     }
 
+    if (window.usermap && typeof window.loadMarkers === 'function') {
+        window.loadMarkers();
+    }
+
     const fab = document.getElementById('alertsFab');
     let fabBadge = document.getElementById('citizenAlertsFabBadge');
     if (activeAlerts > 0) {
@@ -4374,6 +5517,10 @@ window.refreshCitizenOverviewData = async function() {
 
         if (typeof window.refreshCitizenRiskConcernMap === 'function') {
             window.refreshCitizenRiskConcernMap(riskMapReports);
+        }
+
+        if (window.usermap && typeof window.loadMarkers === 'function') {
+            window.loadMarkers();
         }
 
         const fab = document.getElementById('alertsFab');
@@ -4579,17 +5726,31 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
         // Report incident triggers
-document.querySelectorAll('.report-incident-trigger').forEach(function(trigger) {
-            trigger.addEventListener('click', function() {
-                document.getElementById('latitude').value = window.userCoords.currentLatitude;
-                document.getElementById('longitude').value =  window.userCoords.currentLongitude;
-                openFireIncidentModal();
-            });
+document.addEventListener('click', function(event) {
+            const trigger = event.target instanceof Element
+                ? event.target.closest('.report-incident-trigger')
+                : null;
+
+            if (trigger) {
+                event.preventDefault();
+                const latitudeInput = document.getElementById('latitude');
+                const longitudeInput = document.getElementById('longitude');
+
+                if (latitudeInput) {
+                    latitudeInput.value = window.userCoords?.currentLatitude ?? '';
+                }
+
+                if (longitudeInput) {
+                    longitudeInput.value = window.userCoords?.currentLongitude ?? '';
+                }
+
+                window.openFireIncidentModal?.();
+            }
         });
 
         document.querySelectorAll('[data-citizen-risk-hazard-open]').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
-                openConcernReportModal();
+                window.openConcernReportModal?.();
             });
         });
 

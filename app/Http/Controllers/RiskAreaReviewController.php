@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -252,6 +253,10 @@ class RiskAreaReviewController extends Controller
         $validated = $request->validate([
             'decision' => ['required', 'in:approved,rejected'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
+            'final_entry_type' => ['nullable', Rule::in(['hazard', 'risk'])],
+            'final_risk_type' => ['nullable', 'string', Rule::in(array_keys($this->riskTypeOptions()))],
+            'final_hazard_category' => ['nullable', 'string', Rule::in(array_keys($this->hazardTypeOptions()))],
+            'final_condition_code' => ['nullable', 'string', 'max:120'],
         ]);
 
         DB::transaction(function () use ($validated, $riskArea) {
@@ -261,13 +266,45 @@ class RiskAreaReviewController extends Controller
                 return;
             }
 
+            $classificationUpdates = [];
+
+            if ($validated['decision'] === 'approved') {
+                $classification = [
+                    'entry_type' => $validated['final_entry_type'] ?? ($riskArea->entry_type ?: 'risk'),
+                    'risk_type' => $validated['final_risk_type'] ?? $riskArea->risk_type,
+                    'hazard_category' => $validated['final_hazard_category'] ?? $riskArea->hazard_category,
+                    'condition_code' => $validated['final_condition_code'] ?? $riskArea->condition_code,
+                ];
+
+                $this->assertRiskAreaSelectionValidity($classification);
+
+                $classificationUpdates = [
+                    'entry_type' => $classification['entry_type'],
+                    'hazard_category' => $classification['entry_type'] === 'hazard' ? $classification['hazard_category'] : null,
+                    'risk_type' => $classification['entry_type'] === 'risk' ? $classification['risk_type'] : null,
+                    'risk_factor' => $this->deriveRiskFactor($classification['entry_type'], $classification['risk_type'], $classification['hazard_category']),
+                    'mode' => $this->deriveLegacyMode($classification['entry_type'], $classification['condition_code'], $classification['hazard_category']),
+                    'condition_code' => $classification['condition_code'],
+                    'condition_label' => $this->resolveConditionLabel($classification['entry_type'], $classification['risk_type'], $classification['hazard_category'], $classification['condition_code']),
+                    'hazard_type' => $this->deriveLegacyHazardType($classification['entry_type'], $classification['hazard_category']),
+                    'status' => 'verified',
+                ];
+
+                $riskArea->marker?->update([
+                    'category' => $this->deriveMarkerCategory($classification['entry_type']),
+                    'status' => 'active',
+                ]);
+            }
+
             $riskArea->update([
                 'review_status' => $validated['decision'],
                 'review_notes' => $validated['review_notes'] ?: null,
                 'reviewed_at' => now(),
                 'reviewed_by' => Auth::id(),
-            ]);
+            ] + $classificationUpdates);
         });
+
+        Cache::forget('map:markers:index:v2');
 
         BarangayNotificationService::notifyRiskAreaReviewed($riskArea->fresh(['barangayHall.barangay']), $validated['decision']);
 

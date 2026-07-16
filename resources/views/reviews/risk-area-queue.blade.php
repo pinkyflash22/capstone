@@ -738,6 +738,14 @@
                                 $typeIcon = $entryType === 'hazard'
                                     ? ($hazardTypeIcons[$item->hazard_category ?? ''] ?? 'fa-triangle-exclamation')
                                     : ($riskTypeIcons[$item->risk_type ?? ''] ?? 'fa-layer-group');
+                                $finalEntryType = in_array($entryType, ['hazard', 'risk'], true) ? $entryType : 'risk';
+                                $finalRiskType = array_key_exists($item->risk_type ?? '', $riskTypeOptions)
+                                    ? $item->risk_type
+                                    : array_key_first($riskTypeOptions);
+                                $finalHazardCategory = array_key_exists($item->hazard_category ?? '', $hazardTypeOptions)
+                                    ? $item->hazard_category
+                                    : array_key_first($hazardTypeOptions);
+                                $finalConditionCode = $item->condition_code ?? $item->mode;
                             @endphp
                             <article class="request-tile">
                                 <div>
@@ -867,7 +875,7 @@
                                         </div>
                                     @endif
 
-                                    <form method="POST" action="{{ route($reviewRouteName, $item->risk_area_id) }}" style="margin-top: 20px;">
+                                    <form method="POST" action="{{ route($reviewRouteName, $item->risk_area_id) }}" style="margin-top: 20px;" data-final-classification-form>
                                         @csrf
                                         @method('PATCH')
                                         <input type="hidden" name="review_status" value="{{ $filters['review_status'] }}">
@@ -875,6 +883,60 @@
                                         <input type="hidden" name="review_type" value="{{ $filters['review_type'] }}">
                                         <input type="hidden" name="search" value="{{ $filters['search'] }}">
                                         <input type="hidden" name="page" value="{{ $reviewQueue->currentPage() }}">
+
+                                        @if ($reviewType !== 'delete')
+                                            <input type="hidden" name="final_entry_type" value="{{ $finalEntryType }}" data-entry-type-input>
+                                            <input type="hidden" name="final_condition_code" value="{{ $finalConditionCode }}" data-condition-code-input>
+
+                                            <section class="manage-form-card" style="margin-bottom: 16px;">
+                                                <h4>Final classification</h4>
+                                                <p>Before approval, confirm whether this submission should become a live hazard or risk marker.</p>
+                                                <div class="manage-toggle">
+                                                    <button type="button" class="manage-toggle__btn {{ $finalEntryType === 'hazard' ? 'is-active' : '' }}" data-manage-mode="hazard">Hazard</button>
+                                                    <button type="button" class="manage-toggle__btn {{ $finalEntryType === 'risk' ? 'is-active' : '' }}" data-manage-mode="risk">Risk</button>
+                                                </div>
+
+                                                <div class="manage-field-grid" data-mode-section="risk" style="{{ $finalEntryType === 'risk' ? '' : 'display:none;' }}">
+                                                    <div class="filters-group">
+                                                        <label for="review_risk_type_{{ $item->risk_area_id }}">Risk type</label>
+                                                        <select id="review_risk_type_{{ $item->risk_area_id }}" name="final_risk_type" data-risk-type-select>
+                                                            <option value="">Select risk type</option>
+                                                            @foreach ($riskTypeGroups as $groupLabel => $groupValues)
+                                                                <optgroup label="{{ $groupLabel }}">
+                                                                    @foreach ($groupValues as $value)
+                                                                        <option value="{{ $value }}" @selected($finalRiskType === $value)>{{ $riskTypeOptions[$value] ?? $value }}</option>
+                                                                    @endforeach
+                                                                </optgroup>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="filters-group">
+                                                        <label for="review_risk_condition_{{ $item->risk_area_id }}">Risk condition</label>
+                                                        <select id="review_risk_condition_{{ $item->risk_area_id }}" data-risk-condition-select data-current-value="{{ $finalConditionCode }}">
+                                                            <option value="">Select risk condition</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="manage-field-grid" data-mode-section="hazard" style="{{ $finalEntryType === 'hazard' ? '' : 'display:none;' }}">
+                                                    <div class="filters-group">
+                                                        <label for="review_hazard_type_{{ $item->risk_area_id }}">Hazard type</label>
+                                                        <select id="review_hazard_type_{{ $item->risk_area_id }}" name="final_hazard_category" data-hazard-type-select>
+                                                            <option value="">Select hazard type</option>
+                                                            @foreach ($hazardTypeOptions as $value => $label)
+                                                                <option value="{{ $value }}" @selected($finalHazardCategory === $value)>{{ $label }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="filters-group">
+                                                        <label for="review_hazard_condition_{{ $item->risk_area_id }}">Hazard condition</label>
+                                                        <select id="review_hazard_condition_{{ $item->risk_area_id }}" data-hazard-condition-select data-current-value="{{ $finalConditionCode }}">
+                                                            <option value="">Select hazard condition</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        @endif
 
                                         <div class="review-form__row">
                                             <div class="filters-group">
@@ -1335,7 +1397,7 @@
                 });
             };
 
-            document.querySelectorAll('[data-manage-form]').forEach((form) => {
+            document.querySelectorAll('[data-manage-form], [data-final-classification-form]').forEach((form) => {
                 const entryTypeInput = form.querySelector('[data-entry-type-input]');
                 const conditionCodeInput = form.querySelector('[data-condition-code-input]');
                 const modeButtons = form.querySelectorAll('[data-manage-mode]');

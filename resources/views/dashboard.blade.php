@@ -33,6 +33,10 @@
                     <i class="fa-solid fa-user-secret"></i>
                     Report Anonymously
                 </button>
+                <a href="tel:911" class="mobile-entry-btn mobile-entry-btn--call" data-emergency-call>
+                    <i class="fa-solid fa-phone-volume"></i>
+                    Call Emergency
+                </a>
                 <a href="{{ route('auth.login') }}" class="mobile-entry-btn mobile-entry-btn--secondary">
                     <i class="fa-solid fa-right-to-bracket"></i>
                     Sign In
@@ -44,6 +48,77 @@
             </div>
         </div>
     </section>
+
+    <div class="landing-toast" data-landing-toast role="status" aria-live="polite" aria-atomic="true">
+        <i class="fa-solid fa-circle-info" data-landing-toast-icon></i>
+        <span data-landing-toast-message>Ready.</span>
+    </div>
+
+    <div id="emergencyCallConfirm" class="emergency-call-confirm" aria-hidden="true">
+        <div class="emergency-call-confirm__backdrop" data-emergency-call-cancel></div>
+        <section class="emergency-call-confirm__card" role="dialog" aria-modal="true" aria-labelledby="emergencyCallConfirmTitle">
+            <div class="emergency-call-confirm__icon">
+                <i class="fa-solid fa-phone-volume"></i>
+            </div>
+            <h2 id="emergencyCallConfirmTitle">Call emergency?</h2>
+            <p>This will open your phone app and dial 911.</p>
+            <div class="emergency-call-confirm__actions">
+                <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--ghost" data-emergency-call-cancel>
+                    Cancel
+                </button>
+                <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--primary" data-emergency-call-confirm>
+                    Call 911
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <div id="mobileMapModal" class="mobile-map-modal" aria-hidden="true">
+        <div class="mobile-map-modal__backdrop" data-mobile-map-close></div>
+        <section class="mobile-map-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="mobileMapTitle">
+            <header class="mobile-map-modal__header">
+                <div>
+                    <p class="mobile-map-modal__eyebrow">Emergency resources</p>
+                    <h2 id="mobileMapTitle">Nearby map</h2>
+                </div>
+                <button type="button" class="mobile-map-modal__close" data-mobile-map-close aria-label="Close map preview">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </header>
+            <div class="mobile-map-modal__controls" aria-label="Map resource filters">
+                <button type="button" class="mobile-map-modal__chip is-active" data-mobile-map-filter="all">
+                    <i class="fa-solid fa-layer-group"></i>
+                    All
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="stations">
+                    <i class="fa-solid fa-fire-extinguisher"></i>
+                    Stations
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="hydrants">
+                    <i class="fa-solid fa-fire-hydrant"></i>
+                    Hydrants
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="incidents">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                    Incidents
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="barangay">
+                    <i class="fa-solid fa-people-roof"></i>
+                    Barangay
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="risks">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Risk areas
+                </button>
+                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="other">
+                    <i class="fa-solid fa-location-dot"></i>
+                    Other
+                </button>
+            </div>
+            <div id="mobileMapPreview" class="mobile-map-modal__map"></div>
+            <p class="mobile-map-modal__hint">Preview only: resources, incidents, boundaries, and fire-risk areas. No firefighter routes shown.</p>
+        </section>
+    </div>
 
     <div class="desktop-landing-shell">
     <!-- Navigation -->
@@ -67,10 +142,10 @@
 
             <div class="nav-actions">
                 <a href="{{ route('auth.login') }}" class="btn-login">Login</a>
-                <button class="btn-emergency" onclick="emergencyCall()">
+                <a class="btn-emergency" href="tel:911" data-emergency-call>
                     <i class="fa-solid fa-phone-alt"></i>
                     Emergency
-                </button>
+                </a>
             </div>
         </div>
     </nav>
@@ -168,20 +243,40 @@
             <div class="section-header reveal-on-scroll" data-reveal="up">
                 <h2 class="section-title">Emergency Resources Locator</h2>
                 <p class="section-subtitle">
-                    Interactive map showing all fire stations and hydrants in Pangasinan. 
+                    Interactive map showing stations, hydrants, incidents, barangay halls, risk areas, boundaries, and other resources. 
                     Click on any marker for details.
                 </p>
             </div>
 
             <!-- Map Controls -->
             <div class="map-controls reveal-on-scroll" data-reveal="up" data-reveal-delay="80">
-                <button class="map-toggle-btn active" id="showStations">
-                    <i class="fa-solid fa-fire-extinguisher"></i>
-                    Show Fire Stations
+                <button class="map-toggle-btn active" type="button" data-landing-map-filter="all">
+                    <i class="fa-solid fa-layer-group"></i>
+                    All
                 </button>
-                <button class="map-toggle-btn" id="showHydrants">
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="stations">
+                    <i class="fa-solid fa-fire-extinguisher"></i>
+                    Stations
+                </button>
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="hydrants">
                     <i class="fa-solid fa-fire-hydrant"></i>
-                    Show Fire Hydrants
+                    Hydrants
+                </button>
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="incidents">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                    Incidents
+                </button>
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="barangay">
+                    <i class="fa-solid fa-people-roof"></i>
+                    Barangay
+                </button>
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="risks">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Risk areas
+                </button>
+                <button class="map-toggle-btn" type="button" data-landing-map-filter="other">
+                    <i class="fa-solid fa-location-dot"></i>
+                    Other
                 </button>
             </div>
 
@@ -288,7 +383,7 @@
                 <div class="footer-col">
                     <h4>Emergency</h4>
                     <ul class="footer-links">
-                        <li><a href="tel:911"><i class="fa-solid fa-phone-alt"></i> 911 (Emergency)</a></li>
+                        <li><a href="tel:911" data-emergency-call><i class="fa-solid fa-phone-alt"></i> 911 (Emergency)</a></li>
                         <li><a href="tel:+63253091234"><i class="fa-solid fa-phone"></i> (075) 530-1234</a></li>
                         <li><a href="mailto:emergency@pyrosense.gov"><i class="fa-solid fa-envelope"></i> emergency@pyrosense.gov</a></li>
                     </ul>

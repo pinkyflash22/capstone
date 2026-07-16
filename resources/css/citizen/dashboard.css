@@ -1657,6 +1657,19 @@ button.text-orange-600:hover {
   border-radius: 14px;
 }
 
+@media (max-width: 768px) {
+  .citizen-map-stage .leaflet-control-layers,
+  .citizen-map-stage .leaflet-control-layers-expanded,
+  .citizen-map-stage .leaflet-control-layers-toggle,
+  .citizen-map-stage .leaflet-control-layers-base,
+  .citizen-map-stage .leaflet-control-layers-overlays,
+  .citizen-map-stage .leaflet-control-layers-list {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+}
+
 .citizen-map-stage .leaflet-control-layers-expanded .leaflet-control-layers-toggle {
   display: none;
 }

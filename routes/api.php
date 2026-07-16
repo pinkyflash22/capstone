@@ -15,6 +15,7 @@ use App\Http\Controllers\IncidentTypeController;
 // use App\Http\Controllers\MapShapeController;
 use App\Http\Controllers\MarkController;
 use App\Http\Controllers\BoundaryLocationController;
+use App\Http\Controllers\FireRiskAreaOverlayController;
 use App\Http\Controllers\StationOfficerController;
 use App\Http\Controllers\TeamController;
 
@@ -353,6 +354,7 @@ Route::get('/hydrant-types', [HydrantTypeController::class, 'index']);
 // Route::put('/personnel/{id}/availability', [PersonnelController::class, 'updateAvailability']);
 
 Route::get('/shapes', [BoundaryLocationController::class, 'index']); // fetch all shapes
+Route::get('/fire-risk-areas', [FireRiskAreaOverlayController::class, 'index']);
 Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
 Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
 Route::get('/boundaries/barangays/{cityId}', [BoundaryLocationController::class, 'availableBarangays']);

@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\PostController;
 // use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Api\MarkerController;
 use App\Http\Controllers\staff\FirefighterController;
+use App\Http\Controllers\staff\FirefighterV3Controller;
 use App\Http\Controllers\staff\FinalInvestigationFirExportController;
 use App\Http\Controllers\staff\ProgressInvestigationPirExportController;
 use App\Http\Controllers\staff\SpotInvestigationSirExportController;
@@ -469,6 +470,12 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/schedule', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'scheduleV2'])->name('schedule');
         Route::get('/announcements', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'announcements'])->name('announcements');
         Route::get('/profile', [App\Http\Controllers\staff\FirefighterV2Controller::class, 'profile'])->name('profile');
+    });
+
+    Route::middleware(['role:firefighter'])->prefix('firefighter-v3')->name('firefighter.v3.')->group(function () {
+        Route::get('/dashboard/{section?}', [FirefighterV3Controller::class, 'shell'])
+            ->where('section', implode('|', FirefighterV3Controller::HYBRID_SECTIONS))
+            ->name('dashboard');
     });
 
  Route::middleware(['role:citizen'])->prefix('citizen')->name('citizen.')->group(function () {

@@ -316,18 +316,32 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
         };
 
         const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
-        const incidentResponse = await fetch('/citizen/incident', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify(incidentPayload),
-            signal: controller.signal,
-        });
-        window.clearTimeout(timeoutId);
+        let timedOut = false;
+        const timeoutId = window.setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, 45000);
+        let incidentResponse;
+
+        try {
+            incidentResponse = await fetch('/citizen/incident', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(incidentPayload),
+                signal: controller.signal,
+            });
+        } catch (error) {
+            if (error?.name === 'AbortError' && timedOut) {
+                throw new Error('Fire report is still processing. Please wait a moment and refresh your reports.');
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
         
         if (!incidentResponse.ok) {
             const errorPayload = await incidentResponse.json().catch(() => null);

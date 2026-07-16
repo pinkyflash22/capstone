@@ -10,15 +10,30 @@ let userMarker = null;
 let currentStationLayer = null;
 let currentHydrantLayer = null;
 let anonymousReportInFlight = false;
+let landingMapMarkerLayer = null;
+let landingMapBoundaryLayer = null;
+let landingMapRiskLayer = null;
+let landingMapActiveFilter = 'all';
+let mobilePreviewMap = null;
+let mobilePreviewMarkerLayer = null;
+let mobilePreviewBoundaryLayer = null;
+let mobilePreviewRiskLayer = null;
+let mobilePreviewActiveFilter = 'all';
+let mobilePreviewResourcesLoaded = false;
+let mobilePreviewResourcesLoading = false;
+let landingResourceMarkers = [];
+let landingBoundaryShapes = [];
+let landingRiskAreas = [];
+const LANDING_INCIDENT_VISIBILITY_RADIUS_METERS = 300;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    primeVisitorLocation();
     initMap();
     loadStations();
     loadHydrants();
     initEventListeners();
     initMobileEntryPage();
+    primeVisitorLocation();
     initScrollAnimations();
 });
 
@@ -30,6 +45,12 @@ function initMap() {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap, &copy; CartoDB'
     }).addTo(map);
+
+    landingMapBoundaryLayer = L.layerGroup().addTo(map);
+    landingMapRiskLayer = L.layerGroup().addTo(map);
+    landingMapMarkerLayer = L.layerGroup().addTo(map);
+
+    loadLandingMapResources();
 }
 
 // Load stations from database
@@ -46,8 +67,9 @@ function loadStations() {
                     captain: station.captain ?? 'Officer on duty',
                     ...station,
                 }));
-                addStationMarkers();
                 updateNearbyStations(stations.slice(0, 5));
+                renderLandingMapResources();
+                renderMobilePreviewMarkers();
             }
         })
         .catch(error => {
@@ -69,6 +91,7 @@ function loadHydrants() {
                     status: hydrant.status ?? 'operational',
                     ...hydrant,
                 }));
+                renderMobilePreviewMarkers();
             }
         })
         .catch(error => {
@@ -486,25 +509,18 @@ function initEventListeners() {
         });
     }
 
-    // Map toggle buttons
-    const showStationsBtn = document.getElementById('showStations');
-    const showHydrantsBtn = document.getElementById('showHydrants');
-    
-    if (showStationsBtn) {
-        showStationsBtn.addEventListener('click', function() {
-            const isActive = this.classList.contains('active');
-            this.classList.toggle('active');
-            toggleStations(!isActive);
+    // Desktop map filter chips
+    const landingMapFilterButtons = document.querySelectorAll('[data-landing-map-filter]');
+
+    landingMapFilterButtons.forEach((button) => {
+        button.addEventListener('click', function() {
+            landingMapActiveFilter = this.dataset.landingMapFilter || 'all';
+            landingMapFilterButtons.forEach((chip) => {
+                chip.classList.toggle('active', chip === this);
+            });
+            renderLandingMapResources();
         });
-    }
-    
-    if (showHydrantsBtn) {
-        showHydrantsBtn.addEventListener('click', function() {
-            const isActive = this.classList.contains('active');
-            this.classList.toggle('active');
-            toggleHydrants(!isActive);
-        });
-    }
+    });
 
     // Modal close on outside click
     window.addEventListener('click', (e) => {
@@ -524,6 +540,13 @@ function initEventListeners() {
 function initMobileEntryPage() {
     const anonymousReportButtons = document.querySelectorAll('[data-anonymous-report-trigger]');
     const openMapButton = document.querySelector('[data-mobile-open-map]');
+    const emergencyCallButtons = document.querySelectorAll('[data-emergency-call]');
+    const emergencyCallModal = document.getElementById('emergencyCallConfirm');
+    const emergencyCallConfirmButton = document.querySelector('[data-emergency-call-confirm]');
+    const emergencyCallCancelButtons = document.querySelectorAll('[data-emergency-call-cancel]');
+    const mobileMapModal = document.getElementById('mobileMapModal');
+    const mobileMapCloseButtons = document.querySelectorAll('[data-mobile-map-close]');
+    const mobileMapFilterButtons = document.querySelectorAll('[data-mobile-map-filter]');
 
     if (window.innerWidth <= 768 && window.location.hash === '#map') {
         document.body.classList.add('mobile-show-landing');
@@ -533,22 +556,612 @@ function initMobileEntryPage() {
         button.addEventListener('click', submitAnonymousIncidentReport);
     });
 
-    if (!openMapButton) {
+    function closeEmergencyCallConfirm() {
+        if (!emergencyCallModal) return;
+        emergencyCallModal.classList.remove('is-open');
+        emergencyCallModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function openEmergencyCallConfirm(event) {
+        if (!emergencyCallModal) {
+            return;
+        }
+
+        event?.preventDefault();
+        emergencyCallModal.classList.add('is-open');
+        emergencyCallModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        emergencyCallConfirmButton?.focus?.({ preventScroll: true });
+    }
+
+    emergencyCallButtons.forEach((button) => {
+        button.addEventListener('click', openEmergencyCallConfirm);
+    });
+
+    emergencyCallCancelButtons.forEach((button) => {
+        button.addEventListener('click', closeEmergencyCallConfirm);
+    });
+
+    emergencyCallConfirmButton?.addEventListener('click', () => {
+        closeEmergencyCallConfirm();
+        window.location.href = 'tel:911';
+    });
+
+    function closeMobileMapModal() {
+        if (!mobileMapModal) return;
+        mobileMapModal.classList.remove('is-open');
+        mobileMapModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function openMobileMapModal() {
+        if (!mobileMapModal) {
+            document.body.classList.add('mobile-show-landing');
+            window.requestAnimationFrame(() => {
+                document.getElementById('map')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                map?.invalidateSize?.();
+            });
+            return;
+        }
+
+        mobileMapModal.classList.add('is-open');
+        mobileMapModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+
+        window.requestAnimationFrame(() => {
+            initMobilePreviewMap();
+            loadMobilePreviewResources();
+            mobilePreviewMap?.invalidateSize?.();
+        });
+    }
+
+    openMapButton?.addEventListener('click', openMobileMapModal);
+
+    mobileMapCloseButtons.forEach((button) => {
+        button.addEventListener('click', closeMobileMapModal);
+    });
+
+    mobileMapFilterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            mobilePreviewActiveFilter = button.dataset.mobileMapFilter || 'all';
+            mobileMapFilterButtons.forEach((chip) => {
+                chip.classList.toggle('is-active', chip === button);
+            });
+            renderLandingMapResources();
+            renderMobilePreviewMarkers();
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        if (emergencyCallModal?.classList.contains('is-open')) {
+            closeEmergencyCallConfirm();
+        } else if (mobileMapModal?.classList.contains('is-open')) {
+             closeMobileMapModal();
+        }
+    });
+}
+
+function initMobilePreviewMap() {
+    const mapEl = document.getElementById('mobileMapPreview');
+    if (!mapEl || mobilePreviewMap || typeof L === 'undefined') {
         return;
     }
 
-    openMapButton.addEventListener('click', () => {
-        document.body.classList.add('mobile-show-landing');
+    mobilePreviewMap = L.map(mapEl, {
+        zoomControl: true,
+        attributionControl: true,
+    }).setView([16.0433, 120.3333], 10);
 
-        window.requestAnimationFrame(() => {
-            document.getElementById('map')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            map?.invalidateSize?.();
-        });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+    }).addTo(mobilePreviewMap);
+
+    mobilePreviewBoundaryLayer = L.layerGroup().addTo(mobilePreviewMap);
+    mobilePreviewRiskLayer = L.layerGroup().addTo(mobilePreviewMap);
+    mobilePreviewMarkerLayer = L.layerGroup().addTo(mobilePreviewMap);
+}
+
+async function loadLandingMapResources() {
+    await loadMobilePreviewResources();
+}
+
+async function loadMobilePreviewResources() {
+    if (mobilePreviewResourcesLoaded || mobilePreviewResourcesLoading) {
+        renderLandingMapResources();
+        renderMobilePreviewMarkers();
+        return;
+    }
+
+    mobilePreviewResourcesLoading = true;
+
+    try {
+        const [markersResult, shapesResult, risksResult] = await Promise.allSettled([
+            fetch('/api/markers', {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
+            fetch('/api/shapes', {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
+            fetch('/api/fire-risk-areas?levels=medium,high', {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
+        ]);
+
+        if (markersResult.status === 'fulfilled') {
+            landingResourceMarkers = normalizeLandingResourcePayload(markersResult.value);
+        }
+
+        if (shapesResult.status === 'fulfilled') {
+            landingBoundaryShapes = Array.isArray(shapesResult.value) ? shapesResult.value : [];
+        }
+
+        if (risksResult.status === 'fulfilled') {
+            landingRiskAreas = Array.isArray(risksResult.value?.data) ? risksResult.value.data : [];
+        }
+
+        mobilePreviewResourcesLoaded = true;
+    } catch (error) {
+        console.warn('Unable to load mobile map preview resources:', error);
+    } finally {
+        mobilePreviewResourcesLoading = false;
+        renderLandingMapResources();
+        renderMobilePreviewMarkers();
+    }
+}
+
+function normalizeLandingResourcePayload(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.markers)) return payload.markers;
+    return [];
+}
+
+function normalizeLandingCategory(marker = {}) {
+    const direct = String(marker.category?.name || marker.category || marker.marker_category || '').trim().toLowerCase();
+
+    if (direct.includes('station')) return 'station';
+    if (direct.includes('hydrant')) return 'hydrant';
+    if (direct.includes('barangay') || direct.includes('hall')) return 'barangay';
+    if (direct.includes('fire') || direct.includes('incident')) return 'fire';
+    if (direct.includes('risk')) return 'risk';
+    if (direct.includes('hazard')) return 'hazard';
+    if (direct.includes('school')) return 'school';
+    if (direct.includes('bridge')) return 'bridge';
+
+    const categoryId = Number(marker.markerCategory_id || marker.marker_category_id || marker.category_id);
+    return {
+        1: 'station',
+        2: 'hydrant',
+        3: 'fire',
+        4: 'hydrant',
+        5: 'school',
+        6: 'barangay',
+        7: 'bridge',
+        8: 'risk',
+        9: 'hazard',
+    }[categoryId] || 'other';
+}
+
+function shouldShowLandingResource(marker = {}) {
+    return shouldShowLandingResourceForFilter(marker, mobilePreviewActiveFilter);
+}
+
+function shouldShowLandingResourceForFilter(marker = {}, activeFilter = 'all') {
+    const category = normalizeLandingCategory(marker);
+
+    if (category === 'fire' && !isLandingIncidentNearVisitor(marker)) {
+        return false;
+    }
+
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'stations') return category === 'station';
+    if (activeFilter === 'hydrants') return category === 'hydrant';
+    if (activeFilter === 'incidents') return category === 'fire';
+    if (activeFilter === 'barangay') return category === 'barangay';
+    if (activeFilter === 'risks') return ['risk', 'hazard'].includes(category);
+    if (activeFilter === 'other') {
+        return !['station', 'hydrant', 'fire', 'barangay', 'risk', 'hazard'].includes(category);
+    }
+
+    return true;
+}
+
+function isLandingIncidentNearVisitor(marker = {}) {
+    const visitorCoords = getLandingVisitorCoords();
+    if (!visitorCoords) {
+        return false;
+    }
+
+    const lat = Number(marker.lat);
+    const lng = Number(marker.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return false;
+    }
+
+    const distanceKm = calculateDistance(visitorCoords.lat, visitorCoords.lng, lat, lng);
+    return distanceKm * 1000 <= LANDING_INCIDENT_VISIBILITY_RADIUS_METERS;
+}
+
+function getLandingVisitorCoords(maxAgeMs = 10 * 60 * 1000) {
+    const cached = readCachedVisitorLocation();
+    const lat = Number(cached?.lat);
+    const lng = Number(cached?.lng);
+    const timestamp = Number(cached?.timestamp || 0);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    if (Date.now() - timestamp > maxAgeMs) {
+        return null;
+    }
+
+    return { lat, lng };
+}
+
+function landingPreviewIcon(marker = {}) {
+    const category = normalizeLandingCategory(marker);
+    const asset = landingPreviewAsset(category);
+    const size = category === 'fire' ? 40 : 34;
+
+    return L.icon({
+        iconUrl: asset,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size + 4],
+        className: 'landing-preview-marker-icon',
     });
+}
+
+function landingPreviewAsset(category) {
+    return {
+        station: '/station.png',
+        hydrant: '/hydrant.png',
+        barangay: '/hall.png',
+        fire: '/fire.png',
+        risk: '/hazard.png',
+        hazard: '/hazard.png',
+        bridge: '/blockroad.png',
+        school: '/logo.png',
+        other: '/logo.png',
+    }[category] || '/logo.png';
+}
+
+function escapeLandingHtml(value = '') {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function landingResourceTitle(marker = {}) {
+    return marker.station_public?.name
+        || marker.barangay_public?.name
+        || marker.hydrant_public?.code
+        || marker.title
+        || {
+            station: 'Fire station',
+            hydrant: 'Fire hydrant',
+            barangay: 'Barangay hall',
+            fire: 'Fire incident',
+            risk: 'Risk marker',
+            hazard: 'Hazard marker',
+        }[normalizeLandingCategory(marker)]
+        || 'Map marker';
+}
+
+function landingResourceDescription(marker = {}) {
+    return marker.station_public?.address
+        || marker.barangay_public?.address
+        || marker.description
+        || marker.hydrant_public?.station_name
+        || 'Resource location';
+}
+
+function landingResourcePopup(marker = {}) {
+    const category = normalizeLandingCategory(marker);
+    const meta = landingCategoryMeta(category);
+    const title = escapeLandingHtml(landingResourceTitle(marker));
+    const description = escapeLandingHtml(landingResourceDescription(marker));
+    const status = marker.status
+        ? `<span class="landing-preview-popup__status">${escapeLandingHtml(marker.status)}</span>`
+        : '';
+    const rows = landingResourceRows(marker, category)
+        .map((row) => `
+            <div class="landing-preview-popup__row">
+                <span>${escapeLandingHtml(row.label)}</span>
+                <strong>${escapeLandingHtml(row.value)}</strong>
+            </div>
+        `)
+        .join('');
+
+    return `
+        <div class="landing-preview-popup">
+            <div class="landing-preview-popup__head">
+                <span class="landing-preview-popup__icon" style="--preview-accent:${meta.color}">
+                    <img src="${landingPreviewAsset(category)}" alt="" loading="lazy">
+                </span>
+                <div class="landing-preview-popup__title">
+                    <strong>${title}</strong>
+                    <span>${description}</span>
+                </div>
+            </div>
+            <div class="landing-preview-popup__meta">
+                <span class="landing-preview-popup__chip" style="--preview-accent:${meta.color}">
+                    ${escapeLandingHtml(meta.label)}
+                </span>
+                ${status}
+            </div>
+            ${rows ? `<div class="landing-preview-popup__rows">${rows}</div>` : ''}
+        </div>
+    `;
+}
+
+function landingCategoryMeta(category) {
+    return {
+        station: { label: 'Fire station', color: '#2563eb' },
+        hydrant: { label: 'Hydrant', color: '#0ea5e9' },
+        barangay: { label: 'Barangay hall', color: '#0f766e' },
+        fire: { label: 'Fire incident', color: '#dc2626' },
+        risk: { label: 'Risk marker', color: '#d97706' },
+        hazard: { label: 'Hazard marker', color: '#ea580c' },
+        bridge: { label: 'Bridge / road', color: '#64748b' },
+        school: { label: 'School', color: '#7c3aed' },
+        other: { label: 'Other marker', color: '#475569' },
+    }[category] || { label: 'Map marker', color: '#475569' };
+}
+
+function landingResourceRows(marker = {}, category = 'other') {
+    const rows = [];
+    const add = (label, value) => {
+        if (value !== undefined && value !== null && String(value).trim() !== '') {
+            rows.push({ label, value: String(value) });
+        }
+    };
+
+    if (category === 'station') {
+        add('Contact', marker.station_public?.contact_number || marker.station?.contact_number);
+        add('Hours', marker.station_public?.operating_hours);
+        add('Chief', marker.station_public?.chief_name);
+    } else if (category === 'hydrant') {
+        add('Code', marker.hydrant_public?.code || marker.hydrant?.hydrant_code);
+        add('Type', marker.hydrant_public?.type || marker.hydrant?.type);
+        add('Station', marker.hydrant_public?.station_name);
+    } else if (category === 'barangay') {
+        add('Contact', marker.barangay_public?.contact_number);
+        add('Hours', marker.barangay_public?.office_hours);
+        add('Barangay', marker.barangay_public?.barangay_name);
+    } else if (['fire', 'risk', 'hazard'].includes(category)) {
+        add('Status', marker.status);
+        add('Details', marker.description);
+    }
+
+    return rows.slice(0, 3);
+}
+
+function parseLandingGeojson(rawGeojson) {
+    if (!rawGeojson) return null;
+
+    if (typeof rawGeojson === 'string') {
+        try {
+            return JSON.parse(rawGeojson);
+        } catch (error) {
+            console.warn('Unable to parse preview GeoJSON:', error);
+            return null;
+        }
+    }
+
+    return rawGeojson;
+}
+
+function landingRiskAreaStyle(area = {}) {
+    const isHigh = String(area.risk_level || '').toLowerCase() === 'high';
+
+    return {
+        color: isHigh ? '#b91c1c' : '#d97706',
+        fillColor: isHigh ? '#ef4444' : '#f59e0b',
+        fillOpacity: isHigh ? 0.28 : 0.22,
+        opacity: 0.9,
+        weight: isHigh ? 2.5 : 2,
+    };
+}
+
+function renderLandingMapResources() {
+    if (!map || !landingMapMarkerLayer || !landingMapBoundaryLayer || !landingMapRiskLayer) {
+        return;
+    }
+
+    landingMapMarkerLayer.clearLayers();
+    landingMapBoundaryLayer.clearLayers();
+    landingMapRiskLayer.clearLayers();
+
+    const bounds = [];
+
+    landingBoundaryShapes.forEach((shape) => {
+        const geojson = parseLandingGeojson(shape.geojson);
+        if (!geojson) return;
+
+        try {
+            const layer = L.geoJSON(geojson, {
+                style: {
+                    color: '#2563eb',
+                    fillColor: '#93c5fd',
+                    fillOpacity: 0.08,
+                    opacity: 0.72,
+                    weight: 1.5,
+                },
+                interactive: true,
+            }).bindPopup(`<strong>${escapeLandingHtml(shape.name || 'Boundary')}</strong>`);
+
+            layer.addTo(landingMapBoundaryLayer);
+            layer.eachLayer((child) => {
+                const childBounds = child.getBounds?.();
+                if (childBounds?.isValid?.()) bounds.push(childBounds);
+            });
+        } catch (error) {
+            console.warn('Unable to render landing boundary:', { shape, error });
+        }
+    });
+
+    if (['all', 'risks'].includes(landingMapActiveFilter)) {
+        landingRiskAreas.forEach((area) => {
+            const geojson = parseLandingGeojson(area.geojson);
+            if (!geojson) return;
+
+            try {
+                const layer = L.geoJSON(geojson, {
+                    style: landingRiskAreaStyle(area),
+                    interactive: true,
+                }).bindPopup(buildLandingRiskAreaPopup(area));
+
+                layer.addTo(landingMapRiskLayer);
+                layer.eachLayer((child) => {
+                    const childBounds = child.getBounds?.();
+                    if (childBounds?.isValid?.()) bounds.push(childBounds);
+                });
+            } catch (error) {
+                console.warn('Unable to render landing risk area:', { area, error });
+            }
+        });
+    }
+
+    landingResourceMarkers
+        .filter((marker) => shouldShowLandingResourceForFilter(marker, landingMapActiveFilter))
+        .forEach((marker) => {
+            const lat = Number(marker.lat);
+            const lng = Number(marker.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+            bounds.push([lat, lng]);
+            L.marker([lat, lng], {
+                icon: landingPreviewIcon(marker),
+                riseOnHover: true,
+            })
+                .bindPopup(landingResourcePopup(marker), { maxWidth: 260 })
+                .addTo(landingMapMarkerLayer);
+        });
+
+    const nextBounds = L.latLngBounds(bounds);
+    if (nextBounds.isValid()) {
+        map.fitBounds(nextBounds, { padding: [36, 36], maxZoom: 13 });
+    }
+}
+
+function buildLandingRiskAreaPopup(area = {}) {
+    return `
+        <div class="landing-preview-popup landing-preview-popup--risk-area">
+            <div class="landing-preview-popup__head">
+                <span class="landing-preview-popup__icon" style="--preview-accent:${area.risk_level === 'high' ? '#dc2626' : '#d97706'}">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </span>
+                <div class="landing-preview-popup__title">
+                    <strong>${escapeLandingHtml(area.name || 'Fire-risk area')}</strong>
+                    <span>${escapeLandingHtml(area.city_name || 'Mapped boundary')}</span>
+                </div>
+            </div>
+            <div class="landing-preview-popup__meta">
+                <span class="landing-preview-popup__chip" style="--preview-accent:${area.risk_level === 'high' ? '#dc2626' : '#d97706'}">
+                    ${escapeLandingHtml(String(area.risk_label || `${area.risk_level || 'Medium'} fire risk`))}
+                </span>
+            </div>
+        </div>
+    `;
+}
+
+function renderMobilePreviewMarkers() {
+    if (!mobilePreviewMap) {
+        return;
+    }
+
+    mobilePreviewMarkerLayer?.clearLayers();
+    mobilePreviewBoundaryLayer?.clearLayers();
+    mobilePreviewRiskLayer?.clearLayers();
+
+    const bounds = [];
+
+    landingBoundaryShapes.forEach((shape) => {
+        const geojson = parseLandingGeojson(shape.geojson);
+        if (!geojson) return;
+
+        try {
+            const layer = L.geoJSON(geojson, {
+                style: {
+                    color: '#2563eb',
+                    fillColor: '#93c5fd',
+                    fillOpacity: 0.08,
+                    opacity: 0.72,
+                    weight: 1.5,
+                },
+                interactive: true,
+            }).bindPopup(`<strong>${escapeLandingHtml(shape.name || 'Boundary')}</strong>`);
+
+            layer.addTo(mobilePreviewBoundaryLayer);
+            layer.eachLayer((child) => {
+                const childBounds = child.getBounds?.();
+                if (childBounds?.isValid?.()) bounds.push(childBounds);
+            });
+        } catch (error) {
+            console.warn('Unable to render preview boundary:', { shape, error });
+        }
+    });
+
+    const shouldShowRiskAreas = ['all', 'risks'].includes(mobilePreviewActiveFilter);
+    if (shouldShowRiskAreas) {
+        landingRiskAreas.forEach((area) => {
+            const geojson = parseLandingGeojson(area.geojson);
+            if (!geojson) return;
+
+            try {
+                const layer = L.geoJSON(geojson, {
+                    style: landingRiskAreaStyle(area),
+                    interactive: true,
+                }).bindPopup(buildLandingRiskAreaPopup(area));
+
+                layer.addTo(mobilePreviewRiskLayer);
+                layer.eachLayer((child) => {
+                    const childBounds = child.getBounds?.();
+                    if (childBounds?.isValid?.()) bounds.push(childBounds);
+                });
+            } catch (error) {
+                console.warn('Unable to render preview risk area:', { area, error });
+            }
+        });
+    }
+
+    landingResourceMarkers
+        .filter(shouldShowLandingResource)
+        .forEach((marker) => {
+            const lat = Number(marker.lat);
+            const lng = Number(marker.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+            bounds.push([lat, lng]);
+            L.marker([lat, lng], {
+                icon: landingPreviewIcon(marker),
+                riseOnHover: true,
+            })
+                .bindPopup(landingResourcePopup(marker), { maxWidth: 240 })
+                .addTo(mobilePreviewMarkerLayer);
+        });
+
+    if (bounds.length) {
+        const nextBounds = L.latLngBounds(bounds);
+        if (nextBounds.isValid()) {
+            mobilePreviewMap.fitBounds(nextBounds, { padding: [24, 24], maxZoom: 14 });
+        }
+    }
 }
 
 function primeVisitorLocation() {
     if (!navigator.geolocation) {
+        showLandingToast('Location is not supported on this device.', true, 3200);
         return;
     }
 
@@ -556,15 +1169,20 @@ function primeVisitorLocation() {
     const isFresh = cached && (Date.now() - Number(cached.timestamp || 0) < 5 * 60 * 1000);
 
     if (isFresh) {
+        showLandingToast('Location ready.', false, 2600);
         return;
     }
+
+    showLandingToast('Checking your location...', false, 2200);
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
             persistVisitorLocation(position.coords.latitude, position.coords.longitude);
+            showLandingToast('Location ready.', false, 3000);
         },
         (error) => {
             console.warn('Visitor location prefetch failed:', error);
+            showLandingToast('Allow location access for one-tap reporting.', true, 4200);
         },
         {
             enableHighAccuracy: true,
@@ -581,6 +1199,8 @@ function persistVisitorLocation(lat, lng) {
             lng,
             timestamp: Date.now()
         }));
+        renderLandingMapResources();
+        renderMobilePreviewMarkers();
     } catch (error) {
         console.warn('Unable to cache visitor location:', error);
     }
@@ -617,6 +1237,36 @@ function setAnonymousReportButtonsLoading(isLoading) {
             ? '<i class="fa-solid fa-spinner fa-spin"></i> Reporting...'
             : button.dataset.defaultLabel;
     });
+}
+
+function showLandingToast(message, isError = false, timeoutMs = 3600) {
+    const toast = document.querySelector('[data-landing-toast]');
+    const toastMessage = document.querySelector('[data-landing-toast-message]');
+    const toastIcon = document.querySelector('[data-landing-toast-icon]');
+
+    if (!toast || !toastMessage) {
+        if (isError) {
+            console.error(message);
+        } else {
+            console.info(message);
+        }
+        return;
+    }
+
+    window.clearTimeout(showLandingToast.hideTimer);
+    toastMessage.textContent = message;
+    toast.classList.toggle('is-error', isError);
+    toast.classList.add('is-visible');
+
+    if (toastIcon) {
+        toastIcon.className = isError
+            ? 'fa-solid fa-triangle-exclamation'
+            : 'fa-solid fa-circle-check';
+    }
+
+    showLandingToast.hideTimer = window.setTimeout(() => {
+        toast.classList.remove('is-visible');
+    }, timeoutMs);
 }
 
 function getFreshVisitorLocation(maxAgeMs = 10 * 60 * 1000) {
@@ -710,27 +1360,30 @@ async function createAnonymousIncident(markerId, anonymousUserId) {
 
 async function submitAnonymousIncidentReport() {
     if (anonymousReportInFlight) {
+        showLandingToast('Anonymous report is already sending...', false, 2200);
         return;
     }
 
     const anonymousUserId = getAnonymousUserId();
     if (!anonymousUserId) {
-        alert('Anonymous reporting is not available yet because the anonymous account is missing.');
+        showLandingToast('Anonymous reporting is not available yet.', true);
         return;
     }
 
     try {
         anonymousReportInFlight = true;
         setAnonymousReportButtonsLoading(true);
+        showLandingToast('Getting your location...', false, 2200);
 
         const coords = await getFreshVisitorLocation();
+        showLandingToast('Sending anonymous fire report...', false, 2600);
         const markerId = await createAnonymousIncidentMarker(coords.lat, coords.lng);
         await createAnonymousIncident(markerId, anonymousUserId);
 
-        alert('Anonymous fire report sent successfully.');
+        showLandingToast('Anonymous fire report sent.', false, 4200);
     } catch (error) {
         console.error('Anonymous report failed:', error);
-        alert(error.message || 'Failed to send the anonymous fire report.');
+        showLandingToast(error.message || 'Failed to send the anonymous fire report.', true, 4800);
     } finally {
         anonymousReportInFlight = false;
         setAnonymousReportButtonsLoading(false);
@@ -936,9 +1589,7 @@ window.openStationModal = function(stationId) {
 
 // Emergency call
 window.emergencyCall = function() {
-    if (confirm('Call 911 for emergency services?')) {
-        window.location.href = 'tel:911';
-    }
+    document.querySelector('[data-emergency-call]')?.click?.();
 }
 
 // Show/hide loading
