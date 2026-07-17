@@ -695,6 +695,85 @@
             margin-bottom: 0;
         }
 
+        .login-toast {
+            position: fixed;
+            top: calc(1rem + env(safe-area-inset-top, 0px));
+            right: 1rem;
+            z-index: 9999;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: start;
+            gap: 0.75rem;
+            width: min(24rem, calc(100vw - 2rem));
+            border: 1px solid rgba(198, 61, 38, 0.14);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 18px 40px rgba(88, 43, 20, 0.18);
+            color: var(--gray-800);
+            padding: 0.9rem;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-0.75rem);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .login-toast.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .login-toast__icon {
+            display: inline-flex;
+            width: 2rem;
+            height: 2rem;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: var(--primary);
+        }
+
+        .login-toast__title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .login-toast__message {
+            margin-top: 0.18rem;
+            color: var(--gray-600);
+            font-size: 0.8rem;
+            line-height: 1.35;
+        }
+
+        .login-toast__close {
+            display: inline-flex;
+            width: 2rem;
+            height: 2rem;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--gray-400);
+            cursor: pointer;
+        }
+
+        .login-toast__close:hover {
+            background: #f8fafc;
+            color: var(--gray-700);
+        }
+
+        .login-toast.is-error {
+            border-color: rgba(220, 38, 38, 0.18);
+        }
+
+        .login-toast.is-error .login-toast__icon {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
         /* Loading spinner */
         .loading-spinner {
             display: inline-block;
@@ -825,6 +904,21 @@
                 border-radius: 16px;
                 padding: 0.9rem 0.95rem;
                 margin-bottom: 1rem;
+            }
+
+            .login-toast {
+                top: auto;
+                right: 0.85rem;
+                bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+                left: 0.85rem;
+                width: auto;
+                border-radius: 1.1rem;
+                box-shadow: 0 14px 34px rgba(88, 43, 20, 0.2);
+                transform: translateY(0.75rem);
+            }
+
+            .login-toast.is-visible {
+                transform: translateY(0);
             }
 
             .form-group {
@@ -979,6 +1073,17 @@
         </div>
     </nav>
 
+    <div id="loginToast" class="login-toast" role="status" aria-live="polite" aria-atomic="true">
+        <span class="login-toast__icon" aria-hidden="true"><i class="fa-solid fa-circle-info"></i></span>
+        <div>
+            <p id="loginToastTitle" class="login-toast__title">Notice</p>
+            <p id="loginToastMessage" class="login-toast__message"></p>
+        </div>
+        <button type="button" id="loginToastClose" class="login-toast__close" aria-label="Dismiss notification">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
     <!-- Main Content -->
     <main class="main-content">
         <div class="login-card">
@@ -1039,25 +1144,6 @@
                     <h1>Sign in</h1>
                     <p>Access your PyroSense workspace with your registered account.</p>
                 </div>
-
-                <!-- Error Messages -->
-                @if ($errors->any())
-                    <div class="error-message">
-                        <i class="fa-solid fa-circle-exclamation"></i>
-                        <ul>
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-
-                @if (session('success'))
-                    <div class="alert-banner">
-                        <i class="fa-solid fa-circle-check"></i>
-                        <p>{{ session('success') }}</p>
-                    </div>
-                @endif
 
                 @if (in_array(request('post_login_action'), ['quick-report', 'citizen-mobile-hub'], true))
                     <div class="intent-banner">
@@ -1201,6 +1287,49 @@
                 window.location.href = 'tel:911';
             }
         }
+
+        const loginToastPayload = {
+            success: @json(session('success')),
+            errors: @json($errors->all()),
+        };
+        const loginToast = document.getElementById('loginToast');
+        const loginToastTitle = document.getElementById('loginToastTitle');
+        const loginToastMessage = document.getElementById('loginToastMessage');
+        const loginToastClose = document.getElementById('loginToastClose');
+        let loginToastTimer = null;
+
+        function showLoginToast(message, type = 'success') {
+            if (!loginToast || !loginToastTitle || !loginToastMessage || !message) {
+                return;
+            }
+
+            window.clearTimeout(loginToastTimer);
+            const isError = type === 'error';
+            loginToast.classList.toggle('is-error', isError);
+            loginToastTitle.textContent = isError ? 'Sign-in notice' : 'PyroSense';
+            loginToastMessage.textContent = message;
+            loginToast.classList.add('is-visible');
+
+            loginToastTimer = window.setTimeout(() => {
+                loginToast.classList.remove('is-visible');
+            }, isError ? 7200 : 4200);
+        }
+
+        loginToastClose?.addEventListener('click', () => {
+            window.clearTimeout(loginToastTimer);
+            loginToast?.classList.remove('is-visible');
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (loginToastPayload.errors?.length) {
+                showLoginToast(loginToastPayload.errors.join(' '), 'error');
+                return;
+            }
+
+            if (loginToastPayload.success) {
+                showLoginToast(loginToastPayload.success, 'success');
+            }
+        });
 
         const loginForm = document.getElementById('loginForm');
         const submitBtn = document.getElementById('submitBtn');

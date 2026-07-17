@@ -345,7 +345,7 @@ class IncidentController extends Controller
 
     private function getCandidateStationsForIncident(Incident $incident, float $lat, float $lng)
     {
-        $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 5 : 1;
+        $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 3 : 1;
 
         return $this->getStationsSortedByDistance($lat, $lng)
             ->take($stationLimit);
@@ -611,7 +611,7 @@ class IncidentController extends Controller
             ], 404);
         }
 
-        $stationLimit = ((int) ($validated['incident_type_id'] ?? 1)) === 1 ? 5 : 1;
+        $stationLimit = ((int) ($validated['incident_type_id'] ?? 1)) === 1 ? 3 : 1;
         $candidateStations = $stations->take($stationLimit);
 
         foreach ($candidateStations as $station) {

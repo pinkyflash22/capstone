@@ -160,7 +160,7 @@ class IncidentAutoAssignmentService
 
     private function getCandidateStationsForIncident(Incident $incident, float $lat, float $lng)
     {
-        $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 5 : 1;
+        $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 3 : 1;
 
         return $this->getStationsSortedByDistance($lat, $lng)
             ->take($stationLimit);

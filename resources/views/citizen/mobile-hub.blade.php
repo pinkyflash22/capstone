@@ -8,6 +8,9 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <title>PyroSense Mobile Hub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="prefetch" href="{{ Vite::asset('resources/js/user.js') }}" as="script">
+    <link rel="prefetch" href="{{ Vite::asset('resources/css/citizen/dashboard.css') }}" as="style">
+    <link rel="prefetch" href="{{ Vite::asset('resources/css/app.css') }}" as="style">
     @include('partials.pwa-head')
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -549,14 +552,14 @@
                     </a>
                 </div>
 
-                <a href="{{ route('citizen.dashboard') }}" class="mobile-hub-btn mobile-hub-btn--dashboard">
+                <a href="{{ rtrim(route('citizen.dashboard'), '/') }}/alerts?reports=history" class="mobile-hub-btn mobile-hub-btn--dashboard" data-mobile-hub-nav="history">
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
                     <span class="mobile-hub-btn__copy">
                         <strong>History</strong>
                     </span>
                 </a>
 
-                <a href="{{ route('citizen.dashboard') }}" class="mobile-hub-btn mobile-hub-btn--map">
+                <a href="{{ route('citizen.dashboard') }}" class="mobile-hub-btn mobile-hub-btn--map" data-mobile-hub-nav="map">
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-map-location-dot"></i></span>
                     <span class="mobile-hub-btn__copy">
                         <strong>View Map</strong>

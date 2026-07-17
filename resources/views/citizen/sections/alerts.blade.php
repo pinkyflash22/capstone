@@ -458,6 +458,10 @@
         background: #fff7ed;
     }
 
+    #section-alerts .reports-history-mobile-list {
+        display: none;
+    }
+
     @media (min-width: 760px) {
         #section-alerts .aoc-hero-grid,
         #section-alerts .aoc-panel-head-row,
@@ -717,6 +721,159 @@
         #section-alerts .aoc-action-btn {
             width: 100%;
         }
+
+        #citizenReportsHistoryModal {
+            align-items: flex-end;
+            padding: 0.75rem;
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #citizenReportsHistoryModal .reports-history-panel {
+            width: 100%;
+            max-width: 27rem;
+            max-height: 86vh;
+            border-radius: 1.6rem;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+        }
+
+        #citizenReportsHistoryModal .reports-history-header {
+            align-items: flex-start;
+            padding: 1rem 1rem 0.85rem;
+        }
+
+        #citizenReportsHistoryModal .reports-history-title {
+            font-size: 1rem;
+            line-height: 1.18;
+        }
+
+        #citizenReportsHistoryModal .reports-history-subtitle {
+            margin-top: 0.18rem;
+            max-width: 14rem;
+            font-size: 0.76rem;
+            line-height: 1.35;
+        }
+
+        #citizenReportsHistoryModal [data-reports-history-close] {
+            width: 2.75rem;
+            height: 2.75rem;
+            flex: 0 0 2.75rem;
+        }
+
+        #citizenReportsHistoryModal .reports-history-toolbar {
+            padding: 0.75rem 1rem;
+        }
+
+        #citizenReportsHistoryModal .reports-history-toolbar-row,
+        #citizenReportsHistoryModal .reports-history-filter-group {
+            gap: 0.55rem;
+        }
+
+        #citizenReportsHistoryModal #reportsHistorySearch,
+        #citizenReportsHistoryModal #reportsHistoryTypeFilter {
+            min-height: 42px;
+            width: 100%;
+            border-radius: 0.95rem;
+            padding: 0.68rem 0.85rem;
+            font-size: 0.82rem;
+        }
+
+        #citizenReportsHistoryModal #reportsHistoryTypeFilter {
+            max-width: 11.5rem;
+        }
+
+        #citizenReportsHistoryModal #reportsHistorySummary {
+            font-size: 0.78rem;
+        }
+
+        #citizenReportsHistoryModal .reports-history-body {
+            max-height: calc(86vh - 10.75rem);
+            padding: 0.85rem 1rem 1rem;
+        }
+
+        #citizenReportsHistoryModal .reports-history-table-wrap {
+            display: none;
+        }
+
+        #section-alerts .reports-history-mobile-list {
+            display: grid;
+            gap: 0.7rem;
+        }
+
+        #section-alerts .reports-history-card {
+            display: grid;
+            gap: 0.65rem;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 1.05rem;
+            background: linear-gradient(145deg, #ffffff, #fffaf5);
+            padding: 0.85rem;
+        }
+
+        #section-alerts .reports-history-card__top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        #section-alerts .reports-history-card__date {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        #section-alerts .reports-history-card__title {
+            color: #0f172a;
+            font-size: 0.92rem;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        #section-alerts .reports-history-card__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.38rem;
+        }
+
+        #section-alerts .reports-history-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.75rem;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #c2410c;
+            padding: 0.28rem 0.55rem;
+            font-size: 0.68rem;
+            font-weight: 850;
+        }
+
+        #section-alerts .reports-history-chip--status {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        #section-alerts .reports-history-card__location {
+            color: #475569;
+            font-size: 0.78rem;
+            line-height: 1.38;
+        }
+
+        #section-alerts .reports-history-card__action {
+            min-height: 40px;
+            border-radius: 0.9rem;
+            background: linear-gradient(135deg, var(--aoc-red), var(--aoc-orange));
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 850;
+        }
+
+        #section-alerts .reports-history-empty {
+            border: 1px dashed rgba(148, 163, 184, 0.4);
+            border-radius: 1.15rem;
+            background: #f8fafc;
+            padding: 1.4rem 1rem;
+            text-align: center;
+        }
     }
 </style>
 
@@ -885,19 +1042,19 @@
     </div>
 
     <div id="citizenReportsHistoryModal" class="fixed inset-0 z-[4200] hidden items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4">
-        <div class="w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
-            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+        <div class="reports-history-panel w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+            <div class="reports-history-header flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
                 <div>
-                    <h3 class="text-lg font-bold text-slate-900">My Reports History</h3>
-                    <p class="text-sm text-slate-500">Fire Incident and Risk/Hazard Factor records submitted by your account.</p>
+                    <h3 class="reports-history-title text-lg font-bold text-slate-900">My Reports History</h3>
+                    <p class="reports-history-subtitle text-sm text-slate-500">Fire Incident and Risk/Hazard Factor records submitted by your account.</p>
                 </div>
                 <button type="button" data-reports-history-close class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div class="border-b border-slate-100 px-6 py-4">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div class="flex flex-wrap gap-3">
+            <div class="reports-history-toolbar border-b border-slate-100 px-6 py-4">
+                <div class="reports-history-toolbar-row flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div class="reports-history-filter-group flex flex-wrap gap-3">
                         <input id="reportsHistorySearch" type="search" placeholder="Search type, location, or status" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100 md:w-72">
                         <select id="reportsHistoryTypeFilter" class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100">
                             <option value="all">All report types</option>
@@ -908,8 +1065,8 @@
                     <p id="reportsHistorySummary" class="text-sm text-slate-500">No reports yet.</p>
                 </div>
             </div>
-            <div class="max-h-[70vh] overflow-auto px-6 py-5">
-                <div class="overflow-x-auto rounded-3xl border border-slate-200">
+            <div class="reports-history-body max-h-[70vh] overflow-auto px-6 py-5">
+                <div class="reports-history-table-wrap overflow-x-auto rounded-3xl border border-slate-200">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50">
                             <tr class="text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -924,6 +1081,7 @@
                         <tbody id="reportsHistoryTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
                     </table>
                 </div>
+                <div id="reportsHistoryMobileList" class="reports-history-mobile-list"></div>
             </div>
         </div>
     </div>
@@ -1236,6 +1394,7 @@
 
     function renderReportsHistoryTable() {
         const tbody = document.getElementById('reportsHistoryTableBody');
+        const mobileList = document.getElementById('reportsHistoryMobileList');
         const summary = document.getElementById('reportsHistorySummary');
         if (!tbody || !summary) return;
 
@@ -1269,6 +1428,17 @@
                     </td>
                 </tr>
             `;
+            if (mobileList) {
+                mobileList.innerHTML = `
+                    <div class="reports-history-empty">
+                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400">
+                            <i class="fa-regular fa-folder-open text-lg"></i>
+                        </div>
+                        <p class="text-sm font-bold text-slate-700">No reports yet.</p>
+                        <p class="mt-1 text-xs text-slate-500">Your submissions will appear here.</p>
+                    </div>
+                `;
+            }
             return;
         }
 
@@ -1294,7 +1464,45 @@
             `;
         }).join('');
 
+        if (mobileList) {
+            mobileList.innerHTML = items.map((record) => {
+                const key = String(record.incident_id || record.risk_area_id || '');
+                const kind = readReportKind(record);
+                const location = [readReportLocation(record), readReportBarangay(record)]
+                    .filter(Boolean)
+                    .join(' · ');
+
+                return `
+                    <article class="reports-history-card">
+                        <div class="reports-history-card__top">
+                            <div>
+                                <p class="reports-history-card__date">${escapeHtml(formatDate(record.created_at))}</p>
+                                <h4 class="reports-history-card__title">${escapeHtml(readReportTypeLabel(record))}</h4>
+                            </div>
+                            <span class="reports-history-chip reports-history-chip--status">${escapeHtml(readReportStatus(record))}</span>
+                        </div>
+                        <div class="reports-history-card__meta">
+                            <span class="reports-history-chip">${escapeHtml(readReportCategory(record))}</span>
+                        </div>
+                        <p class="reports-history-card__location">
+                            <i class="fa-solid fa-location-dot mr-1 text-orange-500"></i>${escapeHtml(location || 'Location unavailable')}
+                        </p>
+                        <button type="button" class="reports-history-card__action" data-history-details="${escapeHtml(key)}" data-history-kind="${escapeHtml(kind)}">
+                            <i class="fa-regular fa-eye mr-1"></i>View details
+                        </button>
+                    </article>
+                `;
+            }).join('');
+        }
+
         tbody.querySelectorAll('[data-history-details]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const record = findReportRecord(button.dataset.historyDetails, button.dataset.historyKind);
+                if (record) openConcernDetailsModal(record);
+            });
+        });
+
+        mobileList?.querySelectorAll('[data-history-details]').forEach((button) => {
             button.addEventListener('click', () => {
                 const record = findReportRecord(button.dataset.historyDetails, button.dataset.historyKind);
                 if (record) openConcernDetailsModal(record);
@@ -1612,5 +1820,16 @@
     renderAreasConcernRecentReports();
     renderReportsHistoryTable();
     ensureConcernMap();
+
+    if (new URLSearchParams(window.location.search).get('reports') === 'history') {
+        window.setTimeout(() => {
+            window.switchSection?.('alerts', { updateHistory: false });
+            openReportsHistoryModal();
+
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.delete('reports');
+            window.history.replaceState(window.history.state, '', nextUrl.toString());
+        }, 250);
+    }
 })();
 </script>

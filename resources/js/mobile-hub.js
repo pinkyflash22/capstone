@@ -7,11 +7,22 @@ const locationHint = document.getElementById('mobileHubLocationHint');
 const stationLabel = document.getElementById('mobileHubStationLabel');
 const stationHint = document.getElementById('mobileHubStationHint');
 const clockNode = document.getElementById('mobileHubClock');
+const responderCacheKey = 'pyrosense:nearestResponder';
+const responderCacheMaxAgeMs = 60 * 1000;
+const responderCacheMaxDistanceMeters = 150;
 let hubToastTimer = null;
 
 if (reportButton) {
     reportButton.addEventListener('click', submitMobileHubIncidentReport);
 }
+
+document.querySelectorAll('[data-mobile-hub-nav]').forEach((link) => {
+    link.addEventListener('click', () => {
+        const destination = link.dataset.mobileHubNav === 'history' ? 'history' : 'map';
+        showHubToast(destination === 'history' ? 'Opening report history...' : 'Opening map...', 'success');
+        showHubStatus(destination === 'history' ? 'Opening report history...' : 'Opening map...', 'success');
+    });
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     startHubClock();
@@ -66,6 +77,10 @@ function setReportButtonLoading(isLoading) {
     reportButton.disabled = isLoading;
 }
 
+function isAbortError(error) {
+    return error?.name === 'AbortError';
+}
+
 function readCachedCoords() {
     try {
         const raw = window.localStorage.getItem('pyrosense:lastKnownCoords');
@@ -98,6 +113,46 @@ function writeCachedCoords(lat, lng) {
     }
 }
 
+function readCachedResponder(lat, lng) {
+    try {
+        const raw = window.localStorage.getItem(responderCacheKey);
+        const cached = raw ? JSON.parse(raw) : null;
+
+        if (!cached?.responder || !cached?.lat || !cached?.lng || !cached?.timestamp) {
+            return null;
+        }
+
+        const isFresh = Date.now() - Number(cached.timestamp) <= responderCacheMaxAgeMs;
+        const isNearby = getDistanceMeters(lat, lng, Number(cached.lat), Number(cached.lng)) <= responderCacheMaxDistanceMeters;
+
+        return isFresh && isNearby ? normalizeResponder(cached.responder) : null;
+    } catch (error) {
+        console.warn('Unable to read cached responder:', error);
+        return null;
+    }
+}
+
+function writeCachedResponder(lat, lng, responder) {
+    try {
+        window.localStorage.setItem(responderCacheKey, JSON.stringify({
+            lat,
+            lng,
+            responder,
+            timestamp: Date.now(),
+        }));
+    } catch (error) {
+        console.warn('Unable to cache responder:', error);
+    }
+}
+
+function clearCachedResponder() {
+    try {
+        window.localStorage.removeItem(responderCacheKey);
+    } catch (error) {
+        console.warn('Unable to clear cached responder:', error);
+    }
+}
+
 function startHubClock() {
     if (!clockNode) {
         return;
@@ -120,6 +175,7 @@ async function primeHubContext() {
     if (cached?.lat && cached?.lng) {
         updateLocationContext(true);
         updateNearestStationContext('Dispatch matching');
+        scheduleResponderPrefetch(cached.lat, cached.lng);
         return;
     }
 
@@ -165,6 +221,18 @@ function getDistanceLabel(meters) {
     return `${(distance / 1000).toFixed(1)}km away`;
 }
 
+function getDistanceMeters(lat1, lng1, lat2, lng2) {
+    const earthRadius = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadius * c;
+}
+
 function getFreshCoords(maxAgeMs = 10 * 60 * 1000) {
     const cached = readCachedCoords();
     if (cached && Date.now() - cached.timestamp <= maxAgeMs) {
@@ -203,28 +271,8 @@ function getFreshCoords(maxAgeMs = 10 * 60 * 1000) {
     });
 }
 
-async function resolveNearestAvailableResponder(lat, lng) {
-    const params = new URLSearchParams({
-        lat: String(lat),
-        lng: String(lng),
-        incident_type_id: '1',
-    });
-
-    const response = await fetch(`/api/incidents/nearest-available-responder?${params.toString()}`, {
-        headers: {
-            Accept: 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Responder lookup failed with status ${response.status}.`);
-    }
-
-    const payload = await response.json();
-    const responder = payload?.data || null;
-
-    if (!responder?.station_id) {
+function normalizeResponder(responder) {
+    if (!responder?.stationId && !responder?.station_id) {
         return {
             stationId: null,
             stationName: '',
@@ -234,22 +282,72 @@ async function resolveNearestAvailableResponder(lat, lng) {
         };
     }
 
-    const distanceLabel = getDistanceLabel(responder.distance_meters);
-    updateNearestStationContext(
-        distanceLabel ? `${responder.station_name} (${distanceLabel})` : responder.station_name
-    );
-
     return {
-        stationId: Number(responder.station_id) || null,
-        stationName: responder.station_name || '',
-        teamId: Number(responder.team_id) || null,
+        stationId: Number(responder.stationId ?? responder.station_id) || null,
+        stationName: responder.stationName ?? responder.station_name ?? '',
+        teamId: Number(responder.teamId ?? responder.team_id) || null,
         availability: responder.availability || 'nearest_station_only',
-        distanceMeters: Number(responder.distance_meters || 0) || null,
+        distanceMeters: Number(responder.distanceMeters ?? responder.distance_meters ?? 0) || null,
     };
+}
+
+function renderResponderContext(responder) {
+    if (!responder?.stationId) {
+        updateNearestStationContext('Dispatch matching');
+        return;
+    }
+
+    const distanceLabel = getDistanceLabel(responder.distanceMeters);
+    updateNearestStationContext(
+        distanceLabel ? `${responder.stationName} (${distanceLabel})` : responder.stationName
+    );
+}
+
+async function resolveNearestAvailableResponder(lat, lng) {
+    const params = new URLSearchParams({
+        lat: String(lat),
+        lng: String(lng),
+        incident_type_id: '1',
+    });
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
+
+    let response;
+    try {
+        response = await fetch(`/api/incidents/nearest-available-responder?${params.toString()}`, {
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            signal: controller.signal,
+        });
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+        throw new Error(`Responder lookup failed with status ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const responder = payload?.data || null;
+
+    const normalized = normalizeResponder(responder);
+    writeCachedResponder(lat, lng, normalized);
+    renderResponderContext(normalized);
+
+    return normalized;
 }
 
 async function resolveNearestAvailableResponderForReport(lat, lng) {
     try {
+        const cached = readCachedResponder(lat, lng);
+        if (cached) {
+            renderResponderContext(cached);
+            return cached;
+        }
+
         return await resolveNearestAvailableResponder(lat, lng);
     } catch (error) {
         console.warn('Mobile hub responder lookup failed; submitting without pre-assignment:', error);
@@ -265,51 +363,32 @@ async function resolveNearestAvailableResponderForReport(lat, lng) {
     }
 }
 
-async function resolveMobileHubMarkerLabel(lat, lng) {
-    const geoapifyKey = window.geoapifyKey || '83677a1086d44c4e82f903fd2fe2ea9b';
-
-    if (!geoapifyKey) {
-        return {
-            title: 'Fire Emergency',
-            description: 'Fire emergency reported by citizen.',
-        };
-    }
-
-    try {
-        const params = new URLSearchParams({
-            lat: String(lat),
-            lon: String(lng),
-            format: 'json',
-            apiKey: geoapifyKey,
-        });
-
-        const response = await fetch(`https://api.geoapify.com/v1/geocode/reverse?${params.toString()}`);
-        if (!response.ok) {
-            throw new Error('Reverse geocoding failed.');
+function scheduleResponderPrefetch(lat, lng) {
+    const run = () => {
+        const cached = readCachedResponder(lat, lng);
+        if (cached) {
+            renderResponderContext(cached);
+            return;
         }
 
-        const payload = await response.json();
-        const result = Array.isArray(payload?.results) ? payload.results[0] : null;
+        resolveNearestAvailableResponder(lat, lng).catch((error) => {
+            if (isAbortError(error)) {
+                return;
+            }
 
-        const primary = result?.address_line1 || result?.formatted || result?.street || result?.suburb || result?.hamlet || null;
-        const locality = [result?.barangay, result?.city, result?.county].filter(Boolean).join(', ');
+            console.warn('Mobile hub responder prefetch failed:', error);
+        });
+    };
 
-        return {
-            title: primary || 'Fire Emergency',
-            description: locality || result?.formatted || 'Fire emergency reported by citizen.',
-        };
-    } catch (error) {
-        console.warn('Mobile hub reverse geocode failed:', error);
-        return {
-            title: 'Fire Emergency',
-            description: 'Fire emergency reported by citizen.',
-        };
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(run, { timeout: 1800 });
+        return;
     }
+
+    window.setTimeout(run, 250);
 }
 
 async function createMarker(lat, lng) {
-    const markerLabel = await resolveMobileHubMarkerLabel(lat, lng);
-
     const response = await fetch('/api/markers', {
         method: 'POST',
         headers: {
@@ -318,8 +397,8 @@ async function createMarker(lat, lng) {
             'X-CSRF-TOKEN': csrfToken,
         },
         body: JSON.stringify({
-            title: markerLabel.title,
-            description: markerLabel.description,
+            title: 'Fire Emergency',
+            description: 'One-tap fire emergency report from mobile hub.',
             lat,
             lng,
             status: 'active',
@@ -393,6 +472,24 @@ async function updateTeamStatus(teamId) {
     });
 }
 
+function updateTeamStatusInBackground(teamId) {
+    updateTeamStatus(teamId).catch((error) => {
+        console.warn('Mobile hub team status update failed:', error);
+    });
+}
+
+async function sendMobileHubIncidentReport(coords) {
+    const [responder, markerId] = await Promise.all([
+        resolveNearestAvailableResponderForReport(coords.lat, coords.lng),
+        createMarker(coords.lat, coords.lng),
+    ]);
+    const incidentPayload = await createIncident(markerId, responder.stationId, responder.teamId);
+    updateTeamStatusInBackground(responder.teamId);
+    clearCachedResponder();
+
+    return { responder, incidentPayload };
+}
+
 async function submitMobileHubIncidentReport() {
     clearHubStatus();
 
@@ -402,6 +499,8 @@ async function submitMobileHubIncidentReport() {
         return;
     }
 
+    let optimisticTimer = null;
+
     try {
         setReportButtonLoading(true);
         showHubToast('Sending fire emergency report...', 'success');
@@ -409,23 +508,31 @@ async function submitMobileHubIncidentReport() {
 
         const coords = await getFreshCoords();
         updateLocationContext(true);
-        const responder = await resolveNearestAvailableResponderForReport(coords.lat, coords.lng);
-        const markerId = await createMarker(coords.lat, coords.lng);
-        const incidentPayload = await createIncident(markerId, responder.stationId, responder.teamId);
-        await updateTeamStatus(responder.teamId);
 
-        showHubStatus(
-            responder.teamId
-                ? `Fire emergency report sent to ${responder.stationName}.`
-                : (incidentPayload?.message || 'Fire report sent. Dispatch matching is running.'),
-            'success'
-        );
-        showHubToast('Fire emergency report sent.', 'success');
+        let optimisticFeedbackShown = false;
+        optimisticTimer = window.setTimeout(() => {
+            optimisticFeedbackShown = true;
+            showHubStatus('Report queued. Sending in background...', 'success');
+            showHubToast('Fire report queued.', 'success');
+        }, 1200);
+
+        const { responder, incidentPayload } = await sendMobileHubIncidentReport(coords);
+        window.clearTimeout(optimisticTimer);
+
+        const successMessage = responder.teamId
+            ? `Fire emergency report sent to ${responder.stationName}.`
+            : (incidentPayload?.message || 'Fire report sent. Dispatch matching is running.');
+
+        showHubStatus(successMessage, 'success');
+        showHubToast(optimisticFeedbackShown ? 'Fire report confirmed.' : 'Fire report sent.', 'success');
     } catch (error) {
         console.error('Mobile hub report failed:', error);
         showHubStatus(error.message || 'Failed to send the report. Please try again.');
         showHubToast(error.message || 'Report failed. Please try again.', 'error');
     } finally {
+        if (optimisticTimer) {
+            window.clearTimeout(optimisticTimer);
+        }
         setReportButtonLoading(false);
     }
 }

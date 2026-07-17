@@ -25,6 +25,9 @@ let landingResourceMarkers = [];
 let landingBoundaryShapes = [];
 let landingRiskAreas = [];
 const LANDING_INCIDENT_VISIBILITY_RADIUS_METERS = 300;
+const LANDING_RESPONDER_CACHE_KEY = 'pyrosense:nearestResponder';
+const LANDING_RESPONDER_CACHE_MAX_AGE_MS = 60 * 1000;
+const LANDING_RESPONDER_CACHE_MAX_DISTANCE_METERS = 150;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -1170,6 +1173,7 @@ function primeVisitorLocation() {
 
     if (isFresh) {
         showLandingToast('Location ready.', false, 2600);
+        scheduleLandingResponderPrefetch(Number(cached.lat), Number(cached.lng));
         return;
     }
 
@@ -1177,7 +1181,10 @@ function primeVisitorLocation() {
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
-            persistVisitorLocation(position.coords.latitude, position.coords.longitude);
+            const lat = Number(position.coords.latitude);
+            const lng = Number(position.coords.longitude);
+            persistVisitorLocation(lat, lng);
+            scheduleLandingResponderPrefetch(lat, lng);
             showLandingToast('Location ready.', false, 3000);
         },
         (error) => {
@@ -1204,6 +1211,119 @@ function persistVisitorLocation(lat, lng) {
     } catch (error) {
         console.warn('Unable to cache visitor location:', error);
     }
+}
+
+function getLandingDistanceMeters(lat1, lng1, lat2, lng2) {
+    const earthRadius = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadius * c;
+}
+
+function readCachedLandingResponder(lat, lng) {
+    try {
+        const raw = window.localStorage.getItem(LANDING_RESPONDER_CACHE_KEY);
+        const cached = raw ? JSON.parse(raw) : null;
+
+        if (!cached?.responder || !cached?.lat || !cached?.lng || !cached?.timestamp) {
+            return null;
+        }
+
+        const isFresh = Date.now() - Number(cached.timestamp) <= LANDING_RESPONDER_CACHE_MAX_AGE_MS;
+        const isNearby = getLandingDistanceMeters(lat, lng, Number(cached.lat), Number(cached.lng))
+            <= LANDING_RESPONDER_CACHE_MAX_DISTANCE_METERS;
+
+        return isFresh && isNearby ? cached.responder : null;
+    } catch (error) {
+        console.warn('Unable to read cached landing responder:', error);
+        return null;
+    }
+}
+
+function writeCachedLandingResponder(lat, lng, responder) {
+    try {
+        window.localStorage.setItem(LANDING_RESPONDER_CACHE_KEY, JSON.stringify({
+            lat,
+            lng,
+            responder: {
+                stationId: Number(responder.station_id ?? responder.stationId) || null,
+                stationName: responder.station_name ?? responder.stationName ?? '',
+                teamId: Number(responder.team_id ?? responder.teamId) || null,
+                availability: responder.availability || 'nearest_station_only',
+                distanceMeters: Number(responder.distance_meters ?? responder.distanceMeters ?? 0) || null,
+            },
+            timestamp: Date.now(),
+        }));
+    } catch (error) {
+        console.warn('Unable to cache landing responder:', error);
+    }
+}
+
+async function prefetchLandingResponder(lat, lng) {
+    if (readCachedLandingResponder(lat, lng)) {
+        return;
+    }
+
+    const params = new URLSearchParams({
+        lat: String(lat),
+        lng: String(lng),
+        incident_type_id: '1',
+    });
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 2500);
+
+    try {
+        const response = await fetch(`/api/incidents/nearest-available-responder?${params.toString()}`, {
+            headers: {
+                Accept: 'application/json',
+            },
+            signal: controller.signal,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Responder prefetch failed with status ${response.status}.`);
+        }
+
+        const payload = await response.json();
+        if (payload?.data?.station_id) {
+            writeCachedLandingResponder(lat, lng, payload.data);
+        }
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function isLandingAbortError(error) {
+    return error?.name === 'AbortError';
+}
+
+function scheduleLandingResponderPrefetch(lat, lng) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+    }
+
+    const run = () => {
+        prefetchLandingResponder(lat, lng).catch((error) => {
+            if (isLandingAbortError(error)) {
+                return;
+            }
+
+            console.warn('Landing responder prefetch failed:', error);
+        });
+    };
+
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(run, { timeout: 1800 });
+        return;
+    }
+
+    window.setTimeout(run, 250);
 }
 
 function readCachedVisitorLocation() {

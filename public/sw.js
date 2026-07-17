@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260708-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260717-1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -12,7 +12,9 @@ const NO_CACHE_HTML_PATTERNS = [
     /^\/logout$/i,
     /^\/firefighter(?:\/.*)?$/i,
     /^\/admin(?:\/.*)?$/i,
-    /^\/chief(?:\/.*)?$/i
+    /^\/chief(?:\/.*)?$/i,
+    /^\/citizen\/mobile-hub(?:\/.*)?$/i,
+    /^\/citizen\/dashboard(?:\/.*)?$/i
 ];
 
 const APP_SHELL_URLS = [

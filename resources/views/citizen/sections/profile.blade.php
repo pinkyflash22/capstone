@@ -713,6 +713,77 @@
             padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
         }
 
+        #section-profile.is-editing .profile-layout > main.profile-shell,
+        #section-profile.is-account-settings .profile-layout > main.profile-shell {
+            align-content: start;
+            grid-template-rows: auto minmax(0, 1fr);
+            height: 100dvh;
+            max-height: 100dvh;
+            overflow: hidden;
+        }
+
+        #section-profile.is-editing .profile-layout > main.profile-shell > form,
+        #section-profile.is-account-settings .profile-layout > main.profile-shell > section.profile-card {
+            min-height: 0;
+            max-height: calc(100dvh - 6.25rem - env(safe-area-inset-bottom, 0px));
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        #section-profile.is-account-settings .profile-layout > main.profile-shell > section.profile-card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #section-profile.is-account-settings .profile-card-head {
+            flex: 0 0 auto;
+            padding: 1rem;
+        }
+
+        #section-profile.is-account-settings .profile-card-body {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 1rem;
+            padding-bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #section-profile.is-account-settings .profile-card-copy,
+        #section-profile.is-account-settings .profile-setting-copy {
+            font-size: 0.76rem;
+            line-height: 1.35;
+        }
+
+        #section-profile.is-account-settings .profile-settings-list {
+            gap: 0.65rem;
+        }
+
+        #section-profile.is-account-settings .profile-setting-row {
+            gap: 0.65rem;
+            padding: 0.85rem;
+            border-radius: 1rem;
+        }
+
+        #section-profile.is-account-settings .profile-account-form.is-open {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 1rem;
+            background: #fff;
+            padding: 0.85rem;
+        }
+
+        #section-profile.is-account-settings .profile-form-label {
+            font-size: 0.78rem;
+        }
+
+        #section-profile.is-account-settings .profile-input {
+            min-height: 46px;
+            font-size: 0.9rem;
+        }
+
+        #section-profile.is-account-settings .profile-password-toggle {
+            right: 0.75rem;
+            font-size: 0.72rem;
+        }
+
         #section-profile .profile-info-grid,
         #section-profile .profile-social-grid,
         #section-profile .profile-form-grid {

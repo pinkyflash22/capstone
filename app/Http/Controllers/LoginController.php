@@ -73,10 +73,9 @@ class LoginController extends Controller
         // Check if account is locked
         if ($this->isAccountLocked($request)) {
             $lockoutTime = session('login_lockout_time');
-            $minutesLeft = now()->diffInMinutes($lockoutTime);
             
             throw ValidationException::withMessages([
-                'email' => "Too many failed attempts. Your account is locked for {$minutesLeft} minutes."
+                'email' => $this->formatLockoutMessage($lockoutTime)
             ]);
         }
 
@@ -135,6 +134,11 @@ class LoginController extends Controller
         $this->incrementLoginAttempts($request);
         
         $attemptsLeft = $this->maxAttempts - $this->getLoginAttempts($request);
+        if ($attemptsLeft <= 0) {
+            throw ValidationException::withMessages([
+                'email' => $this->formatLockoutMessage(session('login_lockout_time'))
+            ]);
+        }
         
         throw ValidationException::withMessages([
             'email' => "Invalid email or password. You have {$attemptsLeft} attempt(s) remaining."
@@ -533,10 +537,9 @@ class LoginController extends Controller
         // Check if station account is locked
         if ($this->isStationAccountLocked($request)) {
             $lockoutTime = session('station_lockout_time_' . $stationCode);
-            $minutesLeft = now()->diffInMinutes($lockoutTime);
             
             return back()->withErrors([
-                'station_code' => "Too many failed attempts. Station account is locked for {$minutesLeft} minutes."
+                'station_code' => $this->formatLockoutMessage($lockoutTime, 'Station account')
             ]);
         }
 
@@ -563,6 +566,11 @@ class LoginController extends Controller
         $this->incrementStationLoginAttempts($request);
         
         $attemptsLeft = $this->maxAttempts - $this->getStationLoginAttempts($request);
+        if ($attemptsLeft <= 0) {
+            return back()->withErrors([
+                'station_code' => $this->formatLockoutMessage(session('station_lockout_time_' . $stationCode), 'Station account')
+            ]);
+        }
         
         return back()->withErrors([
             'station_code' => "Invalid station code or password. You have {$attemptsLeft} attempt(s) remaining."
@@ -721,6 +729,16 @@ class LoginController extends Controller
         $stationCode = $request->station_code;
         session()->forget('station_attempts_' . $stationCode);
         session()->forget('station_lockout_time_' . $stationCode);
+    }
+
+    private function formatLockoutMessage($lockoutTime, string $subject = 'Your account'): string
+    {
+        $lockoutAt = $lockoutTime ? \Illuminate\Support\Carbon::parse($lockoutTime) : now()->addMinutes($this->lockoutMinutes);
+        $secondsLeft = max(1, now()->diffInSeconds($lockoutAt, false));
+        $minutesLeft = max(1, (int) ceil($secondsLeft / 60));
+        $retryAt = $lockoutAt->timezone(config('app.timezone'))->format('g:i A');
+
+        return "{$subject} is temporarily locked. Try again in {$minutesLeft} minute(s), around {$retryAt}.";
     }
 
     private function storeUserLog(?int $userId, string $action, Request $request): void
