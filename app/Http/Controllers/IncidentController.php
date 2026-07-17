@@ -188,7 +188,7 @@ class IncidentController extends Controller
         return Schema::hasColumn('incidents', 'incident_type_id') && Schema::hasTable('incident_type');
     }
 
-    private function getTeamMemberUserIds(?Team $team)
+    private function getTeamMemberStationOfficerIds(?Team $team)
     {
         if (!$team) {
             return collect();
@@ -244,9 +244,9 @@ class IncidentController extends Controller
             'updated_at' => now()
         ]);
 
-        $teamMemberUserIds = $this->getTeamMemberUserIds($team);
-        if ($stationOfficerStatus && $teamMemberUserIds->isNotEmpty()) {
-            StationOfficer::whereIn('user_id', $teamMemberUserIds->all())
+        $teamMemberStationOfficerIds = $this->getTeamMemberStationOfficerIds($team);
+        if ($stationOfficerStatus && $teamMemberStationOfficerIds->isNotEmpty()) {
+            StationOfficer::whereIn('station_officer_id', $teamMemberStationOfficerIds->all())
                 ->update([
                     'status' => $stationOfficerStatus,
                     'updated_at' => now()
@@ -290,8 +290,8 @@ class IncidentController extends Controller
     {
         $teams = Team::whereIn('status', $allowedStatuses)->get();
         $leaderIds = $teams->pluck('team_leader')->filter()->unique()->values();
-        $stationOfficerMap = StationOfficer::whereIn('user_id', $leaderIds)
-            ->pluck('station_id', 'user_id');
+        $stationOfficerMap = StationOfficer::whereIn('station_officer_id', $leaderIds)
+            ->pluck('station_id', 'station_officer_id');
 
         return $teams
             ->map(function ($team) use ($stationOfficerMap) {
@@ -311,17 +311,17 @@ class IncidentController extends Controller
 
     private function findAvailableTeamForStation(int $stationId): ?Team
     {
-        $stationOfficerUserIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('user_id')
+        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
+            ->pluck('station_officer_id')
             ->filter()
             ->values();
 
-        if ($stationOfficerUserIds->isEmpty()) {
+        if ($stationOfficerIds->isEmpty()) {
             return null;
         }
 
         return Team::where('status', 'available')
-            ->whereIn('team_leader', $stationOfficerUserIds->all())
+            ->whereIn('team_leader', $stationOfficerIds->all())
             ->lockForUpdate()
             ->orderBy('team_id')
             ->first();
@@ -329,16 +329,16 @@ class IncidentController extends Controller
 
     private function findAnyTeamForStation(int $stationId): ?Team
     {
-        $stationOfficerUserIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('user_id')
+        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
+            ->pluck('station_officer_id')
             ->filter()
             ->values();
 
-        if ($stationOfficerUserIds->isEmpty()) {
+        if ($stationOfficerIds->isEmpty()) {
             return null;
         }
 
-        return Team::whereIn('team_leader', $stationOfficerUserIds->all())
+        return Team::whereIn('team_leader', $stationOfficerIds->all())
             ->orderBy('team_id')
             ->first();
     }
@@ -357,9 +357,9 @@ class IncidentController extends Controller
         $team->updated_at = now();
         $team->save();
 
-        $teamMemberUserIds = $this->getTeamMemberUserIds($team);
-        if ($teamMemberUserIds->isNotEmpty()) {
-            StationOfficer::whereIn('user_id', $teamMemberUserIds->all())
+        $teamMemberStationOfficerIds = $this->getTeamMemberStationOfficerIds($team);
+        if ($teamMemberStationOfficerIds->isNotEmpty()) {
+            StationOfficer::whereIn('station_officer_id', $teamMemberStationOfficerIds->all())
                 ->update([
                     'status' => 'dispatched',
                     'updated_at' => now()
@@ -587,6 +587,65 @@ class IncidentController extends Controller
             'success' => true,
             'message' => 'Fire report submitted. BFP processing has started.',
             'data' => $this->serializeIncident($data->fresh($this->getIncidentRelations())),
+        ]);
+    }
+
+    public function nearestAvailableResponder(Request $request)
+    {
+        $validated = $request->validate([
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
+            'incident_type_id' => 'nullable|integer',
+        ]);
+
+        $stations = $this->getStationsSortedByDistance(
+            (float) $validated['lat'],
+            (float) $validated['lng']
+        );
+
+        if ($stations->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No station with valid map coordinates is available.',
+                'data' => null,
+            ], 404);
+        }
+
+        $stationLimit = ((int) ($validated['incident_type_id'] ?? 1)) === 1 ? 5 : 1;
+        $candidateStations = $stations->take($stationLimit);
+
+        foreach ($candidateStations as $station) {
+            $team = $this->findAvailableTeamForStation((int) $station->station_id);
+
+            if (! $team) {
+                continue;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nearest available responder found.',
+                'data' => [
+                    'station_id' => (int) $station->station_id,
+                    'station_name' => $station->station_name,
+                    'team_id' => (int) $team->team_id,
+                    'distance_meters' => round((float) $station->distance_meters),
+                    'availability' => 'available_team',
+                ],
+            ]);
+        }
+
+        $nearestStation = $candidateStations->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'No available team found in the nearest stations. Using nearest station as fallback.',
+            'data' => [
+                'station_id' => (int) $nearestStation->station_id,
+                'station_name' => $nearestStation->station_name,
+                'team_id' => null,
+                'distance_meters' => round((float) $nearestStation->distance_meters),
+                'availability' => 'nearest_station_only',
+            ],
         ]);
     }
 

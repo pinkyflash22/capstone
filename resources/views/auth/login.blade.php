@@ -90,17 +90,17 @@
         }
 
         .logo-icon {
-            width: 76px;
-            height: 56px;
+            width: 64px;
+            height: 64px;
             background: #ffffff;
-            border-radius: 18px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: transform 0.2s;
             box-shadow: 0 12px 24px rgba(198, 61, 38, 0.18);
             border: 1px solid rgba(198, 61, 38, 0.14);
-            padding: 0.35rem 0.55rem;
+            padding: 0.75rem;
         }
 
         .logo-image {
@@ -255,16 +255,16 @@
         }
 
         .brand-icon {
-            width: 110px;
-            height: 76px;
+            width: 86px;
+            height: 86px;
             background: rgba(255, 255, 255, 0.96);
-            border-radius: 24px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 0 14px 28px rgba(17, 24, 39, 0.14);
             border: 1px solid rgba(255,255,255,0.24);
-            padding: 0.5rem 0.8rem;
+            padding: 1rem;
         }
 
         .brand-icon img {
@@ -285,64 +285,72 @@
             font-size: 0.9rem;
         }
 
-        .brand-stats {
+        .brand-story {
+            margin-top: 1.25rem;
+        }
+
+        .brand-story h3 {
+            font-size: 2.15rem;
+            line-height: 1.08;
+            margin-bottom: 1rem;
+            max-width: 430px;
+        }
+
+        .brand-story p {
+            max-width: 460px;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .system-points {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: 0.85rem;
             margin: 2rem 0;
         }
 
-        .stat-item {
-            background: rgba(255, 255, 255, 0.14);
-            border-radius: 16px;
+        .system-point {
+            display: flex;
+            gap: 0.9rem;
+            align-items: flex-start;
             padding: 1rem;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.16);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.84);
-        }
-
-        .emergency-badge {
-            background: rgba(255, 255, 255, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 50px;
-            padding: 1rem 1.5rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 1rem;
-            margin-top: auto;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.13);
+            border: 1px solid rgba(255, 255, 255, 0.16);
             backdrop-filter: blur(10px);
         }
 
-        .emergency-badge i {
-            font-size: 1.5rem;
+        .system-point i {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.16);
             color: #fff6d8;
-            animation: pulse 2s infinite;
         }
 
-        .emergency-badge div p {
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.82);
+        .system-point strong {
+            display: block;
+            margin-bottom: 0.2rem;
+            color: #fff;
+            font-size: 0.95rem;
         }
 
-        .emergency-badge div strong {
-            font-size: 1.5rem;
-            color: white;
+        .system-point span {
+            display: block;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 0.84rem;
+            line-height: 1.45;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .brand-note {
+            margin-top: auto;
+            padding-top: 1.5rem;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 0.86rem;
+            line-height: 1.55;
         }
 
         /* Right Side - Form */
@@ -352,8 +360,8 @@
         }
 
         .form-header {
-            text-align: center;
-            margin-bottom: 2rem;
+            text-align: left;
+            margin-bottom: 1.75rem;
         }
 
         .form-header h1 {
@@ -365,6 +373,7 @@
 
         .form-header p {
             color: var(--gray-500);
+            line-height: 1.5;
         }
 
         .alert-banner {
@@ -743,8 +752,8 @@
             .logo-icon {
                 width: 52px;
                 height: 52px;
-                border-radius: 16px;
-                padding: 0.35rem;
+                border-radius: 50%;
+                padding: 0.6rem;
                 flex-shrink: 0;
             }
 
@@ -793,14 +802,10 @@
             }
 
             .form-header {
-                text-align: left;
                 margin-bottom: 1.25rem;
             }
 
-            .form-header h1,
-            .alert-banner.mobile-hide,
-            .intent-banner,
-            .quick-access-section {
+            .intent-banner {
                 display: none !important;
             }
 
@@ -880,10 +885,6 @@
                 margin: 1.25rem 0;
             }
 
-            .quick-access {
-                gap: 0.75rem;
-            }
-
             .register-link {
                 margin-top: 1.4rem;
                 padding-top: 1.25rem;
@@ -941,10 +942,6 @@
                 padding: 1.15rem 0.95rem 1.25rem;
             }
 
-            .quick-access {
-                grid-template-columns: 1fr;
-            }
-            
             .form-options {
                 flex-direction: column;
                 gap: 0.85rem;
@@ -994,50 +991,53 @@
                         </div>
                         <div class="brand-title">
                             <h2>PyroSense</h2>
-                            <p>Emergency Response System</p>
+                            <p>Fire intelligence and response coordination</p>
                         </div>
                     </div>
 
-                    <div class="brand-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">24/7</div>
-                            <div class="stat-label">Coverage</div>
+                    <div class="brand-story">
+                        <h3>One shared view for safer communities.</h3>
+                        <p>
+                            PyroSense connects citizen reports, barangay risk observations, mapped emergency resources,
+                            and responder updates into one fire-safety workspace.
+                        </p>
+                    </div>
+
+                    <div class="system-points">
+                        <div class="system-point">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                            <div>
+                                <strong>Live map context</strong>
+                                <span>Stations, hydrants, barangay halls, incidents, and risk areas are organized spatially.</span>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value">4.2min</div>
-                            <div class="stat-label">Avg Response</div>
+                        <div class="system-point">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <div>
+                                <strong>Risk-aware reporting</strong>
+                                <span>Community reports and verified field data help highlight places that need attention.</span>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value">25+</div>
-                            <div class="stat-label">Stations</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">150+</div>
-                            <div class="stat-label">Personnel</div>
+                        <div class="system-point">
+                            <i class="fa-solid fa-people-arrows"></i>
+                            <div>
+                                <strong>Role-based coordination</strong>
+                                <span>Citizens, barangays, firefighters, chiefs, and admins each see tools built for their work.</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="emergency-badge">
-                        <i class="fa-solid fa-phone-alt"></i>
-                        <div>
-                            <p>Emergency Hotline</p>
-                            <strong>911</strong>
-                        </div>
-                    </div>
+                    <p class="brand-note">
+                        Sign in only if you already have a PyroSense account. New community members can register as concerned citizens.
+                    </p>
                 </div>
             </div>
 
             <!-- Right Side - Login Form -->
             <div class="form-side">
                 <div class="form-header">
-                    <h1>Welcome Back</h1>
-                    <p>Sign in to your emergency dashboard</p>
-                </div>
-
-                <!-- Alert Banner -->
-                <div class="alert-banner mobile-hide">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    <p>For emergencies, call <strong>911</strong> immediately. This portal is for administrative access only.</p>
+                    <h1>Sign in</h1>
+                    <p>Access your PyroSense workspace with your registered account.</p>
                 </div>
 
                 <!-- Error Messages -->
@@ -1120,7 +1120,7 @@
                             <input type="checkbox" name="remember" id="remember">
                             <label for="remember">Remember me</label>
                         </label>
-                        <a href="#" class="forgot-link">Forgot password?</a>
+                        <a href="{{ route('password.request') }}" class="forgot-link">Forgot password?</a>
                     </div>
 
                     <!-- Submit Button -->
@@ -1142,26 +1142,9 @@
                         <span>Continue with Google</span>
                     </a>
 
-                    <div class="quick-access-section">
-                        <div class="divider">
-                            <span>Quick Access</span>
-                        </div>
-
-                        <div class="quick-access">
-                            <button type="button" class="quick-btn" onclick="fillCredentials('firefighter@pyrosense.gov', 'password123')">
-                                <i class="fa-solid fa-user-firefighter"></i>
-                                Firefighter
-                            </button>
-                            <button type="button" class="quick-btn" onclick="fillCredentials('admin@pyrosense.gov', 'admin123')">
-                                <i class="fa-solid fa-shield"></i>
-                                Administrator
-                            </button>
-                        </div>
-                    </div>
-
                     <!-- Register Link -->
                     <div class="register-link">
-                        <p>Don't have an account? <a href="{{ route('register') }}">Register as responder</a></p>
+                        <p>Don't have an account? <a href="{{ route('register') }}">Register as concerned citizen</a></p>
                     </div>
 
                     <div class="security-note">

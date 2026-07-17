@@ -151,13 +151,6 @@
             color: var(--primary);
         }
 
-        .mobile-hub-copy {
-            margin: 0.2rem 0 0;
-            color: var(--muted);
-            font-size: 0.92rem;
-            line-height: 1.5;
-        }
-
         .mobile-hub-actions {
             display: grid;
             gap: 0.8rem;
@@ -308,14 +301,6 @@
             color: var(--muted);
         }
 
-        .mobile-hub-install {
-            color: var(--primary);
-            font-weight: 700;
-            text-decoration: none;
-            white-space: nowrap;
-            font-size: 0.78rem;
-        }
-
         .mobile-hub-status {
             display: none;
             margin-top: 0.85rem;
@@ -339,6 +324,41 @@
             background: #ecfdf5;
             color: #166534;
             border: 1px solid rgba(34, 197, 94, 0.16);
+        }
+
+        .mobile-hub-toast {
+            position: fixed;
+            left: 50%;
+            bottom: calc(env(safe-area-inset-bottom) + 1rem);
+            z-index: 80;
+            max-width: min(320px, calc(100vw - 2rem));
+            transform: translate(-50%, 120%);
+            border-radius: 999px;
+            padding: 0.78rem 1rem;
+            font-size: 0.82rem;
+            font-weight: 800;
+            line-height: 1.25;
+            text-align: center;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.22s ease, opacity 0.22s ease;
+        }
+
+        .mobile-hub-toast.is-visible {
+            transform: translate(-50%, 0);
+            opacity: 1;
+        }
+
+        .mobile-hub-toast.is-success {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: #fff;
+        }
+
+        .mobile-hub-toast.is-error {
+            background: #fff1f2;
+            color: #9f1239;
+            border: 1px solid rgba(190, 24, 93, 0.16);
         }
 
         .mobile-hub-btn.is-loading {
@@ -370,8 +390,7 @@
 
             .mobile-hub-context-copy small,
             .mobile-hub-context-time small,
-            .mobile-hub-utility small,
-            .mobile-hub-install {
+            .mobile-hub-utility small {
                 font-size: 0.62rem;
             }
 
@@ -395,10 +414,6 @@
 
             .mobile-hub-title {
                 font-size: 1.05rem;
-            }
-
-            .mobile-hub-copy {
-                font-size: 0.74rem;
             }
 
             .mobile-hub-actions {
@@ -487,7 +502,7 @@
             <div class="mobile-hub-context-bar">
                 <div class="mobile-hub-context-copy">
                     <strong id="mobileHubLocationLabel">Location ready</strong>
-                    <small id="mobileHubLocationHint">Preparing your current-location report access.</small>
+                    <small id="mobileHubLocationHint">Ready for one-tap report.</small>
                 </div>
                 <div class="mobile-hub-context-time">
                     <strong id="mobileHubClock">--:--</strong>
@@ -496,7 +511,7 @@
             </div>
             <div class="mobile-hub-alert-tip">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                <span>If there is immediate danger to life, call <strong>911</strong> first before sending a report.</span>
+                <span>In immediate danger, call <strong>911</strong> first.</span>
             </div>
         </section>
 
@@ -507,7 +522,6 @@
                 </div>
                 <div>
                     <div class="mobile-hub-title">Pyro<span>Sense</span></div>
-                    <p class="mobile-hub-copy">Quick access for mobile users.</p>
                 </div>
             </div>
 
@@ -515,8 +529,7 @@
                 <button type="button" class="mobile-hub-btn mobile-hub-btn--report" id="mobileHubReportButton">
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-fire-flame-curved"></i></span>
                     <span class="mobile-hub-btn__copy">
-                        <strong>REPORT FIRE EMERGENCY</strong>
-                        <small>Send your current-location report immediately.</small>
+                        <strong>Report Fire Emergency</strong>
                     </span>
                 </button>
 
@@ -525,7 +538,6 @@
                         <span class="mobile-hub-btn__icon"><i class="fa-solid fa-phone"></i></span>
                         <span class="mobile-hub-btn__copy">
                             <strong>Call 911</strong>
-                            <small>Emergency line</small>
                         </span>
                     </a>
 
@@ -533,7 +545,6 @@
                         <span class="mobile-hub-btn__icon"><i class="fa-solid fa-phone-volume"></i></span>
                         <span class="mobile-hub-btn__copy">
                             <strong>Call BFP</strong>
-                            <small>Station hotline</small>
                         </span>
                     </a>
                 </div>
@@ -541,8 +552,7 @@
                 <a href="{{ route('citizen.dashboard') }}" class="mobile-hub-btn mobile-hub-btn--dashboard">
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
                     <span class="mobile-hub-btn__copy">
-                        <strong>Dashboard / History</strong>
-                        <small>Go to your citizen dashboard and report history.</small>
+                        <strong>History</strong>
                     </span>
                 </a>
 
@@ -550,7 +560,6 @@
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-map-location-dot"></i></span>
                     <span class="mobile-hub-btn__copy">
                         <strong>View Map</strong>
-                        <small>Open the citizen dashboard map and live alerts.</small>
                     </span>
                 </a>
             </div>
@@ -561,10 +570,9 @@
         <div class="mobile-hub-footer">
             <div class="mobile-hub-utility">
                 <div>
-                    <strong id="mobileHubStationLabel">Nearest station</strong>
-                    <small id="mobileHubStationHint">Checking closest fire station for your area.</small>
+                    <strong id="mobileHubStationLabel">Dispatch matching</strong>
+                    <small id="mobileHubStationHint">Nearest available team is selected.</small>
                 </div>
-                <span class="mobile-hub-install">Install App</span>
             </div>
         </div>
         </div>

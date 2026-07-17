@@ -141,6 +141,161 @@ class LoginController extends Controller
         ]);
     }
 
+    public function showForgotPasswordForm()
+    {
+        return response()
+            ->view('auth.forgot-password')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    }
+
+    public function sendPasswordResetOtp(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'account_identifier' => ['required', 'string', 'max:255'],
+        ], [
+            'account_identifier.required' => 'Enter your email address or contact number.',
+        ]);
+
+        $identifier = trim($validated['account_identifier']);
+        $digits = preg_replace('/\D+/', '', $identifier);
+
+        $user = User::query()
+            ->where('email', $identifier)
+            ->when($digits !== '', function ($query) use ($digits, $identifier) {
+                $query->orWhere('contact_number', $digits)
+                    ->orWhere('contact_number', $identifier);
+            })
+            ->first();
+
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'account_identifier' => 'No PyroSense account matched that email address or contact number.',
+            ]);
+        }
+
+        if (! $user->email) {
+            throw ValidationException::withMessages([
+                'account_identifier' => 'This account does not have an email address for password recovery.',
+            ]);
+        }
+
+        $recentRequests = OtpRequest::where('email', $user->email)
+            ->where('created_at', '>=', now()->subMinute())
+            ->count();
+
+        if ($recentRequests >= 3) {
+            throw ValidationException::withMessages([
+                'account_identifier' => 'Too many recovery requests. Please wait a minute before trying again.',
+            ]);
+        }
+
+        $otpCode = $this->generateOtpCode();
+        $requestId = 'password-reset-otp-' . uniqid();
+
+        Mail::raw(
+            "Your PyroSense password reset code is {$otpCode}. This code will expire in 10 minutes. If you did not request this, you can ignore this email.",
+            function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('PyroSense Password Reset Code');
+            }
+        );
+
+        $otp = OtpRequest::create([
+            'user_id' => $user->user_id,
+            'phone' => (string) ($user->contact_number ?? 'N/A'),
+            'email' => $user->email,
+            'request_id' => $requestId,
+            'otp_code' => $otpCode,
+            'expires_at' => now()->addMinutes(10),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        $request->session()->put('pending_password_reset', [
+            'user_id' => $user->user_id,
+            'otp_request_id' => $otp->id,
+            'email' => $user->email,
+        ]);
+
+        return redirect()
+            ->route('password.reset.form')
+            ->with('success', 'We found your account and sent a reset code to ' . $this->maskEmail($user->email) . '.');
+    }
+
+    public function showResetPasswordForm(Request $request)
+    {
+        if (! $request->session()->has('pending_password_reset')) {
+            return redirect()->route('password.request');
+        }
+
+        return response()
+            ->view('auth.forgot-password', [
+                'resetMode' => true,
+                'maskedEmail' => $this->maskEmail((string) $request->session()->get('pending_password_reset.email')),
+            ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    }
+
+    public function resetPasswordWithOtp(Request $request): RedirectResponse
+    {
+        $pending = $request->session()->get('pending_password_reset');
+
+        if (! $pending) {
+            return redirect()->route('password.request');
+        }
+
+        $validated = $request->validate([
+            'otp_code' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $otpRequest = OtpRequest::find($pending['otp_request_id'] ?? null);
+        $user = User::find($pending['user_id'] ?? null);
+
+        if (! $otpRequest || ! $user || (int) $otpRequest->user_id !== (int) $user->user_id) {
+            $request->session()->forget('pending_password_reset');
+
+            throw ValidationException::withMessages([
+                'otp_code' => 'The password reset request is no longer valid. Please start again.',
+            ]);
+        }
+
+        if ($otpRequest->isExpired()) {
+            throw ValidationException::withMessages([
+                'otp_code' => 'The reset code has expired. Please request a new code.',
+            ]);
+        }
+
+        if ($otpRequest->is_verified) {
+            throw ValidationException::withMessages([
+                'otp_code' => 'This reset code has already been used.',
+            ]);
+        }
+
+        if (! hash_equals((string) $otpRequest->otp_code, (string) $validated['otp_code'])) {
+            throw ValidationException::withMessages([
+                'otp_code' => 'Invalid reset code.',
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($validated['password']),
+            'remember_token' => null,
+        ])->save();
+
+        $otpRequest->markAsVerified();
+        $request->session()->forget('pending_password_reset');
+        $this->storeUserLog($user->user_id, 'reset password', $request);
+
+        return redirect()
+            ->route('auth.login')
+            ->with('success', 'Password updated. You can now sign in with your new password.');
+    }
+
     /**
      * Redirect the user to Google for authentication.
      */
@@ -757,5 +912,17 @@ class LoginController extends Controller
     private function generateOtpCode(): string
     {
         return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        if (! str_contains($email, '@')) {
+            return $email;
+        }
+
+        [$name, $domain] = explode('@', $email, 2);
+        $visible = mb_substr($name, 0, 2);
+
+        return $visible . str_repeat('*', max(2, mb_strlen($name) - 2)) . '@' . $domain;
     }
 }

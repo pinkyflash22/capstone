@@ -142,17 +142,17 @@ class IncidentAutoAssignmentService
 
     private function findAvailableTeamForStation(int $stationId): ?Team
     {
-        $stationOfficerUserIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('user_id')
+        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
+            ->pluck('station_officer_id')
             ->filter()
             ->values();
 
-        if ($stationOfficerUserIds->isEmpty()) {
+        if ($stationOfficerIds->isEmpty()) {
             return null;
         }
 
         return Team::where('status', 'available')
-            ->whereIn('team_leader', $stationOfficerUserIds->all())
+            ->whereIn('team_leader', $stationOfficerIds->all())
             ->lockForUpdate()
             ->orderBy('team_id')
             ->first();
@@ -172,7 +172,7 @@ class IncidentAutoAssignmentService
         $team->updated_at = now();
         $team->save();
 
-        $teamMemberUserIds = collect([
+        $teamMemberStationOfficerIds = collect([
             $team->commander_driver,
             $team->pumper,
             $team->team_leader,
@@ -182,8 +182,8 @@ class IncidentAutoAssignmentService
             $team->rescue_radio,
         ])->filter()->unique()->values();
 
-        if ($teamMemberUserIds->isNotEmpty()) {
-            StationOfficer::whereIn('user_id', $teamMemberUserIds->all())
+        if ($teamMemberStationOfficerIds->isNotEmpty()) {
+            StationOfficer::whereIn('station_officer_id', $teamMemberStationOfficerIds->all())
                 ->update([
                     'status' => 'dispatched',
                     'updated_at' => now(),

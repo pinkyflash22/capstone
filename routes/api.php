@@ -261,6 +261,7 @@ Route::delete('/final-investigation/{finalInvestigationReport}', [FinalInvestiga
 // Route::put('/incidents/{incidentId}/complete', [IncidentController::class, 'complete']);
 
 Route::put('/incidents/{incidentId}/false-alarm', [IncidentController::class, 'markFalseAlarm']);
+Route::get('/incidents/nearest-available-responder', [IncidentController::class, 'nearestAvailableResponder']);
 Route::post('/incidents', [IncidentController::class, 'store']);
 Route::put('/incidents/{incidentId}/citizen-update', [IncidentController::class, 'updateCitizenReport']);
 Route::put('/incidents/{incidentId}/{statusId}', [IncidentController::class, 'updateIncidentStatus']);

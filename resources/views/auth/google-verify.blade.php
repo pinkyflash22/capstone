@@ -54,21 +54,6 @@
             backdrop-filter: blur(16px);
         }
 
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 0.9rem;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #fff0e8 0%, #fff5dc 100%);
-            color: var(--primary);
-            font-size: 0.82rem;
-            font-weight: 800;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-            margin-bottom: 1rem;
-        }
-
         h1 {
             margin: 0 0 0.8rem;
             font-size: 2rem;
@@ -81,50 +66,9 @@
             line-height: 1.65;
         }
 
-        .lead + .lead {
-            margin-top: 0.65rem;
-        }
-
         .email {
             color: var(--primary);
             font-weight: 800;
-        }
-
-        .status-panel {
-            display: grid;
-            grid-template-columns: 44px 1fr;
-            gap: 0.85rem;
-            align-items: start;
-            margin: 1.5rem 0 1.25rem;
-            padding: 1rem 1.05rem;
-            border-radius: 20px;
-            background: var(--surface-soft);
-            border: 1px solid rgba(209, 138, 22, 0.14);
-        }
-
-        .status-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(198, 61, 38, 0.12), rgba(209, 138, 22, 0.18));
-            color: var(--primary);
-            font-size: 1.2rem;
-        }
-
-        .status-copy strong {
-            display: block;
-            color: var(--text);
-            margin-bottom: 0.2rem;
-        }
-
-        .status-copy span {
-            display: block;
-            color: var(--muted);
-            font-size: 0.92rem;
-            line-height: 1.55;
         }
 
         .field {
@@ -230,21 +174,14 @@
             padding-left: 1rem;
         }
 
-        .footer-note {
-            margin-top: 1rem;
-            font-size: 0.84rem;
-            color: var(--muted);
-            text-align: center;
-        }
-
         @media (max-width: 560px) {
             .card {
-                padding: 1.4rem;
+                padding: 1.15rem;
                 border-radius: 24px;
             }
 
             h1 {
-                font-size: 1.7rem;
+                font-size: 1.45rem;
             }
 
             .otp-grid {
@@ -260,18 +197,8 @@
 </head>
 <body>
     <div class="card">
-        <div class="eyebrow">Secure Google Access</div>
-        <h1>Verify Your Sign-In</h1>
-        <p class="lead">Finish this one-time check before your Google account can access PyroSense.</p>
-        <p class="lead">We sent a 6-digit verification code to <span class="email">{{ $email }}</span>.</p>
-
-        <div class="status-panel">
-            <div class="status-icon">G</div>
-            <div class="status-copy">
-                <strong>Google account detected</strong>
-                <span>This Google email is new to PyroSense, so email verification is required before the account is fully activated.</span>
-            </div>
-        </div>
+        <h1>Verify sign-in</h1>
+        <p class="lead">Enter the 6-digit code sent to <span class="email">{{ $email }}</span>.</p>
 
         @if (session('success'))
             <div class="message">{{ session('success') }}</div>
@@ -300,7 +227,6 @@
                     <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-otp-digit>
                 </div>
                 <input id="otp_code" name="otp_code" type="hidden" value="{{ old('otp_code') }}">
-                <div class="otp-help">Enter the code exactly as sent to your email.</div>
             </div>
 
             <div class="actions">
@@ -312,8 +238,6 @@
             @csrf
             <button type="submit" class="btn-secondary">Resend Code</button>
         </form>
-
-        <div class="footer-note">If you close this page before verification, you will be asked to verify again on your next Google sign-in.</div>
     </div>
 
     <script>

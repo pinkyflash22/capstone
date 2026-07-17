@@ -254,6 +254,17 @@ body {
     margin-bottom: 0.85rem;
 }
 
+.mobile-entry-logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+}
+
+.mobile-entry-logo .logo-image {
+    width: 42px;
+    height: 42px;
+}
+
 .mobile-entry-title {
     font-size: 1.72rem;
     font-weight: 700;
@@ -321,8 +332,8 @@ body {
 
 .landing-toast {
     position: fixed;
-    left: 50%;
-    bottom: calc(1.1rem + env(safe-area-inset-bottom));
+    top: calc(1.1rem + env(safe-area-inset-top));
+    right: 1.25rem;
     z-index: 2600;
     display: flex;
     align-items: center;
@@ -338,13 +349,13 @@ body {
     font-weight: 800;
     opacity: 0;
     pointer-events: none;
-    transform: translate(-50%, 16px);
+    transform: translateY(-12px);
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .landing-toast.is-visible {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
 }
 
 .landing-toast.is-error {
@@ -1658,6 +1669,18 @@ html.js .reveal-on-scroll[data-reveal="up"] {
         flex-direction: column;
     }
 
+    .landing-toast {
+        top: auto;
+        right: auto;
+        left: 50%;
+        bottom: calc(1.1rem + env(safe-area-inset-bottom));
+        transform: translate(-50%, 16px);
+    }
+
+    .landing-toast.is-visible {
+        transform: translate(-50%, 0);
+    }
+
     .hero-action-btn {
         width: 100%;
     }
@@ -1703,9 +1726,9 @@ html.js .reveal-on-scroll[data-reveal="up"] {
     }
 
     .mobile-entry-logo {
-        width: 70px !important;
-        height: 52px !important;
-        border-radius: 16px !important;
+        width: 62px !important;
+        height: 62px !important;
+        border-radius: 50% !important;
     }
 
     .mobile-entry-title {
