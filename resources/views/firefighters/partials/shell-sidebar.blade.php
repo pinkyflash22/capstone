@@ -1495,7 +1495,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function goToFirefighterDashboard() {
-        window.location.href = @json(route('firefighter.dashboard'));
+        const dashboardHref = @json(route('firefighter.dashboard'));
+        const dashboardPath = new URL(dashboardHref, window.location.origin).pathname;
+
+        if (window.location.pathname === dashboardPath) {
+            closePanels();
+            closeBurstMenu();
+
+            if (typeof window.closeFirefighterInsightsPanel === 'function') {
+                window.closeFirefighterInsightsPanel();
+            }
+
+            if (typeof window.refreshFirefighterDashboardMap === 'function') {
+                window.refreshFirefighterDashboardMap();
+            }
+
+            return;
+        }
+
+        window.location.href = dashboardHref;
     }
 
     resetTransientUi();

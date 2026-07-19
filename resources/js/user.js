@@ -1056,7 +1056,8 @@ function buildLegendSwatch({ color, icon = null, iconHtml = null, imagePath = nu
             align-items: center;
             justify-content: center;
             border: ${safeImagePath ? 0 : borderWidth}px solid #fff;
-            box-shadow: ${safeImagePath ? 'none' : shadow};
+            box-shadow: none;
+            filter: none;
             font-size: ${iconSize}px;
             flex-shrink: 0;
             ${animation}
@@ -1113,7 +1114,8 @@ function updateCitizenMapLegend(legendEntries = []) {
             background: rgba(255,255,255,0.96);
             border: 1px solid rgba(226,232,240,0.95);
             border-radius: 16px;
-            box-shadow: 0 16px 32px rgba(15,23,42,0.14);
+            box-shadow: none;
+            filter: none;
             padding: 12px 14px;
             min-width: 180px;
             backdrop-filter: blur(12px);

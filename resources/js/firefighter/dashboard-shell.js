@@ -148,10 +148,25 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             </div>
         `;
 
-        target.querySelector('[data-retry-action]')?.addEventListener('click', function () {
+        target.querySelector('[data-retry-action]')?.addEventListener('click', async function () {
             const actionName = this.getAttribute('data-retry-action');
             if (actionName && typeof window[actionName] === 'function') {
-                window[actionName](true);
+                const originalContent = this.innerHTML;
+                this.disabled = true;
+                this.setAttribute('aria-busy', 'true');
+                this.innerHTML = '<span class="ff-shell-retry-spinner" aria-hidden="true"></span> Loading...';
+                target.classList.add('is-retrying');
+
+                try {
+                    await window[actionName](true);
+                } finally {
+                    target.classList.remove('is-retrying');
+                    if (this.isConnected) {
+                        this.disabled = false;
+                        this.removeAttribute('aria-busy');
+                        this.innerHTML = originalContent;
+                    }
+                }
             }
         });
     }
@@ -500,8 +515,10 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         buttons.forEach((button) => {
             button.disabled = true;
             button.dataset.pending = 'true';
+            button.setAttribute('aria-busy', 'true');
+            button.classList.add('is-action-pending');
             if (!button.classList.contains('view-incident-details')) {
-                button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${options.buttonLabel || 'Updating...'}`;
+                button.innerHTML = `<span class="ff-action-spinner" aria-hidden="true"></span><span>${options.buttonLabel || 'Updating...'}</span>`;
             }
         });
 
@@ -523,6 +540,8 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             button.disabled = disabled;
             button.innerHTML = html;
             delete button.dataset.pending;
+            button.removeAttribute('aria-busy');
+            button.classList.remove('is-action-pending');
         });
 
         const statusBadge = card.querySelector('.incident-status-badge');
@@ -1017,7 +1036,7 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     const confirmed = await showFalseAlarmConfirmationToast();
     if (!confirmed) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
-        buttonLabel: 'Tagging...',
+        buttonLabel: 'Tagging false alarm...',
         badgeLabel: 'FLAGGING...'
     });
 
@@ -1058,38 +1077,38 @@ function showFalseAlarmConfirmationToast() {
         toast.id = 'falseAlarmConfirmToast';
         toast.style.cssText = `
             position: fixed;
-            right: 24px;
-            bottom: 24px;
-            width: min(360px, calc(100vw - 32px));
-            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-            border: 1px solid rgba(251, 146, 60, 0.28);
-            border-left: 4px solid #ea580c;
-            border-radius: 16px;
-            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
-            padding: 16px;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(15, 23, 42, 0.22);
+            backdrop-filter: blur(4px);
             z-index: 5000;
             color: #7c2d12;
         `;
 
         toast.innerHTML = `
-            <div style="display:flex; align-items:flex-start; gap:12px;">
-                <div style="width:38px; height:38px; border-radius:999px; background:#fb923c; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div style="flex:1;">
-                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;">Flag as False Alarm?</div>
-                    <div style="font-size:13px; line-height:1.45; color:#9a3412;">
-                        This will tag the incident as a false alarm and remove it from active response handling.
+            <div role="dialog" aria-modal="true" aria-labelledby="falseAlarmConfirmTitle" style="width:min(360px, calc(100vw - 32px)); background:linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); border:1px solid rgba(251, 146, 60, 0.26); border-radius:20px; box-shadow:0 24px 54px rgba(15, 23, 42, 0.18); padding:18px;">
+                <div style="display:flex; align-items:flex-start; gap:12px;">
+                    <div style="width:42px; height:42px; border-radius:999px; background:#fb923c; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 10px 20px rgba(251, 146, 60, 0.22);">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div id="falseAlarmConfirmTitle" style="font-size:15px; font-weight:800; margin-bottom:4px; color:#7c2d12;">Flag as False Alarm?</div>
+                        <div style="font-size:13px; line-height:1.45; color:#9a3412;">
+                            This will remove the incident from active response handling.
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
-                <button type="button" id="falseAlarmCancelBtn" style="padding:8px 12px; border-radius:10px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:700; cursor:pointer;">
-                    Cancel
-                </button>
-                <button type="button" id="falseAlarmConfirmBtn" style="padding:8px 12px; border-radius:10px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:700; cursor:pointer;">
-                    Confirm
-                </button>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;">
+                    <button type="button" id="falseAlarmCancelBtn" style="min-height:42px; padding:9px 12px; border-radius:12px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:800; cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button type="button" id="falseAlarmConfirmBtn" style="min-height:42px; padding:9px 12px; border-radius:12px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 12px 24px rgba(234, 88, 12, 0.22);">
+                        Confirm
+                    </button>
+                </div>
             </div>
         `;
 
@@ -1104,6 +1123,11 @@ function showFalseAlarmConfirmationToast() {
 
         toast.querySelector('#falseAlarmCancelBtn')?.addEventListener('click', () => cleanup(false));
         toast.querySelector('#falseAlarmConfirmBtn')?.addEventListener('click', () => cleanup(true));
+        toast.addEventListener('click', (event) => {
+            if (event.target === toast) {
+                cleanup(false);
+            }
+        });
 
         setTimeout(() => {
             if (document.body.contains(toast)) {
@@ -1225,11 +1249,14 @@ function showFalseAlarmConfirmationToast() {
                 return;
             }
 
+            mapElement.classList.add('is-firefighter-map-ready');
             window.map.invalidateSize();
             window.setTimeout(() => window.map?.invalidateSize?.(), 180);
             window.setTimeout(() => window.map?.invalidateSize?.(), 420);
             window.setTimeout(() => window.map?.invalidateSize?.(), 900);
         };
+
+        window.refreshFirefighterDashboardMap = ensureMapVisible;
 
         if (typeof window.initializePyroMapRuntime === 'function') {
             window.initializePyroMapRuntime();
@@ -1240,6 +1267,7 @@ function showFalseAlarmConfirmationToast() {
         window.setTimeout(ensureMapVisible, 360);
         window.addEventListener('resize', ensureMapVisible);
         window.addEventListener('orientationchange', ensureMapVisible);
+        window.addEventListener('pageshow', ensureMapVisible);
 
         window.setTimeout(async function () {
             if (loadState) {

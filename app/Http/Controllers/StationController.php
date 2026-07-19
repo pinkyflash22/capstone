@@ -24,7 +24,7 @@ class StationController extends Controller
 public function index()
 {
     try {
-        $stations = Cache::remember('map:stations:index:v2', now()->addSeconds(45), function () {
+        $stations = Cache::remember('map:stations:index:v3', now()->addSeconds(45), function () {
             return Station::query()
                 ->select([
                     'station_id',
@@ -34,8 +34,6 @@ public function index()
                     'email',
                     'address_id',
                     'marker_id',
-                    'created_at',
-                    'updated_at',
                 ])
                 ->with([
                     'marker:marker_id,title,description,lat,lng,status,category,image,markerCategory_id,created_at,updated_at',
@@ -99,6 +97,7 @@ public function updateByMarker(Request $request, $markerId)
     
     $station->update($request->only(['station_name', 'station_code', 'contact_number', 'email']));
     Cache::forget('map:stations:index:v2');
+    Cache::forget('map:stations:index:v3');
     
     return response()->json(['success' => true, 'data' => $station]);
 }

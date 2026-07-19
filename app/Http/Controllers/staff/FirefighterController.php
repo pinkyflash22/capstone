@@ -293,7 +293,7 @@ class FirefighterController extends Controller
             ->with([
                 'marker:marker_id,title,description,lat,lng,status,category,image',
                 'reporter:user_id,first_name,last_name',
-                'team:team_id,team_name',
+                'team:team_id',
             ])
             ->where('team_id', $teamId)
             ->when($activeOnly, function ($query) {
