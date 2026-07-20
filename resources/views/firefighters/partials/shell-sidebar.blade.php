@@ -434,16 +434,18 @@
             position: relative;
             width: min(100%, 344px);
             margin: 0 auto;
-            gap: 6px;
             min-height: 66px;
-            padding: 12px 16px 11px;
+            padding: 12px 18px 11px;
             border-radius: 24px;
             background: linear-gradient(180deg, rgba(20, 83, 90, 0.98) 0%, rgba(16, 75, 84, 0.96) 100%);
             border: 1px solid rgba(255, 255, 255, 0.12);
             box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            display: flex;
+            justify-content: space-between;
             align-items: end;
+            gap: 0;
+            --ff-dock-center-slot: 96px;
+            --ff-dock-side-width: calc((100% - var(--ff-dock-center-slot)) / 2);
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__rail::before {
@@ -459,6 +461,8 @@
             position: relative;
             min-width: 44px;
             min-height: 44px;
+            width: 44px;
+            height: 44px;
             padding: 0;
             border: none;
             background: transparent;
@@ -471,6 +475,62 @@
             transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
             border-radius: 999px;
             z-index: 1;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group {
+            position: relative;
+            z-index: 2;
+            width: var(--ff-dock-side-width);
+            min-width: 0;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(44px, 1fr));
+            align-items: center;
+            justify-items: center;
+            column-gap: clamp(8px, 2.4vw, 14px);
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group--left {
+            padding-right: 16px;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group--right {
+            padding-left: 16px;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications],
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-settings] {
+            position: relative !important;
+            inset: auto !important;
+            left: auto !important;
+            right: auto !important;
+            top: auto !important;
+            bottom: auto !important;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            margin: 0 !important;
+            transform: none !important;
+            background: transparent !important;
+            background-image: none !important;
+            color: rgba(214, 227, 230, 0.5) !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+            opacity: 1 !important;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications]::before,
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications]::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications].active,
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-settings].active {
+            color: #ffffff !important;
+            background: transparent !important;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item.active {
@@ -494,11 +554,14 @@
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__center {
+            position: absolute;
+            left: 50%;
+            top: 12px;
             width: 66px;
             height: 66px;
             min-width: 66px;
             min-height: 66px;
-            margin: -30px auto 0;
+            margin: -30px 0 0;
             padding: 0;
             border: 4px solid #f5f7ec;
             border-radius: 999px;
@@ -511,8 +574,8 @@
             -webkit-appearance: none;
             flex-shrink: 0;
             box-shadow: 0 18px 34px rgba(34, 197, 94, 0.34), 0 0 0 8px rgba(255, 255, 255, 0.22);
-            position: relative;
             z-index: 3;
+            transform: translateX(-50%);
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__center::before {
@@ -534,6 +597,11 @@
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__center.active {
             box-shadow: 0 18px 34px rgba(34, 197, 94, 0.34), 0 0 0 8px rgba(255, 255, 255, 0.22);
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications] .ff-mobile-icon,
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-settings] .ff-mobile-icon {
+            color: currentColor !important;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__center .ff-mobile-icon {
@@ -725,21 +793,25 @@
             @endif
         </div>
         <div class="ff-mobile-dock__rail">
-            <a href="{{ route('firefighter.schedule') }}" class="ff-mobile-dock__item {{ $currentActive === 'schedule' ? 'active' : '' }}" aria-label="Schedule" data-ff-nav-link data-ff-nav-key="schedule">
-                <span class="ff-mobile-icon" aria-hidden="true">calendar_month</span>
-            </a>
-            <button type="button" class="ff-mobile-dock__item" data-ff-open-notifications aria-label="Notifications">
-                <span class="ff-mobile-icon" aria-hidden="true">notifications</span>
-            </button>
+            <div class="ff-mobile-dock__group ff-mobile-dock__group--left">
+                <a href="{{ route('firefighter.schedule') }}" class="ff-mobile-dock__item {{ $currentActive === 'schedule' ? 'active' : '' }}" aria-label="Schedule" data-ff-nav-link data-ff-nav-key="schedule">
+                    <span class="ff-mobile-icon" aria-hidden="true">calendar_month</span>
+                </a>
+                <button type="button" class="ff-mobile-dock__item" data-ff-open-notifications aria-label="Notifications">
+                    <span class="ff-mobile-icon" aria-hidden="true">notifications</span>
+                </button>
+            </div>
             <button type="button" class="ff-mobile-dock__center {{ $mobileDockIsOpsActive ? 'active' : '' }}" data-ff-dashboard-fab aria-label="Dashboard">
                 <span class="ff-mobile-icon" aria-hidden="true">dashboard</span>
             </button>
-            <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-dock__item {{ $currentActive === 'announcements' ? 'active' : '' }}" aria-label="Announcements" data-ff-nav-link data-ff-nav-key="announcements">
-                <span class="ff-mobile-icon" aria-hidden="true">campaign</span>
-            </a>
-            <button type="button" class="ff-mobile-dock__item {{ $currentActive === 'profile' ? 'active' : '' }}" data-ff-open-settings aria-label="Settings">
-                <span class="ff-mobile-icon" aria-hidden="true">settings</span>
-            </button>
+            <div class="ff-mobile-dock__group ff-mobile-dock__group--right">
+                <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-dock__item {{ $currentActive === 'announcements' ? 'active' : '' }}" aria-label="Announcements" data-ff-nav-link data-ff-nav-key="announcements">
+                    <span class="ff-mobile-icon" aria-hidden="true">campaign</span>
+                </a>
+                <button type="button" class="ff-mobile-dock__item {{ $currentActive === 'profile' ? 'active' : '' }}" data-ff-open-settings aria-label="Settings">
+                    <span class="ff-mobile-icon" aria-hidden="true">settings</span>
+                </button>
+            </div>
         </div>
     </div>
 </nav>
@@ -1461,6 +1533,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!panel) return;
         [notificationsPanel, settingsPanel].forEach(function (target) {
             if (target) {
+                if (target !== panel && target.contains(document.activeElement)) {
+                    document.activeElement?.blur?.();
+                }
                 target.classList.toggle('is-open', target === panel);
                 target.setAttribute('aria-hidden', target === panel ? 'false' : 'true');
             }
@@ -1470,6 +1545,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function closePanels() {
         [notificationsPanel, settingsPanel].forEach(function (panel) {
             if (panel) {
+                if (panel.contains(document.activeElement)) {
+                    document.activeElement?.blur?.();
+                }
                 panel.classList.remove('is-open');
                 panel.setAttribute('aria-hidden', 'true');
             }
@@ -1607,6 +1685,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.addEventListener('click', function (event) {
+        if (event.__ffMapLayerControlHandled) {
+            return;
+        }
+
         const link = event.target.closest ? event.target.closest('a[href]') : null;
 
         if (!isEligibleNavigationLink(link)) {

@@ -13,6 +13,7 @@ use App\Models\InspectionChecklist;
 use App\Models\FsicApproval;
 use App\Models\FsicInspection;
 use App\Models\Province;
+use App\Models\Barangay;
 use App\Models\BarangayHall;
 use App\Models\RiskArea;
 use App\Models\User;
@@ -395,16 +396,26 @@ class PublicController extends Controller
         };
     }
 
-    private function buildCitizenDashboardData(int $accountId, ?float $latitude = null, ?float $longitude = null): array
+    private function buildCitizenDashboardData(
+        int $accountId,
+        ?float $latitude = null,
+        ?float $longitude = null,
+        $preloadedIncidents = null,
+        $preloadedUserIncidents = null
+    ): array
     {
-        $incidents = Incident::with(['marker', 'barangay.city'])
-            ->orderByDesc('created_at')
-            ->get();
+        $incidents = $preloadedIncidents instanceof \Illuminate\Support\Collection
+            ? $preloadedIncidents
+            : Incident::with(['marker', 'barangay.city'])
+                ->orderByDesc('created_at')
+                ->get();
 
-        $userIncidents = Incident::with(['marker', 'barangay.city'])
-            ->where('reported_by', $accountId)
-            ->orderByDesc('created_at')
-            ->get();
+        $userIncidents = $preloadedUserIncidents instanceof \Illuminate\Support\Collection
+            ? $preloadedUserIncidents
+            : Incident::with(['marker', 'barangay.city'])
+                ->where('reported_by', $accountId)
+                ->orderByDesc('created_at')
+                ->get();
 
         $userRiskReports = RiskArea::with(['marker', 'photos', 'barangayHall.barangay.city'])
             ->where('reported_by', $accountId)
@@ -424,7 +435,9 @@ class PublicController extends Controller
 
         $userReports = $userIncidents->count() + $userRiskReports->count();
         $countReport = $userReports;
-        $fireCount = Incident::where('status', 'Reported')->count();
+        $fireCount = $incidents
+            ->filter(fn ($incident) => strtolower(trim((string) $incident->status)) === 'reported')
+            ->count();
         $totalIncidentCount = max($incidents->count(), 1);
         $riskPercentage = round(($fireCount / $totalIncidentCount) * 100, 1);
         $riskLevel = $this->determineRiskLevel($riskPercentage);
@@ -490,30 +503,96 @@ class PublicController extends Controller
         ];
     }
 
+    private function buildCitizenInitialMarkers()
+    {
+        return Cache::remember('citizen:dashboard:initial-markers:v1', now()->addSeconds(45), function () {
+            return Marker::query()
+                ->select([
+                    'marker_id',
+                    'title',
+                    'description',
+                    'lat',
+                    'lng',
+                    'category',
+                    'status',
+                    'image',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->get();
+        });
+    }
+
+    private function buildCitizenAddressOptions(?int $selectedCityId): array
+    {
+        $provinces = Cache::remember('citizen:province-options:v1', now()->addHours(6), function () {
+            return Province::query()
+                ->select(['province_id', 'province_name'])
+                ->orderBy('province_name')
+                ->get();
+        });
+
+        $cities = Cache::remember('citizen:city-options:v1', now()->addHours(6), function () {
+            return City::query()
+                ->select(['city_id', 'city_name'])
+                ->orderBy('city_name')
+                ->get();
+        });
+
+        $selectedBarangays = $selectedCityId
+            ? Cache::remember("citizen:barangays:city:{$selectedCityId}:v1", now()->addHours(6), function () use ($selectedCityId) {
+                return Barangay::query()
+                    ->select(['barangay_id', 'barangay_name', 'city_id'])
+                    ->where('city_id', $selectedCityId)
+                    ->orderBy('barangay_name')
+                    ->get();
+            })
+            : collect();
+
+        $cities = $cities->map(function ($city) use ($selectedCityId, $selectedBarangays) {
+            $cityOption = clone $city;
+            $cityOption->setRelation(
+                'barangays',
+                ((int) $cityOption->city_id === (int) $selectedCityId) ? $selectedBarangays : collect()
+            );
+
+            return $cityOption;
+        });
+
+        return [$provinces, $cities];
+    }
+
     //note dapat kapag mag papass sa isang view kung lahat ng data kailangan mo, idaan mo nalang sa isang controller
     public function index(?string $section = null)
     {
         $accountId = Auth::user()->user_id;
         $initialSection = in_array($section, self::CITIZEN_DASHBOARD_SECTIONS, true) ? $section : 'overview';
 
-        $incidents = Incident::with(['marker', 'barangay.city'])->get();
-        $userReports = Incident::where('reported_by', $accountId)->count();
-        $countReport = Incident::where('reported_by', $accountId)->count();
-        $userinfo = User::where('user_id', $accountId)->with('role','address','address.barangay','address.barangay.city')->get();
-        $markerResponse = app(MarkerController::class)->index()->getData(true);
-        $usermarker = $markerResponse['data'] ?? [];
-        $provinces = Province::with('cities.barangays')->get();
-        $cities = City::with('barangays')->orderBy('city_name')->get(['city_id', 'city_name']);
         $citizenUser = User::with(['role', 'address.barangay.city'])->findOrFail($accountId);
-          $myReports = Incident::where('reported_by',$accountId)
-          ->with(['marker', 'barangay.city'])
-           ->orderBy('created_at', 'desc')
-          ->get();
+        $incidents = Incident::with(['marker', 'barangay.city'])
+            ->orderByDesc('created_at')
+            ->get();
+        $myReports = $incidents
+            ->where('reported_by', $accountId)
+            ->values();
+        $userReports = $myReports->count();
+        $countReport = $userReports;
+        $userinfo = collect([$citizenUser]);
+        $usermarker = $this->buildCitizenInitialMarkers();
+        [$provinces, $cities] = $this->buildCitizenAddressOptions($citizenUser->address?->barangay?->city_id);
 
-        $allStationOfficer = StationOfficer::with(['user'])->get();
-      
-        $stations = Station::with(['marker','address'])->get();
-        $dashboardData = $this->buildCitizenDashboardData($accountId);
+        $allStationOfficer = StationOfficer::query()
+            ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
+            ->with(['user:user_id,first_name,last_name,name,email'])
+            ->get();
+
+        $stations = Cache::remember('citizen:dashboard:stations:v1', now()->addSeconds(45), function () {
+            return Station::with(['marker', 'address.barangay.city'])->get();
+        });
+
+        $dashboardData = $this->buildCitizenDashboardData($accountId, null, null, $incidents, $myReports);
         $riskPercentage = $dashboardData['summary']['risk_percentage'];
         $riskLevel = $dashboardData['summary']['risk_level'];
         $activeAlerts = $dashboardData['summary']['active_alerts'];
@@ -525,8 +604,8 @@ class PublicController extends Controller
 
 
         //request
-        $fsicApplications = FsicRequest::all();
-        $fsicRequests = FsicRequest::where('user_id', $accountId)->get();
+        $fsicApplications = collect();
+        $fsicRequests = FsicRequest::where('user_id', $accountId)->latest()->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
         'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports'));

@@ -914,6 +914,11 @@ class FirefighterController extends Controller
                 }
 
                 $routeArrivalMap = $this->getLatestRouteTimestampsForIncidentIds($incidents->pluck('incident_id')->all());
+                $spotReportMap = SpotInvestigationReport::query()
+                    ->whereIn('incident_id', $incidents->pluck('incident_id')->filter()->all())
+                    ->pluck('spot_investigation_report_id', 'incident_id')
+                    ->mapWithKeys(fn ($reportId, $incidentId) => [(int) $incidentId => (int) $reportId])
+                    ->all();
 
                 $responseDurations = [];
                 $stats = [
@@ -924,12 +929,14 @@ class FirefighterController extends Controller
                     'avg_response_minutes' => 0,
                 ];
 
-                $mappedIncidents = $incidents->map(function ($incident) use (&$stats, &$responseDurations, $routeArrivalMap) {
+                $mappedIncidents = $incidents->map(function ($incident) use (&$stats, &$responseDurations, $routeArrivalMap, $spotReportMap) {
                     $marker = $incident->marker;
                     $arrivalTimestamp = $routeArrivalMap[$incident->incident_id] ?? null;
                     $arrivalAt = $arrivalTimestamp ? Carbon::parse($arrivalTimestamp) : null;
                     $reporterName = trim(($incident->reporter?->first_name ?? '') . ' ' . ($incident->reporter?->last_name ?? ''));
                     $incidentStatusId = $this->getIncidentStatusId($incident->status);
+                    $spotReportId = $spotReportMap[(int) $incident->incident_id] ?? null;
+                    $investigationReady = $incidentStatusId === 4 && $spotReportId === null;
 
                     if (in_array($incidentStatusId, [2, 3], true)) {
                         $stats['active']++;
@@ -972,6 +979,15 @@ class FirefighterController extends Controller
                         'reporter_name' => $reporterName !== '' ? $reporterName : 'Concerned Citizen',
                         'status' => $incident->status,
                         'image_url' => $this->normalizeStoredMediaPath($marker?->image),
+                        'has_spot_report' => $spotReportId !== null,
+                        'spot_report_id' => $spotReportId,
+                        'investigation_ready' => $investigationReady,
+                        'investigation_url' => $investigationReady
+                            ? route('firefighter.my-station', [
+                                'openReport' => 'spot',
+                                'incident_id' => $incident->incident_id,
+                            ])
+                            : null,
                     ];
                 })->values();
 

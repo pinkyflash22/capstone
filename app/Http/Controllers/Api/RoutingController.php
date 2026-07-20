@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller; 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 class RoutingController extends Controller
 {
@@ -25,11 +27,34 @@ class RoutingController extends Controller
    public function reverse(Request $request)
 {
     $validated = $request->validate([
-        'lat' => 'required|numeric',
-        'lon' => 'required|numeric',
+        'lat' => 'required|numeric|between:-90,90',
+        'lon' => 'required|numeric|between:-180,180',
     ]);
 
-    $apiKey = env('GEOAPIFY_KEY');
+    $normalizedLat = round((float) $validated['lat'], 5);
+    $normalizedLon = round((float) $validated['lon'], 5);
+    $cacheKey = sprintf('geoapify:reverse:v1:%0.5f:%0.5f', $normalizedLat, $normalizedLon);
+
+    if (Cache::has($cacheKey)) {
+        return response()
+            ->json(Cache::get($cacheKey))
+            ->header('X-Reverse-Geocode-Cache', 'HIT');
+    }
+
+    $limiterKey = 'geoapify-reverse:' . ($request->user()?->getAuthIdentifier() ?: $request->ip());
+    $maxAttempts = 30;
+    $decaySeconds = 60;
+
+    if (RateLimiter::tooManyAttempts($limiterKey, $maxAttempts)) {
+        return response()->json([
+            'error' => 'Reverse geocoding is temporarily rate limited',
+            'retry_after' => RateLimiter::availableIn($limiterKey),
+        ], 429);
+    }
+
+    RateLimiter::hit($limiterKey, $decaySeconds);
+
+    $apiKey = config('services.geoapify.key');
     if (!$apiKey) {
         return response()->json([
             'error' => 'Reverse geocoding service is not configured'
@@ -38,13 +63,18 @@ class RoutingController extends Controller
 
     try {
         $response = Http::timeout(10)->retry(1, 200)->get('https://api.geoapify.com/v1/geocode/reverse', [
-            'lat' => $validated['lat'],
-            'lon' => $validated['lon'],
+            'lat' => $normalizedLat,
+            'lon' => $normalizedLon,
             'apiKey' => $apiKey,
         ]);
 
         if ($response->successful()) {
-            return response()->json($response->json());
+            $payload = $response->json();
+            Cache::put($cacheKey, $payload, now()->addDays(30));
+
+            return response()
+                ->json($payload)
+                ->header('X-Reverse-Geocode-Cache', 'MISS');
         }
 
         return response()->json([

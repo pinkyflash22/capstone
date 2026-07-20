@@ -1766,14 +1766,14 @@ const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><ci
 
 function createLegendItemHtml({ iconClass = null, iconHtml = null, imagePath = null, bgColor, label, shape = 'circle' }) {
     return `
-        <div class="firefighter-map-legend-item">
-            <span class="firefighter-map-legend-icon ${shape === 'square' ? 'is-square' : 'is-circle'}" style="background:transparent;border:2px solid ${bgColor};box-shadow:none;width:30px;height:30px;">
+        <div class="ff-clean-map-legend__item">
+            <span class="ff-clean-map-legend__icon ${shape === 'square' ? 'is-square' : 'is-circle'}" style="border-color:${bgColor};">
                 ${imagePath
-                    ? `<img src="${imagePath}" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;width:20px;height:20px;align-items:center;justify-content:center;">${iconHtml ? iconHtml : (iconClass ? `<i class="fas ${iconClass}" style="font-size:14px;color:${bgColor};"></i>` : '')}</span>`
-                    : (iconHtml ? `<span style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;color:${bgColor};">${iconHtml}</span>` : (iconClass ? `<i class="fas ${iconClass}" style="font-size:14px;color:${bgColor};"></i>` : ''))
+                    ? `<img src="${imagePath}" alt="" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span class="ff-clean-map-legend__fallback" style="color:${bgColor};">${iconHtml ? iconHtml : (iconClass ? `<i class="fas ${iconClass}"></i>` : '')}</span>`
+                    : (iconHtml ? `<span class="ff-clean-map-legend__fallback is-visible" style="color:${bgColor};">${iconHtml}</span>` : (iconClass ? `<i class="fas ${iconClass}" style="color:${bgColor};"></i>` : ''))
                 }
             </span>
-            <span class="firefighter-map-legend-label">${label}</span>
+            <span class="ff-clean-map-legend__label">${label}</span>
         </div>
     `;
 }
@@ -1789,21 +1789,21 @@ function createFirefighterMapLegend() {
     }
 
     legendContainer.innerHTML = `
-        <div class="firefighter-map-legend-title">Map Legend</div>
-        <div class="firefighter-map-legend-items">
+        <div class="ff-clean-map-legend__title">Map Legend</div>
+        <div class="ff-clean-map-legend__items">
             ${createLegendItemHtml({ iconClass: 'fa-building', imagePath: '/station.png', bgColor: '#2563eb', label: 'Fire Station' })}
             ${createLegendItemHtml({ bgColor: '#0f766e', imagePath: '/hall.png', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
             ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', imagePath: '/hydrant.png', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
             ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
-            <div class="firefighter-map-legend-item">
-                <span class="firefighter-map-legend-icon is-square" style="background:rgba(245,158,11,0.28);border:2px solid #d97706;box-shadow:none;width:30px;height:30px;"></span>
-                <span class="firefighter-map-legend-label">Medium Fire Risk</span>
+            <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
+                <span class="ff-clean-map-legend__label">Medium Fire Risk</span>
             </div>
-            <div class="firefighter-map-legend-item">
-                <span class="firefighter-map-legend-icon is-square" style="background:rgba(239,68,68,0.3);border:2px solid #b91c1c;box-shadow:none;width:30px;height:30px;"></span>
-                <span class="firefighter-map-legend-label">High Fire Risk</span>
+            <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
+                <span class="ff-clean-map-legend__label">High Fire Risk</span>
             </div>
         </div>
     `;
@@ -2562,6 +2562,7 @@ function ensureIncidentAlertPanel() {
     }
 
     const notificationButton = document.getElementById('notificationBtn');
+    const firefighterNotificationButton = document.querySelector('[data-ff-open-notifications]');
     const nativeDropdown = document.getElementById('alertsDropdown');
     if (notificationButton && !notificationButton.dataset.incidentAlertBound) {
         notificationButton.dataset.incidentAlertBound = 'true';
@@ -2580,7 +2581,12 @@ function ensureIncidentAlertPanel() {
     const citizenNotificationFeed = document.getElementById('citizenNotificationsFeed');
     let floatingToggle = document.getElementById(INCIDENT_ALERT_TOGGLE_ID);
 
-    if (!notificationButton && !citizenNotificationFeed && !floatingToggle) {
+    if (firefighterNotificationButton && floatingToggle) {
+        floatingToggle.remove();
+        floatingToggle = null;
+    }
+
+    if (!notificationButton && !firefighterNotificationButton && !citizenNotificationFeed && !floatingToggle) {
         floatingToggle = document.createElement('button');
         floatingToggle.id = INCIDENT_ALERT_TOGGLE_ID;
         floatingToggle.className = 'show';
@@ -2614,7 +2620,7 @@ function ensureIncidentAlertPanel() {
 function syncIncidentAlertBadges(feed = loadIncidentAlertFeed()) {
     const unreadCount = feed.filter((entry) => !entry.read).length;
     const floatingBadge = document.getElementById(INCIDENT_ALERT_BADGE_ID);
-    const notificationButton = document.getElementById('notificationBtn');
+    const notificationButton = document.getElementById('notificationBtn') || document.querySelector('[data-ff-open-notifications]');
     const chiefAlertBadge = document.getElementById('alertBadge');
 
     if (floatingBadge) {
@@ -6597,29 +6603,83 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
         ? getBlockingIncidentRouteForCurrentTeam(targetIncidentId)
         : null;
     const isIncidentRoutingBlocked = Boolean(blockingRoute);
+    const formatCoordinates = () => {
+        const lat = Number(marker.lat);
+        const lng = Number(marker.lng);
+
+        return Number.isFinite(lat) && Number.isFinite(lng)
+            ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+            : '';
+    };
+    const formatDateTime = (value) => {
+        if (!value) {
+            return '';
+        }
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return '';
+        }
+
+        return date.toLocaleString([], {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+    };
+    const compactValue = (...values) => values
+        .map((value) => (value == null ? '' : String(value).trim()))
+        .find((value) => value && !['N/A', 'Unavailable', 'Not available', 'Unknown'].includes(value)) || '';
+    const locationValue = formatCoordinates();
+    const reportedAt = formatDateTime(
+        incident?.reported_at
+        || incident?.created_at
+        || marker.reported_at
+        || marker.created_at
+    );
+    const reporterName = compactValue(
+        incident?.reporter?.name,
+        incident?.reported_by?.name,
+        incident?.user?.name,
+        incident?.reporter_name,
+        marker.reported_by,
+        marker.reporter_name
+    );
+    const assignedTeam = compactValue(
+        incident?.assigned_team?.name,
+        incident?.team?.name,
+        incident?.assignedTeam?.name,
+        incident?.station?.name,
+        marker.assigned_team,
+        marker.station?.name
+    );
     const detailRows = isIncidentMarker(marker)
         ? [
-            { label: 'Category', value: markerPresentation.label },
-            { label: 'Status', value: statusMeta.label },
-            { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+            { label: 'Reported', value: reportedAt },
+            { label: 'Reported by', value: reporterName },
+            { label: 'Assigned team', value: assignedTeam },
+            { label: 'Location', value: locationValue }
         ]
         : isStationMarker(marker)
             ? [
-                { label: 'Category', value: 'Fire Station' },
-                { label: 'Hotline', value: marker.station?.contact_number || marker.contact_number || 'Not available' },
-                { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+                { label: 'Hotline', value: compactValue(marker.station?.contact_number, marker.contact_number) },
+                { label: 'Station', value: compactValue(marker.station?.station_code, marker.station_code, marker.station?.name) },
+                { label: 'Location', value: locationValue }
             ]
             : isHydrantMarker(marker)
                 ? [
-                    { label: 'Category', value: 'Fire Hydrant' },
-                    { label: 'Reference', value: marker.hydrant?.hydrant_code || marker.title || `Hydrant ${marker.marker_id}` },
-                    { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+                    { label: 'Hydrant', value: compactValue(marker.hydrant?.hydrant_code, marker.hydrant_code, marker.title) },
+                    { label: 'Station', value: compactValue(marker.hydrant?.station?.name, marker.station?.name) },
+                    { label: 'Location', value: locationValue }
                 ]
                 : [
-                    { label: 'Category', value: markerPresentation.label },
-                    { label: 'Marker ID', value: String(marker.marker_id || 'N/A') },
-                    { label: 'Location', value: `${Number(marker.lat).toFixed(5)}, ${Number(marker.lng).toFixed(5)}` }
+                    { label: 'Contact', value: compactValue(marker.contact_number, marker.phone) },
+                    { label: 'Location', value: locationValue }
                 ];
+    const visibleDetailRows = detailRows.filter((row) => compactValue(row.value));
 
     const managementMarkup = canManageMarkers
         ? `
@@ -6698,12 +6758,13 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
         actionMarkup += managementMarkup;
     }
 
-    actionMarkup += `
-        <button id="viewDetails${marker.marker_id}" class="responder-marker-popup-btn ${isIncidentMarker(marker) ? 'primary' : 'secondary'}">
-            <i class="fas fa-circle-info"></i>
-            ${isIncidentMarker(marker) ? 'View Incident Details' : 'View Details'}
-        </button>
-    `;
+    const actionSection = actionMarkup.trim()
+        ? `
+            <div class="responder-marker-popup-actions">
+                ${actionMarkup}
+            </div>
+        `
+        : '';
 
     return `
         <div class="responder-marker-popup ${markerPresentation.accentClass}">
@@ -6739,16 +6800,14 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                 </div>
             `}
             <div class="responder-marker-popup-details">
-                ${detailRows.map((row) => `
+                ${visibleDetailRows.map((row) => `
                     <div class="responder-marker-popup-detail-row">
                         <span class="responder-marker-popup-detail-label">${escapeHtml(row.label)}</span>
                         <span class="responder-marker-popup-detail-value">${escapeHtml(row.value)}</span>
                     </div>
                 `).join('')}
             </div>
-            <div class="responder-marker-popup-actions">
-                ${actionMarkup}
-            </div>
+            ${actionSection}
             <input type="hidden" value="${escapeHtml(String(marker.marker_id || ''))}" id="mid">
         </div>
     `;
@@ -6870,6 +6929,10 @@ function closeResponderMapPreviewSheet() {
     const sheet = document.getElementById('responderMapPreviewSheet');
     if (!sheet) {
         return;
+    }
+
+    if (sheet.contains(document.activeElement)) {
+        document.activeElement?.blur?.();
     }
 
     sheet.classList.remove('show');
@@ -9279,8 +9342,11 @@ function closeModal() {
     if (successModal) document.body.removeChild(successModal);
 }
 
-function enhanceCitizenDesktopLayerControl() {
-    if (!isCitizenDashboardMapContext()) {
+function enhancePyroLayerControl() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    const isFirefighterLayerContext = configuredInstanceKey === 'firefighterDashboard';
+
+    if (!isCitizenDashboardMapContext() && !isFirefighterLayerContext) {
         return;
     }
 
@@ -9295,23 +9361,24 @@ function enhanceCitizenDesktopLayerControl() {
     }
 
     control.dataset.pyroEnhanced = 'true';
-    control.classList.add('pyro-citizen-layer-control');
+    control.classList.add('pyro-layer-control', 'pyro-citizen-layer-control');
+    control.classList.toggle('pyro-firefighter-layer-control', isFirefighterLayerContext);
     toggle.setAttribute('aria-label', 'Open map layers');
 
     const countBadge = document.createElement('span');
-    countBadge.className = 'citizen-map-layer-count';
+    countBadge.className = 'pyro-map-layer-count citizen-map-layer-count';
     toggle.appendChild(countBadge);
 
     const header = document.createElement('div');
-    header.className = 'citizen-layer-panel-header';
+    header.className = 'pyro-layer-panel-header citizen-layer-panel-header';
     header.innerHTML = `
         <span>Map layers</span>
-        <button type="button" class="citizen-layer-panel-close" aria-label="Close map layers">
+        <button type="button" class="pyro-layer-panel-close citizen-layer-panel-close" aria-label="Close map layers">
             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
         </button>
     `;
     list.prepend(header);
-    header.querySelector('.citizen-layer-panel-close')?.addEventListener('click', (event) => {
+    header.querySelector('.pyro-layer-panel-close')?.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         control.classList.remove('leaflet-control-layers-expanded');
@@ -9319,12 +9386,12 @@ function enhanceCitizenDesktopLayerControl() {
     });
 
     const styleTitle = document.createElement('div');
-    styleTitle.className = 'citizen-layer-section-title';
+    styleTitle.className = 'pyro-layer-section-title citizen-layer-section-title';
     styleTitle.textContent = 'Map style';
     base.before(styleTitle);
 
     const overlayTitle = document.createElement('div');
-    overlayTitle.className = 'citizen-layer-section-title';
+    overlayTitle.className = 'pyro-layer-section-title citizen-layer-section-title';
     overlayTitle.textContent = 'Show on map';
     overlays.before(overlayTitle);
 
@@ -9342,7 +9409,8 @@ function enhanceCitizenDesktopLayerControl() {
         'Fire Hydrants': 'Fire hydrants',
         'Other Markers': 'Other locations',
         'Water Reference': 'Water references',
-        Shapes: 'Boundaries'
+        Shapes: 'Boundaries',
+        'Fire Risk Areas': 'Fire risk areas'
     };
     const iconMap = {
         'Fire stations': 'fa-building-shield',
@@ -9350,7 +9418,8 @@ function enhanceCitizenDesktopLayerControl() {
         'Fire hydrants': 'fa-droplet',
         'Other locations': 'fa-location-dot',
         'Water references': 'fa-water',
-        Boundaries: 'fa-draw-polygon'
+        Boundaries: 'fa-draw-polygon',
+        'Fire risk areas': 'fa-map-location-dot'
     };
 
     base.querySelectorAll('label').forEach((label) => {
@@ -9383,7 +9452,7 @@ function enhanceCitizenDesktopLayerControl() {
         span.textContent = '';
 
         const icon = document.createElement('i');
-        icon.className = `fa-solid ${iconMap[displayLabel] || 'fa-location-dot'} citizen-layer-row-icon`;
+        icon.className = `fa-solid ${iconMap[displayLabel] || 'fa-location-dot'} pyro-layer-row-icon citizen-layer-row-icon`;
         icon.setAttribute('aria-hidden', 'true');
 
         const text = document.createElement('span');
@@ -9402,6 +9471,102 @@ function enhanceCitizenDesktopLayerControl() {
 
     control.addEventListener('change', updateBadge);
     updateBadge();
+}
+
+const enhanceCitizenDesktopLayerControl = enhancePyroLayerControl;
+
+function syncPyroSharedMapLayerControls() {
+    const registry = window.pyroSharedMapLayers;
+    if (!registry || !window.map) {
+        return;
+    }
+
+    const activeBaseLabel = Object.entries(registry.baseMaps || {})
+        .find(([, layer]) => window.map.hasLayer(layer))?.[0] || registry.defaultBaseLabel || '';
+
+    document.querySelectorAll('[data-ff-map-base-toggle]').forEach((input) => {
+        input.checked = input.dataset.ffMapBaseToggle === activeBaseLabel;
+    });
+
+    document.querySelectorAll('[data-ff-map-layer-toggle]').forEach((input) => {
+        const layer = registry.overlays?.[input.dataset.ffMapLayerToggle];
+        input.checked = Boolean(layer && window.map.hasLayer(layer));
+    });
+}
+
+function exposePyroSharedMapLayers(baseMaps, overlays, defaultBaseLabel) {
+    window.pyroSharedMapLayers = {
+        baseMaps,
+        overlays,
+        defaultBaseLabel
+    };
+
+    window.setPyroMapBaseLayer = function setPyroMapBaseLayer(label) {
+        const registry = window.pyroSharedMapLayers;
+        const targetLayer = registry?.baseMaps?.[label];
+        if (!window.map || !targetLayer) {
+            return;
+        }
+
+        Object.values(registry.baseMaps || {}).forEach((layer) => {
+            if (layer && window.map.hasLayer(layer)) {
+                window.map.removeLayer(layer);
+            }
+        });
+
+        targetLayer.addTo(window.map);
+        syncPyroSharedMapLayerControls();
+    };
+
+    window.setPyroMapOverlayVisibility = function setPyroMapOverlayVisibility(label, visible) {
+        const registry = window.pyroSharedMapLayers;
+        const layer = registry?.overlays?.[label];
+        if (!window.map || !layer) {
+            return;
+        }
+
+        if (visible && !window.map.hasLayer(layer)) {
+            window.map.addLayer(layer);
+        } else if (!visible && window.map.hasLayer(layer)) {
+            window.map.removeLayer(layer);
+        }
+
+        syncPyroSharedMapLayerControls();
+    };
+
+    window.syncPyroSharedMapLayerControls = syncPyroSharedMapLayerControls;
+}
+
+function bindFirefighterMobileLayerControlTrigger() {
+    if (!isFirefighterDashboardMapInstance() || !routeOverlayControl) {
+        return;
+    }
+
+    const control = routeOverlayControl.getContainer?.();
+    const toggle = control?.querySelector('.leaflet-control-layers-toggle');
+    const trigger = toggle || control;
+    if (!control || !trigger || control.dataset.ffMobileTriggerBound === 'true') {
+        return;
+    }
+
+    const openMobileLayers = (event) => {
+        if (window.innerWidth > 768 || typeof window.openFirefighterMapLayersPanel !== 'function') {
+            return;
+        }
+
+        event.__ffMapLayerControlHandled = true;
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        event.stopPropagation();
+        control.classList.remove('leaflet-control-layers-expanded');
+        window.closeFirefighterInsightsPanel?.();
+        window.openFirefighterMapLayersPanel();
+    };
+
+    trigger.addEventListener('click', openMobileLayers, true);
+    trigger.addEventListener('pointerdown', openMobileLayers, true);
+    trigger.addEventListener('touchstart', openMobileLayers, { capture: true, passive: false });
+    control.dataset.ffMobileTriggerBound = 'true';
 }
 
 // ============================================================================
@@ -9515,12 +9680,38 @@ function initAfterMapReady() {
         };
     routeOverlayControl = L.control.layers(routeBaseMaps, routeOverlays, { collapsed: true, position: 'topright' });
     routeOverlayControl.addTo(window.map);
-    enhanceCitizenDesktopLayerControl();
-    window.setTimeout(enhanceCitizenDesktopLayerControl, 100);
-    window.setTimeout(enhanceCitizenDesktopLayerControl, 350);
+    exposePyroSharedMapLayers(
+        routeBaseMaps,
+        routeOverlays,
+        isFirefighterDashboardMap ? 'Carto Light' : (isCitizenDashboardMap ? 'Carto Light' : 'Street Map')
+    );
+    enhancePyroLayerControl();
+    window.setTimeout(enhancePyroLayerControl, 100);
+    window.setTimeout(enhancePyroLayerControl, 350);
+    bindFirefighterMobileLayerControlTrigger();
+    window.setTimeout(bindFirefighterMobileLayerControlTrigger, 100);
+    window.setTimeout(syncPyroSharedMapLayerControls, 150);
+
+    window.map.on('baselayerchange overlayadd overlayremove', () => {
+        syncPyroSharedMapLayerControls();
+    });
 
     // Defense-in-depth: unauthorized roles (e.g. firefighter role 5) cannot see edit/delete controls.
-    window.map.on('popupopen', () => {
+    window.map.on('popupopen', (event) => {
+        if (shouldUseResponderMobileDetailsUi() && event?.popup) {
+            const content = event.popup.getContent?.();
+            if (content && typeof openResponderMapPreviewSheet === 'function') {
+                window.setTimeout(() => {
+                    try {
+                        window.map?.closePopup?.();
+                    } catch (error) {
+                        console.warn('Unable to close mobile Leaflet popup:', error);
+                    }
+                }, 0);
+                openResponderMapPreviewSheet(content);
+            }
+        }
+
         if (canManageMarkers) return;
         document.querySelectorAll('[id^="edit"], [id^="delete"]').forEach((el) => el.remove());
     });

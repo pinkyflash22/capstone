@@ -642,65 +642,42 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             : `<div class="incident-media-fallback"><i class="fas ${incidentTypeIcon}"></i><span>No Image</span></div>`;
         
         html += `
-            <div class="incident-card medium">
-                <div class="incident-card-layout">
-                    <div class="incident-media">
-                        ${imageMarkup}
+            <article class="incident-card medium ff-response-panel">
+                <div class="ff-response-panel__media">
+                    ${imageMarkup}
+                </div>
+                <div class="ff-response-panel__body">
+                    <div class="ff-response-panel__header">
+                        <span class="ff-response-panel__type">
+                            <i class="fas ${incidentTypeIcon}"></i>
+                            ${escapeHtml(incidentType)}
+                        </span>
+                        <span class="ff-response-panel__status ${statusClass}">
+                            ${escapeHtml(statusText)}
+                        </span>
                     </div>
-                    <div class="incident-main">
-                        <div class="incident-topline">
-                            <span class="incident-type">
-                                <i class="fas ${incidentTypeIcon}"></i> ${escapeHtml(incidentType)}
-                            </span>
-                            <span class="incident-priority priority-medium">Assigned</span>
+                    <div class="ff-response-panel__title-row">
+                        <div>
+                            <h3 class="incident-title ff-response-panel__title">${escapeHtml(incidentTitle)}</h3>
+                            <p class="ff-response-panel__summary">${escapeHtml(description)}</p>
                         </div>
-                        <div class="incident-title-wrap">
-                            <h3 class="incident-title">${escapeHtml(incidentTitle)}</h3>
-                            <div class="incident-subtitle">${escapeHtml(description)}</div>
-                        </div>
-                        <div class="incident-detail-grid incident-detail-grid-compact">
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-map-marker-alt"></i> Location</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(locationLabel)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-user-shield"></i> Reported By</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(reporterLabel)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="far fa-calendar-alt"></i> Reported At</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(reportedAt)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="far fa-clock"></i> Assigned At</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(assignedAt)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-hashtag"></i> Incident ID</span>
-                                <span class="incident-detail-value-inline">#${escapeHtml(incident.incident_id)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-crosshairs"></i> Coordinates</span>
-                                <span class="incident-detail-value-inline">${hasCoordinates ? `${escapeHtml(lat)}, ${escapeHtml(lng)}` : 'Coordinates unavailable'}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-signal"></i> Status</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(statusText)}</span>
-                            </span>
-                        </div>
+                        <span class="ff-response-panel__id">#${escapeHtml(incident.incident_id)}</span>
                     </div>
-                    <div class="incident-actions-column">
-                        <div class="incident-status-badge ${statusClass} is-block">
-                            ${statusText}
-                        </div>
-                        <button class="btn btn-outline view-incident-details" data-incident-id="${incident.incident_id}">
-                            <i class="far fa-eye"></i> Details
-                        </button>
-                        ${falseAlarmButton}
-                        ${actionButton}
+                    <div class="ff-response-panel__meta">
+                        <span><i class="fas fa-map-marker-alt"></i>${escapeHtml(locationLabel)}</span>
+                        <span><i class="fas fa-user-shield"></i>${escapeHtml(reporterLabel)}</span>
+                        <span><i class="far fa-calendar-alt"></i>${escapeHtml(reportedAt)}</span>
+                        <span><i class="far fa-clock"></i>Assigned ${escapeHtml(assignedAt)}</span>
                     </div>
                 </div>
-            </div>
+                <div class="incident-actions-column ff-response-panel__actions">
+                    <button class="btn btn-outline view-incident-details" data-incident-id="${incident.incident_id}">
+                        <i class="far fa-eye"></i> Details
+                    </button>
+                    ${falseAlarmButton}
+                    ${actionButton}
+                </div>
+            </article>
         `;
     });
     
@@ -1419,30 +1396,99 @@ let monthlyIncidentsChart = null;
 let priorityChart = null;
 let performanceChart = null;
 
+function getLastSevenDayLabels() {
+    const labels = [];
+    for (let index = 6; index >= 0; index--) {
+        const date = new Date();
+        date.setDate(date.getDate() - index);
+        labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+    }
+    return labels;
+}
+
+function getOperationalChartData(incidents = []) {
+    const safeIncidents = Array.isArray(incidents) ? incidents : [];
+    const statusCounts = {
+        reported: 0,
+        responding: 0,
+        controlled: 0,
+        closed: 0
+    };
+    const last7Labels = getLastSevenDayLabels();
+    const last7Counts = new Array(7).fill(0);
+    const monthWeeks = [0, 0, 0, 0];
+    const today = new Date();
+    const month = today.getMonth();
+    const year = today.getFullYear();
+
+    safeIncidents.forEach(function (incident) {
+        const statusId = getIncidentStatusId(incident);
+        if (statusId === 1) {
+            statusCounts.reported += 1;
+        } else if (statusId === 2) {
+            statusCounts.responding += 1;
+        } else if ([3, 4].includes(statusId)) {
+            statusCounts.controlled += 1;
+        } else if (statusId >= 5) {
+            statusCounts.closed += 1;
+        }
+
+        const createdAt = new Date(incident.created_at || incident.reported_at || incident.updated_at);
+        if (Number.isNaN(createdAt.getTime())) {
+            return;
+        }
+
+        const dayDiff = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate())) / 86400000);
+        if (dayDiff >= 0 && dayDiff < 7) {
+            last7Counts[6 - dayDiff] += 1;
+        }
+
+        if (createdAt.getMonth() === month && createdAt.getFullYear() === year) {
+            const weekIndex = Math.min(Math.floor((createdAt.getDate() - 1) / 7), 3);
+            monthWeeks[weekIndex] += 1;
+        }
+    });
+
+    const activeResponse = statusCounts.responding;
+    const completed = statusCounts.controlled + statusCounts.closed;
+    const needsReport = safeIncidents.filter(function (incident) {
+        const statusId = getIncidentStatusId(incident);
+        return Boolean(incident.investigation_ready || incident.ready_for_investigation || (statusId === 4 && !incident.has_spot_report));
+    }).length;
+
+    return {
+        statusCounts,
+        last7Labels,
+        last7Counts,
+        monthWeeks,
+        actionSummary: [safeIncidents.length, activeResponse, completed, needsReport]
+    };
+}
+
 // Function to initialize all charts
 function initializeCharts() {
-    // Incident Status Chart (Pie/Doughnut)
     const statusCtx = document.getElementById('incidentStatusChart')?.getContext('2d');
     if (statusCtx) {
         incidentStatusChart = new Chart(statusCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Reported', 'Responding', 'Resolved', 'Closed'],
+                labels: ['Reported', 'Responding', 'Controlled', 'Closed'],
                 datasets: [{
                     data: [0, 0, 0, 0],
-                    backgroundColor: ['#e91e8c', '#7c3aed', '#1da1f2', '#f59e0b'],
-                    borderWidth: 0,
-                    hoverOffset: 4
+                    backgroundColor: ['#ef4444', '#2563eb', '#16a34a', '#64748b'],
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                    hoverOffset: 5
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
-                cutout: '68%',
+                maintainAspectRatio: false,
+                cutout: '66%',
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { font: { size: 11 }, usePointStyle: true, boxWidth: 8 }
+                        labels: { font: { size: 11, weight: 700 }, usePointStyle: true, boxWidth: 8 }
                     },
                     tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw} incidents` } }
                 }
@@ -1450,35 +1496,37 @@ function initializeCharts() {
         });
     }
 
-    // Response Time Trend Chart (Line)
     const responseCtx = document.getElementById('responseTimeChart')?.getContext('2d');
     if (responseCtx) {
         responseTimeChart = new Chart(responseCtx, {
             type: 'line',
             data: {
-                labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                labels: getLastSevenDayLabels(),
                 datasets: [{
-                    label: 'Avg Response Time (minutes)',
-                    data: [0, 2, 7, 5, 1, 0, 4],
-                    borderColor: '#e91e8c',
-                    backgroundColor: 'rgba(233, 30, 140, 0.16)',
-                    tension: 0.45,
+                    label: 'Assigned calls',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    borderColor: '#c63d26',
+                    backgroundColor: 'rgba(198, 61, 38, 0.14)',
+                    tension: 0.35,
                     fill: true,
-                    pointBackgroundColor: '#e91e8c',
+                    pointBackgroundColor: '#c63d26',
                     pointBorderColor: '#fff',
                     pointBorderWidth: 3,
-                    pointRadius: 5,
-                    pointHoverRadius: 7
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top', labels: { font: { size: 11 } } },
-                    tooltip: { callbacks: { label: (context) => `${context.raw} minutes` } }
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (context) => `${context.raw} assigned calls` } }
                 },
-                scales: { y: { beginAtZero: true, title: { display: true, text: 'Minutes' } } }
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11, weight: 700 } } },
+                    y: { beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.2)' } }
+                }
             }
         });
     }
@@ -1502,7 +1550,7 @@ function initializeCharts() {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (context) => `${context.raw} incidents` } }
@@ -1514,8 +1562,7 @@ function initializeCharts() {
                     },
                     y: {
                         beginAtZero: true,
-                        max: 10,
-                        ticks: { stepSize: 2, color: '#94a3b8', font: { size: 11 } },
+                        ticks: { precision: 0, color: '#94a3b8', font: { size: 11 } },
                         grid: { color: 'rgba(148, 163, 184, 0.25)', drawBorder: false }
                     }
                 }
@@ -1524,42 +1571,35 @@ function initializeCharts() {
     }
 
 
-    // Performance Metrics Chart (Radar or Gauge)
     const performanceCtx = document.getElementById('performanceChart')?.getContext('2d');
     if (performanceCtx) {
         performanceChart = new Chart(performanceCtx, {
-            type: 'radar',
+            type: 'bar',
             data: {
-                labels: ['Completion Rate', 'Response Time', 'Success Rate', 'Efficiency', 'Teamwork'],
+                labels: ['Assigned', 'Active', 'Completed', 'For report'],
                 datasets: [{
-                    label: 'Performance Score (%)',
-                    data: [0, 0, 0, 0, 0],
-                    backgroundColor: 'rgba(139, 92, 246, 0.18)',
-                    borderColor: '#8b5cf6',
-                    borderWidth: 2.5,
-                    pointBackgroundColor: '#ec4899',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 4.5,
-                    pointHoverRadius: 7
+                    label: 'Action count',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#c63d26', '#2563eb', '#16a34a', '#d18a16'],
+                    borderRadius: 10,
+                    borderSkipped: false
                 }]
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top', labels: { font: { size: 10 }, usePointStyle: true, boxWidth: 8 } },
-                    tooltip: { callbacks: { label: (context) => `${context.raw}%` } }
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (context) => `${context.label}: ${context.raw}` } }
                 },
                 scales: {
-                    r: {
+                    x: {
                         beginAtZero: true,
-                        max: 100,
-                        ticks: { stepSize: 20, backdropColor: 'transparent', color: '#94a3b8' },
-                        angleLines: { color: 'rgba(148, 163, 184, 0.35)' },
-                        grid: { color: 'rgba(148, 163, 184, 0.25)' },
-                        pointLabels: { color: '#64748b', font: { size: 10, weight: 600 } }
-                    }
+                        ticks: { precision: 0, color: '#94a3b8' },
+                        grid: { color: 'rgba(148, 163, 184, 0.22)' }
+                    },
+                    y: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11, weight: 700 } } }
                 }
             }
         });
@@ -1568,108 +1608,28 @@ function initializeCharts() {
 
 // Function to update all charts with incident data
 function updateChartsWithData(incidents) {
-    if (!incidents || incidents.length === 0) {
-        // Set default empty data
-        if (incidentStatusChart) incidentStatusChart.data.datasets[0].data = [0, 0, 0, 0];
-        if (priorityChart) priorityChart.data.datasets[0].data = [0, 0, 0, 0];
-        if (performanceChart) performanceChart.data.datasets[0].data = [0, 0, 0, 0, 0];
-        
-        [incidentStatusChart, priorityChart, performanceChart].forEach(chart => {
-            if (chart) chart.update();
-        });
-        return;
-    }
+    const chartData = getOperationalChartData(incidents);
+    const statusCounts = chartData.statusCounts;
 
-    // Update Incident Status Chart
-    const statusCounts = {
-        reported: incidents.filter(i => getIncidentStatusId(i) === 1).length,
-        responding: incidents.filter(i => getIncidentStatusId(i) === 2).length,
-        resolved: incidents.filter(i => getIncidentStatusId(i) === 3).length,
-        closed: incidents.filter(i => [4, 5].includes(getIncidentStatusId(i))).length
-    };
     if (incidentStatusChart) {
-        incidentStatusChart.data.datasets[0].data = [statusCounts.reported, statusCounts.responding, statusCounts.resolved, statusCounts.closed];
-        incidentStatusChart.update();
-    }
-
-    // Update Priority Chart
-    const priorityCounts = {
-        critical: incidents.filter(i => i.priority === 'critical').length,
-        high: incidents.filter(i => i.priority === 'high').length,
-        medium: incidents.filter(i => i.priority === 'medium').length,
-        low: incidents.filter(i => i.priority === 'low').length
-    };
-    if (priorityChart) {
-        priorityChart.data.datasets[0].data = [priorityCounts.critical, priorityCounts.high, priorityCounts.medium, priorityCounts.low];
-        priorityChart.update();
-    }
-
-    // Calculate average response times for last 7 days
-    const last7Days = [];
-    const responseTimes = [];
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dayStart = new Date(date.setHours(0, 0, 0, 0));
-        const dayEnd = new Date(date.setHours(23, 59, 59, 999));
-        
-        const dayIncidents = incidents.filter(i => {
-            const created = new Date(i.created_at);
-            return created >= dayStart && created <= dayEnd && getIncidentStatusId(i) >= 2;
-        });
-        
-        let avgTime = 0;
-        if (dayIncidents.length > 0) {
-            const totalTime = dayIncidents.reduce((sum, inc) => {
-                const created = new Date(inc.created_at);
-                const responded = inc.updated_at ? new Date(inc.updated_at) : new Date();
-                return sum + (responded - created) / (1000 * 60);
-            }, 0);
-            avgTime = Math.round(totalTime / dayIncidents.length);
-        }
-        responseTimes.push(avgTime);
-        last7Days.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+        incidentStatusChart.data.datasets[0].data = [statusCounts.reported, statusCounts.responding, statusCounts.controlled, statusCounts.closed];
+        incidentStatusChart.update('none');
     }
     
     if (responseTimeChart) {
-        responseTimeChart.data.labels = last7Days;
-        responseTimeChart.data.datasets[0].data = responseTimes;
-        responseTimeChart.update();
+        responseTimeChart.data.labels = chartData.last7Labels;
+        responseTimeChart.data.datasets[0].data = chartData.last7Counts;
+        responseTimeChart.update('none');
     }
 
-    // Update Monthly Incidents Chart (by week)
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const weeksData = [0, 0, 0, 0];
-    
-    incidents.forEach(incident => {
-        const incidentDate = new Date(incident.created_at);
-        if (incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
-            const weekNum = Math.min(Math.floor((incidentDate.getDate() - 1) / 7), 3);
-            weeksData[weekNum]++;
-        }
-    });
-    
     if (monthlyIncidentsChart) {
-        monthlyIncidentsChart.data.datasets[0].data = weeksData;
-        monthlyIncidentsChart.update();
+        monthlyIncidentsChart.data.datasets[0].data = chartData.monthWeeks;
+        monthlyIncidentsChart.update('none');
     }
-
-    // Update Performance Chart
-    const totalIncidents = incidents.length;
-    const completedIncidents = incidents.filter(i => getIncidentStatusId(i) >= 3).length;
-    const completionRate = totalIncidents > 0 ? Math.round((completedIncidents / totalIncidents) * 100) : 0;
-    
-    const avgResponseTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.filter(t => t > 0).length || 0;
-    const responseScore = Math.max(0, Math.min(100, 100 - (avgResponseTime / 30) * 100));
-    
-    const successfulIncidents = incidents.filter(i => [4, 5].includes(getIncidentStatusId(i))).length;
-    const successRate = successfulIncidents > 0 
-        ? Math.round((successfulIncidents / completedIncidents) * 100) : 0;
     
     if (performanceChart) {
-        performanceChart.data.datasets[0].data = [completionRate, Math.round(responseScore), successRate, Math.round((completionRate + responseScore + successRate) / 3), 85];
-        performanceChart.update();
+        performanceChart.data.datasets[0].data = chartData.actionSummary;
+        performanceChart.update('none');
     }
 }
 
@@ -1746,6 +1706,177 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 };
 document.addEventListener('DOMContentLoaded', function () {
+    const mapLayersPanel = document.querySelector('[data-ff-map-layers-panel]');
+    const closeButtons = document.querySelectorAll('[data-ff-map-layers-close]');
+    const baseInputs = document.querySelectorAll('[data-ff-map-base-toggle]');
+    const layerInputs = document.querySelectorAll('[data-ff-map-layer-toggle]');
+    let lastMobileLayerControlTap = 0;
+
+    function syncFirefighterMapLayersPanel() {
+        if (typeof window.syncPyroSharedMapLayerControls === 'function') {
+            window.syncPyroSharedMapLayerControls();
+        }
+    }
+
+    function closeFirefighterMobileDockBurst() {
+        document.querySelector('[data-ff-mobile-dock]')?.classList.remove('is-burst-open');
+    }
+
+    function closeFirefighterMobileUtilityPanels() {
+        document.querySelectorAll('[data-ff-notifications-panel], [data-ff-settings-panel]').forEach(function (panel) {
+            if (panel.contains(document.activeElement)) {
+                document.activeElement?.blur?.();
+            }
+
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+        });
+    }
+
+    function openFirefighterMapLayersPanel() {
+        if (!mapLayersPanel || window.innerWidth > 768) {
+            return;
+        }
+
+        closeFirefighterMobileDockBurst();
+        closeFirefighterMobileUtilityPanels();
+
+        if (typeof window.closeFirefighterInsightsPanel === 'function') {
+            window.closeFirefighterInsightsPanel();
+        }
+
+        syncFirefighterMapLayersPanel();
+        mapLayersPanel.removeAttribute('inert');
+        mapLayersPanel.setAttribute('aria-hidden', 'false');
+        mapLayersPanel.classList.add('is-open');
+    }
+
+    function closeFirefighterMapLayersPanel() {
+        if (!mapLayersPanel) {
+            return;
+        }
+
+        if (mapLayersPanel.contains(document.activeElement)) {
+            document.activeElement?.blur?.();
+        }
+
+        mapLayersPanel.classList.remove('is-open');
+        mapLayersPanel.setAttribute('aria-hidden', 'true');
+        mapLayersPanel.setAttribute('inert', '');
+    }
+
+    function bindLeafletLayerTrigger() {
+        document.querySelectorAll('.firefighter-map-stage .leaflet-control-layers').forEach(function (control) {
+            const trigger = control.querySelector('.leaflet-control-layers-toggle') || control;
+            if (!trigger || control.dataset.ffSheetTriggerBound === 'true') {
+                return;
+            }
+
+            const openFromLeafletControl = function (event) {
+                if (window.innerWidth > 768) {
+                    return;
+                }
+
+                event.__ffMapLayerControlHandled = true;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                event.stopPropagation();
+                control.classList.remove('leaflet-control-layers-expanded');
+                openFirefighterMapLayersPanel();
+            };
+
+            trigger.addEventListener('click', openFromLeafletControl, true);
+            trigger.addEventListener('pointerdown', openFromLeafletControl, true);
+            trigger.addEventListener('touchstart', openFromLeafletControl, { capture: true, passive: false });
+            control.dataset.ffSheetTriggerBound = 'true';
+        });
+    }
+
+    function interceptLeafletLayerControl(event) {
+        if (window.innerWidth > 768 || !mapLayersPanel) {
+            return;
+        }
+
+        const target = event.target;
+        const control = target?.closest?.('.firefighter-map-stage .leaflet-control-layers');
+
+        if (!control) {
+            return;
+        }
+
+        event.__ffMapLayerControlHandled = true;
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        event.stopPropagation();
+
+        if (event.type === 'click' && Date.now() - lastMobileLayerControlTap < 450) {
+            return;
+        }
+
+        lastMobileLayerControlTap = Date.now();
+        control.classList.remove('leaflet-control-layers-expanded');
+        openFirefighterMapLayersPanel();
+    }
+
+    window.openFirefighterMapLayersPanel = openFirefighterMapLayersPanel;
+    window.closeFirefighterMapLayersPanel = closeFirefighterMapLayersPanel;
+
+    closeButtons.forEach(function (button) {
+        button.addEventListener('click', closeFirefighterMapLayersPanel);
+    });
+
+    baseInputs.forEach(function (input) {
+        if (input.dataset.ffLayerBound === 'true') {
+            return;
+        }
+
+        input.addEventListener('change', function () {
+            if (!input.checked || typeof window.setPyroMapBaseLayer !== 'function') {
+                return;
+            }
+
+            window.setPyroMapBaseLayer(input.dataset.ffMapBaseToggle);
+        });
+        input.dataset.ffLayerBound = 'true';
+    });
+
+    layerInputs.forEach(function (input) {
+        if (input.dataset.ffLayerBound === 'true') {
+            return;
+        }
+
+        input.addEventListener('change', function () {
+            if (typeof window.setPyroMapOverlayVisibility !== 'function') {
+                return;
+            }
+
+            window.setPyroMapOverlayVisibility(input.dataset.ffMapLayerToggle, input.checked);
+        });
+        input.dataset.ffLayerBound = 'true';
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && mapLayersPanel?.classList.contains('is-open')) {
+            closeFirefighterMapLayersPanel();
+        }
+    });
+
+    document.addEventListener('pointerdown', interceptLeafletLayerControl, true);
+    document.addEventListener('touchstart', interceptLeafletLayerControl, { capture: true, passive: false });
+    document.addEventListener('click', interceptLeafletLayerControl, true);
+
+    window.addEventListener('resize', function () {
+        if (window.innerWidth > 768) {
+            closeFirefighterMapLayersPanel();
+        }
+    });
+
+    bindLeafletLayerTrigger();
+    window.setTimeout(bindLeafletLayerTrigger, 150);
+    window.setTimeout(bindLeafletLayerTrigger, 500);
+    window.addEventListener('load', bindLeafletLayerTrigger);
+});
+document.addEventListener('DOMContentLoaded', function () {
     const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
     const insightsContent = document.getElementById('firefighterMobileInsightsContent');
     const insightsCloseButtons = document.querySelectorAll('[data-ff-insights-close]');
@@ -1814,16 +1945,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    if (welcomeToast && window.innerWidth <= 768) {
+    if (welcomeToast) {
         welcomeToast.addEventListener('click', function () {
-            openFirefighterInsightsPanel();
+            if (window.innerWidth <= 768) {
+                openFirefighterInsightsPanel();
+            }
         });
 
         window.setTimeout(function () {
             welcomeToast.classList.add('is-visible');
             window.setTimeout(function () {
                 welcomeToast.classList.remove('is-visible');
-            }, 3200);
+            }, window.innerWidth <= 768 ? 3200 : 2800);
         }, 260);
     }
 });

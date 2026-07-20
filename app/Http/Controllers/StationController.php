@@ -24,7 +24,7 @@ class StationController extends Controller
 public function index()
 {
     try {
-        $stations = Cache::remember('map:stations:index:v3', now()->addSeconds(45), function () {
+        $stations = Cache::remember('map:stations:index:v4', now()->addSeconds(45), function () {
             return Station::query()
                 ->select([
                     'station_id',
@@ -36,7 +36,7 @@ public function index()
                     'marker_id',
                 ])
                 ->with([
-                    'marker:marker_id,title,description,lat,lng,status,category,image,markerCategory_id,created_at,updated_at',
+                    'marker:marker_id,title,description,lat,lng,status,category,image,created_at,updated_at',
                     'address:address_id,street,barangay_id',
                     'address.barangay:barangay_id,barangay_name,city_id',
                     'address.barangay.city:city_id,city_name,province_id',
@@ -98,6 +98,7 @@ public function updateByMarker(Request $request, $markerId)
     $station->update($request->only(['station_name', 'station_code', 'contact_number', 'email']));
     Cache::forget('map:stations:index:v2');
     Cache::forget('map:stations:index:v3');
+    Cache::forget('map:stations:index:v4');
     
     return response()->json(['success' => true, 'data' => $station]);
 }
@@ -117,6 +118,8 @@ public function updateByMarker(Request $request, $markerId)
 
        $data = Station::create($validated);
         Cache::forget('map:stations:index:v2');
+        Cache::forget('map:stations:index:v3');
+        Cache::forget('map:stations:index:v4');
         return response()->json(['success'=>true, 'data'=>$data]);
         // return redirect()->route('admin.dashboard')
         //     ->with('success', 'Station created successfully.');
@@ -157,6 +160,8 @@ public function updateByMarker(Request $request, $markerId)
 
         $station->update($validated);
         Cache::forget('map:stations:index:v2');
+        Cache::forget('map:stations:index:v3');
+        Cache::forget('map:stations:index:v4');
 
         return redirect()->route('stations.index')
             ->with('success', 'Station updated successfully.');
@@ -172,6 +177,8 @@ public function updateByMarker(Request $request, $markerId)
 
         $station->delete();
         Cache::forget('map:stations:index:v2');
+        Cache::forget('map:stations:index:v3');
+        Cache::forget('map:stations:index:v4');
 
         return redirect()->route('stations.index')
             ->with('success', 'Station deleted successfully.');

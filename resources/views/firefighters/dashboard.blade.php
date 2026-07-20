@@ -431,13 +431,13 @@
     --}}
     <!-- MAIN CONTENT -->
     <main class="main-content">
-        <div id="firefighterMobileWelcomeToast" class="firefighter-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
+        <div id="firefighterMobileWelcomeToast" class="firefighter-mobile-welcome-toast" role="status" aria-live="polite">
             <div class="firefighter-mobile-welcome-toast__icon">
                 <i class="fas fa-fire"></i>
             </div>
             <div class="firefighter-mobile-welcome-toast__copy">
                 <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                <span>Responder dashboard is ready with your map, incidents, and stats.</span>
+                <span>Assigned calls and map updates are available.</span>
             </div>
         </div>
         <!-- TOP NAVIGATIONBAR -->
@@ -448,7 +448,7 @@
                 </button>
                 <div class="hidden lg:block">
                     <h1 class="text-xl font-bold text-slate-800">Responder Command</h1>
-                    <p class="text-xs text-slate-500 font-medium">Ready for Duty • {{ now()->format('l, F j') }}</p>
+                    <p class="text-xs text-slate-500 font-medium">Responder hub • {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
 
@@ -498,24 +498,6 @@
                 </div>
             </div>
         </nav>
-        <!-- Welcome Banner -->
-        <div class="bg-red-50 border-l-4 border-red-500 rounded-2xl p-8 mb-8 flex items-start justify-between firefighter-dashboard-welcome" data-ff-insights-source>
-            <div>
-                <span class="ff-hero-eyebrow"><i class="fas fa-fire-flame-curved"></i> Responder dashboard</span>
-                <h1 class="text-2xl font-bold text-red-900 mb-2">Welcome back, {{ auth()->user()->first_name }}!</h1>
-                <p class="text-red-700 font-medium ff-hero-subtitle">Monitor incidents, assigned calls, nearby stations, and crew coordination from one live operations view.</p>
-                <p class="text-red-700 font-medium">Station 7 Operations • {{ now()->format('l, F j, Y') }}</p>
-            </div>
-            <div class="hidden md:flex items-center gap-4 bg-white/50 p-2 rounded-xl border border-red-100">
-                <div class="text-right">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Status</p>
-                    <p class="text-xs font-bold text-green-600">FULLY OPERATIONAL</p>
-                </div>
-                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-                    <i class="fas fa-server"></i>
-                </div>
-            </div>
-        </div>
         <!-- Stats Grid -->
         <div class="kpi-grid" data-ff-insights-source>
             <div class="lector-card kpi-card">
@@ -581,7 +563,7 @@
                 <i class="fas fa-spinner fa-spin"></i>
                 <span>Loading live map layers...</span>
             </div>
-            <div id="firefighterMapLegend" class="firefighter-map-legend-panel firefighter-map-stage__legend"></div>
+            <div id="firefighterMapLegend" class="ff-clean-map-legend firefighter-map-stage__legend"></div>
         </div>
         <!-- ASSIGNED INCIDENTS SECTION - DYNAMIC -->
         <div class="assigned-incidents-container" data-ff-insights-source>
@@ -673,64 +655,65 @@
        
         <br>
 
-<!-- Statistics Charts Section - One Row -->
-<div class="grid-4" style="margin-top: 20px;" data-ff-insights-source>
-    <!-- Incident Status Chart -->
-    <div class="stat-card">
-        <div class="stat-header">
-            <span class="stat-title">Incident Status</span>
-            <div class="stat-icon blue">
+<!-- Operations Analytics -->
+<section class="ff-analytics-panel" data-ff-insights-source>
+    <div class="ff-analytics-panel__header">
+        <div>
+            <span class="ff-section-eyebrow">Operations analytics</span>
+            <h2>Incident overview</h2>
+        </div>
+        <p>Charts update from assigned incidents and live dashboard data.</p>
+    </div>
+    <div class="ff-analytics-grid">
+        <article class="ff-chart-card">
+            <div class="ff-chart-card__header">
+                <div>
+                    <span>Status mix</span>
+                    <h3>Assigned incidents</h3>
+                </div>
                 <i class="fas fa-chart-pie"></i>
             </div>
-        </div>
-        <canvas id="incidentStatusChart" style="height: 200px; width: 100%;"></canvas>
-        <div class="stat-trend mt-2">
-            <i class="fas fa-chart-bar"></i> Current breakdown
-        </div>
-    </div>
+            <canvas id="incidentStatusChart"></canvas>
+            <p class="ff-chart-card__note">Reported, responding, controlled, and closed calls.</p>
+        </article>
 
-    <!-- Response Time Trend Chart -->
-    <div class="stat-card">
-        <div class="stat-header">
-            <span class="stat-title">Response Time</span>
-            <div class="stat-icon green">
+        <article class="ff-chart-card">
+            <div class="ff-chart-card__header">
+                <div>
+                    <span>Last 7 days</span>
+                    <h3>Response load</h3>
+                </div>
                 <i class="fas fa-chart-line"></i>
             </div>
-        </div>
-        <canvas id="responseTimeChart" style="height: 200px; width: 100%;"></canvas>
-        <div class="stat-trend mt-2">
-            <i class="fas fa-clock"></i> Last 7 days (minutes)
-        </div>
-    </div>
+            <canvas id="responseTimeChart"></canvas>
+            <p class="ff-chart-card__note">Daily assigned fire incidents.</p>
+        </article>
 
-    <!-- Monthly Incidents Chart -->
-    <div class="stat-card">
-        <div class="stat-header">
-            <span class="stat-title">Monthly Incidents</span>
-            <div class="stat-icon purple">
-                <i class="fas fa-calendar"></i>
+        <article class="ff-chart-card">
+            <div class="ff-chart-card__header">
+                <div>
+                    <span>{{ now()->format('F Y') }}</span>
+                    <h3>Monthly trend</h3>
+                </div>
+                <i class="fas fa-calendar-days"></i>
             </div>
-        </div>
-        <canvas id="monthlyIncidentsChart" style="height: 200px; width: 100%;"></canvas>
-        <div class="stat-trend mt-2">
-            <i class="fas fa-bar-chart"></i> {{ now()->format('F Y') }}
-        </div>
-    </div>
+            <canvas id="monthlyIncidentsChart"></canvas>
+            <p class="ff-chart-card__note">Incidents grouped by week.</p>
+        </article>
 
-    <!-- Performance Metrics Chart -->
-    <div class="stat-card">
-        <div class="stat-header">
-            <span class="stat-title">Performance</span>
-            <div class="stat-icon red">
-                <i class="fas fa-tachometer-alt"></i>
+        <article class="ff-chart-card">
+            <div class="ff-chart-card__header">
+                <div>
+                    <span>Readiness</span>
+                    <h3>Action summary</h3>
+                </div>
+                <i class="fas fa-list-check"></i>
             </div>
-        </div>
-        <canvas id="performanceChart" style="height: 200px; width: 100%;"></canvas>
-        <div class="stat-trend mt-2">
-            <i class="fas fa-chart-line"></i> Success & completion
-        </div>
+            <canvas id="performanceChart"></canvas>
+            <p class="ff-chart-card__note">Assigned, active, completed, and ready for report.</p>
+        </article>
     </div>
-</div>
+</section>
         {{-- <div class="section-header">
             <h2>
                 <i class="fas fa-fire"></i>
@@ -896,6 +879,121 @@
         </div>
     </div>
 
+    <div class="firefighter-mobile-map-panel md:hidden" id="firefighterMobileMapLayersPanel" data-ff-map-layers-panel aria-hidden="true" inert>
+        <div class="firefighter-mobile-map-panel__backdrop" data-ff-map-layers-close></div>
+        <div class="firefighter-mobile-map-panel__sheet" role="dialog" aria-modal="false" aria-label="Map options">
+            <div class="firefighter-mobile-map-panel__handle" aria-hidden="true"></div>
+            <div class="firefighter-mobile-map-panel__header">
+                <div>
+                    <h2 class="firefighter-mobile-map-panel__title">Map options</h2>
+                    <p class="firefighter-mobile-map-panel__subtitle">Show or hide details on the map</p>
+                </div>
+                <button type="button" class="firefighter-mobile-map-panel__close" data-ff-map-layers-close aria-label="Close map options">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="firefighter-mobile-map-panel__body">
+                <div class="firefighter-mobile-map-panel__base" role="radiogroup" aria-label="Map style">
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="Carto Light" checked>
+                        <span>Carto</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="OSM Standard">
+                        <span>OSM</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="OSM HOT">
+                        <span>OSM HOT</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="Satellite">
+                        <span>Satellite</span>
+                    </label>
+                </div>
+
+                <div class="firefighter-mobile-map-panel__layers">
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Stations" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-building-shield" aria-hidden="true"></i></span>
+                        <span>Stations</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Incidents" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-fire-flame-curved" aria-hidden="true"></i></span>
+                        <span>Incidents</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Hydrants" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-droplet" aria-hidden="true"></i></span>
+                        <span>Hydrants</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Other Markers" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
+                        <span>Other</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Risk Areas" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-map-location-dot" aria-hidden="true"></i></span>
+                        <span>Risk areas</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Water Reference">
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-water" aria-hidden="true"></i></span>
+                        <span>Water</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                </div>
+                <details class="firefighter-mobile-map-panel__legend">
+                    <summary>
+                        <span>Map legend</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </summary>
+                    <div class="firefighter-mobile-map-panel__legend-list">
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-user"><i class="fas fa-user-shield" aria-hidden="true"></i></span>
+                            <span>Your location</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('station.png') }}" alt="Fire station" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-building" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Fire station</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-users" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Barangay hall</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('fire.png') }}" alt="Incident" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-fire-flame-curved" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Incident</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('hydrant.png') }}" alt="Hydrant" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-droplet" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Hydrant</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-other"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
+                            <span>Other marker</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-route" aria-hidden="true"></span>
+                            <span>Route</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('truck.png') }}" alt="Responding unit" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-truck-fast" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Responding unit</span>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Modal -->
     <div id="statusModal" class="modal">
         <div class="modal-content">
@@ -942,6 +1040,91 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     @vite(['resources/js/map.js', 'resources/js/firefighter/dashboard-shell.js'])
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const mapLayersPanel = document.querySelector('[data-ff-map-layers-panel]');
+            const mapLayerCloseButtons = document.querySelectorAll('[data-ff-map-layers-close]');
+            let lastLayerTapAt = 0;
+
+            function closeFirefighterInlineInsightsPanel() {
+                if (typeof window.closeFirefighterInsightsPanel === 'function') {
+                    window.closeFirefighterInsightsPanel();
+                    return;
+                }
+
+                const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
+                if (!insightsPanel) return;
+
+                if (insightsPanel.contains(document.activeElement)) {
+                    document.activeElement?.blur?.();
+                }
+
+                insightsPanel.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('menu-open');
+            }
+
+            function openFirefighterInlineMapLayersPanel() {
+                if (!mapLayersPanel || window.innerWidth > 768) return;
+
+                document.querySelector('[data-ff-mobile-dock]')?.classList.remove('is-burst-open');
+                document.querySelectorAll('[data-ff-notifications-panel], [data-ff-settings-panel]').forEach(function (panel) {
+                    if (panel.contains(document.activeElement)) {
+                        document.activeElement?.blur?.();
+                    }
+
+                    panel.classList.remove('is-open');
+                    panel.setAttribute('aria-hidden', 'true');
+                });
+
+                closeFirefighterInlineInsightsPanel();
+                window.syncPyroSharedMapLayerControls?.();
+                mapLayersPanel.removeAttribute('inert');
+                mapLayersPanel.setAttribute('aria-hidden', 'false');
+                mapLayersPanel.classList.add('is-open');
+            }
+
+            function closeFirefighterInlineMapLayersPanel() {
+                if (!mapLayersPanel) return;
+
+                if (mapLayersPanel.contains(document.activeElement)) {
+                    document.activeElement?.blur?.();
+                }
+
+                mapLayersPanel.classList.remove('is-open');
+                mapLayersPanel.setAttribute('aria-hidden', 'true');
+                mapLayersPanel.setAttribute('inert', '');
+            }
+
+            function handleFirefighterLeafletLayerTap(event) {
+                if (window.innerWidth > 768 || !mapLayersPanel) return;
+
+                const control = event.target?.closest?.('.firefighter-map-stage .leaflet-control-layers');
+                if (!control) return;
+
+                event.__ffMapLayerControlHandled = true;
+                event.preventDefault();
+                event.stopImmediatePropagation?.();
+                event.stopPropagation();
+
+                if (event.type === 'click' && Date.now() - lastLayerTapAt < 450) return;
+
+                lastLayerTapAt = Date.now();
+                control.classList.remove('leaflet-control-layers-expanded');
+                openFirefighterInlineMapLayersPanel();
+            }
+
+            window.openFirefighterMapLayersPanel = openFirefighterInlineMapLayersPanel;
+            window.closeFirefighterMapLayersPanel = closeFirefighterInlineMapLayersPanel;
+
+            mapLayerCloseButtons.forEach(function (button) {
+                button.addEventListener('click', closeFirefighterInlineMapLayersPanel);
+            });
+
+            document.addEventListener('pointerdown', handleFirefighterLeafletLayerTap, true);
+            document.addEventListener('touchstart', handleFirefighterLeafletLayerTap, { capture: true, passive: false });
+            document.addEventListener('click', handleFirefighterLeafletLayerTap, true);
+        });
+    </script>
     {{--
     @vite(['resources/js/map.js'])
 
@@ -2745,6 +2928,108 @@ document.addEventListener('DOMContentLoaded', function () {
             }, 3200);
         }, 260);
     }
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const mapLayersPanel = document.querySelector('[data-ff-map-layers-panel]');
+    const mapLayerCloseButtons = document.querySelectorAll('[data-ff-map-layers-close]');
+    let lastLayerTapAt = 0;
+
+    function closeFirefighterInlineInsightsPanel() {
+        if (typeof window.closeFirefighterInsightsPanel === 'function') {
+            window.closeFirefighterInsightsPanel();
+            return;
+        }
+
+        const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
+        if (!insightsPanel) {
+            return;
+        }
+
+        if (insightsPanel.contains(document.activeElement)) {
+            document.activeElement?.blur?.();
+        }
+
+        insightsPanel.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('menu-open');
+    }
+
+    function openFirefighterInlineMapLayersPanel() {
+        if (!mapLayersPanel || window.innerWidth > 768) {
+            return;
+        }
+
+        document.querySelector('[data-ff-mobile-dock]')?.classList.remove('is-burst-open');
+        document.querySelectorAll('[data-ff-notifications-panel], [data-ff-settings-panel]').forEach(function (panel) {
+            if (panel.contains(document.activeElement)) {
+                document.activeElement?.blur?.();
+            }
+
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+        });
+
+        closeFirefighterInlineInsightsPanel();
+
+        if (typeof window.syncPyroSharedMapLayerControls === 'function') {
+            window.syncPyroSharedMapLayerControls();
+        }
+
+        mapLayersPanel.removeAttribute('inert');
+        mapLayersPanel.setAttribute('aria-hidden', 'false');
+        mapLayersPanel.classList.add('is-open');
+    }
+
+    function closeFirefighterInlineMapLayersPanel() {
+        if (!mapLayersPanel) {
+            return;
+        }
+
+        if (mapLayersPanel.contains(document.activeElement)) {
+            document.activeElement?.blur?.();
+        }
+
+        mapLayersPanel.classList.remove('is-open');
+        mapLayersPanel.setAttribute('aria-hidden', 'true');
+        mapLayersPanel.setAttribute('inert', '');
+    }
+
+    function handleFirefighterLeafletLayerTap(event) {
+        if (window.innerWidth > 768 || !mapLayersPanel) {
+            return;
+        }
+
+        const control = event.target?.closest?.('.firefighter-map-stage .leaflet-control-layers');
+        if (!control) {
+            return;
+        }
+
+        event.__ffMapLayerControlHandled = true;
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        event.stopPropagation();
+
+        if (event.type === 'click' && Date.now() - lastLayerTapAt < 450) {
+            return;
+        }
+
+        lastLayerTapAt = Date.now();
+        control.classList.remove('leaflet-control-layers-expanded');
+        openFirefighterInlineMapLayersPanel();
+    }
+
+    window.openFirefighterMapLayersPanel = openFirefighterInlineMapLayersPanel;
+    window.closeFirefighterMapLayersPanel = closeFirefighterInlineMapLayersPanel;
+
+    mapLayerCloseButtons.forEach(function (button) {
+        button.addEventListener('click', closeFirefighterInlineMapLayersPanel);
+    });
+
+    document.addEventListener('pointerdown', handleFirefighterLeafletLayerTap, true);
+    document.addEventListener('touchstart', handleFirefighterLeafletLayerTap, { capture: true, passive: false });
+    document.addEventListener('click', handleFirefighterLeafletLayerTap, true);
 });
 </script>
 

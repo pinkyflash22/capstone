@@ -1315,17 +1315,19 @@
                 position: relative;
                 width: min(100%, 344px);
                 margin: 0 auto;
-                display: grid;
-                grid-template-columns: repeat(5, minmax(0, 1fr));
+                display: flex;
+                justify-content: space-between;
                 align-items: end;
-                gap: 6px;
+                gap: 0;
                 min-height: 60px;
-                padding: 10px 16px 9px;
+                padding: 10px 18px 9px;
                 border-radius: 24px;
                 background: linear-gradient(180deg, rgba(18, 53, 60, 0.95) 0%, rgba(22, 73, 82, 0.96) 100%);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
                 pointer-events: auto;
+                --citizen-dock-center-slot: 96px;
+                --citizen-dock-side-width: calc((100% - var(--citizen-dock-center-slot)) / 2);
             }
 
             .citizen-mobile-dock__track::before {
@@ -1353,6 +1355,18 @@
                 border: none;
                 background: transparent;
                 pointer-events: auto;
+            }
+
+            .citizen-mobile-dock__group {
+                position: relative;
+                z-index: 2;
+                width: var(--citizen-dock-side-width);
+                min-width: 0;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(44px, 1fr));
+                align-items: center;
+                justify-items: center;
+                column-gap: clamp(8px, 2.4vw, 14px);
             }
 
             .citizen-mobile-dock__item.nav-item,
@@ -1392,15 +1406,21 @@
             }
 
             .citizen-mobile-dock__center-wrap {
-                position: relative;
-                display: flex;
-                justify-content: center;
-                align-self: start;
+                position: absolute;
+                left: 50%;
+                top: 10px;
+                width: var(--citizen-dock-center-slot);
+                height: 66px;
                 overflow: visible;
                 pointer-events: auto;
+                transform: translateX(-50%);
+                z-index: 5;
             }
 
             .citizen-mobile-dock__item--center {
+                position: absolute;
+                left: 50%;
+                top: 0;
                 width: 66px;
                 height: 66px;
                 min-width: 66px;
@@ -1417,6 +1437,7 @@
                 box-shadow: 0 18px 34px rgba(34, 197, 94, 0.34), 0 0 0 8px rgba(255, 255, 255, 0.22);
                 z-index: 3;
                 pointer-events: auto;
+                transform: translateX(-50%);
             }
 
             .citizen-mobile-dock__item--center::before,
@@ -1439,7 +1460,7 @@
             }
 
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__item--center {
-                transform: scale(1.05);
+                transform: translateX(-50%) scale(1.05);
             }
 
             .citizen-mobile-dock__burst {
@@ -1469,6 +1490,11 @@
                 opacity: 1;
                 transform: translate(-50%, 0) scale(1);
                 pointer-events: auto;
+            }
+
+            .alerts-fab {
+                display: none !important;
+                pointer-events: none !important;
             }
 
             .citizen-mobile-dock__burst-item {
@@ -2071,20 +2097,22 @@
     <nav class="citizen-mobile-dock md:hidden" aria-label="Citizen mobile navigation">
         <div class="citizen-mobile-dock__shell">
             <div class="citizen-mobile-dock__track">
-                <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" data-citizen-switch-section="overview" aria-label="Overview">
-                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="m3 10.8 9-7 9 7"></path>
-                        <path d="M5.5 9.5V20h13V9.5"></path>
-                        <path d="M9.5 20v-6h5v6"></path>
-                    </svg>
-                </button>
+                <div class="citizen-mobile-dock__group citizen-mobile-dock__group--left">
+                    <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" data-citizen-switch-section="overview" aria-label="Overview">
+                        <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m3 10.8 9-7 9 7"></path>
+                            <path d="M5.5 9.5V20h13V9.5"></path>
+                            <path d="M9.5 20v-6h5v6"></path>
+                        </svg>
+                    </button>
 
-                <button type="button" class="citizen-mobile-dock__item" aria-label="Notifications" data-citizen-alerts-open>
-                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
-                        <path d="M10 21h4"></path>
-                    </svg>
-                </button>
+                    <button type="button" class="citizen-mobile-dock__item" aria-label="Notifications" data-citizen-alerts-open>
+                        <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                            <path d="M10 21h4"></path>
+                        </svg>
+                    </button>
+                </div>
 
                 <div class="citizen-mobile-dock__center-wrap" data-citizen-nav-center>
                     <div class="citizen-mobile-dock__burst" data-citizen-nav-burst>
@@ -2131,20 +2159,22 @@
                     </button>
                 </div>
 
-                <button type="button" class="citizen-mobile-dock__item" data-citizen-dock-item="announcements" data-citizen-switch-section="announcements" aria-label="Announcements">
-                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 13h3l10 5V6L7 11H4z"></path>
-                        <path d="M7 13v5"></path>
-                        <path d="M18 9.5a3 3 0 0 1 0 5"></path>
-                    </svg>
-                </button>
+                <div class="citizen-mobile-dock__group citizen-mobile-dock__group--right">
+                    <button type="button" class="citizen-mobile-dock__item" data-citizen-dock-item="announcements" data-citizen-switch-section="announcements" aria-label="Announcements">
+                        <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 13h3l10 5V6L7 11H4z"></path>
+                            <path d="M7 13v5"></path>
+                            <path d="M18 9.5a3 3 0 0 1 0 5"></path>
+                        </svg>
+                    </button>
 
-                <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
-                    <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
-                        <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2.1 2.1 0 0 1-3 3l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21a2.1 2.1 0 0 1-4.2 0v-.1a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1a2.1 2.1 0 0 1-3-3l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2a2.1 2.1 0 0 1 0-4.2h.1a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1a2.1 2.1 0 0 1 3-3l.1.1a1.8 1.8 0 0 0 2 .4 1.8 1.8 0 0 0 1.1-1.7V2a2.1 2.1 0 0 1 4.2 0v.1a1.8 1.8 0 0 0 1.1 1.7 1.8 1.8 0 0 0 2-.4l.1-.1a2.1 2.1 0 0 1 3 3l-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.1a2.1 2.1 0 0 1 0 4.2h-.1a1.8 1.8 0 0 0-1.7 1.3z"></path>
-                    </svg>
-                </button>
+                    <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
+                        <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
+                            <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2.1 2.1 0 0 1-3 3l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21a2.1 2.1 0 0 1-4.2 0v-.1a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1a2.1 2.1 0 0 1-3-3l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2a2.1 2.1 0 0 1 0-4.2h.1a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1a2.1 2.1 0 0 1 3-3l.1.1a1.8 1.8 0 0 0 2 .4 1.8 1.8 0 0 0 1.1-1.7V2a2.1 2.1 0 0 1 4.2 0v.1a1.8 1.8 0 0 0 1.1 1.7 1.8 1.8 0 0 0 2-.4l.1-.1a2.1 2.1 0 0 1 3 3l-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.1a2.1 2.1 0 0 1 0 4.2h-.1a1.8 1.8 0 0 0-1.7 1.3z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>

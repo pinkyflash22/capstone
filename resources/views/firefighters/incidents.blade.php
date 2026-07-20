@@ -115,10 +115,17 @@
         .action-btn {
             display: inline-flex; justify-content: center; align-items: center; gap: 8px; height: 42px; padding: 0 16px;
             border-radius: 14px; border: 0; cursor: pointer; font-size: .85rem; font-weight: 700; transition: all .2s ease;
+            text-decoration: none;
         }
         .action-btn.primary { background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%); color: #fff; }
         .action-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(198,61,38,.22); }
         .action-btn.ghost { background: #fff7f3; color: #9a3412; border: 1px solid rgba(198,61,38,.12); }
+        .action-btn.investigation { background: #ecfeff; color: #0f766e; border: 1px solid rgba(20,184,166,.22); }
+        .action-note {
+            display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px;
+            border-radius: 14px; background: #f8fafc; color: #64748b; border: 1px solid rgba(226,232,240,.92);
+            font-size: .8rem; font-weight: 800; text-align: center;
+        }
         .list-empty { padding: 56px 20px; text-align: center; color: #94a3b8; }
         .list-empty i { font-size: 3rem; color: #cbd5e1; margin-bottom: 14px; }
         .shimmer-grid { padding: 14px 24px 24px; display: grid; gap: 14px; }
@@ -441,6 +448,9 @@
                 const imageUrl = resolveStorageUrl(incident.image_url);
                 const statusBucket = getStatusBucket(incident.incident_status_id);
                 const statusLabel = statusBucket === 'active' ? 'Available / Active' : (statusBucket === 'controlled' ? 'Controlled' : 'Closed');
+                const investigationAction = incident.investigation_ready && incident.investigation_url
+                    ? `<a class="action-btn investigation" href="${escapeHtml(incident.investigation_url)}"><i class="fa-solid fa-magnifying-glass"></i> Start Spot Report</a>`
+                    : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '');
                 return `
                     <article class="incident-item">
                         <div class="incident-image">
@@ -462,6 +472,7 @@
                             </div>
                         </div>
                         <div class="incident-actions">
+                            ${investigationAction}
                             <button type="button" class="action-btn primary" onclick="openIncidentDetails(${incident.incident_id})"><i class="fa-solid fa-eye"></i> View Details</button>
                             <button type="button" class="action-btn ghost" onclick="copyIncidentId(${incident.incident_id})"><i class="fa-regular fa-copy"></i> Copy ID</button>
                         </div>

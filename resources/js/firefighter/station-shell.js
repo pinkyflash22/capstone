@@ -327,6 +327,45 @@ function bootFirefighterMyStationPage() {
         loadReports(type);
     }
 
+    async function handleReportDeepLink() {
+        const params = new URLSearchParams(window.location.search);
+        const reportType = params.get('openReport');
+
+        if (!reportType) return;
+
+        if (!['spot', 'progress', 'final'].includes(reportType)) {
+            params.delete('openReport');
+            replaceCurrentQuery(params);
+            return;
+        }
+
+        await openReportModal(reportType);
+
+        if (reportType === 'spot') {
+            const incidentId = params.get('incident_id');
+            const incidentSelect = spotForm?.querySelector('select[name="incident_id"]');
+
+            if (incidentId && incidentSelect) {
+                incidentSelect.value = incidentId;
+                incidentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+                if (incidentSelect.value !== String(incidentId)) {
+                    showToast('This incident is not available for a new spot investigation report.', 'error');
+                }
+            }
+        }
+
+        params.delete('openReport');
+        params.delete('incident_id');
+        replaceCurrentQuery(params);
+    }
+
+    function replaceCurrentQuery(params) {
+        const query = params.toString();
+        const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+        window.history.replaceState(window.history.state || {}, '', cleanUrl);
+    }
+
     function getSelectedOptionText(select) {
         const option = select?.options?.[select.selectedIndex];
         return option?.dataset?.location || option?.textContent?.trim() || 'Unknown incident location';
@@ -1098,6 +1137,7 @@ function bootFirefighterMyStationPage() {
     loadPersonnel();
     loadReports(initialReportTab);
     loadEquipment();
+    handleReportDeepLink();
 
     window.__ffCurrentPageCleanup = function () {
         cleanupRequests();
