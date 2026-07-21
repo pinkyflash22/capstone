@@ -6055,19 +6055,15 @@ async function updateCoordinate(data, options = {}) {
             
             const incident = findIncidentInLookup(marker, incidentLookup);
             const tempIcon = getIconByCategoryId(marker.markerCategory_id, '', marker);
-            const useResponderMobileDetailsUi = shouldUseResponderMobileDetailsUi();
             const newMarker = L.marker([lat, lng], { icon: tempIcon });
-
-            if (!useResponderMobileDetailsUi) {
-                const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
-                const popupMaxWidth = window.innerWidth <= 768 ? 264 : 300;
-                const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
-                if (shouldUseResponderPopupUi()) {
-                    popupOptions.className = 'responder-custom-popup';
-                }
-
-                newMarker.bindPopup(popupContent, popupOptions);
+            const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
+            const popupMaxWidth = window.innerWidth <= 768 ? 264 : 340;
+            const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
+            if (shouldUseResponderPopupUi()) {
+                popupOptions.className = 'responder-custom-popup';
             }
+
+            newMarker.bindPopup(popupContent, popupOptions);
             
             if (isIncidentMarker(marker)) {
                 const circle = L.circle([lat, lng], { radius: 200, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.2 });
@@ -6079,32 +6075,38 @@ async function updateCoordinate(data, options = {}) {
                 ? '/storage/' + marker.multimedia.path
                 : null;
 
-            if (useResponderMobileDetailsUi) {
-                newMarker.on('click', () => {
-                    const resolvedIncident = findIncidentForMarker(marker, incident);
-                    const popupContent = generatePopupContent({ marker: marker, incident: resolvedIncident }, incidents);
+            newMarker.on('click', () => {
+                const resolvedIncident = findIncidentForMarker(marker, incident);
+                const latestPopupContent = generatePopupContent({ marker: marker, incident: resolvedIncident }, incidents);
+                newMarker.setPopupContent(latestPopupContent);
 
+                if (shouldUseResponderMobileDetailsUi()) {
                     try {
                         window.map?.closePopup?.();
                     } catch (closePopupError) {
                         console.warn('Unable to close existing popup before opening mobile details:', closePopupError);
                     }
 
-                    openResponderMapPreviewSheet(popupContent, {
+                    openResponderMapPreviewSheet(latestPopupContent, {
                         marker,
                         incident: resolvedIncident,
                         image: marker.multimedia || null,
                         created_at: marker.created_at || null
                     });
-                });
-            } else {
-                newMarker.on('popupopen', () => addPopupEventListeners({
+                    return;
+                }
+
+                if (!newMarker.isPopupOpen?.()) {
+                    newMarker.openPopup();
+                }
+            });
+
+            newMarker.on('popupopen', () => addPopupEventListeners({
                     marker: marker,
                     incident,
                     image: marker.multimedia || null,
                     created_at: marker.created_at
-                }));
-            }
+            }));
             existingMarkers[marker.marker_id] = newMarker;
         });
 

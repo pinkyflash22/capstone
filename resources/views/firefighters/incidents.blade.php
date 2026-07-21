@@ -647,6 +647,7 @@
         }
 
         function renderShimmerState() {
+            if (!listState) return;
             listState.innerHTML = `<div class="shimmer-grid">${Array.from({ length: 4 }).map(() => `
                 <div class="shimmer-card">
                     <div class="shimmer-box shimmer-avatar"></div>
@@ -664,11 +665,16 @@
         }
 
         function updateStats(stats = {}) {
-            document.getElementById('statTotal').textContent = stats.total ?? 0;
-            document.getElementById('statActive').textContent = stats.active ?? 0;
-            document.getElementById('statControlled').textContent = stats.controlled ?? 0;
-            document.getElementById('statClosed').textContent = stats.closed ?? 0;
-            document.getElementById('statAvgResponse').textContent = `${stats.avg_response_minutes ?? 0}m`;
+            const setStatText = (id, value) => {
+                const target = document.getElementById(id);
+                if (target) target.textContent = value;
+            };
+
+            setStatText('statTotal', stats.total ?? 0);
+            setStatText('statActive', stats.active ?? 0);
+            setStatText('statControlled', stats.controlled ?? 0);
+            setStatText('statClosed', stats.closed ?? 0);
+            setStatText('statAvgResponse', `${stats.avg_response_minutes ?? 0}m`);
         }
 
         function getFilteredIncidents() {
@@ -697,7 +703,10 @@
 
         function renderIncidentList() {
             const incidents = getFilteredIncidents();
-            resultsCount.textContent = `${incidents.length} incident${incidents.length === 1 ? '' : 's'}`;
+            if (!listState) return;
+            if (resultsCount) {
+                resultsCount.textContent = `${incidents.length} incident${incidents.length === 1 ? '' : 's'}`;
+            }
             if (mobileResultsCount) {
                 mobileResultsCount.textContent = String(incidents.length);
             }
@@ -778,7 +787,9 @@
                 renderIncidentList();
             } catch (error) {
                 console.error('Incident registry fetch failed:', error);
-                listState.innerHTML = `<div class="list-empty"><i class="fa-solid fa-triangle-exclamation"></i><div class="text-lg font-semibold text-slate-700">Failed to load incident records.</div><div class="mt-2 text-sm text-slate-500">${escapeHtml(error.message || 'Unknown error')}</div></div>`;
+                if (listState) {
+                    listState.innerHTML = `<div class="list-empty"><i class="fa-solid fa-triangle-exclamation"></i><div class="text-lg font-semibold text-slate-700">Failed to load incident records.</div><div class="mt-2 text-sm text-slate-500">${escapeHtml(error.message || 'Unknown error')}</div></div>`;
+                }
             } finally {
                 incidentState.request = null;
             }

@@ -428,8 +428,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
         Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
-        Route::get('/equipments', [FirefighterController::class, 'equipments'])->name('equipments');
-        Route::get('/fsic-requests', [FirefighterController::class, 'equipments'])->name('fsic-requests');
+        Route::redirect('/equipments', '/firefighter/fsic');
+        Route::redirect('/fsic-requests', '/firefighter/fsic');
+        Route::get('/fsic', [FirefighterController::class, 'equipments'])->name('equipments');
         Route::get('/api/fsic-requests/{id}', [FirefighterController::class, 'getAssignedFsicRequest'])->name('fsic-requests.show');
         Route::post('/api/fsic-requests/{id}/inspect', [FirefighterController::class, 'submitFsicInspection'])->name('fsic-requests.inspect');
         Route::get('/schedule', [FirefighterController::class, 'schedule'])->name('schedule');

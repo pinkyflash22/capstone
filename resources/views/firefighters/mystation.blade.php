@@ -39,7 +39,7 @@
                         @if($stationImageUrl)
                             <img src="{{ $stationImageUrl }}" alt="{{ $stationName }}">
                         @else
-                            <i class="fa-solid fa-building-shield"></i>
+                            <i class="fa-solid fa-building"></i>
                         @endif
                     </div>
 
@@ -72,7 +72,7 @@
 
                 <div id="stationOverviewSection" class="station-section-shell" data-station-section="overview">
                     <div class="section-shell-card station-loading-card">
-                        <i class="fa-solid fa-building-shield"></i>
+                        <i class="fa-solid fa-building"></i>
                         <span>Loading overview...</span>
                     </div>
                 </div>
@@ -90,9 +90,9 @@
                             <div class="section-title"><i class="fa-solid fa-file-lines"></i> Investigation Reports</div>
                         </div>
                         <div class="action-row">
-                            <button type="button" class="btn btn-outline" data-open-report-modal="spot"><i class="fa-solid fa-file-circle-plus"></i> New Spot</button>
-                            <button type="button" class="btn btn-outline" data-open-report-modal="progress"><i class="fa-solid fa-file-circle-plus"></i> New Progress</button>
-                            <button type="button" class="btn btn-primary" data-open-report-modal="final"><i class="fa-solid fa-file-circle-plus"></i> New Final</button>
+                            <button type="button" class="btn btn-outline" data-open-report-modal="spot"><i class="fa-solid fa-plus"></i> New Spot</button>
+                            <button type="button" class="btn btn-outline" data-open-report-modal="progress"><i class="fa-solid fa-plus"></i> New Progress</button>
+                            <button type="button" class="btn btn-primary" data-open-report-modal="final"><i class="fa-solid fa-plus"></i> New Final</button>
                         </div>
                     </div>
 
@@ -133,12 +133,14 @@
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid">
+                        <div class="form-section-label">Incident reference</div>
                         <div class="form-group full">
                             <label class="form-label">Incident</label>
                             <select name="incident_id" class="form-select" data-station-ref="spot-incidents" required>
                                 <option value="">Select incident</option>
                             </select>
                         </div>
+                        <div class="form-section-label">Casualties and owner</div>
                         <div class="form-group">
                             <label class="form-label">Dead</label>
                             <input type="number" min="0" step="1" name="dead" class="form-input" value="0">
@@ -151,6 +153,7 @@
                             <label class="form-label">Owner</label>
                             <input type="text" name="owner" class="form-input" placeholder="Owner or responsible party">
                         </div>
+                        <div class="form-section-label">Report timeline</div>
                         <div class="form-group">
                             <label class="form-label">Report Completed</label>
                             <input type="datetime-local" name="report_completed_at" class="form-input">
@@ -167,6 +170,7 @@
                             <label class="form-label">Fire Out</label>
                             <input type="datetime-local" name="fire_out" class="form-input" id="spotFireOutInput">
                         </div>
+                        <div class="form-section-label">Location and damage</div>
                         <div class="form-group full">
                             <label class="form-label">Place of Occurrence</label>
                             <input type="text" name="place_of_occurrence" class="form-input" placeholder="Street, barangay, city, landmark">
@@ -187,6 +191,7 @@
                             <label class="form-label">Highest Alarm</label>
                             <input type="text" name="highest_alarm_level" class="form-input" placeholder="Example: 1st alarm, 2nd alarm">
                         </div>
+                        <div class="form-section-label">Occupancy details</div>
                         <div class="form-group full">
                             <label class="form-label">Occupancy</label>
                             <select name="occupancy" class="form-select" required>
@@ -208,6 +213,7 @@
                             <label class="form-label">Occupant</label>
                             <input type="text" name="occupant" class="form-input" placeholder="Occupant or tenant name">
                         </div>
+                        <div class="form-section-label">Narrative and disposition</div>
                         <div class="form-group full">
                             <label class="form-label">Raw Description / Field Notes</label>
                             <textarea name="description" class="form-textarea" rows="5" placeholder="Type quick notes in Tagalog or English about what happened, observed fire conditions, witness statements, actions taken, and other scene details"></textarea>
@@ -221,13 +227,14 @@
                             <textarea name="details_of_investigation" class="form-textarea" rows="6" placeholder="Full fire incident narration, area affected, weather condition, observed conditions, and other initial findings"></textarea>
                             <div class="table-muted">Use field notes first, then let the system draft a cleaner narrative that you can still edit.</div>
                             <button type="button" class="btn btn-outline" data-generate-spot-narrative style="margin-top: 0.85rem; width: fit-content;">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
+                                <i class="fa-solid fa-magic"></i> Generate Narrative
                             </button>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Disposition</label>
                             <textarea name="disposition" class="form-textarea" rows="4" placeholder="Assessment, case status, and whether this will be elevated to a higher office"></textarea>
                         </div>
+                        <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
                             <label class="form-label">Noted By</label>
                             <select name="noted_by_station_officer_id" class="form-select" data-station-ref="officers">
@@ -244,7 +251,11 @@
                 </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="spot">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Spot Report</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span class="submit-label-full">Submit Spot Report</span>
+                        <span class="submit-label-mobile">Submit</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -260,12 +271,14 @@
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid">
+                        <div class="form-section-label">Source report</div>
                         <div class="form-group full">
                             <label class="form-label">Spot Investigation Report</label>
                             <select name="spot_investigation_id" class="form-select" data-station-ref="spot-reports" required>
                                 <option value="">Select spot report</option>
                             </select>
                         </div>
+                        <div class="form-section-label">Cause and orders</div>
                         <div class="form-group">
                             <label class="form-label">Fire Origin</label>
                             <select name="fire_origin_id" class="form-select" data-station-ref="fire-origins">
@@ -296,6 +309,7 @@
                             <label class="form-label">Mission Order Date</label>
                             <input type="date" name="mission_order_date" class="form-input">
                         </div>
+                        <div class="form-section-label">Narrative and disposition</div>
                         <div class="form-group full">
                             <label class="form-label">Fire Cause</label>
                             <textarea name="fire_cause" class="form-textarea" rows="3" required></textarea>
@@ -304,13 +318,14 @@
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="6"></textarea>
                             <button type="button" class="btn btn-outline" data-generate-progress-narrative style="margin-top: 0.85rem; width: fit-content;">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
+                                <i class="fa-solid fa-magic"></i> Generate Narrative
                             </button>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Disposition</label>
                             <textarea name="disposition" class="form-textarea" rows="4"></textarea>
                         </div>
+                        <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
                             <label class="form-label">Noted By</label>
                             <select name="noted_by_station_officer_id" class="form-select" data-station-ref="officers">
@@ -327,7 +342,11 @@
                 </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="progress">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Progress Report</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span class="submit-label-full">Submit Progress Report</span>
+                        <span class="submit-label-mobile">Submit</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -343,12 +362,14 @@
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid">
+                        <div class="form-section-label">Source report</div>
                         <div class="form-group full">
                             <label class="form-label">Progress Investigation Report</label>
                             <select name="progress_investigation_id" class="form-select" data-station-ref="progress-reports" required>
                                 <option value="">Select progress report</option>
                             </select>
                         </div>
+                        <div class="form-section-label">Damage and timeline</div>
                         <div class="form-group">
                             <label class="form-label">Total Damage</label>
                             <input type="number" min="0" step="0.01" name="total_damage" class="form-input" required>
@@ -373,6 +394,7 @@
                             <label class="form-label">Alarm Time</label>
                             <input type="datetime-local" name="alarm_at" class="form-input">
                         </div>
+                        <div class="form-section-label">Location and affected parties</div>
                         <div class="form-group full">
                             <label class="form-label">Establishment Burned</label>
                             <input type="text" name="establishment_burned" class="form-input">
@@ -389,6 +411,7 @@
                             <label class="form-label">Cause of Fire</label>
                             <textarea name="cause_of_fire" class="form-textarea" rows="2"></textarea>
                         </div>
+                        <div class="form-section-label">Documents and findings</div>
                         <div class="form-group full">
                             <label class="form-label">Substantiating Documents</label>
                             <div class="checkbox-grid" id="finalSubstantiatingDocuments"></div>
@@ -397,7 +420,7 @@
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="5"></textarea>
                             <button type="button" class="btn btn-outline" data-generate-final-narrative style="margin-top: 0.85rem; width: fit-content;">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
+                                <i class="fa-solid fa-magic"></i> Generate Narrative
                             </button>
                         </div>
                         <div class="form-group full">
@@ -412,6 +435,7 @@
                             <label class="form-label">Recommendation</label>
                             <textarea name="recommendation" class="form-textarea" rows="4"></textarea>
                         </div>
+                        <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
                             <label class="form-label">Noted By</label>
                             <select name="noted_by_station_officer_id" class="form-select" data-station-ref="officers">
@@ -428,7 +452,11 @@
                 </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="final">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Final Report</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span class="submit-label-full">Submit Final Report</span>
+                        <span class="submit-label-mobile">Submit</span>
+                    </button>
                 </div>
             </form>
         </div>

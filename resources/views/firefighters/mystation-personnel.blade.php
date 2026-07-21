@@ -1,14 +1,14 @@
-<section class="station-grid">
-    <div class="section-card">
+<section class="station-personnel-stack">
+    <section class="section-card">
         <div class="section-header">
-        <div>
-            <div class="section-title"><i class="fa-solid fa-people-group"></i> Crew Members</div>
-        </div>
+            <div>
+                <div class="section-title"><i class="fa-solid fa-users"></i> Crew Members</div>
+            </div>
         </div>
         <div class="section-body">
             @if($crewMembers->isEmpty())
                 <div class="empty-box">
-                    <i class="fa-solid fa-user-slash"></i>
+                    <i class="fa-solid fa-user"></i>
                     <div>No crew members yet.</div>
                 </div>
             @else
@@ -25,13 +25,13 @@
                 </div>
             @endif
         </div>
-    </div>
+    </section>
 
     <section class="section-card">
         <div class="section-header">
-        <div>
-            <div class="section-title"><i class="fa-solid fa-id-card-clip"></i> Station Officers</div>
-        </div>
+            <div>
+                <div class="section-title"><i class="fa-solid fa-id-card"></i> Station Officers</div>
+            </div>
         </div>
         <div class="section-body table-wrap">
             <table class="data-table">
@@ -68,7 +68,7 @@
                         <tr>
                             <td colspan="5">
                                 <div class="empty-box">
-                                    <i class="fa-solid fa-users-slash"></i>
+                                    <i class="fa-solid fa-users"></i>
                                     <div>No station officers found.</div>
                                 </div>
                             </td>

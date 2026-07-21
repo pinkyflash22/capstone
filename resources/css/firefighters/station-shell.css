@@ -201,6 +201,19 @@
     gap: 24px;
 }
 
+.station-personnel-stack {
+    display: grid;
+    gap: 18px;
+}
+
+.station-personnel-stack .section-card {
+    min-width: 0;
+}
+
+.station-personnel-stack .crew-list {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
 .stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -489,10 +502,12 @@
 }
 
 .report-modal-panel {
-    width: min(980px, 100%);
-    max-height: min(88vh, 920px);
-    overflow: auto;
-    border-radius: 28px;
+    width: min(780px, calc(100vw - 40px));
+    max-height: min(84vh, 780px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px;
     background:
         radial-gradient(circle at top right, rgba(255, 205, 86, 0.22), transparent 34%),
         linear-gradient(135deg, #fff7f2 0%, #ffffff 100%);
@@ -501,7 +516,7 @@
 }
 
 .report-modal-panel--manage {
-    width: min(860px, 100%);
+    width: min(720px, calc(100vw - 40px));
 }
 
 .report-modal-header,
@@ -518,7 +533,15 @@
 }
 
 .report-modal-body {
-    padding: 22px;
+    padding: 18px 20px;
+    overflow: auto;
+}
+
+.report-modal-panel > form {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
 }
 
 .report-close {
@@ -532,6 +555,30 @@
 
 .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px 14px;
+}
+
+.form-section-label {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 4px;
+    color: #c2410c;
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.form-section-label::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+    flex: 0 0 auto;
 }
 
 .form-group.full,
@@ -556,16 +603,25 @@
 .form-select,
 .form-textarea {
     width: 100%;
-    padding: 12px 14px;
-    border-radius: 16px;
+    padding: 10px 12px;
+    border-radius: 14px;
     border: 1px solid rgba(203, 213, 225, 0.92);
     background: rgba(255, 255, 255, 0.96);
     color: #172554;
 }
 
+.form-input,
+.form-select {
+    min-height: 44px;
+}
+
 .form-textarea {
-    min-height: 110px;
+    min-height: 92px;
     resize: vertical;
+}
+
+.submit-label-mobile {
+    display: none;
 }
 
 .checkbox-grid {
@@ -836,16 +892,17 @@
     }
 
     .report-modal {
-        padding: 10px;
+        padding: 10px 10px calc(var(--ff-mobile-bottom-h, 84px) + env(safe-area-inset-bottom) + 12px);
         align-items: flex-end;
     }
 
     .report-modal-panel,
     .report-modal-panel--manage {
         width: 100%;
-        max-height: 92vh;
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
+        max-height: calc(100dvh - var(--ff-mobile-bottom-h, 84px) - env(safe-area-inset-bottom) - 22px);
+        border-radius: 22px 22px 18px 18px;
+        overflow: hidden;
+        box-shadow: none;
     }
 
     .station-shell-page {
@@ -995,59 +1052,96 @@
         padding: 11px 12px;
     }
 
-    .report-modal-panel,
-    .report-modal-panel--manage {
-        max-width: 100%;
-        max-height: min(78dvh, 700px);
-        border-radius: 24px 24px 18px 18px;
-        box-shadow: none;
-    }
-
     .report-modal-panel::before,
     .report-modal-panel--manage::before {
         content: "";
         display: block;
-        width: 52px;
-        height: 5px;
+        width: 46px;
+        height: 4px;
         border-radius: 999px;
         background: #cbd5e1;
-        margin: 0 auto 14px;
+        margin: 7px auto 4px;
+        flex: 0 0 auto;
     }
 
     .report-modal-header,
     .report-modal-footer {
-        padding: 12px 14px;
+        padding: 9px 12px;
+        flex-direction: row !important;
+        align-items: center !important;
     }
 
     .report-modal-title {
-        font-size: 0.95rem;
+        min-width: 0;
+        font-size: 0.86rem;
+        line-height: 1.2;
     }
 
     .report-modal-body {
-        padding: 14px;
+        padding: 10px 12px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
     }
 
     .report-close {
-        width: 38px;
-        height: 38px;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        font-size: 0.78rem;
     }
 
     .form-grid,
     .detail-grid,
     .checkbox-grid {
-        gap: 9px;
+        gap: 8px;
+    }
+
+    .form-section-label {
+        gap: 6px;
+        margin-top: 2px;
+        padding-top: 2px;
+        font-size: 0.58rem;
+        letter-spacing: 0.08em;
+    }
+
+    .form-section-label::before {
+        width: 5px;
+        height: 5px;
     }
 
     .form-input,
     .form-select,
     .form-textarea {
-        padding: 10px 11px;
-        border-radius: 12px;
-        font-size: 0.82rem;
+        padding: 8px 10px;
+        border-radius: 11px;
+        font-size: 0.76rem;
+    }
+
+    .form-input,
+    .form-select {
+        min-height: 38px;
     }
 
     .form-textarea {
-        min-height: 86px;
+        min-height: 68px;
+    }
+
+    .report-modal-footer {
+        position: sticky;
+        bottom: 0;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(12px);
+    }
+
+    .report-modal-footer .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 9px 10px;
+        border-radius: 13px;
+        font-size: 0.72rem;
+        white-space: nowrap;
     }
 
     .detail-item {
@@ -1201,5 +1295,160 @@
     body.firefighter-portal-shell .main-content > .station-shell-page {
         width: calc(100dvw - 16px) !important;
         max-width: calc(100dvw - 16px) !important;
+    }
+}
+
+body.firefighter-portal-shell #spotReportModal.report-modal,
+body.firefighter-portal-shell #progressReportModal.report-modal,
+body.firefighter-portal-shell #finalReportModal.report-modal,
+body.firefighter-portal-shell #manageReportModal.report-modal {
+    z-index: 12000 !important;
+    padding: 24px !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+body.firefighter-portal-shell #spotReportModal .report-modal-panel,
+body.firefighter-portal-shell #progressReportModal .report-modal-panel,
+body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+body.firefighter-portal-shell #manageReportModal .report-modal-panel {
+    position: relative !important;
+    z-index: 12001 !important;
+}
+
+body.firefighter-portal-shell #spotReportModal .report-modal-panel,
+body.firefighter-portal-shell #progressReportModal .report-modal-panel,
+body.firefighter-portal-shell #finalReportModal .report-modal-panel {
+    width: min(680px, calc(100vw - 48px)) !important;
+    max-width: min(680px, calc(100vw - 48px)) !important;
+    max-height: min(76dvh, 720px) !important;
+}
+
+body.firefighter-portal-shell #manageReportModal .report-modal-panel {
+    width: min(640px, calc(100vw - 48px)) !important;
+    max-width: min(640px, calc(100vw - 48px)) !important;
+    max-height: min(76dvh, 700px) !important;
+}
+
+body.firefighter-portal-shell .report-modal-panel {
+    overflow: hidden !important;
+}
+
+body.firefighter-portal-shell .report-modal-header {
+    flex: 0 0 auto !important;
+}
+
+body.firefighter-portal-shell .report-modal-body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+
+body.firefighter-portal-shell .report-modal-footer {
+    flex: 0 0 auto !important;
+}
+
+@media (max-width: 768px) {
+    body.firefighter-portal-shell #spotReportModal.report-modal,
+    body.firefighter-portal-shell #progressReportModal.report-modal,
+    body.firefighter-portal-shell #finalReportModal.report-modal,
+    body.firefighter-portal-shell #manageReportModal.report-modal {
+        padding: 8px 10px calc(var(--ff-mobile-bottom-h, 84px) + env(safe-area-inset-bottom) + 10px) !important;
+        align-items: flex-end !important;
+    }
+
+    body.firefighter-portal-shell #spotReportModal .report-modal-panel,
+    body.firefighter-portal-shell #progressReportModal .report-modal-panel,
+    body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+    body.firefighter-portal-shell #manageReportModal .report-modal-panel {
+        width: calc(100dvw - 24px) !important;
+        max-width: calc(100dvw - 24px) !important;
+        max-height: min(58dvh, calc(100dvh - var(--ff-mobile-bottom-h, 84px) - env(safe-area-inset-bottom) - 22px)) !important;
+        border-radius: 18px 18px 14px 14px !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-header {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+        padding: 7px 10px !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-title {
+        font-size: 0.76rem !important;
+        line-height: 1.2 !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-body {
+        padding: 7px 10px !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-footer {
+        position: sticky !important;
+        bottom: 0 !important;
+        padding: 7px 10px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    body.firefighter-portal-shell .report-close {
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 30px !important;
+    }
+
+    body.firefighter-portal-shell .form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 6px !important;
+    }
+
+    body.firefighter-portal-shell .form-label {
+        font-size: 0.56rem !important;
+    }
+
+    body.firefighter-portal-shell .form-input,
+    body.firefighter-portal-shell .form-select {
+        min-height: 34px !important;
+    }
+
+    body.firefighter-portal-shell .form-input,
+    body.firefighter-portal-shell .form-select,
+    body.firefighter-portal-shell .form-textarea {
+        padding: 6px 8px !important;
+        font-size: 0.7rem !important;
+        border-radius: 9px !important;
+    }
+
+    body.firefighter-portal-shell .form-textarea {
+        min-height: 54px !important;
+    }
+
+    body.firefighter-portal-shell .form-section-label {
+        font-size: 0.54rem !important;
+        margin-top: 1px !important;
+    }
+
+    body.firefighter-portal-shell .submit-label-full {
+        display: none !important;
+    }
+
+    body.firefighter-portal-shell .submit-label-mobile {
+        display: inline !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-footer .btn {
+        min-height: 38px !important;
+        padding: 8px 9px !important;
+        font-size: 0.72rem !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-footer .btn-outline {
+        flex: 0 0 42% !important;
+    }
+
+    body.firefighter-portal-shell .report-modal-footer .btn-primary {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
     }
 }

@@ -22,22 +22,31 @@
         }
 
         .fsic-main {
-            margin-left: 300px;
-            padding: 28px;
-            width: calc(100% - 300px);
+            width: calc(100% - var(--ff-sidebar-w, 300px));
         }
 
-        .fsic-topbar {
+        .fsic-content {
+            width: 100%;
+        }
+
+        .fsic-page-actions {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            padding: 18px 22px;
-            margin-bottom: 22px;
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid rgba(31, 41, 55, 0.08);
-            border-radius: 20px;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            margin-bottom: 18px;
+        }
+
+        .fsic-mobile-title {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 22px;
         }
 
         .fsic-page-title h1 {
@@ -51,6 +60,20 @@
             margin: 4px 0 0;
             color: #6b7280;
             font-size: 0.92rem;
+        }
+
+        .fsic-mobile-count {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            background: #fff7f3;
+            border: 1px solid rgba(198, 61, 38, 0.16);
+            color: #c63d26;
+            font-weight: 800;
         }
 
         .fsic-kpis {
@@ -81,6 +104,10 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: #9ca3af;
+        }
+
+        .fsic-kpi-label-short {
+            display: none;
         }
 
         .fsic-kpi-icon {
@@ -590,12 +617,251 @@
         }
 
         @media (max-width: 768px) {
-            .fsic-topbar,
-            .fsic-card-header,
-            .fsic-modal-header,
+            html {
+                scroll-padding-top: 0;
+            }
+
+            body.firefighter-portal-shell {
+                background: #fbf7ef !important;
+            }
+
+            .fsic-shell {
+                min-height: auto;
+                display: block;
+            }
+
+            .fsic-shell > .ff-mobile-bottom-spacer {
+                display: none !important;
+                height: 0 !important;
+            }
+
+            .fsic-main {
+                min-height: auto !important;
+                padding: max(8px, var(--ff-safe-top)) 10px calc(var(--ff-mobile-dock-h, var(--ff-mobile-bottom-h, 84px)) + 20px) !important;
+                overflow-x: hidden;
+            }
+
+            .fsic-content {
+                max-width: 430px;
+                margin: 0 auto;
+                display: grid;
+                gap: 10px;
+            }
+
+            .fsic-mobile-title {
+                display: flex;
+            }
+
+            .fsic-page-actions {
+                display: none;
+            }
+
+            .fsic-page-actions .fsic-page-title {
+                display: none;
+            }
+
+            .fsic-page-actions .btn {
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                border-radius: 14px;
+            }
+
+            .fsic-page-actions .btn span {
+                display: none;
+            }
+
+            .fsic-kpis {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 6px;
+                margin-bottom: 0;
+            }
+
+            .fsic-kpi {
+                min-width: 0;
+                border-radius: 14px;
+                padding: 8px 5px;
+                box-shadow: none;
+                display: grid;
+                align-content: center;
+                gap: 4px;
+            }
+
+            .fsic-kpi-head {
+                justify-content: center;
+                margin-bottom: 0;
+            }
+
+            .fsic-kpi-label {
+                display: block;
+                max-width: 100%;
+                overflow: hidden;
+                text-align: center;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 0.52rem;
+                letter-spacing: 0.02em;
+            }
+
+            .fsic-kpi-label-full {
+                display: none;
+            }
+
+            .fsic-kpi-label-short {
+                display: inline;
+            }
+
+            .fsic-kpi-icon {
+                display: none;
+            }
+
+            .fsic-kpi-value {
+                text-align: center;
+                font-size: 1.08rem;
+            }
+
+            .fsic-card {
+                border-radius: 22px;
+                box-shadow: none;
+                overflow: hidden;
+                min-height: 0;
+            }
+
+            .fsic-card-header {
+                padding: 14px 14px 8px;
+            }
+
+            .fsic-card-title {
+                font-size: 1rem;
+            }
+
+            .fsic-card-subtitle {
+                display: none;
+            }
+
+            .fsic-table-wrap {
+                overflow: visible;
+                padding: 0 10px 12px;
+                min-height: 0;
+            }
+
+            .fsic-table,
+            .fsic-table tbody,
+            .fsic-table tr,
+            .fsic-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .fsic-table thead {
+                display: none;
+            }
+
+            .fsic-table tbody {
+                display: grid;
+                gap: 10px;
+            }
+
+            .fsic-table tbody tr {
+                padding: 11px;
+                border: 1px solid rgba(226, 232, 240, 0.9);
+                border-radius: 18px;
+                background: #fffdfa;
+            }
+
+            .fsic-table td {
+                border-bottom: 0;
+                padding: 4px 0;
+                font-size: 0.82rem;
+            }
+
+            .fsic-table td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 2px;
+                font-size: 0.62rem;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #94a3b8;
+            }
+
+            .fsic-table td:first-child::before,
+            .fsic-table td:nth-child(2)::before {
+                display: none;
+            }
+
+            .fsic-row-title {
+                font-size: 0.88rem;
+                line-height: 1.2;
+            }
+
+            .fsic-row-meta {
+                font-size: 0.7rem;
+            }
+
+            .status-pill {
+                padding: 5px 9px;
+                font-size: 0.68rem;
+            }
+
+            .table-action {
+                width: 100%;
+                min-height: 42px;
+                border-radius: 14px;
+                margin-top: 6px;
+                font-size: 0.8rem;
+            }
+
+            .empty-state {
+                padding: 22px 12px;
+                font-size: 0.82rem;
+            }
+
+            .empty-state i {
+                font-size: 2rem;
+            }
+
+            .fsic-modal {
+                align-items: flex-end;
+                padding: 0 10px calc(var(--ff-mobile-dock-h, var(--ff-mobile-bottom-h, 84px)) + 8px);
+                z-index: 2600;
+            }
+
+            .fsic-modal-panel {
+                width: min(100%, 430px);
+                max-height: min(76dvh, 620px);
+                border-radius: 24px;
+                box-shadow: 0 -16px 34px rgba(15, 23, 42, 0.18);
+            }
+
+            .fsic-modal-header {
+                padding: 16px 16px 12px;
+                align-items: center;
+            }
+
+            .fsic-modal-title {
+                font-size: 1rem;
+            }
+
+            .fsic-modal-subtitle {
+                font-size: 0.74rem;
+            }
+
+            .fsic-close-btn {
+                width: 44px;
+                height: 44px;
+                flex: 0 0 auto;
+            }
+
+            .fsic-modal-body {
+                padding: 14px 16px;
+                max-height: calc(76dvh - 150px);
+            }
+
             .fsic-modal-footer {
-                flex-direction: column;
-                align-items: stretch;
+                padding: 12px 16px 16px;
+                gap: 8px;
             }
 
             .fsic-kpis,
@@ -605,14 +871,62 @@
                 grid-template-columns: 1fr;
             }
 
+            .fsic-content .fsic-kpis {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
             .btn-row {
                 margin-left: 0;
                 width: 100%;
-                flex-direction: column;
+                flex-direction: row;
             }
 
             .btn-row .btn {
                 width: 100%;
+                min-height: 44px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .fsic-main {
+                padding-inline: 8px !important;
+            }
+
+            .fsic-content .fsic-kpis {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            .fsic-page-title h1 {
+                font-size: 1.28rem;
+            }
+
+            .fsic-page-title p {
+                font-size: 0.76rem;
+            }
+
+            .fsic-mobile-title {
+                padding: 13px 14px;
+                border-radius: 20px;
+            }
+
+            .fsic-card {
+                border-radius: 20px;
+            }
+
+            .fsic-table-wrap {
+                padding-inline: 8px;
+            }
+
+            .fsic-kpi {
+                padding: 7px 3px;
+            }
+
+            .fsic-kpi-label {
+                font-size: 0.48rem;
+            }
+
+            .fsic-kpi-value {
+                font-size: 1rem;
             }
         }
     </style>
@@ -622,42 +936,56 @@
     <div class="fsic-shell">
         @include('firefighters.partials.shell-sidebar', ['active' => 'fsic'])
 
-        <main class="fsic-main">
-            <div class="fsic-topbar">
+        <main class="main-content fsic-main">
+            @include('firefighters.partials.shell-topbar', [
+                'title' => 'FSIC Requests',
+                'subtitle' => 'Assigned fire safety inspection requests'
+            ])
+
+            <div class="requests-shell fsic-content">
+            <section class="fsic-mobile-title" aria-label="FSIC request summary">
+                <div class="fsic-page-title">
+                    <h1>FSIC Requests</h1>
+                    <p>Assigned inspections</p>
+                </div>
+                <span class="fsic-mobile-count" id="mobileAssignedCount">{{ $assignedFsicRequests->count() }}</span>
+            </section>
+
+            <div class="fsic-page-actions">
                 <div class="fsic-page-title">
                     <h1>FSIC Requests</h1>
                     <p>Inspect assigned fire safety clearance requests for your station.</p>
                 </div>
                 <button type="button" class="btn btn-outline" onclick="refreshFsicRequests()">
-                    <i class="fas fa-rotate"></i> Refresh
+                    <i class="fas fa-rotate"></i> <span>Refresh</span>
                 </button>
             </div>
 
             <div class="fsic-kpis">
                 <div class="fsic-kpi">
                     <div class="fsic-kpi-head">
-                        <span class="fsic-kpi-label">Assigned</span>
+                        <span class="fsic-kpi-label"><span class="fsic-kpi-label-full">Assigned</span><span class="fsic-kpi-label-short">All</span></span>
                         <span class="fsic-kpi-icon"><i class="fas fa-file-invoice"></i></span>
                     </div>
                     <div class="fsic-kpi-value" id="assignedCount">{{ $assignedFsicRequests->count() }}</div>
                 </div>
                 <div class="fsic-kpi">
                     <div class="fsic-kpi-head">
-                        <span class="fsic-kpi-label">For Inspection</span>
+                        <span class="fsic-kpi-label"><span class="fsic-kpi-label-full">For Inspection</span><span class="fsic-kpi-label-short">Inspect</span></span>
                         <span class="fsic-kpi-icon"><i class="fas fa-clipboard-check"></i></span>
                     </div>
                     <div class="fsic-kpi-value" id="forInspectionCount">{{ $assignedFsicRequests->where('status', 'for_inspection')->count() }}</div>
                 </div>
                 <div class="fsic-kpi">
                     <div class="fsic-kpi-head">
-                        <span class="fsic-kpi-label">Inspected</span>
+                        <span class="fsic-kpi-label"><span class="fsic-kpi-label-full">Inspected</span><span class="fsic-kpi-label-short">Done</span></span>
                         <span class="fsic-kpi-icon"><i class="fas fa-magnifying-glass"></i></span>
                     </div>
                     <div class="fsic-kpi-value" id="inspectedCount">{{ $assignedFsicRequests->where('status', 'inspected')->count() }}</div>
                 </div>
                 <div class="fsic-kpi">
                     <div class="fsic-kpi-head">
-                        <span class="fsic-kpi-label">Approved</span>
+                        <span class="fsic-kpi-label"><span class="fsic-kpi-label-full">Approved</span><span class="fsic-kpi-label-short">OK</span></span>
                         <span class="fsic-kpi-icon"><i class="fas fa-certificate"></i></span>
                     </div>
                     <div class="fsic-kpi-value" id="approvedCount">{{ $assignedFsicRequests->where('status', 'approved')->count() }}</div>
@@ -687,22 +1015,22 @@
                         <tbody id="fsicRequestsTableBody">
                             @forelse($assignedFsicRequests as $request)
                                 <tr data-request-id="{{ $request->id }}" class="fsic-request-row">
-                                    <td>
+                                    <td data-label="Request">
                                         <div class="fsic-row-title">{{ $request->business_name }}</div>
                                         <div class="fsic-row-meta">{{ $request->request_code }}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="Applicant">
                                         <div class="fsic-row-title">{{ $request->owner_name }}</div>
                                         <div class="fsic-row-meta">{{ $request->user->email ?? 'No email' }}</div>
                                     </td>
-                                    <td>{{ optional($request->date_requested)->format('M d, Y') ?? optional($request->created_at)->format('M d, Y') }}</td>
-                                    <td>
+                                    <td data-label="Requested">{{ optional($request->date_requested)->format('M d, Y') ?? optional($request->created_at)->format('M d, Y') }}</td>
+                                    <td data-label="Status">
                                         <span class="status-pill status-{{ $request->status }}">
                                             {{ ucfirst(str_replace('_', ' ', $request->status)) }}
                                         </span>
                                     </td>
-                                    <td>{{ $request->approval->fsic_number ?? 'Pending' }}</td>
-                                    <td>
+                                    <td data-label="FSIC No.">{{ $request->approval->fsic_number ?? 'Pending' }}</td>
+                                    <td data-label="Action">
                                         @if($request->status === 'for_inspection')
                                             <button type="button" class="table-action inspect" onclick="event.stopPropagation(); openInspectionModal({{ $request->id }})">
                                                 <i class="fas fa-clipboard-check"></i> Inspect
@@ -728,6 +1056,7 @@
                     </table>
                 </div>
             </section>
+            </div>
         </main>
     </div>
 
@@ -921,10 +1250,15 @@
         }
 
         function updateStats() {
-            document.getElementById('assignedCount').textContent = fsicRequests.length;
+            const assignedCount = fsicRequests.length;
+            document.getElementById('assignedCount').textContent = assignedCount;
             document.getElementById('forInspectionCount').textContent = fsicRequests.filter(request => canInspectRequest(request)).length;
             document.getElementById('inspectedCount').textContent = fsicRequests.filter(request => request.status === 'inspected' && !canInspectRequest(request)).length;
             document.getElementById('approvedCount').textContent = fsicRequests.filter(request => request.status === 'approved').length;
+            const mobileAssignedCount = document.getElementById('mobileAssignedCount');
+            if (mobileAssignedCount) {
+                mobileAssignedCount.textContent = assignedCount;
+            }
         }
 
         function canInspectRequest(request) {
@@ -943,20 +1277,20 @@
             const canInspect = canInspectRequest(request);
             return `
                 <tr data-request-id="${request.id}" class="fsic-request-row">
-                    <td>
+                    <td data-label="Request">
                         <div class="fsic-row-title">${escapeHtml(request.business_name)}</div>
                         <div class="fsic-row-meta">${escapeHtml(request.request_code)}</div>
                     </td>
-                    <td>
+                    <td data-label="Applicant">
                         <div class="fsic-row-title">${escapeHtml(request.owner_name)}</div>
                         <div class="fsic-row-meta">${escapeHtml(request.user?.email || 'No email')}</div>
                     </td>
-                    <td>${escapeHtml(formatDate(request.date_requested || request.created_at))}</td>
-                    <td>
+                    <td data-label="Requested">${escapeHtml(formatDate(request.date_requested || request.created_at))}</td>
+                    <td data-label="Status">
                         <span class="status-pill ${getStatusClass(request.status)}">${escapeHtml(formatStatus(request.status))}</span>
                     </td>
-                    <td>${escapeHtml(request.approval?.fsic_number || 'Pending')}</td>
-                    <td>
+                    <td data-label="FSIC No.">${escapeHtml(request.approval?.fsic_number || 'Pending')}</td>
+                    <td data-label="Action">
                         ${canInspect
                             ? `<button type="button" class="table-action inspect" onclick="event.stopPropagation(); openInspectionModal(${request.id})"><i class="fas fa-clipboard-check"></i> Inspect</button>`
                             : `<button type="button" class="table-action view" onclick="event.stopPropagation(); openDetailsModal(${request.id})"><i class="fas fa-eye"></i> View</button>`
@@ -1255,6 +1589,11 @@
         window.closeDetailsModal = closeDetailsModal;
         window.goToInspectionStep = goToInspectionStep;
         window.submitInspection = submitInspection;
+
+        if (window.matchMedia('(max-width: 768px)').matches && 'scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+            window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+        }
     </script>
     @include('partials.pwa-body')
 </body>
