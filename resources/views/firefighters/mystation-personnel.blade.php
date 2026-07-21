@@ -1,16 +1,15 @@
 <section class="station-grid">
     <div class="section-card">
         <div class="section-header">
-            <div>
-                <div class="section-title"><i class="fa-solid fa-people-group"></i> Crew Members</div>
-                <div class="section-subtitle">These members are derived from the user IDs stored in your assigned team slots.</div>
-            </div>
+        <div>
+            <div class="section-title"><i class="fa-solid fa-people-group"></i> Crew Members</div>
+        </div>
         </div>
         <div class="section-body">
             @if($crewMembers->isEmpty())
                 <div class="empty-box">
                     <i class="fa-solid fa-user-slash"></i>
-                    <div>No crew members are linked to your current response team yet.</div>
+                    <div>No crew members yet.</div>
                 </div>
             @else
                 <div class="crew-list">
@@ -30,10 +29,9 @@
 
     <section class="section-card">
         <div class="section-header">
-            <div>
-                <div class="section-title"><i class="fa-solid fa-id-card-clip"></i> Station Officers</div>
-                <div class="section-subtitle">All station officers whose <code>station_id</code> matches your assigned station.</div>
-            </div>
+        <div>
+            <div class="section-title"><i class="fa-solid fa-id-card-clip"></i> Station Officers</div>
+        </div>
         </div>
         <div class="section-body table-wrap">
             <table class="data-table">
@@ -58,21 +56,20 @@
                             };
                         @endphp
                         <tr>
-                            <td>
+                            <td data-label="Officer">
                                 <div class="table-title">{{ trim(($officer->user->first_name ?? '') . ' ' . ($officer->user->last_name ?? '')) ?: 'Unknown Officer' }}</div>
-                                <div class="table-muted">ID #{{ $officer->station_officer_id }}</div>
                             </td>
-                            <td>{{ $officer->rank ?? 'N/A' }}</td>
-                            <td>{{ ucfirst($officer->user->role->role ?? 'station officer') }}</td>
-                            <td>{{ $officer->user->contact_number ?? ($officer->user->email ?? 'N/A') }}</td>
-                            <td><span class="status-pill {{ $statusClass }}">{{ ucwords(str_replace('-', ' ', $status)) }}</span></td>
+                            <td data-label="Rank">{{ $officer->rank ?? 'N/A' }}</td>
+                            <td data-label="Role">{{ ucfirst($officer->user->role->role ?? 'station officer') }}</td>
+                            <td data-label="Contact">{{ $officer->user->contact_number ?? ($officer->user->email ?? 'N/A') }}</td>
+                            <td data-label="Status"><span class="status-pill {{ $statusClass }}">{{ ucwords(str_replace('-', ' ', $status)) }}</span></td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="5">
                                 <div class="empty-box">
                                     <i class="fa-solid fa-users-slash"></i>
-                                    <div>No station officers found for this station.</div>
+                                    <div>No station officers found.</div>
                                 </div>
                             </td>
                         </tr>

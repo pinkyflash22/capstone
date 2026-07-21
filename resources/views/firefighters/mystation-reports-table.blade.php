@@ -16,8 +16,8 @@
                     @php $hasFinal = (bool) $report->finalInvestigation; @endphp
                     <tr id="progress-report-{{ $report->progress_investigation_report_id }}">
                         <td>
-                            <div class="table-title">Spot #{{ $report->spot_investigation_id }}</div>
-                            <div class="table-muted">{{ $report->spotInvestigation?->incident?->marker?->title ?? 'Unknown incident location' }}</div>
+                            <div class="table-title">{{ $report->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
+                            <div class="table-muted">Spot report</div>
                         </td>
                         <td>{{ $report->fireOrigin?->origin ?? 'N/A' }}</td>
                         <td>{{ $report->fire_cause ?? 'N/A' }}</td>
@@ -39,7 +39,7 @@
                         <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-file-circle-xmark"></i>
-                                <div>No progress investigation reports have been filed for this station yet.</div>
+                                <div>No progress reports yet.</div>
                             </div>
                         </td>
                     </tr>
@@ -63,8 +63,8 @@
                 @forelse($reports as $report)
                     <tr id="final-report-{{ $report->final_investigation_report_id }}">
                         <td>
-                            <div class="table-title">Progress #{{ $report->progress_investigation_id }}</div>
-                            <div class="table-muted">{{ $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? 'Unknown incident location' }}</div>
+                            <div class="table-title">{{ $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
+                            <div class="table-muted">Progress report</div>
                         </td>
                         <td>{{ $report->exact_address ?? 'N/A' }}</td>
                         <td>PHP {{ number_format((float) ($report->total_damage ?? 0), 2) }}</td>
@@ -83,7 +83,7 @@
                         <td colspan="5">
                             <div class="empty-box">
                                 <i class="fa-solid fa-file-circle-xmark"></i>
-                                <div>No final investigation reports have been filed for this station yet.</div>
+                                <div>No final reports yet.</div>
                             </div>
                         </td>
                     </tr>
@@ -109,8 +109,8 @@
                     @php $hasProgress = (bool) $report->progressInvestigation; @endphp
                     <tr id="spot-report-{{ $report->spot_investigation_report_id }}">
                         <td>
-                            <div class="table-title">Incident #{{ $report->incident_id }}</div>
-                            <div class="table-muted">{{ $report->incident?->marker?->title ?? 'Unknown incident location' }}</div>
+                            <div class="table-title">{{ $report->incident?->marker?->title ?? 'Fire incident' }}</div>
+                            <div class="table-muted">Spot report</div>
                         </td>
                         <td>{{ trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unknown investigator' }}</td>
                         <td>{{ optional($report->fire_started)->format('M d, Y h:i A') ?: 'N/A' }}<br>{{ optional($report->fire_out)->format('M d, Y h:i A') ?: 'N/A' }}</td>
@@ -132,7 +132,7 @@
                         <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-file-circle-xmark"></i>
-                                <div>No spot investigation reports have been filed for this station yet.</div>
+                                <div>No spot reports yet.</div>
                             </div>
                         </td>
                     </tr>

@@ -432,20 +432,20 @@
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__rail {
             position: relative;
-            width: min(100%, 344px);
+            width: min(calc(100vw - 28px), 344px);
             margin: 0 auto;
             min-height: 66px;
-            padding: 12px 18px 11px;
+            padding: 12px 12px 11px;
             border-radius: 24px;
             background: linear-gradient(180deg, rgba(20, 83, 90, 0.98) 0%, rgba(16, 75, 84, 0.96) 100%);
             border: 1px solid rgba(255, 255, 255, 0.12);
             box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: minmax(88px, 1fr) 82px minmax(88px, 1fr);
             align-items: end;
+            justify-items: center;
             gap: 0;
-            --ff-dock-center-slot: 96px;
-            --ff-dock-side-width: calc((100% - var(--ff-dock-center-slot)) / 2);
+            box-sizing: border-box;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__rail::before {
@@ -480,21 +480,24 @@
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group {
             position: relative;
             z-index: 2;
-            width: var(--ff-dock-side-width);
+            width: 100%;
             min-width: 0;
             display: grid;
-            grid-template-columns: repeat(2, minmax(44px, 1fr));
+            grid-template-columns: repeat(2, 44px);
             align-items: center;
             justify-items: center;
-            column-gap: clamp(8px, 2.4vw, 14px);
+            justify-content: space-evenly;
+            column-gap: 0;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group--left {
-            padding-right: 16px;
+            grid-column: 1;
+            padding-right: 0;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__group--right {
-            padding-left: 16px;
+            grid-column: 3;
+            padding-left: 0;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__item[data-ff-open-notifications],
@@ -786,11 +789,6 @@
             <a href="{{ route('firefighter.equipments') }}" class="ff-mobile-dock__burst-item {{ in_array($currentActive, ['equipment', 'fsic'], true) ? 'active' : '' }}" aria-label="Requests" data-ff-nav-link data-ff-nav-key="equipment">
                 <span class="ff-mobile-icon" aria-hidden="true">assignment</span>
             </a>
-            @if ($currentActive === 'dashboard')
-                <button type="button" class="ff-mobile-dock__burst-item" data-ff-open-insights aria-label="Charts and Cards">
-                    <span class="ff-mobile-icon" aria-hidden="true">stacked_bar_chart</span>
-                </button>
-            @endif
         </div>
         <div class="ff-mobile-dock__rail">
             <div class="ff-mobile-dock__group ff-mobile-dock__group--left">
@@ -1090,6 +1088,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const openLogsButton = document.querySelector('[data-ff-open-logs]');
     const openInsightsButton = document.querySelector('[data-ff-open-insights]');
     const mainContent = document.querySelector('.main-content');
+    const isFirefighterDashboardScreen = Boolean(document.querySelector('[data-ff-page-root="dashboard"]'));
     const routeSkeletons = {
         incidents: document.querySelector('[data-ff-route-skeleton="incidents"]'),
         announcements: document.querySelector('[data-ff-route-skeleton="announcements"]'),
@@ -1169,28 +1168,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showRouteSkeleton(routeKey, navKey) {
-        const skeleton = routeSkeletons[routeKey];
-        const currentMainContent = document.querySelector('.main-content');
-
-        if (!skeleton || !currentMainContent) {
-            return;
-        }
-
         syncPendingNavState(navKey || routeKey);
         hideAllRouteSkeletons();
-
-        const rect = currentMainContent.getBoundingClientRect();
-        const top = Math.max(rect.top, 0);
-        const left = Math.max(rect.left, 0);
-        const width = Math.max(rect.width, 280);
-        const height = Math.max(window.innerHeight - top - 12, 420);
-
-        skeleton.style.top = `${top}px`;
-        skeleton.style.left = `${left}px`;
-        skeleton.style.width = `${width}px`;
-        skeleton.style.height = `${height}px`;
-        skeleton.classList.add('is-active');
-        skeleton.setAttribute('aria-hidden', 'false');
     }
 
     function isEligibleNavigationLink(link) {
@@ -1599,6 +1578,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (dashboardFab) {
         const beginHold = function (event) {
             if (window.innerWidth > 768) return;
+            if (isFirefighterDashboardScreen) {
+                holdTriggered = false;
+                touchTapPending = event.type === 'touchstart';
+                clearHoldTimer();
+                if (event.type === 'touchstart') {
+                    event.preventDefault();
+                }
+                return;
+            }
             holdTriggered = false;
             touchTapPending = event.type === 'touchstart';
             clearHoldTimer();

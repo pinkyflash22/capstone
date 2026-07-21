@@ -417,6 +417,32 @@
     font-size: 1.5rem;
 }
 
+.station-loading-card,
+.report-modal-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #64748b;
+    font-weight: 800;
+}
+
+.station-loading-card {
+    min-height: 92px;
+}
+
+.station-loading-card i,
+.report-modal-loading i {
+    color: #c63d26;
+}
+
+.report-modal-loading {
+    min-height: 64px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    background: rgba(255, 255, 255, 0.86);
+}
+
 .shell-line,
 .shell-panel {
     position: relative;
@@ -427,12 +453,7 @@
 
 .shell-line::after,
 .shell-panel::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.78), transparent);
-    animation: station-shell-shimmer 1.35s infinite;
+    content: none;
 }
 
 .shell-line {
@@ -451,10 +472,6 @@
 .shell-panel-medium { min-height: 240px; }
 .shell-panel-tall { min-height: 320px; }
 .shell-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-@keyframes station-shell-shimmer {
-    100% { transform: translateX(100%); }
-}
 
 .report-modal {
     position: fixed;
@@ -628,36 +645,194 @@
 }
 
 @media (max-width: 768px) {
+    body.firefighter-portal-shell .main-content > .station-shell-page {
+        width: min(100%, 760px);
+        margin: 0 auto;
+        padding-top: 0 !important;
+        align-self: start;
+    }
+
     .station-shell {
-        gap: 18px;
+        gap: 10px;
     }
 
     .station-hero,
     .section-card,
     .section-shell-card {
-        border-radius: 22px;
-        padding: 18px;
+        border-radius: 16px;
+        padding: 12px 14px;
+        box-shadow: none;
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(226, 232, 240, 0.9);
     }
 
     .station-hero-media {
-        min-height: 220px;
+        display: none;
+    }
+
+    .station-hero-content {
+        gap: 10px;
+    }
+
+    .station-chip,
+    .status-pill,
+    .qty-pill {
+        gap: 5px;
+        padding: 6px 9px;
+        font-size: 0.62rem;
+        letter-spacing: 0.06em;
     }
 
     .station-title {
-        font-size: 2rem;
+        font-size: 1.22rem;
+        line-height: 1.2;
     }
 
     .station-subtitle {
+        font-size: 0.82rem;
+    }
+
+    .station-hero-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .hero-detail {
+        padding: 9px 10px;
+        border-radius: 12px;
+    }
+
+    .hero-detail-label,
+    .stat-block-label,
+    .detail-label,
+    .form-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.06em;
+    }
+
+    .hero-detail-value,
+    .table-title,
+    .crew-name,
+    .equipment-name,
+    .detail-value {
+        font-size: 0.82rem;
+        line-height: 1.35;
+    }
+
+    .table-muted,
+    .crew-role,
+    .equipment-category {
+        font-size: 0.74rem;
+        line-height: 1.35;
+    }
+
+    .section-header {
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .section-title {
+        gap: 7px;
         font-size: 0.94rem;
+    }
+
+    .section-title i,
+    .empty-box i,
+    .station-loading-card i,
+    .report-modal-loading i {
+        font-size: 0.95rem;
+    }
+
+    .station-gallery-grid,
+    .station-gallery-item {
+        display: none;
+    }
+
+    .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px;
+    }
+
+    .stat-block {
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .stat-block-value {
+        margin-top: 4px;
+        font-size: 1.1rem;
+    }
+
+    .crew-list,
+    .equipment-grid {
+        gap: 8px;
+    }
+
+    .crew-item,
+    .equipment-item {
+        gap: 9px;
+        padding: 10px;
+        border-radius: 13px;
+        box-shadow: none;
+    }
+
+    .crew-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        font-size: 0.78rem;
+        flex: 0 0 auto;
+    }
+
+    .equipment-item {
+        grid-template-columns: 1fr;
+    }
+
+    .qty-pill {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .action-row {
         width: 100%;
         justify-content: stretch;
+        gap: 8px;
     }
 
     .action-row .btn {
-        flex: 1 1 100%;
+        flex: 1 1 calc(33.333% - 8px);
+        min-width: 0;
+        padding: 9px 8px;
+        border-radius: 13px;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+
+    .btn {
+        gap: 6px;
+        padding: 10px 12px;
+        font-size: 0.78rem;
+    }
+
+    .report-tabs {
+        gap: 7px;
+        margin-bottom: 10px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+    }
+
+    .report-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .report-tab {
+        flex: 0 0 auto;
+        padding: 9px 11px;
+        border-radius: 13px;
+        font-size: 0.72rem;
+        white-space: nowrap;
     }
 
     .report-modal {
@@ -674,11 +849,10 @@
     }
 
     .station-shell-page {
-        gap: 16px;
+        gap: 10px;
     }
 
     .station-grid,
-    .stat-grid,
     .station-gallery-grid,
     .crew-list,
     .equipment-grid {
@@ -686,12 +860,100 @@
     }
 
     .table-wrap {
-        margin-inline: -4px;
+        margin-inline: 0;
         padding-bottom: 4px;
     }
 
     .data-table {
-        min-width: 620px;
+        min-width: 0;
+        font-size: 0.75rem;
+    }
+
+    .data-table thead {
+        display: none;
+    }
+
+    .data-table,
+    .data-table tbody,
+    .data-table tr,
+    .data-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .data-table tbody {
+        display: grid;
+        gap: 8px;
+    }
+
+    .data-table tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 5px 10px;
+        padding: 10px 11px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .data-table tr + tr {
+        margin-top: 0;
+    }
+
+    .data-table td {
+        min-width: 0;
+        padding: 0;
+        border-bottom: 0;
+        color: #475569;
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+
+    .data-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 1px;
+        color: #94a3b8;
+        font-size: 0.55rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .data-table td[data-label="Officer"] {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .data-table td[data-label="Status"] {
+        grid-column: 2;
+        grid-row: 1;
+        align-self: start;
+        justify-self: end;
+    }
+
+    .data-table td[data-label="Rank"] {
+        grid-column: 1 / 2;
+        grid-row: 2;
+        color: #64748b;
+    }
+
+    .data-table td[data-label="Role"] {
+        grid-column: 2 / 3;
+        grid-row: 2;
+        color: #64748b;
+        text-align: right;
+    }
+
+    .data-table td[data-label="Contact"] {
+        grid-column: 1 / -1;
+        margin-top: 2px;
+        padding-top: 7px;
+        border-top: 1px solid rgba(226, 232, 240, 0.78);
+    }
+
+    .data-table td[colspan] {
+        grid-column: 1 / -1;
     }
 
     .table-actions,
@@ -708,11 +970,37 @@
         width: 100%;
     }
 
+    .table-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        margin-top: 6px;
+    }
+
+    .table-action {
+        padding: 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+    }
+
+    .empty-box,
+    .station-section-error {
+        padding: 12px;
+        border-radius: 14px;
+        font-size: 0.78rem;
+    }
+
+    .station-loading-card {
+        min-height: 48px;
+        padding: 11px 12px;
+    }
+
     .report-modal-panel,
     .report-modal-panel--manage {
         max-width: 100%;
-        max-height: min(82dvh, 760px);
+        max-height: min(78dvh, 700px);
         border-radius: 24px 24px 18px 18px;
+        box-shadow: none;
     }
 
     .report-modal-panel::before,
@@ -724,5 +1012,194 @@
         border-radius: 999px;
         background: #cbd5e1;
         margin: 0 auto 14px;
+    }
+
+    .report-modal-header,
+    .report-modal-footer {
+        padding: 12px 14px;
+    }
+
+    .report-modal-title {
+        font-size: 0.95rem;
+    }
+
+    .report-modal-body {
+        padding: 14px;
+    }
+
+    .report-close {
+        width: 38px;
+        height: 38px;
+    }
+
+    .form-grid,
+    .detail-grid,
+    .checkbox-grid {
+        gap: 9px;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+        padding: 10px 11px;
+        border-radius: 12px;
+        font-size: 0.82rem;
+    }
+
+    .form-textarea {
+        min-height: 86px;
+    }
+
+    .detail-item {
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .reports-shell-panel {
+        min-height: 0;
+    }
+}
+
+@media (max-width: 420px) {
+    body.firefighter-portal-shell .main-content > .station-shell-page {
+        width: calc(100% - 20px);
+    }
+
+    .action-row .btn {
+        flex-basis: 100%;
+    }
+
+    .station-hero,
+    .section-card,
+    .section-shell-card {
+        padding: 11px 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    body.firefighter-portal-shell:has([data-ff-page-root="station"]) {
+        overflow-x: hidden !important;
+    }
+
+    body.firefighter-portal-shell .main-content:has(> [data-ff-page-root="station"]) {
+        width: 100dvw !important;
+        max-width: 100dvw !important;
+        margin-left: 0 !important;
+        padding: max(6px, var(--ff-safe-top, 0px)) 10px calc(var(--ff-mobile-bottom-h, 84px) + 14px) !important;
+        overflow-x: hidden !important;
+    }
+
+    body.firefighter-portal-shell .main-content > [data-ff-page-root="station"],
+    body.firefighter-portal-shell .main-content > .station-shell-page {
+        width: calc(100dvw - 20px) !important;
+        max-width: calc(100dvw - 20px) !important;
+        min-width: 0 !important;
+        margin: 0 auto !important;
+        overflow-x: hidden !important;
+    }
+
+    [data-ff-page-root="station"],
+    [data-ff-page-root="station"] * {
+        max-width: 100%;
+    }
+
+    [data-ff-page-root="station"] .station-shell,
+    [data-ff-page-root="station"] .station-hero,
+    [data-ff-page-root="station"] .station-hero-content,
+    [data-ff-page-root="station"] .section-card,
+    [data-ff-page-root="station"] .section-shell-card,
+    [data-ff-page-root="station"] .reports-shell-panel {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    [data-ff-page-root="station"] .station-hero,
+    [data-ff-page-root="station"] .section-card,
+    [data-ff-page-root="station"] .section-shell-card {
+        padding: 10px !important;
+        border-radius: 14px !important;
+        box-shadow: none !important;
+        background: rgba(255, 255, 255, 0.86) !important;
+    }
+
+    [data-ff-page-root="station"] .station-title {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+        font-size: clamp(1rem, 5.2vw, 1.22rem) !important;
+        line-height: 1.16 !important;
+    }
+
+    [data-ff-page-root="station"] .station-chip {
+        max-width: 100% !important;
+        padding: 5px 8px !important;
+        font-size: 0.58rem !important;
+    }
+
+    [data-ff-page-root="station"] .hero-detail,
+    [data-ff-page-root="station"] .stat-block,
+    [data-ff-page-root="station"] .crew-item,
+    [data-ff-page-root="station"] .equipment-item,
+    [data-ff-page-root="station"] .data-table tr,
+    [data-ff-page-root="station"] .empty-box,
+    [data-ff-page-root="station"] .station-section-error {
+        border-radius: 12px !important;
+        box-shadow: none !important;
+    }
+
+    [data-ff-page-root="station"] .hero-detail-value,
+    [data-ff-page-root="station"] .table-title,
+    [data-ff-page-root="station"] .table-muted,
+    [data-ff-page-root="station"] .crew-name,
+    [data-ff-page-root="station"] .crew-role,
+    [data-ff-page-root="station"] .equipment-name,
+    [data-ff-page-root="station"] .equipment-category {
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+    }
+
+    [data-ff-page-root="station"] .hero-detail-value,
+    [data-ff-page-root="station"] .table-title,
+    [data-ff-page-root="station"] .crew-name,
+    [data-ff-page-root="station"] .equipment-name {
+        font-size: 0.8rem !important;
+    }
+
+    [data-ff-page-root="station"] .hero-detail-label,
+    [data-ff-page-root="station"] .stat-block-label,
+    [data-ff-page-root="station"] .table-muted,
+    [data-ff-page-root="station"] .crew-role,
+    [data-ff-page-root="station"] .equipment-category {
+        font-size: 0.68rem !important;
+    }
+
+    [data-ff-page-root="station"] .section-title {
+        font-size: 0.88rem !important;
+        line-height: 1.2 !important;
+    }
+
+    [data-ff-page-root="station"] .stat-block-value {
+        font-size: 1rem !important;
+    }
+
+    [data-ff-page-root="station"] .station-loading-card {
+        min-height: 42px !important;
+        padding: 9px 10px !important;
+        font-size: 0.78rem !important;
+    }
+}
+
+@media (max-width: 380px) {
+    body.firefighter-portal-shell .main-content:has(> [data-ff-page-root="station"]) {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    body.firefighter-portal-shell .main-content > [data-ff-page-root="station"],
+    body.firefighter-portal-shell .main-content > .station-shell-page {
+        width: calc(100dvw - 16px) !important;
+        max-width: calc(100dvw - 16px) !important;
     }
 }

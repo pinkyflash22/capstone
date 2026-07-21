@@ -61,6 +61,7 @@
     }
 
     body.firefighter-dashboard-page .firefighter-map-stage .map-container {
+        position: relative !important;
         width: 100vw !important;
         height: 100dvh !important;
         min-height: 100dvh !important;
@@ -81,6 +82,50 @@
 
     body.firefighter-dashboard-page #firefighterMapLoadState {
         display: none !important;
+    }
+
+    body.firefighter-dashboard-page .firefighter-map-stage .leaflet-control-layers {
+        display: none !important;
+    }
+
+    body.firefighter-dashboard-page .ff-mobile-map-layers-button {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 42px);
+        right: 16px;
+        z-index: 720;
+        width: 48px;
+        height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(226, 232, 240, 0.92);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.96);
+        color: #475569;
+        box-shadow: none !important;
+        filter: none !important;
+        -webkit-filter: none !important;
+    }
+
+    body.firefighter-dashboard-page .ff-mobile-map-layers-button i {
+        font-size: 18px;
+    }
+
+    body.firefighter-dashboard-page .ff-mobile-map-layers-button span {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: #c63d26;
+        color: #ffffff;
+        border: 2px solid #ffffff;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 16px;
+        text-align: center;
     }
 }
 
@@ -121,6 +166,12 @@
     }
 
     body.firefighter-dashboard-page #incidentAlertCenterToggle {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    body.firefighter-dashboard-page #firefighterMobileInsightsPanel {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;

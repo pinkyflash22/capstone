@@ -108,6 +108,42 @@ function bootFirefighterMyStationPage() {
         window.setTimeout(() => toast.remove(), timeout);
     }
 
+    function buildLoadingCard(message) {
+        return `
+            <div class="section-shell-card station-loading-card">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <span>${escapeHtml(message)}</span>
+            </div>
+        `;
+    }
+
+    function setModalLoading(type, message = 'Loading report form...') {
+        const modal = document.getElementById(`${type}ReportModal`);
+        const body = modal?.querySelector('.report-modal-body');
+        if (!body) return null;
+
+        const loading = document.createElement('div');
+        loading.className = 'report-modal-loading';
+        loading.dataset.reportModalLoading = type;
+        loading.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i><span>${escapeHtml(message)}</span>`;
+        body.prepend(loading);
+        return loading;
+    }
+
+    function clearModalLoading(type) {
+        document.querySelectorAll('[data-report-modal-loading]').forEach((element) => {
+            if (element.dataset.reportModalLoading === type) {
+                element.remove();
+            }
+        });
+    }
+
+    function setFormControlsDisabled(form, disabled) {
+        form?.querySelectorAll('input, select, textarea, button').forEach((control) => {
+            control.disabled = disabled;
+        });
+    }
+
     function renderSectionError(target, message, retryHandler) {
         if (!target) return;
         target.innerHTML = `
@@ -197,6 +233,10 @@ function bootFirefighterMyStationPage() {
             document.querySelectorAll('.report-tab').forEach((tabButton) => {
                 tabButton.classList.toggle('active', tabButton.dataset.reportTab === tab);
             });
+
+            if (reportsContainer) {
+                reportsContainer.innerHTML = buildLoadingCard(`Loading ${tab} investigation reports...`);
+            }
 
             const url = urlOverride || `${routes.reports}?tab=${encodeURIComponent(tab)}`;
             const result = await fetchStationSection('reports', url);
@@ -293,20 +333,40 @@ function bootFirefighterMyStationPage() {
     }
 
     async function openReportModal(type) {
+        const modal = document.getElementById(`${type}ReportModal`);
+        const form = type === 'spot' ? spotForm : type === 'progress' ? progressForm : finalForm;
+
+        modal?.classList.add('active');
+        clearModalLoading(type);
+        modal?.querySelectorAll('.station-section-error').forEach((errorBox) => errorBox.remove());
+        const loading = setModalLoading(type);
+        setFormControlsDisabled(form, true);
+
         try {
             if (type === 'spot') populateSpotModal(await ensureModalData('spot'));
             if (type === 'progress') populateProgressModal(await ensureModalData('progress'));
             if (type === 'final') populateFinalModal(await ensureModalData('final'));
-            document.getElementById(`${type}ReportModal`)?.classList.add('active');
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error(`Unable to open ${type} modal:`, error);
-            showToast(`Unable to load ${type} modal data right now.`, 'error');
+            loading?.remove();
+            const body = modal?.querySelector('.report-modal-body');
+            body?.prepend(Object.assign(document.createElement('div'), {
+                className: 'station-section-error',
+                innerHTML: `<div>Unable to load ${escapeHtml(type)} report choices right now. You can close this and try again.</div>`,
+            }));
+            showToast(`Unable to load ${type} report choices right now.`, 'error');
+        } finally {
+            clearModalLoading(type);
+            setFormControlsDisabled(form, false);
         }
     }
 
     function closeReportModal(type) {
-        document.getElementById(`${type}ReportModal`)?.classList.remove('active');
+        const modal = document.getElementById(`${type}ReportModal`);
+        modal?.classList.remove('active');
+        clearModalLoading(type);
+        modal?.querySelector('.station-section-error')?.remove();
     }
 
     function openManageModal(title) {
@@ -433,7 +493,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="spot-report-${report.id}">
-                <td><div class="table-title">Incident #${escapeHtml(report.incident_id)}</div><div class="table-muted">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></td>
+                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Spot report</div></td>
                 <td>${escapeHtml(report.investigator_name || currentOfficerName)}</td>
                 <td>${escapeHtml(formatDateTime(report.fire_started))}<br>${escapeHtml(formatDateTime(report.fire_out))}</td>
                 <td>${escapeHtml(formatMoney(report.estimated_damage))}</td>
@@ -453,7 +513,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="progress-report-${report.id}">
-                <td><div class="table-title">Spot #${escapeHtml(report.spot_investigation_id)}</div><div class="table-muted">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></td>
+                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Progress report</div></td>
                 <td>${escapeHtml(report.fire_origin_name || 'N/A')}</td>
                 <td>${escapeHtml(report.fire_cause || 'N/A')}</td>
                 <td>${escapeHtml(report.responsible_arson || 'Not specified')}</td>
@@ -473,7 +533,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="final-report-${report.id}">
-                <td><div class="table-title">Progress #${escapeHtml(report.progress_investigation_id)}</div><div class="table-muted">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></td>
+                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Final report</div></td>
                 <td>${escapeHtml(report.exact_address || 'N/A')}</td>
                 <td>${escapeHtml(formatMoney(report.total_damage))}</td>
                 <td>${escapeHtml(formatDateTime(report.created_at))}</td>
@@ -508,7 +568,7 @@ function bootFirefighterMyStationPage() {
         if (type === 'spot') {
             return `
                 <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-label">Incident</div><div class="detail-value">Incident #${escapeHtml(report.incident_id)}</div></div>
+                    <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">Spot investigation</div></div>
                     <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></div>
                     <div class="detail-item"><div class="detail-label">Investigator</div><div class="detail-value">${escapeHtml(report.investigator_name || currentOfficerName)}</div></div>
                     <div class="detail-item"><div class="detail-label">Occupancy</div><div class="detail-value">${escapeHtml(report.occupancy || 'N/A')}</div></div>
@@ -525,7 +585,7 @@ function bootFirefighterMyStationPage() {
         if (type === 'progress') {
             return `
                 <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-label">Spot Report</div><div class="detail-value">Spot #${escapeHtml(report.spot_investigation_id)}</div></div>
+                    <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">Progress investigation</div></div>
                     <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></div>
                     <div class="detail-item"><div class="detail-label">Fire Origin</div><div class="detail-value">${escapeHtml(report.fire_origin_name || 'N/A')}</div></div>
                     <div class="detail-item"><div class="detail-label">Responsible Arson</div><div class="detail-value">${escapeHtml(report.responsible_arson || 'Not specified')}</div></div>
@@ -538,7 +598,7 @@ function bootFirefighterMyStationPage() {
 
         return `
             <div class="detail-grid">
-                <div class="detail-item"><div class="detail-label">Progress Report</div><div class="detail-value">Progress #${escapeHtml(report.progress_investigation_id)}</div></div>
+                <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">Final investigation</div></div>
                 <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></div>
                 <div class="detail-item"><div class="detail-label">Total Damage</div><div class="detail-value">${escapeHtml(formatMoney(report.total_damage))}</div></div>
                 <div class="detail-item"><div class="detail-label">Alarm Time</div><div class="detail-value">${escapeHtml(formatDateTime(report.alarm_at))}</div></div>

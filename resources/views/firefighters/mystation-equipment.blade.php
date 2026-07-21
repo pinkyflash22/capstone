@@ -2,14 +2,13 @@
     <div class="section-header">
         <div>
             <div class="section-title"><i class="fa-solid fa-toolbox"></i> Station Equipment</div>
-            <div class="section-subtitle">Equipment records are loaded from the station-equipment assignments linked to this station.</div>
         </div>
     </div>
     <div class="section-body">
         @if($equipmentAssignments->isEmpty())
             <div class="empty-box">
                 <i class="fa-solid fa-box-open"></i>
-                <div>No equipment assignments are linked to this station yet.</div>
+                <div>No equipment yet.</div>
             </div>
         @else
             <div class="equipment-grid">

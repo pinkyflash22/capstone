@@ -1730,11 +1730,12 @@ function createRouteInfoCard() {
     `;
     
     routeCard.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-            <h3 class="font-semibold text-gray-800">
-                <i class="fas fa-route text-blue-600"></i>
-                Active Routes
-            </h3>
+        <div class="route-info-card__handle" aria-hidden="true"></div>
+        <div class="route-card-header">
+            <h4>
+                <i class="fas fa-route"></i>
+                Active routes
+            </h4>
             <button id="stopAllSimulationsBtn" class="text-sm text-red-600 hover:text-red-700" style="background: none; border: none; cursor: pointer;">
                 <i class="fas fa-stop"></i> Stop All
             </button>

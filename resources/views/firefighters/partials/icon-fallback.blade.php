@@ -60,6 +60,7 @@ function getFirefighterMaterialSymbol(iconName) {
         'fa-circle': 'radio_button_checked',
         'fa-circle-check': 'task_alt',
         'fa-circle-info': 'info',
+        'fa-circle-notch': 'progress_activity',
         'fa-city': 'location_city',
         'fa-clipboard-check': 'fact_check',
         'fa-clipboard-list': 'assignment',
@@ -77,10 +78,13 @@ function getFirefighterMaterialSymbol(iconName) {
         'fa-eye': 'visibility',
         'fa-file-alt': 'description',
         'fa-file-circle-check': 'task',
+        'fa-file-circle-plus': 'note_add',
         'fa-file-invoice': 'receipt_long',
+        'fa-file-lines': 'description',
         'fa-fire': 'local_fire_department',
         'fa-fire-extinguisher': 'fire_extinguisher',
         'fa-fire-station': 'local_fire_department',
+        'fa-floppy-disk': 'save',
         'fa-flag': 'flag',
         'fa-folder': 'folder',
         'fa-folder-check': 'folder_open',
@@ -166,6 +170,7 @@ function getFirefighterMaterialSymbol(iconName) {
         'fa-users-slash': 'group_off',
         'fa-video': 'videocam',
         'fa-water': 'water_drop',
+        'fa-wand-magic-sparkles': 'auto_fix_high',
         'fa-whatsapp': 'chat',
         'fa-xmark': 'close'
     };
@@ -209,6 +214,7 @@ function getFirefighterInlineIconSvg(iconName) {
         'fa-circle': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor" stroke="none"/></svg>',
         'fa-circle-check': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none"/><path d="M8 12l2.5 2.5L16 9"/></svg>',
         'fa-circle-info': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 10v5"/><circle cx="12" cy="7.5" r="0.8" fill="currentColor" stroke="none"/></svg>',
+        'fa-circle-notch': '<svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8" fill="none"/></svg>',
         'fa-city': '<svg viewBox="0 0 24 24"><path d="M4 20V9l5-2v13"/><path d="M9 20V5l6-2v17"/><path d="M15 20v-8l5-2v10"/></svg>',
         'fa-clipboard-list': '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2" fill="none"/><path d="M9 4.5h6M9 9h6M9 13h6M9 17h4"/></svg>',
         'fa-clock': '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 7v5l3 2"/></svg>',
@@ -222,11 +228,15 @@ function getFirefighterInlineIconSvg(iconName) {
         'fa-exclamation-triangle': '<svg viewBox="0 0 24 24"><path d="M12 4l8 15H4z" fill="none"/><path d="M12 9v4"/><circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none"/></svg>',
         'fa-expand': '<svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 21h-5v-5"/></svg>',
         'fa-eye': '<svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5z"/><circle cx="12" cy="12" r="2.5" fill="none"/></svg>',
+        'fa-building-shield': '<svg viewBox="0 0 24 24"><path d="M4 20V6l8-3 8 3v14"/><path d="M8 9h2M8 13h2M8 17h2M14 9h2"/><path d="M16 13l4 1.5v3.2c0 2-1.5 3.7-4 4.8-2.5-1.1-4-2.8-4-4.8v-3.2z"/></svg>',
         'fa-file-alt': '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg>',
+        'fa-file-circle-plus': '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v8"/><path d="M14 3v4h4M9 11h5"/><circle cx="17" cy="17" r="4" fill="none"/><path d="M17 15v4M15 17h4"/></svg>',
+        'fa-file-lines': '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h6M9 18h4"/></svg>',
         'fa-fire': '<svg viewBox="0 0 24 24"><path d="M12 4c1.5 3-1 4.5 1 7 1.4-1 2.5-2.7 2.5-4.5 3 2 5 5.1 5 8.4A8.5 8.5 0 0 1 4 14c0-2.9 1.5-5.5 4-7 .2 2 1 3 2.5 4 .2-2.4.6-4.3 1.5-7z"/></svg>',
         'fa-fire-extinguisher': '<svg viewBox="0 0 24 24"><path d="M10 6h5"/><path d="M15 6a2 2 0 0 1 2 2v1"/><path d="M9 9h6v10H9z"/><path d="M11 4h2v2h-2z"/><path d="M17 9h1.5"/></svg>',
         'fa-fire-station': '<svg viewBox="0 0 24 24"><path d="M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/><path d="M10 10h4"/></svg>',
         'fa-flag': '<svg viewBox="0 0 24 24"><path d="M6 3v18"/><path d="M6 4h10l-2 4 2 4H6"/></svg>',
+        'fa-floppy-disk': '<svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4"/><path d="M8 20v-6h8v6"/></svg>',
         'fa-folder': '<svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
         'fa-gauge-high': '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>',
         'fa-graduation-cap': '<svg viewBox="0 0 24 24"><path d="M3 10l9-4 9 4-9 4z"/><path d="M7 12v4c2 2 8 2 10 0v-4"/><path d="M21 10v5"/></svg>',
@@ -288,12 +298,13 @@ function getFirefighterInlineIconSvg(iconName) {
         'fa-users-slash': '<svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="2.5" fill="none"/><path d="M4.5 18a4.5 4.5 0 0 1 4.5-4.5"/><circle cx="16.5" cy="10" r="2" fill="none"/><path d="M14 18a3.5 3.5 0 0 1 3.5-3.5"/><path d="M4 4l16 16"/></svg>',
         'fa-user-secret': '<svg viewBox="0 0 24 24"><path d="M7 9c2-3 8-3 10 0"/><circle cx="12" cy="10" r="2.5" fill="none"/><path d="M6 19a6 6 0 0 1 12 0"/><path d="M9 8l-1-2M15 8l1-2"/></svg>',
         'fa-video': '<svg viewBox="0 0 24 24"><rect x="4" y="7" width="11" height="10" rx="2" fill="none"/><path d="M15 10l5-3v10l-5-3"/></svg>',
+        'fa-wand-magic-sparkles': '<svg viewBox="0 0 24 24"><path d="M5 19l10-10"/><path d="M14 6l4 4"/><path d="M19 3v3M19 10v3M16 6h-3M22 6h-3"/><path d="M8 4l.8 1.7 1.7.8-1.7.8L8 9l-.8-1.7-1.7-.8 1.7-.8z"/></svg>',
         'fa-water': '<svg viewBox="0 0 24 24"><path d="M12 4c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"/></svg>',
         'fa-whatsapp': '<svg viewBox="0 0 24 24"><path d="M20 11.5A8.5 8.5 0 0 1 7 18l-3 1 1-3A8.5 8.5 0 1 1 20 11.5z"/><path d="M9 8c0 4 4 7 7 7"/><path d="M10 11l1-1M14 15l1-1"/></svg>',
         'fa-xmark': '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'
     };
 
-    return icons[iconName] || '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none"/></svg>';
+    return icons[iconName] || null;
 }
 
 function replaceFirefighterFaIcons(root = document) {

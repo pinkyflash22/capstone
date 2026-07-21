@@ -23,13 +23,13 @@
 
     @include('partials.pwa-head')
 </head>
-<body>
+<body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'station'])
 
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'My Station',
-            'subtitle' => 'Station profile, officers, crew assignments, equipment inventory, and investigation reports'
+            'subtitle' => 'Station resources and reports'
         ])
 
         <div data-ff-page-root="station" class="station-shell-page">
@@ -44,12 +44,9 @@
                     </div>
 
                     <div class="station-hero-content">
-                        <span class="station-chip"><i class="fa-solid fa-fire"></i> BFP Station Details</span>
+                        <span class="station-chip"><i class="fa-solid fa-fire"></i> Station Details</span>
                         <div>
                             <h1 class="station-title">{{ $stationName }}</h1>
-                            <p class="station-subtitle">
-                                This page is scoped to your assigned station only. It renders the station shell first, then streams roster, equipment, and investigation data into each section.
-                            </p>
                         </div>
 
                         <div class="station-hero-grid">
@@ -74,36 +71,23 @@
                 </section>
 
                 <div id="stationOverviewSection" class="station-section-shell" data-station-section="overview">
-                    <div class="section-shell-card">
-                        <div class="shell-heading">
-                            <div class="shell-line shell-line-lg"></div>
-                            <div class="shell-line shell-line-md"></div>
-                        </div>
-                        <div class="shell-grid shell-grid-two">
-                            <div class="shell-panel shell-panel-tall"></div>
-                            <div class="shell-panel shell-panel-tall"></div>
-                        </div>
+                    <div class="section-shell-card station-loading-card">
+                        <i class="fa-solid fa-building-shield"></i>
+                        <span>Loading overview...</span>
                     </div>
                 </div>
 
                 <div id="stationPersonnelSection" class="station-section-shell" data-station-section="personnel">
-                    <div class="section-shell-card">
-                        <div class="shell-heading">
-                            <div class="shell-line shell-line-lg"></div>
-                            <div class="shell-line shell-line-md"></div>
-                        </div>
-                        <div class="shell-grid shell-grid-two">
-                            <div class="shell-panel shell-panel-medium"></div>
-                            <div class="shell-panel shell-panel-large"></div>
-                        </div>
+                    <div class="section-shell-card station-loading-card">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Loading personnel...</span>
                     </div>
                 </div>
 
                 <section class="section-card">
                     <div class="section-header">
                         <div>
-                            <div class="section-title"><i class="fa-solid fa-file-lines"></i> Report Management</div>
-                            <div class="section-subtitle">Only spot, progress, and final investigation reports scoped to this station are shown here.</div>
+                            <div class="section-title"><i class="fa-solid fa-file-lines"></i> Investigation Reports</div>
                         </div>
                         <div class="action-row">
                             <button type="button" class="btn btn-outline" data-open-report-modal="spot"><i class="fa-solid fa-file-circle-plus"></i> New Spot</button>
@@ -119,23 +103,17 @@
                     </div>
 
                     <div id="stationReportsPanelContainer" class="reports-shell-panel">
-                        <div class="section-shell-card">
-                            <div class="shell-grid">
-                                <div class="shell-panel shell-panel-large"></div>
-                            </div>
+                        <div class="section-shell-card station-loading-card">
+                            <i class="fa-solid fa-file-lines"></i>
+                            <span>Loading reports...</span>
                         </div>
                     </div>
                 </section>
 
                 <div id="stationEquipmentSection" class="station-section-shell" data-station-section="equipment">
-                    <div class="section-shell-card">
-                        <div class="shell-heading">
-                            <div class="shell-line shell-line-lg"></div>
-                            <div class="shell-line shell-line-md"></div>
-                        </div>
-                        <div class="shell-grid">
-                            <div class="shell-panel shell-panel-large"></div>
-                        </div>
+                    <div class="section-shell-card station-loading-card">
+                        <i class="fa-solid fa-truck-medical"></i>
+                        <span>Loading equipment...</span>
                     </div>
                 </div>
             </div>
@@ -325,7 +303,6 @@
                         <div class="form-group full">
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="6"></textarea>
-                            <div class="table-muted">Generate a refined progress narrative from the linked spot report context and your current findings.</div>
                             <button type="button" class="btn btn-outline" data-generate-progress-narrative style="margin-top: 0.85rem; width: fit-content;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
                             </button>
@@ -419,7 +396,6 @@
                         <div class="form-group full">
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="5"></textarea>
-                            <div class="table-muted">Generate the final investigation narrative sections from the linked progress and spot reports, then fine-tune them before saving.</div>
                             <button type="button" class="btn btn-outline" data-generate-final-narrative style="margin-top: 0.85rem; width: fit-content;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Narrative
                             </button>

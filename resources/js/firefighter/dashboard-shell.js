@@ -1710,12 +1710,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeButtons = document.querySelectorAll('[data-ff-map-layers-close]');
     const baseInputs = document.querySelectorAll('[data-ff-map-base-toggle]');
     const layerInputs = document.querySelectorAll('[data-ff-map-layer-toggle]');
+    const mobileLayerButtons = document.querySelectorAll('[data-ff-mobile-map-layers-button]');
+    const mobileLayerCountBadges = document.querySelectorAll('[data-ff-mobile-map-layers-count]');
     let lastMobileLayerControlTap = 0;
 
     function syncFirefighterMapLayersPanel() {
         if (typeof window.syncPyroSharedMapLayerControls === 'function') {
             window.syncPyroSharedMapLayerControls();
         }
+        syncFirefighterMobileLayerButtonBadge();
+    }
+
+    function syncFirefighterMobileLayerButtonBadge() {
+        const activeCount = Array.from(layerInputs).filter(function (input) {
+            return input.checked;
+        }).length;
+
+        mobileLayerCountBadges.forEach(function (badge) {
+            badge.textContent = String(activeCount);
+            badge.hidden = activeCount === 0;
+        });
     }
 
     function closeFirefighterMobileDockBurst() {
@@ -1825,6 +1839,23 @@ document.addEventListener('DOMContentLoaded', function () {
         button.addEventListener('click', closeFirefighterMapLayersPanel);
     });
 
+    mobileLayerButtons.forEach(function (button) {
+        const openFromButton = function (event) {
+            if (window.innerWidth > 768) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation?.();
+            event.stopPropagation();
+            openFirefighterMapLayersPanel();
+        };
+
+        button.addEventListener('pointerdown', openFromButton, true);
+        button.addEventListener('touchstart', openFromButton, { capture: true, passive: false });
+        button.addEventListener('click', openFromButton, true);
+    });
+
     baseInputs.forEach(function (input) {
         if (input.dataset.ffLayerBound === 'true') {
             return;
@@ -1851,6 +1882,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             window.setPyroMapOverlayVisibility(input.dataset.ffMapLayerToggle, input.checked);
+            syncFirefighterMobileLayerButtonBadge();
         });
         input.dataset.ffLayerBound = 'true';
     });
@@ -1875,6 +1907,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.setTimeout(bindLeafletLayerTrigger, 150);
     window.setTimeout(bindLeafletLayerTrigger, 500);
     window.addEventListener('load', bindLeafletLayerTrigger);
+    syncFirefighterMobileLayerButtonBadge();
 });
 document.addEventListener('DOMContentLoaded', function () {
     const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
@@ -1917,9 +1950,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        moveInsightsIntoPanel();
-        insightsPanel.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('menu-open');
+        closeFirefighterInsightsPanel();
     }
 
     function closeFirefighterInsightsPanel() {
@@ -1946,12 +1977,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (welcomeToast) {
-        welcomeToast.addEventListener('click', function () {
-            if (window.innerWidth <= 768) {
-                openFirefighterInsightsPanel();
-            }
-        });
-
         window.setTimeout(function () {
             welcomeToast.classList.add('is-visible');
             window.setTimeout(function () {

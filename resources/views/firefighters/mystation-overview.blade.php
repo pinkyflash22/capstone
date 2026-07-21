@@ -2,14 +2,13 @@
     <div class="section-header">
         <div>
             <div class="section-title"><i class="fa-solid fa-images"></i> Station Photos</div>
-            <div class="section-subtitle">Profile and gallery images uploaded by your station command or system administrator.</div>
         </div>
     </div>
     <div class="section-body">
         @if($stationGallery->isEmpty())
             <div class="empty-box">
                 <i class="fa-solid fa-image"></i>
-                <div>No additional station photos have been uploaded yet.</div>
+                <div>No station photos yet.</div>
             </div>
         @else
             <div class="station-gallery-grid">
@@ -27,10 +26,9 @@
 <section class="station-grid">
     <div class="section-card">
         <div class="section-header">
-            <div>
-                <div class="section-title"><i class="fa-solid fa-chart-column"></i> Station Snapshot</div>
-                <div class="section-subtitle">Current station counts based on roster, assigned crew members, equipment lines, and filed investigation reports.</div>
-            </div>
+        <div>
+            <div class="section-title"><i class="fa-solid fa-chart-column"></i> Station Snapshot</div>
+        </div>
         </div>
         <div class="section-body">
             <div class="stat-grid">

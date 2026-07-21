@@ -558,6 +558,10 @@
             </div>
             <div class="map-container overflow-hidden rounded-2xl border border-slate-200">
                 <div id="firefighterDashboardMap" class="bg-gray-200" style="height: 500px;"></div>
+                <button type="button" class="ff-mobile-map-layers-button" data-ff-mobile-map-layers-button aria-label="Open map layers">
+                    <i class="fas fa-layer-group" aria-hidden="true"></i>
+                    <span data-ff-mobile-map-layers-count hidden>0</span>
+                </button>
             </div>
             <div id="firefighterMapLoadState" class="ff-map-load-note">
                 <i class="fas fa-spinner fa-spin"></i>
@@ -583,24 +587,29 @@
                 </div>
             </div>
         </div>
-<div id="routeInfoCard" style="display: none;">
+<div id="routeInfoCard" class="route-info-card" style="display: none;" aria-live="polite">
+        <div class="route-info-card__handle" aria-hidden="true"></div>
         <div class="route-card-header">
-            <h4><i class="fas fa-route"></i> Route Information</h4>
+            <h4><i class="fas fa-route"></i> Route details</h4>
             <span id="routeSourceBadge" class="route-source-badge live">
                 <i class="fas fa-location-crosshairs"></i><span>LIVE</span>
             </span>
         </div>
-        <div class="info-row">
-            <strong>Destination:</strong> <span id="destinationTitle">Loading...</span>
-        </div>
-        <div class="info-row">
-            <strong>Distance:</strong> <span id="routeDistance">0 km</span>
-        </div>
-        <div class="info-row">
-            <strong>ETA:</strong> <span id="routeETA">--:--</span>
-        </div>
-        <div class="info-row">
-            <strong>Duration:</strong> <span id="routeDuration">0 min</span>
+        <div class="route-info-card__body">
+            <div class="info-row info-row--destination">
+                <strong>Destination</strong> <span id="destinationTitle">Loading...</span>
+            </div>
+            <div class="route-info-card__stats">
+                <div class="info-row">
+                    <strong>Distance</strong> <span id="routeDistance">0 km</span>
+                </div>
+                <div class="info-row">
+                    <strong>ETA</strong> <span id="routeETA">--:--</span>
+                </div>
+                <div class="info-row">
+                    <strong>Duration</strong> <span id="routeDuration">0 min</span>
+                </div>
+            </div>
         </div>
         <div class="route-progress-container mt-3">
             <div id="routeProgress" class="route-progress-bar" style="width: 0%"></div>
@@ -610,7 +619,7 @@
             <button class="speed-btn active" data-speed="normal">🚒 Normal</button>
             <button class="speed-btn" data-speed="fast">🐇 Fast</button>
         </div>
-        <button class="btn btn-sm btn-outline mt-2 w-full" onclick="stopSimulation()">
+        <button class="route-stop-btn btn btn-sm btn-outline mt-2 w-full" onclick="stopSimulation()">
             <i class="fas fa-stop"></i> Stop Simulation
         </button>
     </div>
@@ -1044,6 +1053,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             const mapLayersPanel = document.querySelector('[data-ff-map-layers-panel]');
             const mapLayerCloseButtons = document.querySelectorAll('[data-ff-map-layers-close]');
+            const mobileLayerButtons = document.querySelectorAll('[data-ff-mobile-map-layers-button]');
             let lastLayerTapAt = 0;
 
             function closeFirefighterInlineInsightsPanel() {
@@ -1118,6 +1128,21 @@
 
             mapLayerCloseButtons.forEach(function (button) {
                 button.addEventListener('click', closeFirefighterInlineMapLayersPanel);
+            });
+
+            mobileLayerButtons.forEach(function (button) {
+                const openFromButton = function (event) {
+                    if (window.innerWidth > 768) return;
+
+                    event.preventDefault();
+                    event.stopImmediatePropagation?.();
+                    event.stopPropagation();
+                    openFirefighterInlineMapLayersPanel();
+                };
+
+                button.addEventListener('pointerdown', openFromButton, true);
+                button.addEventListener('touchstart', openFromButton, { capture: true, passive: false });
+                button.addEventListener('click', openFromButton, true);
             });
 
             document.addEventListener('pointerdown', handleFirefighterLeafletLayerTap, true);
@@ -2888,9 +2913,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        moveInsightsIntoPanel();
-        insightsPanel.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('menu-open');
+        closeFirefighterInsightsPanel();
     }
 
     function closeFirefighterInsightsPanel() {
@@ -2917,10 +2940,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (welcomeToast && window.innerWidth <= 768) {
-        welcomeToast.addEventListener('click', function () {
-            openFirefighterInsightsPanel();
-        });
-
         window.setTimeout(function () {
             welcomeToast.classList.add('is-visible');
             window.setTimeout(function () {

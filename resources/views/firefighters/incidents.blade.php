@@ -49,8 +49,27 @@
         }
         .toolbar-card {
             padding: 18px 20px; display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(220px, .7fr) minmax(180px, .45fr) auto;
+            grid-template-columns: minmax(0, 1fr) minmax(180px, .36fr) auto;
             gap: 14px; align-items: center;
+        }
+        .sort-select-wrap {
+            position: relative;
+            min-width: 0;
+        }
+        .sort-select-wrap::before {
+            content: '\f0b0';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #c63d26;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .sort-select-wrap .select-field {
+            padding-left: 42px;
         }
         .search-field, .select-field {
             width: 100%; height: 48px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fffaf6;
@@ -111,6 +130,7 @@
             display: block; margin-bottom: 4px; color: #94a3b8; font-size: .72rem; font-weight: 800;
             text-transform: uppercase; letter-spacing: .06em;
         }
+        .incident-meta-item--secondary { display: block; }
         .incident-actions { display: flex; flex-direction: column; gap: 10px; min-width: 158px; }
         .action-btn {
             display: inline-flex; justify-content: center; align-items: center; gap: 8px; height: 42px; padding: 0 16px;
@@ -178,6 +198,9 @@
         .detail-description h3 { margin: 0 0 10px; color: #172033; font-size: .98rem; font-weight: 800; }
         .detail-description p { margin: 0; color: #475569; line-height: 1.7; font-size: .94rem; }
         .detail-image { width: 100%; max-height: 260px; object-fit: cover; border-radius: 18px; border: 1px solid rgba(226,232,240,.9); }
+        .incidents-mobile-title {
+            display: none;
+        }
         @media (max-width: 1280px) {
             .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
             .toolbar-card { grid-template-columns: 1fr 220px 180px; }
@@ -190,43 +213,281 @@
             .incident-actions, .shimmer-actions { grid-column: 1 / -1; min-width: 0; flex-direction: row; display: flex; }
         }
         @media (max-width: 720px) {
-            .stats-grid, .detail-grid, .incident-meta { grid-template-columns: 1fr; }
-            .main-content { padding: 12px 14px calc(112px + env(safe-area-inset-bottom, 0px)); }
-            .incidents-shell { gap: 16px; }
-            .incidents-summary,
-            .list-card {
-                border-radius: 20px;
-                padding-left: 16px;
-                padding-right: 16px;
+            .main-content { padding: max(10px, env(safe-area-inset-top, 0px)) 10px calc(104px + env(safe-area-inset-bottom, 0px)) !important; }
+            .incidents-shell { gap: 10px; }
+            .incidents-mobile-title {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 12px 14px;
+                border-radius: 18px;
+                background: rgba(255,255,255,.94);
+                border: 1px solid rgba(226,232,240,.9);
             }
-            .incidents-summary h1 { font-size: 1.72rem; }
-            .incidents-summary p { font-size: .9rem; }
-            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-            .stat-card { padding: 16px; border-radius: 18px; }
-            .stat-card-value { font-size: 1.5rem; }
-            .toolbar-card { padding: 14px 16px; gap: 10px; }
-            .filter-tabs { padding: 0 16px 16px; overflow-x: auto; flex-wrap: nowrap; }
-            .filter-tab { white-space: nowrap; }
-            .list-card-header { padding: 18px 16px 14px; }
+            .incidents-mobile-title__copy {
+                min-width: 0;
+            }
+            .incidents-mobile-title__eyebrow {
+                margin: 0 0 2px;
+                color: #c63d26;
+                font-size: .62rem;
+                font-weight: 900;
+                letter-spacing: .12em;
+                text-transform: uppercase;
+            }
+            .incidents-mobile-title__heading {
+                margin: 0;
+                color: #172033;
+                font-size: 1.05rem;
+                font-weight: 900;
+                line-height: 1.1;
+            }
+            .incidents-mobile-title__count {
+                flex: 0 0 auto;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 40px;
+                height: 34px;
+                padding: 0 10px;
+                border-radius: 999px;
+                background: #fff7f3;
+                color: #c63d26;
+                border: 1px solid rgba(198,61,38,.12);
+                font-size: .72rem;
+                font-weight: 900;
+            }
+            .incidents-summary,
+            .stats-grid {
+                display: none !important;
+            }
+            .list-card {
+                border-radius: 18px;
+                box-shadow: none;
+                border-color: rgba(226,232,240,.88);
+                overflow: hidden;
+            }
+            .list-card-header {
+                padding: 10px 14px 8px;
+                align-items: flex-start;
+            }
+            .list-card-title { font-size: .98rem; }
+            .list-card-subtitle { display: none; }
+            .results-pill {
+                padding: 7px 9px;
+                gap: 5px;
+                font-size: .68rem;
+                white-space: nowrap;
+            }
+            .results-pill i { font-size: .72rem; }
+            .toolbar-card {
+                margin: 0 10px 10px;
+                padding: 10px;
+                gap: 8px;
+                border-radius: 15px;
+                box-shadow: none;
+                border-color: rgba(226,232,240,.86);
+                grid-template-columns: minmax(0, 1fr) 42px 42px;
+            }
+            .search-field,
+            .select-field {
+                height: 40px;
+                border-radius: 12px;
+                padding: 0 11px;
+                font-size: .78rem;
+            }
+            .sort-select-wrap {
+                width: 42px;
+                height: 40px;
+            }
+            .sort-select-wrap::before {
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: .82rem;
+            }
+            .sort-select-wrap .select-field {
+                width: 42px;
+                min-width: 42px;
+                padding: 0;
+                color: transparent;
+                text-shadow: none;
+                cursor: pointer;
+                appearance: none;
+                -webkit-appearance: none;
+                background: #fff7f3;
+                border-color: rgba(198,61,38,.16);
+            }
+            .sort-select-wrap .select-field option {
+                color: #172033;
+            }
+            #refreshIncidentsBtn {
+                width: 42px;
+                min-width: 42px;
+                padding: 0;
+                border-radius: 12px;
+            }
+            #refreshIncidentsBtn .action-btn__text {
+                display: none;
+            }
+            .filter-tabs {
+                padding: 0 10px 10px;
+                gap: 7px;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                scrollbar-width: none;
+            }
+            .filter-tabs::-webkit-scrollbar { display: none; }
+            .filter-tab {
+                padding: 7px 10px;
+                font-size: .68rem;
+                white-space: nowrap;
+                box-shadow: none !important;
+            }
             .incident-list,
-            .shimmer-grid { padding: 12px 16px 18px; }
-            .incident-item { grid-template-columns: 1fr; padding: 16px; border-radius: 18px; }
-            .incident-item { grid-template-columns: 1fr; }
-            .incident-image { width: 56px; height: 56px; }
-            .incident-actions, .shimmer-actions { flex-direction: column; }
-            .action-btn { width: 100%; }
-            .incident-modal { padding: 10px; align-items: flex-end; }
+            .shimmer-grid { padding: 8px 10px 12px; gap: 9px; }
+            .incident-item {
+                grid-template-columns: 40px minmax(0, 1fr);
+                gap: 10px;
+                padding: 11px;
+                border-radius: 15px;
+                box-shadow: none;
+            }
+            .incident-image {
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+                font-size: .95rem;
+            }
+            .incident-topline {
+                gap: 5px;
+                margin-bottom: 5px;
+            }
+            .incident-chip {
+                gap: 4px;
+                padding: 4px 7px;
+                font-size: .58rem;
+                letter-spacing: .025em;
+            }
+            .incident-chip i { font-size: .62rem; }
+            .incident-title {
+                font-size: .86rem;
+                line-height: 1.25;
+            }
+            .incident-description {
+                display: none;
+            }
+            .incident-meta {
+                grid-template-columns: 1fr;
+                gap: 5px;
+                margin-top: 8px;
+            }
+            .incident-meta-item {
+                font-size: .7rem;
+                line-height: 1.3;
+            }
+            .incident-meta-label {
+                margin-bottom: 1px;
+                font-size: .56rem;
+                letter-spacing: .04em;
+            }
+            .incident-meta-item--secondary {
+                display: none;
+            }
+            .incident-actions,
+            .shimmer-actions {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 7px;
+                min-width: 0;
+            }
+            .incident-actions .action-btn:first-child:last-child,
+            .incident-actions .action-note:first-child:last-child {
+                grid-column: 1 / -1;
+            }
+            .action-btn,
+            .action-note {
+                width: 100%;
+                min-height: 36px;
+                height: 36px;
+                padding: 0 9px;
+                border-radius: 11px;
+                gap: 5px;
+                font-size: .7rem;
+            }
+            .action-btn i,
+            .action-note i { font-size: .72rem; }
+            .list-empty {
+                padding: 30px 14px;
+            }
+            .list-empty i {
+                font-size: 1.9rem;
+                margin-bottom: 8px;
+            }
+            .shimmer-card {
+                grid-template-columns: 40px minmax(0, 1fr);
+                gap: 10px;
+                padding: 11px;
+                border-radius: 15px;
+            }
+            .shimmer-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+            }
+            .shimmer-line-lg { height: 13px; width: 54%; }
+            .shimmer-line-md { height: 10px; }
+            .shimmer-line-sm { height: 10px; }
+            .shimmer-btn { height: 34px; }
+            .incident-modal { padding: 0 10px calc(90px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
             .incident-modal-panel {
                 width: 100%;
-                max-height: min(84dvh, 760px);
+                max-height: min(72dvh, 620px);
                 border-radius: 24px 24px 18px 18px;
+                box-shadow: 0 -10px 28px rgba(15,23,42,.18);
             }
-            .incident-modal-body { padding: 16px; max-height: calc(84dvh - 118px); }
+            .incident-modal-header {
+                padding: 15px 16px 12px;
+                align-items: center;
+            }
+            .incident-modal-title { font-size: .98rem; }
+            .incident-modal-subtitle { margin-top: 3px; font-size: .72rem; }
+            .incident-modal-close {
+                width: 40px;
+                height: 40px;
+                flex: 0 0 40px;
+            }
+            .incident-modal-body {
+                padding: 12px;
+                gap: 10px;
+                max-height: calc(72dvh - 82px);
+            }
+            .detail-grid { grid-template-columns: 1fr; gap: 8px; }
+            .detail-card {
+                padding: 10px 11px;
+                border-radius: 13px;
+            }
+            .detail-label { font-size: .58rem; margin-bottom: 3px; }
+            .detail-value { font-size: .74rem; line-height: 1.35; }
+            .detail-description {
+                padding: 11px;
+                border-radius: 13px;
+            }
+            .detail-description h3 { font-size: .82rem; margin-bottom: 5px; }
+            .detail-description p { font-size: .74rem; line-height: 1.45; }
+            .detail-image {
+                max-height: 150px;
+                border-radius: 13px;
+            }
         }
         @media (max-width: 430px) {
-            .stats-grid { grid-template-columns: 1fr; }
-            .summary-pills { width: 100%; }
-            .summary-pill { width: 100%; justify-content: center; }
+            .main-content { padding-left: 8px; padding-right: 8px; }
+            .toolbar-card { margin-left: 8px; margin-right: 8px; }
+            .filter-tabs { padding-left: 8px; padding-right: 8px; }
+            .incident-list,
+            .shimmer-grid { padding-left: 8px; padding-right: 8px; }
+            .incident-chip:nth-child(3) { display: none; }
         }
     </style>
     @include('partials.pwa-head')
@@ -262,6 +523,14 @@
                 <article class="stat-card"><div class="stat-card-label"><span>Avg Response</span><i class="fa-solid fa-stopwatch"></i></div><div class="stat-card-value" id="statAvgResponse">--</div><div class="stat-card-meta">Based on completed incidents from report time to end time</div></article>
             </section>
 
+            <section class="incidents-mobile-title" aria-label="Incident registry summary">
+                <div class="incidents-mobile-title__copy">
+                    <p class="incidents-mobile-title__eyebrow">Responder incidents</p>
+                    <h1 class="incidents-mobile-title__heading">Incident Registry</h1>
+                </div>
+                <span class="incidents-mobile-title__count" id="mobileResultsCount">0</span>
+            </section>
+
             <section class="list-card">
                 <div class="list-card-header">
                     <div>
@@ -279,16 +548,16 @@
                 </div>
 
                 <div class="toolbar-card">
-                    <input type="search" id="incidentSearch" class="search-field" placeholder="Search title, type, reporter, location, or incident ID">
-                    <select id="incidentTypeFilter" class="select-field"><option value="all">All incident types</option></select>
-                    <select id="incidentSort" class="select-field">
-                        <option value="reported_desc">Newest reported</option>
-                        <option value="reported_asc">Oldest reported</option>
-                        <option value="updated_desc">Latest updated</option>
-                        <option value="updated_asc">Oldest updated</option>
-                        <option value="type_asc">Type A-Z</option>
-                    </select>
-                    <button type="button" class="action-btn ghost" id="refreshIncidentsBtn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    <input type="search" id="incidentSearch" class="search-field" placeholder="Search incident, reporter, or location">
+                    <span class="sort-select-wrap">
+                        <select id="incidentSort" class="select-field" aria-label="Sort incidents" title="Sort incidents">
+                            <option value="reported_desc">Newest reported</option>
+                            <option value="reported_asc">Oldest reported</option>
+                            <option value="updated_desc">Latest updated</option>
+                            <option value="updated_asc">Oldest updated</option>
+                        </select>
+                    </span>
+                    <button type="button" class="action-btn ghost" id="refreshIncidentsBtn" aria-label="Refresh incidents" title="Refresh incidents"><i class="fa-solid fa-rotate"></i> <span class="action-btn__text">Refresh</span></button>
                 </div>
 
                 <div id="incidentListState"></div>
@@ -312,10 +581,10 @@
     <script>
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
         const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 30000;
-        const incidentState = { incidents: [], filter: 'all', search: '', type: 'all', sort: 'reported_desc', poller: null, request: null, lastFetchedAt: 0 };
+        const incidentState = { incidents: [], filter: 'all', search: '', sort: 'reported_desc', poller: null, request: null, lastFetchedAt: 0 };
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
-        const typeFilter = document.getElementById('incidentTypeFilter');
+        const mobileResultsCount = document.getElementById('mobileResultsCount');
         const sortSelect = document.getElementById('incidentSort');
         const searchInput = document.getElementById('incidentSearch');
         const statusTabs = document.getElementById('statusTabs');
@@ -402,19 +671,11 @@
             document.getElementById('statAvgResponse').textContent = `${stats.avg_response_minutes ?? 0}m`;
         }
 
-        function buildTypeOptions(incidents) {
-            const currentValue = incidentState.type;
-            const types = [...new Set((incidents || []).map(incident => incident.incident_type_name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-            typeFilter.innerHTML = `<option value="all">All incident types</option>${types.map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join('')}`;
-            typeFilter.value = (types.includes(currentValue) || currentValue === 'all') ? currentValue : 'all';
-        }
-
         function getFilteredIncidents() {
             const search = incidentState.search.trim().toLowerCase();
             const filtered = incidentState.incidents.filter((incident) => {
                 const bucket = getStatusBucket(incident.incident_status_id);
                 if (incidentState.filter !== 'all' && bucket !== incidentState.filter) return false;
-                if (incidentState.type !== 'all' && incident.incident_type_name !== incidentState.type) return false;
                 if (!search) return true;
                 const haystack = [incident.incident_id, incident.title, incident.description, incident.location, incident.reporter_name, incident.incident_type_name, incident.incident_status_name]
                     .map(value => String(value || '').toLowerCase()).join(' ');
@@ -426,7 +687,6 @@
                     case 'reported_asc': return new Date(left.reported_at || 0) - new Date(right.reported_at || 0);
                     case 'updated_desc': return new Date(right.updated_at || 0) - new Date(left.updated_at || 0);
                     case 'updated_asc': return new Date(left.updated_at || 0) - new Date(right.updated_at || 0);
-                    case 'type_asc': return String(left.incident_type_name || '').localeCompare(String(right.incident_type_name || ''));
                     case 'reported_desc':
                     default: return new Date(right.reported_at || 0) - new Date(left.reported_at || 0);
                 }
@@ -438,6 +698,9 @@
         function renderIncidentList() {
             const incidents = getFilteredIncidents();
             resultsCount.textContent = `${incidents.length} incident${incidents.length === 1 ? '' : 's'}`;
+            if (mobileResultsCount) {
+                mobileResultsCount.textContent = String(incidents.length);
+            }
 
             if (!incidents.length) {
                 listState.innerHTML = `<div class="list-empty"><i class="fa-solid fa-folder-open"></i><div class="text-lg font-semibold text-slate-700">No incidents match the current filters.</div><div class="mt-2 text-sm text-slate-500">Try clearing the search or switching to another incident category.</div></div>`;
@@ -466,9 +729,9 @@
                             <p class="incident-description">${escapeHtml(incident.description || 'No incident description was recorded for this response.')}</p>
                             <div class="incident-meta">
                                 <div class="incident-meta-item"><span class="incident-meta-label">Location</span>${escapeHtml(incident.location || 'Unknown location')}</div>
-                                <div class="incident-meta-item"><span class="incident-meta-label">Reported By</span>${escapeHtml(incident.reporter_name || 'Concerned Citizen')}</div>
+                                <div class="incident-meta-item incident-meta-item--secondary"><span class="incident-meta-label">Reported By</span>${escapeHtml(incident.reporter_name || 'Concerned Citizen')}</div>
                                 <div class="incident-meta-item"><span class="incident-meta-label">Reported At</span>${escapeHtml(formatDateTime(incident.reported_at))}</div>
-                                <div class="incident-meta-item"><span class="incident-meta-label">Last Updated</span>${escapeHtml(formatDateTime(incident.updated_at))}</div>
+                                <div class="incident-meta-item incident-meta-item--secondary"><span class="incident-meta-label">Last Updated</span>${escapeHtml(formatDateTime(incident.updated_at))}</div>
                             </div>
                         </div>
                         <div class="incident-actions">
@@ -512,7 +775,6 @@
                 incidentState.incidents = Array.isArray(result.data?.incidents) ? result.data.incidents : [];
                 incidentState.lastFetchedAt = Date.now();
                 updateStats(result.data?.stats || {});
-                buildTypeOptions(incidentState.incidents);
                 renderIncidentList();
             } catch (error) {
                 console.error('Incident registry fetch failed:', error);
@@ -583,7 +845,6 @@
                 renderIncidentList();
             });
             searchInput.addEventListener('input', (event) => { incidentState.search = event.target.value || ''; renderIncidentList(); });
-            typeFilter.addEventListener('change', (event) => { incidentState.type = event.target.value || 'all'; renderIncidentList(); });
             sortSelect.addEventListener('change', (event) => { incidentState.sort = event.target.value || 'reported_desc'; renderIncidentList(); });
             refreshBtn.addEventListener('click', () => fetchIncidentRegistry(true));
             document.getElementById('closeIncidentModal').addEventListener('click', closeIncidentDetails);
