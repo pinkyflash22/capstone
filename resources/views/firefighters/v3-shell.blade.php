@@ -78,8 +78,9 @@
             width: 54px;
             height: 54px;
             object-fit: contain;
-            border-radius: 18px;
+            border-radius: 999px;
             background: #fff7ef;
+            padding: 8px;
         }
 
         .ff3-brand strong { display: block; font-size: 1.18rem; letter-spacing: -.03em; }

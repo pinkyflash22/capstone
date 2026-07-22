@@ -25,101 +25,121 @@
         }
 
         .schedule-shell {
-            max-width: 1480px;
+            max-width: 1400px;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 16px;
         }
 
         .schedule-hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
-            gap: 20px;
-            padding: 28px 30px;
-            border-radius: 30px;
-            background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 44%, #ffffff 100%);
-            border: 1px solid rgba(245, 158, 11, 0.12);
-            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 16px 18px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.04);
         }
 
         .schedule-hero h1 {
             margin: 0;
-            font-size: clamp(2rem, 3vw, 2.8rem);
-            line-height: 1;
+            font-size: clamp(1.35rem, 2vw, 1.8rem);
+            line-height: 1.1;
             color: #0f172a;
             font-weight: 900;
         }
 
         .schedule-hero p {
-            margin: 12px 0 0;
+            margin: 4px 0 0;
             color: #64748b;
-            line-height: 1.65;
-            font-size: 0.98rem;
-            max-width: 62ch;
-        }
-
-        .schedule-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 18px;
-        }
-
-        .schedule-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            min-height: 40px;
-            padding: 0 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.76);
-            color: #9a3412;
-            border: 1px solid rgba(245, 158, 11, 0.14);
-            font-size: 0.82rem;
-            font-weight: 800;
+            line-height: 1.35;
+            font-size: 0.86rem;
         }
 
         .schedule-summary-grid {
-            display: grid;
-            gap: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
         }
 
         .schedule-summary-card {
-            background: rgba(255, 255, 255, 0.82);
-            border: 1px solid rgba(245, 158, 11, 0.12);
-            border-radius: 22px;
-            padding: 18px 18px 16px;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 34px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid rgba(198, 61, 38, 0.1);
+            box-shadow: none;
         }
 
         .schedule-summary-label {
-            color: #64748b;
-            font-size: 0.74rem;
+            color: inherit;
+            font-size: 0.7rem;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.06em;
         }
 
         .schedule-summary-value {
-            margin-top: 6px;
+            margin-top: 0;
             color: #0f172a;
-            font-size: 1.6rem;
+            font-size: 0.88rem;
             font-weight: 900;
+        }
+
+        .schedule-legend {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+
+        .schedule-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .schedule-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .schedule-dot.official { background: #c63d26; }
+        .schedule-dot.personal { background: #16a34a; }
+
+        .schedule-dot-row {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            min-height: 8px;
+            margin-top: auto;
         }
 
         .schedule-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
-            gap: 22px;
+            grid-template-columns: minmax(0, 1.85fr) minmax(300px, 0.9fr);
+            gap: 18px;
         }
 
         .calendar-card,
         .agenda-card {
             background: rgba(255, 255, 255, 0.94);
-            border-radius: 30px;
+            border-radius: 22px;
             border: 1px solid rgba(226, 232, 240, 0.92);
-            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.04);
             overflow: hidden;
         }
 
@@ -128,7 +148,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 22px 24px 18px;
+            padding: 16px 18px 14px;
             border-bottom: 1px solid rgba(226, 232, 240, 0.9);
             background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
         }
@@ -136,15 +156,8 @@
         .calendar-toolbar-title h2 {
             margin: 0;
             color: #0f172a;
-            font-size: 1.35rem;
+            font-size: 1.25rem;
             font-weight: 900;
-        }
-
-        .calendar-toolbar-title p {
-            margin: 4px 0 0;
-            color: #64748b;
-            font-size: 0.86rem;
-            font-weight: 500;
         }
 
         .calendar-toolbar-actions {
@@ -182,14 +195,16 @@
         }
 
         .calendar-grid-wrap {
-            padding: 20px 22px 24px;
+            padding: 16px 18px 18px;
         }
 
         .calendar-weekdays,
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, minmax(0, 1fr));
-            gap: 10px;
+            gap: 7px;
+            width: 100%;
+            min-width: 0;
         }
 
         .calendar-weekdays {
@@ -206,15 +221,17 @@
         }
 
         .calendar-day {
-            min-height: 148px;
-            border-radius: 22px;
+            min-width: 0;
+            width: 100%;
+            min-height: 118px;
+            border-radius: 16px;
             border: 1px solid rgba(226, 232, 240, 0.95);
             background: linear-gradient(180deg, #ffffff 0%, #fffdf9 100%);
-            padding: 14px;
+            padding: 10px;
             text-align: left;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -238,6 +255,7 @@
         .calendar-day.selected {
             border-color: rgba(198, 61, 38, 0.4);
             box-shadow: 0 16px 32px rgba(198, 61, 38, 0.12);
+            background: linear-gradient(180deg, #fff3e8 0%, #ffffff 100%);
         }
 
         .calendar-day-head {
@@ -267,21 +285,26 @@
         }
 
         .calendar-event-stack {
-            display: grid;
-            gap: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
             min-height: 0;
         }
 
         .calendar-event-pill {
-            border-radius: 16px;
-            padding: 10px 12px;
-            font-size: 0.76rem;
-            line-height: 1.35;
+            border-radius: 999px;
+            padding: 4px 7px;
+            font-size: 0.66rem;
+            line-height: 1.1;
             font-weight: 700;
             background: #eff6ff;
             color: #1d4ed8;
-            display: grid;
-            gap: 2px;
+            display: inline-flex;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .calendar-event-pill.operations { background: #eff6ff; color: #1d4ed8; }
@@ -294,28 +317,8 @@
             box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.16);
         }
 
-        .calendar-pill-source {
-            font-size: 0.64rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            opacity: 0.72;
-        }
-
-        .calendar-day-add {
-            margin-top: auto;
-            height: 38px;
-            border: 1px dashed rgba(198, 61, 38, 0.22);
-            border-radius: 14px;
-            background: rgba(255, 247, 237, 0.7);
-            color: #9a3412;
-            font-size: 0.78rem;
-            font-weight: 800;
-            cursor: pointer;
-        }
-
         .agenda-header {
-            padding: 24px 24px 18px;
+            padding: 18px 20px 14px;
             border-bottom: 1px solid rgba(226, 232, 240, 0.9);
         }
 
@@ -326,22 +329,15 @@
             font-weight: 900;
         }
 
-        .agenda-header p {
-            margin: 8px 0 0;
-            color: #64748b;
-            font-size: 0.88rem;
-            line-height: 1.6;
-        }
-
         .agenda-body {
-            padding: 22px 24px 26px;
+            padding: 16px 18px 18px;
             display: grid;
-            gap: 18px;
+            gap: 14px;
         }
 
         .selected-day-card {
-            border-radius: 24px;
-            padding: 18px 20px;
+            border-radius: 18px;
+            padding: 14px;
             background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
             border: 1px solid rgba(245, 158, 11, 0.14);
         }
@@ -375,8 +371,8 @@
 
         .agenda-event {
             border: 1px solid rgba(226, 232, 240, 0.92);
-            border-radius: 22px;
-            padding: 16px 16px 14px;
+            border-radius: 16px;
+            padding: 13px;
             background: #ffffff;
             display: grid;
             gap: 10px;
@@ -474,8 +470,8 @@
 
         .agenda-empty {
             border: 1px dashed rgba(226, 232, 240, 1);
-            border-radius: 22px;
-            padding: 28px 18px;
+            border-radius: 16px;
+            padding: 18px 14px;
             text-align: center;
             color: #94a3b8;
             background: #f8fafc;
@@ -700,7 +696,8 @@
         #scheduleToast {
             position: fixed;
             right: 1.5rem;
-            bottom: 1.5rem;
+            top: 5.5rem;
+            bottom: auto;
             background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
             color: #fff;
             padding: 0.85rem 1.1rem;
@@ -721,61 +718,85 @@
         }
 
         @media (max-width: 1280px) {
-            .schedule-layout,
-            .schedule-hero {
+            .schedule-layout {
                 grid-template-columns: 1fr;
             }
         }
 
         @media (max-width: 768px) {
             .main-content {
-                padding-left: 14px;
-                padding-right: 14px;
-                padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+                padding: 10px 10px calc(var(--ff-mobile-dock-h, 92px) + 52px + env(safe-area-inset-bottom, 0px)) !important;
             }
 
             .schedule-shell {
                 gap: 16px;
-            }
-
-            .schedule-hero,
-            .calendar-card,
-            .agenda-card {
-                border-radius: 22px;
+                padding-bottom: 18px;
             }
 
             .schedule-hero {
-                padding: 20px 18px;
+                align-items: flex-start;
+                padding: 12px;
+                border-radius: 16px;
+                flex-direction: column;
             }
 
             .schedule-hero h1 {
-                font-size: clamp(1.7rem, 7vw, 2.15rem);
-                line-height: 1.05;
+                font-size: 1.2rem;
             }
 
             .schedule-hero p {
-                font-size: 0.92rem;
+                font-size: 0.78rem;
             }
 
-            .schedule-summary-grid,
+            .schedule-summary-grid {
+                justify-content: flex-start;
+            }
+
             .schedule-layout {
                 gap: 14px;
+                grid-template-columns: 1fr;
             }
 
             .calendar-toolbar {
-                padding: 18px 16px 16px;
-                flex-direction: column;
-                align-items: stretch;
+                padding: 12px;
+                display: grid;
+                grid-template-columns: 44px minmax(0, 1fr) 58px 44px;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .calendar-toolbar-title {
+                min-width: 0;
+                text-align: center;
+            }
+
+            .calendar-toolbar-title h2 {
+                font-size: 1.08rem;
+                white-space: nowrap;
             }
 
             .calendar-toolbar-actions {
-                width: 100%;
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                display: contents;
             }
 
             .calendar-btn {
-                width: 100%;
+                width: auto;
+                min-width: 44px;
+                height: 40px;
+                padding: 0 10px;
+                border-radius: 12px;
+                font-size: 0.74rem;
+            }
+
+            #prevMonthBtn { grid-column: 1; grid-row: 1; }
+            .calendar-toolbar-title { grid-column: 2; grid-row: 1; }
+            #todayMonthBtn { grid-column: 3; grid-row: 1; }
+            #nextMonthBtn { grid-column: 4; grid-row: 1; }
+
+            .schedule-legend {
+                grid-column: 1 / -1;
+                justify-content: center;
+                font-size: 0.7rem;
             }
 
             .schedule-modal {
@@ -785,7 +806,7 @@
 
             .schedule-modal-card {
                 width: 100%;
-                max-height: min(84dvh, 760px);
+                max-height: calc(100dvh - 100px);
                 border-radius: 24px 24px 18px 18px;
                 margin: 0 auto;
             }
@@ -806,38 +827,61 @@
 
             .calendar-weekdays,
             .calendar-grid {
-                gap: 8px;
+                gap: 4px;
             }
 
             .calendar-grid-wrap {
-                overflow-x: auto;
-                padding: 16px;
-            }
-
-            .calendar-weekdays,
-            .calendar-grid {
-                min-width: 620px;
+                overflow-x: visible;
+                padding: 10px;
             }
 
             .calendar-day {
-                min-height: 132px;
-                padding: 12px;
-                border-radius: 18px;
-            }
-        }
-
-        @media (max-width: 430px) {
-            .main-content {
-                padding-left: 12px;
-                padding-right: 12px;
+                min-height: 54px;
+                padding: 6px 4px;
+                border-radius: 10px;
+                gap: 4px;
             }
 
-            .schedule-summary-card {
-                padding: 16px;
+            .calendar-weekday {
+                font-size: 0;
             }
 
-            .calendar-toolbar-actions {
-                grid-template-columns: 1fr;
+            .calendar-weekday::first-letter {
+                font-size: 0.6rem;
+            }
+
+            .calendar-day-number {
+                font-size: 0.82rem;
+            }
+
+            .calendar-day-tag {
+                min-width: 18px;
+                height: 18px;
+                font-size: 0.6rem;
+            }
+
+            .calendar-event-pill {
+                width: 6px;
+                height: 6px;
+                padding: 0;
+                font-size: 0;
+            }
+
+            .selected-day-card h4,
+            .agenda-header h3 {
+                font-size: 1rem;
+            }
+
+            .agenda-card:last-child {
+                margin-bottom: 16px;
+            }
+
+            #scheduleToast {
+                left: 12px;
+                right: 12px;
+                top: auto;
+                bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+                font-size: 0.82rem;
             }
         }
     </style>
@@ -855,27 +899,22 @@
         <div class="schedule-shell">
             <section class="schedule-hero">
                 <div>
-                    <h1>Track official station activities and your personal schedule in one board.</h1>
-                    <p>Chief-created activities appear here automatically for your station, while your personal schedule stays private to your firefighter account. Use the same monthly board style to review both without mixing ownership.</p>
-                    <div class="schedule-badges">
-                        <span class="schedule-badge"><i class="fa-solid fa-shield-halved"></i> Chief official schedule</span>
-                        <span class="schedule-badge"><i class="fa-solid fa-user-clock"></i> Personal firefighter schedule</span>
-                        <span class="schedule-badge"><i class="fa-solid fa-layer-group"></i> Shared calendar design with command view</span>
-                    </div>
+                    <h1>My Schedule</h1>
+                    <p id="scheduleMonthSummary">{{ now()->format('F Y') }}</p>
                 </div>
 
                 <div class="schedule-summary-grid">
                     <div class="schedule-summary-card">
-                        <div class="schedule-summary-label">Current Window</div>
-                        <div class="schedule-summary-value" id="scheduleMonthSummary">{{ now()->format('F Y') }}</div>
+                        <div class="schedule-summary-label">Official</div>
+                        <div class="schedule-summary-value" id="scheduleOfficialCount">--</div>
                     </div>
                     <div class="schedule-summary-card">
-                        <div class="schedule-summary-label">Visible Activities</div>
-                        <div class="schedule-summary-value" id="scheduleEventCount">--</div>
-                    </div>
-                    <div class="schedule-summary-card">
-                        <div class="schedule-summary-label">Personal Blocks</div>
+                        <div class="schedule-summary-label">Personal</div>
                         <div class="schedule-summary-value" id="schedulePersonalCount">--</div>
+                    </div>
+                    <div class="schedule-summary-card">
+                        <div class="schedule-summary-label">Upcoming</div>
+                        <div class="schedule-summary-value" id="scheduleUpcomingCount">--</div>
                     </div>
                 </div>
             </section>
@@ -885,13 +924,17 @@
                     <div class="calendar-toolbar">
                         <div class="calendar-toolbar-title">
                             <h2 id="calendarMonthLabel">{{ now()->format('F Y') }}</h2>
-                            <p>Chief official schedules are read-only here. Only your own personal schedules can be changed.</p>
                         </div>
 
                         <div class="calendar-toolbar-actions">
-                            <button type="button" class="calendar-btn" id="prevMonthBtn"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button type="button" class="calendar-btn" id="prevMonthBtn" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
                             <button type="button" class="calendar-btn primary" id="todayMonthBtn">Today</button>
-                            <button type="button" class="calendar-btn" id="nextMonthBtn"><i class="fa-solid fa-chevron-right"></i></button>
+                            <button type="button" class="calendar-btn" id="nextMonthBtn" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+
+                        <div class="schedule-legend" aria-label="Schedule legend">
+                            <span><i class="schedule-dot official" aria-hidden="true"></i> Official</span>
+                            <span><i class="schedule-dot personal" aria-hidden="true"></i> Personal</span>
                         </div>
                     </div>
 
@@ -912,7 +955,6 @@
                 <aside class="agenda-card">
                     <div class="agenda-header">
                         <h3>Day Agenda</h3>
-                        <p>Official station activities and your personal schedule are grouped on the selected date.</p>
                     </div>
 
                     <div class="agenda-body">
@@ -922,7 +964,7 @@
                             <p id="selectedDaySummary">Choose a date to inspect official activities and your personal schedule.</p>
                             <div class="mt-4">
                                 <button type="button" class="calendar-btn primary" id="selectedDayAddBtn">
-                                    <i class="fa-solid fa-plus"></i> Add Personal Schedule
+                                    <i class="fa-solid fa-plus"></i> Add Schedule
                                 </button>
                             </div>
                         </div>
@@ -930,7 +972,7 @@
                         <div id="selectedDayAgenda" class="agenda-list"></div>
 
                         <div class="upcoming-card">
-                            <h4>Upcoming Schedule Queue</h4>
+                            <h4>Upcoming</h4>
                             <div id="upcomingScheduleList"></div>
                         </div>
                     </div>
@@ -943,8 +985,8 @@
         <div class="schedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
             <div class="schedule-modal-head">
                 <div>
-                    <h3 id="scheduleModalTitle">Add Personal Schedule</h3>
-                    <p id="scheduleModalSubtitle">Create a private schedule block for the selected day.</p>
+                    <h3 id="scheduleModalTitle">Add Schedule</h3>
+                    <p id="scheduleModalSubtitle">Create a schedule for the selected day.</p>
                 </div>
                 <button type="button" class="schedule-modal-close" id="scheduleModalClose" aria-label="Close schedule modal">
                     <i class="fa-solid fa-xmark"></i>
@@ -1027,8 +1069,9 @@
             let stationName = @json($stationName ?: 'Unassigned Station');
             const monthLabel = document.getElementById('calendarMonthLabel');
             const monthSummary = document.getElementById('scheduleMonthSummary');
-            const eventCount = document.getElementById('scheduleEventCount');
+            const officialCount = document.getElementById('scheduleOfficialCount');
             const personalCount = document.getElementById('schedulePersonalCount');
+            const upcomingCount = document.getElementById('scheduleUpcomingCount');
             const grid = document.getElementById('firefighterScheduleCalendarGrid');
             const selectedDayLabel = document.getElementById('selectedDayLabel');
             const selectedDaySummary = document.getElementById('selectedDaySummary');
@@ -1362,15 +1405,15 @@
 
                 selectedDayLabel.textContent = formatLongDate(selectedDate);
                 selectedDaySummary.textContent = events.length
-                    ? `${officialCount} official and ${personalCountForDay} personal schedule block${(officialCount + personalCountForDay) === 1 ? '' : 's'} on this day.`
-                    : 'No official or personal schedule blocks for this day yet.';
+                    ? `${officialCount} official · ${personalCountForDay} personal`
+                    : 'Nothing is scheduled for this day.';
 
                 if (!events.length) {
                     selectedDayAgenda.innerHTML = `
                         <div class="agenda-empty">
                             <i class="fa-regular fa-calendar-days text-xl mb-3"></i>
-                            <div class="text-sm font-semibold text-slate-600">Open day</div>
-                            <div class="text-xs mt-1">Chief official schedules and your personal blocks will appear here.</div>
+                            <div class="text-sm font-semibold text-slate-600">No schedules</div>
+                            <div class="text-xs mt-1">Nothing is scheduled for this day.</div>
                         </div>
                     `;
                     return;
@@ -1400,13 +1443,13 @@
                 }).join('') : `
                     <div class="agenda-empty">
                         <i class="fa-regular fa-calendar-days text-xl mb-3"></i>
-                        <div class="text-sm font-semibold text-slate-600">No schedules yet</div>
-                        <div class="text-xs mt-1">Chief official activities and your personal schedule will appear here.</div>
+                        <div class="text-sm font-semibold text-slate-600">No upcoming schedules.</div>
                     </div>
                 `;
 
-                eventCount.textContent = String(scheduleEventsData.length);
+                officialCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'official').length);
                 personalCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'personal').length);
+                upcomingCount.textContent = String(upcoming.length);
             }
 
             function renderCalendar() {
@@ -1426,6 +1469,8 @@
                     cellDate.setDate(firstCell.getDate() + i);
                     const dateKey = formatDateKey(cellDate);
                     const events = getEventsForDate(dateKey);
+                    const officialEvents = events.filter(event => event.source_type === 'official');
+                    const personalEvents = events.filter(event => event.source_type === 'personal');
                     const isCurrentMonth = cellDate.getMonth() === month;
                     const isToday = dateKey === todayKey;
                     const isSelected = dateKey === state.selectedDateKey;
@@ -1434,22 +1479,19 @@
                     cell.type = 'button';
                     cell.className = `calendar-day${isCurrentMonth ? '' : ' muted'}${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`;
                     cell.dataset.date = dateKey;
+                    cell.setAttribute('aria-label', `${formatLongDate(cellDate)}, ${events.length} schedule${events.length === 1 ? '' : 's'}`);
+                    cell.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                    if (isToday) {
+                        cell.setAttribute('aria-current', 'date');
+                    }
                     cell.innerHTML = `
                         <div class="calendar-day-head">
                             <span class="calendar-day-number">${cellDate.getDate()}</span>
                             ${events.length ? `<span class="calendar-day-tag">${events.length}</span>` : ''}
                         </div>
                         <div class="calendar-event-stack">
-                            ${events.slice(0, 2).map(event => `
-                                <div class="calendar-event-pill ${event.activity_type || 'operations'} ${event.source_type === 'personal' ? 'personal-event' : ''}">
-                                    <div class="calendar-pill-source">${event.source_type === 'personal' ? 'Personal' : 'Official'}</div>
-                                    <div>${event.schedule || `${event.start_time} - ${event.end_time}`}</div>
-                                    <div>${event.event}</div>
-                                </div>
-                            `).join('')}
-                            <button type="button" class="calendar-day-add" data-add-date="${dateKey}">
-                                <i class="fa-solid fa-plus"></i> Add Personal
-                            </button>
+                            ${officialEvents.length ? `<span class="calendar-event-pill operations" title="${officialEvents.length} official schedule">${officialEvents.length > 1 ? officialEvents.length + ' official' : 'Official'}</span>` : ''}
+                            ${personalEvents.length ? `<span class="calendar-event-pill personal-event" title="${personalEvents.length} personal schedule">${personalEvents.length > 1 ? personalEvents.length + ' personal' : 'Personal'}</span>` : ''}
                         </div>
                     `;
 
@@ -1457,11 +1499,6 @@
                         state.selectedDateKey = dateKey;
                         renderCalendar();
                         renderSelectedDay();
-                    });
-
-                    cell.querySelector('[data-add-date]')?.addEventListener('click', function (event) {
-                        event.stopPropagation();
-                        openScheduleModal(dateKey);
                     });
 
                     grid.appendChild(cell);
@@ -1483,10 +1520,10 @@
                 scheduleNotes.value = eventData?.notes || '';
                 scheduleEventDate.value = dateKey;
                 scheduleEventDate.min = getTodayKey();
-                scheduleModalTitle.textContent = eventData ? 'Edit Personal Schedule' : 'Add Personal Schedule';
+                scheduleModalTitle.textContent = eventData ? 'Edit Schedule' : 'Add Schedule';
                 scheduleModalSubtitle.textContent = eventData
-                    ? `Update your private schedule block for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`
-                    : `Create a private schedule block for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`;
+                    ? `Update ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`
+                    : `Create a schedule for ${formatLongDate(new Date(`${dateKey}T00:00:00`))}.`;
                 scheduleSubmitBtn.textContent = eventData ? 'Update Schedule' : 'Save Schedule';
                 scheduleDeleteBtn.classList.toggle('show', Boolean(eventData));
                 refreshTimeSelectors(dateKey);
@@ -1510,8 +1547,8 @@
                 scheduleStatus.value = 'planned';
                 scheduleBarangay.value = '';
                 scheduleNotes.value = '';
-                scheduleModalTitle.textContent = 'Add Personal Schedule';
-                scheduleModalSubtitle.textContent = 'Create a private schedule block for the selected day.';
+                scheduleModalTitle.textContent = 'Add Schedule';
+                scheduleModalSubtitle.textContent = 'Create a schedule for the selected day.';
                 scheduleSubmitBtn.textContent = 'Save Schedule';
                 scheduleDeleteBtn.classList.remove('show');
                 state.editingEventId = null;
@@ -1554,7 +1591,7 @@
                     if (closeModalAfter) {
                         closeScheduleModal();
                     }
-                    showScheduleToast('Personal schedule deleted successfully.');
+                    showScheduleToast('Schedule deleted.');
                 } catch (error) {
                     showScheduleToast(error.message || 'Unable to delete personal schedule.', true);
                 }
@@ -1702,7 +1739,7 @@
                     renderCalendar();
                     renderSelectedDay();
                     closeScheduleModal();
-                    showScheduleToast(isEditing ? 'Personal schedule updated successfully.' : 'Personal schedule saved successfully.');
+                    showScheduleToast(isEditing ? 'Schedule updated.' : 'Schedule added.');
                 } catch (error) {
                     showScheduleToast(error.message || 'Unable to save personal schedule.', true);
                 } finally {

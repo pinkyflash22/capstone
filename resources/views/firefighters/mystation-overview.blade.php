@@ -1,22 +1,25 @@
-<section class="section-card">
-    <div class="section-header">
+<section class="section-card station-photos-card" data-station-photo-count="{{ $stationGallery->count() }}">
+    <div class="section-header station-section-header-compact">
         <div>
-            <div class="section-title"><i class="fa-solid fa-images"></i> Station Photos</div>
+            <div class="section-title">
+                <i class="fa-solid fa-image"></i>
+                Station Photos <span class="station-officers-count">&middot; {{ $stationGallery->count() }}</span>
+            </div>
         </div>
     </div>
     <div class="section-body">
         @if($stationGallery->isEmpty())
-            <div class="empty-box">
+            <div class="empty-box station-empty-compact">
                 <i class="fa-solid fa-image"></i>
-                <div>No station photos yet.</div>
+                <div>No station photos added yet.</div>
             </div>
         @else
             <div class="station-gallery-grid">
                 @foreach($stationGallery as $photo)
-                    <div class="station-gallery-item">
+                    <figure class="station-gallery-item">
                         <img src="{{ $photo['url'] }}" alt="Station photo {{ $loop->iteration }}">
-                        <div class="station-gallery-caption">{{ $photo['caption'] ?: 'Station photo #' . $loop->iteration }}</div>
-                    </div>
+                        <figcaption class="station-gallery-caption">{{ $photo['caption'] ?: 'Station photo ' . $loop->iteration }}</figcaption>
+                    </figure>
                 @endforeach
             </div>
         @endif

@@ -17,8 +17,16 @@
     @php
         $stationName = $station?->station_name ?? 'Station not assigned';
         $stationCode = $station?->station_code ?? 'N/A';
-        $stationContact = $station?->contact_number ?? 'No contact number on file';
-        $stationEmail = $station?->email ?? 'No station email on file';
+        $stationContactRaw = $station?->contact_number;
+        $stationContact = $stationContactRaw ?: 'Contact not yet provided';
+        $stationPhoneHref = $stationContactRaw ? preg_replace('/\D+/', '', $stationContactRaw) : null;
+        $stationEmailRaw = $station?->email;
+        $stationEmail = $stationEmailRaw ?: 'Email not yet provided';
+        $stationAddressLabel = $stationAddress ?: 'Address not yet provided';
+        $officerStatus = strtolower($stationOfficer?->status ?? 'available');
+        $stationStatusLabel = $officerStatus === 'available'
+            ? 'On duty'
+            : ucwords(str_replace('-', ' ', $officerStatus));
     @endphp
 
     @include('partials.pwa-head')
@@ -34,48 +42,79 @@
 
         <div data-ff-page-root="station" class="station-shell-page">
             <div class="station-shell">
-                <section class="station-hero">
-                    <div class="station-hero-media">
-                        @if($stationImageUrl)
-                            <img src="{{ $stationImageUrl }}" alt="{{ $stationName }}">
-                        @else
-                            <i class="fa-solid fa-building"></i>
-                        @endif
+                <section class="station-identity-card" aria-labelledby="stationIdentityTitle">
+                    <div class="station-identity-main">
+                        <div class="station-identity-avatar">
+                            @if($stationImageUrl)
+                                <img src="{{ $stationImageUrl }}" alt="{{ $stationName }}">
+                            @else
+                                <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            @endif
+                        </div>
+
+                        <div class="station-identity-copy">
+                            <span class="station-chip"><i class="fa-solid fa-location-dot"></i> Responder Station</span>
+                            <h1 class="station-title" id="stationIdentityTitle">{{ $stationName }}</h1>
+                            <div class="station-identity-meta" aria-label="Station quick details">
+                                {{-- <span><i class="fa-solid fa-hashtag"></i>{{ $stationCode }}</span> --}}
+                                <span><i class="fa-solid fa-location-dot"></i>{{ $stationAddressLabel }}</span>
+                                <span class="status-pill station-duty-pill">{{ $stationStatusLabel }}</span>
+                            </div>
+                            <div class="station-contact-list">
+                                @if($stationPhoneHref)
+                                    <a href="tel:{{ $stationPhoneHref }}"><i class="fa-solid fa-phone"></i>{{ $stationContact }}</a>
+                                @else
+                                    <span><i class="fa-solid fa-phone-slash"></i>{{ $stationContact }}</span>
+                                @endif
+                                @if($stationEmailRaw)
+                                    <a href="mailto:{{ $stationEmail }}"><i class="fa-solid fa-mail"></i>{{ $stationEmail }}</a>
+                                @else
+                                    <span><i class="fa-solid fa-envelope-open"></i>{{ $stationEmail }}</span>
+                                @endif
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="station-hero-content">
-                        <span class="station-chip"><i class="fa-solid fa-fire"></i> Station Details</span>
-                        <div>
-                            <h1 class="station-title">{{ $stationName }}</h1>
-                        </div>
-
-                        <div class="station-hero-grid">
-                            <div class="hero-detail">
-                                <div class="hero-detail-label">Station Code</div>
-                                <div class="hero-detail-value">{{ $stationCode }}</div>
-                            </div>
-                            <div class="hero-detail">
-                                <div class="hero-detail-label">Contact Number</div>
-                                <div class="hero-detail-value">{{ $stationContact }}</div>
-                            </div>
-                            <div class="hero-detail">
-                                <div class="hero-detail-label">Email Address</div>
-                                <div class="hero-detail-value">{{ $stationEmail }}</div>
-                            </div>
-                            <div class="hero-detail">
-                                <div class="hero-detail-label">Station Address</div>
-                                <div class="hero-detail-value">{{ $stationAddress ?: 'No station address on file' }}</div>
-                            </div>
-                        </div>
+                    <div class="station-identity-actions">
+                        <a href="#stationPersonnelSection" class="btn btn-outline"><i class="fa-solid fa-users"></i> Roster</a>
+                        <a href="#stationReportsPanelContainer" class="btn btn-primary"><i class="fa-solid fa-file-lines"></i> Reports</a>
                     </div>
                 </section>
 
-                <div id="stationOverviewSection" class="station-section-shell" data-station-section="overview">
-                    <div class="section-shell-card station-loading-card">
-                        <i class="fa-solid fa-building"></i>
-                        <span>Loading overview...</span>
-                    </div>
-                </div>
+                <section class="station-summary-grid" aria-label="Station operations summary">
+                    <article class="station-summary-card" data-station-summary-card="officers">
+                        <span class="station-summary-icon"><i class="fa-solid fa-user-shield"></i></span>
+                        <div>
+                            <span class="station-summary-label">Officers on Duty</span>
+                            <strong data-station-summary-value="officers">--</strong>
+                            <small data-station-summary-context="officers">Loading roster</small>
+                        </div>
+                    </article>
+                    <article class="station-summary-card" data-station-summary-card="equipment">
+                        <span class="station-summary-icon"><i class="fa-solid fa-toolbox"></i></span>
+                        <div>
+                            <span class="station-summary-label">Ready Equipment</span>
+                            <strong data-station-summary-value="equipment">--</strong>
+                            <small data-station-summary-context="equipment">Loading equipment</small>
+                        </div>
+                    </article>
+                    <article class="station-summary-card" data-station-summary-card="reports">
+                        <span class="station-summary-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                        <div>
+                            <span class="station-summary-label">Investigation Reports</span>
+                            <strong data-station-summary-value="reports">--</strong>
+                            <small data-station-summary-context="reports">Loading current tab</small>
+                        </div>
+                    </article>
+                    <article class="station-summary-card" data-station-summary-card="photos">
+                        <span class="station-summary-icon"><i class="fa-solid fa-image"></i></span>
+                        <div>
+                            <span class="station-summary-label">Station Photos</span>
+                            <strong data-station-summary-value="photos">--</strong>
+                            <small data-station-summary-context="photos">Loading gallery</small>
+                        </div>
+                    </article>
+                </section>
 
                 <div id="stationPersonnelSection" class="station-section-shell" data-station-section="personnel">
                     <div class="section-shell-card station-loading-card">
@@ -116,6 +155,13 @@
                         <span>Loading equipment...</span>
                     </div>
                 </div>
+
+                <div id="stationOverviewSection" class="station-section-shell" data-station-section="overview">
+                    <div class="section-shell-card station-loading-card">
+                        <i class="fa-solid fa-images"></i>
+                        <span>Loading photos...</span>
+                    </div>
+                </div>
             </div>
             <script>
                 window.initFirefighterMyStationPage?.();
@@ -123,16 +169,24 @@
         </div>
     </main>
 
-    <div class="report-modal" id="spotReportModal">
+    <div class="report-modal" id="spotReportModal" role="dialog" aria-modal="true" aria-labelledby="spotReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
             <div class="report-modal-header">
-                <div class="report-modal-title">Create Spot Investigation Report</div>
-                <button type="button" class="report-close" data-close-report-modal="spot"><i class="fa-solid fa-times"></i></button>
+                <div class="report-modal-title" id="spotReportModalTitle">
+                    <span class="report-title-full">Create Spot Investigation Report</span>
+                    <span class="report-title-mobile">New Spot Report</span>
+                </div>
+                <button type="button" class="report-close" data-close-report-modal="spot" aria-label="Close spot report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="spotReportForm">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
-                    <div class="form-grid">
+                    <div class="form-grid" data-report-form-content>
+                        <div class="report-form-hint full">
+                            <strong>Use this for first findings.</strong>
+                            <span>Record the scene, casualties, owner, damage estimate, and initial disposition.</span>
+                            <small>Example notes: fire started at kitchen, 1 injured, estimated damage 50000.</small>
+                        </div>
                         <div class="form-section-label">Incident reference</div>
                         <div class="form-group full">
                             <label class="form-label">Incident</label>
@@ -177,11 +231,11 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Estimated Damage</label>
-                            <input type="number" min="0" step="0.01" name="estimated_damage" class="form-input" required>
+                            <input type="number" min="0" step="0.01" name="estimated_damage" class="form-input" placeholder="Example: 50000" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Estimated Area</label>
-                            <input type="number" min="0" step="0.01" name="estimated_area" class="form-input" required>
+                            <input type="number" min="0" step="0.01" name="estimated_area" class="form-input" placeholder="Example: 30" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Affected Establishments</label>
@@ -261,19 +315,28 @@
         </div>
     </div>
 
-    <div class="report-modal" id="progressReportModal">
+    <div class="report-modal" id="progressReportModal" role="dialog" aria-modal="true" aria-labelledby="progressReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
             <div class="report-modal-header">
-                <div class="report-modal-title">Create Progress Investigation Report</div>
-                <button type="button" class="report-close" data-close-report-modal="progress"><i class="fa-solid fa-times"></i></button>
+                <div class="report-modal-title" id="progressReportModalTitle">
+                    <span class="report-title-full">Create Progress Investigation Report</span>
+                    <span class="report-title-mobile">New Progress Report</span>
+                </div>
+                <button type="button" class="report-close" data-close-report-modal="progress" aria-label="Close progress report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="progressReportForm">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
-                    <div class="form-grid">
+                    <div class="form-grid" data-report-form-content>
+                        <div class="report-form-hint full">
+                            <strong>Use this for follow-up findings.</strong>
+                            <span>Update the likely origin, cause, mission order, and new facts after investigation work continues.</span>
+                            <small>Example notes: electrical origin, witness interview completed, mission order received.</small>
+                        </div>
                         <div class="form-section-label">Source report</div>
                         <div class="form-group full">
-                            <label class="form-label">Spot Investigation Report</label>
+                            <label class="form-label">Source Spot Report</label>
+                            <div class="form-helper">Select the spot report this progress report continues.</div>
                             <select name="spot_investigation_id" class="form-select" data-station-ref="spot-reports" required>
                                 <option value="">Select spot report</option>
                             </select>
@@ -291,7 +354,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Responsible Arson</label>
-                            <input type="text" name="responsible_arson" class="form-input">
+                            <input type="text" name="responsible_arson" class="form-input" placeholder="Name or N/A">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Report Completed</label>
@@ -303,7 +366,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Mission Order Number</label>
-                            <input type="text" name="mission_order_number" class="form-input">
+                            <input type="text" name="mission_order_number" class="form-input" placeholder="Example: MO-2026-001">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Mission Order Date</label>
@@ -312,7 +375,7 @@
                         <div class="form-section-label">Narrative and disposition</div>
                         <div class="form-group full">
                             <label class="form-label">Fire Cause</label>
-                            <textarea name="fire_cause" class="form-textarea" rows="3" required></textarea>
+                            <textarea name="fire_cause" class="form-textarea" rows="3" placeholder="Example: unattended cooking, electrical overload, or still under investigation" required></textarea>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Facts of the Case</label>
@@ -352,19 +415,28 @@
         </div>
     </div>
 
-    <div class="report-modal" id="finalReportModal">
+    <div class="report-modal" id="finalReportModal" role="dialog" aria-modal="true" aria-labelledby="finalReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
             <div class="report-modal-header">
-                <div class="report-modal-title">Create Final Investigation Report</div>
-                <button type="button" class="report-close" data-close-report-modal="final"><i class="fa-solid fa-times"></i></button>
+                <div class="report-modal-title" id="finalReportModalTitle">
+                    <span class="report-title-full">Create Final Investigation Report</span>
+                    <span class="report-title-mobile">New Final Report</span>
+                </div>
+                <button type="button" class="report-close" data-close-report-modal="final" aria-label="Close final report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="finalReportForm">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
-                    <div class="form-grid">
+                    <div class="form-grid" data-report-form-content>
+                        <div class="report-form-hint full">
+                            <strong>Use this for the closing report.</strong>
+                            <span>Summarize verified damage, final cause, supporting documents, findings, and recommendation.</span>
+                            <small>Example outcome: accidental electrical fire, final damage 75000, case closed.</small>
+                        </div>
                         <div class="form-section-label">Source report</div>
                         <div class="form-group full">
-                            <label class="form-label">Progress Investigation Report</label>
+                            <label class="form-label">Source Progress Report</label>
+                            <div class="form-helper">Select the progress report this final report completes.</div>
                             <select name="progress_investigation_id" class="form-select" data-station-ref="progress-reports" required>
                                 <option value="">Select progress report</option>
                             </select>
@@ -372,7 +444,7 @@
                         <div class="form-section-label">Damage and timeline</div>
                         <div class="form-group">
                             <label class="form-label">Total Damage</label>
-                            <input type="number" min="0" step="0.01" name="total_damage" class="form-input" required>
+                            <input type="number" min="0" step="0.01" name="total_damage" class="form-input" placeholder="Example: 75000" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Report Completed</label>
@@ -397,7 +469,7 @@
                         <div class="form-section-label">Location and affected parties</div>
                         <div class="form-group full">
                             <label class="form-label">Establishment Burned</label>
-                            <input type="text" name="establishment_burned" class="form-input">
+                            <input type="text" name="establishment_burned" class="form-input" placeholder="House, store, warehouse, or N/A">
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Fire Victim/s</label>
@@ -462,11 +534,11 @@
         </div>
     </div>
 
-    <div class="report-modal" id="manageReportModal">
+    <div class="report-modal" id="manageReportModal" role="dialog" aria-modal="true" aria-labelledby="manageReportModalTitle">
         <div class="report-modal-panel report-modal-panel--manage">
             <div class="report-modal-header">
                 <div class="report-modal-title" id="manageReportModalTitle">Manage Investigation Report</div>
-                <button type="button" class="report-close" data-close-manage-modal><i class="fa-solid fa-times"></i></button>
+                <button type="button" class="report-close" data-close-manage-modal aria-label="Close report details"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="report-modal-body" id="manageReportModalBody"></div>
             <div class="report-modal-footer" id="manageReportModalFooter"></div>

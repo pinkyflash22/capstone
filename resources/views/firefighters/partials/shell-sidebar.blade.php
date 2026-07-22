@@ -17,7 +17,6 @@
             'items' => [
                 ['type' => 'link', 'label' => 'Announcements', 'icon' => 'fas fa-bullhorn', 'route' => 'firefighter.announcements', 'active' => ['announcements']],
                 ['type' => 'link', 'label' => 'My Schedule', 'icon' => 'fas fa-calendar', 'route' => 'firefighter.schedule', 'active' => ['schedule']],
-                ['type' => 'button', 'label' => 'My Logs', 'icon' => 'fas fa-clock-rotate-left', 'onclick' => 'openMyLogsModal()'],
             ],
         ],
     ];
@@ -729,7 +728,7 @@
 <aside class="sidebar ff-sidebar-shell hidden md:flex" id="{{ $sidebarId }}">
     <div class="sidebar-header-gradient px-6 py-8">
         <div class="ff-shell-brand flex items-center gap-3">
-            <div class="ff-shell-brand-icon w-20 h-14 bg-white rounded-2xl flex items-center justify-center border border-white/60 shadow-sm px-2 py-1">
+            <div class="ff-shell-brand-icon w-14 h-14 bg-white rounded-full flex items-center justify-center border border-white/60 shadow-sm p-2 overflow-hidden">
                 @include('partials.app-logo', ['class' => 'ff-shell-brand-logo w-full h-full object-contain'])
             </div>
             <div class="ff-shell-brand-copy">

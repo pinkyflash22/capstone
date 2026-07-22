@@ -1530,27 +1530,71 @@ public function updateMyProfile(Request $request)
 {
     $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();
 
-    $validated = $request->validate([
+    $validated = $request->validateWithBag('profileUpdate', [
         'first_name' => ['required', 'string', 'max:255'],
         'middle_name' => ['nullable', 'string', 'max:255'],
         'last_name' => ['required', 'string', 'max:255'],
-        'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $user->user_id . ',user_id'],
         'contact_number' => ['required', 'string', 'max:30'],
-        'password' => ['nullable', 'string', 'min:8', 'confirmed'],
     ]);
-
-    if (blank($validated['password'] ?? null)) {
-        unset($validated['password']);
-    }
-
-    unset($validated['password_confirmation']);
 
     $user->update($validated);
     UserActivityLogger::log('updated profile', Auth::user()?->user_id, $request);
 
     return redirect()
         ->route('firefighter.my-profile')
-        ->with('success', 'Profile updated successfully.');
+        ->with('success', 'Profile updated.');
+}
+
+public function updateMyProfileEmail(Request $request)
+{
+    $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();
+
+    $validated = $request->validateWithBag('emailUpdate', [
+        'new_email' => [
+            'required',
+            'email',
+            'max:255',
+            'different:current_email',
+            Rule::unique('users', 'email')->ignore($user->user_id, 'user_id'),
+        ],
+        'current_password' => ['required', 'current_password'],
+    ], [
+        'new_email.different' => 'Please enter a different email address.',
+        'current_password.current_password' => 'The current password is incorrect.',
+    ]);
+
+    $user->update([
+        'email' => strtolower($validated['new_email']),
+    ]);
+
+    UserActivityLogger::log('updated profile email', Auth::user()?->user_id, $request);
+
+    return redirect()
+        ->route('firefighter.my-profile')
+        ->with('success', 'Email address updated.');
+}
+
+public function updateMyProfilePassword(Request $request)
+{
+    $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();
+
+    $validated = $request->validateWithBag('passwordUpdate', [
+        'current_password' => ['required', 'current_password'],
+        'password' => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+    ], [
+        'current_password.current_password' => 'The current password is incorrect.',
+        'password.different' => 'Use a new password that is different from your current password.',
+    ]);
+
+    $user->forceFill([
+        'password' => $validated['password'],
+    ])->save();
+
+    UserActivityLogger::log('updated profile password', Auth::user()?->user_id, $request);
+
+    return redirect()
+        ->route('firefighter.my-profile')
+        ->with('success', 'Password updated successfully.');
 }
     public function getAllLocations()
     {

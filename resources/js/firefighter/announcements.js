@@ -6,6 +6,9 @@ class AnnouncementSystem {
         this.hasMore = true;
         this.selectedImages = [];
         this.selectedVideo = null;
+        this.imagePreviewUrls = [];
+        this.videoPreviewUrl = null;
+        this.isSubmitting = false;
         this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         this.editorPost = null;
         this.activeMediaPostId = null;
@@ -44,6 +47,7 @@ class AnnouncementSystem {
     init() {
         this.loadPosts(true);
         this.initializeEventListeners();
+        this.updateComposerState();
     }
 
     initializeEventListeners() {
@@ -52,14 +56,20 @@ class AnnouncementSystem {
         const postInput = document.getElementById('postContent');
         if (postInput) {
             postInput.addEventListener('input', this.autoResizeTextarea);
+            postInput.addEventListener('input', () => this.updateComposerState());
         }
 
         document.getElementById('imageUpload')?.addEventListener('change', (event) => this.handleImageUpload(event));
         document.getElementById('videoUpload')?.addEventListener('change', (event) => this.handleVideoUpload(event));
         document.getElementById('togglePollBuilder')?.addEventListener('click', () => {
-            document.getElementById('pollBuilder')?.classList.toggle('active');
+            const builder = document.getElementById('pollBuilder');
+            const trigger = document.getElementById('togglePollBuilder');
+            builder?.classList.toggle('active');
+            trigger?.setAttribute('aria-pressed', builder?.classList.contains('active') ? 'true' : 'false');
+            this.updateComposerState();
         });
         document.getElementById('addPollOption')?.addEventListener('click', () => this.addPollOptionField());
+        document.getElementById('pollBuilder')?.addEventListener('input', () => this.updateComposerState());
         document.getElementById('closePostEditor')?.addEventListener('click', () => this.closeEditor());
         document.getElementById('postEditorModal')?.addEventListener('click', (event) => {
             if (event.target.id === 'postEditorModal') {
@@ -73,6 +83,11 @@ class AnnouncementSystem {
         });
 
         document.addEventListener('click', this.documentClickHandler);
+        window.addEventListener('beforeunload', (event) => {
+            if (!this.hasComposerContent()) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
     }
 
     destroy() {
@@ -82,7 +97,10 @@ class AnnouncementSystem {
 
     autoResizeTextarea() {
         this.style.height = 'auto';
-        this.style.height = `${this.scrollHeight}px`;
+        const maxHeight = window.matchMedia('(max-width: 768px)').matches ? 132 : 180;
+        const nextHeight = Math.min(this.scrollHeight, maxHeight);
+        this.style.height = `${nextHeight}px`;
+        this.style.overflowY = this.scrollHeight > maxHeight ? 'auto' : 'hidden';
     }
 
     async loadPosts(reset = false) {
@@ -124,13 +142,24 @@ class AnnouncementSystem {
     }
 
     async createPost() {
-        const content = document.getElementById('postContent')?.value.trim() || '';
-        const pollPayload = this.collectPollPayload();
+        if (this.isSubmitting) return;
 
-        if (!content && this.selectedImages.length === 0 && !this.selectedVideo && !pollPayload) {
-            this.showNotification('Add text, image, video, or poll content first.', 'warning');
+        const content = document.getElementById('postContent')?.value.trim() || '';
+        const pollPayload = this.collectPollPayload({ silent: false });
+
+        if (pollPayload?.__invalid) {
+            this.updateComposerState();
             return;
         }
+
+        if (!content && this.selectedImages.length === 0 && !this.selectedVideo && !pollPayload) {
+            this.setInlineError('Write an announcement or add media.');
+            this.showNotification('Add announcement content first.', 'warning');
+            return;
+        }
+
+        this.setInlineError('');
+        this.isSubmitting = true;
 
         const formData = new FormData();
         formData.append('content', content);
@@ -152,7 +181,7 @@ class AnnouncementSystem {
             submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Posting...';
         }
 
-        this.showNotification('Submitting post...', 'info');
+        this.showNotification('Posting announcement...', 'info');
 
         try {
             const response = await fetch('/firefighter/posts/store', {
@@ -171,16 +200,18 @@ class AnnouncementSystem {
 
             this.posts.unshift(result.data);
             this.renderPosts();
-            this.clearPost();
+            this.clearPost({ force: true });
             this.showNotification('Post published successfully.', 'success');
         } catch (error) {
             console.error('Error creating post:', error);
             this.showNotification(error.message || 'Failed to create post.', 'error');
         } finally {
+            this.isSubmitting = false;
             if (submitButton) {
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalHtml;
             }
+            this.updateComposerState();
         }
     }
 
@@ -235,7 +266,13 @@ class AnnouncementSystem {
         const post = this.posts.find((item) => item.id === postId);
         if (!post) return;
 
-        const confirmed = window.confirm('Delete this post?');
+        const confirmed = await this.confirmAction({
+            eyebrow: 'Delete post',
+            title: 'Delete announcement?',
+            message: 'This post will be removed from the station feed.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+        });
         if (!confirmed) return;
 
         this.showNotification('Deleting post...', 'info');
@@ -329,7 +366,12 @@ class AnnouncementSystem {
     handleImageUpload(event) {
         const files = Array.from(event.target.files || []);
         const validFiles = files.filter((file) => {
+            if (!file.type.startsWith('image/')) {
+                this.setInlineError('Only image files are supported.');
+                return false;
+            }
             if (file.size > 5 * 1024 * 1024) {
+                this.setInlineError(`${file.name} is larger than 5MB.`);
                 this.showNotification(`${file.name} is too large. Max 5MB.`, 'warning');
                 return false;
             }
@@ -338,13 +380,22 @@ class AnnouncementSystem {
 
         this.selectedImages = [...validFiles];
         this.displayImagePreviews();
+        this.setInlineError('');
+        this.updateComposerState();
     }
 
     handleVideoUpload(event) {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        if (!file.type.startsWith('video/')) {
+            this.setInlineError('Only video files are supported.');
+            event.target.value = '';
+            return;
+        }
+
         if (file.size > 50 * 1024 * 1024) {
+            this.setInlineError('Video is larger than 50MB.');
             this.showNotification('Video is too large. Max 50MB.', 'warning');
             event.target.value = '';
             return;
@@ -352,6 +403,8 @@ class AnnouncementSystem {
 
         this.selectedVideo = file;
         this.displayVideoPreview();
+        this.setInlineError('');
+        this.updateComposerState();
     }
 
     addPollOptionField() {
@@ -368,10 +421,14 @@ class AnnouncementSystem {
         `;
 
         container.appendChild(row);
-        row.querySelector('[data-remove-poll-option]')?.addEventListener('click', () => row.remove());
+        row.querySelector('[data-remove-poll-option]')?.addEventListener('click', () => {
+            row.remove();
+            this.updateComposerState();
+        });
+        this.updateComposerState();
     }
 
-    collectPollPayload() {
+    collectPollPayload({ silent = false } = {}) {
         const builder = document.getElementById('pollBuilder');
         if (!builder?.classList.contains('active')) return null;
 
@@ -382,8 +439,20 @@ class AnnouncementSystem {
 
         if (!question && options.length === 0) return null;
         if (!question || options.length < 2) {
-            this.showNotification('Polls need one question and at least two options.', 'warning');
-            return null;
+            if (!silent) {
+                this.setInlineError('Polls need one question and at least two options.');
+                this.showNotification('Complete the poll first.', 'warning');
+            }
+            return { __invalid: true };
+        }
+
+        const uniqueOptions = new Set(options.map((option) => option.toLowerCase()));
+        if (uniqueOptions.size !== options.length) {
+            if (!silent) {
+                this.setInlineError('Poll options cannot be identical.');
+                this.showNotification('Poll options must be unique.', 'warning');
+            }
+            return { __invalid: true };
         }
 
         return { question, options };
@@ -392,23 +461,34 @@ class AnnouncementSystem {
     displayImagePreviews() {
         const previewArea = document.getElementById('imagePreview');
         if (!previewArea) return;
+        this.revokeImagePreviewUrls();
         previewArea.innerHTML = '';
+        previewArea.classList.toggle('has-items', this.selectedImages.length > 0);
+        document.querySelector('[data-attachment-action="image"]')?.classList.toggle('is-active', this.selectedImages.length > 0);
+
+        if (this.selectedImages.length === 0) return;
+
+        const grid = document.createElement('div');
+        grid.className = `image-preview-grid count-${Math.min(this.selectedImages.length, 4)}`;
+        const summary = document.createElement('div');
+        summary.className = 'preview-summary';
+        summary.textContent = `${this.selectedImages.length} photo${this.selectedImages.length === 1 ? '' : 's'} ready`;
+        previewArea.appendChild(summary);
+        previewArea.appendChild(grid);
 
         this.selectedImages.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const previewItem = document.createElement('div');
-                previewItem.className = 'preview-item';
-                previewItem.innerHTML = `
-                    <img src="${event.target.result}" alt="Preview">
-                    <button class="remove-preview" type="button" data-remove-image="${index}">
-                        <i class="fa-solid fa-times"></i>
-                    </button>
-                `;
-                previewArea.appendChild(previewItem);
-                previewItem.querySelector('[data-remove-image]')?.addEventListener('click', () => this.removeImage(index));
-            };
-            reader.readAsDataURL(file);
+            const objectUrl = URL.createObjectURL(file);
+            this.imagePreviewUrls.push(objectUrl);
+            const previewItem = document.createElement('div');
+            previewItem.className = 'preview-item';
+            previewItem.innerHTML = `
+                <img src="${objectUrl}" alt="Selected photo preview">
+                <button class="remove-preview" type="button" data-remove-image="${index}" aria-label="Remove selected photo">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            `;
+            grid.appendChild(previewItem);
+            previewItem.querySelector('[data-remove-image]')?.addEventListener('click', () => this.removeImage(index));
         });
     }
 
@@ -419,16 +499,20 @@ class AnnouncementSystem {
         if (!this.selectedVideo) {
             previewArea.classList.remove('active');
             previewArea.innerHTML = '';
+            document.querySelector('[data-attachment-action="video"]')?.classList.remove('is-active');
             return;
         }
 
+        this.revokeVideoPreviewUrl();
+        this.videoPreviewUrl = URL.createObjectURL(this.selectedVideo);
         previewArea.classList.add('active');
+        document.querySelector('[data-attachment-action="video"]')?.classList.add('is-active');
         previewArea.innerHTML = `
-            <video controls preload="metadata" src="${URL.createObjectURL(this.selectedVideo)}"></video>
-            <div class="post-actions" style="padding-top:12px;">
-                <button class="btn btn-outline" type="button" id="removeVideoPreviewButton">
-                    <i class="fa-regular fa-trash-can"></i>
-                    Remove Video
+            <video controls preload="metadata" src="${this.videoPreviewUrl}"></video>
+            <div class="video-preview-meta">
+                <span>${this.escapeHtml(this.selectedVideo.name)} · ${this.formatBytes(this.selectedVideo.size)}</span>
+                <button class="video-preview-remove" type="button" id="removeVideoPreviewButton">
+                    Remove
                 </button>
             </div>
         `;
@@ -437,6 +521,7 @@ class AnnouncementSystem {
             this.selectedVideo = null;
             document.getElementById('videoUpload').value = '';
             this.displayVideoPreview();
+            this.updateComposerState();
         });
     }
 
@@ -445,12 +530,26 @@ class AnnouncementSystem {
         this.displayImagePreviews();
         const imageUpload = document.getElementById('imageUpload');
         if (imageUpload) imageUpload.value = '';
+        this.updateComposerState();
     }
 
-    clearPost() {
+    async clearPost({ force = false } = {}) {
+        if (!force && this.hasComposerContent()) {
+            const confirmed = await this.confirmAction({
+                eyebrow: 'Discard draft',
+                title: 'Discard announcement?',
+                message: 'Your text and selected media will be removed.',
+                confirmText: 'Discard',
+                cancelText: 'Keep editing',
+            });
+
+            if (!confirmed) return;
+        }
+
         document.getElementById('postContent').value = '';
         document.getElementById('pollQuestion').value = '';
         document.getElementById('pollBuilder')?.classList.remove('active');
+        document.getElementById('togglePollBuilder')?.setAttribute('aria-pressed', 'false');
         document.getElementById('pollOptionsContainer').innerHTML = `
             <div class="poll-option-row">
                 <input class="post-input" data-poll-option maxlength="120" placeholder="Option 2">
@@ -462,10 +561,14 @@ class AnnouncementSystem {
 
         this.selectedImages = [];
         this.selectedVideo = null;
+        this.revokeImagePreviewUrls();
+        this.revokeVideoPreviewUrl();
         document.getElementById('imageUpload').value = '';
         document.getElementById('videoUpload').value = '';
         this.displayImagePreviews();
         this.displayVideoPreview();
+        this.setInlineError('');
+        this.updateComposerState();
     }
 
     renderPosts() {
@@ -505,7 +608,7 @@ class AnnouncementSystem {
         `).join('');
 
         return `
-            <div class="post-card" data-post-id="${post.id}">
+            <article class="post-card" data-post-id="${post.id}">
                 <div class="post-header">
                     <div class="post-header-main">
                         <div class="post-author-avatar">${this.escapeHtml(authorAvatar)}</div>
@@ -571,17 +674,23 @@ class AnnouncementSystem {
                     </div>
                     <div class="comments-list">${commentsHtml}</div>
                 </div>
-            </div>
+            </article>
         `;
     }
 
     renderImages(postId, imageUrls) {
         if (!imageUrls || imageUrls.length === 0) return '';
-        const items = imageUrls.map((url) => {
+        const visibleUrls = imageUrls.slice(0, 4);
+        const hiddenCount = Math.max(imageUrls.length - visibleUrls.length, 0);
+        const items = visibleUrls.map((url, index) => {
             const normalizedUrl = this.normalizeMediaUrl(url);
-            return `<img src="${normalizedUrl}" alt="Post image" loading="lazy" data-open-media-post="${postId}" data-media-type="image" data-media-src="${normalizedUrl}" onerror="this.style.display='none'; this.closest('.post-media')?.classList.add('media-error');">`;
+            const image = `<img src="${normalizedUrl}" alt="Announcement photo" loading="lazy" data-open-media-post="${postId}" data-media-type="image" data-media-src="${normalizedUrl}" onerror="this.style.display='none'; this.closest('.post-media')?.classList.add('media-error');">`;
+            if (hiddenCount > 0 && index === visibleUrls.length - 1) {
+                return `<span class="post-media-more" data-more-label="+${hiddenCount}">${image}</span>`;
+            }
+            return image;
         }).join('');
-        return `<div class="post-media">${items}</div>`;
+        return `<div class="post-media post-media--count-${Math.min(imageUrls.length, 4)}">${items}</div>`;
     }
 
     openMediaDrawer(postId, mediaType, mediaSrc) {
@@ -729,7 +838,7 @@ class AnnouncementSystem {
                     <input type="file" id="editorImageUpload" name="images[]" accept="image/*" multiple hidden>
                 </label>
                 <label class="attachment-btn video" for="editorVideoUpload">
-                    <i class="fa-regular fa-video"></i>
+                    <i class="fa-solid fa-video"></i>
                     Replace Video
                     <input type="file" id="editorVideoUpload" name="video" accept="video/*" hidden>
                 </label>
@@ -816,12 +925,8 @@ class AnnouncementSystem {
                 <div class="empty-state-icon">
                     <i class="fa-regular fa-message"></i>
                 </div>
-                <h3>No Announcements Yet</h3>
-                <p>Be the first to post a station update.</p>
-                <button onclick="document.getElementById('postContent').focus()">
-                    <i class="fa-regular fa-pen-to-square"></i>
-                    Create First Announcement
-                </button>
+                <h3>No announcements yet</h3>
+                <p>Station updates will appear here.</p>
             </div>
         `;
     }
@@ -846,33 +951,181 @@ class AnnouncementSystem {
         }
     }
 
+    confirmAction({
+        eyebrow = 'Confirm action',
+        title = 'Are you sure?',
+        message = 'Please confirm to continue.',
+        confirmText = 'Confirm',
+        cancelText = 'Cancel',
+    } = {}) {
+        const dialog = document.getElementById('announcementConfirm');
+        const titleEl = document.getElementById('announcementConfirmTitle');
+        const messageEl = document.getElementById('announcementConfirmMessage');
+        const eyebrowEl = document.getElementById('announcementConfirmEyebrow');
+        const confirmButton = dialog?.querySelector('[data-announcement-confirm-ok]');
+        const cancelButton = dialog?.querySelector('[data-announcement-confirm-cancel]');
+
+        if (!dialog || !titleEl || !messageEl || !confirmButton || !cancelButton) {
+            return Promise.resolve(false);
+        }
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        if (eyebrowEl) eyebrowEl.textContent = eyebrow;
+        confirmButton.textContent = confirmText;
+        cancelButton.textContent = cancelText;
+
+        return new Promise((resolve) => {
+            const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+            const close = (value) => {
+                dialog.hidden = true;
+                dialog.setAttribute('aria-hidden', 'true');
+                confirmButton.removeEventListener('click', onConfirm);
+                cancelButton.removeEventListener('click', onCancel);
+                dialog.removeEventListener('click', onBackdrop);
+                document.removeEventListener('keydown', onKeydown);
+                previousFocus?.focus?.({ preventScroll: true });
+                resolve(value);
+            };
+
+            const onConfirm = () => close(true);
+            const onCancel = () => close(false);
+            const onBackdrop = (event) => {
+                if (event.target === dialog) close(false);
+            };
+            const onKeydown = (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    close(false);
+                }
+            };
+
+            confirmButton.addEventListener('click', onConfirm);
+            cancelButton.addEventListener('click', onCancel);
+            dialog.addEventListener('click', onBackdrop);
+            document.addEventListener('keydown', onKeydown);
+
+            dialog.hidden = false;
+            dialog.setAttribute('aria-hidden', 'false');
+            cancelButton.focus({ preventScroll: true });
+        });
+    }
+
     showNotification(message, type = 'info') {
+        const stack = this.getToastStack();
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-
-        const colors = {
-            success: '#15803d',
-            warning: '#d97706',
-            error: '#dc2626',
-            info: '#1d4ed8',
-        };
-
-        notification.innerHTML = `<span>${this.escapeHtml(message)}</span>`;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${colors[type] || colors.info};
-            color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
-            box-shadow: 0 12px 24px rgba(15,23,42,0.18);
-            z-index: 9999;
-            font-weight: 700;
+        notification.className = `announcement-toast announcement-toast--${type}`;
+        notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        notification.innerHTML = `
+            <i class="${this.getNotificationIcon(type)} announcement-toast__icon" aria-hidden="true"></i>
+            <span>${this.escapeHtml(message)}</span>
+            <button class="announcement-toast__close" type="button" aria-label="Close notification">
+                <i class="fa-solid fa-times"></i>
+            </button>
         `;
 
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 2600);
+        stack.appendChild(notification);
+        notification.querySelector('.announcement-toast__close')?.addEventListener('click', () => notification.remove());
+
+        const timeout = type === 'error' ? 5200 : 3200;
+        setTimeout(() => notification.remove(), timeout);
+    }
+
+    updateComposerState() {
+        const submitButton = document.getElementById('submitAnnouncementButton');
+        const clearButton = document.getElementById('composerClearButton');
+        const pollButton = document.getElementById('togglePollBuilder');
+        const pollBuilder = document.getElementById('pollBuilder');
+        const hasContent = this.hasComposerContent();
+        const hasText = Boolean(document.getElementById('postContent')?.value.trim());
+        const pollState = this.getPollState();
+        const canSubmit = hasText || this.selectedImages.length > 0 || Boolean(this.selectedVideo) || pollState.valid;
+
+        if (submitButton) {
+            submitButton.disabled = this.isSubmitting || !canSubmit;
+            submitButton.setAttribute('aria-disabled', submitButton.disabled ? 'true' : 'false');
+        }
+
+        if (clearButton) {
+            clearButton.hidden = !hasContent;
+        }
+
+        pollButton?.classList.toggle('is-active', Boolean(pollBuilder?.classList.contains('active') && (pollState.hasAnyInput || pollState.valid)));
+    }
+
+    hasComposerContent() {
+        const hasText = Boolean(document.getElementById('postContent')?.value.trim());
+        const hasQuestion = Boolean(document.getElementById('pollQuestion')?.value.trim());
+        const hasOption = Array.from(document.querySelectorAll('[data-poll-option]')).some((input) => input.value.trim());
+        return hasText || hasQuestion || hasOption || this.selectedImages.length > 0 || Boolean(this.selectedVideo);
+    }
+
+    getPollState() {
+        const builder = document.getElementById('pollBuilder');
+        if (!builder?.classList.contains('active')) {
+            return { valid: false, hasAnyInput: false };
+        }
+
+        const question = document.getElementById('pollQuestion')?.value.trim();
+        const options = Array.from(document.querySelectorAll('[data-poll-option]'))
+            .map((input) => input.value.trim())
+            .filter(Boolean);
+        const uniqueOptions = new Set(options.map((option) => option.toLowerCase()));
+
+        return {
+            valid: Boolean(question && options.length >= 2 && uniqueOptions.size === options.length),
+            hasAnyInput: Boolean(question || options.length),
+        };
+    }
+
+    setInlineError(message = '') {
+        const error = document.getElementById('composerInlineError');
+        const text = error?.querySelector('span');
+        if (!error || !text) return;
+        text.textContent = message;
+        error.hidden = !message;
+    }
+
+    revokeImagePreviewUrls() {
+        this.imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+        this.imagePreviewUrls = [];
+    }
+
+    revokeVideoPreviewUrl() {
+        if (this.videoPreviewUrl) {
+            URL.revokeObjectURL(this.videoPreviewUrl);
+            this.videoPreviewUrl = null;
+        }
+    }
+
+    formatBytes(bytes = 0) {
+        if (!bytes) return '0 KB';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    getToastStack() {
+        let stack = document.getElementById('announcementToastStack');
+        if (!stack) {
+            stack = document.createElement('div');
+            stack.id = 'announcementToastStack';
+            stack.className = 'announcement-toast-stack';
+            stack.setAttribute('aria-live', 'polite');
+            document.body.appendChild(stack);
+        }
+        return stack;
+    }
+
+    getNotificationIcon(type) {
+        const icons = {
+            success: 'fa-solid fa-circle-check',
+            warning: 'fa-solid fa-triangle-exclamation',
+            error: 'fa-solid fa-circle-exclamation',
+            info: 'fa-solid fa-circle-info',
+        };
+        return icons[type] || icons.info;
     }
 
     getTimeAgo(date) {

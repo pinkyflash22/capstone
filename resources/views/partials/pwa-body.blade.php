@@ -357,7 +357,11 @@
         const pillIcon = document.getElementById('pyrosenseConnectionPillIcon');
         const pillTitle = document.getElementById('pyrosenseConnectionPillTitle');
         const pillText = document.getElementById('pyrosenseConnectionPillText');
-        const nativeFetch = window.fetch.bind(window);
+        if (!window.__pyroNativeFetch) {
+            window.__pyroNativeFetch = window.fetch.bind(window);
+        }
+
+        const nativeFetch = window.__pyroNativeFetch;
         let sessionExpiredPromptOpen = false;
         let sessionExpiredDetected = false;
 
@@ -439,6 +443,7 @@
             window.fetch = function (input, init) {
                 return pyroFetch(input, init);
             };
+            window.fetch.__pyroWrapped = true;
             window.__pyroFetchWrapped = true;
         }
 

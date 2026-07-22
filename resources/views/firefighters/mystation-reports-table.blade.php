@@ -38,7 +38,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-box">
-                                <i class="fa-solid fa-file-circle-xmark"></i>
+                                <i class="fa-solid fa-box-open"></i>
                                 <div>No progress reports yet.</div>
                             </div>
                         </td>
@@ -82,7 +82,7 @@
                     <tr>
                         <td colspan="5">
                             <div class="empty-box">
-                                <i class="fa-solid fa-file-circle-xmark"></i>
+                                <i class="fa-solid fa-box-open"></i>
                                 <div>No final reports yet.</div>
                             </div>
                         </td>
@@ -131,7 +131,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-box">
-                                <i class="fa-solid fa-file-circle-xmark"></i>
+                                <i class="fa-solid fa-box-open"></i>
                                 <div>No spot reports yet.</div>
                             </div>
                         </td>

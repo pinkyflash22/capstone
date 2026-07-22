@@ -30,7 +30,7 @@
         .ff2-shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); min-height: 100vh; }
         .ff2-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: 1px solid rgba(226,232,240,.72); background: radial-gradient(circle at top right, rgba(219,146,24,.24) 0, rgba(219,146,24,.24) 90px, transparent 90px), radial-gradient(circle at left 88px, rgba(201,75,42,.18) 0, rgba(201,75,42,.18) 110px, transparent 110px), linear-gradient(180deg, #ffffff 0%, #fff8f2 28%, #ffffff 100%); padding: 28px 22px 24px; }
         .ff2-brand { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 28px; background: linear-gradient(135deg, #ffffff 0%, #fff5ed 100%); border: 1px solid rgba(201,75,42,.12); box-shadow: 0 14px 32px rgba(201,75,42,.08); }
-        .ff2-brand-mark { width: 58px; height: 58px; border-radius: 20px; display: grid; place-items: center; background: linear-gradient(135deg, #c94b2a 0%, #db9218 100%); color: #fff; font-size: 1.45rem; box-shadow: 0 18px 28px rgba(201,75,42,.24); }
+        .ff2-brand-mark { width: 58px; height: 58px; border-radius: 999px; display: grid; place-items: center; background: linear-gradient(135deg, #c94b2a 0%, #db9218 100%); color: #fff; font-size: 1.45rem; box-shadow: 0 18px 28px rgba(201,75,42,.24); }
         .ff2-brand-copy strong { display: block; font-size: 1.28rem; line-height: 1.1; letter-spacing: -.02em; }
         .ff2-brand-copy span { display: block; margin-top: 4px; color: var(--ff2-copy); font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; }
         .ff2-nav-group { margin-top: 28px; }

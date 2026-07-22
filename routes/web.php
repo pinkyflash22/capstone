@@ -444,6 +444,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/training', [FirefighterController::class, 'training'])->name('training');
         Route::get('/my-profile', [FirefighterController::class, 'myProfile'])->name('my-profile');
         Route::put('/my-profile', [FirefighterController::class, 'updateMyProfile'])->name('my-profile.update');
+        Route::put('/my-profile/email', [FirefighterController::class, 'updateMyProfileEmail'])->name('my-profile.email.update');
+        Route::put('/my-profile/password', [FirefighterController::class, 'updateMyProfilePassword'])->name('my-profile.password.update');
 
 
         Route::get('/assigned/{id}',[FirefighterController::class, 'getAssignedIncidents'])->name('assigned');

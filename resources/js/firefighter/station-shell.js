@@ -108,6 +108,310 @@ function bootFirefighterMyStationPage() {
         window.setTimeout(() => toast.remove(), timeout);
     }
 
+    const mobilePickerMedia = window.matchMedia('(max-width: 767px)');
+    let activeReportPicker = null;
+    const mobilePickerListeners = [];
+
+    function isMobileReportPicker() {
+        return mobilePickerMedia.matches;
+    }
+
+    function getControlLabel(control) {
+        return control?.closest('.form-group')?.querySelector('.form-label')?.textContent?.trim()
+            || control?.getAttribute('aria-label')
+            || 'Choose value';
+    }
+
+    function ensurePickerId(control) {
+        if (!control.id) {
+            control.id = `report-control-${Math.random().toString(36).slice(2, 9)}`;
+        }
+        return control.id;
+    }
+
+    function emitControlChange(control) {
+        control.dispatchEvent(new Event('input', { bubbles: true }));
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function closeReportPicker() {
+        activeReportPicker?.remove();
+        activeReportPicker = null;
+        document.body.classList.remove('report-picker-open');
+    }
+
+    function buildPickerShell(title, subtitle = '') {
+        closeReportPicker();
+
+        const sheet = document.createElement('div');
+        sheet.className = 'report-control-picker';
+        sheet.setAttribute('role', 'dialog');
+        sheet.setAttribute('aria-modal', 'true');
+        sheet.innerHTML = `
+            <div class="report-control-picker__scrim" data-close-report-picker></div>
+            <div class="report-control-picker__sheet">
+                <div class="report-control-picker__handle"></div>
+                <div class="report-control-picker__header">
+                    <div>
+                        <div class="report-control-picker__title">${escapeHtml(title)}</div>
+                        ${subtitle ? `<div class="report-control-picker__subtitle">${escapeHtml(subtitle)}</div>` : ''}
+                    </div>
+                    <button type="button" class="report-control-picker__close" data-close-report-picker aria-label="Close picker">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="report-control-picker__body"></div>
+            </div>
+        `;
+
+        sheet.addEventListener('click', (event) => {
+            if (event.target.closest('[data-close-report-picker]')) {
+                closeReportPicker();
+            }
+        });
+
+        document.body.appendChild(sheet);
+        document.body.classList.add('report-picker-open');
+        activeReportPicker = sheet;
+        return sheet.querySelector('.report-control-picker__body');
+    }
+
+    function openMobileSelectPicker(select) {
+        if (!select || select.disabled) return;
+
+        const targetId = ensurePickerId(select);
+        const body = buildPickerShell(getControlLabel(select), 'Tap one option to apply.');
+        const options = Array.from(select.options || []);
+        activeReportPicker.dataset.targetId = targetId;
+
+        const list = document.createElement('div');
+        list.className = 'report-select-sheet-list';
+        list.innerHTML = options.map((option, index) => {
+            const isSelected = option.selected || String(option.value) === String(select.value);
+            const isPlaceholder = !option.value;
+            return `
+                <button
+                    type="button"
+                    class="report-select-option ${isSelected ? 'is-selected' : ''} ${isPlaceholder ? 'is-placeholder' : ''}"
+                    data-report-select-index="${index}"
+                    ${option.disabled ? 'disabled' : ''}
+                >
+                    <span>${escapeHtml(option.textContent.trim() || 'Choose option')}</span>
+                    ${isSelected ? '<i class="fa-solid fa-check"></i>' : ''}
+                </button>
+            `;
+        }).join('');
+
+        list.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-report-select-index]');
+            if (!button || button.disabled) return;
+            const option = options[Number(button.dataset.reportSelectIndex)];
+            if (!option) return;
+            select.value = option.value;
+            emitControlChange(select);
+            closeReportPicker();
+        });
+
+        body.appendChild(list);
+    }
+
+    function padNumber(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function parseReportDateValue(value, includeTime) {
+        if (value) {
+            const parsed = includeTime ? new Date(value) : new Date(`${value}T12:00:00`);
+            if (!Number.isNaN(parsed.getTime())) {
+                return parsed;
+            }
+        }
+        const now = new Date();
+        now.setSeconds(0, 0);
+        return now;
+    }
+
+    function formatReportDateValue(date, includeTime) {
+        const datePart = `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`;
+        if (!includeTime) return datePart;
+        return `${datePart}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}`;
+    }
+
+    function formatPickerPreview(date, includeTime) {
+        const options = {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            ...(includeTime ? { hour: 'numeric', minute: '2-digit' } : {}),
+        };
+        return date.toLocaleString(undefined, options);
+    }
+
+    function openMobileDatePicker(input) {
+        if (!input || input.disabled || input.readOnly) return;
+
+        const includeTime = input.type === 'datetime-local';
+        const targetId = ensurePickerId(input);
+        const state = {
+            selected: parseReportDateValue(input.value, includeTime),
+            viewYear: parseReportDateValue(input.value, includeTime).getFullYear(),
+            viewMonth: parseReportDateValue(input.value, includeTime).getMonth(),
+        };
+
+        const body = buildPickerShell(getControlLabel(input), includeTime ? 'Choose date and time.' : 'Choose date.');
+        activeReportPicker.dataset.targetId = targetId;
+
+        function setSelected(date) {
+            state.selected = new Date(date);
+            state.selected.setSeconds(0, 0);
+            state.viewYear = state.selected.getFullYear();
+            state.viewMonth = state.selected.getMonth();
+            render();
+        }
+
+        function shiftTime(minutes) {
+            const next = new Date(state.selected);
+            next.setMinutes(next.getMinutes() + minutes);
+            setSelected(next);
+        }
+
+        function render() {
+            const firstOfMonth = new Date(state.viewYear, state.viewMonth, 1);
+            const firstGridDate = new Date(state.viewYear, state.viewMonth, 1 - firstOfMonth.getDay());
+            const today = new Date();
+            const monthLabel = firstOfMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+            const days = Array.from({ length: 42 }, (_, index) => {
+                const day = new Date(firstGridDate);
+                day.setDate(firstGridDate.getDate() + index);
+                const sameMonth = day.getMonth() === state.viewMonth;
+                const selected = day.toDateString() === state.selected.toDateString();
+                const isToday = day.toDateString() === today.toDateString();
+                return `
+                    <button
+                        type="button"
+                        class="report-date-day ${sameMonth ? '' : 'is-muted'} ${selected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''}"
+                        data-report-date="${formatReportDateValue(day, false)}"
+                    >
+                        ${day.getDate()}
+                    </button>
+                `;
+            }).join('');
+
+            body.innerHTML = `
+                <div class="report-date-preview">${escapeHtml(formatPickerPreview(state.selected, includeTime))}</div>
+                <div class="report-date-header">
+                    <button type="button" data-report-month="-1" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
+                    <strong>${escapeHtml(monthLabel)}</strong>
+                    <button type="button" data-report-month="1" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+                <div class="report-date-weekdays">
+                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                </div>
+                <div class="report-date-grid">${days}</div>
+                ${includeTime ? `
+                    <div class="report-time-row">
+                        <div class="report-time-display">${padNumber(state.selected.getHours())}:${padNumber(state.selected.getMinutes())}</div>
+                        <button type="button" data-report-time="-60"><i class="fa-solid fa-minus"></i> Hour</button>
+                        <button type="button" data-report-time="60">Hour <i class="fa-solid fa-plus"></i></button>
+                        <button type="button" data-report-time="-5"><i class="fa-solid fa-minus"></i> 5m</button>
+                        <button type="button" data-report-time="5">5m <i class="fa-solid fa-plus"></i></button>
+                    </div>
+                ` : ''}
+                <div class="report-picker-actions">
+                    <button type="button" class="btn btn-outline" data-report-date-clear>Clear</button>
+                    <button type="button" class="btn btn-outline" data-report-date-today>Today</button>
+                    <button type="button" class="btn btn-primary" data-report-date-apply>Apply</button>
+                </div>
+            `;
+        }
+
+        body.addEventListener('click', (event) => {
+            const monthButton = event.target.closest('[data-report-month]');
+            if (monthButton) {
+                state.viewMonth += Number(monthButton.dataset.reportMonth);
+                if (state.viewMonth < 0) {
+                    state.viewMonth = 11;
+                    state.viewYear -= 1;
+                }
+                if (state.viewMonth > 11) {
+                    state.viewMonth = 0;
+                    state.viewYear += 1;
+                }
+                render();
+                return;
+            }
+
+            const dayButton = event.target.closest('[data-report-date]');
+            if (dayButton) {
+                const [year, month, day] = dayButton.dataset.reportDate.split('-').map(Number);
+                const next = new Date(state.selected);
+                next.setFullYear(year, month - 1, day);
+                setSelected(next);
+                return;
+            }
+
+            const timeButton = event.target.closest('[data-report-time]');
+            if (timeButton) {
+                shiftTime(Number(timeButton.dataset.reportTime));
+                return;
+            }
+
+            if (event.target.closest('[data-report-date-clear]')) {
+                input.value = '';
+                emitControlChange(input);
+                closeReportPicker();
+                return;
+            }
+
+            if (event.target.closest('[data-report-date-today]')) {
+                setSelected(new Date());
+                return;
+            }
+
+            if (event.target.closest('[data-report-date-apply]')) {
+                input.value = formatReportDateValue(state.selected, includeTime);
+                emitControlChange(input);
+                closeReportPicker();
+            }
+        });
+
+        render();
+    }
+
+    function bindMobileReportPickers() {
+        if (mobilePickerListeners.length) return;
+
+        const interceptPickerControl = (event) => {
+            if (!isMobileReportPicker()) return;
+            if (event.target.closest('.report-control-picker')) return;
+
+            const control = event.target.closest('.report-modal.active select.form-select, .report-modal.active input[type="date"].form-input, .report-modal.active input[type="datetime-local"].form-input');
+            if (!control) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            control.blur();
+
+            if (control.matches('select')) {
+                openMobileSelectPicker(control);
+                return;
+            }
+
+            openMobileDatePicker(control);
+        };
+
+        ['pointerdown', 'mousedown', 'click', 'focusin'].forEach((eventName) => {
+            document.addEventListener(eventName, interceptPickerControl, true);
+            mobilePickerListeners.push([eventName, interceptPickerControl]);
+        });
+    }
+
+    function unbindMobileReportPickers() {
+        mobilePickerListeners.splice(0).forEach(([eventName, handler]) => {
+            document.removeEventListener(eventName, handler, true);
+        });
+    }
+
     function buildLoadingCard(message) {
         return `
             <div class="section-shell-card station-loading-card">
@@ -117,7 +421,35 @@ function bootFirefighterMyStationPage() {
         `;
     }
 
-    function setModalLoading(type, message = 'Loading report form...') {
+    function updateModalOpenState() {
+        const hasOpenModal = Boolean(document.querySelector('.report-modal.active'));
+        document.body.classList.toggle('modal-open', hasOpenModal);
+        document.body.classList.toggle('report-modal-open', hasOpenModal);
+    }
+
+    function setReportModalState(modal, state) {
+        if (!modal) return;
+        modal.dataset.reportState = state;
+    }
+
+    function resetReportModalScroll(modal) {
+        if (!modal) return;
+
+        window.requestAnimationFrame(() => {
+            const panel = modal.querySelector('.report-modal-panel');
+            const body = modal.querySelector('.report-modal-body');
+
+            if (panel) {
+                panel.scrollTop = 0;
+            }
+
+            if (body) {
+                body.scrollTop = 0;
+            }
+        });
+    }
+
+    function setModalLoading(type, message = 'Preparing report form...') {
         const modal = document.getElementById(`${type}ReportModal`);
         const body = modal?.querySelector('.report-modal-body');
         if (!body) return null;
@@ -140,6 +472,7 @@ function bootFirefighterMyStationPage() {
 
     function setFormControlsDisabled(form, disabled) {
         form?.querySelectorAll('input, select, textarea, button').forEach((control) => {
+            if (control.matches('[data-close-report-modal]')) return;
             control.disabled = disabled;
         });
     }
@@ -191,11 +524,56 @@ function bootFirefighterMyStationPage() {
         });
     }
 
+    function setSummaryMetric(key, value, context = '') {
+        const valueElement = root.querySelector(`[data-station-summary-value="${key}"]`);
+        const contextElement = root.querySelector(`[data-station-summary-context="${key}"]`);
+
+        if (valueElement) {
+            valueElement.textContent = String(value ?? '--');
+        }
+
+        if (contextElement && context) {
+            contextElement.textContent = context;
+        }
+    }
+
+    function syncOverviewSummary() {
+        const photoCard = overviewSection?.querySelector('[data-station-photo-count]');
+        if (!photoCard) return;
+
+        const photoCount = Number(photoCard.dataset.stationPhotoCount || 0);
+        setSummaryMetric('photos', photoCount, photoCount === 1 ? '1 photo available' : `${photoCount} photos available`);
+    }
+
+    function syncPersonnelSummary() {
+        const roster = personnelSection?.querySelector('[data-station-officers-roster]');
+        if (!roster) return;
+
+        const available = Number(roster.dataset.officersAvailable || 0);
+        const total = Number(roster.dataset.officersTotal || 0);
+        setSummaryMetric('officers', available, `${total} rostered officers`);
+    }
+
+    function syncEquipmentSummary() {
+        const equipmentSummary = equipmentSection?.querySelector('[data-equipment-summary]');
+        if (!equipmentSummary) return;
+
+        const ready = Number(equipmentSummary.dataset.equipmentReady || 0);
+        const lines = Number(equipmentSummary.dataset.equipmentLines || 0);
+        setSummaryMetric('equipment', ready, `${lines} equipment records`);
+    }
+
+    function syncReportsSummary(tab = currentReportTab) {
+        const loadedCount = Object.keys(reportStore[tab] || {}).length;
+        setSummaryMetric('reports', loadedCount, `${tab} reports loaded`);
+    }
+
     async function loadOverview(force = false) {
         try {
             const query = force ? `${routes.overview}?refresh=1` : routes.overview;
             const result = await fetchStationSection('overview', query);
             overviewSection.innerHTML = result?.data?.html || '';
+            syncOverviewSummary();
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station overview failed:', error);
@@ -208,6 +586,7 @@ function bootFirefighterMyStationPage() {
             const query = force ? `${routes.personnel}?refresh=1` : routes.personnel;
             const result = await fetchStationSection('personnel', query);
             personnelSection.innerHTML = result?.data?.html || '';
+            syncPersonnelSummary();
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station personnel failed:', error);
@@ -220,6 +599,7 @@ function bootFirefighterMyStationPage() {
             const query = force ? `${routes.equipment}?refresh=1` : routes.equipment;
             const result = await fetchStationSection('equipment', query);
             equipmentSection.innerHTML = result?.data?.html || '';
+            syncEquipmentSummary();
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station equipment failed:', error);
@@ -246,6 +626,7 @@ function bootFirefighterMyStationPage() {
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.set('report_tab', tab);
             window.history.replaceState(window.history.state || {}, '', currentUrl);
+            syncReportsSummary(tab);
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station reports failed:', error);
@@ -337,47 +718,62 @@ function bootFirefighterMyStationPage() {
         const form = type === 'spot' ? spotForm : type === 'progress' ? progressForm : finalForm;
 
         modal?.classList.add('active');
+        setReportModalState(modal, 'loading');
+        updateModalOpenState();
+        resetReportModalScroll(modal);
         clearModalLoading(type);
         modal?.querySelectorAll('.station-section-error').forEach((errorBox) => errorBox.remove());
         const loading = setModalLoading(type);
+        resetReportModalScroll(modal);
         setFormControlsDisabled(form, true);
 
         try {
             if (type === 'spot') populateSpotModal(await ensureModalData('spot'));
             if (type === 'progress') populateProgressModal(await ensureModalData('progress'));
             if (type === 'final') populateFinalModal(await ensureModalData('final'));
+            setReportModalState(modal, 'ready');
+            resetReportModalScroll(modal);
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error(`Unable to open ${type} modal:`, error);
+            setReportModalState(modal, 'error');
             loading?.remove();
             const body = modal?.querySelector('.report-modal-body');
             body?.prepend(Object.assign(document.createElement('div'), {
                 className: 'station-section-error',
-                innerHTML: `<div>Unable to load ${escapeHtml(type)} report choices right now. You can close this and try again.</div>`,
+                innerHTML: `<div>We couldn't load the report form.</div><button type="button" class="btn btn-primary" data-open-report-modal="${escapeHtml(type)}">Try again</button>`,
             }));
             showToast(`Unable to load ${type} report choices right now.`, 'error');
+            resetReportModalScroll(modal);
         } finally {
             clearModalLoading(type);
-            setFormControlsDisabled(form, false);
+            if (modal?.dataset.reportState === 'ready') {
+                setFormControlsDisabled(form, false);
+            }
         }
     }
 
     function closeReportModal(type) {
         const modal = document.getElementById(`${type}ReportModal`);
         modal?.classList.remove('active');
+        setReportModalState(modal, 'idle');
         clearModalLoading(type);
         modal?.querySelector('.station-section-error')?.remove();
+        updateModalOpenState();
     }
 
     function openManageModal(title) {
         manageReportModalTitle.textContent = title;
         manageReportModal.classList.add('active');
+        updateModalOpenState();
+        resetReportModalScroll(manageReportModal);
     }
 
     function closeManageModal() {
         manageReportModal.classList.remove('active');
         manageReportModalBody.innerHTML = '';
         manageReportModalFooter.innerHTML = '';
+        updateModalOpenState();
     }
 
     function switchReportTab(type) {
@@ -689,6 +1085,7 @@ function bootFirefighterMyStationPage() {
                 ? `<a class="btn btn-outline" href="${buildPirRoute(report.id)}">Download Word</a>`
                 : `<a class="btn btn-outline" href="${buildFirRoute(report.id)}">Download Word</a>`;
         manageReportModalFooter.innerHTML = `${downloadButton}<button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>`;
+        resetReportModalScroll(manageReportModal);
     }
 
     async function openEditModal(type, report) {
@@ -706,6 +1103,7 @@ function bootFirefighterMyStationPage() {
             <button type="button" class="btn btn-outline" data-close-manage-modal>Cancel</button>
             <button type="button" class="btn btn-primary" id="saveManagedReportButton"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
         `;
+        resetReportModalScroll(manageReportModal);
 
         document.getElementById('saveManagedReportButton')?.addEventListener('click', () => saveManagedReport(type, report.id));
     }
@@ -812,6 +1210,7 @@ function bootFirefighterMyStationPage() {
             <button type="button" class="btn btn-outline" data-close-manage-modal>Cancel</button>
             <button type="button" class="btn btn-danger" id="confirmDeleteReportButton"><i class="fa-solid fa-trash"></i> Delete Report</button>
         `;
+        resetReportModalScroll(manageReportModal);
 
         document.getElementById('confirmDeleteReportButton')?.addEventListener('click', async () => {
             try {
@@ -841,9 +1240,11 @@ function bootFirefighterMyStationPage() {
 
     async function submitReportForm(form, endpoint, mapSuccessData, handleSuccess) {
         const submitButton = form.querySelector('button[type="submit"]');
+        const modal = form.closest('.report-modal');
         const originalHtml = submitButton.innerHTML;
+        setReportModalState(modal, 'submitting');
         submitButton.disabled = true;
-        submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+        submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating report...';
 
         try {
             const formData = new FormData(form);
@@ -871,6 +1272,7 @@ function bootFirefighterMyStationPage() {
             showToast(error.message || 'Failed to submit report.', 'error');
             return null;
         } finally {
+            setReportModalState(modal, 'ready');
             submitButton.disabled = false;
             submitButton.innerHTML = originalHtml;
         }
@@ -1182,7 +1584,12 @@ function bootFirefighterMyStationPage() {
     document.querySelectorAll('.report-modal').forEach((modal) => {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) {
-                modal.classList.remove('active');
+                const modalType = modal.id.replace('ReportModal', '');
+                if (modal.id === 'manageReportModal') {
+                    closeManageModal();
+                    return;
+                }
+                closeReportModal(modalType);
             }
         });
     });
@@ -1192,6 +1599,7 @@ function bootFirefighterMyStationPage() {
     window.loadFirefighterStationEquipment = loadEquipment;
     window.loadFirefighterStationReports = () => loadReports(currentReportTab);
 
+    bindMobileReportPickers();
     bindForms();
     loadOverview();
     loadPersonnel();
@@ -1201,8 +1609,14 @@ function bootFirefighterMyStationPage() {
 
     window.__ffCurrentPageCleanup = function () {
         cleanupRequests();
+        closeReportPicker();
+        unbindMobileReportPickers();
         closeManageModal();
-        document.querySelectorAll('.report-modal.active').forEach((modal) => modal.classList.remove('active'));
+        document.querySelectorAll('.report-modal.active').forEach((modal) => {
+            modal.classList.remove('active');
+            modal.dataset.reportState = 'idle';
+        });
+        updateModalOpenState();
         document.removeEventListener('click', documentClickHandler);
     };
 }
