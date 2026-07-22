@@ -1817,40 +1817,21 @@ function createChiefMapLegend() {
     }
 
     legendContainer.innerHTML = `
-        <div class="chief-map-legend-title">Map Legend</div>
-        <div class="chief-map-legend-items">
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #2563eb;box-shadow:none;width:30px;height:30px;"><img src="/station.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas fa-building" style="font-size:14px;color:#2563eb;"></i></span></span>
-                <span class="chief-map-legend-label">Fire Station</span>
+        <div class="ff-clean-map-legend__title">Map Legend</div>
+        <div class="ff-clean-map-legend__items">
+            ${createLegendItemHtml({ iconClass: 'fa-building', imagePath: '/station.png', bgColor: '#2563eb', label: 'Fire Station' })}
+            ${createLegendItemHtml({ bgColor: '#0f766e', imagePath: '/hall.png', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
+            ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', imagePath: '/hydrant.png', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
+            ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
+            ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
+            ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
+            <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
+                <span class="ff-clean-map-legend__label">Medium Fire Risk</span>
             </div>
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #0f766e;box-shadow:none;width:30px;height:30px;"><img src="/hall.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;width:20px;height:20px;align-items:center;justify-content:center;color:#0f766e;">${BARANGAY_GROUP_ICON_SVG}</span></span>
-                <span class="chief-map-legend-label">Barangay Hall</span>
-            </div>
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon is-square" style="background:transparent;border:2px solid #ef4444;box-shadow:none;width:30px;height:30px;"><img src="/hydrant.png" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas fa-fire-extinguisher" style="font-size:14px;color:#ef4444;"></i></span></span>
-                <span class="chief-map-legend-label">Hydrant</span>
-            </div>
-            ${[
-                { ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' },
-              
-            ].map(item => `
-                <div class="chief-map-legend-item">
-                    <span class="chief-map-legend-icon" style="background:transparent;border:2px solid ${item.bgColor};box-shadow:none;width:30px;height:30px;"><img src="${item.imagePath || ''}" alt="" style="width:20px;height:20px;object-fit:contain;" onerror="this.style.display='none'; const fallback=this.nextElementSibling; if(fallback){fallback.style.display='inline-flex';}"><span style="display:none;"><i class="fas ${item.iconClass}" style="font-size:14px;color:${item.bgColor};"></i></span></span>
-                    <span class="chief-map-legend-label">${item.label}</span>
-                </div>
-            `).join('')}
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon" style="background:transparent;border:2px solid #64748b;box-shadow:none;width:30px;height:30px;"><i class="fas fa-location-dot" style="font-size:14px;color:#64748b;"></i></span>
-                <span class="chief-map-legend-label">Other Marker</span>
-            </div>
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon is-square" style="background:rgba(245,158,11,0.28);border:2px solid #d97706;box-shadow:none;width:30px;height:30px;"></span>
-                <span class="chief-map-legend-label">Medium Fire Risk</span>
-            </div>
-            <div class="chief-map-legend-item">
-                <span class="chief-map-legend-icon is-square" style="background:rgba(239,68,68,0.3);border:2px solid #b91c1c;box-shadow:none;width:30px;height:30px;"></span>
-                <span class="chief-map-legend-label">High Fire Risk</span>
+            <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
+                <span class="ff-clean-map-legend__label">High Fire Risk</span>
             </div>
         </div>
     `;
@@ -9348,8 +9329,9 @@ function closeModal() {
 function enhancePyroLayerControl() {
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterLayerContext = configuredInstanceKey === 'firefighterDashboard';
+    const isChiefLayerContext = isChiefCommandMapContext();
 
-    if (!isCitizenDashboardMapContext() && !isFirefighterLayerContext) {
+    if (!isCitizenDashboardMapContext() && !isFirefighterLayerContext && !isChiefLayerContext) {
         return;
     }
 
@@ -9366,6 +9348,7 @@ function enhancePyroLayerControl() {
     control.dataset.pyroEnhanced = 'true';
     control.classList.add('pyro-layer-control', 'pyro-citizen-layer-control');
     control.classList.toggle('pyro-firefighter-layer-control', isFirefighterLayerContext);
+    control.classList.toggle('pyro-chief-layer-control', isChiefLayerContext);
     toggle.setAttribute('aria-label', 'Open map layers');
 
     const countBadge = document.createElement('span');
@@ -9497,6 +9480,34 @@ function syncPyroSharedMapLayerControls() {
     });
 }
 
+function bindPyroSharedMapLayerInputs(root = document) {
+    const scope = root || document;
+
+    scope.querySelectorAll('[data-ff-map-base-toggle]').forEach((input) => {
+        if (input.dataset.pyroLayerInputBound === 'true') {
+            return;
+        }
+
+        input.addEventListener('change', () => {
+            if (input.checked) {
+                window.setPyroMapBaseLayer?.(input.dataset.ffMapBaseToggle);
+            }
+        });
+        input.dataset.pyroLayerInputBound = 'true';
+    });
+
+    scope.querySelectorAll('[data-ff-map-layer-toggle]').forEach((input) => {
+        if (input.dataset.pyroLayerInputBound === 'true') {
+            return;
+        }
+
+        input.addEventListener('change', () => {
+            window.setPyroMapOverlayVisibility?.(input.dataset.ffMapLayerToggle, input.checked);
+        });
+        input.dataset.pyroLayerInputBound = 'true';
+    });
+}
+
 function exposePyroSharedMapLayers(baseMaps, overlays, defaultBaseLabel) {
     window.pyroSharedMapLayers = {
         baseMaps,
@@ -9538,10 +9549,181 @@ function exposePyroSharedMapLayers(baseMaps, overlays, defaultBaseLabel) {
     };
 
     window.syncPyroSharedMapLayerControls = syncPyroSharedMapLayerControls;
+    bindPyroSharedMapLayerInputs();
+}
+
+function createResponderMobileMapLayersPanel() {
+    if (document.querySelector('[data-ff-map-layers-panel]') || !isChiefCommandMapContext()) {
+        return null;
+    }
+
+    const panel = document.createElement('div');
+    panel.className = 'firefighter-mobile-map-panel responder-mobile-map-panel md:hidden';
+    panel.id = 'chiefMobileMapLayersPanel';
+    panel.dataset.ffMapLayersPanel = '';
+    panel.setAttribute('aria-hidden', 'true');
+    panel.setAttribute('inert', '');
+    panel.innerHTML = `
+        <div class="firefighter-mobile-map-panel__backdrop" data-ff-map-layers-close></div>
+        <div class="firefighter-mobile-map-panel__sheet" role="dialog" aria-modal="false" aria-label="Map options">
+            <div class="firefighter-mobile-map-panel__handle" aria-hidden="true"></div>
+            <div class="firefighter-mobile-map-panel__header">
+                <div>
+                    <h2 class="firefighter-mobile-map-panel__title">Map options</h2>
+                    <p class="firefighter-mobile-map-panel__subtitle">Show or hide details on the map</p>
+                </div>
+                <button type="button" class="firefighter-mobile-map-panel__close" data-ff-map-layers-close aria-label="Close map options">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="firefighter-mobile-map-panel__body">
+                <div class="firefighter-mobile-map-panel__base" role="radiogroup" aria-label="Map style">
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="Carto Light" checked>
+                        <span>Carto</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="OSM Standard">
+                        <span>OSM</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="OSM HOT">
+                        <span>OSM HOT</span>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__base-item">
+                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="Satellite">
+                        <span>Satellite</span>
+                    </label>
+                </div>
+                <div class="firefighter-mobile-map-panel__layers">
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Stations" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-building-shield" aria-hidden="true"></i></span>
+                        <span>Stations</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Incidents" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-fire-flame-curved" aria-hidden="true"></i></span>
+                        <span>Incidents</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Hydrants" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-droplet" aria-hidden="true"></i></span>
+                        <span>Hydrants</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Other Markers" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
+                        <span>Other</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Fire Risk Areas" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-map-location-dot" aria-hidden="true"></i></span>
+                        <span>Risk areas</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Water Reference">
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-water" aria-hidden="true"></i></span>
+                        <span>Water</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Shapes" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-draw-polygon" aria-hidden="true"></i></span>
+                        <span>Boundaries</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                </div>
+                <details class="firefighter-mobile-map-panel__legend">
+                    <summary>
+                        <span>Map legend</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </summary>
+                    <div class="firefighter-mobile-map-panel__legend-list">
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="/station.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-building" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Fire station</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="/hall.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-users" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Barangay hall</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="/fire.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-fire-flame-curved" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Incident</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch"><img src="/hydrant.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-droplet" aria-hidden="true" style="display:none;"></i></span>
+                            <span>Hydrant</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-other"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
+                            <span>Other marker</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-route" aria-hidden="true"></span>
+                            <span>Route</span>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(panel);
+    return panel;
+}
+
+function bindResponderMobileMapLayersPanel() {
+    const panel = document.querySelector('[data-ff-map-layers-panel]') || createResponderMobileMapLayersPanel();
+    if (!panel || panel.dataset.pyroPanelBound === 'true') {
+        return;
+    }
+
+    const openPanel = () => {
+        if (window.innerWidth > 768) {
+            return;
+        }
+
+        bindPyroSharedMapLayerInputs(panel);
+        window.syncPyroSharedMapLayerControls?.();
+        panel.removeAttribute('inert');
+        panel.setAttribute('aria-hidden', 'false');
+        panel.classList.add('is-open');
+        window.setTimeout(() => window.map?.invalidateSize?.(), 80);
+    };
+
+    const closePanel = () => {
+        if (panel.contains(document.activeElement)) {
+            document.activeElement?.blur?.();
+        }
+
+        panel.classList.remove('is-open');
+        panel.setAttribute('aria-hidden', 'true');
+        panel.setAttribute('inert', '');
+        window.setTimeout(() => window.map?.invalidateSize?.(), 80);
+    };
+
+    panel.querySelectorAll('[data-ff-map-layers-close]').forEach((button) => {
+        button.addEventListener('click', closePanel);
+    });
+
+    panel.dataset.pyroPanelBound = 'true';
+    window.openResponderMapLayersPanel = openPanel;
+    window.closeResponderMapLayersPanel = closePanel;
+
+    if (!window.openFirefighterMapLayersPanel) {
+        window.openFirefighterMapLayersPanel = openPanel;
+    }
 }
 
 function bindFirefighterMobileLayerControlTrigger() {
-    if (!isFirefighterDashboardMapInstance() || !routeOverlayControl) {
+    const isResponderLayerContext = isFirefighterDashboardMapInstance() || isChiefCommandMapContext();
+    if (!isResponderLayerContext || !routeOverlayControl) {
         return;
     }
 
@@ -9553,7 +9735,8 @@ function bindFirefighterMobileLayerControlTrigger() {
     }
 
     const openMobileLayers = (event) => {
-        if (window.innerWidth > 768 || typeof window.openFirefighterMapLayersPanel !== 'function') {
+        const opener = window.openResponderMapLayersPanel || window.openFirefighterMapLayersPanel;
+        if (window.innerWidth > 768 || typeof opener !== 'function') {
             return;
         }
 
@@ -9563,7 +9746,7 @@ function bindFirefighterMobileLayerControlTrigger() {
         event.stopPropagation();
         control.classList.remove('leaflet-control-layers-expanded');
         window.closeFirefighterInsightsPanel?.();
-        window.openFirefighterMapLayersPanel();
+        opener();
     };
 
     trigger.addEventListener('click', openMobileLayers, true);
@@ -9615,6 +9798,7 @@ function initAfterMapReady() {
     
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
+    const isChiefCommandMap = isChiefCommandMapContext();
 
     var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap, &copy; CartoDB',
@@ -9632,13 +9816,13 @@ function initAfterMapReady() {
         maxZoom: 18,
         attribution: 'Hydro reference (c) Esri'
     });
-    (isFirefighterDashboardMap ? cartoLight : street).addTo(window.map);
+    ((isFirefighterDashboardMap || isChiefCommandMap) ? cartoLight : street).addTo(window.map);
     window.pyroPwa?.attachMapOfflineNotice?.(window.map);
 
     console.log(roleToken);
     console.log('User Role:', roleName, 'Role ID:', roleToken);
     const isCitizenDashboardMap = isCitizenDashboardMapContext();
-    const routeBaseMaps = isFirefighterDashboardMap
+    const routeBaseMaps = (isFirefighterDashboardMap || isChiefCommandMap)
         ? {
             "Carto Light": cartoLight,
             "OSM Standard": street,
@@ -9673,6 +9857,16 @@ function initAfterMapReady() {
                 "Water Reference": waterReference,
                 "Shapes": shapeFeatureGroup
             }
+        : isChiefCommandMap
+            ? {
+                "Fire Stations": stationFeatureGroup,
+                "Incidents": incidentFeatureGroup,
+                "Fire Hydrants": hydrantFeatureGroup,
+                "Other Markers": otherFeatureGroup,
+                "Fire Risk Areas": fireRiskAreaLayerGroup,
+                "Water Reference": waterReference,
+                "Shapes": shapeFeatureGroup
+            }
         : {
             "Stations": stationFeatureGroup,
             "Incidents": incidentFeatureGroup,
@@ -9686,12 +9880,14 @@ function initAfterMapReady() {
     exposePyroSharedMapLayers(
         routeBaseMaps,
         routeOverlays,
-        isFirefighterDashboardMap ? 'Carto Light' : (isCitizenDashboardMap ? 'Carto Light' : 'Street Map')
+        (isFirefighterDashboardMap || isChiefCommandMap) ? 'Carto Light' : (isCitizenDashboardMap ? 'Carto Light' : 'Street Map')
     );
     enhancePyroLayerControl();
     window.setTimeout(enhancePyroLayerControl, 100);
     window.setTimeout(enhancePyroLayerControl, 350);
+    bindResponderMobileMapLayersPanel();
     bindFirefighterMobileLayerControlTrigger();
+    window.setTimeout(bindResponderMobileMapLayersPanel, 100);
     window.setTimeout(bindFirefighterMobileLayerControlTrigger, 100);
     window.setTimeout(syncPyroSharedMapLayerControls, 150);
 

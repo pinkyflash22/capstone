@@ -585,7 +585,7 @@ class PublicController extends Controller
 
         $allStationOfficer = StationOfficer::query()
             ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
-            ->with(['user:user_id,first_name,last_name,name,email'])
+            ->with(['user:user_id,first_name,middle_name,last_name,email'])
             ->get();
 
         $stations = Cache::remember('citizen:dashboard:stations:v1', now()->addSeconds(45), function () {
