@@ -324,17 +324,30 @@ class AnalyticController extends Controller
     {
         try {
             if (! $this->forecastModelService->ensureReady()) {
-                throw new \RuntimeException('Forecast model could not be prepared automatically. Check the model files and training command on the server.');
+                $report = $this->forecastModelService->lastTrainingReport();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forecast model is not ready yet.',
+                    'details' => $report['message'] ?? 'The model could not be prepared automatically.',
+                    'diagnostics' => $report['diagnostics'] ?? [],
+                    'code' => $report['status'] ?? 'forecast_model_unavailable',
+                ], 503);
             }
 
             $this->barangayPredictionService->assertRuntimeReady();
         } catch (\Throwable $e) {
-            Log::warning('Prediction API runtime check failed: ' . $e->getMessage());
+            Log::warning('Prediction API runtime check failed.', [
+                'message' => $e->getMessage(),
+                'forecast_report' => $this->forecastModelService->lastTrainingReport(),
+            ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Prediction service is not ready on this server.',
-                'details' => $e->getMessage(),
+                'details' => 'Check the configured Python runtime, model files, and training logs.',
+                'diagnostics' => $this->forecastModelService->readinessDiagnostics(),
+                'code' => 'prediction_runtime_unavailable',
             ], 503);
         }
 
@@ -347,38 +360,40 @@ class AnalyticController extends Controller
             @set_time_limit(180);
             @ini_set('max_execution_time', '180');
 
-            $exitCode = Artisan::call('ai:train-forecast-model', [
-                '--dataset' => 'capstone-ai/station_barangay_monthly_db.json',
-                '--export' => true,
-            ]);
+            $report = $this->forecastModelService->retrain(exportDataset: true);
 
-            $output = trim(Artisan::output());
-
-            if ($exitCode !== 0) {
+            if (! ($report['success'] ?? false)) {
                 Log::warning('Manual forecast model retrain failed.', [
-                    'exit_code' => $exitCode,
-                    'output' => $output,
+                    'report' => $report,
                 ]);
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Model retraining failed. Check server logs for details.',
-                    'output' => $output,
+                    'message' => $report['message'] ?? 'Model retraining failed. Check server logs for details.',
+                    'diagnostics' => $report['diagnostics'] ?? [],
+                    'code' => $report['status'] ?? 'training_failed',
                 ], 500);
             }
 
+            $metadata = $this->forecastModelService->readMetadataSummary();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Forecast model retrained successfully using the latest database export.',
-                'output' => $output,
+                'message' => 'Forecast model retrained successfully.',
+                'model_metadata' => $metadata,
             ]);
         } catch (\Throwable $e) {
-            Log::error('Manual forecast model retrain error: ' . $e->getMessage());
+            Log::error('Manual forecast model retrain error.', [
+                'message' => $e->getMessage(),
+                'report' => $this->forecastModelService->lastTrainingReport(),
+            ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to retrain the model on this server.',
-                'details' => $e->getMessage(),
+                'details' => 'Check the server logs for the training command output.',
+                'diagnostics' => $this->forecastModelService->readinessDiagnostics(),
+                'code' => 'training_exception',
             ], 500);
         }
     }
@@ -3043,13 +3058,13 @@ private function getOpenRouterModelCandidates(): array
  */
     public function exploreRecommendation(Request $request)
 {
+    $recommendationTitle = $this->normalizeRecommendationTitle($request->input('recommendation_title'));
+    $recommendationDescription = $request->input('recommendation_description');
+    $priority = $request->input('priority', 'Medium') ?: 'Medium';
+    $analysisId = $request->input('analysis_id');
+    $actionPlanChecklistId = $request->input('action_plan_checklist_id');
+
     try {
-        $recommendationTitle = $request->input('recommendation_title');
-        $recommendationDescription = $request->input('recommendation_description');
-        $priority = $request->input('priority', 'Medium');
-        $analysisId = $request->input('analysis_id');
-        $actionPlanChecklistId = $request->input('action_plan_checklist_id');
-        
         Log::info('=== EXPLORE RECOMMENDATION START ===');
         Log::info('Title: ' . $recommendationTitle);
         
@@ -3135,22 +3150,22 @@ private function getOpenRouterModelCandidates(): array
             ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
             : null;
         $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
-            'recommendation_title' => $request->input('recommendation_title', 'this recommendation'),
-            'recommendation_description' => $request->input('recommendation_description'),
-            'priority' => $request->input('priority', 'Medium'),
+            'recommendation_title' => $recommendationTitle,
+            'recommendation_description' => $recommendationDescription,
+            'priority' => $priority,
         ]);
           $fallbackData = $this->getFallbackExploreData(
-              $request->input('recommendation_title', 'this recommendation'),
-              $request->input('priority', 'Medium'),
-              $request->input('recommendation_description'),
+              $recommendationTitle,
+              $priority,
+              $recommendationDescription,
               $contextPayload
           );
         $savedSuggestion = $this->storeRecommendationSuggestion(
             $analysis,
             $actionPlanChecklist,
-            $request->input('recommendation_title', 'this recommendation'),
-            $request->input('recommendation_description'),
-            $request->input('priority', 'Medium'),
+            $recommendationTitle,
+            $recommendationDescription,
+            $priority,
             $contextPayload,
             $fallbackData,
             'fallback_response'
@@ -3166,6 +3181,13 @@ private function getOpenRouterModelCandidates(): array
         ]);
     }
 }
+
+    private function normalizeRecommendationTitle($title): string
+    {
+        $normalizedTitle = trim((string) $title);
+
+        return $normalizedTitle !== '' ? $normalizedTitle : 'Priority fire-risk recommendation';
+    }
 
     private function buildExploreRecommendationContext(?Analysis $analysis, ?AiActionPlanChecklist $actionPlanChecklist, array $recommendation): array
     {
@@ -3966,7 +3988,9 @@ private function parseExploreResponse($content, ?array $contextualFallback = nul
  */
 private function getFallbackExploreData($recommendationTitle, $priority, ?string $recommendationDescription = null, array $contextPayload = [])
   {
-      $priorityLevel = strtolower($priority);
+      $recommendationTitle = $this->normalizeRecommendationTitle($recommendationTitle);
+      $priority = $priority ?: 'Medium';
+      $priorityLevel = strtolower((string) $priority);
       $urgencyText = $priorityLevel === 'critical' ? 'Immediate' : ($priorityLevel === 'high' ? 'Urgent' : 'Standard');
       $profile = $this->buildRecommendationActionProfile($recommendationTitle, $recommendationDescription, $contextPayload);
 

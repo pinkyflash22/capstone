@@ -14,13 +14,28 @@ class BarangayController extends Controller
 {
     public function index()
     {
-        $barangays = Barangay::with('city.province')->paginate(15);
+        $barangays = Barangay::with('city.province')
+            ->withCount(['boundaryLocations', 'stations'])
+            ->orderBy('barangay_name')
+            ->paginate(15);
+
+        if ($this->isStationAdminRoute()) {
+            return view('chief.barangays.index', compact('barangays'));
+        }
+
         return view('admin.addresses.barangays.index', compact('barangays'));
     }
 
     public function create()
     {
-        $cities = City::with('province')->get();
+        $cities = City::with('province')
+            ->orderBy('city_name')
+            ->get();
+
+        if ($this->isStationAdminRoute()) {
+            return view('chief.barangays.create', compact('cities'));
+        }
+
         return view('admin.addresses.barangays.create', compact('cities'));
     }
 
@@ -33,7 +48,7 @@ class BarangayController extends Controller
 
         Barangay::create($validated);
 
-        return redirect()->route('barangays.index')
+        return redirect()->route($this->scopedBarangayRoute('index'))
             ->with('success', 'Barangay created successfully.');
     }
 
@@ -104,7 +119,7 @@ class BarangayController extends Controller
 
         $barangay->update($validated);
 
-        return redirect()->route('barangays.index')
+        return redirect()->route($this->scopedBarangayRoute('index'))
             ->with('success', 'Barangay updated successfully.');
     }
 
@@ -116,7 +131,7 @@ class BarangayController extends Controller
 
         $barangay->delete();
 
-        return redirect()->route('barangays.index')
+        return redirect()->route($this->scopedBarangayRoute('index'))
             ->with('success', 'Barangay deleted successfully.');
     }
 
@@ -124,5 +139,25 @@ class BarangayController extends Controller
     {
         $barangays = Barangay::where('city_id', $cityId)->get();
         return response()->json($barangays);
+    }
+
+    private function isStationAdminRoute(): bool
+    {
+        return str_starts_with((string) request()->route()?->getName(), 'station-admin.');
+    }
+
+    private function scopedBarangayRoute(string $action): string
+    {
+        $routeName = (string) request()->route()?->getName();
+
+        if (str_starts_with($routeName, 'station-admin.')) {
+            return "station-admin.barangays.{$action}";
+        }
+
+        if (str_starts_with($routeName, 'admin.')) {
+            return "admin.barangays.{$action}";
+        }
+
+        return "barangays.{$action}";
     }
 }

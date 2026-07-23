@@ -389,6 +389,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
         Route::resource('resource-management', App\Http\Controllers\Chief\ResourceManagementController::class);
+        Route::get('/barangays', [BarangayController::class, 'index'])->name('barangays.index');
+        Route::get('/barangays/create', [BarangayController::class, 'create'])->name('barangays.create');
+        Route::post('/barangays', [BarangayController::class, 'store'])->name('barangays.store');
         Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
         Route::post('/resource-management/assign-equipment', [App\Http\Controllers\Chief\ResourceManagementController::class, 'assignEquipmentToStation'])
             ->name('resource-management.assign-equipment');

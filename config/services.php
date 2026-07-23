@@ -48,6 +48,8 @@ return [
     'ai_prediction' => [
         'python_binary' => env('AI_PYTHON_BINARY', 'python3'),
         'prediction_script' => env('AI_PREDICTION_SCRIPT', 'capstone-ai/predict_event.py'),
+        'training_script' => env('AI_TRAINING_SCRIPT', 'capstone-ai/train_model.py'),
+        'dataset_path' => env('AI_DATASET_PATH', 'capstone-ai/station_barangay_monthly_db.json'),
         'model_path' => env('AI_MODEL_PATH', 'capstone-ai/fire_model.pkl'),
         'metadata_path' => env('AI_MODEL_METADATA_PATH', 'capstone-ai/fire_model_metadata.json'),
     ],

@@ -5377,10 +5377,27 @@ function routeCurrentMapDetail(source = 'real') {
 // ============================================================================
 
 export function getName(lat, lon) {
-    let popupmarker = L.popup()
-        .setLatLng([lat, lon])
-        .setContent("Loading address...")
-        .openOn(window.map);
+    const useMobileMarkerModal = window.matchMedia?.('(max-width: 640px)').matches;
+    let popupmarker = null;
+
+    if (useMobileMarkerModal) {
+        selectedLat = lat;
+        selectedLng = lon;
+        if (window.map?.closePopup) {
+            window.map.closePopup();
+        }
+        openModal();
+
+        const descriptionInput = document.getElementById('markerDescription');
+        if (descriptionInput && !descriptionInput.value) {
+            descriptionInput.placeholder = 'Resolving selected address...';
+        }
+    } else {
+        popupmarker = L.popup()
+            .setLatLng([lat, lon])
+            .setContent("Loading address...")
+            .openOn(window.map);
+    }
 
     fetch('/api/reverse', {
         method: 'POST',
@@ -5392,8 +5409,24 @@ export function getName(lat, lon) {
     })
     .then(res => res.json())
     .then(data => {
-        if (!data.features || data.features.length === 0) return;
+        if (!data.features || data.features.length === 0) {
+            const descriptionInput = document.getElementById('markerDescription');
+            if (useMobileMarkerModal && descriptionInput && !descriptionInput.value) {
+                descriptionInput.placeholder = 'Address unavailable. You can still save this marker.';
+            }
+            return;
+        }
         const address = data.features[0].properties.formatted;
+
+        if (useMobileMarkerModal) {
+            const descriptionInput = document.getElementById('markerDescription');
+            if (descriptionInput && !descriptionInput.value) {
+                descriptionInput.value = address;
+                descriptionInput.placeholder = 'Marker details';
+            }
+            return;
+        }
+
         popupmarker.setLatLng([lat, lon]).setContent(`
             <div style="min-width: 200px;">
                 <p style="margin: 0 0 10px 0; font-size: 13px;">${address}</p>
@@ -5416,7 +5449,13 @@ export function getName(lat, lon) {
             popupmarker = null;
         });
     })
-    .catch(err => console.error(err));
+    .catch(err => {
+        const descriptionInput = document.getElementById('markerDescription');
+        if (useMobileMarkerModal && descriptionInput && !descriptionInput.value) {
+            descriptionInput.placeholder = 'Address unavailable. You can still save this marker.';
+        }
+        console.error(err);
+    });
 }
 
 function clearAllMarkers() {
@@ -10346,7 +10385,11 @@ setTimeout(() => {
                 
                 alert('Marker saved successfully!');
                 const modal = document.getElementById('markerModal');
-                if (modal) modal.style.display = 'none';
+                if (modal) {
+                    modal.style.display = 'none';
+                    modal.classList.remove('is-open', 'active');
+                    modal.setAttribute('aria-hidden', 'true');
+                }
                 await fetchCoordinate();
             } catch (error) {
                 console.error('Error saving:', error);
@@ -10482,7 +10525,8 @@ window.closeModal = function() {
     }
 
     modal.style.display = 'none';
-    modal.classList.remove('active');
+    modal.classList.remove('is-open', 'active');
+    modal.setAttribute('aria-hidden', 'true');
 };
 
 window.openModal = function() {
@@ -10509,7 +10553,8 @@ window.openModal = function() {
     const modal = document.getElementById('markerModal');
     if (modal) {
         modal.style.display = 'flex';
-        modal.classList.add('active');
+        modal.classList.add('is-open', 'active');
+        modal.setAttribute('aria-hidden', 'false');
     }
 };
 

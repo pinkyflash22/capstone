@@ -200,9 +200,9 @@
         "target_column": "incident_count",
         "train_rows": 324,
         "test_rows": 108,
-        "mae": 0.0228,
-        "rmse": 0.092,
-        "r2_score": 0.6867
+        "mae": 0.0353,
+        "rmse": 0.1968,
+        "r2_score": -0.4347
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
@@ -214,7 +214,7 @@
       }
     }
   },
-  "trained_at": "2026-07-08T08:19:59.830247+00:00",
+  "trained_at": "2026-07-23T02:31:39.179800+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

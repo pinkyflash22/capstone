@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -12,39 +13,109 @@ class ForecastModelService
 {
     private string $modelPath;
     private string $metadataPath;
+    private string $datasetPath;
+    private string $datasetOption;
+    private string $trainingScriptPath;
+    private string $pythonBinary;
+    private array $lastTrainingReport = [];
 
     public function __construct()
     {
-        $this->modelPath = base_path('capstone-ai/fire_model.pkl');
-        $this->metadataPath = base_path('capstone-ai/fire_model_metadata.json');
+        $this->datasetOption = (string) config('services.ai_prediction.dataset_path', 'capstone-ai/station_barangay_monthly_db.json');
+        $this->modelPath = $this->resolvePath((string) config('services.ai_prediction.model_path', 'capstone-ai/fire_model.pkl'));
+        $this->metadataPath = $this->resolvePath((string) config('services.ai_prediction.metadata_path', 'capstone-ai/fire_model_metadata.json'));
+        $this->datasetPath = $this->resolvePath($this->datasetOption);
+        $this->trainingScriptPath = $this->resolvePath((string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py'));
+        $this->pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
     }
 
     public function ensureReady(): bool
     {
         if (! $this->needsRetraining()) {
+            $this->lastTrainingReport = [
+                'success' => true,
+                'status' => 'ready',
+                'message' => 'Forecast model files are ready.',
+                'diagnostics' => $this->readinessDiagnostics(),
+            ];
+
             return true;
         }
 
-        try {
-            $exitCode = Artisan::call('ai:train-forecast-model', [
-                '--dataset' => 'capstone-ai/station_barangay_monthly_db.json',
-                '--export' => true,
-            ]);
+        return $this->retrain(exportDataset: true)['success'] === true;
+    }
 
-            if ($exitCode !== 0) {
-                Log::warning('Forecast model training command failed.', [
-                    'output' => Artisan::output(),
-                ]);
-
-                return false;
+    public function retrain(bool $exportDataset = true): array
+    {
+        $runTraining = function () use ($exportDataset) {
+            if (! File::exists($this->trainingScriptPath)) {
+                return $this->recordTrainingReport(false, 'training_script_missing', 'Forecast training script is missing.');
             }
 
-            return File::exists($this->modelPath) && File::exists($this->metadataPath);
-        } catch (\Throwable $e) {
-            Log::warning('Unable to prepare forecast model automatically: ' . $e->getMessage());
+            if (! File::exists($this->datasetPath) && ! $exportDataset) {
+                return $this->recordTrainingReport(false, 'dataset_missing', 'Forecast dataset is missing.');
+            }
 
-            return false;
+            $parameters = ['--dataset' => $this->datasetOption];
+            if ($exportDataset) {
+                $parameters['--export'] = true;
+            }
+
+            try {
+                $exitCode = Artisan::call('ai:train-forecast-model', $parameters);
+                $output = trim(Artisan::output());
+
+                if ($exitCode !== 0) {
+                    Log::warning('Forecast model training command failed.', [
+                        'exit_code' => $exitCode,
+                        'output' => $output,
+                        'diagnostics' => $this->readinessDiagnostics(includePaths: true),
+                    ]);
+
+                    return $this->recordTrainingReport(false, 'training_failed', 'Forecast model training failed. Check server logs for command output.', [
+                        'exit_code' => $exitCode,
+                    ]);
+                }
+
+                $ready = File::exists($this->modelPath) && File::exists($this->metadataPath);
+
+                return $this->recordTrainingReport(
+                    $ready,
+                    $ready ? 'trained' : 'model_output_missing',
+                    $ready
+                        ? 'Forecast model retrained successfully.'
+                        : 'Training finished, but model output files were not created.',
+                    ['exit_code' => $exitCode]
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Unable to prepare forecast model automatically.', [
+                    'message' => $e->getMessage(),
+                    'diagnostics' => $this->readinessDiagnostics(includePaths: true),
+                ]);
+
+                return $this->recordTrainingReport(false, 'training_exception', 'Forecast model could not be prepared on this server.');
+            }
+        };
+
+        try {
+            return Cache::lock('forecast-model-training', 180)->block(5, $runTraining);
+        } catch (\Throwable $e) {
+            Log::warning('Forecast model lock unavailable, running training without lock.', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return $runTraining();
         }
+    }
+
+    public function lastTrainingReport(): array
+    {
+        return $this->lastTrainingReport ?: [
+            'success' => false,
+            'status' => 'not_checked',
+            'message' => 'Forecast model readiness has not been checked yet.',
+            'diagnostics' => $this->readinessDiagnostics(),
+        ];
     }
 
     public function needsRetraining(): bool
@@ -68,8 +139,8 @@ class ForecastModelService
         if (! File::exists($this->metadataPath)) {
             return [
                 'model_ready' => false,
-                'model_path' => $this->modelPath,
-                'metadata_path' => $this->metadataPath,
+                'model_file' => File::exists($this->modelPath),
+                'metadata_file' => File::exists($this->metadataPath),
             ];
         }
 
@@ -80,9 +151,9 @@ class ForecastModelService
 
             return [
                 'model_ready' => File::exists($this->modelPath),
-                'model_path' => $this->modelPath,
-                'metadata_path' => $this->metadataPath,
-                'metadata_error' => $e->getMessage(),
+                'model_file' => File::exists($this->modelPath),
+                'metadata_file' => File::exists($this->metadataPath),
+                'metadata_error' => 'Metadata could not be read.',
             ];
         }
 
@@ -118,9 +189,54 @@ class ForecastModelService
             ],
             'regression_metrics' => Arr::get($metrics, 'regression_metrics', []),
             'notes' => Arr::get($decoded, 'notes', []),
-            'model_path' => $this->modelPath,
-            'metadata_path' => $this->metadataPath,
+            'model_file' => File::exists($this->modelPath),
+            'metadata_file' => File::exists($this->metadataPath),
         ];
+    }
+
+    public function readinessDiagnostics(bool $includePaths = false): array
+    {
+        $diagnostics = [
+            'model_file' => File::exists($this->modelPath),
+            'metadata_file' => File::exists($this->metadataPath),
+            'dataset_file' => File::exists($this->datasetPath),
+            'training_script' => File::exists($this->trainingScriptPath),
+            'python_configured' => filled($this->pythonBinary),
+            'needs_retraining' => $this->needsRetraining(),
+        ];
+
+        if ($includePaths) {
+            $diagnostics['paths'] = [
+                'model' => $this->modelPath,
+                'metadata' => $this->metadataPath,
+                'dataset' => $this->datasetPath,
+                'training_script' => $this->trainingScriptPath,
+                'python_binary' => $this->pythonBinary,
+            ];
+        }
+
+        return $diagnostics;
+    }
+
+    private function recordTrainingReport(bool $success, string $status, string $message, array $extra = []): array
+    {
+        $this->lastTrainingReport = array_merge([
+            'success' => $success,
+            'status' => $status,
+            'message' => $message,
+            'diagnostics' => $this->readinessDiagnostics(),
+        ], $extra);
+
+        return $this->lastTrainingReport;
+    }
+
+    private function resolvePath(string $path): string
+    {
+        if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) || str_starts_with($path, '/') || str_starts_with($path, '\\')) {
+            return $path;
+        }
+
+        return base_path($path);
     }
 
     private function resolveLatestDataUpdateTimestamp(): ?int

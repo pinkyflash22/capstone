@@ -943,6 +943,176 @@
             .analytics-chart-canvas { min-width: 620px; min-height: 300px; }
             .analytics-section__head { margin-bottom: 14px; }
         }
+
+        .analytics-toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: min(360px, calc(100vw - 32px));
+            padding: 12px 14px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.96);
+            color: #0f172a;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+            transition: opacity 180ms ease, transform 180ms ease;
+        }
+
+        .analytics-toast.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .analytics-toast__icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #2563eb;
+            flex: 0 0 auto;
+        }
+
+        .analytics-toast[data-type="success"] .analytics-toast__icon {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .analytics-toast[data-type="warning"] .analytics-toast__icon {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+
+        .analytics-toast[data-type="error"] .analytics-toast__icon {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .analytics-toast__message {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+
+        .analytics-confirm[hidden],
+        .analytics-toast[hidden] {
+            display: none !important;
+        }
+
+        .analytics-confirm {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.46);
+            backdrop-filter: blur(4px);
+        }
+
+        .analytics-confirm__panel {
+            width: min(420px, 100%);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 24px;
+            background: #fff;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+            overflow: hidden;
+        }
+
+        .analytics-confirm__body {
+            padding: 24px;
+        }
+
+        .analytics-confirm__eyebrow {
+            margin-bottom: 8px;
+            color: #dc2626;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .analytics-confirm__title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.22rem;
+            font-weight: 900;
+        }
+
+        .analytics-confirm__message {
+            margin: 10px 0 0;
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .analytics-confirm__actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding: 14px 18px 18px;
+            background: #fffaf5;
+        }
+
+        .analytics-confirm__button {
+            min-height: 44px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 14px;
+            padding: 0 18px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .analytics-confirm__button--cancel {
+            background: #fff;
+            color: #475569;
+        }
+
+        .analytics-confirm__button--accept {
+            border: none;
+            background: linear-gradient(135deg, #dc2626, #f59e0b);
+            color: #fff;
+            box-shadow: 0 14px 30px rgba(220, 38, 38, 0.18);
+        }
+
+        @media (max-width: 640px) {
+            .analytics-toast {
+                top: auto;
+                right: 14px;
+                bottom: calc(92px + env(safe-area-inset-bottom));
+                left: 14px;
+                max-width: none;
+            }
+
+            .analytics-confirm {
+                align-items: flex-end;
+                padding: 14px;
+            }
+
+            .analytics-confirm__panel {
+                border-radius: 24px;
+            }
+
+            .analytics-confirm__body {
+                padding: 20px 18px;
+            }
+
+            .analytics-confirm__actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                padding: 12px 14px 14px;
+            }
+        }
     </style>
 </head>
 <body class="chief-legacy-layout">
@@ -1400,6 +1570,25 @@
         </div>
     </div>
 
+    <div id="analyticsToast" class="analytics-toast" data-type="info" role="status" aria-live="polite" hidden>
+        <span class="analytics-toast__icon"><i class="fa-solid fa-circle-info"></i></span>
+        <span id="analyticsToastMessage" class="analytics-toast__message"></span>
+    </div>
+
+    <div id="analyticsConfirmModal" class="analytics-confirm" aria-hidden="true" hidden>
+        <div class="analytics-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="analyticsConfirmTitle" aria-describedby="analyticsConfirmMessage">
+            <div class="analytics-confirm__body">
+                <div id="analyticsConfirmEyebrow" class="analytics-confirm__eyebrow">Confirm action</div>
+                <h3 id="analyticsConfirmTitle" class="analytics-confirm__title">Continue?</h3>
+                <p id="analyticsConfirmMessage" class="analytics-confirm__message">Please confirm this action.</p>
+            </div>
+            <div class="analytics-confirm__actions">
+                <button type="button" id="analyticsConfirmCancel" class="analytics-confirm__button analytics-confirm__button--cancel">Cancel</button>
+                <button type="button" id="analyticsConfirmAccept" class="analytics-confirm__button analytics-confirm__button--accept">Continue</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let hourlyChart, dailyChart;
         let currentRecommendations = [];
@@ -1409,6 +1598,85 @@
         let currentPredictionDetails = null;
         let currentAiModels = null;
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        let analyticsToastTimer = null;
+        let analyticsConfirmResolver = null;
+
+        function showAnalyticsToast(message, type = 'info') {
+            const toast = document.getElementById('analyticsToast');
+            const messageEl = document.getElementById('analyticsToastMessage');
+            const icon = toast?.querySelector('.analytics-toast__icon i');
+
+            if (!toast || !messageEl) return;
+
+            const iconMap = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-exclamation',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info',
+            };
+
+            messageEl.textContent = message || 'Action updated.';
+            toast.dataset.type = type;
+            if (icon) {
+                icon.className = `fa-solid ${iconMap[type] || iconMap.info}`;
+            }
+
+            toast.hidden = false;
+            window.clearTimeout(analyticsToastTimer);
+            requestAnimationFrame(() => toast.classList.add('is-visible'));
+            analyticsToastTimer = window.setTimeout(() => {
+                toast.classList.remove('is-visible');
+                window.setTimeout(() => { toast.hidden = true; }, 200);
+            }, 3600);
+        }
+
+        function showAnalyticsConfirm(options = {}) {
+            const modal = document.getElementById('analyticsConfirmModal');
+            const eyebrow = document.getElementById('analyticsConfirmEyebrow');
+            const title = document.getElementById('analyticsConfirmTitle');
+            const message = document.getElementById('analyticsConfirmMessage');
+            const cancel = document.getElementById('analyticsConfirmCancel');
+            const accept = document.getElementById('analyticsConfirmAccept');
+
+            if (!modal || !cancel || !accept || !title || !message) {
+                return Promise.resolve(false);
+            }
+
+            eyebrow.textContent = options.eyebrow || 'Confirm action';
+            title.textContent = options.title || 'Continue?';
+            message.textContent = options.message || 'Please confirm this action.';
+            cancel.textContent = options.cancelText || 'Cancel';
+            accept.textContent = options.acceptText || 'Continue';
+
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            accept.focus({ preventScroll: true });
+
+            return new Promise((resolve) => {
+                analyticsConfirmResolver = resolve;
+            });
+        }
+
+        function closeAnalyticsConfirm(value) {
+            const modal = document.getElementById('analyticsConfirmModal');
+            if (modal) {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.hidden = true;
+            }
+
+            if (analyticsConfirmResolver) {
+                analyticsConfirmResolver(value);
+                analyticsConfirmResolver = null;
+            }
+        }
+
+        document.getElementById('analyticsConfirmCancel')?.addEventListener('click', () => closeAnalyticsConfirm(false));
+        document.getElementById('analyticsConfirmAccept')?.addEventListener('click', () => closeAnalyticsConfirm(true));
+        document.getElementById('analyticsConfirmModal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'analyticsConfirmModal') {
+                closeAnalyticsConfirm(false);
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -1967,7 +2235,7 @@
                 predictionContainer.innerHTML = `<div style="border:1px solid rgba(220,38,38,0.18); background:#fef2f2; color:#991b1b; border-radius:16px; padding:18px 20px;"><div style="font-weight:800; font-size:15px;">Prediction service unavailable</div><div style="margin-top:6px; font-size:14px; line-height:1.5;">${fallbackMessage}</div>${detailHtml}</div>`;
             }
 
-            alert(details ? `${fallbackMessage}\n\n${details}` : fallbackMessage);
+            showAnalyticsToast(details ? `${fallbackMessage} ${details}` : fallbackMessage, 'error');
         }
 
         async function runAIAnalysis(locationId, predictionScope = 'current_month') {
@@ -2076,9 +2344,11 @@
                     modalBody.innerHTML = `
                         <div class="text-center py-8 text-red-500">
                             <i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i>
-                            <p>Failed to generate implementation plan: ${result.message || 'Unknown error'}</p>
+                            <p>${escapeHtml(result.message || 'Unable to generate the implementation plan right now.')}</p>
+                            <button type="button" class="analytics-confirm__button analytics-confirm__button--accept" style="margin-top:14px;" onclick="exploreRecommendation(currentRecommendations[${index}], ${index})">Retry</button>
                         </div>
                     `;
+                    showAnalyticsToast(result.message || 'Implementation plan is unavailable right now.', 'warning');
                 }
             } catch (error) {
                 console.error('Explore error:', error);
@@ -2086,9 +2356,10 @@
                     <div class="text-center py-8 text-red-500">
                         <i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i>
                         <p>Failed to generate implementation plan. Please try again.</p>
-                        <p class="text-sm mt-2 text-gray-500">${error.message}</p>
+                        <button type="button" class="analytics-confirm__button analytics-confirm__button--accept" style="margin-top:14px;" onclick="exploreRecommendation(currentRecommendations[${index}], ${index})">Retry</button>
                     </div>
                 `;
+                showAnalyticsToast('Implementation plan request failed. You can retry from the modal.', 'error');
             }
         }
         
@@ -2720,13 +2991,31 @@
             }
         }
 
-        function emergencyCall() {
-            if (confirm('Call emergency services (911)?')) window.location.href = 'tel:911';
+        async function emergencyCall() {
+            const confirmed = await showAnalyticsConfirm({
+                eyebrow: 'Emergency call',
+                title: 'Call 911?',
+                message: 'This will open your phone app or browser calling prompt.',
+                cancelText: 'No',
+                acceptText: 'Call 911',
+            });
+
+            if (confirmed) {
+                window.location.href = 'tel:911';
+            }
         }
 
         async function retrainForecastModel() {
             const button = document.getElementById('retrainModelBtn');
-            if (!confirm('Retrain the prediction model using the latest database records? This can take a few moments.')) {
+            const confirmed = await showAnalyticsConfirm({
+                eyebrow: 'Model training',
+                title: 'Retrain forecast model?',
+                message: 'PyroSense will rebuild the forecast model using the latest station and incident records. This can take a few moments.',
+                cancelText: 'Not now',
+                acceptText: 'Retrain',
+            });
+
+            if (!confirmed) {
                 return;
             }
 
@@ -2752,9 +3041,12 @@
                     throw new Error(result.message || 'Model retraining failed.');
                 }
 
-                alert(result.message || 'Forecast model retrained successfully.');
+                const trainedAt = result.model_metadata?.trained_at
+                    ? ` Trained at ${result.model_metadata.trained_at}.`
+                    : '';
+                showAnalyticsToast(`${result.message || 'Forecast model retrained successfully.'}${trainedAt}`, 'success');
             } catch (error) {
-                alert(error.message || 'Unable to retrain the forecast model.');
+                showAnalyticsToast(error.message || 'Unable to retrain the forecast model.', 'error');
             } finally {
                 if (button) {
                     button.disabled = false;
@@ -2767,13 +3059,13 @@
         document.getElementById('analyzeBtn')?.addEventListener('click', () => {
             const stationSelect = document.getElementById('stationSelect');
             if (stationSelect.value) runAIAnalysis(stationSelect.value, 'current_month');
-            else alert('Please select a location');
+            else showAnalyticsToast('Please select a location first.', 'warning');
         });
 
         document.getElementById('predictNextMonthBtn')?.addEventListener('click', () => {
             const stationSelect = document.getElementById('stationSelect');
             if (stationSelect.value) runAIAnalysis(stationSelect.value, 'next_month');
-            else alert('Please select a location');
+            else showAnalyticsToast('Please select a location first.', 'warning');
         });
 
         document.getElementById('retrainModelBtn')?.addEventListener('click', retrainForecastModel);

@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
@@ -70,7 +71,7 @@ class PublicController extends Controller
         return self::CITIZEN_DASHBOARD_SECTIONS;
     }
 
-    private function buildCitizenWeeklyActivity($incidents): array
+    private function buildCitizenWeeklyActivity(Collection $incidents): array
     {
         $today = now();
         $startOfWeek = $today->copy()->startOfWeek();
@@ -442,7 +443,7 @@ class PublicController extends Controller
         $riskPercentage = round(($fireCount / $totalIncidentCount) * 100, 1);
         $riskLevel = $this->determineRiskLevel($riskPercentage);
         $weeklyActivity = $this->buildCitizenWeeklyActivity($userIncidents);
-        $requestsCount = FsicRequest::where('user_id', $accountId)->count();
+        $requestsCount = FsicRequest::query()->where('user_id', $accountId)->count();
 
         $nearbyIncidents = collect();
 
@@ -605,7 +606,7 @@ class PublicController extends Controller
 
         //request
         $fsicApplications = collect();
-        $fsicRequests = FsicRequest::where('user_id', $accountId)->latest()->get();
+        $fsicRequests = FsicRequest::query()->where('user_id', $accountId)->latest()->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
         'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports'));

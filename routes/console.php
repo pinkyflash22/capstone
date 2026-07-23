@@ -539,8 +539,9 @@ Artisan::command('ai:train-barangay-model {--dataset=capstone-ai/station_baranga
 
     if ($this->option('generate-demo')) {
         $this->info('Generating demo station + barangay monthly dataset...');
+        $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
         $generateProcess = Process::path(base_path())
-            ->run(['python', 'capstone-ai/generate_station_barangay_monthly_json.py']);
+            ->run([$pythonBinary, 'capstone-ai/generate_station_barangay_monthly_json.py']);
 
         if ($generateProcess->failed()) {
             $this->error('Failed to generate demo dataset.');
@@ -560,8 +561,10 @@ Artisan::command('ai:train-barangay-model {--dataset=capstone-ai/station_baranga
     }
 
     $this->info("Training barangay model using {$datasetPath}...");
+    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
     $trainProcess = Process::path(base_path())
-        ->run(['python', 'capstone-ai/train_model.py', $datasetPath]);
+        ->run([$pythonBinary, $trainingScript, $datasetPath]);
 
     if ($trainProcess->failed()) {
         $this->error('Barangay model training failed.');
@@ -604,8 +607,10 @@ Artisan::command('ai:train-forecast-model {--dataset=capstone-ai/station_baranga
     }
 
     $this->info("Training forecast model using {$datasetPath}...");
+    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
     $trainProcess = Process::path(base_path())
-        ->run(['python', 'capstone-ai/train_model.py', $datasetPath]);
+        ->run([$pythonBinary, $trainingScript, $datasetPath]);
 
     if ($trainProcess->failed()) {
         $this->error('Forecast model training failed.');
@@ -642,8 +647,9 @@ Artisan::command('ai:predict-barangay-risk {payload?} {--file=capstone-ai/sample
         ? 'Building AI-ready prediction payload...'
         : 'Running barangay risk prediction...');
 
+    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
     $predictProcess = Process::path(base_path())
-        ->run(['python', $script, $inputArgument]);
+        ->run([$pythonBinary, $script, $inputArgument]);
 
     if ($predictProcess->failed()) {
         $this->error('Prediction command failed.');

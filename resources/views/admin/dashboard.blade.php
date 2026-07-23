@@ -1712,7 +1712,7 @@
             @endphp
 
             <!-- Full Width Map -->
-            <div id="management" class="lector-card mb-8 scroll-mt-24">
+            <div id="management" class="lector-card chief-dashboard-map-card mb-8 scroll-mt-24">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
@@ -1727,6 +1727,7 @@
                 </div>
    
                 <div id="map"></div>
+                <div id="chiefMapLegend" class="chief-map-legend ff-clean-map-legend"></div>
 
                 {{-- <div id="unifiedMap" style="height: 500px; width: 100%;"></div> --}}
                 <div class="map-actions">
@@ -2052,9 +2053,23 @@
 
         <!-- Modals (same as before) -->
         <!-- Modals -->
-<div id="markerModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h3>Add Map Marker</h3>
+<div id="markerModal" class="modal chief-marker-modal" style="display: none;" aria-hidden="true">
+    <div class="modal-content chief-marker-modal__card" role="dialog" aria-modal="true" aria-labelledby="markerModalTitle">
+        <div class="chief-marker-modal__header">
+            <div class="chief-marker-modal__title-row">
+                <span class="chief-marker-modal__icon"><i class="fa-solid fa-location-dot"></i></span>
+                <div>
+                    <p class="chief-marker-modal__eyebrow">Map Management</p>
+                    <h3 id="markerModalTitle">Add Map Marker</h3>
+                    <p class="chief-marker-modal__subtitle">Save a verified resource or location point on the command map.</p>
+                </div>
+            </div>
+            <button type="button" class="chief-marker-modal__close" onclick="closeModal()" aria-label="Close add marker form">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="chief-marker-modal__body">
         
         <!-- Marker Basic Fields -->
         <div class="mb-4">
@@ -2195,7 +2210,9 @@
     </div>
 </div>
         
-        <div class="modal-actions">
+        </div>
+
+        <div class="modal-actions chief-marker-modal__actions">
             <button class="btn-save" id="saveMarkerBtn">Save Marker</button>
             <button class="btn-cancel" onclick="closeModal()">Cancel</button>
         </div>
@@ -2455,6 +2472,11 @@
             });
     });
     
+    window.mapInstanceConfig = {
+        containerId: 'map',
+        instanceKey: 'chiefDashboard'
+    };
+
     var marker = @json($mapmarker) || [];
     window.mapData = {
         marker: @json($mapmarker) || []
@@ -2953,7 +2975,11 @@
 
     function openModal() {
         const modal = document.getElementById('markerModal');
-        if (modal) modal.style.display = 'flex';
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('is-open', 'active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
         
         // Reset all fields when opening modal
         if (stationFields) stationFields.classList.remove('show');
@@ -2997,7 +3023,11 @@
 
     function closeModal() {
         const modal = document.getElementById('markerModal');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('is-open', 'active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
     }
 
     function emergencyCall() {
