@@ -265,6 +265,147 @@
             justify-content: center;
         }
         .modal-close:hover { background: #f3f4f6; color: #dc2626; }
+
+        #exploreModal,
+        #predictionDetailModal {
+            padding: 24px;
+        }
+        .analytics-forecast-modal {
+            width: min(92vw, 780px);
+            max-height: min(78vh, 720px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+        }
+        .analytics-forecast-modal--details {
+            width: min(92vw, 860px);
+        }
+        .analytics-forecast-modal .modal-header {
+            flex: 0 0 auto;
+            padding: 1rem 1.25rem;
+        }
+        .analytics-forecast-modal .modal-header h3 {
+            font-size: 1.05rem;
+            line-height: 1.25;
+        }
+        .analytics-forecast-modal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 1.15rem 1.25rem;
+        }
+        .analytics-forecast-modal .modal-footer {
+            flex: 0 0 auto;
+            padding: 0.9rem 1.25rem;
+            background: rgba(255, 255, 255, 0.96);
+        }
+        .analytics-forecast-modal .modal-close {
+            width: 42px;
+            height: 42px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+        }
+
+        @media (max-width: 640px) {
+            #exploreModal.modal.show,
+            #predictionDetailModal.modal.show {
+                align-items: flex-end;
+                justify-content: center;
+                padding: 0 10px max(10px, env(safe-area-inset-bottom));
+            }
+            .analytics-forecast-modal,
+            .analytics-forecast-modal--details {
+                width: 100%;
+                max-width: none;
+                max-height: min(84svh, 680px);
+                border-radius: 24px 24px 18px 18px;
+                animation: analyticsSheetIn 0.24s ease;
+            }
+            .analytics-forecast-modal::before {
+                content: "";
+                width: 54px;
+                height: 5px;
+                border-radius: 999px;
+                background: #cbd5e1;
+                align-self: center;
+                margin: 10px 0 2px;
+                flex: 0 0 auto;
+            }
+            .analytics-forecast-modal .modal-header {
+                padding: 0.75rem 1rem 0.85rem;
+            }
+            .analytics-forecast-modal .modal-header h3 {
+                font-size: 0.98rem;
+                max-width: calc(100% - 54px);
+            }
+            .analytics-forecast-modal .modal-close {
+                width: 44px;
+                height: 44px;
+                font-size: 1rem;
+            }
+            .analytics-forecast-modal .modal-body {
+                padding: 0.9rem 1rem;
+            }
+            .analytics-forecast-modal .modal-footer {
+                padding: 0.75rem 1rem 0.95rem;
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .analytics-forecast-modal .modal-footer button {
+                width: 100%;
+                min-height: 42px;
+            }
+            .analytics-forecast-modal .modal-body > div {
+                gap: 12px !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="grid-template-columns"] {
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="padding:18px"],
+            .analytics-forecast-modal .modal-body [style*="padding:16px"],
+            .analytics-forecast-modal .modal-body [style*="padding:14px"] {
+                padding: 12px !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="font-size:28px"] {
+                font-size: 1.35rem !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="font-size:22px"],
+            .analytics-forecast-modal .modal-body [style*="font-size:24px"] {
+                font-size: 1.1rem !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="font-size:15px"],
+            .analytics-forecast-modal .modal-body [style*="font-size:14px"] {
+                font-size: 0.82rem !important;
+            }
+            .analytics-forecast-modal .modal-body [style*="font-size:13px"] {
+                font-size: 0.78rem !important;
+            }
+            .step-item {
+                gap: 10px;
+                padding: 12px;
+                margin-bottom: 8px;
+            }
+            .step-number {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+            .resource-tag {
+                width: 100%;
+                margin-right: 0;
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+        }
+        @keyframes analyticsSheetIn {
+            from { transform: translateY(18px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
         
         /* Enhanced Step Items */
         .step-item {
@@ -816,6 +957,173 @@
             border-radius: 999px;
         }
 
+        .chief-theme-shell,
+        .analytics-stack,
+        .analytics-shell-card,
+        .analytics-section,
+        .analytics-chart-wrap,
+        .prediction-card {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .analytics-info-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .analytics-info-button {
+            display: none;
+            width: 38px;
+            height: 38px;
+            border: 1px solid rgba(251, 146, 60, 0.22);
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #c2410c;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .analytics-info-popover {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            z-index: 45;
+            width: min(260px, calc(100vw - 28px));
+            padding: 12px 14px;
+            border: 1px solid rgba(251, 146, 60, 0.2);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.98);
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.55;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-4px);
+            transition: opacity 160ms ease, transform 160ms ease;
+        }
+
+        .analytics-info-wrap.is-open .analytics-info-popover {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .analytics-mobile-select-trigger,
+        .analytics-mobile-select-sheet {
+            display: none;
+        }
+
+        .analytics-mobile-select-sheet {
+            position: fixed;
+            inset: 0;
+            z-index: 10020;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.18);
+        }
+
+        .analytics-mobile-select-sheet[aria-hidden="false"] {
+            display: flex;
+        }
+
+        .analytics-mobile-select-panel {
+            width: min(420px, 100%);
+            max-height: min(66vh, 500px);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(251, 146, 60, 0.18);
+            border-radius: 24px 24px 18px 18px;
+            background:
+                radial-gradient(circle at top right, rgba(245, 158, 11, 0.13), transparent 36%),
+                #fff;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+            overflow: hidden;
+        }
+
+        .analytics-mobile-select-handle {
+            width: 52px;
+            height: 5px;
+            margin: 8px auto 6px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            flex: 0 0 auto;
+        }
+
+        .analytics-mobile-select-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 14px 12px;
+            border-bottom: 1px solid #eef2f7;
+        }
+
+        .analytics-mobile-select-title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .analytics-mobile-select-close {
+            width: 44px;
+            height: 44px;
+            border: 1px solid #fed7aa;
+            border-radius: 16px;
+            background: #fffaf5;
+            color: #c2410c;
+            cursor: pointer;
+        }
+
+        .analytics-mobile-select-search {
+            margin: 12px 14px 8px;
+            min-height: 42px;
+            border: 1px solid #fed7aa;
+            border-radius: 14px;
+            padding: 0 12px;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 700;
+            outline: none;
+        }
+
+        .analytics-mobile-select-options {
+            display: grid;
+            gap: 8px;
+            padding: 0 14px 14px;
+            overflow: auto;
+        }
+
+        .analytics-mobile-select-option {
+            min-height: 44px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: #fff;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 12px;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .analytics-mobile-select-option.is-selected {
+            border-color: rgba(245, 158, 11, 0.46);
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
         @media (max-width: 1024px) {
             .mobile-menu-btn { display: block; }
             .mobile-logo { display: flex; }
@@ -832,7 +1140,8 @@
             .legacy-chief-sidebar.open { transform: translateX(0); }
             .main-content {
                 margin-left: 0;
-                padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px) !important;
+                padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 112px) !important;
+                overflow-x: hidden;
             }
             .dashboard-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
             .top-nav-container { padding: 0 16px; }
@@ -845,7 +1154,7 @@
                 margin: 8px auto 0 !important;
                 padding: 0 10px !important;
                 width: calc(100% - 20px) !important;
-                max-width: 330px !important;
+                max-width: 100% !important;
                 border-radius: 14px !important;
                 top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
             }
@@ -872,8 +1181,10 @@
             }
 
             .content-container {
-                max-width: 330px;
-                padding: 12px 8px 0;
+                width: 100%;
+                max-width: 100%;
+                padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 112px);
+                overflow-x: clip;
             }
 
             .content-container > div:first-child h1 {
@@ -912,9 +1223,7 @@
                 margin-bottom: 12px;
             }
 
-            canvas {
-                max-height: 180px !important;
-            }
+            canvas { max-height: none !important; }
 
             .recommendation-card {
                 padding: 12px;
@@ -926,22 +1235,86 @@
                 padding: 4px 6px;
             }
 
+            .analytics-stack { gap: 12px; }
             .analytics-hero,
             .analytics-shell-card,
             .analytics-chart-wrap,
             .prediction-card,
             .analytics-ops-card { border-radius: 18px; }
-            .analytics-section { padding: 18px; }
-            .analytics-hero { padding: 20px 18px; }
-            .analytics-hero__subtitle { font-size: 0.92rem; }
-            .analytics-control-grid,
-            .prediction-summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+            .analytics-section { padding: 14px; }
+            .analytics-hero { padding: 15px 14px; }
+            .analytics-hero__eyebrow { padding: 6px 10px; font-size: 9.5px; }
+            .analytics-hero__title { margin-top: 10px; font-size: 1.55rem; max-width: none; }
+            .analytics-hero__subtitle { font-size: 0.78rem; line-height: 1.45; }
+            .analytics-hero__meta { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+            .analytics-hero__meta-card { padding: 10px 12px; border-radius: 14px; }
+            .analytics-hero__meta-value { font-size: 12.5px; margin-top: 5px; }
+            .analytics-section__head { align-items: center; gap: 8px; margin-bottom: 10px; }
+            .analytics-section__title { font-size: 0.94rem; gap: 8px; }
+            .analytics-section__copy { display: none; }
+            .analytics-info-button { display: inline-flex; }
+            .analytics-control-grid { display: flex; flex-direction: column; gap: 10px; }
             .analytics-control-field,
-            .analytics-control-field--wide,
+            .analytics-control-field--wide { width: 100%; grid-column: auto; gap: 5px; }
+            .analytics-control-label { font-size: 10px; letter-spacing: 0.06em; }
+            .analytics-input,
+            .analytics-select,
+            .analytics-mobile-select-trigger {
+                min-height: 42px;
+                border-radius: 12px;
+                font-size: 13px;
+                padding: 0 11px;
+            }
+            .analytics-mobile-select-trigger {
+                width: 100%;
+                border: 1px solid #dbe3ef;
+                background: #fff;
+                color: #0f172a;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                font-weight: 800;
+            }
+            #barangaySelect.analytics-mobile-enhanced {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                opacity: 0;
+                pointer-events: none;
+            }
+            .analytics-actions { grid-template-columns: 1fr; gap: 8px; width: 100%; }
+            .analytics-btn { min-height: 44px; padding: 10px 12px; border-radius: 13px; align-items: center; }
+            .analytics-btn__copy strong { font-size: 12.5px; }
+            .analytics-btn__copy span { display: none; }
+            .prediction-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
             .prediction-card,
-            .prediction-card--wide { grid-column: span 6; }
-            .analytics-chart-canvas { min-width: 620px; min-height: 300px; }
-            .analytics-section__head { margin-bottom: 14px; }
+            .prediction-card--wide { grid-column: auto; padding: 11px; border-radius: 16px; }
+            .prediction-card--wide { grid-column: 1 / -1; }
+            .prediction-card__icon { width: 34px; height: 34px; border-radius: 12px; font-size: 13px; }
+            .prediction-card__label { font-size: 9.5px; }
+            .prediction-card__value { font-size: 1.25rem; margin-top: 9px; }
+            .prediction-card__copy { font-size: 11.5px; line-height: 1.35; }
+            .prediction-driver-chip { padding: 6px 9px; font-size: 10.5px; }
+            .analytics-dual-grid,
+            .analytics-panel-grid { grid-template-columns: 1fr; gap: 10px; }
+            .analytics-chart-wrap { padding: 10px; overflow: hidden; }
+            .analytics-chart-canvas { width: 100%; min-width: 0 !important; min-height: 0 !important; height: 224px; }
+            .analytics-chart-canvas canvas { width: 100% !important; height: 100% !important; }
+            .analytics-insight { padding: 9px 10px; border-radius: 13px; font-size: 11.5px; line-height: 1.45; }
+            .analytics-ops-grid { grid-template-columns: 1fr; gap: 8px; }
+            .analytics-ops-card { padding: 12px; }
+            .analytics-ops-card__value { font-size: 1.28rem; }
+            .analytics-legend-note { gap: 6px; font-size: 10.5px; }
+            .recommendation-card { padding: 12px !important; border-radius: 15px !important; margin-bottom: 10px !important; }
+            .explore-btn { width: 100%; justify-content: center; padding: 10px 12px; font-size: 12px; border-radius: 12px; }
+        }
+
+        @media (max-width: 340px) {
+            .analytics-hero__title { font-size: 1.38rem; }
+            .prediction-summary-grid { grid-template-columns: 1fr; }
+            .analytics-section { padding: 12px; }
+            .analytics-chart-canvas { height: 210px; }
         }
 
         .analytics-toast {
@@ -1530,7 +1903,7 @@
 
     <!-- Enhanced Explore Recommendation Modal -->
     <div id="exploreModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content analytics-forecast-modal">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-lightbulb" style="color: #f59e0b;"></i> AI Implementation Plan</h3>
                 <button class="modal-close" onclick="closeExploreModal()"><i class="fa-solid fa-times"></i></button>
@@ -1549,7 +1922,7 @@
     </div>
 
     <div id="predictionDetailModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content analytics-forecast-modal analytics-forecast-modal--details">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-chart-line" style="color: #dc2626;"></i> Forecast Details</h3>
                 <button class="modal-close" onclick="closePredictionDetailModal()"><i class="fa-solid fa-times"></i></button>
@@ -1600,6 +1973,185 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
+        const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
+
+        function isAnalyticsMobile() {
+            return analyticsMobileQuery.matches;
+        }
+
+        function cleanGeneratedText(text) {
+            return String(text ?? '')
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .replace(/`([^`]*)`/g, '$1')
+                .replace(/^#{1,6}\s*/gm, '')
+                .replace(/^\s*[-*]\s+/gm, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        function syncMobileBarangaySelect() {
+            const select = document.getElementById('barangaySelect');
+            const trigger = document.querySelector('[data-analytics-barangay-trigger]');
+            if (!select || !trigger) return;
+
+            const selected = select.options[select.selectedIndex];
+            trigger.disabled = select.disabled;
+            trigger.innerHTML = `
+                <span>${escapeHtml(selected?.textContent || 'Choose barangay')}</span>
+                <i class="fa-solid fa-chevron-up"></i>
+            `;
+        }
+
+        function closeMobileBarangaySheet() {
+            const sheet = document.querySelector('[data-analytics-barangay-sheet]');
+            if (!sheet) return;
+
+            sheet.setAttribute('aria-hidden', 'true');
+            document.body.style.removeProperty('overflow');
+            document.querySelector('[data-analytics-barangay-trigger]')?.focus({ preventScroll: true });
+        }
+
+        function renderMobileBarangayOptions(searchTerm = '') {
+            const select = document.getElementById('barangaySelect');
+            const list = document.querySelector('[data-analytics-barangay-options]');
+            if (!select || !list) return;
+
+            const query = searchTerm.trim().toLowerCase();
+            const options = Array.from(select.options).filter((option) => {
+                return !query || option.textContent.toLowerCase().includes(query);
+            });
+
+            list.innerHTML = options.length
+                ? options.map((option) => `
+                    <button type="button"
+                        class="analytics-mobile-select-option ${option.value === select.value ? 'is-selected' : ''}"
+                        data-analytics-barangay-value="${escapeHtml(option.value)}"
+                        aria-selected="${option.value === select.value ? 'true' : 'false'}">
+                        <span>${escapeHtml(option.textContent)}</span>
+                        ${option.value === select.value ? '<i class="fa-solid fa-check"></i>' : ''}
+                    </button>
+                `).join('')
+                : '<div class="analytics-mobile-select-option" aria-disabled="true">No barangay found</div>';
+        }
+
+        function openMobileBarangaySheet() {
+            const select = document.getElementById('barangaySelect');
+            const sheet = document.querySelector('[data-analytics-barangay-sheet]');
+            const search = document.querySelector('[data-analytics-barangay-search]');
+            if (!select || !sheet || select.disabled) return;
+
+            renderMobileBarangayOptions('');
+            if (search) search.value = '';
+            sheet.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => search?.focus({ preventScroll: true }), 80);
+        }
+
+        function initializeMobileBarangaySelect() {
+            const select = document.getElementById('barangaySelect');
+            if (!select || document.querySelector('[data-analytics-barangay-trigger]')) return;
+
+            select.classList.add('analytics-mobile-enhanced');
+
+            const trigger = document.createElement('button');
+            trigger.type = 'button';
+            trigger.className = 'analytics-mobile-select-trigger';
+            trigger.setAttribute('data-analytics-barangay-trigger', 'true');
+            trigger.setAttribute('aria-haspopup', 'dialog');
+            trigger.addEventListener('click', openMobileBarangaySheet);
+            select.insertAdjacentElement('afterend', trigger);
+
+            const sheet = document.createElement('div');
+            sheet.className = 'analytics-mobile-select-sheet';
+            sheet.setAttribute('data-analytics-barangay-sheet', 'true');
+            sheet.setAttribute('aria-hidden', 'true');
+            sheet.innerHTML = `
+                <div class="analytics-mobile-select-panel" role="dialog" aria-modal="true" aria-label="Choose barangay">
+                    <div class="analytics-mobile-select-handle" aria-hidden="true"></div>
+                    <div class="analytics-mobile-select-head">
+                        <h2 class="analytics-mobile-select-title">Choose barangay</h2>
+                        <button type="button" class="analytics-mobile-select-close" data-analytics-barangay-close aria-label="Close barangay selector">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <input type="search" class="analytics-mobile-select-search" data-analytics-barangay-search placeholder="Search barangay">
+                    <div class="analytics-mobile-select-options" data-analytics-barangay-options></div>
+                </div>
+            `;
+            document.body.appendChild(sheet);
+
+            sheet.addEventListener('click', (event) => {
+                if (event.target === sheet || event.target.closest('[data-analytics-barangay-close]')) {
+                    closeMobileBarangaySheet();
+                    return;
+                }
+
+                const option = event.target.closest('[data-analytics-barangay-value]');
+                if (!option) return;
+
+                select.value = option.getAttribute('data-analytics-barangay-value');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                syncMobileBarangaySelect();
+                closeMobileBarangaySheet();
+            });
+
+            sheet.querySelector('[data-analytics-barangay-search]')?.addEventListener('input', (event) => {
+                renderMobileBarangayOptions(event.target.value);
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && sheet.getAttribute('aria-hidden') === 'false') {
+                    closeMobileBarangaySheet();
+                }
+            });
+
+            new MutationObserver(syncMobileBarangaySelect).observe(select, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['disabled']
+            });
+            select.addEventListener('change', syncMobileBarangaySelect);
+            syncMobileBarangaySelect();
+        }
+
+        function enhanceAnalyticsInfoButtons() {
+            document.querySelectorAll('.analytics-section__head').forEach((head, index) => {
+                const copy = head.querySelector('.analytics-section__copy');
+                if (!copy || head.querySelector('.analytics-info-wrap')) return;
+
+                const wrap = document.createElement('span');
+                wrap.className = 'analytics-info-wrap';
+                wrap.innerHTML = `
+                    <button type="button" class="analytics-info-button" aria-expanded="false" aria-label="Show section details">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                    <span class="analytics-info-popover" id="analyticsInfoPopover${index}" role="status">${escapeHtml(copy.textContent)}</span>
+                `;
+                head.appendChild(wrap);
+
+                const button = wrap.querySelector('.analytics-info-button');
+                button?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    document.querySelectorAll('.analytics-info-wrap.is-open').forEach((openWrap) => {
+                        if (openWrap !== wrap) {
+                            openWrap.classList.remove('is-open');
+                            openWrap.querySelector('.analytics-info-button')?.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                    const nextState = !wrap.classList.contains('is-open');
+                    wrap.classList.toggle('is-open', nextState);
+                    button.setAttribute('aria-expanded', nextState ? 'true' : 'false');
+                });
+            });
+
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.analytics-info-wrap.is-open').forEach((wrap) => {
+                    wrap.classList.remove('is-open');
+                    wrap.querySelector('.analytics-info-button')?.setAttribute('aria-expanded', 'false');
+                });
+            });
+        }
 
         function showAnalyticsToast(message, type = 'info') {
             const toast = document.getElementById('analyticsToast');
@@ -1685,6 +2237,9 @@
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
 
+            enhanceAnalyticsInfoButtons();
+            initializeMobileBarangaySelect();
+
             if (openBtn) {
                 openBtn.addEventListener('click', function() {
                     sidebar.classList.add('open');
@@ -1729,6 +2284,7 @@
                     if (barangaySelect) {
                         barangaySelect.innerHTML = '<option value="all">All barangays in forecast</option>';
                         barangaySelect.disabled = true;
+                        syncMobileBarangaySelect();
                     }
                     return;
                 }
@@ -1764,6 +2320,7 @@
 
             if (!stationBarangays.length) {
                 barangaySelect.disabled = true;
+                syncMobileBarangaySelect();
                 return;
             }
 
@@ -1777,6 +2334,7 @@
             });
 
             barangaySelect.disabled = false;
+            syncMobileBarangaySelect();
         }
 
         function renderBarangayPredictionPanel(predictions = []) {
@@ -2050,6 +2608,23 @@
             const chartContext = analysisData.chart_context || {};
             const daily = chartContext.daily || {};
             const hourly = chartContext.hourly || {};
+            const compactChart = isAnalyticsMobile();
+            const chartFontSize = compactChart ? 10 : 12;
+            const chartPointRadius = compactChart ? 2 : 4;
+            const chartLegend = {
+                position: compactChart ? 'bottom' : 'top',
+                labels: {
+                    usePointStyle: true,
+                    boxWidth: compactChart ? 7 : 10,
+                    padding: compactChart ? 8 : 12,
+                    font: { size: chartFontSize, weight: compactChart ? '600' : '700' }
+                }
+            };
+            const chartTicks = {
+                color: '#64748b',
+                font: { size: chartFontSize },
+                maxTicksLimit: compactChart ? 5 : 8
+            };
 
             if (hourlyChart) hourlyChart.destroy();
             if (dailyChart) dailyChart.destroy();
@@ -2067,7 +2642,7 @@
                             backgroundColor: 'rgba(148,163,184,0.12)',
                             borderDash: [6, 6],
                             tension: 0.35,
-                            pointRadius: 3,
+                            pointRadius: compactChart ? 1.5 : 3,
                             yAxisID: 'y',
                         },
                         {
@@ -2076,7 +2651,7 @@
                             borderColor: '#dc2626',
                             backgroundColor: 'rgba(220,38,38,0.12)',
                             tension: 0.35,
-                            pointRadius: 4,
+                            pointRadius: chartPointRadius,
                             pointBackgroundColor: '#dc2626',
                             yAxisID: 'y',
                         },
@@ -2087,7 +2662,7 @@
                             backgroundColor: 'rgba(245,158,11,0.14)',
                             tension: 0.2,
                             pointRadius: 0,
-                            borderWidth: 2,
+                            borderWidth: compactChart ? 1.5 : 2,
                             yAxisID: 'y1',
                             spanGaps: true,
                         }
@@ -2098,7 +2673,7 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { position: 'top', labels: { usePointStyle: true } },
+                        legend: chartLegend,
                         tooltip: {
                             callbacks: {
                                 label: (context) => {
@@ -2114,16 +2689,19 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: 'Incident count' }
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
                         },
                         y1: {
                             beginAtZero: true,
                             position: 'right',
+                            ticks: chartTicks,
                             grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'Predicted probability (%)' }
+                            title: { display: !compactChart, text: 'Predicted probability (%)' }
                         },
                         x: {
-                            title: { display: true, text: 'Date' }
+                            ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                            title: { display: !compactChart, text: 'Date' }
                         }
                     }
                 }
@@ -2151,7 +2729,9 @@
                             label: 'Current month actual',
                             data: hourly.current_period || [],
                             backgroundColor: 'rgba(37,99,235,0.78)',
-                            borderRadius: 6,
+                            borderRadius: compactChart ? 4 : 6,
+                            barPercentage: compactChart ? 0.72 : 0.82,
+                            categoryPercentage: compactChart ? 0.72 : 0.82,
                             yAxisID: 'y',
                         },
                         {
@@ -2162,7 +2742,7 @@
                             backgroundColor: 'rgba(234,88,12,0.12)',
                             tension: 0,
                             spanGaps: true,
-                            pointRadius: 4,
+                            pointRadius: chartPointRadius,
                             yAxisID: 'y1',
                         }
                     ]
@@ -2172,7 +2752,7 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { position: 'top', labels: { usePointStyle: true } },
+                        legend: chartLegend,
                         tooltip: {
                             callbacks: {
                                 label: (context) => {
@@ -2188,16 +2768,19 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: 'Incident frequency' }
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident frequency' }
                         },
                         y1: {
                             beginAtZero: true,
                             position: 'right',
+                            ticks: chartTicks,
                             grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'Predicted probability (%)' }
+                            title: { display: !compactChart, text: 'Predicted probability (%)' }
                         },
                         x: {
-                            title: { display: true, text: 'Hour of day' }
+                            ticks: { ...chartTicks, maxRotation: 0 },
+                            title: { display: !compactChart, text: 'Hour of day' }
                         }
                     }
                 }
@@ -2524,9 +3107,9 @@
         }
         
         function escapeHtml(text) {
-            if (!text) return '';
+            if (text === null || text === undefined) return '';
             const div = document.createElement('div');
-            div.textContent = text;
+            div.textContent = cleanGeneratedText(text);
             return div.innerHTML;
         }
 

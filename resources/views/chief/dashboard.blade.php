@@ -428,22 +428,27 @@
 
             <div class="flex items-center gap-6">
                 <!-- Notification Bell -->
-                <div class="hidden md:block relative">
-                    <button id="notificationBtn" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative">
+                <div class="hidden md:block relative chief-alerts-host">
+                    <button id="notificationBtn" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative" aria-controls="alertsDropdown" aria-expanded="false" aria-label="Open incident notifications">
                         <i class="fa-regular fa-bell"></i>
                         @if($alerts->count() > 0)
                         <span id="alertBadge" class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
                         @endif
                     </button>
-                    <div id="alertsDropdown" class="hidden absolute right-0 mt-3 w-[24rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl z-[5200] overflow-hidden">
+                    <div id="alertsDropdown" class="hidden absolute right-0 mt-3 w-[24rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl z-[5200] overflow-hidden" aria-hidden="true">
                         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                             <div>
                                 <p class="text-sm font-bold text-slate-800">Incident Notifications</p>
                                 <p class="text-[11px] text-slate-500">Live alerts from field reports</p>
                             </div>
-                            <button type="button" onclick="markAllAsRead()" class="text-[11px] font-semibold text-amber-700 hover:text-amber-800">
-                                Mark all as read
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="markAllAsRead()" class="text-[11px] font-semibold text-amber-700 hover:text-amber-800">
+                                    Mark all as read
+                                </button>
+                                <button type="button" id="alertsDropdownClose" class="chief-alerts-mobile-close" aria-label="Close incident notifications">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
                         </div>
                         <div id="alertsDropdownList" class="max-h-[24rem] overflow-y-auto divide-y divide-slate-100">
                             <div class="px-4 py-6 text-sm text-slate-500 text-center">
@@ -451,6 +456,7 @@
                             </div>
                         </div>
                     </div>
+                    <div id="chiefNotificationBackdrop" class="chief-notification-backdrop" hidden></div>
                 </div>
 
                 <!-- User Profile Dropdown -->
@@ -1607,22 +1613,89 @@
         // Alert bell toggle
         const alertBell = document.getElementById('notificationBtn');
         const alertsDropdown = document.getElementById('alertsDropdown');
-        
+        const alertsHost = alertsDropdown?.closest('.chief-alerts-host');
+        const alertsBackdrop = document.getElementById('chiefNotificationBackdrop');
+        const alertsCloseBtn = document.getElementById('alertsDropdownClose');
+        let lastAlertsFocus = null;
+
+        function isChiefAlertsPanelOpen() {
+            return Boolean(alertsDropdown?.classList.contains('show'));
+        }
+
+        function openChiefAlertsPanel() {
+            if (!alertsDropdown) return;
+            lastAlertsFocus = document.activeElement;
+            alertsHost?.classList.add('chief-alerts-host-open');
+            alertsDropdown.classList.add('show');
+            alertsDropdown.classList.remove('hidden');
+            alertsDropdown.setAttribute('aria-hidden', 'false');
+            alertBell?.setAttribute('aria-expanded', 'true');
+            alertsBackdrop?.removeAttribute('hidden');
+            alertsBackdrop?.classList.add('is-visible');
+            document.body.classList.add('chief-notifications-open');
+
+            if (window.matchMedia('(max-width: 767px)').matches) {
+                window.setTimeout(() => alertsCloseBtn?.focus({ preventScroll: true }), 0);
+            }
+        }
+
+        function closeChiefAlertsPanel(options = {}) {
+            if (!alertsDropdown) return;
+
+            if (alertsDropdown.contains(document.activeElement)) {
+                document.activeElement?.blur?.();
+            }
+
+            alertsDropdown.classList.remove('show');
+            alertsDropdown.classList.add('hidden');
+            alertsDropdown.setAttribute('aria-hidden', 'true');
+            alertBell?.setAttribute('aria-expanded', 'false');
+            alertsBackdrop?.classList.remove('is-visible');
+            alertsBackdrop?.setAttribute('hidden', 'hidden');
+            alertsHost?.classList.remove('chief-alerts-host-open');
+            document.body.classList.remove('chief-notifications-open');
+
+            if (options.restoreFocus !== false) {
+                (lastAlertsFocus || alertBell)?.focus?.({ preventScroll: true });
+            }
+        }
+
+        function toggleChiefAlertsPanel() {
+            isChiefAlertsPanelOpen() ? closeChiefAlertsPanel() : openChiefAlertsPanel();
+        }
+
         if (alertBell) {
             alertBell.addEventListener('click', function(e) {
                 e.stopPropagation();
-                alertsDropdown?.classList.toggle('show');
-                alertsDropdown?.classList.toggle('hidden');
+                toggleChiefAlertsPanel();
             });
         }
-        
-        // Close dropdown when clicking outside
+
+        alertsCloseBtn?.addEventListener('click', () => closeChiefAlertsPanel());
+        alertsBackdrop?.addEventListener('click', () => closeChiefAlertsPanel());
+        alertsBackdrop?.addEventListener('touchmove', (event) => event.preventDefault(), { passive: false });
+        alertsBackdrop?.addEventListener('wheel', (event) => event.preventDefault(), { passive: false });
+
         document.addEventListener('click', function(e) {
-            if (!alertBell?.contains(e.target) && !alertsDropdown?.contains(e.target)) {
-                alertsDropdown?.classList.remove('show');
-                alertsDropdown?.classList.add('hidden');
+            if (!isChiefAlertsPanelOpen()) return;
+            if (alertBell?.contains(e.target) || alertsDropdown?.contains(e.target)) return;
+            closeChiefAlertsPanel({ restoreFocus: false });
+        });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isChiefAlertsPanelOpen()) return;
+            if (alertsDropdown?.contains(e.target)) return;
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isChiefAlertsPanelOpen()) {
+                closeChiefAlertsPanel();
             }
         });
+
+        window.openChiefAlertsPanel = openChiefAlertsPanel;
+        window.closeChiefAlertsPanel = closeChiefAlertsPanel;
 
         // Initialize all charts
         initializeCharts();
@@ -2485,7 +2558,12 @@
     function focusOnMarker(lat, lng) {
         if (window.map) {
             window.map.setView([lat, lng], 16);
-            document.getElementById('alertsDropdown')?.classList.remove('show');
+            if (typeof window.closeChiefAlertsPanel === 'function') {
+                window.closeChiefAlertsPanel({ restoreFocus: false });
+            } else {
+                document.getElementById('alertsDropdown')?.classList.remove('show');
+                document.getElementById('alertsDropdown')?.classList.add('hidden');
+            }
         }
     }
 
@@ -2493,11 +2571,17 @@
         if (typeof window.markAllIncidentAlertsRead === 'function') {
             window.markAllIncidentAlertsRead();
         }
-        document.getElementById('alertsDropdown')?.classList.remove('show');
-        document.getElementById('alertsDropdown')?.classList.add('hidden');
+        if (typeof window.closeChiefAlertsPanel === 'function') {
+            window.closeChiefAlertsPanel({ restoreFocus: false });
+        } else {
+            document.getElementById('alertsDropdown')?.classList.remove('show');
+            document.getElementById('alertsDropdown')?.classList.add('hidden');
+        }
     }
 
     function openModal() {
+        window.removeMapPlacementMarker?.({ clearCoordinates: true });
+        window.enableMarkerPlacementSelection?.();
         const modal = document.getElementById('markerModal');
         if (modal) {
             modal.style.display = 'flex';
@@ -2546,13 +2630,42 @@
         if (modal) modal.style.display = 'none';
     }
 
-    function closeModal() {
+    function closeModal(options = {}) {
         const modal = document.getElementById('markerModal');
         if (modal) {
             modal.style.display = 'none';
             modal.classList.remove('is-open', 'active');
             modal.setAttribute('aria-hidden', 'true');
         }
+        if (!options.skipPlacementCleanup) {
+            window.disableMarkerPlacementSelection?.({
+                clearCoordinates: options.keepCoordinates !== true
+            });
+        }
+    }
+
+    const markerModalCleanupTarget = document.getElementById('markerModal');
+    if (markerModalCleanupTarget && !markerModalCleanupTarget.dataset.markerCleanupBound) {
+        markerModalCleanupTarget.dataset.markerCleanupBound = 'true';
+
+        markerModalCleanupTarget.addEventListener('click', (event) => {
+            if (event.target === markerModalCleanupTarget) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+
+            const isMarkerModalOpen =
+                markerModalCleanupTarget.classList.contains('is-open') ||
+                markerModalCleanupTarget.classList.contains('active') ||
+                markerModalCleanupTarget.style.display !== 'none';
+
+            if (isMarkerModalOpen) {
+                closeModal();
+            }
+        });
     }
 
     function openAddCategory() {
@@ -2573,8 +2686,17 @@
         console.warn('closeAddCategory called but no category modal exists on chief dashboard.');
     }
 
-    function emergencyCall() {
-        if (confirm('Call 911 for emergency services?')) {
+    async function emergencyCall() {
+        const shouldCall = typeof window.showMarkerConfirm === 'function'
+            ? await window.showMarkerConfirm({
+                title: 'Call emergency?',
+                message: 'Open your phone dialer for 911.',
+                confirmText: 'Call 911',
+                cancelText: 'Cancel'
+            })
+            : true;
+
+        if (shouldCall) {
             window.location.href = 'tel:911';
         }
     }
@@ -2853,24 +2975,135 @@
         }, 1000);
     });
     
-    // Make route calculation functions globally available
-    window.calculateRouteToStation = function(stationId, stationName, lat, lng) {
-        if (window.unifiedMap) {
-            window.unifiedMap.calculateRouteToStation(stationId, stationName, lat, lng);
+    window.showChiefRouteToast = function(message, state = 'loading') {
+        let toast = document.getElementById('chiefRouteToast');
+
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'chiefRouteToast';
+            toast.className = 'chief-route-toast';
+            toast.setAttribute('role', 'status');
+            toast.setAttribute('aria-live', 'polite');
+            toast.innerHTML = `
+                <span class="chief-route-toast__spinner" aria-hidden="true"></span>
+                <span class="chief-route-toast__icon" aria-hidden="true"></span>
+                <span class="chief-route-toast__copy"></span>
+            `;
+            document.body.appendChild(toast);
+        }
+
+        toast.classList.remove('chief-route-toast--loading', 'chief-route-toast--success', 'chief-route-toast--error');
+        toast.classList.add('is-visible', `chief-route-toast--${state}`);
+        toast.querySelector('.chief-route-toast__copy').textContent = message || 'Loading route...';
+
+        window.clearTimeout(window.__chiefRouteToastTimer);
+        if (state !== 'loading') {
+            window.__chiefRouteToastTimer = window.setTimeout(() => {
+                toast.classList.remove('is-visible');
+            }, 2600);
         }
     };
-    
-    window.calculateRouteToIncident = function(incidentId) {
-        if (window.unifiedMap) {
-            window.unifiedMap.calculateRouteToIncident(incidentId);
-        }
-    };
-    
-    window.stopSimulation = function() {
-        if (window.unifiedMap) {
-            window.unifiedMap.stopSimulation();
-        }
-    };
+
+    function installChiefRouteFeedbackWrappers() {
+        const wrapRouteFunction = function(name) {
+            const routeFn = window[name];
+
+            if (typeof routeFn !== 'function' || routeFn.__chiefRouteFeedbackWrapped) {
+                return;
+            }
+
+            const wrapped = function(...args) {
+                const source = args[2]?.source === 'demo' || name === 'calculateDemoRouteToIncident'
+                    ? 'demo'
+                    : 'real';
+                const loadingMessage = source === 'demo' ? 'Loading demo route...' : 'Loading directions...';
+                const successMessage = source === 'demo' ? 'Demo route ready.' : 'Directions ready.';
+
+                window.showChiefRouteToast(loadingMessage, 'loading');
+
+                let result;
+                try {
+                    result = routeFn.apply(this, args);
+                } catch (error) {
+                    window.showChiefRouteToast('Route failed. Please try again.', 'error');
+                    throw error;
+                }
+
+                if (result && typeof result.then === 'function') {
+                    return result
+                        .then((value) => {
+                            if (value === false || value?.ok === false) {
+                                window.showChiefRouteToast('Route could not be displayed.', 'error');
+                                return value;
+                            }
+
+                            window.showChiefRouteToast(successMessage, 'success');
+                            return value;
+                        })
+                        .catch((error) => {
+                            window.showChiefRouteToast('Route failed. Please try again.', 'error');
+                            throw error;
+                        });
+                }
+
+                window.setTimeout(() => {
+                    window.showChiefRouteToast(
+                        result === false || result?.ok === false ? 'Route could not be displayed.' : successMessage,
+                        result === false || result?.ok === false ? 'error' : 'success'
+                    );
+                }, 700);
+
+                return result;
+            };
+
+            wrapped.__chiefRouteFeedbackWrapped = true;
+            wrapped.__chiefRouteOriginal = routeFn;
+            window[name] = wrapped;
+        };
+
+        wrapRouteFunction('calculateRouteToIncident');
+        wrapRouteFunction('calculateDemoRouteToIncident');
+        wrapRouteFunction('calculateRouteToStation');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        installChiefRouteFeedbackWrappers();
+
+        let routeWrapAttempts = 0;
+        const routeWrapTimer = window.setInterval(function() {
+            installChiefRouteFeedbackWrappers();
+            routeWrapAttempts += 1;
+
+            if (routeWrapAttempts >= 12) {
+                window.clearInterval(routeWrapTimer);
+            }
+        }, 500);
+    });
+
+    // Keep map.js route handlers intact. These fallbacks only run if the shared route module is absent.
+    if (typeof window.calculateRouteToStation !== 'function') {
+        window.calculateRouteToStation = function(stationId, stationName, lat, lng) {
+            if (window.unifiedMap) {
+                window.unifiedMap.calculateRouteToStation(stationId, stationName, lat, lng);
+            }
+        };
+    }
+
+    if (typeof window.calculateRouteToIncident !== 'function') {
+        window.calculateRouteToIncident = function(incidentId) {
+            if (window.unifiedMap) {
+                window.unifiedMap.calculateRouteToIncident(incidentId);
+            }
+        };
+    }
+
+    if (typeof window.stopSimulation !== 'function') {
+        window.stopSimulation = function() {
+            if (window.unifiedMap) {
+                window.unifiedMap.stopSimulation();
+            }
+        };
+    }
 
     window.refreshMap = function() {
         if (window.map && typeof window.map.invalidateSize === 'function') {

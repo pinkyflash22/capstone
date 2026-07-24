@@ -246,7 +246,23 @@ class MarkerController extends Controller
             'image' => $validated['image'] ?? null
         ]);
 
-        return response()->json(['success'=>true, 'data'=>$data]);
+        $data->refresh();
+        $data->load([
+            'stations.address.barangay.city',
+            'stations.stationOfficers.user.role',
+            'barangayHall.address.barangay.city',
+            'barangayHall.barangay.city',
+            'hydrants.station',
+            'incidents',
+            'riskAreas',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Marker saved successfully.',
+            'data' => $data,
+            'marker' => $data,
+        ], 201);
     }
 
  

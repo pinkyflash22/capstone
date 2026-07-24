@@ -30,6 +30,11 @@ let selectedShapeId = null;
 let startMarker = null;
 let endMarker = null;
 let stations = [];
+let markerPlacementSelectionActive = false;
+let markerMapClickHandlerRegistered = false;
+let markerSaveInProgress = false;
+let optimisticMarkerSequence = 0;
+const optimisticMapMarkers = new Map();
 
 // Route and simulation variables
 let routeLayer = null;
@@ -4618,7 +4623,7 @@ styleElement.textContent = `
         display: none;
         justify-content: center;
         align-items: center;
-        z-index: 10001;
+        z-index: 10080;
     }
     
     .edit-modal.active { display: flex; }
@@ -4721,6 +4726,87 @@ styleElement.textContent = `
     }
     
     .edit-btn-cancel:hover { background: #d1d5db; }
+
+    @media (max-width: 768px) {
+        .edit-modal {
+            align-items: flex-end;
+            background: rgba(15, 23, 42, 0.34);
+            padding: 0;
+        }
+
+        .edit-modal-content {
+            width: 100%;
+            max-width: 100%;
+            max-height: min(82svh, 620px);
+            border-radius: 24px 24px 0 0;
+            padding: 16px;
+            padding-bottom: calc(16px + env(safe-area-inset-bottom));
+            box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.18);
+        }
+
+        .edit-modal-content::before {
+            content: '';
+            display: block;
+            width: 52px;
+            height: 5px;
+            margin: -4px auto 14px;
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+
+        .edit-modal-header {
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+        }
+
+        .edit-modal-header h3 {
+            font-size: 18px;
+        }
+
+        .edit-modal-close {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #fed7aa;
+            border-radius: 14px;
+            color: #c2410c;
+            background: #fff7ed;
+        }
+
+        .edit-form-group {
+            margin-bottom: 12px;
+        }
+
+        .edit-form-group label {
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .edit-form-group input,
+        .edit-form-group textarea,
+        .edit-form-group select {
+            min-height: 42px;
+            padding: 9px 11px;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+
+        .edit-modal-actions {
+            position: sticky;
+            bottom: 0;
+            margin: 12px -16px -16px;
+            padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, rgba(255,255,255,0.84), #fff 34%);
+        }
+
+        .edit-btn-save,
+        .edit-btn-cancel {
+            min-height: 44px;
+            border-radius: 14px;
+        }
+    }
     
     @keyframes slideInRight {
         from { transform: translateX(100%); opacity: 0; }
@@ -4851,6 +4937,7 @@ function initEditModal() {
         editModal = document.createElement('div');
         editModal.id = 'editModal';
         editModal.className = 'edit-modal';
+        editModal.setAttribute('aria-hidden', 'true');
         editModal.innerHTML = `
             <div class="edit-modal-content">
                 <div class="edit-modal-header">
@@ -4860,6 +4947,11 @@ function initEditModal() {
                 <div id="editModalContent"></div>
             </div>
         `;
+        editModal.addEventListener('click', (event) => {
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        });
         document.body.appendChild(editModal);
     } else {
         editModal = document.getElementById('editModal');
@@ -4922,6 +5014,10 @@ async function openEditModal(marker) {
     
     initEditModal();
     currentEditMarker = marker;
+
+    if (typeof closeResponderMapPreviewSheet === 'function') {
+        closeResponderMapPreviewSheet();
+    }
     
     const modalContent = document.getElementById('editModalContent');
     let extraFieldsHtml = '';
@@ -5018,6 +5114,9 @@ async function openEditModal(marker) {
     }, 50);
     
     editModal.classList.add('active');
+    editModal.style.display = 'flex';
+    editModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('map-edit-modal-open');
     
     const saveBtn = document.getElementById('editSaveBtn');
     if (saveBtn) {
@@ -5130,7 +5229,13 @@ async function updateMarker(markerId) {
 
 function closeEditModal() {
     if (editModal) {
+        if (editModal.contains(document.activeElement)) {
+            document.activeElement?.blur?.();
+        }
         editModal.classList.remove('active');
+        editModal.style.display = 'none';
+        editModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('map-edit-modal-open');
         currentEditMarker = null;
     }
 }
@@ -5528,13 +5633,31 @@ function extractRouteLatLngs(routeLike) {
         return [];
     }
 
-    if (Array.isArray(coordinates[0]) && coordinates[0].length > 0 && Array.isArray(coordinates[0][0])) {
-        coordinates = coordinates[0];
-    }
+    const coordinatePairs = [];
+    const collectCoordinatePairs = (value) => {
+        if (!Array.isArray(value)) {
+            return;
+        }
+
+        if (
+            value.length >= 2
+            && !Array.isArray(value[0])
+            && !Array.isArray(value[1])
+            && Number.isFinite(Number(value[0]))
+            && Number.isFinite(Number(value[1]))
+        ) {
+            coordinatePairs.push(value);
+            return;
+        }
+
+        value.forEach(collectCoordinatePairs);
+    };
+
+    collectCoordinatePairs(coordinates);
 
     const latlngs = [];
-    for (let i = 0; i < coordinates.length; i++) {
-        const coord = coordinates[i];
+    for (let i = 0; i < coordinatePairs.length; i++) {
+        const coord = coordinatePairs[i];
         if (!Array.isArray(coord) || coord.length < 2) {
             continue;
         }
@@ -5664,9 +5787,13 @@ function unregisterRouteRendering(routeId) {
 }
 
 async function fetchCoordinate(options = {}) {
-    const { preferSeeded = false, revalidate = true } = options;
+    const { preferSeeded = false, revalidate = true, force = false } = options;
 
     try {
+        if (force) {
+            window.removeMapPlacementMarker?.({ clearCoordinates: false });
+        }
+
         const seededMarkers = window.mapData?.marker;
         if (preferSeeded && Array.isArray(seededMarkers) && seededMarkers.length > 0) {
             // Paint markers immediately for fast first render.
@@ -5693,7 +5820,7 @@ async function fetchCoordinate(options = {}) {
             }
         }
 
-        if (shouldSkipStaticLayerRefetch(lastMarkersFetchAt)) {
+        if (!force && shouldSkipStaticLayerRefetch(lastMarkersFetchAt)) {
             return;
         }
 
@@ -6193,9 +6320,13 @@ async function fetchStations(options = {}) {
         writeStaticMapCache('stations', data.data || data || []);
         
         console.log('Stations loaded:', stations.length);
+        return stations;
     } catch (error) {
         console.error('Error fetching stations:', error);
-        stations = [];
+        if (!Array.isArray(stations)) {
+            stations = [];
+        }
+        return stations;
     }
 }
 
@@ -6939,11 +7070,22 @@ function openResponderMapPreviewSheet(content, markerContext = null) {
     document.body.style.overflow = 'hidden';
 
     if (markerContext?.marker) {
+        const marker = markerContext.marker;
+        const sheetEditButton = body?.querySelector(`[id="edit${marker.marker_id}"]`);
+        if (sheetEditButton && canManageMarkers) {
+            sheetEditButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                openEditModal(marker);
+            });
+        }
+
         addPopupEventListeners({
-            marker: markerContext.marker,
+            marker,
             incident: markerContext.incident || null,
             image: markerContext.image || null,
-            created_at: markerContext.created_at || markerContext.marker.created_at || null
+            created_at: markerContext.created_at || marker.created_at || null
         });
     }
 }
@@ -7191,32 +7333,51 @@ function showResponderIncidentDetails(marker, incident, imagePath = null) {
     );
 }
 
-async function calculateRouteToStation(stationId) {
-    await fetchStations();
+async function calculateRouteToStation(stationId, stationName = null, lat = null, lng = null) {
+    await fetchStations({ preferSeeded: true });
     console.log('trying...', stations);
     console.log('station id...', stationId);
-    
-    // Find station by marker_id
-    const station = stations.find(s => s.marker.marker_id == stationId);
+
+    const station = stations.find(s =>
+        s?.marker?.marker_id == stationId
+        || s?.marker_id == stationId
+        || s?.station_id == stationId
+        || s?.id == stationId
+    );
     console.log('Found station:', station);
-    
-    if (!station || !window.userCoords.ready) return;
-    
+
+    const destinationLat = parseFloat(station?.lat ?? station?.marker?.lat ?? lat);
+    const destinationLng = parseFloat(station?.lng ?? station?.marker?.lng ?? lng);
+
+    if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) {
+        showToast('Station coordinates are not available.', 'error');
+        throw new Error('Station coordinates are not available.');
+    }
+
     const destination = {
-        lat: parseFloat(station.lat),
-        lng: parseFloat(station.lng),
-        title: station.station_name || 'Fire Station'
+        lat: destinationLat,
+        lng: destinationLng,
+        title: station?.station_name || stationName || 'Fire Station'
     };
     console.log('calculating route to station:', destination);
-    const origin = window.userCoords;
+
+    const origin = typeof resolveRouteOrigin === 'function'
+        ? await resolveRouteOrigin('real', destination)
+        : window.userCoords;
+
+    if (!origin?.ready || !Number.isFinite(Number(origin.currentLatitude)) || !Number.isFinite(Number(origin.currentLongitude))) {
+        showToast('Getting your location... Please wait.', 'warning');
+        throw new Error('Current location is not ready.');
+    }
+
     window.thisIncidents = null;
-    await calculateRouteWithGeoapify(origin, destination);
+    return await calculateRouteWithGeoapify(origin, destination);
 }
 
 async function calculateRouteWithGeoapify(origin, destination) {
     if (!origin || !destination || !window.geoapifyKey) {
         console.error('Missing origin, destination, or API key');
-        return;
+        throw new Error('Missing route configuration.');
     }
     console.log('Generating origin:', origin);
     console.log('Generating destination:', destination);
@@ -7240,57 +7401,73 @@ async function calculateRouteWithGeoapify(origin, destination) {
         const data = await response.json();
         console.log('Generating route data:', data);
         
-        if (data.features && data.features.length > 0) {
-            const route = data.features[0];
-            const routeSource = origin?.routeSource || destination?.routeSource || 'real';
-            route.route_source = routeSource;
-            route.origin_lat = origin?.currentLatitude ?? null;
-            route.origin_lng = origin?.currentLongitude ?? null;
-            window.activeRoute = route;
+        if (!data.features || data.features.length === 0) {
+            throw new Error('No route returned by Geoapify.');
+        }
 
-            if (window.thisIncidents) {
-                // SAVE TO DATABASE FOR ALL USERS TO SEE
-                const savedRoute = await saveRouteToDatabase(route, destination, origin);
-                console.log("displaying route data1: ", savedRoute);
-                
-                // Add to multi-truck system
-                if (savedRoute && savedRoute.data) {    
-                    const routeId = savedRoute.data.route_id;
-                    const matchedIncident = window.incidentsData?.find(inc => inc.incident_id == window.thisIncidents);
-                    const persistedRoute = {
-                        ...savedRoute.data,
-                        route_source: savedRoute.data.route_source || routeSource,
-                        route_team_id: matchedIncident?.team_id ?? null,
-                        route_station_id: savedRoute.data.route_station_id ?? null
-                    };
-                    await displayAndStartRoute(routeId, persistedRoute, destination);
-                    console.log("displaying route data2: ", persistedRoute);
-                } else {
-                    // Fallback: still show route to the current user if DB persistence fails.
-                    console.warn('Route persistence failed; rendering local route fallback.');
-                    displayGeoapifyRoute(route);
-                    updateRouteInfoFromGeoapify(route);
+        const route = data.features[0];
+        const routeSource = origin?.routeSource || destination?.routeSource || 'real';
+        route.route_source = routeSource;
+        route.origin_lat = origin?.currentLatitude ?? null;
+        route.origin_lng = origin?.currentLongitude ?? null;
+        window.activeRoute = route;
+
+        if (window.thisIncidents) {
+            // SAVE TO DATABASE FOR ALL USERS TO SEE
+            const savedRoute = await saveRouteToDatabase(route, destination, origin);
+            console.log("displaying route data1: ", savedRoute);
+
+            // Add to multi-truck system
+            if (savedRoute && savedRoute.data) {
+                const routeId = savedRoute.data.route_id;
+                const matchedIncident = window.incidentsData?.find(inc => inc.incident_id == window.thisIncidents);
+                const persistedRoute = {
+                    ...savedRoute.data,
+                    route_source: savedRoute.data.route_source || routeSource,
+                    route_team_id: matchedIncident?.team_id ?? null,
+                    route_station_id: savedRoute.data.route_station_id ?? null
+                };
+                const displayed = await displayAndStartRoute(routeId, persistedRoute, destination);
+                console.log("displaying route data2: ", persistedRoute);
+
+                if (displayed === false) {
+                    throw new Error('Route could not be displayed for this user.');
                 }
             } else {
-                console.log('No incident_id for route persistence, displaying station route locally');
-                displayGeoapifyRoute(route);
+                // Fallback: still show route to the current user if DB persistence fails.
+                console.warn('Route persistence failed; rendering local route fallback.');
+                const displayed = displayGeoapifyRoute(route);
+                if (!displayed) {
+                    throw new Error('Route could not be displayed.');
+                }
                 updateRouteInfoFromGeoapify(route);
             }
-            
-            console.log("displaying route data3: ", route);
-            
-            const routeCard = document.getElementById('routeInfoCard');
-            if (routeCard) routeCard.style.display = 'block';
-            
-            window.routeDestination = {
-                ...destination,
-                routeSource
-            };
+        } else {
+            console.log('No incident_id for route persistence, displaying station route locally');
+            const displayed = displayGeoapifyRoute(route);
+            if (!displayed) {
+                throw new Error('Route could not be displayed.');
+            }
+            updateRouteInfoFromGeoapify(route);
         }
+
+        console.log("displaying route data3: ", route);
+
+        const routeCard = document.getElementById('routeInfoCard');
+        if (routeCard) routeCard.style.display = 'block';
+
+        window.routeDestination = {
+            ...destination,
+            routeSource
+        };
+
+        return { ok: true, route, routeSource };
         
     } catch (error) {
         console.error('Geoapify route calculation error:', error);
         console.log('error route data:', error);
+        showToast(error.message || 'Route failed. Please try again.', 'error');
+        throw error;
     }
 }
 
@@ -7423,6 +7600,12 @@ function bindTruckDetailsPopup(routeId, marker, truck = null) {
 }
 
 function displayGeoapifyRoute(route) {
+    if (!window.map || typeof L === 'undefined') {
+        console.error('Map is not ready for route display');
+        showToast('Map is not ready for route display.', 'error');
+        return false;
+    }
+
     if (routeLayer) {
         window.map.removeLayer(routeLayer);
     }
@@ -7431,9 +7614,9 @@ function displayGeoapifyRoute(route) {
     
     if (latlngs.length === 0) {
         console.error('No valid coordinates found in route');
-        console.log('Coordinates structure:', JSON.stringify(coordinates).substring(0, 500));
+        console.log('Route structure:', JSON.stringify(route?.geometry?.coordinates || route?.coordinates || route).substring(0, 500));
         showToast('Invalid route data', 'error');
-        return;
+        return false;
     }
     
     console.log('Final latlngs count:', latlngs.length);
@@ -7453,6 +7636,10 @@ function displayGeoapifyRoute(route) {
         lineJoin: 'round',
         lineCap: 'round'
     }).addTo(window.map);
+
+    if (typeof routeLayer.bringToFront === 'function') {
+        routeLayer.bringToFront();
+    }
     
     // Fit map to route bounds
     const bounds = routeLayer.getBounds();
@@ -7496,6 +7683,7 @@ function displayGeoapifyRoute(route) {
     }
     
     console.log('Route displayed successfully!');
+    return true;
 }
 
 function addDistanceMarkers(latlngs, totalDistance) {
@@ -7923,7 +8111,7 @@ async function displayAndStartRoute(routeId, route, destination) {
     console.log('Displaying route data:', route);
     if (!shouldDisplayRouteForCurrentUser(route)) {
         console.log('Skipping route for current user/team:', routeId);
-        return;
+        return false;
     }
     
     // Extract coordinates (same as before)
@@ -7932,7 +8120,7 @@ async function displayAndStartRoute(routeId, route, destination) {
     if (latlngs.length === 0) {
         console.error('No valid coordinates found after parsing');
         showToast('Invalid route coordinates', 'error');
-        return;
+        return false;
     }
     
     console.log(`Route ${routeId} has ${latlngs.length} points`);
@@ -8023,6 +8211,7 @@ async function displayAndStartRoute(routeId, route, destination) {
     // Start simulation for new route
     console.log('Starting simulation for new route:', routeId);
     await startSimulationForRoute(routeId);
+    return true;
 }
 
 function addStartMovementButton(routeId, destinationTitle) {
@@ -8877,6 +9066,157 @@ function getMarkerCategoryEnumValue(categoryInput) {
         case 'hazard': return 'hazard';
         default: return null;
     }
+}
+
+function showMarkerFeedback(message, type = 'info', title = 'Map update') {
+    if (typeof showNotification === 'function') {
+        showNotification(message, type, title);
+        return;
+    }
+
+    console[type === 'error' ? 'error' : 'log'](message);
+}
+
+function removeMapPlacementMarker(options = {}) {
+    const { clearCoordinates = true } = options;
+
+    if (startMarker && window.map) {
+        try {
+            window.map.removeLayer(startMarker);
+        } catch (error) {
+            console.warn('Unable to remove placement marker:', error);
+        }
+    }
+
+    startMarker = null;
+
+    if (clearCoordinates) {
+        selectedLat = null;
+        selectedLng = null;
+    }
+}
+
+function handleManagedMapClick(e) {
+    if (isDrawing) return;
+
+    if (manageShapesMode) {
+        let clickedShape = null;
+        let clickedLayer = null;
+        Object.values(shapeLayers).forEach(layer => {
+            if (layer.getBounds && layer.getBounds().contains(e.latlng)) {
+                clickedShape = layer.shapeId;
+                clickedLayer = layer;
+            }
+        });
+
+        if (clickedShape) {
+            onShapeClick(clickedShape, clickedLayer, e.latlng);
+        }
+
+        return;
+    }
+
+    if (!markerPlacementSelectionActive) {
+        return;
+    }
+
+    selectedLat = e.latlng.lat;
+    selectedLng = e.latlng.lng;
+    removeMapPlacementMarker({ clearCoordinates: false });
+    startMarker = L.marker(e.latlng).addTo(window.map);
+    getName(startMarker.getLatLng().lat, startMarker.getLatLng().lng);
+}
+
+function ensureManagedMapClickHandler() {
+    if (!window.map) return;
+
+    window.map.off('click', handleManagedMapClick);
+    window.map.on('click', handleManagedMapClick);
+    markerMapClickHandlerRegistered = true;
+}
+
+window.removeMapPlacementMarker = removeMapPlacementMarker;
+window.enableMarkerPlacementSelection = function enableMarkerPlacementSelection() {
+    markerPlacementSelectionActive = true;
+    ensureManagedMapClickHandler();
+
+    if (window.map?.getContainer && !manageShapesMode) {
+        window.map.getContainer().style.cursor = 'crosshair';
+    }
+};
+
+window.disableMarkerPlacementSelection = function disableMarkerPlacementSelection(options = {}) {
+    const { clearCoordinates = true } = options;
+    markerPlacementSelectionActive = false;
+    removeMapPlacementMarker({ clearCoordinates });
+
+    if (window.map?.getContainer && !manageShapesMode) {
+        window.map.getContainer().style.cursor = '';
+    }
+};
+
+function getOptimisticMarkerLayer(categoryInput) {
+    switch (getMarkerCategoryKey(categoryInput)) {
+        case 'station': return stationLayer;
+        case 'incident': return incidentLayer;
+        case 'hydrant': return hydrantLayer;
+        default: return otherLayer;
+    }
+}
+
+function createOptimisticMapMarker(lat, lng, title, categoryInput) {
+    if (!window.map || !lat || !lng) {
+        return null;
+    }
+
+    const optimisticId = `optimistic-${Date.now()}-${++optimisticMarkerSequence}`;
+    const label = getCategoryName(categoryInput);
+    const displayTitle = title || label || 'New marker';
+    const icon = L.divIcon({
+        className: 'pyro-optimistic-marker-wrapper',
+        html: `
+            <div class="pyro-optimistic-marker" aria-label="Saving ${label}">
+                <span class="pyro-optimistic-marker__pulse"></span>
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+        `,
+        iconSize: [34, 42],
+        iconAnchor: [17, 42],
+        popupAnchor: [0, -38],
+    });
+
+    const marker = L.marker([lat, lng], {
+        icon,
+        interactive: false,
+        keyboard: false,
+        opacity: 0.94,
+        zIndexOffset: 900,
+    });
+    const layer = getOptimisticMarkerLayer(categoryInput);
+
+    if (!window.map.hasLayer(layer)) {
+        layer.addTo(window.map);
+    }
+
+    marker.bindTooltip(`Saving ${displayTitle}`, { direction: 'top', offset: [0, -34] });
+    marker.addTo(layer);
+    optimisticMapMarkers.set(optimisticId, { marker, layer });
+
+    return optimisticId;
+}
+
+function removeOptimisticMapMarker(optimisticId) {
+    if (!optimisticId || !optimisticMapMarkers.has(optimisticId)) {
+        return;
+    }
+
+    const entry = optimisticMapMarkers.get(optimisticId);
+    try {
+        entry.layer.removeLayer(entry.marker);
+    } catch (error) {
+        console.warn('Unable to remove optimistic marker:', error);
+    }
+    optimisticMapMarkers.delete(optimisticId);
 }
 
 function deleteMarker(value) {
@@ -10117,26 +10457,7 @@ function initAfterMapReady() {
     markerStatePollingInterval = setInterval(pollMarkerStateChanges, getMarkerStatePollIntervalMs());
     
     if (canManageMarkers) {
-        window.map.on('click', function(e) {
-            selectedLat = e.latlng.lat;
-            selectedLng = e.latlng.lng;
-            if (isDrawing) return;
-            if (manageShapesMode) {
-                let clickedShape = null, clickedLayer = null;
-                Object.values(shapeLayers).forEach(layer => {
-                    if (layer.getBounds && layer.getBounds().contains(e.latlng)) { clickedShape = layer.shapeId; clickedLayer = layer; }
-                });
-                if (clickedShape) { onShapeClick(clickedShape, clickedLayer, e.latlng); return; }
-            }
-            if (!startMarker) {
-                startMarker = L.marker(e.latlng).addTo(window.map);
-                getName(startMarker.getLatLng().lat, startMarker.getLatLng().lng);
-                return;
-            }
-            window.map.removeLayer(startMarker);
-            startMarker = L.marker(e.latlng).addTo(window.map);
-            getName(startMarker.getLatLng().lat, startMarker.getLatLng().lng);
-        });
+        ensureManagedMapClickHandler();
     }
     
     setTimeout(() => showNotification('Welcome to PyroSense Dashboard', 'info', 'System Ready'), 1000);
@@ -10146,6 +10467,328 @@ function initAfterMapReady() {
 // Save marker button handler
 // ============================================================================
 
+function getMarkerSaveFormContext() {
+    const categorySelect = document.getElementById('mCategory');
+    const selectedOption = categorySelect?.options?.[categorySelect.selectedIndex] || null;
+    const categoryId = categorySelect?.value || '';
+    const categoryName = selectedOption?.getAttribute('data-category-name') || '';
+    const categoryEnum = selectedOption?.getAttribute('data-category-enum') || getMarkerCategoryEnumValue(categoryId) || categoryId;
+
+    return {
+        title: document.getElementById('markerTitle')?.value?.trim() || '',
+        description: document.getElementById('markerDescription')?.value?.trim() || '',
+        categoryId,
+        categoryName,
+        categoryEnum,
+        isIncidentMarker: categoryEnum === 'fire',
+        isStationMarker: categoryEnum === 'station' || categoryName.toLowerCase() === 'station',
+        isHydrantMarker: categoryEnum === 'hydrant' || categoryName.toLowerCase() === 'hydrant',
+        isSchoolMarker: categoryEnum === 'school' || categoryName.toLowerCase() === 'school',
+        isBarangayMarker: categoryEnum === 'barangay' || categoryName.toLowerCase() === 'barangay hall',
+        reportedByUserIdInput: document.getElementById('reportedByUserId'),
+        reportedBySearchInput: document.getElementById('reportedBySearch'),
+        reportedByWalkInInput: document.getElementById('reportedByWalkIn'),
+        walkInFirstNameInput: document.getElementById('walkInFirstName'),
+        walkInLastNameInput: document.getElementById('walkInLastName'),
+        walkInContactNumberInput: document.getElementById('walkInContactNumber'),
+        defaultIncidentTeamIdInput: document.getElementById('defaultIncidentTeamId'),
+    };
+}
+
+function validateMarkerSaveContext(context) {
+    if (!selectedLat || !selectedLng) {
+        return 'Tap the map first to choose where this marker should be placed.';
+    }
+
+    if (!context.categoryEnum) {
+        return 'Choose a marker category before saving.';
+    }
+
+    if (context.isIncidentMarker) {
+        if (!context.defaultIncidentTeamIdInput?.value) {
+            return 'No default station team is configured for this account yet.';
+        }
+
+        if (context.reportedByWalkInInput?.checked) {
+            if (!context.walkInFirstNameInput?.value?.trim() || !context.walkInLastNameInput?.value?.trim() || !context.walkInContactNumberInput?.value?.trim()) {
+                return 'Complete the walk-in reporter details first.';
+            }
+        } else if (!context.reportedByUserIdInput?.value) {
+            return 'Select the citizen who reported this incident.';
+        }
+    }
+
+    if (context.isStationMarker) {
+        const requiredStationFields = [
+            document.getElementById('stationName')?.value,
+            document.getElementById('stationCode')?.value,
+            document.getElementById('stationContact')?.value,
+            document.getElementById('stationEmail')?.value,
+            document.getElementById('stationBarangay')?.value,
+            document.getElementById('stationStreet')?.value,
+        ];
+
+        if (requiredStationFields.some(value => !String(value || '').trim())) {
+            return 'Complete the station required fields first.';
+        }
+    }
+
+    if (context.isHydrantMarker) {
+        if (!document.getElementById('hydrantCode')?.value?.trim()) {
+            return 'Enter the hydrant code first.';
+        }
+
+        if (!document.getElementById('hydrantStation')?.value) {
+            return 'Choose the station this hydrant belongs to.';
+        }
+    }
+
+    if (context.isSchoolMarker && !document.getElementById('schoolName')?.value?.trim()) {
+        return 'Enter the school name first.';
+    }
+
+    if (context.isBarangayMarker) {
+        if (!document.getElementById('barangayHallName')?.value?.trim() || !document.getElementById('barangayHallBarangay')?.value) {
+            return 'Complete the barangay hall name and barangay first.';
+        }
+    }
+
+    return null;
+}
+
+async function readJsonResponse(response, fallbackMessage) {
+    const raw = await response.text();
+    let parsed = null;
+
+    if (raw) {
+        try {
+            parsed = JSON.parse(raw);
+        } catch (parseError) {
+            throw new Error(response.ok ? `${fallbackMessage}: invalid server response` : `${fallbackMessage} (HTTP ${response.status})`);
+        }
+    }
+
+    if (!response.ok) {
+        const validationMessage = parsed?.message
+            || parsed?.error
+            || Object.values(parsed?.errors || {}).flat().join(' ')
+            || `${fallbackMessage} (HTTP ${response.status})`;
+
+        throw new Error(validationMessage);
+    }
+
+    return parsed || {};
+}
+
+async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
+    if (context.isIncidentMarker) {
+        let reportedByUserId = context.reportedByUserIdInput?.value || '';
+
+        if (context.reportedByWalkInInput?.checked) {
+            const walkInResponse = await fetch('/station-admin/api/walk-in-citizen', {
+                method: 'POST',
+                headers: jsonHeaders,
+                body: JSON.stringify({
+                    first_name: context.walkInFirstNameInput?.value?.trim() || '',
+                    last_name: context.walkInLastNameInput?.value?.trim() || '',
+                    contact_number: context.walkInContactNumberInput?.value?.trim() || ''
+                })
+            });
+
+            const walkInResult = await readJsonResponse(walkInResponse, 'Failed to save walk-in citizen');
+            if (!walkInResult.success || !walkInResult.user_id) {
+                throw new Error(walkInResult.message || 'Failed to save walk-in citizen');
+            }
+
+            reportedByUserId = walkInResult.user_id;
+            if (context.reportedBySearchInput && walkInResult.citizen) {
+                const citizenName = [walkInResult.citizen.first_name, walkInResult.citizen.middle_name, walkInResult.citizen.last_name].filter(Boolean).join(' ');
+                context.reportedBySearchInput.value = `${walkInResult.citizen.account_code || 'CIT'} - ${citizenName} - ${walkInResult.citizen.contact_number || ''}`.trim();
+            }
+            if (context.reportedByUserIdInput) {
+                context.reportedByUserIdInput.value = reportedByUserId;
+            }
+        }
+
+        const incidentResponse = await fetch('/api/incidents', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                marker_id: markerId,
+                status: 'reported',
+                team_id: Number(context.defaultIncidentTeamIdInput.value),
+                reported_by: Number(reportedByUserId)
+            })
+        });
+
+        const incidentResult = await readJsonResponse(incidentResponse, 'Failed to create incident');
+        if (!incidentResult.success) {
+            throw new Error(incidentResult.message || 'Failed to create incident');
+        }
+        return;
+    }
+
+    if (context.isStationMarker) {
+        const addressResponse = await fetch('/api/full-addresses', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                street: document.getElementById('stationStreet')?.value,
+                barangay_id: document.getElementById('stationBarangay')?.value,
+                postal_id: null
+            })
+        });
+        const addressResult = await readJsonResponse(addressResponse, 'Failed to create station address');
+        if (!addressResult.success) throw new Error(addressResult.message || 'Failed to create station address');
+
+        const stationResponse = await fetch('/api/station', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                station_name: document.getElementById('stationName')?.value,
+                station_code: document.getElementById('stationCode')?.value,
+                contact_number: document.getElementById('stationContact')?.value,
+                email: document.getElementById('stationEmail')?.value,
+                address_id: addressResult.address_id,
+                marker_id: markerId
+            })
+        });
+        await readJsonResponse(stationResponse, 'Failed to create station');
+        return;
+    }
+
+    if (context.isHydrantMarker) {
+        const hydrantResponse = await fetch('/api/hydrant', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                hydrant_code: document.getElementById('hydrantCode')?.value,
+                station_id: document.getElementById('hydrantStation')?.value,
+                marker_id: markerId,
+                hydrant_type_id: document.getElementById('hydrantType')?.value || null
+            })
+        });
+        await readJsonResponse(hydrantResponse, 'Failed to create hydrant');
+        return;
+    }
+
+    if (context.isSchoolMarker) {
+        const schoolResponse = await fetch('/api/schools', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                school_name: document.getElementById('schoolName')?.value,
+                marker_id: markerId
+            })
+        });
+        await readJsonResponse(schoolResponse, 'Failed to create school marker details');
+        return;
+    }
+
+    if (context.isBarangayMarker) {
+        const hallStreet = document.getElementById('barangayHallStreet')?.value?.trim();
+        let addressId = null;
+
+        if (hallStreet) {
+            const hallAddressResponse = await fetch('/api/full-addresses', {
+                method: 'POST',
+                headers: jsonHeaders,
+                body: JSON.stringify({
+                    street: hallStreet,
+                    barangay_id: document.getElementById('barangayHallBarangay')?.value,
+                    postal_id: null
+                })
+            });
+            const hallAddressResult = await readJsonResponse(hallAddressResponse, 'Failed to create barangay hall address');
+            if (!hallAddressResult.success) throw new Error(hallAddressResult.message || 'Failed to create barangay hall address');
+            addressId = hallAddressResult.address_id;
+        }
+
+        const hallResponse = await fetch('/api/barangay-halls', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                hall_name: document.getElementById('barangayHallName')?.value?.trim(),
+                barangay_id: Number(document.getElementById('barangayHallBarangay')?.value),
+                marker_id: markerId,
+                address_id: addressId,
+                contact_number: document.getElementById('barangayHallContact')?.value?.trim() || null,
+                email: document.getElementById('barangayHallEmail')?.value?.trim() || null,
+                captain_user_id: document.getElementById('barangayHallCaptain')?.value ? Number(document.getElementById('barangayHallCaptain')?.value) : null
+            })
+        });
+        await readJsonResponse(hallResponse, 'Failed to create barangay hall');
+    }
+}
+
+async function saveMarkerOptimisticallyFromForm(saveButton) {
+    if (markerSaveInProgress) return;
+
+    const context = getMarkerSaveFormContext();
+    const validationMessage = validateMarkerSaveContext(context);
+
+    if (validationMessage) {
+        showMarkerFeedback(validationMessage, 'warning', 'Marker needs details');
+        return;
+    }
+
+    markerSaveInProgress = true;
+    const originalText = saveButton?.innerHTML;
+    if (saveButton) {
+        saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        saveButton.disabled = true;
+    }
+
+    const saveLat = selectedLat;
+    const saveLng = selectedLng;
+    const optimisticMarkerId = createOptimisticMapMarker(saveLat, saveLng, context.title || context.categoryName, context.categoryEnum);
+    const jsonHeaders = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': csrfToken
+    };
+
+    window.disableMarkerPlacementSelection?.({ clearCoordinates: true });
+    window.closeModal?.({ skipPlacementCleanup: true });
+    showMarkerFeedback('Marker is saving in the background.', 'info', 'Saving marker');
+
+    try {
+        const markerResponse = await fetch('/api/markers', {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({
+                title: context.title || context.categoryName || 'Map marker',
+                description: context.description,
+                lat: saveLat,
+                lng: saveLng,
+                category: context.categoryEnum,
+                status: 'active'
+            })
+        });
+
+        const markerResult = await readJsonResponse(markerResponse, 'Failed to create marker');
+        const markerId = markerResult.marker?.marker_id || markerResult.data?.marker_id || markerResult.marker_id;
+        if (!markerId) throw new Error('Failed to create marker');
+
+        await saveMarkerDetailsForCategory(markerId, context, jsonHeaders);
+        removeOptimisticMapMarker(optimisticMarkerId);
+        await fetchCoordinate({ force: true });
+        showMarkerFeedback('Marker saved and added to the map.', 'success', 'Marker saved');
+    } catch (error) {
+        console.error('Error saving marker:', error);
+        removeOptimisticMapMarker(optimisticMarkerId);
+        window.removeMapPlacementMarker?.({ clearCoordinates: true });
+        await fetchCoordinate({ force: true }).catch(() => {});
+        showMarkerFeedback(error.message || 'Marker could not be saved.', 'error', 'Save failed');
+    } finally {
+        markerSaveInProgress = false;
+        if (saveButton) {
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+        }
+    }
+}
+
 setTimeout(() => {
     const saveMarkerBtn = document.getElementById('saveMarkerBtn');
     if (saveMarkerBtn) {
@@ -10154,6 +10797,8 @@ setTimeout(() => {
         
         newSaveBtn.addEventListener('click', async function(e) {
             e.preventDefault();
+            await saveMarkerOptimisticallyFromForm(newSaveBtn);
+            return;
             const titleInput = document.getElementById('markerTitle');
             const descriptionInput = document.getElementById('markerDescription');
             const categorySelect = document.getElementById('mCategory');
@@ -10322,8 +10967,8 @@ setTimeout(() => {
                     const hydrantStationId = document.getElementById('hydrantStation')?.value;
                     const hydrantTypeId = document.getElementById('hydrantType')?.value;
                     
-                    if (!hydrantCode) { alert('Please enter hydrant code'); return; }
-                    if (!hydrantStationId) { alert('Please select the station this hydrant belongs to'); return; }
+                    if (!hydrantCode) { throw new Error('Please enter hydrant code'); }
+                    if (!hydrantStationId) { throw new Error('Please select the station this hydrant belongs to'); }
                     
                     const hydrantResponse = await fetch('/api/hydrant', {
                         method: 'POST',
@@ -10333,7 +10978,7 @@ setTimeout(() => {
                     await readJsonResponse(hydrantResponse, 'Failed to create hydrant');
                 } else if (categoryName.toLowerCase() === 'school') {
                     const schoolName = document.getElementById('schoolName')?.value;
-                    if (!schoolName) { alert('Please enter school name'); return; }
+                    if (!schoolName) { throw new Error('Please enter school name'); }
                     const schoolResponse = await fetch('/api/schools', {
                         method: 'POST',
                         headers: jsonHeaders,
@@ -10349,7 +10994,6 @@ setTimeout(() => {
                     const hallCaptainOfficerId = document.getElementById('barangayHallCaptain')?.value;
 
                     if (!hallName || !hallBarangayId) {
-                        alert('Please fill in the required barangay hall fields');
                         throw new Error('Missing barangay hall fields');
                     }
 
@@ -10513,15 +11157,21 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
 
     window.thisIncidents = resolvedIncidentId;
     console.log('thisincidents: ', window.thisIncidents);
-    await calculateRouteWithGeoapify(origin, destination);
+    return await calculateRouteWithGeoapify(origin, destination);
 }
 
 
 
-window.closeModal = function() {
+window.closeModal = function(options = {}) {
     const modal = document.getElementById('markerModal');
     if (!modal) {
         return;
+    }
+
+    if (!options.skipPlacementCleanup) {
+        window.disableMarkerPlacementSelection?.({
+            clearCoordinates: options.keepCoordinates !== true,
+        });
     }
 
     modal.style.display = 'none';
@@ -10530,6 +11180,9 @@ window.closeModal = function() {
 };
 
 window.openModal = function() {
+    window.removeMapPlacementMarker?.({ clearCoordinates: true });
+    window.enableMarkerPlacementSelection?.();
+
     const titleInput = document.getElementById('markerTitle');
     const descriptionInput = document.getElementById('markerDescription');
     const categorySelect = document.getElementById('mCategory');
@@ -10557,6 +11210,31 @@ window.openModal = function() {
         modal.setAttribute('aria-hidden', 'false');
     }
 };
+
+const markerModalCleanupTarget = document.getElementById('markerModal');
+if (markerModalCleanupTarget && !markerModalCleanupTarget.dataset.markerCleanupBound) {
+    markerModalCleanupTarget.dataset.markerCleanupBound = 'true';
+
+    markerModalCleanupTarget.addEventListener('click', (event) => {
+        if (event.target === markerModalCleanupTarget) {
+            window.closeModal?.();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        if (
+            markerModalCleanupTarget.classList.contains('is-open') ||
+            markerModalCleanupTarget.classList.contains('active') ||
+            markerModalCleanupTarget.style.display !== 'none'
+        ) {
+            window.closeModal?.();
+        }
+    });
+}
 
 window.openAddCategory = function() {
     const modal = document.getElementById('categoryModal');

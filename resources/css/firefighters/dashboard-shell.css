@@ -514,7 +514,7 @@
     }
 
     body.firefighter-dashboard-page .responder-map-preview-sheet {
-        z-index: 100;
+        z-index: 10030 !important;
         pointer-events: none;
     }
 
@@ -529,6 +529,7 @@
     }
 
     body.firefighter-dashboard-page .responder-map-preview-sheet__card {
+        z-index: 10031 !important;
         left: 8px !important;
         right: 8px !important;
         bottom: calc(var(--ff-mobile-dock-h, 92px) - 10px) !important;
