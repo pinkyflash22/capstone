@@ -39,10 +39,10 @@ return new class extends Migration
             }
         });
 
-        try {
-            DB::statement('ALTER TABLE boundary_location MODIFY station_id BIGINT UNSIGNED NULL');
-        } catch (\Throwable $e) {
-            // Ignore when the underlying database driver uses a different alter syntax.
+        if (Schema::hasColumn('boundary_location', 'station_id')) {
+            Schema::table('boundary_location', function (Blueprint $table) {
+                $table->unsignedBigInteger('station_id')->nullable()->change();
+            });
         }
 
         DB::table('boundary_location')

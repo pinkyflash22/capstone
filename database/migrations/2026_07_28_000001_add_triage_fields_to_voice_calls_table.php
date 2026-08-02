@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,41 +12,46 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('voice_calls', function (Blueprint $table) {
-            if (! Schema::hasColumn('voice_calls', 'created_incident_id')) {
-                $table->unsignedBigInteger('created_incident_id')->nullable()->after('incident_id');
-                $table->foreign('created_incident_id')->references('incident_id')->on('incidents')->nullOnDelete();
-            }
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS created_incident_id BIGINT NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS caller_latitude NUMERIC(10,7) NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS caller_longitude NUMERIC(10,7) NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS caller_accuracy INTEGER NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS caller_location_label VARCHAR(255) NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS flagged_by BIGINT NULL');
+        DB::statement('ALTER TABLE voice_calls ADD COLUMN IF NOT EXISTS flag_reason VARCHAR(160) NULL');
 
-            if (! Schema::hasColumn('voice_calls', 'caller_latitude')) {
-                $table->decimal('caller_latitude', 10, 7)->nullable()->after('created_incident_id');
-            }
+        $createdIncidentForeignExists = ! empty(DB::select(
+            '
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = current_schema()
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND constraint_type = ?
+            ',
+            ['voice_calls', 'voice_calls_created_incident_id_foreign', 'FOREIGN KEY']
+        ));
 
-            if (! Schema::hasColumn('voice_calls', 'caller_longitude')) {
-                $table->decimal('caller_longitude', 10, 7)->nullable()->after('caller_latitude');
-            }
+        if (! $createdIncidentForeignExists) {
+            DB::statement('ALTER TABLE voice_calls ADD CONSTRAINT voice_calls_created_incident_id_foreign FOREIGN KEY (created_incident_id) REFERENCES incidents(incident_id) ON DELETE SET NULL');
+        }
 
-            if (! Schema::hasColumn('voice_calls', 'caller_accuracy')) {
-                $table->unsignedInteger('caller_accuracy')->nullable()->after('caller_longitude');
-            }
+        $flaggedByForeignExists = ! empty(DB::select(
+            '
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = current_schema()
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND constraint_type = ?
+            ',
+            ['voice_calls', 'voice_calls_flagged_by_foreign', 'FOREIGN KEY']
+        ));
 
-            if (! Schema::hasColumn('voice_calls', 'caller_location_label')) {
-                $table->string('caller_location_label')->nullable()->after('caller_accuracy');
-            }
-
-            if (! Schema::hasColumn('voice_calls', 'flagged_at')) {
-                $table->timestamp('flagged_at')->nullable()->after('ended_at');
-            }
-
-            if (! Schema::hasColumn('voice_calls', 'flagged_by')) {
-                $table->unsignedBigInteger('flagged_by')->nullable()->after('flagged_at');
-                $table->foreign('flagged_by')->references('user_id')->on('users')->nullOnDelete();
-            }
-
-            if (! Schema::hasColumn('voice_calls', 'flag_reason')) {
-                $table->string('flag_reason', 160)->nullable()->after('flagged_by');
-            }
-        });
+        if (! $flaggedByForeignExists) {
+            DB::statement('ALTER TABLE voice_calls ADD CONSTRAINT voice_calls_flagged_by_foreign FOREIGN KEY (flagged_by) REFERENCES users(user_id) ON DELETE SET NULL');
+        }
     }
 
     public function down(): void
@@ -55,28 +60,49 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('voice_calls', function (Blueprint $table) {
-            if (Schema::hasColumn('voice_calls', 'created_incident_id')) {
-                $table->dropForeign(['created_incident_id']);
-                $table->dropColumn('created_incident_id');
-            }
+        $createdIncidentForeignExists = ! empty(DB::select(
+            '
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = current_schema()
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND constraint_type = ?
+            ',
+            ['voice_calls', 'voice_calls_created_incident_id_foreign', 'FOREIGN KEY']
+        ));
 
-            foreach (['caller_latitude', 'caller_longitude', 'caller_accuracy', 'caller_location_label'] as $column) {
-                if (Schema::hasColumn('voice_calls', $column)) {
-                    $table->dropColumn($column);
-                }
-            }
+        if ($createdIncidentForeignExists) {
+            DB::statement('ALTER TABLE voice_calls DROP CONSTRAINT voice_calls_created_incident_id_foreign');
+        }
 
-            if (Schema::hasColumn('voice_calls', 'flagged_by')) {
-                $table->dropForeign(['flagged_by']);
-                $table->dropColumn('flagged_by');
-            }
+        $flaggedByForeignExists = ! empty(DB::select(
+            '
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = current_schema()
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND constraint_type = ?
+            ',
+            ['voice_calls', 'voice_calls_flagged_by_foreign', 'FOREIGN KEY']
+        ));
 
-            foreach (['flagged_at', 'flag_reason'] as $column) {
-                if (Schema::hasColumn('voice_calls', $column)) {
-                    $table->dropColumn($column);
-                }
-            }
-        });
+        if ($flaggedByForeignExists) {
+            DB::statement('ALTER TABLE voice_calls DROP CONSTRAINT voice_calls_flagged_by_foreign');
+        }
+
+        foreach ([
+            'created_incident_id',
+            'caller_latitude',
+            'caller_longitude',
+            'caller_accuracy',
+            'caller_location_label',
+            'flagged_at',
+            'flagged_by',
+            'flag_reason',
+        ] as $column) {
+            DB::statement("ALTER TABLE voice_calls DROP COLUMN IF EXISTS {$column}");
+        }
     }
 };

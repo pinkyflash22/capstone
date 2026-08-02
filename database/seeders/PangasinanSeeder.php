@@ -17,7 +17,7 @@ class PangasinanSeeder extends Seeder
             'province_name' => 'Pangasinan',
             'created_at' => $now,
             'updated_at' => $now,
-        ]);
+        ], 'province_id');
 
         // 2. Cities (sample)
         $cities =[
@@ -78,7 +78,7 @@ class PangasinanSeeder extends Seeder
                 'province_id' => $provinceId,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ], 'city_id');
 
             $barangays = match ($city['city_name']) {
                 'Urbiztondo' => [

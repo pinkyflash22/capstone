@@ -22,7 +22,7 @@ return new class extends Migration
         $table->decimal('lat', 10, 7);
         $table->decimal('lng', 10, 7);
         $table->enum('status', ['active', 'inactive', 'completed'])->default('active');
-        $table->enum('category', ['fire', 'station', 'hydrant', 'school', 'barangay', 'bridge'])->nullable();
+        $table->enum('category', ['fire', 'station', 'hydrant', 'school', 'barangay', 'bridge', 'risk', 'hazard'])->nullable();
        
         $table->longText('image')->nullable();
         $table->timestamps();
