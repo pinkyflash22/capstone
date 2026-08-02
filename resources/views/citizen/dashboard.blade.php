@@ -1856,6 +1856,7 @@
             }
         }
     </style>
+    @include('partials.voice-call-config')
     @vite(['resources/css/app.css', 'resources/css/citizen/dashboard.css', 'resources/js/user.js'])
     @vite(['resources/js/map.js'])
 

@@ -1401,6 +1401,7 @@
             scrollbar-width: none;
         }
     </style>
+    @include('partials.voice-call-config')
     @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/app.css', 'resources/js/map.js'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
@@ -2973,7 +2974,14 @@
         document.getElementById('alertsDropdown')?.classList.remove('show');
     }
 
-    function openModal() {
+    function openModal(options = {}) {
+        if (options.fromMapClick) {
+            window.disableMarkerPlacementSelection?.({ clearCoordinates: false });
+        } else {
+            window.removeMapPlacementMarker?.({ clearCoordinates: true });
+            window.enableMarkerPlacementSelection?.();
+        }
+
         const modal = document.getElementById('markerModal');
         if (modal) {
             modal.style.display = 'flex';
@@ -3021,12 +3029,17 @@
         if (modal) modal.style.display = 'none';
     }
 
-    function closeModal() {
+    function closeModal(options = {}) {
         const modal = document.getElementById('markerModal');
         if (modal) {
             modal.style.display = 'none';
             modal.classList.remove('is-open', 'active');
             modal.setAttribute('aria-hidden', 'true');
+        }
+        if (!options.skipPlacementCleanup) {
+            window.disableMarkerPlacementSelection?.({
+                clearCoordinates: options.keepCoordinates !== true
+            });
         }
     }
 

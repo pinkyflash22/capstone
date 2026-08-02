@@ -799,16 +799,12 @@ class StationAdminController extends Controller
         $incidents = Incident::with(['marker', 'team', 'reporter'])
             ->orderBy('created_at')
             ->get();
-        $alerts = Incident::with('marker')->get();
+        $alerts = $incidents;
         $stations = Station::all();
         $provinces = Province::orderBy('province_name')->get();
         $thisperson = $this->getAuthenticatedStationOfficer();
         $stationId = $thisperson->station_id;
         $stationperson = StationOfficer::where('station_id',$stationId)->with('station','station.users')->get();
-        // Get all users with role 'chief'
-        $chiefRole = Role::where('role', 'chief')->first();
-        $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
-        $fsicRequests= FsicRequest::all();
         $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
         $citizens = User::when($citizenRoleId, fn ($query) => $query->where('role_id', $citizenRoleId))
             ->orderBy('first_name')
@@ -819,6 +815,11 @@ class StationAdminController extends Controller
             ->orderBy('position')
             ->get();
         $defaultTeam = $this->getFirstTeamForStation($stationId);
+        $teamIds = $this->getTeamIdsForStation($stationId);
+        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
+            ->pluck('station_officer_id')
+            ->filter()
+            ->values();
         $incidentTrendData = $this->buildIncidentTrendData($incidents);
         $stationReadiness = $this->buildStationReadinessData();
         $recentAnalyses = $stationId
@@ -837,14 +838,41 @@ class StationAdminController extends Controller
                     return $analysis;
                 })
             : collect();
+        $analysisTrendSeries = collect($recentAnalyses)
+            ->sortBy('created_at')
+            ->values()
+            ->map(function ($analysis) {
+                return [
+                    'label' => optional(\Carbon\Carbon::parse($analysis->created_at))->format('M d'),
+                    'incident_count' => (int) ($analysis->incident_count ?? 0),
+                    'predicted_fire_incidents' => (int) (data_get($analysis->predictions ?? [], 'predicted_fire_incidents') ?? 0),
+                    'confidence' => (int) ($analysis->confidence_score ?? 0),
+                    'risk_level' => (string) ($analysis->risk_level ?? 'Unknown'),
+                ];
+            })
+            ->values();
+        $dashboardStatsSeed = [
+            'incident_total' => $teamIds->isNotEmpty()
+                ? $incidents->whereIn('team_id', $teamIds->all())->count()
+                : 0,
+            'active_responses' => $teamIds->isNotEmpty()
+                ? $incidents
+                    ->whereIn('team_id', $teamIds->all())
+                    ->whereIn('status', ['Responding', 'On Scene'])
+                    ->count()
+                : 0,
+            'fsic_claims' => $stationOfficerIds->isNotEmpty()
+                ? FsicApproval::whereIn('approved_by', $stationOfficerIds)->whereNotNull('date_issued')->count()
+                : 0,
+            'crew_online' => $stationperson->whereIn('status', ['available', 'dispatched', 'on-scene'])->count(),
+            'station_id' => $stationId,
+        ];
 
         return view('chief.dashboard', compact(
-            'fsicRequests',
             'mapmarker',
             'incidents',
             'alerts',
             'stations',
-            'chiefs',
             'provinces',
             'stationperson',
             'citizens',
@@ -852,7 +880,9 @@ class StationAdminController extends Controller
             'defaultTeam',
             'incidentTrendData',
             'stationReadiness',
-            'recentAnalyses'
+            'recentAnalyses',
+            'analysisTrendSeries',
+            'dashboardStatsSeed'
         ));
     }
 

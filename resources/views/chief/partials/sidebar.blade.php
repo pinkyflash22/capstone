@@ -50,6 +50,64 @@
     ];
 @endphp
 
+@if ($active !== 'dashboard')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dashboardUrl = @json(route('station-admin.dashboard'));
+            const dashboardAssets = [
+                @json(Vite::asset('resources/css/chief/dashboard.css')),
+                @json(Vite::asset('resources/css/app.css')),
+                @json(Vite::asset('resources/js/map.js')),
+            ];
+            const dashboardApiUrls = [
+                @json(route('station-admin.dashboard-stats')),
+                @json(url('/api/incident/latest')),
+            ];
+            let dashboardPrefetched = false;
+
+            const appendPrefetchLink = (href, as = 'fetch') => {
+                if (!href || document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) {
+                    return;
+                }
+
+                const link = document.createElement('link');
+                link.rel = 'prefetch';
+                link.href = href;
+                link.as = as;
+                document.head.appendChild(link);
+            };
+
+            const prefetchDashboard = () => {
+                if (dashboardPrefetched) {
+                    return;
+                }
+
+                dashboardPrefetched = true;
+                appendPrefetchLink(dashboardUrl, 'document');
+                dashboardAssets.forEach((assetHref) => {
+                    const as = assetHref.endsWith('.css') ? 'style' : 'script';
+                    appendPrefetchLink(assetHref, as);
+                });
+                dashboardApiUrls.forEach((apiUrl) => appendPrefetchLink(apiUrl, 'fetch'));
+            };
+
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(prefetchDashboard, { timeout: 1500 });
+            } else {
+                window.setTimeout(prefetchDashboard, 900);
+            }
+
+            document
+                .querySelectorAll('a[href="' + dashboardUrl + '"]')
+                .forEach((link) => {
+                    ['mouseenter', 'focus', 'touchstart', 'pointerdown'].forEach((eventName) => {
+                        link.addEventListener(eventName, prefetchDashboard, { passive: true, once: true });
+                    });
+                });
+        });
+    </script>
+@endif
+
 <aside class="sidebar chief-shell-sidebar hidden md:flex" id="sidebar">
     <div class="sidebar-header-gradient chief-shell-sidebar-header px-6 py-8">
         <div class="chief-shell-brand flex items-center gap-3">

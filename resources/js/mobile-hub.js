@@ -108,6 +108,16 @@ function writeCachedCoords(lat, lng) {
             lng,
             timestamp: Date.now(),
         }));
+        window.localStorage.setItem('pyrosense:current-location', JSON.stringify({
+            lat,
+            lng,
+            timestamp: Date.now(),
+        }));
+        window.currentLocation = {
+            lat,
+            lng,
+            timestamp: Date.now(),
+        };
     } catch (error) {
         console.warn('Unable to cache coordinates:', error);
     }

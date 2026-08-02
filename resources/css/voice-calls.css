@@ -1,0 +1,372 @@
+.pyro-voice-toast-stack {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 2147483000;
+    display: grid;
+    gap: 10px;
+    width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.pyro-voice-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(220, 91, 36, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #12213a;
+    box-shadow: 0 18px 40px rgba(18, 33, 58, 0.14);
+    font-size: 13px;
+    font-weight: 700;
+    pointer-events: auto;
+}
+
+.pyro-voice-toast--error {
+    border-color: rgba(220, 38, 38, 0.25);
+    color: #991b1b;
+}
+
+.pyro-voice-panel,
+.pyro-voice-caller-dock {
+    position: fixed;
+    z-index: 2147482500;
+    font-family: inherit;
+}
+
+.pyro-voice-panel {
+    top: 96px;
+    right: 20px;
+    width: min(380px, calc(100vw - 32px));
+    max-height: min(620px, calc(100vh - 128px));
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+}
+
+.pyro-voice-panel[hidden],
+.pyro-voice-caller-dock[hidden] {
+    display: none !important;
+}
+
+.pyro-voice-panel__header,
+.pyro-voice-caller-dock__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.pyro-voice-panel__eyebrow,
+.pyro-voice-caller-dock__eyebrow {
+    margin: 0 0 2px;
+    color: #c2410c;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.pyro-voice-panel__title,
+.pyro-voice-caller-dock__title {
+    margin: 0;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.15;
+}
+
+.pyro-voice-panel__body {
+    display: grid;
+    gap: 10px;
+    max-height: 470px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.pyro-voice-call-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 18px;
+    background: linear-gradient(135deg, #fff 0%, #fff8f1 100%);
+}
+
+.pyro-voice-call-card--active {
+    border-color: rgba(22, 163, 74, 0.32);
+    background: linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
+}
+
+.pyro-voice-call-card--flagged {
+    border-color: rgba(245, 158, 11, 0.35);
+    background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+}
+
+.pyro-voice-call-card__top {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.pyro-voice-avatar {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #d6421d, #e39a0a);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.pyro-voice-call-card__name {
+    margin: 0;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pyro-voice-call-card__meta {
+    margin: 2px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.pyro-voice-call-card__location {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 10px;
+    border: 1px solid rgba(226, 232, 240, 0.86);
+    border-radius: 14px;
+    background: rgba(248, 250, 252, 0.82);
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.pyro-voice-call-card__location-icon {
+    color: #d6421d;
+    font-weight: 900;
+}
+
+.pyro-voice-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #c2410c;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.pyro-voice-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.pyro-voice-actions--triage {
+    grid-template-columns: 1fr;
+}
+
+.pyro-voice-btn {
+    min-height: 42px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 14px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.pyro-voice-btn:disabled {
+    cursor: progress;
+    opacity: 0.62;
+}
+
+.pyro-voice-btn--primary {
+    border-color: transparent;
+    background: linear-gradient(135deg, #d6421d, #e39a0a);
+    color: #fff;
+}
+
+.pyro-voice-btn--danger {
+    border-color: rgba(220, 38, 38, 0.2);
+    color: #b91c1c;
+}
+
+.pyro-voice-btn--success {
+    border-color: rgba(22, 163, 74, 0.22);
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #fff;
+}
+
+.pyro-voice-btn--warning {
+    border-color: rgba(245, 158, 11, 0.28);
+    color: #b45309;
+}
+
+.pyro-voice-btn[aria-busy="true"] {
+    position: relative;
+}
+
+.pyro-voice-btn[aria-busy="true"]::before {
+    display: inline-block;
+    width: 0.85em;
+    height: 0.85em;
+    margin-right: 7px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    content: "";
+    vertical-align: -0.1em;
+    animation: pyro-voice-spin 0.72s linear infinite;
+}
+
+@keyframes pyro-voice-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.pyro-voice-btn--wide {
+    grid-column: 1 / -1;
+}
+
+.pyro-voice-caller-dock {
+    right: 18px;
+    bottom: 18px;
+    width: min(360px, calc(100vw - 32px));
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+}
+
+.pyro-voice-caller-dock__body {
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px 16px;
+}
+
+.pyro-voice-status-line {
+    margin: 0;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.pyro-voice-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .pyro-voice-toast-stack {
+        top: auto;
+        right: 12px;
+        bottom: calc(var(--mobile-nav-height, 92px) + env(safe-area-inset-bottom) + 14px);
+        left: 12px;
+        width: auto;
+    }
+
+    .pyro-voice-panel,
+    .pyro-voice-caller-dock {
+        top: auto;
+        right: 10px;
+        bottom: calc(var(--mobile-nav-height, 92px) + env(safe-area-inset-bottom) + 10px);
+        left: 10px;
+        width: auto;
+        max-height: min(58vh, 420px);
+        border-radius: 24px;
+    }
+
+    .pyro-voice-panel::before,
+    .pyro-voice-caller-dock::before {
+        content: "";
+        display: block;
+        width: 54px;
+        height: 5px;
+        margin: 8px auto 0;
+        border-radius: 999px;
+        background: #cbd5e1;
+    }
+
+    .pyro-voice-panel__header,
+    .pyro-voice-caller-dock__header {
+        padding: 10px 14px 12px;
+    }
+
+    .pyro-voice-panel__title,
+    .pyro-voice-caller-dock__title {
+        font-size: 16px;
+    }
+
+    .pyro-voice-panel__body {
+        max-height: calc(58vh - 78px);
+        padding: 10px;
+    }
+
+    .pyro-voice-call-card {
+        padding: 10px;
+        border-radius: 16px;
+    }
+
+    .pyro-voice-call-card__top {
+        grid-template-columns: 38px minmax(0, 1fr);
+    }
+
+    .pyro-voice-call-card__name {
+        white-space: normal;
+    }
+
+    .pyro-voice-call-card__location {
+        padding: 8px 9px;
+        font-size: 11.5px;
+    }
+
+    .pyro-voice-avatar {
+        width: 38px;
+        height: 38px;
+        font-size: 12px;
+    }
+
+    .pyro-voice-badge {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .pyro-voice-actions {
+        gap: 7px;
+    }
+
+    .pyro-voice-btn {
+        min-height: 40px;
+        border-radius: 13px;
+        font-size: 12px;
+    }
+}

@@ -17,6 +17,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 
+    @php
+        $pyroVoiceStationId = optional($stationperson->first())->station_id;
+    @endphp
+    @include('partials.voice-call-config')
     @vite(['resources/css/chief/dashboard.css'])
     @vite(['resources/css/app.css', 'resources/js/map.js'])
     @vite(['resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
@@ -550,7 +554,7 @@
                     </div>
                     <div class="kpi-info">
                         <h3>Total Incidents</h3>
-                        <p id="chiefIncidentTotal">--</p>
+                        <p id="chiefIncidentTotal">{{ $dashboardStatsSeed['incident_total'] ?? 0 }}</p>
                     </div>
                 </div>
 
@@ -560,7 +564,7 @@
                     </div>
                     <div class="kpi-info">
                         <h3>Active Responses</h3>
-                        <p id="chiefActiveResponses">--</p>
+                        <p id="chiefActiveResponses">{{ $dashboardStatsSeed['active_responses'] ?? 0 }}</p>
                     </div>
                 </div>
 
@@ -570,7 +574,7 @@
                     </div>
                     <div class="kpi-info">
                         <h3>FSIC Claims</h3>
-                        <p id="chiefFsicClaims">--</p>
+                        <p id="chiefFsicClaims">{{ $dashboardStatsSeed['fsic_claims'] ?? 0 }}</p>
                     </div>
                 </div>
 
@@ -580,16 +584,26 @@
                     </div>
                     <div class="kpi-info">
                         <h3>Personnel Online</h3>
-                        <p id="chiefCrewOnline">--</p>
+                        <p id="chiefCrewOnline">{{ $dashboardStatsSeed['crew_online'] ?? 0 }}</p>
                     </div>
                 </div>
         </div>
 
         @php
-            $analysisTrendSeries = collect($recentAnalyses ?? [])
+            $analysisTrendSeries = collect($analysisTrendSeries ?? $recentAnalyses ?? [])
                 ->sortBy('created_at')
                 ->values()
                 ->map(function ($analysis) {
+                    if (is_array($analysis) && array_key_exists('label', $analysis)) {
+                        return [
+                            'label' => (string) ($analysis['label'] ?? ''),
+                            'incident_count' => (int) ($analysis['incident_count'] ?? 0),
+                            'predicted_fire_incidents' => (int) ($analysis['predicted_fire_incidents'] ?? 0),
+                            'confidence' => (int) ($analysis['confidence'] ?? 0),
+                            'risk_level' => (string) ($analysis['risk_level'] ?? 'Unknown'),
+                        ];
+                    }
+
                     return [
                         'label' => optional(\Carbon\Carbon::parse($analysis->created_at))->format('M d'),
                         'incident_count' => (int) ($analysis->incident_count ?? 0),
@@ -1533,10 +1547,21 @@
     };
     window.incidentsData = @json($incidents) || [];
     var stations = @json($stations) || [];
-
-    window.stationDatas = {
-        stations: @json($stations) || []
+    window.chiefDashboardStatsSeed = @json($dashboardStatsSeed ?? []);
+    window.pyroPublicAssetUrls = {
+        station: @json(asset('station.png')),
+        hydrant: @json(asset('hydrant.png')),
+        barangay: @json(asset('hall.png')),
+        evacuation: @json(asset('hall.png')),
+        incident: @json(asset('fire.png')),
+        risk: @json(asset('hazard.png')),
+        hazard: @json(asset('hazard.png')),
+        firefighter: @json(asset('team.png')),
+        firetruck: @json(asset('truck.png'))
     };
+
+    window.stationsData = @json($stations) || [];
+    window.stationDatas = window.stationsData;
 
     let multimediaData = [];
     let icons = [];
@@ -2579,9 +2604,13 @@
         }
     }
 
-    function openModal() {
-        window.removeMapPlacementMarker?.({ clearCoordinates: true });
-        window.enableMarkerPlacementSelection?.();
+    function openModal(options = {}) {
+        if (options.fromMapClick) {
+            window.disableMarkerPlacementSelection?.({ clearCoordinates: false });
+        } else {
+            window.removeMapPlacementMarker?.({ clearCoordinates: true });
+            window.enableMarkerPlacementSelection?.();
+        }
         const modal = document.getElementById('markerModal');
         if (modal) {
             modal.style.display = 'flex';
@@ -2703,13 +2732,13 @@
 
     async function refreshChiefDashboardStats() {
         try {
-            chiefStatsRequest = fetchChiefDashboardOnce(chiefStatsRequest, '/station-admin/api/dashboard-stats', {
+            chiefStatsRequest = createChiefDashboardRequest(chiefStatsRequest, '/station-admin/api/dashboard-stats', {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             });
-            const response = await chiefStatsRequest;
+            const response = await chiefStatsRequest.promise;
 
             if (!response.ok) {
                 throw new Error(`Failed to load dashboard stats (${response.status})`);
@@ -2717,17 +2746,12 @@
 
             const payload = await response.json();
             const stats = payload?.data || {};
-
-            const incidentTotal = document.getElementById('chiefIncidentTotal');
-            const activeResponses = document.getElementById('chiefActiveResponses');
-            const fsicClaims = document.getElementById('chiefFsicClaims');
-            const crewOnline = document.getElementById('chiefCrewOnline');
-
-            if (incidentTotal) incidentTotal.textContent = stats.incident_total ?? '0';
-            if (activeResponses) activeResponses.textContent = stats.active_responses ?? '0';
-            if (fsicClaims) fsicClaims.textContent = stats.fsic_claims ?? '0';
-            if (crewOnline) crewOnline.textContent = stats.crew_online ?? '0';
+            applyChiefDashboardStats(stats);
+            writeChiefDashboardStatsCache(stats);
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
             console.error('Error refreshing chief dashboard stats:', error);
         } finally {
             chiefStatsRequest = null;
@@ -2740,7 +2764,7 @@
         const openBtn = document.getElementById('openSidebar');
         const backdrop = document.getElementById('sidebarBackdrop');
 
-        if (openBtn) {
+        if (openBtn && sidebar && backdrop) {
             openBtn.addEventListener('click', function() {
                 sidebar.classList.add('open');
                 backdrop.classList.remove('hidden');
@@ -2748,7 +2772,7 @@
             });
         }
 
-        if (backdrop) {
+        if (backdrop && sidebar) {
             backdrop.addEventListener('click', function() {
                 sidebar.classList.remove('open');
                 backdrop.classList.add('hidden');
@@ -2756,7 +2780,14 @@
             });
         }
 
-        refreshChiefDashboardStats();
+        const cachedStats = readChiefDashboardStatsCache();
+        if (cachedStats) {
+            applyChiefDashboardStats(cachedStats);
+        } else if (window.chiefDashboardStatsSeed) {
+            applyChiefDashboardStats(window.chiefDashboardStatsSeed);
+        }
+
+        queueChiefDashboardBootTask(() => refreshChiefDashboardStats(), 180);
     });
     
     // Make functions globally available
@@ -2823,18 +2854,17 @@
 
 <script>
     const CHIEF_DASHBOARD_FETCH_TIMEOUT_MS = 10000;
+    const CHIEF_DASHBOARD_STATS_CACHE_KEY = 'pyrosense:chief-dashboard:stats';
     let chiefAutoAssignRequest = null;
     let chiefLatestIncidentRequest = null;
     let chiefStatsRequest = null;
 
-    function fetchChiefDashboardOnce(currentRequest, url, options = {}) {
-        if (currentRequest) {
-            return currentRequest;
-        }
+    function createChiefDashboardRequest(currentRequest, url, options = {}) {
+        currentRequest?.controller?.abort();
 
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), CHIEF_DASHBOARD_FETCH_TIMEOUT_MS);
-        const requestPromise = fetch(url, {
+        const promise = fetch(url, {
             cache: 'no-store',
             ...options,
             signal: controller.signal
@@ -2842,7 +2872,64 @@
             window.clearTimeout(timeoutId);
         });
 
-        return requestPromise;
+        return { controller, promise };
+    }
+
+    function applyChiefDashboardStats(stats = {}) {
+        const incidentTotal = document.getElementById('chiefIncidentTotal');
+        const activeResponses = document.getElementById('chiefActiveResponses');
+        const fsicClaims = document.getElementById('chiefFsicClaims');
+        const crewOnline = document.getElementById('chiefCrewOnline');
+
+        if (incidentTotal) incidentTotal.textContent = stats.incident_total ?? '0';
+        if (activeResponses) activeResponses.textContent = stats.active_responses ?? '0';
+        if (fsicClaims) fsicClaims.textContent = stats.fsic_claims ?? '0';
+        if (crewOnline) crewOnline.textContent = stats.crew_online ?? '0';
+    }
+
+    function readChiefDashboardStatsCache() {
+        try {
+            const raw = window.sessionStorage?.getItem(CHIEF_DASHBOARD_STATS_CACHE_KEY);
+            if (!raw) {
+                return null;
+            }
+
+            const parsed = JSON.parse(raw);
+            if (!parsed?.stats || typeof parsed.stats !== 'object') {
+                return null;
+            }
+
+            if ((Date.now() - Number(parsed.saved_at || 0)) > 120000) {
+                return null;
+            }
+
+            return parsed.stats;
+        } catch (error) {
+            console.warn('Unable to read chief dashboard stats cache:', error);
+            return null;
+        }
+    }
+
+    function writeChiefDashboardStatsCache(stats = {}) {
+        try {
+            window.sessionStorage?.setItem(CHIEF_DASHBOARD_STATS_CACHE_KEY, JSON.stringify({
+                stats,
+                saved_at: Date.now()
+            }));
+        } catch (error) {
+            console.warn('Unable to write chief dashboard stats cache:', error);
+        }
+    }
+
+    function queueChiefDashboardBootTask(callback, delayMs = 0) {
+        window.setTimeout(() => {
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(() => callback(), { timeout: 1500 });
+                return;
+            }
+
+            callback();
+        }, delayMs);
     }
 
     window.runPendingIncidentAutoAssignment = async function() {
@@ -2852,14 +2939,14 @@
         }
 
         try {
-            chiefAutoAssignRequest = fetchChiefDashboardOnce(chiefAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
+            chiefAutoAssignRequest = createChiefDashboardRequest(chiefAutoAssignRequest, '/api/incidents/auto-assign-recent-unassigned', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': token
                 }
             });
-            const response = await chiefAutoAssignRequest;
+            const response = await chiefAutoAssignRequest.promise;
 
             const result = await response.json().catch(() => ({}));
             if (result?.success && Number(result.assigned) > 0) {
@@ -2870,6 +2957,9 @@
                 ]);
             }
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
             console.error('Chief dashboard auto-assignment failed:', error);
         } finally {
             chiefAutoAssignRequest = null;
@@ -2878,13 +2968,13 @@
 
     window.refreshChiefIncidentNotifications = async function() {
         try {
-            chiefLatestIncidentRequest = fetchChiefDashboardOnce(chiefLatestIncidentRequest, '/api/incident/latest', {
+            chiefLatestIncidentRequest = createChiefDashboardRequest(chiefLatestIncidentRequest, '/api/incident/latest', {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                 }
             });
-            const response = await chiefLatestIncidentRequest;
+            const response = await chiefLatestIncidentRequest.promise;
 
             if (!response.ok) {
                 throw new Error(`Failed to refresh chief incident notifications (${response.status})`);
@@ -2900,6 +2990,9 @@
                 });
             }
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
             console.error('Chief incident notification refresh failed:', error);
         } finally {
             chiefLatestIncidentRequest = null;
@@ -2911,15 +3004,15 @@
     
     // Initialize UnifiedMapService AFTER your existing map is ready
     document.addEventListener('DOMContentLoaded', function() {
-        window.runPendingIncidentAutoAssignment();
-        window.refreshChiefIncidentNotifications();
-        window.startChiefDashboardIntervals();
+        queueChiefDashboardBootTask(() => window.refreshChiefIncidentNotifications(), 700);
+        queueChiefDashboardBootTask(() => window.runPendingIncidentAutoAssignment(), 1400);
+        queueChiefDashboardBootTask(() => window.startChiefDashboardIntervals(), 2200);
 
         document.addEventListener('visibilitychange', () => {
             if (window.chiefDashboardIsVisible()) {
                 refreshChiefDashboardStats();
-                window.refreshChiefIncidentNotifications();
-                window.startChiefDashboardIntervals();
+                queueChiefDashboardBootTask(() => window.refreshChiefIncidentNotifications(), 0);
+                queueChiefDashboardBootTask(() => window.startChiefDashboardIntervals(), 300);
                 return;
             }
 
@@ -2962,8 +3055,6 @@
                     window.unifiedMap = new UnifiedMapService();
                     window.unifiedMap.setupOnExistingMap();
                     console.log('UnifiedMapService integrated with existing map');
-                } else {
-                    console.warn('UnifiedMapService is not loaded on chief dashboard.');
                 }
                 return;
             }

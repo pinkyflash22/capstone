@@ -544,12 +544,12 @@
                         </span>
                     </a>
 
-                    <a href="tel:09171891611" class="mobile-hub-btn mobile-hub-btn--hotline mobile-hub-btn--compact">
+                    <button type="button" class="mobile-hub-btn mobile-hub-btn--hotline mobile-hub-btn--compact" data-pyro-voice-call>
                         <span class="mobile-hub-btn__icon"><i class="fa-solid fa-phone-volume"></i></span>
                         <span class="mobile-hub-btn__copy">
                             <strong>Call BFP</strong>
                         </span>
-                    </a>
+                    </button>
                 </div>
 
                 <a href="{{ rtrim(route('citizen.dashboard'), '/') }}/alerts?reports=history" class="mobile-hub-btn mobile-hub-btn--dashboard" data-mobile-hub-nav="history">
@@ -580,6 +580,7 @@
         </div>
         </div>
     </main>
+    @include('partials.voice-call-config')
     @vite(['resources/js/mobile-hub.js'])
     @include('partials.pwa-body')
 </body>

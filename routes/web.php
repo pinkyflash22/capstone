@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\ManagementController;
 use App\Http\Controllers\StationOfficerController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\UserLogController;
+use App\Http\Controllers\VoiceCallController;
 
 //station admin
 use App\Http\Controllers\Chief\StationAdminController;
@@ -212,6 +213,19 @@ Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-db
 //     }
 // });
 Route::middleware(['auth', 'prevent.back.history'])->group(function () {
+    Route::prefix('voice-calls')->name('voice-calls.')->group(function () {
+        Route::post('/', [VoiceCallController::class, 'store'])->name('store');
+        Route::get('/incoming', [VoiceCallController::class, 'incoming'])->name('incoming');
+        Route::get('/stream', [VoiceCallController::class, 'stream'])->name('stream');
+        Route::get('/{voiceCall}', [VoiceCallController::class, 'show'])->name('show');
+        Route::post('/{voiceCall}/accept', [VoiceCallController::class, 'accept'])->name('accept');
+        Route::post('/{voiceCall}/reject', [VoiceCallController::class, 'reject'])->name('reject');
+        Route::post('/{voiceCall}/end', [VoiceCallController::class, 'end'])->name('end');
+        Route::post('/{voiceCall}/create-incident', [VoiceCallController::class, 'createIncident'])->name('create-incident');
+        Route::post('/{voiceCall}/flag-prank', [VoiceCallController::class, 'flagPrank'])->name('flag-prank');
+        Route::post('/{voiceCall}/token', [VoiceCallController::class, 'token'])->name('token');
+    });
+
     Route::get('/user-logs', [UserLogController::class, 'index'])->name('user-logs.index');
     Route::get('/user-logs/all', [UserLogController::class, 'all'])->name('user-logs.all');
     Route::post('/user-logs/action', [UserLogController::class, 'store'])->name('user-logs.store');

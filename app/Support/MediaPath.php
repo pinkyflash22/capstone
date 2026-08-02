@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Storage;
 
 class MediaPath
 {
+    private const PUBLIC_ASSET_PREFIX = 'public://';
     private const SUPABASE_PREFIX = 'supabase://';
+    private const LEGACY_BRAND_LOGO_PATH = 'supabase://branding/logos/logo.png';
 
     public static function diskFor(?string $path): string
     {
@@ -21,6 +23,10 @@ class MediaPath
 
         if (self::isAbsoluteUrl($path)) {
             return $path;
+        }
+
+        if (str_starts_with($path, self::PUBLIC_ASSET_PREFIX)) {
+            return ltrim(substr($path, strlen(self::PUBLIC_ASSET_PREFIX)), '/');
         }
 
         if (str_starts_with($path, self::SUPABASE_PREFIX)) {
@@ -45,6 +51,14 @@ class MediaPath
             return null;
         }
 
+        if ($path === self::LEGACY_BRAND_LOGO_PATH || str_contains($path, '/branding/logos/logo.png')) {
+            return asset('logo.png');
+        }
+
+        if (str_starts_with($path, self::PUBLIC_ASSET_PREFIX)) {
+            return asset((string) self::stripPrefix($path));
+        }
+
         if (self::isAbsoluteUrl($path)) {
             return $path;
         }
@@ -54,7 +68,7 @@ class MediaPath
 
     public static function delete(?string $path): void
     {
-        if ($path === null || $path === '' || self::isAbsoluteUrl($path)) {
+        if ($path === null || $path === '' || self::isAbsoluteUrl($path) || str_starts_with($path, self::PUBLIC_ASSET_PREFIX)) {
             return;
         }
 

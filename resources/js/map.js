@@ -210,6 +210,11 @@ function isChiefCommandMapContext() {
         || roleMeta === 'station admin';
 }
 
+function isChiefDashboardMapInstance() {
+    const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
+    return configuredInstanceKey === 'chiefDashboard';
+}
+
 function shouldUseResponderPopupUi() {
     return isFirefighterDashboardMapInstance() || isChiefCommandMapContext();
 }
@@ -241,7 +246,7 @@ function getMarkerStatePollIntervalMs() {
 }
 
 function shouldSkipStaticLayerRefetch(lastFetchedAt) {
-    return isFirefighterDashboardMapInstance()
+    return (isFirefighterDashboardMapInstance() || isChiefDashboardMapInstance())
         && lastFetchedAt > 0
         && (Date.now() - lastFetchedAt) < STATIC_LAYER_REFETCH_INTERVAL_MS;
 }
@@ -2086,14 +2091,36 @@ function initializePyroMapRuntime() {
     window.routesGroup = L.layerGroup().addTo(window.map);
     
     initAfterMapReady();
+
+    const shouldDeferChiefRevalidation = isChiefDashboardMapInstance();
     fetchStations({
         preferSeeded: true,
-        revalidate: !isFirefighterDashboardMapInstance()
+        revalidate: !isFirefighterDashboardMapInstance() && !shouldDeferChiefRevalidation
     });
     fetchCoordinate({
         preferSeeded: true,
-        revalidate: !isFirefighterDashboardMapInstance()
+        revalidate: !isFirefighterDashboardMapInstance() && !shouldDeferChiefRevalidation
     });
+
+    if (shouldDeferChiefRevalidation) {
+        window.setTimeout(() => {
+            fetchStations({
+                preferSeeded: true,
+                revalidate: true
+            }).catch((error) => {
+                console.warn('Deferred chief station refresh failed:', error);
+            });
+        }, 900);
+
+        window.setTimeout(() => {
+            fetchCoordinate({
+                preferSeeded: true,
+                revalidate: true
+            }).catch((error) => {
+                console.warn('Deferred chief marker refresh failed:', error);
+            });
+        }, 1400);
+    }
     
     // Ensure the map repaints correctly after layout settles.
     setTimeout(() => window.map?.invalidateSize(), 0);
@@ -3252,7 +3279,7 @@ const CATEGORY_ICON_MAP = {
     6: 'evacuation'
 };
 
-const PUBLIC_MARKER_IMAGE_MAP = {
+const DEFAULT_PUBLIC_MARKER_IMAGE_MAP = {
     station: '/station.png',
     hydrant: '/hydrant.png',
     barangay: '/hall.png',
@@ -3264,18 +3291,27 @@ const PUBLIC_MARKER_IMAGE_MAP = {
     firetruck: '/truck.png'
 };
 
+function getPublicMarkerImageMap() {
+    const configuredMap = window.pyroPublicAssetUrls;
+    return {
+        ...DEFAULT_PUBLIC_MARKER_IMAGE_MAP,
+        ...(configuredMap && typeof configuredMap === 'object' ? configuredMap : {})
+    };
+}
+
 // ============================================================================
 // HELPER FUNCTIONS FOR ICONS (keeping your existing icon functions)
 // ============================================================================
 
 function inferMarkerImagePath(marker = null, iconConfig = null) {
+    const publicMarkerImageMap = getPublicMarkerImageMap();
     const explicitCategoryKey = getMarkerCategoryKey(marker);
-    if (explicitCategoryKey && PUBLIC_MARKER_IMAGE_MAP[explicitCategoryKey]) {
-        return PUBLIC_MARKER_IMAGE_MAP[explicitCategoryKey];
+    if (explicitCategoryKey && publicMarkerImageMap[explicitCategoryKey]) {
+        return publicMarkerImageMap[explicitCategoryKey];
     }
 
-    if (iconConfig?.id && PUBLIC_MARKER_IMAGE_MAP[iconConfig.id]) {
-        return PUBLIC_MARKER_IMAGE_MAP[iconConfig.id];
+    if (iconConfig?.id && publicMarkerImageMap[iconConfig.id]) {
+        return publicMarkerImageMap[iconConfig.id];
     }
 
     const haystack = [
@@ -5491,7 +5527,7 @@ export function getName(lat, lon) {
         if (window.map?.closePopup) {
             window.map.closePopup();
         }
-        openModal();
+        openModal({ fromMapClick: true });
 
         const descriptionInput = document.getElementById('markerDescription');
         if (descriptionInput && !descriptionInput.value) {
@@ -5546,7 +5582,7 @@ export function getName(lat, lon) {
             btn.addEventListener('click', function() {
                 selectedLat = lat;
                 selectedLng = lon;
-                openModal();
+                openModal({ fromMapClick: true });
             });
         }
         popupmarker.on('popupclose', function() {
@@ -5788,6 +5824,7 @@ function unregisterRouteRendering(routeId) {
 
 async function fetchCoordinate(options = {}) {
     const { preferSeeded = false, revalidate = true, force = false } = options;
+    let renderedFallbackData = false;
 
     try {
         if (force) {
@@ -5798,6 +5835,7 @@ async function fetchCoordinate(options = {}) {
         if (preferSeeded && Array.isArray(seededMarkers) && seededMarkers.length > 0) {
             // Paint markers immediately for fast first render.
             renderMarkersQuick(seededMarkers);
+            renderedFallbackData = true;
 
             // Upgrade marker details asynchronously without blocking first paint.
             setTimeout(() => {
@@ -5814,6 +5852,7 @@ async function fetchCoordinate(options = {}) {
         const cachedMarkers = readStaticMapCache('markers');
         if ((!Array.isArray(seededMarkers) || seededMarkers.length === 0) && Array.isArray(cachedMarkers) && cachedMarkers.length > 0) {
             renderMarkersQuick(cachedMarkers);
+            renderedFallbackData = true;
 
             if (!revalidate) {
                 return;
@@ -5842,7 +5881,9 @@ async function fetchCoordinate(options = {}) {
         writeStaticMapCache('markers', coordinates);
     } catch (error) {
         console.error('Fetch error in fetchCoordinate:', error);
-        showNotification('Failed to fetch markers: ' + error.message, 'error');
+        if (!renderedFallbackData && !isChiefDashboardMapInstance()) {
+            showNotification('Failed to fetch markers: ' + error.message, 'error');
+        }
     }
 }
 
@@ -6267,6 +6308,7 @@ async function updateCoordinate(data, options = {}) {
 
 async function fetchStations(options = {}) {
     const { preferSeeded = false, revalidate = true } = options;
+    let usedSeededOrCachedData = false;
 
     try {
         const normalizeStationsPayload = (payload) => {
@@ -6283,9 +6325,12 @@ async function fetchStations(options = {}) {
             }));
         };
 
-        const seededStations = window.stationsData;
+        const seededStations = Array.isArray(window.stationsData)
+            ? window.stationsData
+            : (Array.isArray(window.stationDatas?.stations) ? window.stationDatas.stations : []);
         if (preferSeeded && Array.isArray(seededStations) && seededStations.length > 0) {
             stations = normalizeStationsPayload(seededStations);
+            usedSeededOrCachedData = true;
 
             if (!revalidate) {
                 return stations;
@@ -6295,6 +6340,7 @@ async function fetchStations(options = {}) {
         const cachedStations = readStaticMapCache('stations');
         if ((!Array.isArray(seededStations) || seededStations.length === 0) && Array.isArray(cachedStations) && cachedStations.length > 0) {
             stations = normalizeStationsPayload(cachedStations);
+            usedSeededOrCachedData = true;
 
             if (!revalidate) {
                 return stations;
@@ -6323,6 +6369,9 @@ async function fetchStations(options = {}) {
         return stations;
     } catch (error) {
         console.error('Error fetching stations:', error);
+        if (!usedSeededOrCachedData && !isChiefDashboardMapInstance()) {
+            showNotification?.('Unable to refresh stations right now', 'warning');
+        }
         if (!Array.isArray(stations)) {
             stations = [];
         }
@@ -8651,6 +8700,7 @@ function createFireTruckIcon(color = '#dc2626') {
         icon: 'fa-truck-fire',
         bgColor: color
     };
+    const publicMarkerImageMap = getPublicMarkerImageMap();
 
     return L.divIcon({
         className: 'custom-fa-icon fire-truck-icon',
@@ -8658,7 +8708,7 @@ function createFireTruckIcon(color = '#dc2626') {
             width: 48,
             height: 48,
             borderRadius: '50%',
-            imagePath: PUBLIC_MARKER_IMAGE_MAP.firetruck || '/truck.png',
+            imagePath: publicMarkerImageMap.firetruck || '/truck.png',
             fallbackIconClass: iconConfig.icon,
             bgColor: color,
             iconFontSize: 22
@@ -9096,6 +9146,13 @@ function removeMapPlacementMarker(options = {}) {
     }
 }
 
+function shouldAllowDashboardMarkerPlacementClick() {
+    const path = window.location?.pathname || '';
+
+    return Boolean(document.getElementById('markerModal'))
+        && (path.includes('/station-admin/dashboard') || path.includes('/admin/dashboard'));
+}
+
 function handleManagedMapClick(e) {
     if (isDrawing) return;
 
@@ -9116,7 +9173,7 @@ function handleManagedMapClick(e) {
         return;
     }
 
-    if (!markerPlacementSelectionActive) {
+    if (!markerPlacementSelectionActive && !shouldAllowDashboardMarkerPlacementClick()) {
         return;
     }
 
@@ -9516,7 +9573,9 @@ async function loadShapes() {
         lastShapesFetchAt = Date.now();
     } catch (error) {
         console.error('Error loading shapes:', error);
-        showNotification('Error loading shapes', 'error');
+        if (!isChiefDashboardMapInstance()) {
+            showNotification('Error loading shapes', 'error');
+        }
     }
 }
 
@@ -9645,7 +9704,9 @@ async function loadFireRiskAreas() {
         console.log('Fire risk areas loaded:', areas.length);
     } catch (error) {
         console.error('Error loading fire risk areas:', error);
-        showNotification?.('Unable to load fire risk areas', 'warning');
+        if (!isChiefDashboardMapInstance()) {
+            showNotification?.('Unable to load fire risk areas', 'warning');
+        }
     }
 }
 
@@ -10445,11 +10506,24 @@ function initAfterMapReady() {
     }
     
     if (!isFirefighterDashboardMap) {
-        loadShapes();
-        setTimeout(focusBoundaryEditorContext, 350);
+        if (isChiefDashboardMapInstance()) {
+            window.setTimeout(() => {
+                loadShapes();
+                setTimeout(focusBoundaryEditorContext, 350);
+            }, 1800);
+        } else {
+            loadShapes();
+            setTimeout(focusBoundaryEditorContext, 350);
+        }
     }
     if (!isCitizenDashboardMap) {
-        loadFireRiskAreas();
+        if (isChiefDashboardMapInstance()) {
+            window.setTimeout(() => {
+                loadFireRiskAreas();
+            }, 2400);
+        } else {
+            loadFireRiskAreas();
+        }
     }
     if (markerStatePollingInterval) {
         clearInterval(markerStatePollingInterval);
@@ -11179,9 +11253,13 @@ window.closeModal = function(options = {}) {
     modal.setAttribute('aria-hidden', 'true');
 };
 
-window.openModal = function() {
-    window.removeMapPlacementMarker?.({ clearCoordinates: true });
-    window.enableMarkerPlacementSelection?.();
+window.openModal = function(options = {}) {
+    if (options.fromMapClick) {
+        window.disableMarkerPlacementSelection?.({ clearCoordinates: false });
+    } else {
+        window.removeMapPlacementMarker?.({ clearCoordinates: true });
+        window.enableMarkerPlacementSelection?.();
+    }
 
     const titleInput = document.getElementById('markerTitle');
     const descriptionInput = document.getElementById('markerDescription');

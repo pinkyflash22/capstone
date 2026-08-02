@@ -45,6 +45,18 @@ return [
         'key' => env('GEOAPIFY_KEY'),
     ],
 
+    'agora' => [
+        'app_id' => env('AGORA_APP_ID'),
+        'app_certificate' => env('AGORA_APP_CERTIFICATE'),
+        'token_ttl' => (int) env('AGORA_TOKEN_TTL', 3600),
+    ],
+
+    'voice_calls' => [
+        'missed_after_seconds' => (int) env('VOICE_CALL_MISSED_AFTER_SECONDS', 90),
+        'poll_interval_ms' => (int) env('VOICE_CALL_POLL_INTERVAL_MS', 2000),
+        'stale_answered_after_seconds' => (int) env('VOICE_CALL_STALE_ANSWERED_AFTER_SECONDS', 180),
+    ],
+
     'ai_prediction' => [
         'python_binary' => env('AI_PYTHON_BINARY', 'python3'),
         'prediction_script' => env('AI_PREDICTION_SCRIPT', 'capstone-ai/predict_event.py'),

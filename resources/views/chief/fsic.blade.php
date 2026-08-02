@@ -9,6 +9,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <meta name="user-role" content="{{ auth()->user()->role->role ?? 'station_admin' }}">
     <meta name="user-role-id" content="{{ auth()->user()->role_id ?? 4 }}">
+    @include('partials.pwa-head')
     
     <title>FSIC Management - PyroSense</title>
     
@@ -20,6 +21,12 @@
     <style>
         * {
             font-family: 'Inter', sans-serif;
+        }
+
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
         }
         
         /* Sidebar Styles */
@@ -653,6 +660,9 @@
             z-index: 10000;
             align-items: center;
             justify-content: center;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
         
         .modal.show {
@@ -667,6 +677,8 @@
             max-height: 85vh;
             overflow-y: auto;
             position: relative;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
         
         .modal-header {
@@ -688,6 +700,201 @@
             display: flex;
             justify-content: flex-end;
             gap: 0.5rem;
+        }
+
+        .new-request-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
+        .form-section-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+
+        .form-section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .form-section-hint {
+            margin: -0.25rem 0 0.75rem;
+            font-size: 0.74rem;
+            line-height: 1.45;
+            color: #64748b;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .field-label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .field-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .field-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .field-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.2rem;
+            padding: 0 0.45rem;
+            border-radius: 999px;
+            font-size: 0.66rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .field-chip.required {
+            background: #fff1f2;
+            color: #b91c1c;
+            border: 1px solid #fecdd3;
+        }
+
+        .field-chip.optional {
+            background: #f8fafc;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+
+        .field-input {
+            width: 100%;
+            min-height: 2.7rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.8rem;
+            padding: 0.7rem 0.85rem;
+            font-size: 0.9rem;
+            color: #0f172a;
+            background: #fff;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: #f97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+        }
+
+        .inline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .helper-text {
+            font-size: 0.74rem;
+            color: #64748b;
+        }
+
+        @media (min-width: 769px) {
+            #newRequestModal {
+                padding: 28px;
+            }
+
+            #newRequestModal .modal-content {
+                width: min(760px, calc(100vw - 56px)) !important;
+                max-width: 760px !important;
+                max-height: min(82vh, 860px) !important;
+                border-radius: 20px;
+                overflow: hidden;
+            }
+
+            #newRequestModal .modal-header {
+                padding: 1rem 1.25rem;
+            }
+
+            #newRequestModal .modal-body {
+                padding: 1rem 1.25rem 1.1rem;
+            }
+
+            #newRequestModal .modal-footer {
+                padding: 0.9rem 1.25rem 1rem;
+            }
+
+            #newRequestModal .new-request-form {
+                gap: 0.7rem;
+            }
+
+            #newRequestModal .form-section-card {
+                padding: 0.85rem 0.9rem;
+                border-radius: 0.95rem;
+            }
+
+            #newRequestModal .form-section-title {
+                margin-bottom: 0.6rem;
+                font-size: 0.84rem;
+            }
+
+            #newRequestModal .form-section-hint {
+                margin-bottom: 0.6rem;
+                font-size: 0.7rem;
+            }
+
+            #newRequestModal .field-label {
+                margin-bottom: 0.28rem;
+                font-size: 0.76rem;
+            }
+
+            #newRequestModal .field-chip {
+                font-size: 0.62rem;
+            }
+
+            #newRequestModal .field-input {
+                min-height: 2.45rem;
+                padding: 0.58rem 0.72rem;
+                font-size: 0.84rem;
+                border-radius: 0.72rem;
+            }
+
+            #newRequestModal .form-grid-2,
+            #newRequestModal .form-grid-3 {
+                gap: 0.65rem;
+            }
+
+            #newRequestModal .mb-3 {
+                margin-bottom: 0.75rem;
+            }
+
+            #newRequestModal .btn-primary,
+            #newRequestModal .btn-outline {
+                min-height: 2.35rem;
+                padding: 0.6rem 0.9rem;
+                font-size: 0.78rem;
+            }
         }
         
         /* Tabs */
@@ -1023,6 +1230,14 @@
             .top-nav-container {
                 padding: 0 16px;
             }
+
+            .lector-top-bar,
+            .chief-theme-hero,
+            .requests-card,
+            .tabs-container,
+            .modal-content {
+                max-width: 100%;
+            }
             
             .progress-steps {
                 flex-direction: column;
@@ -1085,8 +1300,79 @@
             }
 
             .fsic-content-shell {
-                max-width: 330px;
-                padding: 0.7rem 0.5rem 1.4rem;
+                width: 100%;
+                max-width: 100%;
+                padding: 0.8rem 0.75rem 1.5rem;
+            }
+
+            .chief-theme-hero {
+                padding: 0.95rem;
+                gap: 0.9rem;
+            }
+
+            .chief-theme-hero__title {
+                font-size: 1.05rem !important;
+                line-height: 1.15;
+            }
+
+            .chief-theme-hero__copy {
+                font-size: 0.7rem !important;
+                line-height: 1.35;
+            }
+
+            .chief-theme-badges {
+                gap: 0.45rem;
+            }
+
+            .chief-theme-badge {
+                min-height: 1.85rem;
+                padding: 0 0.6rem;
+                font-size: 0.58rem !important;
+            }
+
+            .chief-theme-summary-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 0.45rem !important;
+            }
+
+            .chief-theme-summary-card {
+                border-radius: 1rem;
+                padding: 0.7rem 0.55rem 0.65rem !important;
+                min-width: 0;
+            }
+
+            .chief-theme-summary-label {
+                font-size: 0.54rem !important;
+                letter-spacing: 0.05em;
+            }
+
+            .chief-theme-summary-value {
+                margin-top: 0.25rem;
+                font-size: 1rem !important;
+                line-height: 1;
+            }
+
+            .chief-theme-summary-copy {
+                margin-top: 0.22rem;
+                font-size: 0.55rem !important;
+                line-height: 1.25;
+            }
+
+            .chief-theme-actions {
+                display: block;
+            }
+
+            .chief-theme-summary-card .btn-primary {
+                width: 100%;
+                min-height: 2rem;
+                padding: 0.45rem 0.35rem;
+                font-size: 0.6rem;
+                border-radius: 0.8rem;
+                gap: 0.3rem !important;
+            }
+
+            .chief-theme-summary-card .btn-primary i {
+                font-size: 0.62rem;
             }
 
             .fsic-toolbar {
@@ -1172,7 +1458,7 @@
 
             .table-wrapper {
                 overflow: visible;
-                padding: 0.75rem;
+                padding: 0.55rem;
             }
 
             .fsic-table,
@@ -1210,9 +1496,9 @@
 
             .fsic-table td {
                 border-bottom: 1px solid #f8ede0;
-                padding: 0.62rem 0.8rem;
-                font-size: 0.72rem;
-                line-height: 1.45;
+                padding: 0.56rem 0.72rem;
+                font-size: 0.7rem;
+                line-height: 1.4;
             }
 
             .fsic-table td:last-child {
@@ -1235,22 +1521,22 @@
             }
 
             .fsic-request-title {
-                font-size: 0.8rem;
+                font-size: 0.76rem;
             }
 
             .fsic-request-meta {
-                font-size: 0.64rem;
+                font-size: 0.6rem;
             }
 
             .fsic-request-code {
-                font-size: 0.8rem;
+                font-size: 0.76rem;
             }
 
             .fsic-status-pill {
                 width: fit-content;
                 min-height: 1.55rem;
                 padding: 0 0.55rem;
-                font-size: 0.62rem;
+                font-size: 0.58rem;
             }
 
             .fsic-action-group {
@@ -1267,6 +1553,13 @@
                 font-size: 0.65rem;
             }
 
+            input,
+            select,
+            textarea,
+            button {
+                font-size: 16px;
+            }
+
             .fsic-table-empty {
                 padding: 1.7rem 0.9rem;
                 font-size: 0.72rem;
@@ -1274,6 +1567,150 @@
 
             .fsic-table-empty strong {
                 font-size: 0.82rem;
+            }
+
+            .modal-header {
+                padding: 0.85rem 1rem;
+            }
+
+            .modal-header h2 {
+                font-size: 0.95rem;
+                line-height: 1.35;
+                padding-right: 1.75rem;
+            }
+
+            .modal-body {
+                padding: 0.9rem;
+            }
+
+            .modal-footer {
+                padding: 0.85rem 0.9rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+                flex-wrap: wrap;
+            }
+
+            .modal {
+                padding: 0;
+                align-items: flex-end;
+            }
+
+            .modal-content {
+                display: flex;
+                flex-direction: column;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: min(88dvh, 820px);
+                max-height: min(88dvh, 820px) !important;
+                margin: 0;
+                overflow: hidden;
+                border-radius: 22px 22px 0 0 !important;
+            }
+
+            .modal-body {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+                padding-bottom: 1rem;
+            }
+
+            .modal-footer {
+                flex-shrink: 0;
+                position: sticky;
+                bottom: 0;
+                background: #fff;
+            }
+
+            .modal-footer .btn-primary,
+            .modal-footer .btn-outline,
+            .modal-footer .btn-success,
+            .modal-footer .btn-danger {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+                min-height: 2.4rem;
+                font-size: 0.74rem;
+            }
+
+            .form-section-card {
+                padding: 0.8rem;
+                border-radius: 0.9rem;
+            }
+
+            .form-section-title {
+                font-size: 0.8rem;
+                margin-bottom: 0.65rem;
+            }
+
+            .form-grid-2,
+            .form-grid-3,
+            .grid.grid-cols-2,
+            .grid.grid-cols-1.md\:grid-cols-3,
+            .grid.grid-cols-2.gap-3,
+            .grid.grid-cols-2.gap-2 {
+                grid-template-columns: 1fr;
+                gap: 0.65rem;
+            }
+
+            .field-label {
+                font-size: 0.74rem;
+                margin-bottom: 0.28rem;
+            }
+
+            .field-label-row {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .field-input {
+                min-height: 2.45rem;
+                padding: 0.62rem 0.72rem;
+                border-radius: 0.72rem;
+                font-size: 0.82rem;
+            }
+
+            #newRequestModal .modal-content {
+                height: min(90dvh, 860px);
+                max-height: min(90dvh, 860px) !important;
+            }
+
+            #newRequestModal .modal-body {
+                padding-top: 0.8rem;
+            }
+
+            .helper-text {
+                font-size: 0.68rem;
+            }
+
+            .form-section-hint {
+                font-size: 0.68rem;
+                margin-bottom: 0.55rem;
+            }
+
+            .field-chip {
+                font-size: 0.58rem;
+            }
+
+            .add-applicant-btn {
+                font-size: 0.68rem;
+            }
+
+            .applicant-form h4,
+            .progress-steps .step-label,
+            .text-sm,
+            label.block.text-sm {
+                font-size: 0.74rem !important;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .chief-theme-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .chief-theme-summary-card:last-child {
+                grid-column: 1 / -1;
             }
         }
         
@@ -1459,15 +1896,11 @@
             }
 
             .modal {
-                align-items: flex-end;
-                padding: 10px;
+                padding: 0;
             }
 
             .modal-content {
-                width: 100% !important;
-                max-width: 100% !important;
-                max-height: min(84dvh, 760px) !important;
-                border-radius: 24px 24px 18px 18px !important;
+                border-radius: 24px 24px 0 0 !important;
             }
 
             .modal-content::before {
@@ -1572,7 +2005,7 @@
                 </button>
                 <div class="hidden lg:block">
                     <h1 class="text-xl font-bold text-slate-800">FSIC Management</h1>
-                    <p class="text-xs text-slate-500 font-medium">Inspection And Certification Records • {{ now()->format('l, F j') }}</p>
+                    <p class="text-xs text-slate-500 font-medium">FSIC records • {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
 
@@ -1629,25 +2062,25 @@
                 <div>
                     <span class="chief-theme-hero__eyebrow">
                         <i class="fa-solid fa-file-certificate"></i>
-                        FSIC Command Desk
+                        FSIC Desk
                     </span>
-                    <h1 class="chief-theme-hero__title">Fire Safety Inspection Certificate</h1>
-                    <p class="chief-theme-hero__copy">Manage, inspect, approve, and issue FSIC requests with the same command-first workflow style used in Activity Schedule.</p>
+                    <h1 class="chief-theme-hero__title">FSIC Requests</h1>
+                    <p class="chief-theme-hero__copy">Review, inspect, approve, and issue requests.</p>
                     <div class="chief-theme-badges">
                         <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('l, F j') }}</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-building-shield"></i> Live station review queue</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-building-shield"></i> Station queue</span>
                     </div>
                 </div>
                 <div class="chief-theme-summary-grid">
                     <article class="chief-theme-summary-card">
                         <div class="chief-theme-summary-label">Pending</div>
                         <div class="chief-theme-summary-value">{{ $pendingCount ?? 0 }}</div>
-                        <div class="chief-theme-summary-copy">Requests waiting for command review.</div>
+                        <div class="chief-theme-summary-copy">Waiting review.</div>
                     </article>
                     <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">For Inspection</div>
+                        <div class="chief-theme-summary-label">Inspection</div>
                         <div class="chief-theme-summary-value">{{ $forInspectionCount ?? 0 }}</div>
-                        <div class="chief-theme-summary-copy">Filed requests already moving into inspection work.</div>
+                        <div class="chief-theme-summary-copy">In field processing.</div>
                     </article>
                     <article class="chief-theme-summary-card">
                         <div class="chief-theme-summary-label">Actions</div>
@@ -1663,11 +2096,11 @@
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab-btn active" data-tab="pending">Pending Requests</button>
-                <button class="tab-btn" data-tab="for-inspection">For Inspection</button>
+                <button class="tab-btn" data-tab="for-inspection">Inspection</button>
                 <button class="tab-btn" data-tab="inspected">Inspected</button>
                 <button class="tab-btn" data-tab="approved">Approved</button>
                 <button class="tab-btn" data-tab="rejected">Rejected</button>
-                <button class="tab-btn" data-tab="all">All Requests</button>
+                <button class="tab-btn" data-tab="all">All</button>
             </div>
 
             <!-- Tabs Container -->
@@ -1678,7 +2111,7 @@
                         <div class="p-5 border-b">
                             <h2 class="font-bold text-gray-800 flex items-center gap-2">
                                 <i class="fa-solid fa-clock text-yellow-600"></i>
-                                Pending Requests for Review
+                                Pending
                             </h2>
                         </div>
                         <div class="table-wrapper">
@@ -1712,7 +2145,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="7" class="fsic-table-empty"><strong>No pending requests</strong>New applications waiting for command review will appear here.</td>
+                                        <td colspan="7" class="fsic-table-empty"><strong>No pending requests</strong>New submissions will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -1727,7 +2160,7 @@
                         <div class="p-5 border-b">
                             <h2 class="font-bold text-gray-800 flex items-center gap-2">
                                 <i class="fa-solid fa-clipboard-list text-blue-600"></i>
-                                Requests For Inspection
+                                Inspection
                             </h2>
                         </div>
                         <div class="table-wrapper">
@@ -1761,7 +2194,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="7" class="fsic-table-empty"><strong>No requests for inspection</strong>Requests assigned for field inspection will appear here.</td>
+                                        <td colspan="7" class="fsic-table-empty"><strong>No inspection requests</strong>Reviewed items will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -1776,7 +2209,7 @@
                         <div class="p-5 border-b">
                             <h2 class="font-bold text-gray-800 flex items-center gap-2">
                                 <i class="fa-solid fa-check-circle text-purple-600"></i>
-                                Inspected Requests
+                                Inspected
                             </h2>
                         </div>
                         <div class="table-wrapper">
@@ -1809,7 +2242,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="6" class="fsic-table-empty"><strong>No inspected requests</strong>Completed inspection reports ready for command decision will show here.</td>
+                                        <td colspan="6" class="fsic-table-empty"><strong>No inspected requests</strong>Completed inspections will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -1860,7 +2293,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="8" class="fsic-table-empty"><strong>No approved requests</strong>Approved and issued records will appear here for printing and tracking.</td>
+                                        <td colspan="8" class="fsic-table-empty"><strong>No approved requests</strong>Issued records will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -1906,7 +2339,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="6" class="fsic-table-empty"><strong>No rejected requests</strong>Declined applications will be listed here for audit and review.</td>
+                                        <td colspan="6" class="fsic-table-empty"><strong>No rejected requests</strong>Declined items will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -1921,7 +2354,7 @@
                         <div class="p-5 border-b">
                             <h2 class="font-bold text-gray-800 flex items-center gap-2">
                                 <i class="fa-solid fa-list-ul"></i>
-                                All FSIC Requests
+                                All Requests
                             </h2>
                         </div>
                         <div class="table-wrapper">
@@ -1952,7 +2385,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="6" class="fsic-table-empty"><strong>No requests found</strong>The full request registry will appear here as records are created.</td>
+                                        <td colspan="6" class="fsic-table-empty"><strong>No requests found</strong>Records will appear here.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -2287,137 +2720,206 @@
     <div id="newRequestModal" class="modal">
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
-                <h2 class="text-xl font-bold">New FSIC Request</h2>
+                <h2 class="text-xl font-bold">New Request</h2>
                 <button onclick="closeNewRequestModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <form id="newRequestForm">
-                    <!-- Applicant Selection -->
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Applicant *</label>
-                        <select name="user_id" id="applicantSelect" class="w-full border rounded-lg p-2" required>
-                            <option value="">Select Existing User</option>
+                <form id="newRequestForm" class="new-request-form">
+                    <div class="form-section-card">
+                        <div class="form-section-title">
+                            <i class="fa-regular fa-user"></i>
+                            Applicant
+                        </div>
+                        <p class="form-section-hint">Choose the citizen account to attach to this request. Required before submission.</p>
+                        <div class="field-label-row">
+                            <label class="field-label">Applicant</label>
+                            <span class="field-meta"><span class="field-chip required">Required</span></span>
+                        </div>
+                        <select name="user_id" id="applicantSelect" class="field-input" required>
+                            <option value="">Select user</option>
                             @foreach($users ?? [] as $user)
                                 <option value="{{ $user->user_id }}">{{ $user->first_name }} {{ $user->last_name }} ({{ $user->email }})</option>
                             @endforeach
                         </select>
                         <button type="button" class="add-applicant-btn" onclick="toggleApplicantForm()">
-                            <i class="fa-solid fa-plus-circle"></i> Add New Applicant
+                            <i class="fa-solid fa-plus-circle"></i> Add applicant
                         </button>
                     </div>
                     
-                    <!-- Add New Applicant Form (Hidden by default) -->
                     <div id="applicantForm" class="applicant-form" style="display: none;">
-                        <h4><i class="fa-solid fa-user-plus"></i> New Applicant Information</h4>
-                        <div class="grid grid-cols-2 gap-3 mb-3">
+                        <h4><i class="fa-solid fa-user-plus"></i> New Applicant</h4>
+                        <p class="form-section-hint">Use this only if the applicant does not have an account yet.</p>
+                        <div class="form-grid-2 mb-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                                <input type="text" id="new_first_name" class="w-full border rounded-lg p-2" placeholder="First Name">
+                                <div class="field-label-row">
+                                    <label class="field-label">First Name</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <input type="text" id="new_first_name" class="field-input" placeholder="First Name">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
-                                <input type="text" id="new_middle_name" class="w-full border rounded-lg p-2" placeholder="Middle Name">
+                                <div class="field-label-row">
+                                    <label class="field-label">Middle Name</label>
+                                    <span class="field-meta"><span class="field-chip optional">Optional</span></span>
+                                </div>
+                                <input type="text" id="new_middle_name" class="field-input" placeholder="Middle Name">
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="form-grid-2 mb-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-                                <input type="text" id="new_last_name" class="w-full border rounded-lg p-2" placeholder="Last Name">
+                                <div class="field-label-row">
+                                    <label class="field-label">Last Name</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <input type="text" id="new_last_name" class="field-input" placeholder="Last Name">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number *</label>
-                                <input type="tel" id="new_contact_number" class="w-full border rounded-lg p-2" placeholder="09XX XXX XXXX">
+                                <div class="field-label-row">
+                                    <label class="field-label">Contact Number</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <input type="tel" id="new_contact_number" class="field-input" placeholder="09XX XXX XXXX">
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                            <input type="email" id="new_email" class="w-full border rounded-lg p-2" placeholder="email@example.com">
+                            <div class="field-label-row">
+                                <label class="field-label">Email</label>
+                                <span class="field-meta"><span class="field-chip required">Required</span></span>
+                            </div>
+                            <input type="email" id="new_email" class="field-input" placeholder="email@example.com">
                         </div>
-                        <button type="button" class="btn-primary btn-sm" onclick="createNewApplicant()">
-                            <i class="fa-solid fa-save"></i> Save Applicant
-                        </button>
-                        <button type="button" class="btn-outline btn-sm" onclick="toggleApplicantForm()">
-                            Cancel
-                        </button>
+                        <div class="inline-actions">
+                            <button type="button" class="btn-primary btn-sm" onclick="createNewApplicant()">
+                                <i class="fa-solid fa-save"></i> Save Applicant
+                            </button>
+                            <button type="button" class="btn-outline btn-sm" onclick="toggleApplicantForm()">
+                                Cancel
+                            </button>
+                        </div>
                         <div id="applicantLoading" class="hidden mt-2"><span class="loading-spinner"></span> Creating...</div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
-                        <input type="text" name="business_name" class="w-full border rounded-lg p-2" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Owner Name *</label>
-                        <input type="text" name="owner_name" class="w-full border rounded-lg p-2" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
-                        <select name="business_type" class="w-full border rounded-lg p-2">
-                            <option value="">Select...</option>
-                            <option value="retail">Retail / Store</option>
-                            <option value="restaurant">Restaurant / Food Service</option>
-                            <option value="office">Office</option>
-                            <option value="warehouse">Warehouse / Storage</option>
-                            <option value="hotel">Hotel / Inn</option>
-                            <option value="school">School / Educational</option>
-                            <option value="hospital">Hospital / Clinic</option>
-                            <option value="manufacturing">Manufacturing / Factory</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Building/Street Address *</label>
-                        <input type="text" name="building_address" class="w-full border rounded-lg p-2" required>
-                    </div>
-                    
-                    <!-- Location Dropdowns -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Province *</label>
-                            <select name="province_id" id="provinceSelect" class="w-full border rounded-lg p-2" required onchange="loadCities()">
-                                <option value="">Select Province</option>
-                                @foreach($provinces ?? [] as $province)
-                                    <option value="{{ $province->province_id }}" data-province-name="{{ $province->province_name }}">{{ $province->province_name }}</option>
-                                @endforeach
-                            </select>
+                    <div class="form-section-card">
+                        <div class="form-section-title">
+                            <i class="fa-solid fa-building"></i>
+                            Business
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">City/Municipality *</label>
-                            <select name="city_id" id="citySelect" class="w-full border rounded-lg p-2" required onchange="loadBarangays()" disabled>
-                                <option value="">Select City First</option>
-                            </select>
+                        <p class="form-section-hint">Enter the establishment details exactly as they should appear in the FSIC request.</p>
+                        <div class="mb-3">
+                            <div class="field-label-row">
+                                <label class="field-label">Business Name</label>
+                                <span class="field-meta"><span class="field-chip required">Required</span></span>
+                            </div>
+                            <input type="text" name="business_name" class="field-input" required>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Barangay *</label>
-                            <select name="barangay_id" id="barangaySelect" class="w-full border rounded-lg p-2" required disabled>
-                                <option value="">Select Barangay</option>
+                        <div class="mb-3">
+                            <div class="field-label-row">
+                                <label class="field-label">Owner Name</label>
+                                <span class="field-meta"><span class="field-chip required">Required</span></span>
+                            </div>
+                            <input type="text" name="owner_name" class="field-input" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="field-label-row">
+                                <label class="field-label">Business Type</label>
+                                <span class="field-meta"><span class="field-chip optional">Optional</span></span>
+                            </div>
+                            <select name="business_type" class="field-input">
+                                <option value="">Select type</option>
+                                <option value="retail">Retail / Store</option>
+                                <option value="restaurant">Restaurant / Food Service</option>
+                                <option value="office">Office</option>
+                                <option value="warehouse">Warehouse / Storage</option>
+                                <option value="hotel">Hotel / Inn</option>
+                                <option value="school">School / Educational</option>
+                                <option value="hospital">Hospital / Clinic</option>
+                                <option value="manufacturing">Manufacturing / Factory</option>
                             </select>
                         </div>
                     </div>
+
+                    <div class="form-section-card">
+                        <div class="form-section-title">
+                            <i class="fa-solid fa-location-dot"></i>
+                            Address
+                        </div>
+                        <p class="form-section-hint">This location is used for inspection routing and certificate records.</p>
+                        <div class="mb-3">
+                            <div class="field-label-row">
+                                <label class="field-label">Building / Street</label>
+                                <span class="field-meta"><span class="field-chip required">Required</span></span>
+                            </div>
+                            <input type="text" name="building_address" class="field-input" required>
+                        </div>
+                        <div class="form-grid-3 mb-3">
+                            <div>
+                                <div class="field-label-row">
+                                    <label class="field-label">Province</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <select name="province_id" id="provinceSelect" class="field-input" required onchange="loadCities()">
+                                    <option value="">Select province</option>
+                                    @foreach($provinces ?? [] as $province)
+                                        <option value="{{ $province->province_id }}" data-province-name="{{ $province->province_name }}">{{ $province->province_name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <div class="field-label-row">
+                                    <label class="field-label">City / Municipality</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <select name="city_id" id="citySelect" class="field-input" required onchange="loadBarangays()" disabled>
+                                    <option value="">Select city first</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div class="field-label-row">
+                                    <label class="field-label">Barangay</label>
+                                    <span class="field-meta"><span class="field-chip required">Required</span></span>
+                                </div>
+                                <select name="barangay_id" id="barangaySelect" class="field-input" required disabled>
+                                    <option value="">Select barangay</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <!-- Hidden fields for location names -->
                     <input type="hidden" id="provinceName" name="province">
                     <input type="hidden" id="cityName" name="city">
                     <input type="hidden" id="barangayName" name="barangay">
-                    
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">DTI/SEC No.</label>
-                            <input type="text" name="dti_sec_registration_no" class="w-full border rounded-lg p-2">
+
+                    <div class="form-section-card">
+                        <div class="form-section-title">
+                            <i class="fa-regular fa-file-lines"></i>
+                            Reference Numbers
+                        </div>
+                        <p class="form-section-hint">These help with record matching, but you can submit without them if not yet available.</p>
+                        <div class="form-grid-2 mb-3">
+                            <div>
+                                <div class="field-label-row">
+                                    <label class="field-label">DTI / SEC No.</label>
+                                    <span class="field-meta"><span class="field-chip optional">Optional</span></span>
+                                </div>
+                                <input type="text" name="dti_sec_registration_no" class="field-input">
+                            </div>
+                            <div>
+                                <div class="field-label-row">
+                                    <label class="field-label">Mayor's Permit No.</label>
+                                    <span class="field-meta"><span class="field-chip optional">Optional</span></span>
+                                </div>
+                                <input type="text" name="mayors_permit_no" class="field-input">
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Mayor's Permit No.</label>
-                            <input type="text" name="mayors_permit_no" class="w-full border rounded-lg p-2">
+                            <div class="field-label-row">
+                                <label class="field-label">TIN Number</label>
+                                <span class="field-meta"><span class="field-chip optional">Optional</span></span>
+                            </div>
+                            <input type="text" name="tin_number" class="field-input">
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">TIN Number</label>
-                        <input type="text" name="tin_number" class="w-full border rounded-lg p-2">
                     </div>
                 </form>
             </div>
@@ -3496,6 +3998,7 @@
         window.createNewApplicant = createNewApplicant;
         window.emergencyCall = emergencyCall;
     </script>
+    @include('partials.pwa-body', ['showPwaInstallButton' => true])
     @include('chief.partials.logs-modal')
     @include('chief.partials.logs-script')
     @include('chief.partials.logout-confirmation')

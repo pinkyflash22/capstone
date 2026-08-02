@@ -575,7 +575,7 @@
                                 </div>
                             </div>
                             @if($st->contact_number)
-                                <a href="tel:{{ $st->contact_number }}" class="contact-call">
+                                <a href="tel:{{ $st->contact_number }}" class="contact-call" data-pyro-voice-call data-voice-station-id="{{ $st->station_id }}">
                                     <i class="fa-solid fa-phone"></i>
                                     {{ $st->contact_number }}
                                 </a>
