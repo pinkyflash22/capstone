@@ -57,7 +57,7 @@
                             <h1 class="station-title" id="stationIdentityTitle">{{ $stationName }}</h1>
                             <div class="station-identity-meta" aria-label="Station quick details">
                                 {{-- <span><i class="fa-solid fa-hashtag"></i>{{ $stationCode }}</span> --}}
-                                <span><i class="fa-solid fa-location-dot"></i>{{ $stationAddressLabel }}</span>
+                                <span class="station-address-pill"><i class="fa-solid fa-location-dot"></i><span>{{ $stationAddressLabel }}</span></span>
                                 <span class="status-pill station-duty-pill">{{ $stationStatusLabel }}</span>
                             </div>
                             <div class="station-contact-list">

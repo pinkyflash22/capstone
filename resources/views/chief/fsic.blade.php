@@ -681,14 +681,42 @@
             -webkit-overflow-scrolling: touch;
         }
         
-        .modal-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #e5e7eb;
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 10;
-        }
+.modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+}
+
+.modal-header h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.modal-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.modal-close-btn:hover {
+    background: #eef2f7;
+    border-color: #cbd5e1;
+}
         
         .modal-body {
             padding: 1.5rem;
@@ -1456,10 +1484,15 @@
                 line-height: 1.4;
             }
 
-            .table-wrapper {
-                overflow: visible;
-                padding: 0.55rem;
-            }
+.table-wrapper {
+    overflow: visible;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding: 0.55rem 0.35rem 0.7rem;
+}
 
             .fsic-table,
             .fsic-table thead,
@@ -1471,35 +1504,42 @@
                 width: 100%;
             }
 
-            .fsic-table {
-                min-width: 0;
-                border-collapse: separate;
-            }
+.fsic-table {
+    min-width: 0;
+    border-collapse: separate;
+    margin-inline: auto;
+}
 
             .fsic-table thead {
                 display: none;
             }
 
-            .fsic-table tbody {
-                display: grid;
-                gap: 0.65rem;
-            }
+.fsic-table tbody {
+    display: grid;
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 32rem;
+    margin-inline: auto;
+}
 
-            .fsic-table tbody tr {
-                background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
-                border: 1px solid #f3e4c8;
-                border-radius: 0.9rem;
-                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-                padding: 0.25rem 0;
-                overflow: hidden;
-            }
+.fsic-table tbody tr {
+    background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+    border: 1px solid #f3e4c8;
+    border-radius: 0.9rem;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    padding: 0.25rem 0;
+    overflow: hidden;
+    width: 100%;
+    margin-inline: auto;
+}
 
-            .fsic-table td {
-                border-bottom: 1px solid #f8ede0;
-                padding: 0.56rem 0.72rem;
-                font-size: 0.7rem;
-                line-height: 1.4;
-            }
+.fsic-table td {
+    border-bottom: 1px solid #f8ede0;
+    padding: 0.56rem 0.72rem;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    text-align: left;
+}
 
             .fsic-table td:last-child {
                 border-bottom: none;
@@ -1573,11 +1613,11 @@
                 padding: 0.85rem 1rem;
             }
 
-            .modal-header h2 {
-                font-size: 0.95rem;
-                line-height: 1.35;
-                padding-right: 1.75rem;
-            }
+.modal-header h2 {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    padding-right: 0;
+}
 
             .modal-body {
                 padding: 0.9rem;
@@ -1614,17 +1654,33 @@
                 padding-bottom: 1rem;
             }
 
-            .modal-footer {
-                flex-shrink: 0;
-                position: sticky;
-                bottom: 0;
-                background: #fff;
-            }
+.modal-footer {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+}
 
-            .modal-footer .btn-primary,
-            .modal-footer .btn-outline,
-            .modal-footer .btn-success,
-            .modal-footer .btn-danger {
+.modal-close-btn,
+.modal-header > button.absolute {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    width: 2.2rem;
+    height: 2.2rem;
+    min-width: 2.2rem;
+    min-height: 2.2rem;
+    font-size: 0.88rem;
+}
+
+.modal-footer > * {
+    flex: 1 1 100%;
+}
+
+.modal-footer .btn-primary,
+.modal-footer .btn-outline,
+.modal-footer .btn-success,
+.modal-footer .btn-danger {
                 width: 100%;
                 justify-content: center;
                 text-align: center;
@@ -1879,17 +1935,20 @@
                 border-radius: 20px;
             }
 
-            .fsic-content-shell {
-                width: min(100%, 760px);
-                max-width: 760px;
-                padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
-            }
+    .fsic-content-shell {
+        width: min(100%, 760px);
+        max-width: 760px;
+        padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
+        margin-inline: auto;
+    }
 
-            .requests-card,
-            .tabs-container {
-                border-radius: 0;
-                margin-inline: -14px;
-            }
+    .requests-card,
+    .tabs-container {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+        margin-inline: auto;
+    }
 
             .requests-card .p-5 {
                 padding: 16px;
@@ -2402,7 +2461,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">Review FSIC Request</h2>
-                <button onclick="closeReviewModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeReviewModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
@@ -2534,7 +2593,7 @@
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">Conduct Inspection</h2>
-                <button onclick="closeInspectionModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeInspectionModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
@@ -2611,7 +2670,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">Final Approval</h2>
-                <button onclick="closeApprovalModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeApprovalModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
@@ -2682,7 +2741,7 @@
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">FSIC Request Details</h2>
-                <button onclick="closeViewModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeViewModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
@@ -2702,7 +2761,7 @@
         <div class="modal-content" style="max-width: 980px;">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">FSIC Certificate Preview</h2>
-                <button onclick="closeCertificateModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeCertificateModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>
@@ -2721,7 +2780,7 @@
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h2 class="text-xl font-bold">New Request</h2>
-                <button onclick="closeNewRequestModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <button onclick="closeNewRequestModal()" class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                     <i class="fa-solid fa-times text-xl"></i>
                 </button>
             </div>

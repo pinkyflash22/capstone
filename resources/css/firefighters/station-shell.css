@@ -2022,6 +2022,7 @@ body.report-modal-open {
     align-items: center;
     gap: 16px;
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 [data-ff-page-root="station"] .station-identity-avatar {
@@ -2049,6 +2050,7 @@ body.report-modal-open {
 
 [data-ff-page-root="station"] .station-identity-copy {
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 [data-ff-page-root="station"] .station-chip {
@@ -2102,6 +2104,17 @@ body.report-modal-open {
     text-decoration: none;
 }
 
+[data-ff-page-root="station"] .station-address-pill {
+    align-items: flex-start;
+    white-space: normal;
+}
+
+[data-ff-page-root="station"] .station-address-pill > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 [data-ff-page-root="station"] .station-duty-pill {
     color: #15803d !important;
     background: #dcfce7 !important;
@@ -2111,8 +2124,8 @@ body.report-modal-open {
 [data-ff-page-root="station"] .station-identity-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
     flex: 0 0 auto;
+    gap: 10px;
 }
 
 [data-ff-page-root="station"] .station-summary-grid {
@@ -2358,6 +2371,10 @@ body.report-modal-open {
         min-height: 28px;
         padding: 5px 8px;
         font-size: 0.72rem;
+    }
+
+    [data-ff-page-root="station"] .station-address-pill {
+        width: 100%;
     }
 
     [data-ff-page-root="station"] .station-identity-actions {
@@ -2849,6 +2866,15 @@ body.firefighter-portal-shell .report-modal-footer .btn {
         width: 100% !important;
         min-width: 0 !important;
         max-width: 100% !important;
+    }
+
+    [data-ff-page-root="station"] .station-address-pill {
+        display: grid !important;
+        grid-template-columns: 14px minmax(0, 1fr) !important;
+        align-items: start !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
     }
 
     [data-ff-page-root="station"] .station-contact-list a,

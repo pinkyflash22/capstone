@@ -257,6 +257,10 @@
             font-size: 0.85rem;
         }
 
+        .plain-sight-hidden {
+            display: none !important;
+        }
+
         .station-table tbody tr:hover {
             background: #fff7ed;
         }
@@ -675,6 +679,7 @@
             z-index: 1000;
             justify-content: center;
             align-items: center;
+            padding: 20px;
         }
 
         .modal.active { display: flex; }
@@ -682,16 +687,50 @@
         .modal-content {
             background: linear-gradient(135deg, #fff8ef 0%, #ffffff 100%);
             border-radius: 24px;
-            width: 90%;
-            max-width: 650px;
-            max-height: 90vh;
+            width: min(92vw, 560px);
+            max-width: 560px;
+            max-height: min(84vh, 820px);
             overflow-y: auto;
             border: 1px solid rgba(245, 158, 11, 0.12);
             box-shadow: 0 28px 54px rgba(15, 23, 42, 0.16);
         }
 
+        #registerUserModal .modal-content,
+        #editUserModal .modal-content,
+        #teamModal .modal-content,
+        #editOfficerModal .modal-content,
+        #equipmentCategoryModal .modal-content,
+        #equipmentItemModal .modal-content,
+        #stationEquipmentModal .modal-content {
+            width: min(92vw, 620px);
+            max-width: 620px !important;
+        }
+
+        #editEquipmentModal .modal-content {
+            width: min(90vw, 760px);
+            max-width: 760px !important;
+        }
+
+        #viewUserModal .modal-content,
+        #viewOfficerModal .modal-content,
+        #viewTeamModal .modal-content {
+            width: min(92vw, 640px);
+            max-width: 640px !important;
+        }
+
+        #editTeamModal .modal-content {
+            width: min(94vw, 720px);
+            max-width: 720px !important;
+        }
+
+        #deleteOfficerModal .modal-content,
+        #deleteUserModal .modal-content {
+            width: min(90vw, 440px);
+            max-width: 440px !important;
+        }
+
         .modal-header {
-            padding: 18px 24px;
+            padding: 14px 18px;
             border-bottom: 1px solid rgba(245, 158, 11, 0.12);
             display: flex;
             justify-content: space-between;
@@ -701,12 +740,21 @@
             border-radius: 24px 24px 0 0;
         }
 
-        .modal-header h2 { font-size: 1.2rem; margin: 0; }
-        .modal-close { background: none; border: none; color: white; font-size: 1.3rem; cursor: pointer; }
+        .modal-header h2 { font-size: 1rem; margin: 0; line-height: 1.3; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.05rem;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
 
-        .modal-body { padding: 24px; }
+        .modal-body { padding: 16px 18px; }
         .modal-footer {
-            padding: 16px 24px;
+            padding: 12px 18px 16px;
             border-top: 1px solid #eef2f6;
             display: flex;
             justify-content: flex-end;
@@ -789,25 +837,26 @@
         .detail-value { color: #1e293b; font-size: 0.9rem; }
         .resource-profile-card {
             display: grid;
-            gap: 1rem;
+            gap: 0.8rem;
         }
         .resource-profile-hero {
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 1rem 1.1rem;
+            padding: 0.85rem 0.95rem;
             border-radius: 1rem;
             background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
             border: 1px solid rgba(226, 232, 240, 0.95);
         }
         .resource-profile-avatar {
-            width: 56px;
-            height: 56px;
+            width: 48px;
+            height: 48px;
             border-radius: 999px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
+            font-size: 0.85rem;
             color: #fff;
             background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
             flex-shrink: 0;
@@ -816,23 +865,24 @@
             min-width: 0;
         }
         .resource-profile-name {
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 800;
             color: #172033;
+            word-break: break-word;
         }
         .resource-profile-meta {
             margin-top: 0.2rem;
             color: #64748b;
-            font-size: 0.84rem;
-            line-height: 1.5;
+            font-size: 0.78rem;
+            line-height: 1.45;
         }
         .resource-detail-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 0.85rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.7rem;
         }
         .resource-detail-card {
-            padding: 0.95rem 1rem;
+            padding: 0.8rem 0.9rem;
             border-radius: 1rem;
             background: #fff;
             border: 1px solid rgba(226, 232, 240, 0.95);
@@ -845,22 +895,22 @@
             letter-spacing: 0.05em;
         }
         .resource-detail-card .detail-value {
-            font-size: 0.95rem;
+            font-size: 0.86rem;
             font-weight: 600;
             color: #172033;
-            line-height: 1.5;
+            line-height: 1.4;
             word-break: break-word;
         }
         .resource-detail-section {
-            padding-top: 0.5rem;
+            padding-top: 0.2rem;
         }
         .resource-detail-section-title {
-            font-size: 0.8rem;
+            font-size: 0.76rem;
             font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.55rem;
         }
         .resource-edit-card {
             padding: 0.95rem 1rem;
@@ -891,6 +941,18 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 16px;
+        }
+
+        #editUserModal .form-grid {
+            gap: 12px 18px;
+        }
+
+        #editUserModal .form-group {
+            margin-bottom: 12px;
+        }
+
+        #editUserModal .form-label {
+            margin-bottom: 5px;
         }
 
         .full-width {
@@ -946,15 +1008,43 @@
 
         #toast {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
+            top: 22px;
+            right: 22px;
             background: #1e293b;
             color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
+            padding: 12px 18px;
+            border-radius: 14px;
             display: none;
             z-index: 9999;
             font-size: 0.85rem;
+            font-weight: 600;
+            max-width: min(360px, calc(100vw - 32px));
+            box-shadow: 0 20px 38px rgba(15, 23, 42, 0.18);
+            transform: translateY(-10px);
+            opacity: 0;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        #toast.show {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #toast.toast-success {
+            background: #059669;
+        }
+
+        #toast.toast-error {
+            background: #dc2626;
+        }
+
+        #toast.toast-info {
+            background: #2563eb;
+        }
+
+        #toast.toast-warning {
+            background: #d97706;
         }
 
         /* Sortable headers */
@@ -1015,6 +1105,10 @@
 
             .management-container {
                 max-width: 330px;
+                gap: 12px;
+            }
+
+            .chief-theme-shell {
                 gap: 12px;
             }
 
@@ -1216,21 +1310,22 @@
             .table-responsive {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
             }
 
             .station-table {
-                font-size: 0.68rem;
-                min-width: 720px;
+                font-size: 0.66rem;
+                min-width: 620px;
             }
 
             .station-table th,
             .station-table td {
-                padding: 8px 10px;
-                font-size: 0.66rem;
+                padding: 7px 8px;
+                font-size: 0.63rem;
             }
 
             .station-table th {
-                font-size: 0.56rem;
+                font-size: 0.54rem;
             }
 
             .form-grid {
@@ -1239,6 +1334,202 @@
 
             .full-width {
                 grid-column: span 1;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                margin-bottom: 14px;
+            }
+
+            .stat-card {
+                padding: 12px;
+                gap: 10px;
+                border-radius: 16px;
+            }
+
+            .stat-info h3 {
+                font-size: 0.62rem;
+                line-height: 1.25;
+            }
+
+            .stat-number {
+                font-size: 1.18rem;
+                line-height: 1;
+            }
+
+            .stat-change {
+                font-size: 0.66rem;
+            }
+
+            .action-btn {
+                width: 32px;
+                height: 32px;
+                border-radius: 10px;
+            }
+
+            .status-select {
+                min-height: 30px;
+                padding: 3px 7px;
+                font-size: 0.66rem;
+            }
+
+            .modal {
+                align-items: flex-start;
+                padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 112px);
+            }
+
+            .modal-content,
+            #registerUserModal .modal-content,
+            #editUserModal .modal-content,
+            #teamModal .modal-content,
+            #editOfficerModal .modal-content,
+            #equipmentCategoryModal .modal-content,
+            #equipmentItemModal .modal-content,
+            #stationEquipmentModal .modal-content,
+            #viewUserModal .modal-content,
+            #viewOfficerModal .modal-content,
+            #viewTeamModal .modal-content,
+            #editTeamModal .modal-content,
+            #deleteOfficerModal .modal-content,
+            #deleteUserModal .modal-content {
+                width: 100%;
+                max-width: 100% !important;
+                max-height: calc(100dvh - 136px);
+                margin-top: 6px;
+                border-radius: 18px;
+            }
+
+            .modal-header {
+                padding: 11px 12px;
+                border-radius: 18px 18px 0 0;
+                gap: 10px;
+            }
+
+            .modal-header h2 {
+                font-size: 0.86rem;
+                line-height: 1.25;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .modal-close {
+                width: 30px;
+                height: 30px;
+                font-size: 0.92rem;
+                flex-shrink: 0;
+            }
+
+            .modal-body {
+                padding: 12px;
+            }
+
+            .modal-footer {
+                position: sticky;
+                bottom: 0;
+                padding: 10px 12px 14px;
+                gap: 8px;
+                background: linear-gradient(180deg, rgba(255,248,239,0.9) 0%, #fff 28%);
+                backdrop-filter: blur(8px);
+            }
+
+            .modal-footer .btn-outline,
+            .modal-footer .btn-primary,
+            .modal-footer .btn-danger {
+                flex: 1 1 0;
+                min-height: 38px;
+                padding: 8px 12px;
+                font-size: 0.74rem;
+                border-radius: 12px;
+            }
+
+            .form-group {
+                margin-bottom: 14px;
+            }
+
+            .form-label {
+                margin-bottom: 6px;
+                font-size: 0.75rem;
+            }
+
+            .form-input,
+            .form-select {
+                padding: 9px 11px;
+                border-radius: 12px;
+                font-size: 0.78rem;
+            }
+
+            .resource-profile-card {
+                gap: 0.55rem;
+            }
+
+            .resource-profile-hero {
+                gap: 0.7rem;
+                padding: 0.7rem 0.78rem;
+                border-radius: 14px;
+            }
+
+            .resource-profile-avatar {
+                width: 40px;
+                height: 40px;
+                font-size: 0.72rem;
+            }
+
+            .resource-profile-name {
+                font-size: 0.82rem;
+            }
+
+            .resource-profile-meta {
+                font-size: 0.7rem;
+            }
+
+            .resource-detail-grid {
+                grid-template-columns: 1fr;
+                gap: 0.35rem;
+            }
+
+            .resource-detail-card {
+                padding: 0.18rem 0;
+                border: 0;
+                border-bottom: 1px solid #eef2f6;
+                border-radius: 0;
+                box-shadow: none;
+                background: transparent;
+            }
+
+            .resource-detail-card:last-child {
+                border-bottom: 0;
+            }
+
+            .resource-detail-card .detail-label {
+                font-size: 0.64rem;
+                margin-bottom: 0.12rem;
+            }
+
+            .resource-detail-card .detail-value {
+                font-size: 0.78rem;
+                line-height: 1.35;
+            }
+
+            .resource-detail-section-title {
+                font-size: 0.68rem;
+                margin-bottom: 0.35rem;
+            }
+
+            #toast {
+                top: auto;
+                right: 50%;
+                bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+                transform: translateX(50%) translateY(10px);
+                width: min(92vw, 320px);
+                max-width: min(92vw, 320px);
+                border-radius: 14px;
+                padding: 11px 14px;
+                font-size: 0.76rem;
+            }
+
+            #toast.show {
+                transform: translateX(50%) translateY(0);
             }
         }
     </style>
@@ -1509,7 +1800,7 @@
                     <table class="station-table">
                         <thead>
                             <tr>
-                                <th>BFP ID</th>
+                                <th class="plain-sight-hidden" aria-hidden="true">BFP ID</th>
                                 <th>Officer Name</th>
                                 <th>Station</th>
                                 <th>Rank</th>
@@ -1535,7 +1826,7 @@
                                 elseif ($statusClass == 'resigned') { $bgColor = '#78716c20'; $textColor = '#44403c'; }
                             @endphp
                             <tr class="personnel-row" data-officer-id="{{ $officer->station_officer_id }}" data-station-id="{{ $officer->station_id }}" data-status="{{ $statusClass }}">
-                                <td>{{ $officer->user?->user_id ?? 'N/A' }}</td>
+                                <td class="plain-sight-hidden" aria-hidden="true">{{ $officer->user?->user_id ?? 'N/A' }}</td>
                                 <td class="personnel-name"><strong>{{ $officer->user?->first_name ?? '' }} {{ $officer->user?->middle_name ?? '' }} {{ $officer->user?->last_name ?? '' }}</strong></td>
                                 <td>{{ $officer->station?->station_name ?? 'N/A' }}</td>
                                 <td>{{ $officer->rank ?? 'N/A' }}</td>
@@ -1576,7 +1867,7 @@
                     <table class="station-table">
                         <thead>
                             <tr>
-                                <th>Team ID</th>
+                                <th class="plain-sight-hidden" aria-hidden="true">Team ID</th>
                                 <th>Team Leader</th>
                                 <th>Driver</th>
                                 <th>Pumper</th>
@@ -1603,7 +1894,7 @@
                                 elseif ($teamStatusClass == 'training') { $teamBgColor = '#14b8a620'; $teamTextColor = '#0f766e'; }
                             @endphp
                             <tr class="team-row" data-team-id="{{ $team->team_id }}" data-status="{{ $teamStatusClass }}" data-station-id="{{ $team->station_id ?? '' }}">
-                                <td><strong>{{ $team->team_id ?? 'N/A' }}</strong></td>
+                                <td class="plain-sight-hidden" aria-hidden="true"><strong>{{ $team->team_id ?? 'N/A' }}</strong></td>
                                 <td>{{ $team->teamLeader?->first_name ?? '' }} {{ $team->teamLeader?->last_name ?? '' }}<br><small>({{ $team->teamLeader?->account_code ?? 'N/A' }})</small></td>
                                 <td>{{ $team->commander?->first_name ?? '' }} {{ $team->commander?->last_name ?? '' }}<br><small>({{ $team->commander?->account_code ?? 'N/A' }})</small></td>
                                 <td>{{ $team->pumpers?->first_name ?? '' }} {{ $team->pumpers?->last_name ?? '' }}<br><small>({{ $team->pumpers?->account_code ?? 'N/A' }})</small></td>
@@ -1670,7 +1961,7 @@
                     <table class="station-table" id="usersTable">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="sortTableByColumn(0)">User ID <i class="fa-solid fa-arrow-down-wide-short"></i></th>
+                                <th class="sortable plain-sight-hidden" onclick="sortTableByColumn(0)" aria-hidden="true">User ID <i class="fa-solid fa-arrow-down-wide-short"></i></th>
                                 <th class="sortable" onclick="sortTableByColumn(1)">Account Code <i class="fa-solid fa-arrow-down-wide-short"></i></th>
                                 <th class="sortable" onclick="sortTableByColumn(2)">Full Name <i class="fa-solid fa-arrow-down-wide-short"></i></th>
                                 <th class="sortable" onclick="sortTableByColumn(3)">Email <i class="fa-solid fa-arrow-down-wide-short"></i></th>
@@ -1684,7 +1975,7 @@
                         <tbody id="usersTableBody">
                             @foreach ($systemUsers as $user)
                             <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
-                                <td>{{ $user->user_id }}</td>
+                                <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
                                 <td><strong>{{ $user->account_code ?? 'N/A' }}</strong></td>
                                 <td>{{ $user->first_name ?? '' }} {{ $user->middle_name ?? '' }} {{ $user->last_name ?? '' }}</td>
                                 <td>{{ $user->email ?? 'N/A' }}</td>
@@ -1760,6 +2051,7 @@
                                             'equipment_id' => $equip->equipment_id,
                                             'name' => $equip->equipment_name,
                                             'category' => $equip->category ?? 'Uncategorized',
+                                            'type' => $equip->type ?? 'Unspecified',
                                             'quantity' => 1,
                                             'station_id' => $stationId,
                                             'station_name' => $equip->station->station_name ?? 'Unassigned'
@@ -1769,7 +2061,7 @@
                             @endphp
                             @foreach ($stationEquipment as $items)
                                 @foreach ($items as $item)
-                                <tr class="equipment-row" data-equipment-id="{{ $item['equipment_id'] }}" data-station-id="{{ $item['station_id'] }}">
+                                <tr class="equipment-row" data-equipment-id="{{ $item['equipment_id'] }}" data-station-id="{{ $item['station_id'] }}" data-category="{{ $item['category'] }}" data-type="{{ $item['type'] }}">
                                     <td><strong>{{ $item['name'] }}</strong></td>
                                     <td>{{ $item['category'] }}</td>
                                     {{-- <td class="equipment-station">{{ $item['station_name'] }}</td> --}}
@@ -2394,10 +2686,6 @@
                 
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label"><i class="fa-solid fa-id-card"></i> BFP ID</label>
-                        <input type="text" class="form-input" id="editOfficerBfpId" readonly disabled style="background: #f1f5f9;">
-                    </div>
-                    <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-user"></i> First Name</label>
                         <input type="text" class="form-input" id="editOfficerFirstName" name="first_name" required>
                     </div>
@@ -2645,6 +2933,17 @@
         </form>
     </div>
 </div>
+    @php
+        $equipmentCategoryOptions = [
+            'Personal Protective Equipment',
+            'firefighting equipment',
+            'rescue equipment',
+            'communication equipment',
+            'vehicles',
+        ];
+        $equipmentTypeOptions = ['disposable', 'repairable'];
+    @endphp
+
     <!-- Add Equipment Category Modal -->
     <div id="equipmentCategoryModal" class="modal">
         <div class="modal-content">
@@ -2652,7 +2951,7 @@
                 <h2><i class="fa-solid fa-tags"></i> Add Equipment Category</h2>
                 <button class="modal-close" onclick="closeModal('equipmentCategoryModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="equipmentForm" method="POST">
+            <form id="equipmentForm" method="POST" action="{{ route('station-admin.equipment-category.store') }}">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
@@ -2675,16 +2974,30 @@
                 <h2><i class="fa-solid fa-box"></i> Add Equipment Item</h2>
                 <button class="modal-close" onclick="closeModal('equipmentItemModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="eform" action="{{ route('admin.equipment.store') }}" method="POST">
+            <form id="eform" action="{{ route('station-admin.equipment.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-layer-group"></i> Equipment Category</label>
-                       
+                        <select class="form-select" name="category">
+                            <option value="">Select Category</option>
+                            @foreach ($equipmentCategoryOptions as $categoryOption)
+                                <option value="{{ $categoryOption }}">{{ $categoryOption }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-tag"></i> Equipment Name</label>
                         <input type="text" class="form-input" name="equipment_name" placeholder="e.g., Fire Extinguisher" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fa-solid fa-screwdriver-wrench"></i> Equipment Type</label>
+                        <select class="form-select" name="type">
+                            <option value="">Select Type</option>
+                            @foreach ($equipmentTypeOptions as $typeOption)
+                                <option value="{{ $typeOption }}">{{ ucfirst($typeOption) }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2692,6 +3005,73 @@
                     <button type="submit" class="btn-primary">Save Equipment</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Edit Equipment Modal -->
+    <div id="editEquipmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-pen-to-square"></i> Edit Equipment</h2>
+                <button class="modal-close" onclick="closeModal('editEquipmentModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="editEquipmentForm" method="POST">
+                @csrf
+                @method('PUT')
+                <input type="hidden" id="editEquipmentId" name="equipment_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label"><i class="fa-solid fa-tag"></i> Equipment Name</label>
+                        <input type="text" class="form-input" id="editEquipmentName" name="equipment_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fa-solid fa-layer-group"></i> Equipment Category</label>
+                        <select class="form-select" id="editEquipmentCategory" name="category">
+                            <option value="">Select Category</option>
+                            @foreach ($equipmentCategoryOptions as $categoryOption)
+                                <option value="{{ $categoryOption }}">{{ $categoryOption }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fa-solid fa-screwdriver-wrench"></i> Equipment Type</label>
+                        <select class="form-select" id="editEquipmentType" name="type">
+                            <option value="">Select Type</option>
+                            @foreach ($equipmentTypeOptions as $typeOption)
+                                <option value="{{ $typeOption }}">{{ ucfirst($typeOption) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline" onclick="closeModal('editEquipmentModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Update Equipment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Equipment Modal -->
+    <div id="deleteEquipmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-trash"></i> Delete Equipment</h2>
+                <button class="modal-close" onclick="closeModal('deleteEquipmentModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="text-align:center">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:42px;color:#dc2626"></i>
+                    <br><br>
+                    Do you want to delete this equipment?
+                    <br>
+                    <strong id="deleteEquipmentName" style="word-break:break-word;"></strong>
+                </p>
+                <input type="hidden" id="deleteEquipmentId">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeModal('deleteEquipmentModal')">Cancel</button>
+                <button class="btn-danger" onclick="confirmDeleteEquipment()">Delete</button>
+            </div>
         </div>
     </div>
 
@@ -2710,7 +3090,7 @@
                         <select class="form-select" name="equipment_id" required>
                             <option value="">Select Equipment</option>
                             @foreach ($equipments as $equip)
-                                <option value="{{ $equip->equipment_id }}">{{ $equip->equipment_name }} ({{ $equip->category->category_name ?? 'Uncategorized' }})</option>
+                                <option value="{{ $equip->equipment_id }}">{{ $equip->equipment_name }} ({{ $equip->category ?? 'Uncategorized' }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -2841,15 +3221,30 @@ if (officerForm) {
         let currentOfficerId = null;
         let currentTeamId = null;
         let currentUserId = null;
+        let toastTimer = null;
 
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
+            if (!toast) return;
+
             toast.textContent = message;
-            toast.style.background = type === 'success' ? '#10b981' : '#ef4444';
-            toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
+            toast.style.display = '';
+            toast.className = '';
+            toast.classList.add(`toast-${type}`, 'show');
+
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+            }
+
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (!toast.classList.contains('show')) {
+                        toast.className = '';
+                        toast.style.display = 'none';
+                    }
+                }, 180);
+            }, 2800);
         }
 
         function closeModal(modalId) {
@@ -2990,6 +3385,124 @@ if (officerForm) {
             updateUserCount();
         }
 
+        const chiefResourceContext = {
+            cityId: @json($chiefCityId ?? null),
+            provinceId: @json($chiefProvinceId ?? null),
+        };
+
+        function getAllowedChiefCityId() {
+            const cityId = Number(chiefResourceContext.cityId || 0);
+            return Number.isFinite(cityId) && cityId > 0 ? cityId : null;
+        }
+
+        function getAllowedChiefProvinceId() {
+            const provinceId = Number(chiefResourceContext.provinceId || 0);
+            return Number.isFinite(provinceId) && provinceId > 0 ? provinceId : null;
+        }
+
+        function filterCitiesToChiefScope(cities) {
+            const allowedCityId = getAllowedChiefCityId();
+
+            if (!allowedCityId) {
+                return Array.isArray(cities) ? cities : [];
+            }
+
+            return (Array.isArray(cities) ? cities : []).filter(city => Number(city.city_id) === allowedCityId);
+        }
+
+        function populateCityOptions(select, cities, selectedCityId = null) {
+            if (!select) return;
+
+            const filteredCities = filterCitiesToChiefScope(cities);
+            select.innerHTML = '<option value="">Select City</option>';
+
+            filteredCities.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city.city_id;
+                option.textContent = city.city_name;
+
+                if (selectedCityId && Number(city.city_id) === Number(selectedCityId)) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            });
+
+            select.disabled = filteredCities.length === 0;
+        }
+
+        function lockAddressScopeToChiefArea() {
+            const allowedProvinceId = getAllowedChiefProvinceId();
+            const allowedCityId = getAllowedChiefCityId();
+            const regProvince = document.getElementById('regProvince');
+            const regCity = document.getElementById('regCity');
+            const regBarangay = document.getElementById('regBarangay');
+            const editProvince = document.getElementById('editProvince');
+            const editCity = document.getElementById('editCity');
+            const editBarangay = document.getElementById('editBarangay');
+
+            const lockProvince = (select) => {
+                if (!select || !allowedProvinceId) return;
+
+                const optionExists = Array.from(select.options).some(option => Number(option.value) === Number(allowedProvinceId));
+                if (!optionExists) return;
+
+                select.value = String(allowedProvinceId);
+                select.disabled = true;
+            };
+
+            const lockCity = (select) => {
+                if (!select || !allowedCityId) return;
+                select.value = String(allowedCityId);
+                select.disabled = true;
+            };
+
+            lockProvince(regProvince);
+            lockProvince(editProvince);
+            lockCity(regCity);
+            lockCity(editCity);
+
+            if (regBarangay && allowedCityId && regCity && Number(regCity.value || 0) !== Number(allowedCityId)) {
+                regBarangay.disabled = true;
+                regBarangay.innerHTML = '<option value="">Select Barangay</option>';
+            }
+
+            if (editBarangay && allowedCityId && editCity && Number(editCity.value || 0) !== Number(allowedCityId)) {
+                editBarangay.disabled = true;
+                editBarangay.innerHTML = '<option value="">Select Barangay</option>';
+            }
+        }
+
+        function loadScopedBarangays(cityId, barangaySelect, selectedBarangayId = null) {
+            const allowedCityId = getAllowedChiefCityId();
+
+            barangaySelect.disabled = true;
+            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+
+            if (!cityId || (allowedCityId && Number(cityId) !== Number(allowedCityId))) {
+                return Promise.resolve();
+            }
+
+            return fetch(`/api/barangays/${cityId}`)
+                .then(response => response.json())
+                .then(barangays => {
+                    barangaySelect.disabled = false;
+                    barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+
+                    barangays.forEach(barangay => {
+                        const option = document.createElement('option');
+                        option.value = barangay.barangay_id;
+                        option.textContent = barangay.barangay_name;
+
+                        if (selectedBarangayId && Number(barangay.barangay_id) === Number(selectedBarangayId)) {
+                            option.selected = true;
+                        }
+
+                        barangaySelect.appendChild(option);
+                    });
+                });
+        }
+
         function updateUserCount() {
             const visibleRows = document.querySelectorAll('#usersTableBody .user-row[style="display: none;"]');
             const totalRows = document.querySelectorAll('#usersTableBody .user-row').length;
@@ -3042,19 +3555,35 @@ if (officerForm) {
         }
 
         function loadCitiesForEdit(provinceId, selectedCityId = null) {
+            const allowedProvinceId = getAllowedChiefProvinceId();
+            const allowedCityId = getAllowedChiefCityId();
+            const citySelect = document.getElementById('editCity');
+            const barangaySelect = document.getElementById('editBarangay');
+
+            if (!citySelect || !barangaySelect) {
+                return;
+            }
+
+            citySelect.disabled = true;
+            citySelect.innerHTML = '<option value="">Select City</option>';
+            barangaySelect.disabled = true;
+            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+
+            if (allowedProvinceId && Number(provinceId) !== Number(allowedProvinceId)) {
+                return;
+            }
+
             fetch(`/api/cities/${provinceId}`)
                 .then(response => response.json())
                 .then(cities => {
-                    const citySelect = document.getElementById('editCity');
-                    citySelect.disabled = false;
-                    citySelect.innerHTML = '<option value="">Select City</option>';
-                    cities.forEach(city => {
-                        const option = document.createElement('option');
-                        option.value = city.city_id;
-                        option.textContent = city.city_name;
-                        if (selectedCityId && city.city_id == selectedCityId) option.selected = true;
-                        citySelect.appendChild(option);
-                    });
+                    populateCityOptions(citySelect, cities, selectedCityId);
+                    lockAddressScopeToChiefArea();
+
+                    if (allowedCityId && selectedCityId && Number(selectedCityId) !== Number(allowedCityId)) {
+                        citySelect.value = '';
+                        return;
+                    }
+
                     if (selectedCityId) {
                         loadBarangaysForEdit(selectedCityId);
                     }
@@ -3062,20 +3591,10 @@ if (officerForm) {
         }
 
         function loadBarangaysForEdit(cityId, selectedBarangayId = null) {
-            fetch(`/api/barangays/${cityId}`)
-                .then(response => response.json())
-                .then(barangays => {
-                    const barangaySelect = document.getElementById('editBarangay');
-                    barangaySelect.disabled = false;
-                    barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-                                        barangays.forEach(barangay => {
-                        const option = document.createElement('option');
-                        option.value = barangay.barangay_id;
-                        option.textContent = barangay.barangay_name;
-                        if (selectedBarangayId && barangay.barangay_id == selectedBarangayId) option.selected = true;
-                        barangaySelect.appendChild(option);
-                    });
-                });
+            const barangaySelect = document.getElementById('editBarangay');
+            if (!barangaySelect) return;
+
+            loadScopedBarangays(cityId, barangaySelect, selectedBarangayId);
         }
 
         function viewUser(userId) {
@@ -3095,7 +3614,6 @@ if (officerForm) {
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Account Information</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">User ID</div><div class="detail-value">${user.user_id}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Account Code</div><div class="detail-value">${user.account_code || 'N/A'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Email Address</div><div class="detail-value">${user.email || 'N/A'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Contact Number</div><div class="detail-value">${user.contact_number || 'N/A'}</div></div>
@@ -3863,7 +4381,6 @@ function validateTeamMembers(formData) {
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Personnel Information</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">BFP ID</div><div class="detail-value">${officer.user?.user_id || 'N/A'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Rank</div><div class="detail-value">${officer.rank || 'N/A'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Station</div><div class="detail-value">${officer.station?.station_name || 'N/A'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${officer.status?.toLowerCase()}">${officer.status || 'Unknown'}</span></div></div>
@@ -3904,7 +4421,6 @@ function validateTeamMembers(formData) {
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Team Overview</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">Team ID</div><div class="detail-value">${team.team_id}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${team.status?.toLowerCase()}">${team.status || 'Unknown'}</span></div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Team Leader</div><div class="detail-value">${formatTeamMemberLabel(teamLeader, 'Unassigned Leader')}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Driver</div><div class="detail-value">${formatTeamMemberLabel(commander, 'Unassigned Driver')}</div></div>
@@ -3934,7 +4450,6 @@ function validateTeamMembers(formData) {
     if (officer) { 
         document.getElementById('editOfficerId').value = officer.station_officer_id;
         document.getElementById('editOfficerUserId').value = officer.user_id;
-        document.getElementById('editOfficerBfpId').value = officer.user?.user_id || 'N/A';
         document.getElementById('editOfficerFirstName').value = officer.user?.first_name || '';
         document.getElementById('editOfficerMiddleName').value = officer.user?.middle_name || '';
         document.getElementById('editOfficerLastName').value = officer.user?.last_name || '';
@@ -3995,14 +4510,74 @@ function validateTeamMembers(formData) {
             document.getElementById('deleteOfficerModal').classList.add('active'); 
         }
         
-        function editEquipment(id) { 
-            showToast('Edit equipment feature - implement API endpoint', 'info'); 
+        function editEquipment(id) {
+            const equipment = (window.resourcesData.equipments || []).find(item => Number(item.equipment_id) === Number(id));
+            if (!equipment) {
+                showToast('Equipment record not found.', 'error');
+                return;
+            }
+
+            document.getElementById('editEquipmentId').value = equipment.equipment_id;
+            document.getElementById('editEquipmentName').value = equipment.equipment_name || '';
+            document.getElementById('editEquipmentCategory').value = equipment.category || '';
+            document.getElementById('editEquipmentType').value = equipment.type || '';
+            document.getElementById('editEquipmentForm').action = `/station-admin/equipment/${equipment.equipment_id}`;
+            document.getElementById('editEquipmentModal').style.display = 'flex';
+            document.getElementById('editEquipmentModal').classList.add('active');
         }
         
-        function deleteEquipment(id) { 
-            if (confirm('Delete this equipment?')) {
-                showToast('Equipment deleted', 'success');
+        function deleteEquipment(id) {
+            const equipment = (window.resourcesData.equipments || []).find(item => Number(item.equipment_id) === Number(id));
+            if (!equipment) {
+                showToast('Equipment record not found.', 'error');
+                return;
             }
+
+            document.getElementById('deleteEquipmentId').value = equipment.equipment_id;
+            document.getElementById('deleteEquipmentName').textContent = equipment.equipment_name || 'Selected equipment';
+            document.getElementById('deleteEquipmentModal').style.display = 'flex';
+            document.getElementById('deleteEquipmentModal').classList.add('active');
+        }
+
+        function confirmDeleteEquipment() {
+            const id = document.getElementById('deleteEquipmentId').value;
+            const deleteButton = document.querySelector('#deleteEquipmentModal .btn-danger');
+            const originalLabel = deleteButton ? deleteButton.innerHTML : '';
+
+            if (deleteButton) {
+                deleteButton.disabled = true;
+                deleteButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
+            }
+
+            fetch(`/station-admin/equipment/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Unable to delete equipment.');
+                }
+                return data;
+            })
+            .then(data => {
+                showToast(data.message || 'Equipment deleted successfully.', 'success');
+                closeModal('deleteEquipmentModal');
+                setTimeout(() => location.reload(), 900);
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to delete equipment.', 'error');
+            })
+            .finally(() => {
+                if (deleteButton) {
+                    deleteButton.disabled = false;
+                    deleteButton.innerHTML = originalLabel;
+                }
+            });
         }
 
         function closeViewModal() { 
@@ -4287,67 +4862,165 @@ function validateTeamMembers(formData) {
 
         document.getElementById('eform')?.addEventListener('submit', function(e) {
             e.preventDefault();
-            fetch('/admin/equipment', { 
+            const form = this;
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalLabel = submitButton ? submitButton.innerHTML : '';
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
+            fetch(this.action, { 
                 method: 'POST', 
                 body: new FormData(this), 
                 headers: { 
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken 
                 } 
             })
-            .then(r => r.json())
+            .then(async r => {
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.message || 'Unable to add equipment.');
+                return d;
+            })
             .then(d => { 
-                if (d.success) { 
-                    showToast('Equipment added'); 
-                    setTimeout(() => location.reload(), 1500); 
-                } else { 
-                    showToast(d.message || 'Error', 'error'); 
-                } 
+                showToast(d.message || 'Equipment added successfully.', 'success');
+                closeModal('equipmentItemModal');
+                setTimeout(() => location.reload(), 900); 
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to add equipment.', 'error');
+            })
+            .finally(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalLabel;
+                }
             });
-            closeModal('equipmentItemModal');
         });
 
         
 
         document.getElementById('equipmentForm')?.addEventListener('submit', function(e) {
             e.preventDefault();
-            fetch('/admin/equipment-category', { 
-                method: 'POST', 
-                body: new FormData(this), 
-                headers: { 
-                    'X-CSRF-TOKEN': csrfToken 
-                } 
-            })
-            .then(r => r.json())
-            .then(d => { 
-                if (d.success) { 
-                    showToast('Category added'); 
-                    setTimeout(() => location.reload(), 1500); 
-                } else { 
-                    showToast(d.message || 'Error', 'error'); 
-                } 
-            });
-            closeModal('equipmentCategoryModal');
-        });
+            const form = this;
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalLabel = submitButton ? submitButton.innerHTML : '';
 
-        document.getElementById('stationEquipmentForm')?.addEventListener('submit', function(e) {
-            e.preventDefault();
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
             fetch(this.action, { 
                 method: 'POST', 
                 body: new FormData(this), 
                 headers: { 
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken 
                 } 
             })
-            .then(r => r.json())
+            .then(async r => {
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.message || 'Unable to add category.');
+                return d;
+            })
             .then(d => { 
-                if (d.success) { 
-                    showToast('Equipment assigned'); 
-                    setTimeout(() => location.reload(), 1500); 
-                } else { 
-                    showToast(d.message || 'Error', 'error'); 
-                } 
+                showToast(d.message || 'Category added successfully.', 'success');
+                closeModal('equipmentCategoryModal');
+                setTimeout(() => location.reload(), 900); 
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to add category.', 'error');
+            })
+            .finally(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalLabel;
+                }
             });
-            closeModal('stationEquipmentModal');
+        });
+
+        document.getElementById('stationEquipmentForm')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const form = this;
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalLabel = submitButton ? submitButton.innerHTML : '';
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Assigning...';
+            }
+
+            fetch(this.action, { 
+                method: 'POST', 
+                body: new FormData(this), 
+                headers: { 
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken 
+                } 
+            })
+            .then(async r => {
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.message || 'Unable to assign equipment.');
+                return d;
+            })
+            .then(d => { 
+                showToast(d.message || 'Equipment assigned successfully.', 'success');
+                closeModal('stationEquipmentModal');
+                setTimeout(() => location.reload(), 900); 
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to assign equipment.', 'error');
+            })
+            .finally(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalLabel;
+                }
+            });
+        });
+
+        document.getElementById('editEquipmentForm')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const form = this;
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalLabel = submitButton ? submitButton.innerHTML : '';
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+            }
+
+            fetch(this.action, {
+                method: 'POST',
+                body: new FormData(this),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-HTTP-Method-Override': 'PUT'
+                }
+            })
+            .then(async r => {
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.message || 'Unable to update equipment.');
+                return d;
+            })
+            .then(d => {
+                showToast(d.message || 'Equipment updated successfully.', 'success');
+                closeModal('editEquipmentModal');
+                setTimeout(() => location.reload(), 900);
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to update equipment.', 'error');
+            })
+            .finally(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalLabel;
+                }
+            });
         });
 
         document.getElementById('registerUserForm')?.addEventListener('submit', function(e) {
@@ -4538,24 +5211,29 @@ function validateTeamMembers(formData) {
             const regProvince = document.getElementById('regProvince');
             const regCity = document.getElementById('regCity');
             const regBarangay = document.getElementById('regBarangay');
+
+            lockAddressScopeToChiefArea();
             
             if (regProvince) {
                 regProvince.addEventListener('change', function() {
                     const provinceId = this.value;
+                    const allowedProvinceId = getAllowedChiefProvinceId();
                     regCity.disabled = true;
                     regCity.innerHTML = '<option value="">Select City</option>';
                     regBarangay.disabled = true;
                     regBarangay.innerHTML = '<option value="">Select Barangay</option>';
                     
-                    if (provinceId) {
+                    if (provinceId && (!allowedProvinceId || Number(provinceId) === Number(allowedProvinceId))) {
                         fetch(`/api/cities/${provinceId}`)
                             .then(response => response.json())
                             .then(cities => {
-                                regCity.disabled = false;
-                                regCity.innerHTML = '<option value="">Select City</option>';
-                                cities.forEach(city => {
-                                    regCity.innerHTML += `<option value="${city.city_id}">${city.city_name}</option>`;
-                                });
+                                populateCityOptions(regCity, cities);
+                                lockAddressScopeToChiefArea();
+
+                                const allowedCityId = getAllowedChiefCityId();
+                                if (allowedCityId) {
+                                    loadScopedBarangays(allowedCityId, regBarangay);
+                                }
                             });
                     }
                 });
@@ -4564,20 +5242,7 @@ function validateTeamMembers(formData) {
             if (regCity) {
                 regCity.addEventListener('change', function() {
                     const cityId = this.value;
-                    regBarangay.disabled = true;
-                    regBarangay.innerHTML = '<option value="">Select Barangay</option>';
-                    
-                    if (cityId) {
-                        fetch(`/api/barangays/${cityId}`)
-                            .then(response => response.json())
-                            .then(barangays => {
-                                regBarangay.disabled = false;
-                                regBarangay.innerHTML = '<option value="">Select Barangay</option>';
-                                barangays.forEach(barangay => {
-                                    regBarangay.innerHTML += `<option value="${barangay.barangay_id}">${barangay.barangay_name}</option>`;
-                                });
-                            });
-                    }
+                    loadScopedBarangays(cityId, regBarangay);
                 });
             }
 
@@ -4589,43 +5254,19 @@ function validateTeamMembers(formData) {
             if (editProvince) {
                 editProvince.addEventListener('change', function() {
                     const provinceId = this.value;
-                    editCity.disabled = true;
-                    editCity.innerHTML = '<option value="">Select City</option>';
-                    editBarangay.disabled = true;
-                    editBarangay.innerHTML = '<option value="">Select Barangay</option>';
-                    
-                    if (provinceId) {
-                        fetch(`/api/cities/${provinceId}`)
-                            .then(response => response.json())
-                            .then(cities => {
-                                editCity.disabled = false;
-                                editCity.innerHTML = '<option value="">Select City</option>';
-                                cities.forEach(city => {
-                                    editCity.innerHTML += `<option value="${city.city_id}">${city.city_name}</option>`;
-                                });
-                            });
-                    }
+                    loadCitiesForEdit(provinceId);
                 });
             }
             
             if (editCity) {
                 editCity.addEventListener('change', function() {
                     const cityId = this.value;
-                    editBarangay.disabled = true;
-                    editBarangay.innerHTML = '<option value="">Select Barangay</option>';
-                    
-                    if (cityId) {
-                        fetch(`/api/barangays/${cityId}`)
-                            .then(response => response.json())
-                            .then(barangays => {
-                                editBarangay.disabled = false;
-                                editBarangay.innerHTML = '<option value="">Select Barangay</option>';
-                                barangays.forEach(barangay => {
-                                    editBarangay.innerHTML += `<option value="${barangay.barangay_id}">${barangay.barangay_name}</option>`;
-                                });
-                            });
-                    }
+                    loadScopedBarangays(cityId, editBarangay);
                 });
+            }
+
+            if (regProvince && getAllowedChiefProvinceId()) {
+                regProvince.dispatchEvent(new Event('change'));
             }
         });
 

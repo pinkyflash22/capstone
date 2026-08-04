@@ -291,6 +291,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');
         Route::post('/stations/{station}/media/profile', [StationMediaController::class, 'storeProfile'])->name('stations.media.profile');
         Route::post('/stations/{station}/media/gallery', [StationMediaController::class, 'storeGallery'])->name('stations.media.gallery');
+        Route::put('/station-media/{stationMedia}', [StationMediaController::class, 'update'])->name('station-media.update');
         Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
@@ -391,6 +392,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');
         Route::post('/stations/{station}/media/profile', [StationMediaController::class, 'storeProfile'])->name('stations.media.profile');
         Route::post('/stations/{station}/media/gallery', [StationMediaController::class, 'storeGallery'])->name('stations.media.gallery');
+        Route::put('/station-media/{stationMedia}', [StationMediaController::class, 'update'])->name('station-media.update');
         Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');

@@ -628,10 +628,10 @@ class ManagementPage {
         if (!thead) return;
 
         const headers = {
-            incidents: ['ID', 'Title', 'Location', 'Priority', 'Status', 'Reported By', 'Date', 'Actions'],
-            reports: ['Report ID', 'Report', 'Stage', 'Incident', 'Investigator', 'Filed', 'Actions'],
-            personnel: ['ID', 'Name', 'Role', 'Account Code', 'Contact', 'Status', 'Actions'],
-            equipment: ['ID', 'Equipment', 'Type', 'Available', 'Maintenance', 'Damaged', 'Actions']
+            incidents: ['Title', 'Location', 'Priority', 'Status', 'Reported By', 'Date', 'Actions'],
+            reports: ['Report', 'Stage', 'Incident', 'Investigator', 'Filed', 'Actions'],
+            personnel: ['Name', 'Role', 'Account Code', 'Contact', 'Status', 'Actions'],
+            equipment: ['Equipment', 'Type', 'Available', 'Maintenance', 'Damaged', 'Actions']
         };
 
         const currentHeaders = headers[this.currentTab] || ['Data', 'Actions'];
@@ -669,7 +669,7 @@ class ManagementPage {
 
         if (data.length === 0) {
             tbody.innerHTML = `
-                <tr>
+                <tr class="table-empty-row">
                     <td colspan="8" class="empty-state">
                         <i class="fa-regular fa-folder-open"></i>
                         <h3>No ${this.currentTab} found</h3>
@@ -720,24 +720,23 @@ class ManagementPage {
 
         return `
             <tr data-id="${incident.incident_id}">
-                <td>#${incident.incident_id}</td>
-                <td>
+                <td data-label="Title">
                     <div class="cell-content">
                         <strong>${this.escapeHtml(title)}</strong>
                         ${incident.marker?.description ? `<br><small>${this.escapeHtml(incident.marker.description.substring(0, 50))}${incident.marker.description.length > 50 ? '...' : ''}</small>` : ''}
                     </div>
                 </td>
-                <td>
+                <td data-label="Location">
                     <div class="location-cell">
                         <i class="fa-solid fa-location-dot"></i>
                         <span class="coordinates">${this.escapeHtml(location)}</span>
                     </div>
                 </td>
-                <td><span class="priority-badge ${priorityClass}">${priority}</span></td>
-                <td><span class="${statusClass}">${status}</span></td>
-                <td>${this.escapeHtml(reportedBy)}</td>
-                <td>${date}</td>
-                <td>
+                <td data-label="Priority"><span class="priority-badge ${priorityClass}">${priority}</span></td>
+                <td data-label="Status"><span class="${statusClass}">${status}</span></td>
+                <td data-label="Reported By">${this.escapeHtml(reportedBy)}</td>
+                <td data-label="Date">${date}</td>
+                <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
                         <button class="action-btn edit" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
@@ -757,13 +756,12 @@ class ManagementPage {
 
         return `
             <tr data-id="${report.id}">
-                <td>#${report.report_id}</td>
-                <td><strong>${this.escapeHtml(report.title)}</strong></td>
-                <td><span class="badge">${this.escapeHtml(report.type || 'Investigation')}</span></td>
-                <td>${this.escapeHtml(report.incident_title || 'N/A')}</td>
-                <td>${this.escapeHtml(report.investigator_name || report.author || 'Unknown')}</td>
-                <td>${report.created_at ? new Date(report.created_at).toLocaleDateString() : 'N/A'}</td>
-                <td>
+                <td data-label="Report"><strong>${this.escapeHtml(report.title)}</strong></td>
+                <td data-label="Stage"><span class="badge">${this.escapeHtml(report.type || 'Investigation')}</span></td>
+                <td data-label="Incident">${this.escapeHtml(report.incident_title || 'N/A')}</td>
+                <td data-label="Investigator">${this.escapeHtml(report.investigator_name || report.author || 'Unknown')}</td>
+                <td data-label="Filed">${report.created_at ? new Date(report.created_at).toLocaleDateString() : 'N/A'}</td>
+                <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
                         <span class="${statusClass}">${this.escapeHtml(report.report_kind || 'report')}</span>
@@ -800,26 +798,44 @@ class ManagementPage {
         `;
     }
 
+    getPersonnelStatusValue(person) {
+        return (person?.status || (person?.status_id == 1 ? 'active' : 'inactive') || 'inactive').toString().toLowerCase();
+    }
+
+    getPersonnelStatusClass(status) {
+        const statusClassMap = {
+            active: 'status-badge active',
+            inactive: 'status-badge cancelled',
+            available: 'status-badge approved',
+            on_duty: 'status-badge active',
+            'on-duty': 'status-badge active',
+            off_duty: 'status-badge pending',
+            'off-duty': 'status-badge pending'
+        };
+
+        return statusClassMap[status] || 'status-badge pending';
+    }
+
     renderPersonnelRow(person) {
         const name = `${person.first_name || ''} ${person.last_name || ''}`.trim() || 'Unknown';
         const role = person.role?.role || 'Staff';
-        const status = person.status_id == 1 ? 'active' : 'inactive';
-        const statusClass = status === 'active' ? 'status-badge active' : 'status-badge cancelled';
+        const status = this.getPersonnelStatusValue(person);
+        const statusClass = this.getPersonnelStatusClass(status);
+        const statusLabel = status.replace(/[_-]/g, ' ');
 
         return `
             <tr data-id="${person.user_id}">
-                <td>#${person.user_id}</td>
-                <td>
+                <td data-label="Name">
                     <div class="avatar-group">
                         <span class="avatar-sm">${name.substring(0, 2).toUpperCase()}</span>
                         <strong>${this.escapeHtml(name)}</strong>
                     </div>
                 </td>
-                <td>${this.escapeHtml(role)}</td>
-                <td><code>${this.escapeHtml(person.account_code || 'N/A')}</code></td>
-                <td>${this.escapeHtml(person.contact_number || 'N/A')}</td>
-                <td><span class="${statusClass}">${status}</span></td>
-                <td>
+                <td data-label="Role">${this.escapeHtml(role)}</td>
+                <td data-label="Account Code"><code>${this.escapeHtml(person.account_code || 'N/A')}</code></td>
+                <td data-label="Contact">${this.escapeHtml(person.contact_number || 'N/A')}</td>
+                <td data-label="Status"><span class="${statusClass}">${this.escapeHtml(statusLabel)}</span></td>
+                <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
                         <button class="action-btn edit" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
@@ -840,16 +856,15 @@ class ManagementPage {
 
         return `
             <tr data-id="${equipment.equipment_id}">
-                <td>#${equipment.equipment_id}</td>
-                <td>
+                <td data-label="Equipment">
                     <strong>${this.escapeHtml(equipment.equipment_name)}</strong>
                     ${equipment.category_name ? `<br><small>${this.escapeHtml(equipment.category_name)}</small>` : ''}
                 </td>
-                <td>${this.escapeHtml(equipment.type || 'General')}</td>
-                <td>${equipment.available_quantity ?? 0}</td>
-                <td>${equipment.maintenance_quantity ?? 0}</td>
-                <td>${equipment.damaged_quantity ?? 0}</td>
-                <td>
+                <td data-label="Type">${this.escapeHtml(equipment.type || 'General')}</td>
+                <td data-label="Available">${equipment.available_quantity ?? 0}</td>
+                <td data-label="Maintenance">${equipment.maintenance_quantity ?? 0}</td>
+                <td data-label="Damaged">${equipment.damaged_quantity ?? 0}</td>
+                <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
                         <button class="action-btn edit" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
@@ -971,13 +986,13 @@ class ManagementPage {
         
         let headers = [];
         if (this.currentTab === 'incidents') {
-            headers = ['ID', 'Title', 'Location', 'Priority', 'Status', 'Reported By', 'Date'];
+            headers = ['Title', 'Location', 'Priority', 'Status', 'Reported By', 'Date'];
         } else if (this.currentTab === 'reports') {
-            headers = ['Report ID', 'Report', 'Stage', 'Incident', 'Investigator', 'Filed'];
+            headers = ['Report', 'Stage', 'Incident', 'Investigator', 'Filed'];
         } else if (this.currentTab === 'personnel') {
-            headers = ['ID', 'Name', 'Role', 'Account Code', 'Contact', 'Status'];
+            headers = ['Name', 'Role', 'Account Code', 'Contact', 'Status'];
         } else if (this.currentTab === 'equipment') {
-            headers = ['ID', 'Equipment', 'Type', 'Available', 'Maintenance', 'Damaged'];
+            headers = ['Equipment', 'Type', 'Available', 'Maintenance', 'Damaged'];
         }
         
         const csvRows = [headers.join(',')];
@@ -986,7 +1001,6 @@ class ManagementPage {
             const values = headers.map(header => {
                 let value = '';
                 switch(header) {
-                    case 'ID': value = row.id || row.incident_id || row.user_id || row.equipment_id; break;
                     case 'Report ID': value = row.report_id || row.id || ''; break;
                     case 'Title': value = row.marker?.title || row.title; break;
                     case 'Report': value = row.title || ''; break;
@@ -999,7 +1013,9 @@ class ManagementPage {
                         if (row.incident_status_id) {
                             const statusMap = {1: 'reported', 2: 'responding', 3: 'active', 4: 'resolved'};
                             value = statusMap[row.incident_status_id] || '';
-                        } else if (row.status_id) {
+                        } else if (row.status) {
+                            value = row.status;
+                        } else if (row.status_id !== undefined && row.status_id !== null) {
                             value = row.status_id == 1 ? 'active' : 'inactive';
                         } else {
                             value = row.status || '';
@@ -1645,7 +1661,6 @@ class ManagementPage {
                             <span>${priority.toUpperCase()} INCIDENT</span>
                         </div>
                         <h2 class="incident-title">${this.escapeHtml(item.marker?.title || item.title || 'Untitled Incident')}</h2>
-                        <div class="incident-id">ID: #${item.incident_id}</div>
                     </div>
                     <div class="status-display">
                         <span class="status-label">Current Status</span>
@@ -1699,7 +1714,6 @@ class ManagementPage {
                 <div class="detail-header">
                     <div>
                         <h2 class="incident-title">${this.escapeHtml(report.title)}</h2>
-                        <div class="incident-id">ID: #${report.report_id}</div>
                     </div>
                     <div class="status-display">
                         <span class="status-badge-large status-${report.report_kind}">${report.type || 'Investigation Report'}</span>
@@ -1788,18 +1802,20 @@ class ManagementPage {
 
     renderPersonnelDetail(person, viewContent, formatDate) {
         const name = `${person.first_name || ''} ${person.last_name || ''}`.trim() || 'Unknown';
+        const status = this.getPersonnelStatusValue(person);
+        const statusLabel = status.replace(/[_-]/g, ' ').toUpperCase();
+        const statusClass = `status-${status.replace(/_/g, '-')}`;
 
         viewContent.innerHTML = `
             <div class="detail-container">
                 <div class="detail-header">
                     <div>
                         <h2 class="personnel-title">${this.escapeHtml(name)}</h2>
-                        <div class="personnel-id">ID: #${person.user_id}</div>
                     </div>
                     <div class="status-display">
-                        <span class="status-badge-large ${person.status_id == 1 ? 'status-active' : 'status-cancelled'}">
+                        <span class="status-badge-large ${statusClass}">
                             <i class="fa-solid fa-circle"></i>
-                            ${person.status_id == 1 ? 'ACTIVE' : 'INACTIVE'}
+                            ${this.escapeHtml(statusLabel)}
                         </span>
                     </div>
                 </div>
@@ -1853,7 +1869,6 @@ class ManagementPage {
                 <div class="detail-header">
                     <div>
                         <h2 class="incident-title">${this.escapeHtml(equipment.equipment_name)}</h2>
-                        <div class="incident-id">ID: #${equipment.equipment_id}</div>
                     </div>
                     <div class="status-display">
                         <span class="status-badge-large status-${equipment.status || 'available'}">

@@ -101,4 +101,20 @@ class StationMediaController extends Controller
 
         return back()->with('success', 'Station image removed successfully.');
     }
+
+    public function update(Request $request, StationMedia $stationMedia)
+    {
+        $station = $stationMedia->station;
+        abort_unless($station && $this->canManageStation($station), 403);
+
+        $validated = $request->validate([
+            'caption' => 'nullable|string|max:255',
+        ]);
+
+        $stationMedia->update([
+            'caption' => $validated['caption'] ?? null,
+        ]);
+
+        return back()->with('success', 'Station image details updated successfully.');
+    }
 }

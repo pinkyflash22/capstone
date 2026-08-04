@@ -103,12 +103,12 @@ class FireRiskAreaOverlayController extends Controller
                 SUM(CASE WHEN risk_areas.assessment_level IN ('moderate', 'medium') THEN 1 ELSE 0 END) as moderate_assessment_count,
                 MAX(risk_areas.risk_score) as max_risk_score,
                 AVG(risk_areas.risk_score) as avg_risk_score,
-                SUM(CASE WHEN risk_areas.blocked_hydrant = 1 THEN 1 ELSE 0 END) as blocked_hydrant_count,
-                SUM(CASE WHEN risk_areas.combustible_materials_present = 1 THEN 1 ELSE 0 END) as combustible_material_count,
-                SUM(CASE WHEN risk_areas.informal_settlement = 1 THEN 1 ELSE 0 END) as informal_settlement_count,
-                SUM(CASE WHEN risk_areas.cooking_fire_prone_activity = 1 THEN 1 ELSE 0 END) as cooking_fire_activity_count,
-                SUM(CASE WHEN risk_areas.poor_waste_disposal = 1 THEN 1 ELSE 0 END) as poor_waste_disposal_count,
-                SUM(CASE WHEN risk_areas.previous_fire_prone_location = 1 THEN 1 ELSE 0 END) as previous_fire_prone_count,
+                SUM(CASE WHEN risk_areas.blocked_hydrant IS TRUE THEN 1 ELSE 0 END) as blocked_hydrant_count,
+                SUM(CASE WHEN risk_areas.combustible_materials_present IS TRUE THEN 1 ELSE 0 END) as combustible_material_count,
+                SUM(CASE WHEN risk_areas.informal_settlement IS TRUE THEN 1 ELSE 0 END) as informal_settlement_count,
+                SUM(CASE WHEN risk_areas.cooking_fire_prone_activity IS TRUE THEN 1 ELSE 0 END) as cooking_fire_activity_count,
+                SUM(CASE WHEN risk_areas.poor_waste_disposal IS TRUE THEN 1 ELSE 0 END) as poor_waste_disposal_count,
+                SUM(CASE WHEN risk_areas.previous_fire_prone_location IS TRUE THEN 1 ELSE 0 END) as previous_fire_prone_count,
                 SUM(CASE WHEN risk_areas.road_accessibility IN ('difficult', 'very_difficult') THEN 1 ELSE 0 END) as poor_access_count,
                 COALESCE(SUM(risk_areas.estimated_affected_households), 0) as affected_households
             ")

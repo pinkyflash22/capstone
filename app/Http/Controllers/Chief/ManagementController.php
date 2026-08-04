@@ -689,6 +689,8 @@ public function storeIncident(Request $request)
         }
 
         $personnel = $query->get()->map(function ($officer) {
+            $resolvedStatus = (int) ($officer->user?->status_id ?? 0) === 1 ? 'active' : 'inactive';
+
             return [
                 'user_id' => $officer->user?->user_id,
                 'station_officer_id' => $officer->station_officer_id,
@@ -698,6 +700,7 @@ public function storeIncident(Request $request)
                 'account_code' => $officer->user?->account_code,
                 'contact_number' => $officer->user?->contact_number,
                 'status_id' => $officer->user?->status_id,
+                'status' => $resolvedStatus,
                 'rank' => $officer->rank,
                 'role' => $officer->user?->role ? [
                     'role_id' => $officer->user->role->role_id,

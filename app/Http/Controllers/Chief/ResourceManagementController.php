@@ -37,8 +37,12 @@ class ResourceManagementController extends Controller
       
         $stationOfficers = StationOfficer::where('station_id',$stationExact)->with('user.role','station')->get();
 
-        $activeStations = Station::where('station_id', $stationExact)->with(['marker'])->get();
+        $activeStations = Station::where('station_id', $stationExact)
+            ->with(['marker', 'address.barangay.city.province'])
+            ->get();
         $currentStation = $activeStations->first();
+        $chiefCityId = $currentStation?->address?->barangay?->city?->city_id;
+        $chiefProvinceId = $currentStation?->address?->barangay?->city?->province?->province_id;
         $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
 
         // $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->get();
@@ -74,7 +78,21 @@ class ResourceManagementController extends Controller
         $boundaryBarangays = $this->buildBoundaryBarangayList($stationExact);
         
         
-        return view('chief.resource-management', compact('citizens','allusers','provinces','roles','equipments','activeStations','users','stationOfficers','allTeam', 'currentStation', 'boundaryBarangays'));
+        return view('chief.resource-management', compact(
+            'citizens',
+            'allusers',
+            'provinces',
+            'roles',
+            'equipments',
+            'activeStations',
+            'users',
+            'stationOfficers',
+            'allTeam',
+            'currentStation',
+            'boundaryBarangays',
+            'chiefCityId',
+            'chiefProvinceId'
+        ));
     }
 
     protected function buildBoundaryBarangayList(?int $stationId)
