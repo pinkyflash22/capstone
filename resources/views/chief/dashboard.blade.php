@@ -1545,7 +1545,7 @@
     window.mapData = {
         marker: @json($mapmarker) || []
     };
-    window.incidentsData = @json($incidents) || [];
+    window.incidentsData = [];
     var stations = @json($stations) || [];
     window.chiefDashboardStatsSeed = @json($dashboardStatsSeed ?? []);
     window.pyroPublicAssetUrls = {
@@ -2731,6 +2731,10 @@
     }
 
     async function refreshChiefDashboardStats() {
+        if (chiefStatsRequest) {
+            return;
+        }
+
         try {
             chiefStatsRequest = createChiefDashboardRequest(chiefStatsRequest, '/station-admin/api/dashboard-stats', {
                 headers: {
@@ -2812,6 +2816,8 @@
         return document.visibilityState === 'visible';
     };
     window.clearChiefDashboardIntervals = function() {
+        const runtime = window.__chiefDashboardPollingRuntime || null;
+
         if (window.chiefStatsInterval) {
             clearInterval(window.chiefStatsInterval);
             window.chiefStatsInterval = null;
@@ -2824,9 +2830,20 @@
             clearInterval(window.chiefNotificationInterval);
             window.chiefNotificationInterval = null;
         }
+
+        if (runtime) {
+            runtime.pollingStarted = false;
+        }
     };
     window.startChiefDashboardIntervals = function() {
+        const runtime = window.__chiefDashboardPollingRuntime || { pollingStarted: false };
+
+        if (!window.chiefDashboardIsVisible() || runtime.pollingStarted) {
+            return;
+        }
+
         window.clearChiefDashboardIntervals();
+        runtime.pollingStarted = true;
 
         window.chiefStatsInterval = window.setInterval(() => {
             if (!window.chiefDashboardIsVisible()) return;
@@ -2860,8 +2877,6 @@
     let chiefStatsRequest = null;
 
     function createChiefDashboardRequest(currentRequest, url, options = {}) {
-        currentRequest?.controller?.abort();
-
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), CHIEF_DASHBOARD_FETCH_TIMEOUT_MS);
         const promise = fetch(url, {
@@ -2873,6 +2888,29 @@
         });
 
         return { controller, promise };
+    }
+
+    function getChiefDashboardPollingRuntime() {
+        if (!window.__chiefDashboardPollingRuntime) {
+            window.__chiefDashboardPollingRuntime = {
+                initialized: false,
+                pollingStarted: false,
+                listenersBound: false,
+                bootTimeoutIds: new Set(),
+                idleCallbackIds: new Set(),
+                listeners: {}
+            };
+        }
+
+        return window.__chiefDashboardPollingRuntime;
+    }
+
+    function abortChiefDashboardRequest(request) {
+        try {
+            request?.controller?.abort();
+        } catch (error) {
+            console.warn('Unable to abort chief dashboard request cleanly:', error);
+        }
     }
 
     function applyChiefDashboardStats(stats = {}) {
@@ -2921,20 +2959,47 @@
         }
     }
 
+    function cancelChiefDashboardBootTasks() {
+        const runtime = getChiefDashboardPollingRuntime();
+
+        runtime.bootTimeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+        runtime.bootTimeoutIds.clear();
+
+        if (typeof window.cancelIdleCallback === 'function') {
+            runtime.idleCallbackIds.forEach((idleId) => window.cancelIdleCallback(idleId));
+        }
+        runtime.idleCallbackIds.clear();
+    }
+
     function queueChiefDashboardBootTask(callback, delayMs = 0) {
-        window.setTimeout(() => {
+        const runtime = getChiefDashboardPollingRuntime();
+        const timeoutId = window.setTimeout(() => {
+            runtime.bootTimeoutIds.delete(timeoutId);
+
             if (typeof window.requestIdleCallback === 'function') {
-                window.requestIdleCallback(() => callback(), { timeout: 1500 });
+                const idleId = window.requestIdleCallback(() => {
+                    runtime.idleCallbackIds.delete(idleId);
+                    callback();
+                }, { timeout: 1500 });
+
+                runtime.idleCallbackIds.add(idleId);
                 return;
             }
 
             callback();
         }, delayMs);
+
+        runtime.bootTimeoutIds.add(timeoutId);
+        return timeoutId;
     }
 
     window.runPendingIncidentAutoAssignment = async function() {
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         if (!token) {
+            return;
+        }
+
+        if (chiefAutoAssignRequest) {
             return;
         }
 
@@ -2967,6 +3032,10 @@
     };
 
     window.refreshChiefIncidentNotifications = async function() {
+        if (chiefLatestIncidentRequest) {
+            return;
+        }
+
         try {
             chiefLatestIncidentRequest = createChiefDashboardRequest(chiefLatestIncidentRequest, '/api/incident/latest', {
                 headers: {
@@ -2999,25 +3068,88 @@
         }
     };
 
+    function abortChiefDashboardPollingRequests() {
+        abortChiefDashboardRequest(chiefStatsRequest);
+        abortChiefDashboardRequest(chiefAutoAssignRequest);
+        abortChiefDashboardRequest(chiefLatestIncidentRequest);
+    }
+
+    function handleChiefDashboardVisibilityChange() {
+        const runtime = getChiefDashboardPollingRuntime();
+
+        if (!window.chiefDashboardIsVisible()) {
+            cancelChiefDashboardBootTasks();
+            window.clearChiefDashboardIntervals();
+            runtime.pollingStarted = false;
+            return;
+        }
+
+        refreshChiefDashboardStats();
+        queueChiefDashboardBootTask(() => window.refreshChiefIncidentNotifications(), 0);
+        queueChiefDashboardBootTask(() => window.startChiefDashboardIntervals(), 300);
+    }
+
+    function teardownChiefDashboardPolling() {
+        const runtime = getChiefDashboardPollingRuntime();
+
+        cancelChiefDashboardBootTasks();
+        window.clearChiefDashboardIntervals();
+        abortChiefDashboardPollingRequests();
+        runtime.pollingStarted = false;
+
+        if (runtime.listenersBound) {
+            const { visibilitychange, pagehide, beforeunload } = runtime.listeners;
+
+            if (visibilitychange) {
+                document.removeEventListener('visibilitychange', visibilitychange);
+            }
+            if (pagehide) {
+                window.removeEventListener('pagehide', pagehide);
+            }
+            if (beforeunload) {
+                window.removeEventListener('beforeunload', beforeunload);
+            }
+
+            runtime.listenersBound = false;
+        }
+
+        runtime.listeners = {};
+        runtime.initialized = false;
+    }
+
+    function initializeChiefDashboardPolling() {
+        const runtime = getChiefDashboardPollingRuntime();
+
+        if (runtime.initialized) {
+            return runtime;
+        }
+
+        runtime.initialized = true;
+
+        if (!runtime.listenersBound) {
+            runtime.listeners.visibilitychange = handleChiefDashboardVisibilityChange;
+            runtime.listeners.pagehide = teardownChiefDashboardPolling;
+            runtime.listeners.beforeunload = teardownChiefDashboardPolling;
+
+            document.addEventListener('visibilitychange', runtime.listeners.visibilitychange);
+            window.addEventListener('pagehide', runtime.listeners.pagehide);
+            window.addEventListener('beforeunload', runtime.listeners.beforeunload);
+
+            runtime.listenersBound = true;
+        }
+
+        return runtime;
+    }
+
     // Store existing map reference for UnifiedMapService
     window.unifiedMap = null;
     
     // Initialize UnifiedMapService AFTER your existing map is ready
     document.addEventListener('DOMContentLoaded', function() {
+        initializeChiefDashboardPolling();
         queueChiefDashboardBootTask(() => window.refreshChiefIncidentNotifications(), 700);
         queueChiefDashboardBootTask(() => window.runPendingIncidentAutoAssignment(), 1400);
         queueChiefDashboardBootTask(() => window.startChiefDashboardIntervals(), 2200);
-
-        document.addEventListener('visibilitychange', () => {
-            if (window.chiefDashboardIsVisible()) {
-                refreshChiefDashboardStats();
-                queueChiefDashboardBootTask(() => window.refreshChiefIncidentNotifications(), 0);
-                queueChiefDashboardBootTask(() => window.startChiefDashboardIntervals(), 300);
-                return;
-            }
-
-            window.clearChiefDashboardIntervals();
-        });
 
         // Sidebar Mobile Toggle
         const openSidebarBtn = document.getElementById('openSidebar');

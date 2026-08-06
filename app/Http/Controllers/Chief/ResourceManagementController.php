@@ -26,7 +26,8 @@ class ResourceManagementController extends Controller
      */
     public function index()
     {
-        $thisUser = Auth::user()->user_id;
+        $loggedInChief = Auth::user()?->loadMissing('address.barangay.city.province');
+        $thisUser = $loggedInChief?->user_id;
         //direct to station officer
         $thisStation = StationOfficer::where('user_id', $thisUser)->first();
         //ito na ung station nya mismo
@@ -41,8 +42,10 @@ class ResourceManagementController extends Controller
             ->with(['marker', 'address.barangay.city.province'])
             ->get();
         $currentStation = $activeStations->first();
-        $chiefCityId = $currentStation?->address?->barangay?->city?->city_id;
-        $chiefProvinceId = $currentStation?->address?->barangay?->city?->province?->province_id;
+        $chiefCityId = $loggedInChief?->address?->barangay?->city?->city_id
+            ?? $currentStation?->address?->barangay?->city?->city_id;
+        $chiefProvinceId = $loggedInChief?->address?->barangay?->city?->province?->province_id
+            ?? $currentStation?->address?->barangay?->city?->province?->province_id;
         $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
 
         // $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->get();
@@ -75,7 +78,7 @@ class ResourceManagementController extends Controller
         //need padin include ung citizen e
         $roles = Role::all();
         $provinces = Province::orderBy('province_name')->get();
-        $boundaryBarangays = $this->buildBoundaryBarangayList($stationExact);
+        $boundaryBarangays = $this->buildBoundaryBarangayList($stationExact, $chiefCityId);
         
         
         return view('chief.resource-management', compact(
@@ -95,7 +98,7 @@ class ResourceManagementController extends Controller
         ));
     }
 
-    protected function buildBoundaryBarangayList(?int $stationId)
+    protected function buildBoundaryBarangayList(?int $stationId, ?int $chiefCityId = null)
     {
         $supportsBarangayBoundaries = Schema::hasColumn('boundary_location', 'barangay_id')
             && Schema::hasColumn('boundary_location', 'boundary_type');
@@ -106,9 +109,13 @@ class ResourceManagementController extends Controller
                 : ['address.barangay.city', 'barangays.city'])
             ->find($stationId);
 
-        $cityId = $station?->address?->barangay?->city?->city_id;
+        $cityId = $chiefCityId ?: $station?->address?->barangay?->city?->city_id;
 
         $barangays = $station?->barangays;
+
+        if ($barangays && $cityId) {
+            $barangays = $barangays->filter(fn (Barangay $barangay) => (int) $barangay->city_id === (int) $cityId);
+        }
 
         if (! $barangays || $barangays->isEmpty()) {
             $barangays = Barangay::query()

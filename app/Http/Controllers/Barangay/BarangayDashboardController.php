@@ -452,29 +452,90 @@ class BarangayDashboardController extends Controller
 
         if ($barangay) {
             $historicalIncidents = HistoricalFireIncident::query()
-                ->with(['incident.marker'])
+                ->select([
+                    'historical_fire_incident_id',
+                    'barangay_id',
+                    'incident_id',
+                    'incident_date',
+                    'incident_count',
+                    'fire_classification',
+                    'fire_cause',
+                    'incident_location',
+                    'is_verified',
+                ])
+                ->with(['incident.marker:marker_id,title,category,lat,lng'])
                 ->where('barangay_id', $barangay->barangay_id)
                 ->orderByDesc('incident_date')
                 ->limit(12)
                 ->get();
 
             $predictionChecklists = BarangayPredictionChecklist::query()
-                ->with(['assignee', 'reviewer'])
+                ->select([
+                    'barangay_prediction_checklist_id',
+                    'barangay_id',
+                    'title',
+                    'ai_output',
+                    'planning_notes',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'assigned_to',
+                    'reviewed_by',
+                    'compliance_remarks',
+                ])
+                ->with([
+                    'assignee:user_id,first_name,middle_name,last_name',
+                    'reviewer:user_id,first_name,middle_name,last_name',
+                ])
                 ->where('barangay_id', $barangay->barangay_id)
-                ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
                 ->orderBy('target_date')
                 ->limit(12)
                 ->get();
 
             $aiActionPlanChecklists = AiActionPlanChecklist::query()
-                ->with(['assignee', 'confirmer', 'items.reviewer', 'suggestions'])
+                ->select([
+                    'ai_action_plan_checklist_id',
+                    'barangay_id',
+                    'source_description',
+                    'plan_title',
+                    'plan_description',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'assigned_to',
+                    'confirmed_by',
+                    'confirmation_notes',
+                ])
+                ->with([
+                    'assignee:user_id,first_name,middle_name,last_name',
+                    'confirmer:user_id,first_name,middle_name,last_name',
+                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,status',
+                ])
                 ->where('barangay_id', $barangay->barangay_id)
-                ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
                 ->orderBy('target_date')
                 ->limit(12)
                 ->get();
 
             $markers = Marker::query()
+                ->select(['marker_id', 'title', 'description', 'lat', 'lng', 'category', 'status'])
                 ->whereIn('category', ['barangay', 'fire', 'school', 'hydrant', 'bridge', 'station', 'risk', 'hazard'])
                 ->orderByDesc('marker_id')
                 ->limit(18)
@@ -484,23 +545,80 @@ class BarangayDashboardController extends Controller
 
         if ($hall) {
             $fireRecords = BarangayFireRecord::query()
-                ->with(['incident.marker'])
+                ->with(['incident.marker:marker_id,title,category,lat,lng'])
                 ->where('barangay_hall_id', $hall->barangay_hall_id)
                 ->orderByDesc('incident_date')
                 ->get();
 
             $riskAreas = RiskArea::query()
-                ->with(['marker', 'station', 'reporter', 'photos'])
+                ->select([
+                    'risk_area_id',
+                    'marker_id',
+                    'station_id',
+                    'barangay_hall_id',
+                    'entry_type',
+                    'risk_type',
+                    'hazard_type',
+                    'risk_factor',
+                    'condition_label',
+                    'status',
+                    'reported_by',
+                    'created_at',
+                ])
+                ->with([
+                    'marker:marker_id,title,category,lat,lng',
+                    'station:station_id,station_name',
+                    'reporter:user_id,first_name,middle_name,last_name',
+                    'photos:risk_area_photo_id,risk_area_id,photo_path,photo_name',
+                ])
                 ->where('barangay_hall_id', $hall->barangay_hall_id)
                 ->orderByDesc('created_at')
                 ->limit(12)
                 ->get();
 
             $mitigationActions = MitigationAction::query()
-                ->with(['riskArea.marker', 'checklist', 'creator', 'attachments'])
+                ->select([
+                    'mitigation_action_id',
+                    'barangay_id',
+                    'risk_area_id',
+                    'barangay_prediction_checklist_id',
+                    'ai_action_plan_checklist_id',
+                    'title',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'description',
+                    'created_by',
+                    'created_at',
+                ])
+                ->with([
+                    'riskArea:risk_area_id,marker_id',
+                    'riskArea.marker:marker_id,title',
+                    'checklist:barangay_prediction_checklist_id,title',
+                    'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
+                    'creator:user_id,first_name,middle_name,last_name',
+                    'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
+                ])
                 ->where('barangay_id', $barangay?->barangay_id)
-                ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
-                ->orderByRaw("FIELD(status, 'in_progress', 'planned', 'blocked', 'completed', 'cancelled')")
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
+                ->orderByRaw("
+                    CASE status
+                        WHEN 'in_progress' THEN 1
+                        WHEN 'planned' THEN 2
+                        WHEN 'blocked' THEN 3
+                        WHEN 'completed' THEN 4
+                        WHEN 'cancelled' THEN 5
+                        ELSE 6
+                    END
+                ")
                 ->orderBy('target_date')
                 ->orderByDesc('created_at')
                 ->limit(16)

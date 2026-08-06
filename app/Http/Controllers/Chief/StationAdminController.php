@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -265,16 +266,15 @@ class StationAdminController extends Controller
 
     protected function getManagedBarangaysForStationAdmin()
     {
-        $stationOfficer = StationOfficer::query()
-            ->with(['station.address.barangay.city'])
-            ->where('user_id', Auth::user()->user_id)
-            ->first();
-
-        $cityId = $stationOfficer?->station?->address?->barangay?->city?->city_id;
+        $user = Auth::user();
+        $user?->loadMissing('address.barangay.city');
+        $cityId = $user?->address?->barangay?->city?->city_id;
 
         return Barangay::query()
+            ->select(['barangay_id', 'barangay_name', 'city_id'])
             ->when($cityId, fn ($query) => $query->where('city_id', $cityId))
-            ->with('city')
+            ->when(! $cityId, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['city:city_id,city_name'])
             ->orderBy('barangay_name')
             ->get();
     }
@@ -929,17 +929,64 @@ class StationAdminController extends Controller
         $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
 
         $mitigationActions = MitigationAction::query()
-            ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
+            ->select([
+                'mitigation_action_id',
+                'barangay_id',
+                'risk_area_id',
+                'barangay_prediction_checklist_id',
+                'ai_action_plan_checklist_id',
+                'title',
+                'category',
+                'priority_level',
+                'status',
+                'target_date',
+                'description',
+                'remarks',
+                'created_by',
+                'created_at',
+            ])
+            ->with([
+                'barangay:barangay_id,barangay_name,city_id',
+                'barangay.city:city_id,city_name',
+                'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
+                'riskArea:risk_area_id,barangay_hall_id,marker_id',
+                'riskArea.marker:marker_id,title',
+                'checklist:barangay_prediction_checklist_id,title',
+                'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
+                'creator:user_id,first_name,middle_name,last_name',
+            ])
             ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
             ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
-            ->orderByRaw("FIELD(status, 'in_progress', 'planned', 'blocked', 'completed', 'cancelled')")
+            ->orderByRaw("
+                CASE priority_level
+                    WHEN 'critical' THEN 1
+                    WHEN 'high' THEN 2
+                    WHEN 'medium' THEN 3
+                    WHEN 'low' THEN 4
+                    ELSE 5
+                END
+            ")
+            ->orderByRaw("
+                CASE status
+                    WHEN 'in_progress' THEN 1
+                    WHEN 'planned' THEN 2
+                    WHEN 'blocked' THEN 3
+                    WHEN 'completed' THEN 4
+                    WHEN 'cancelled' THEN 5
+                    ELSE 6
+                END
+            ")
             ->orderBy('target_date')
             ->orderByDesc('created_at')
             ->get();
 
         $riskAreas = RiskArea::query()
-            ->with(['marker', 'barangayHall.barangay'])
+            ->select(['risk_area_id', 'barangay_hall_id', 'marker_id'])
+            ->with([
+                'marker:marker_id,title',
+                'barangayHall:barangay_hall_id,barangay_id',
+                'barangayHall.barangay:barangay_id,barangay_name',
+            ])
             ->when(! empty($barangayIds), function ($query) use ($barangayIds) {
                 $query->whereHas('barangayHall', fn ($hallQuery) => $hallQuery->whereIn('barangay_id', $barangayIds));
             })
@@ -948,10 +995,32 @@ class StationAdminController extends Controller
             ->get();
 
         $predictionChecklists = BarangayPredictionChecklist::query()
-            ->with(['assignee', 'reviewer', 'barangay'])
+            ->select([
+                'barangay_prediction_checklist_id',
+                'barangay_id',
+                'title',
+                'priority_level',
+                'status',
+                'target_date',
+                'assigned_to',
+                'reviewed_by',
+            ])
+            ->with([
+                'assignee:user_id,first_name,middle_name,last_name',
+                'reviewer:user_id,first_name,middle_name,last_name',
+                'barangay:barangay_id,barangay_name',
+            ])
             ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
             ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("
+                CASE priority_level
+                    WHEN 'critical' THEN 1
+                    WHEN 'high' THEN 2
+                    WHEN 'medium' THEN 3
+                    WHEN 'low' THEN 4
+                    ELSE 5
+                END
+            ")
             ->orderBy('target_date')
             ->get();
 
@@ -1373,5 +1442,268 @@ public function storeFullAddress(Request $request)
                 'station_id' => $stationId,
             ],
         ]);
+    }
+
+    public function incidentMapData()
+    {
+        $stationOfficer = $this->getAuthenticatedStationOfficer();
+        $stationId = $stationOfficer?->station_id;
+
+        if (! $stationId) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $incidents = $this->getChiefIncidentMapCollection($stationId)
+            ->map(fn (Incident $incident) => $this->serializeChiefIncidentMapItem($incident))
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $incidents,
+        ]);
+    }
+
+    public function incidentMapChanges(Request $request)
+    {
+        $validated = $request->validate([
+            'cursor_updated_at' => ['nullable', 'date'],
+            'cursor_incident_id' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $stationOfficer = $this->getAuthenticatedStationOfficer();
+        $stationId = $stationOfficer?->station_id;
+
+        if (! $stationId) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'meta' => [
+                    'cursor' => [
+                        'updated_at' => null,
+                        'incident_id' => 0,
+                    ],
+                ],
+            ]);
+        }
+
+        $cursorUpdatedAt = ! empty($validated['cursor_updated_at'])
+            ? Carbon::parse($validated['cursor_updated_at'])
+            : null;
+        $cursorIncidentId = (int) ($validated['cursor_incident_id'] ?? 0);
+        $incidents = $this->getChiefIncidentMapCollection($stationId);
+
+        $changes = $incidents
+            ->filter(function (Incident $incident) use ($cursorUpdatedAt, $cursorIncidentId) {
+                $effectiveUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($incident);
+                $incidentId = (int) $incident->incident_id;
+
+                if (! $cursorUpdatedAt) {
+                    return true;
+                }
+
+                if ($effectiveUpdatedAt && $effectiveUpdatedAt->gt($cursorUpdatedAt)) {
+                    return true;
+                }
+
+                if ($effectiveUpdatedAt && $effectiveUpdatedAt->equalTo($cursorUpdatedAt) && $incidentId > $cursorIncidentId) {
+                    return true;
+                }
+
+                return $incidentId > $cursorIncidentId;
+            })
+            ->sort(function (Incident $left, Incident $right) {
+                $leftUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($left);
+                $rightUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($right);
+                $leftTimestamp = $leftUpdatedAt?->getTimestamp() ?? 0;
+                $rightTimestamp = $rightUpdatedAt?->getTimestamp() ?? 0;
+
+                if ($leftTimestamp === $rightTimestamp) {
+                    return (int) $left->incident_id <=> (int) $right->incident_id;
+                }
+
+                return $leftTimestamp <=> $rightTimestamp;
+            })
+            ->values()
+            ->map(fn (Incident $incident) => $this->serializeChiefIncidentMapItem($incident));
+
+        return response()->json([
+            'success' => true,
+            'data' => $changes,
+            'meta' => [
+                'cursor' => $this->buildChiefIncidentMapCursor($incidents),
+            ],
+        ]);
+    }
+
+    protected function getChiefIncidentMapCollection(?int $stationId)
+    {
+        if (! $stationId) {
+            return collect();
+        }
+
+        $teamIds = $this->getTeamIdsForStation($stationId)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+        $stationMarkers = Cache::remember('station-admin:incident-map:station-markers:v1', now()->addSeconds(60), function () {
+            return Station::query()
+                ->select(['station_id', 'marker_id'])
+                ->with(['marker:marker_id,lat,lng'])
+                ->get()
+                ->filter(fn (Station $station) => $station->marker && $station->marker->lat !== null && $station->marker->lng !== null)
+                ->values();
+        });
+
+        return Incident::query()
+            ->select([
+                'incident_id',
+                'marker_id',
+                'team_id',
+                'status',
+                'updated_at',
+            ])
+            ->with([
+                'marker:marker_id,lat,lng,category,updated_at',
+                'incidentReport:incident_id,severity',
+            ])
+            ->whereHas('marker', function ($query) {
+                $query->whereNotNull('lat')
+                    ->whereNotNull('lng');
+            })
+            ->get()
+            ->filter(function (Incident $incident) use ($stationId, $teamIds, $stationMarkers) {
+                if ($teamIds->isNotEmpty() && $incident->team_id && $teamIds->contains((int) $incident->team_id)) {
+                    return true;
+                }
+
+                $nearestStationId = $this->resolveNearestStationIdForIncident($incident, $stationMarkers);
+
+                return $nearestStationId !== null && $nearestStationId === (int) $stationId;
+            })
+            ->values();
+    }
+
+    protected function serializeChiefIncidentMapItem(Incident $incident): array
+    {
+        $effectiveUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($incident);
+
+        return [
+            'id' => $incident->incident_id,
+            'latitude' => $incident->marker ? (float) $incident->marker->lat : null,
+            'longitude' => $incident->marker ? (float) $incident->marker->lng : null,
+            'status' => $incident->status,
+            'incident_type' => $this->resolveIncidentMapType($incident),
+            'severity' => $incident->incidentReport?->severity,
+            'updated_at' => optional($effectiveUpdatedAt)->toIso8601String(),
+        ];
+    }
+
+    protected function resolveChiefIncidentMapUpdatedAt(Incident $incident): ?Carbon
+    {
+        $incidentUpdatedAt = $incident->updated_at instanceof Carbon
+            ? $incident->updated_at
+            : ($incident->updated_at ? Carbon::parse($incident->updated_at) : null);
+        $markerUpdatedAt = $incident->marker?->updated_at instanceof Carbon
+            ? $incident->marker->updated_at
+            : ($incident->marker?->updated_at ? Carbon::parse($incident->marker->updated_at) : null);
+
+        if (! $incidentUpdatedAt) {
+            return $markerUpdatedAt;
+        }
+
+        if (! $markerUpdatedAt) {
+            return $incidentUpdatedAt;
+        }
+
+        return $markerUpdatedAt->greaterThan($incidentUpdatedAt) ? $markerUpdatedAt : $incidentUpdatedAt;
+    }
+
+    protected function buildChiefIncidentMapCursor($incidents): array
+    {
+        $latestIncident = $incidents
+            ->sort(function (Incident $left, Incident $right) {
+                $leftUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($left);
+                $rightUpdatedAt = $this->resolveChiefIncidentMapUpdatedAt($right);
+                $leftTimestamp = $leftUpdatedAt?->getTimestamp() ?? 0;
+                $rightTimestamp = $rightUpdatedAt?->getTimestamp() ?? 0;
+
+                if ($leftTimestamp === $rightTimestamp) {
+                    return (int) $right->incident_id <=> (int) $left->incident_id;
+                }
+
+                return $rightTimestamp <=> $leftTimestamp;
+            })
+            ->first();
+
+        return [
+            'updated_at' => optional($latestIncident ? $this->resolveChiefIncidentMapUpdatedAt($latestIncident) : null)->toIso8601String(),
+            'incident_id' => $latestIncident ? (int) $latestIncident->incident_id : 0,
+        ];
+    }
+
+    protected function resolveIncidentMapType(Incident $incident): string
+    {
+        $category = strtolower((string) ($incident->marker?->category ?? 'fire'));
+
+        return match ($category) {
+            'fire' => 'Fire',
+            'station' => 'Station',
+            'hydrant' => 'Hydrant',
+            'school' => 'School',
+            default => Str::title(str_replace(['-', '_'], ' ', $category)),
+        };
+    }
+
+    protected function resolveNearestStationIdForIncident(Incident $incident, $stationMarkers): ?int
+    {
+        $incidentLat = $incident->marker?->lat;
+        $incidentLng = $incident->marker?->lng;
+
+        if ($incidentLat === null || $incidentLng === null) {
+            return null;
+        }
+
+        $nearestStationId = null;
+        $nearestDistanceMeters = null;
+
+        foreach ($stationMarkers as $station) {
+            $stationLat = $station->marker?->lat;
+            $stationLng = $station->marker?->lng;
+
+            if ($stationLat === null || $stationLng === null) {
+                continue;
+            }
+
+            $distanceMeters = $this->calculateDistanceMeters(
+                (float) $incidentLat,
+                (float) $incidentLng,
+                (float) $stationLat,
+                (float) $stationLng
+            );
+
+            if ($nearestDistanceMeters === null || $distanceMeters < $nearestDistanceMeters) {
+                $nearestDistanceMeters = $distanceMeters;
+                $nearestStationId = (int) $station->station_id;
+            }
+        }
+
+        return $nearestStationId;
+    }
+
+    protected function calculateDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadiusMeters = 6371000;
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lngDelta = deg2rad($lng2 - $lng1);
+
+        $a = sin($latDelta / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lngDelta / 2) ** 2;
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadiusMeters * $c;
     }
 }

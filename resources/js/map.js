@@ -76,8 +76,12 @@ let markerReferenceCache = {
 let latestIncidentsCache = {
     data: null,
     loadedAt: 0,
-    requestPromise: null
+    requestPromise: null,
+    cursorUpdatedAt: null,
+    cursorIncidentId: 0
 };
+const incidentDetailsCache = new Map();
+const incidentDetailsRequestCache = new Map();
 const TRUCK_REALTIME_REFRESH_MS = 2000;
 
 // Shape management variables
@@ -140,6 +144,11 @@ const TRUCK_REALTIME_ROUTE_SYNC_MS = 5000;
 const LIVE_FETCH_TIMEOUT_MS = 15000;
 const STATIC_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const liveRequestRegistry = new Map();
+let routePollingInFlight = false;
+let markerStatePollingInFlight = false;
+let mapPollingVisibilityHandler = null;
+let mapPollingPageHideHandler = null;
+let mapPollingBeforeUnloadHandler = null;
 
 function isPageVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -162,20 +171,14 @@ function abortLiveRequestsByPrefix(prefix) {
 function destroyPyroMapRuntime(options = {}) {
     const { removeMap = true } = options;
 
-    if (routePollingInterval) {
-        clearInterval(routePollingInterval);
-        routePollingInterval = null;
-    }
-
-    if (markerStatePollingInterval) {
-        clearInterval(markerStatePollingInterval);
-        markerStatePollingInterval = null;
-    }
+    stopMapLivePolling();
+    unbindMapPollingLifecycle();
 
     stopAllSimulations();
     abortLiveRequestsByPrefix('route-active');
     abortLiveRequestsByPrefix('markers-poll');
     abortLiveRequestsByPrefix('incident-latest-poll');
+    abortLiveRequestsByPrefix('chief-incident-map');
 
     if (removeMap && window.map) {
         try {
@@ -192,6 +195,55 @@ function destroyPyroMapRuntime(options = {}) {
 }
 
 window.destroyPyroMapRuntime = destroyPyroMapRuntime;
+
+function stopMapLivePolling() {
+    if (routePollingInterval) {
+        clearInterval(routePollingInterval);
+        routePollingInterval = null;
+    }
+
+    if (markerStatePollingInterval) {
+        clearInterval(markerStatePollingInterval);
+        markerStatePollingInterval = null;
+    }
+}
+
+function bindMapPollingLifecycle() {
+    if (mapPollingVisibilityHandler || typeof document === 'undefined') {
+        return;
+    }
+
+    mapPollingVisibilityHandler = () => {
+        if (isPageVisible()) {
+            startMapLivePolling();
+            return;
+        }
+
+        stopMapLivePolling();
+    };
+    mapPollingPageHideHandler = () => destroyPyroMapRuntime({ removeMap: false });
+    mapPollingBeforeUnloadHandler = () => destroyPyroMapRuntime({ removeMap: false });
+
+    document.addEventListener('visibilitychange', mapPollingVisibilityHandler);
+    window.addEventListener('pagehide', mapPollingPageHideHandler);
+    window.addEventListener('beforeunload', mapPollingBeforeUnloadHandler);
+}
+
+function unbindMapPollingLifecycle() {
+    if (mapPollingVisibilityHandler && typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', mapPollingVisibilityHandler);
+    }
+    if (mapPollingPageHideHandler) {
+        window.removeEventListener('pagehide', mapPollingPageHideHandler);
+    }
+    if (mapPollingBeforeUnloadHandler) {
+        window.removeEventListener('beforeunload', mapPollingBeforeUnloadHandler);
+    }
+
+    mapPollingVisibilityHandler = null;
+    mapPollingPageHideHandler = null;
+    mapPollingBeforeUnloadHandler = null;
+}
 
 function isFirefighterDashboardMapInstance() {
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
@@ -276,12 +328,20 @@ function buildIncidentLookup(incidents) {
     }
 
     for (const incident of incidents) {
+        const incidentId = incident?.incident_id ?? incident?.id ?? null;
+        const lat = incident?.lat ?? incident?.latitude ?? incident?.marker?.lat ?? null;
+        const lng = incident?.lng ?? incident?.longitude ?? incident?.marker?.lng ?? null;
+
         if (incident?.marker_id !== null && incident?.marker_id !== undefined) {
             lookup.set(`marker:${incident.marker_id}`, incident);
         }
 
-        if (incident?.incident_id !== null && incident?.incident_id !== undefined) {
-            lookup.set(`incident:${incident.incident_id}`, incident);
+        if (incidentId !== null && incidentId !== undefined) {
+            lookup.set(`incident:${incidentId}`, incident);
+        }
+
+        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+            lookup.set(`coord:${Number(lat).toFixed(6)}:${Number(lng).toFixed(6)}`, incident);
         }
     }
 
@@ -311,7 +371,204 @@ function findIncidentInLookup(marker, incidentLookup, fallbackIncident = null) {
         }
     }
 
+    const markerLat = marker?.lat ?? marker?.marker?.lat ?? null;
+    const markerLng = marker?.lng ?? marker?.marker?.lng ?? null;
+    if (markerLat !== null && markerLat !== undefined && markerLng !== null && markerLng !== undefined) {
+        const byCoordinate = incidentLookup.get(`coord:${Number(markerLat).toFixed(6)}:${Number(markerLng).toFixed(6)}`);
+        if (byCoordinate) {
+            return byCoordinate;
+        }
+    }
+
     return null;
+}
+
+function normalizeIncidentForMap(incident) {
+    if (!incident || typeof incident !== 'object') {
+        return null;
+    }
+
+    const incidentId = incident.incident_id ?? incident.id ?? null;
+    const lat = incident.lat ?? incident.latitude ?? incident.marker?.lat ?? null;
+    const lng = incident.lng ?? incident.longitude ?? incident.marker?.lng ?? null;
+
+    return {
+        ...incident,
+        incident_id: incidentId,
+        id: incident.id ?? incidentId,
+        lat,
+        lng,
+        status: incident.status || incident.incident_status || 'reported',
+        incident_status: incident.incident_status || incident.status || 'reported',
+        incident_type: incident.incident_type || incident.incident_type_name || 'Fire',
+        incident_type_name: incident.incident_type_name || incident.incident_type || 'Fire',
+        reported_at: incident.reported_at || incident.created_at || incident.updated_at || null
+    };
+}
+
+function resolveIncidentCursorTimestamp(incident) {
+    return incident?.updated_at
+        || incident?.marker?.updated_at
+        || incident?.created_at
+        || null;
+}
+
+function buildLatestIncidentCursor(incidents) {
+    if (!Array.isArray(incidents) || incidents.length === 0) {
+        return {
+            updatedAt: null,
+            incidentId: 0
+        };
+    }
+
+    const sortedIncidents = [...incidents].sort((left, right) => {
+        const leftTimestamp = Date.parse(resolveIncidentCursorTimestamp(left) || 0) || 0;
+        const rightTimestamp = Date.parse(resolveIncidentCursorTimestamp(right) || 0) || 0;
+
+        if (leftTimestamp === rightTimestamp) {
+            return Number(right?.incident_id ?? right?.id ?? 0) - Number(left?.incident_id ?? left?.id ?? 0);
+        }
+
+        return rightTimestamp - leftTimestamp;
+    });
+    const latestIncident = sortedIncidents[0] || null;
+
+    return {
+        updatedAt: resolveIncidentCursorTimestamp(latestIncident),
+        incidentId: Number(latestIncident?.incident_id ?? latestIncident?.id ?? 0) || 0
+    };
+}
+
+function mergeIncidentCollections(existingIncidents = [], incomingIncidents = []) {
+    const mergedById = new Map();
+
+    for (const incident of existingIncidents) {
+        const normalizedIncident = normalizeIncidentForMap(incident);
+        const incidentId = normalizedIncident?.incident_id ?? normalizedIncident?.id ?? null;
+        if (incidentId === null || incidentId === undefined) {
+            continue;
+        }
+
+        mergedById.set(Number(incidentId), normalizedIncident);
+    }
+
+    for (const incident of incomingIncidents) {
+        const normalizedIncident = normalizeIncidentForMap(incident);
+        const incidentId = normalizedIncident?.incident_id ?? normalizedIncident?.id ?? null;
+        if (incidentId === null || incidentId === undefined) {
+            continue;
+        }
+
+        mergedById.set(Number(incidentId), normalizedIncident);
+    }
+
+    return Array.from(mergedById.values()).sort((left, right) => {
+        const leftTimestamp = Date.parse(resolveIncidentCursorTimestamp(left) || 0) || 0;
+        const rightTimestamp = Date.parse(resolveIncidentCursorTimestamp(right) || 0) || 0;
+
+        if (leftTimestamp === rightTimestamp) {
+            return Number(right?.incident_id ?? right?.id ?? 0) - Number(left?.incident_id ?? left?.id ?? 0);
+        }
+
+        return rightTimestamp - leftTimestamp;
+    });
+}
+
+function commitLatestIncidentsCache(nextIncidents, options = {}) {
+    const {
+        replace = false,
+        cursorUpdatedAt = null,
+        cursorIncidentId = 0
+    } = options;
+    const normalizedIncomingIncidents = Array.isArray(nextIncidents)
+        ? nextIncidents.map(normalizeIncidentForMap).filter(Boolean)
+        : [];
+    const mergedIncidents = replace
+        ? normalizedIncomingIncidents
+        : mergeIncidentCollections(latestIncidentsCache.data || [], normalizedIncomingIncidents);
+    const derivedCursor = buildLatestIncidentCursor(mergedIncidents);
+
+    latestIncidentsCache = {
+        data: mergedIncidents,
+        loadedAt: Date.now(),
+        requestPromise: null,
+        cursorUpdatedAt: cursorUpdatedAt || derivedCursor.updatedAt || latestIncidentsCache.cursorUpdatedAt || null,
+        cursorIncidentId: Number(cursorIncidentId || derivedCursor.incidentId || latestIncidentsCache.cursorIncidentId || 0) || 0
+    };
+
+    return latestIncidentsCache.data;
+}
+
+function mergeIncidentIntoClientState(incident) {
+    const normalizedIncident = normalizeIncidentForMap(incident);
+    if (!normalizedIncident?.incident_id) {
+        return normalizedIncident;
+    }
+
+    const currentIncidents = Array.isArray(window.incidentsData) ? window.incidentsData : [];
+    const nextIncidents = currentIncidents.filter((entry) => {
+        const entryId = entry?.incident_id ?? entry?.id ?? null;
+        return Number(entryId) !== Number(normalizedIncident.incident_id);
+    });
+
+    nextIncidents.unshift(normalizedIncident);
+    window.incidentsData = nextIncidents;
+    window.incidentsLookup = buildIncidentLookup(nextIncidents);
+    commitLatestIncidentsCache(nextIncidents, { replace: true });
+
+    return normalizedIncident;
+}
+
+function getCachedIncidentDetails(incidentId) {
+    if (incidentId === null || incidentId === undefined) {
+        return null;
+    }
+
+    return incidentDetailsCache.get(Number(incidentId)) || null;
+}
+
+async function fetchIncidentDetailsById(incidentId) {
+    const normalizedIncidentId = Number(incidentId);
+    if (!Number.isFinite(normalizedIncidentId) || normalizedIncidentId <= 0) {
+        return null;
+    }
+
+    const cachedIncident = getCachedIncidentDetails(normalizedIncidentId);
+    if (cachedIncident) {
+        return cachedIncident;
+    }
+
+    if (incidentDetailsRequestCache.has(normalizedIncidentId)) {
+        return incidentDetailsRequestCache.get(normalizedIncidentId);
+    }
+
+    const requestPromise = (async () => {
+        const response = await fetch(`/api/incidents/${normalizedIncidentId}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch incident details (${response.status})`);
+        }
+
+        const payload = await response.json();
+        const incident = normalizeIncidentForMap(payload?.data || payload);
+
+        if (incident?.incident_id) {
+            incidentDetailsCache.set(normalizedIncidentId, incident);
+            mergeIncidentIntoClientState(incident);
+        }
+
+        return incident;
+    })().finally(() => {
+        incidentDetailsRequestCache.delete(normalizedIncidentId);
+    });
+
+    incidentDetailsRequestCache.set(normalizedIncidentId, requestPromise);
+    return requestPromise;
 }
 
 function getTruckRealtimeLocation(truck) {
@@ -2092,43 +2349,22 @@ function initializePyroMapRuntime() {
     
     initAfterMapReady();
 
-    const shouldDeferChiefRevalidation = isChiefDashboardMapInstance();
     fetchStations({
         preferSeeded: true,
-        revalidate: !isFirefighterDashboardMapInstance() && !shouldDeferChiefRevalidation
+        revalidate: !isFirefighterDashboardMapInstance() && !isChiefDashboardMapInstance()
     });
     fetchCoordinate({
         preferSeeded: true,
-        revalidate: !isFirefighterDashboardMapInstance() && !shouldDeferChiefRevalidation
+        revalidate: !isFirefighterDashboardMapInstance()
     });
-
-    if (shouldDeferChiefRevalidation) {
-        window.setTimeout(() => {
-            fetchStations({
-                preferSeeded: true,
-                revalidate: true
-            }).catch((error) => {
-                console.warn('Deferred chief station refresh failed:', error);
-            });
-        }, 900);
-
-        window.setTimeout(() => {
-            fetchCoordinate({
-                preferSeeded: true,
-                revalidate: true
-            }).catch((error) => {
-                console.warn('Deferred chief marker refresh failed:', error);
-            });
-        }, 1400);
-    }
     
     // Ensure the map repaints correctly after layout settles.
     setTimeout(() => window.map?.invalidateSize(), 0);
     setTimeout(() => window.map?.invalidateSize(), 250);
     setTimeout(() => window.map?.invalidateSize(), 600);
     
-    // Start polling for routes from database
-    startRoutePolling();
+    bindMapPollingLifecycle();
+    startMapLivePolling();
     return initializedMap;
 }
 
@@ -2225,6 +2461,14 @@ function writeStaticMapCache(scope, data) {
         savedAt: Date.now(),
         data
     });
+}
+
+function clearStaticMapCache(scope) {
+    try {
+        window.localStorage?.removeItem(getStaticMapCacheKey(scope));
+    } catch (error) {
+        console.warn('Unable to clear local storage key:', getStaticMapCacheKey(scope), error);
+    }
 }
 
 function loadIncidentAlertFeed() {
@@ -5252,8 +5496,11 @@ async function updateMarker(markerId) {
         closeModal();
         closeEditModal();
         showNotification('Marker updated successfully!', 'success');
-
-        await fetchCoordinate();
+        invalidateMarkerReferenceData();
+        await Promise.allSettled([
+            fetchStations({ force: true }),
+            fetchCoordinate({ force: true })
+        ]);
         
     } catch (error) {
         console.error('Error updating marker:', error);
@@ -5942,6 +6189,12 @@ async function pollMarkerStateChanges() {
         return;
     }
 
+    if (markerStatePollingInFlight) {
+        return;
+    }
+
+    markerStatePollingInFlight = true;
+
     try {
         const [markersResponse, incidentsResponse] = await Promise.all([
             fetchLiveResponseOnce('markers-poll', '/api/markers', {
@@ -5979,6 +6232,8 @@ async function pollMarkerStateChanges() {
             return;
         }
         console.error('Marker state polling failed:', error);
+    } finally {
+        markerStatePollingInFlight = false;
     }
 }
 
@@ -5987,6 +6242,24 @@ function normalizeCoordinatePayload(data) {
     if (Array.isArray(data)) return data;
     if (data && typeof data === 'object') return [data];
     return [];
+}
+
+function invalidateMarkerReferenceData() {
+    markerReferenceCache = {
+        incidentTypes: null,
+        hydrants: null,
+        schools: null,
+        stations: null,
+        loadedAt: 0,
+        requestPromise: null
+    };
+    lastStationsFetchAt = 0;
+    clearStaticMapCache('stations');
+}
+
+function invalidateShapeData() {
+    lastShapesFetchAt = 0;
+    clearStaticMapCache('shapes');
 }
 
 function renderMarkersQuick(data) {
@@ -6023,8 +6296,9 @@ function renderMarkersQuick(data) {
     }
 }
 
-async function getMarkerReferenceData() {
-    const shouldRefreshCache = !markerReferenceCache.loadedAt || (Date.now() - markerReferenceCache.loadedAt) > 60000;
+async function getMarkerReferenceData(options = {}) {
+    const { force = false } = options;
+    const shouldRefreshCache = force || !markerReferenceCache.loadedAt;
 
     if (!shouldRefreshCache &&
         markerReferenceCache.incidentTypes &&
@@ -6062,6 +6336,8 @@ async function getMarkerReferenceData() {
             stationsData = stationData.data || stationData;
         }
 
+        writeStaticMapCache('stations', Array.isArray(stationsData) ? stationsData : []);
+
         markerReferenceCache = {
             incidentTypes,
             hydrants,
@@ -6082,6 +6358,7 @@ async function getMarkerReferenceData() {
 
 async function getLatestIncidentsData(options = {}) {
     const { force = false, useLiveRequest = false } = options;
+    const shouldUseChiefLightweightEndpoint = isChiefCommandMapContext();
     const cacheIsFresh = !force
         && Array.isArray(latestIncidentsCache.data)
         && (Date.now() - latestIncidentsCache.loadedAt) < LATEST_INCIDENTS_CACHE_TTL_MS;
@@ -6095,29 +6372,57 @@ async function getLatestIncidentsData(options = {}) {
     }
 
     latestIncidentsCache.requestPromise = (async () => {
+        const liveRequestKey = shouldUseChiefLightweightEndpoint
+            ? 'chief-incident-map-changes-poll'
+            : 'incident-latest-poll';
+        const hasChiefCursor = shouldUseChiefLightweightEndpoint
+            && useLiveRequest
+            && Array.isArray(latestIncidentsCache.data)
+            && latestIncidentsCache.data.length > 0
+            && Boolean(latestIncidentsCache.cursorUpdatedAt);
+        const requestUrl = shouldUseChiefLightweightEndpoint
+            ? (hasChiefCursor
+                ? `/station-admin/api/incidents/map/changes?${new URLSearchParams({
+                    cursor_updated_at: latestIncidentsCache.cursorUpdatedAt,
+                    cursor_incident_id: String(latestIncidentsCache.cursorIncidentId || 0)
+                }).toString()}`
+                : '/station-admin/api/incidents/map')
+            : '/api/incident/latest';
         const response = useLiveRequest
-            ? await fetchLiveResponseOnce('incident-latest-poll', '/api/incident/latest', {
+            ? await fetchLiveResponseOnce(liveRequestKey, requestUrl, {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken
                 }
             })
-            : await fetch('/api/incident/latest');
+            : await fetch(requestUrl, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
 
         if (!response.ok) {
             throw new Error(`Failed to fetch latest incidents: ${response.status}`);
         }
 
         const incidentData = await response.json();
-        const normalizedIncidents = incidentData.data || incidentData || [];
+        const rawIncidents = incidentData.data || incidentData || [];
+        const normalizedIncidents = Array.isArray(rawIncidents) ? rawIncidents : [];
 
-        latestIncidentsCache = {
-            data: Array.isArray(normalizedIncidents) ? normalizedIncidents : [],
-            loadedAt: Date.now(),
-            requestPromise: null
-        };
+        if (shouldUseChiefLightweightEndpoint) {
+            const responseCursorUpdatedAt = incidentData?.meta?.cursor?.updated_at || null;
+            const responseCursorIncidentId = Number(incidentData?.meta?.cursor?.incident_id || 0) || 0;
+            const nextIncidents = commitLatestIncidentsCache(normalizedIncidents, {
+                replace: !hasChiefCursor,
+                cursorUpdatedAt: responseCursorUpdatedAt,
+                cursorIncidentId: responseCursorIncidentId
+            });
 
-        return latestIncidentsCache.data;
+            return nextIncidents;
+        }
+
+        return commitLatestIncidentsCache(normalizedIncidents, { replace: true });
     })().catch((error) => {
         latestIncidentsCache.requestPromise = null;
         throw error;
@@ -6263,10 +6568,21 @@ async function updateCoordinate(data, options = {}) {
                 ? '/storage/' + marker.multimedia.path
                 : null;
 
-            newMarker.on('click', () => {
+            newMarker.on('click', async () => {
                 const resolvedIncident = findIncidentForMarker(marker, incident);
-                const latestPopupContent = generatePopupContent({ marker: marker, incident: resolvedIncident }, incidents);
-                newMarker.setPopupContent(latestPopupContent);
+                const incidentId = resolvedIncident?.incident_id ?? resolvedIncident?.id ?? marker?.incident_id ?? null;
+                const canFetchFullIncident = isIncidentMarker(marker) && Number.isFinite(Number(incidentId)) && Number(incidentId) > 0;
+                const hasCachedIncident = Boolean(getCachedIncidentDetails(incidentId));
+                const initialPopupContext = {
+                    marker,
+                    incident: resolvedIncident,
+                    image: marker.multimedia || null,
+                    created_at: marker.created_at || null,
+                    isLoadingDetails: canFetchFullIncident && !hasCachedIncident,
+                    loadingMessage: 'Loading latest incident details...'
+                };
+                const initialPopupContent = generatePopupContent(initialPopupContext, incidents);
+                newMarker.setPopupContent(initialPopupContent);
 
                 if (shouldUseResponderMobileDetailsUi()) {
                     try {
@@ -6275,25 +6591,58 @@ async function updateCoordinate(data, options = {}) {
                         console.warn('Unable to close existing popup before opening mobile details:', closePopupError);
                     }
 
-                    openResponderMapPreviewSheet(latestPopupContent, {
-                        marker,
-                        incident: resolvedIncident,
-                        image: marker.multimedia || null,
-                        created_at: marker.created_at || null
-                    });
+                    openResponderMapPreviewSheet(initialPopupContent, initialPopupContext);
+                } else if (!newMarker.isPopupOpen?.()) {
+                    newMarker.openPopup();
+                }
+
+                addPopupEventListeners(initialPopupContext);
+
+                if (!canFetchFullIncident || hasCachedIncident) {
                     return;
                 }
 
-                if (!newMarker.isPopupOpen?.()) {
-                    newMarker.openPopup();
+                try {
+                    const fullIncident = await fetchIncidentDetailsById(incidentId);
+                    const hydratedIncident = fullIncident || resolvedIncident;
+                    const hydratedPopupContext = {
+                        marker,
+                        incident: hydratedIncident,
+                        image: marker.multimedia || null,
+                        created_at: marker.created_at || null
+                    };
+                    const hydratedPopupContent = generatePopupContent(hydratedPopupContext, incidents);
+                    newMarker.setPopupContent(hydratedPopupContent);
+                    addPopupEventListeners(hydratedPopupContext);
+
+                    if (shouldUseResponderMobileDetailsUi()) {
+                        openResponderMapPreviewSheet(hydratedPopupContent, hydratedPopupContext);
+                    }
+                } catch (popupHydrationError) {
+                    console.error('Unable to hydrate incident popup details:', popupHydrationError);
+                    const errorPopupContext = {
+                        marker,
+                        incident: resolvedIncident,
+                        image: marker.multimedia || null,
+                        created_at: marker.created_at || null,
+                        isLoadingDetails: true,
+                        loadingMessage: 'Unable to refresh full incident details right now.'
+                    };
+                    const errorPopupContent = generatePopupContent(errorPopupContext, incidents);
+                    newMarker.setPopupContent(errorPopupContent);
+                    addPopupEventListeners(errorPopupContext);
+
+                    if (shouldUseResponderMobileDetailsUi()) {
+                        openResponderMapPreviewSheet(errorPopupContent, errorPopupContext);
+                    }
                 }
             });
 
             newMarker.on('popupopen', () => addPopupEventListeners({
-                    marker: marker,
-                    incident,
-                    image: marker.multimedia || null,
-                    created_at: marker.created_at
+                marker,
+                incident: findIncidentForMarker(marker, incident),
+                image: marker.multimedia || null,
+                created_at: marker.created_at
             }));
             existingMarkers[marker.marker_id] = newMarker;
         });
@@ -6307,7 +6656,7 @@ async function updateCoordinate(data, options = {}) {
 }
 
 async function fetchStations(options = {}) {
-    const { preferSeeded = false, revalidate = true } = options;
+    const { preferSeeded = false, revalidate = true, force = false } = options;
     let usedSeededOrCachedData = false;
 
     try {
@@ -6347,7 +6696,11 @@ async function fetchStations(options = {}) {
             }
         }
 
-        if (shouldSkipStaticLayerRefetch(lastStationsFetchAt)) {
+        if (!force && isChiefDashboardMapInstance() && Array.isArray(stations) && stations.length > 0) {
+            return stations;
+        }
+
+        if (!force && shouldSkipStaticLayerRefetch(lastStationsFetchAt)) {
             return stations;
         }
 
@@ -6383,6 +6736,9 @@ function generatePopupContent(coord, incidents) {
     const marker = coord.marker || coord;
     const incident = coord.incident
         || incidents.find(inc => inc.marker_id === marker.marker_id);
+    const loadingMarkup = coord?.isLoadingDetails && isIncidentMarker(marker)
+        ? buildIncidentPopupLoadingMarkup(coord.loadingMessage || 'Loading latest incident details...')
+        : '';
     const imagePath = marker.multimedia?.path ? '/storage/' + marker.multimedia.path : (coord.image?.path ? '/storage/' + coord.image.path : null);
     const sidebarGradient = 'linear-gradient(135deg, #c63d26 0%, #d18a16 100%)';
     const sidebarSoftSurface = 'linear-gradient(135deg, #fff0e8 0%, #fff5dc 100%)';
@@ -6406,7 +6762,10 @@ function generatePopupContent(coord, incidents) {
     const actionGap = isMobilePopup ? '6px' : '8px';
 
     if (shouldUseResponderPopupUi()) {
-        return buildResponderPopupContent(marker, incident, imagePath);
+        return buildResponderPopupContent(marker, incident, imagePath, {
+            isLoadingDetails: coord?.isLoadingDetails,
+            loadingMessage: coord?.loadingMessage
+        });
     }
 
     // Special design for fire stations (category_id = 1)
@@ -6532,6 +6891,7 @@ function generatePopupContent(coord, incidents) {
                         </div>
                         ` : ''}
                     </div>
+                    ${loadingMarkup}
                 </div>
                 
                 ${incidentStatus === 'reported' && canManageMarkers ? `
@@ -6798,10 +7158,22 @@ function getBlockingIncidentRouteLabel(route) {
     return 'another ongoing incident';
 }
 
-function buildResponderPopupContent(marker, incident, imagePath = null) {
+function buildIncidentPopupLoadingMarkup(message = 'Loading latest incident details...') {
+    return `
+        <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 247, 237, 0.95); border: 1px solid rgba(217, 119, 6, 0.18); color: #9a3412; font-size: 12px; font-weight: 600;">
+            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+            <span>${escapeHtml(message)}</span>
+        </div>
+    `;
+}
+
+function buildResponderPopupContent(marker, incident, imagePath = null, options = {}) {
     const markerPresentation = getResponderPopupPresentation(marker);
     const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status);
     const targetIncidentId = incident?.incident_id ?? marker?.incident_id ?? null;
+    const loadingMarkup = options.isLoadingDetails && isIncidentMarker(marker)
+        ? buildIncidentPopupLoadingMarkup(options.loadingMessage || 'Loading latest incident details...')
+        : '';
     const blockingRoute = isIncidentMarker(marker)
         ? getBlockingIncidentRouteForCurrentTeam(targetIncidentId)
         : null;
@@ -7010,6 +7382,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
                     </div>
                 `).join('')}
             </div>
+            ${loadingMarkup}
             ${actionSection}
             <input type="hidden" value="${escapeHtml(String(marker.marker_id || ''))}" id="mid">
         </div>
@@ -7017,6 +7390,12 @@ function buildResponderPopupContent(marker, incident, imagePath = null) {
 }
 
 function findIncidentForMarker(marker, fallbackIncident = null) {
+    const incidentId = marker?.incident_id ?? fallbackIncident?.incident_id ?? fallbackIncident?.id ?? null;
+    const cachedIncident = getCachedIncidentDetails(incidentId);
+    if (cachedIncident) {
+        return cachedIncident;
+    }
+
     if (fallbackIncident) {
         return fallbackIncident;
     }
@@ -8737,9 +9116,17 @@ function applyTruckHeading(marker, angle) {
 }
 
 function startRoutePolling() {
-    if (routePollingInterval) clearInterval(routePollingInterval);
+    if (routePollingInterval) {
+        return;
+    }
 
     const pollRoutes = async () => {
+        if (!isPageVisible() || routePollingInFlight) {
+            return;
+        }
+
+        routePollingInFlight = true;
+
         try {
             const response = await fetchLiveResponseOnce('route-active-poll', '/api/route/active', {
                 headers: {
@@ -8897,12 +9284,26 @@ function startRoutePolling() {
                 return;
             }
             console.error('Error polling routes:', error);
+        } finally {
+            routePollingInFlight = false;
         }
     };
 
     pollRoutes();
     
     routePollingInterval = setInterval(pollRoutes, getRoutePollIntervalMs());
+}
+
+function startMapLivePolling() {
+    if (!isPageVisible()) {
+        return;
+    }
+
+    startRoutePolling();
+
+    if (!markerStatePollingInterval) {
+        markerStatePollingInterval = setInterval(pollMarkerStateChanges, getMarkerStatePollIntervalMs());
+    }
 }
 
 async function startSimulationFromPosition(routeId, startIndex) {
@@ -9071,10 +9472,20 @@ function addPopupEventListeners(coord) {
                 showToast('Fetching details...', 'info');
                 const imagePath = coord.image?.path ? '/storage/' + coord.image.path : (marker.multimedia?.path ? '/storage/' + marker.multimedia.path : null);
                 const markerData = { ...marker, category: getCategoryName(marker), created_at: coord.created_at || marker.created_at };
+                let resolvedIncident = findIncidentForMarker(marker, coord.incident);
+                const incidentId = resolvedIncident?.incident_id ?? resolvedIncident?.id ?? marker?.incident_id ?? null;
+
+                if (isIncidentMarker(marker) && Number.isFinite(Number(incidentId)) && Number(incidentId) > 0) {
+                    try {
+                        resolvedIncident = await fetchIncidentDetailsById(incidentId) || resolvedIncident;
+                    } catch (incidentDetailsError) {
+                        console.error('Unable to fetch full incident details for details view:', incidentDetailsError);
+                    }
+                }
+
                 if (shouldUseResponderPopupUi()) {
-                    const incident = findIncidentForMarker(marker, coord.incident);
                     if (isIncidentMarker(marker)) {
-                        showResponderIncidentDetails(markerData, incident, imagePath);
+                        showResponderIncidentDetails(markerData, resolvedIncident, imagePath);
                         return;
                     }
 
@@ -9290,7 +9701,11 @@ function deleteMarker(value) {
     .then(data => {
         if (data.success) {
             showNotification(data.message || 'Marker deleted successfully!', 'success');
-            fetchCoordinate();
+            invalidateMarkerReferenceData();
+            Promise.allSettled([
+                fetchStations({ force: true }),
+                fetchCoordinate({ force: true })
+            ]);
             if (currentDetailsMarker && currentDetailsMarker.marker_id == value) closeDetailsPanel();
         } else {
             showNotification(data.message || 'Failed to delete marker', 'error');
@@ -9318,7 +9733,11 @@ async function saveMarker(lat, lng, title, description, categoryId) {
         const descInput = document.getElementById('markerDescription');
         if (titleInput) titleInput.value = '';
         if (descInput) descInput.value = '';
-        await fetchCoordinate();
+        invalidateMarkerReferenceData();
+        await Promise.allSettled([
+            fetchStations({ force: true }),
+            fetchCoordinate({ force: true })
+        ]);
         showNotification('Marker created successfully!', 'success');
         return markerId;
     } catch (err) {
@@ -9461,6 +9880,8 @@ function editShape(shapeData) {
         shapeData.layer.unbindTooltip();
         shapeData.layer.bindTooltip(newName, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
         window.map.closePopup();
+        invalidateShapeData();
+        loadShapes({ force: true });
     })
     .catch(err => {
         console.error('Error updating shape:', err);
@@ -9487,6 +9908,8 @@ function deleteShape(shapeId) {
         }
         window.map.closePopup();
         showNotification('Shape deleted successfully!', 'success');
+        invalidateShapeData();
+        loadShapes({ force: true });
     })
     .catch(err => {
         console.error('Error deleting shape:', err);
@@ -9494,7 +9917,9 @@ function deleteShape(shapeId) {
     });
 }
 
-async function loadShapes() {
+async function loadShapes(options = {}) {
+    const { force = false } = options;
+
     try {
         if (isFirefighterDashboardMapInstance()) {
             if (shapeFeatureGroup) {
@@ -9504,7 +9929,11 @@ async function loadShapes() {
             return;
         }
 
-        if (shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
+        if (!force && lastShapesFetchAt > 0) {
+            return;
+        }
+
+        if (!force && shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
             return;
         }
 
@@ -9535,7 +9964,9 @@ async function loadShapes() {
                 } catch (e) { console.error('Error creating cached layer for shape:', e); }
             });
 
-            if (shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
+            lastShapesFetchAt = Date.now();
+
+            if (!force) {
                 return;
             }
         }
@@ -10448,20 +10879,10 @@ function initAfterMapReady() {
             })
             .then(data => {
                 if (data.shape) {
-                    if (drawnItems.hasLayer(layer)) drawnItems.removeLayer(layer);
-                    const colorIndex = Object.keys(shapeLayers).length % colors.length;
-                    const newLayer = L.geoJSON(geojson, { style: { color: colors[colorIndex], weight: 3, fillOpacity: 0.2, fillColor: colors[colorIndex] }, interactive: true });
-                    newLayer.shapeId = data.shape.id;
-                    newLayer.shapeName = data.shape.name || boundaryMeta.name;
-                    newLayer.shapeBarangayId = data.shape.barangay_id || null;
-                    newLayer.shapeBoundaryType = data.shape.boundary_type || 'custom';
-                    newLayer.shapeSource = data.shape.source || 'manual';
-                    newLayer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(data.shape.id, newLayer, e.latlng); } });
-                    shapeFeatureGroup.addLayer(newLayer);
-                    shapeLayers[data.shape.id] = newLayer;
                     cachedBoundaryBarangaysByCity.delete(boundaryMeta.city_id);
-                    newLayer.bindTooltip(data.shape.name || boundaryMeta.name, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
                     showNotification('Shape saved successfully!', 'success');
+                    invalidateShapeData();
+                    loadShapes({ force: true });
                 }
             })
             .catch(err => {
@@ -10480,7 +10901,11 @@ function initAfterMapReady() {
                         body: JSON.stringify({ geojson: layer.toGeoJSON() })
                     })
                     .then(res => res.json())
-                    .then(data => showNotification('Shape updated successfully!', 'success'))
+                    .then(data => {
+                        showNotification('Shape updated successfully!', 'success');
+                        invalidateShapeData();
+                        loadShapes({ force: true });
+                    })
                     .catch(err => console.error('Error updating shape:', err));
                 }
             });
@@ -10493,11 +10918,9 @@ function initAfterMapReady() {
                     fetch(`/api/shapes/${layer.shapeId}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
                     .then(res => res.json())
                     .then(data => {
-                        if (shapeLayers[layer.shapeId]) {
-                            if (shapeFeatureGroup) shapeFeatureGroup.removeLayer(shapeLayers[layer.shapeId]);
-                            delete shapeLayers[layer.shapeId];
-                        }
                         showNotification('Shape deleted successfully!', 'success');
+                        invalidateShapeData();
+                        loadShapes({ force: true });
                     })
                     .catch(err => console.error('Error deleting shape:', err));
                 }
@@ -10525,10 +10948,7 @@ function initAfterMapReady() {
             loadFireRiskAreas();
         }
     }
-    if (markerStatePollingInterval) {
-        clearInterval(markerStatePollingInterval);
-    }
-    markerStatePollingInterval = setInterval(pollMarkerStateChanges, getMarkerStatePollIntervalMs());
+    startMapLivePolling();
     
     if (canManageMarkers) {
         ensureManagedMapClickHandler();
@@ -10846,7 +11266,11 @@ async function saveMarkerOptimisticallyFromForm(saveButton) {
 
         await saveMarkerDetailsForCategory(markerId, context, jsonHeaders);
         removeOptimisticMapMarker(optimisticMarkerId);
-        await fetchCoordinate({ force: true });
+        invalidateMarkerReferenceData();
+        await Promise.allSettled([
+            fetchStations({ force: true }),
+            fetchCoordinate({ force: true })
+        ]);
         showMarkerFeedback('Marker saved and added to the map.', 'success', 'Marker saved');
     } catch (error) {
         console.error('Error saving marker:', error);
@@ -11108,7 +11532,11 @@ setTimeout(() => {
                     modal.classList.remove('is-open', 'active');
                     modal.setAttribute('aria-hidden', 'true');
                 }
-                await fetchCoordinate();
+                invalidateMarkerReferenceData();
+                await Promise.allSettled([
+                    fetchStations({ force: true }),
+                    fetchCoordinate({ force: true })
+                ]);
             } catch (error) {
                 console.error('Error saving:', error);
                 alert('Error: ' + error.message);

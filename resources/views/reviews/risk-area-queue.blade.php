@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
@@ -8,11 +9,20 @@
     <title>PyroSense · {{ $pageTitle }}</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
 
     <style>
         body {
             background: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        html,
+        body.chief-dashboard-page {
+            min-height: 100%;
+            height: auto;
+            overflow-y: auto;
         }
 
         .review-shell {
@@ -23,6 +33,20 @@
 
         .review-main {
             min-width: 0;
+            overflow: visible;
+        }
+
+        .lector-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 24px 28px 8px;
+            padding: 14px 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
         }
 
         .review-topbar {
@@ -31,6 +55,14 @@
             justify-content: space-between;
             gap: 16px;
             padding: 24px 28px 8px;
+        }
+
+        .review-topbar__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .review-topbar h1 {
@@ -46,18 +78,267 @@
             font-size: 0.95rem;
         }
 
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 42px;
+            padding: 8px 14px;
+            border: 1px solid #fcd9bd;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #334155;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .user-dropdown-toggle:hover {
+            background: #ffedd5;
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 260px;
+            background: #fff;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 18px;
+            box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .user-dropdown-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 12px 18px;
+            background: transparent;
+            border: 0;
+            color: #1e293b;
+            text-decoration: none;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .user-dropdown-item:hover {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
         .review-page {
             padding: 20px 28px 40px;
         }
 
-        .review-alert {
-            margin-bottom: 18px;
+        .review-notice-layer {
+            position: fixed;
+            top: 22px;
+            right: 24px;
+            z-index: 1700;
+            pointer-events: none;
+        }
+
+        .review-notice {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: min(360px, calc(100vw - 32px));
+            max-width: min(420px, calc(100vw - 32px));
             padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid #bbf7d0;
+            background: rgba(240, 253, 244, 0.98);
+            color: #166534;
+            box-shadow: 0 20px 42px rgba(15, 23, 42, 0.14);
+            opacity: 0;
+            transform: translateY(-16px);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+            pointer-events: auto;
+        }
+
+        .review-notice.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .review-notice--error {
+            border-color: #fecaca;
+            background: rgba(254, 242, 242, 0.98);
+            color: #b91c1c;
+        }
+
+        .review-notice__icon {
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #15803d;
+            flex-shrink: 0;
+        }
+
+        .review-notice--error .review-notice__icon {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .review-notice__content {
+            min-width: 0;
+        }
+
+        .review-notice__title {
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .review-notice__message {
+            margin-top: 2px;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .map-picker-card {
+            grid-column: 1 / -1;
+            display: grid;
+            gap: 12px;
+        }
+
+        .map-picker-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 12px 14px;
             border-radius: 16px;
-            border: 1px solid rgba(245, 158, 11, 0.22);
+            border: 1px solid #fed7aa;
             background: #fff7ed;
+        }
+
+        .map-picker-status__label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             color: #9a3412;
+            font-size: 0.88rem;
+            font-weight: 800;
+        }
+
+        .map-picker-status__label.is-ready {
+            color: #166534;
+        }
+
+        .map-picker-status__coords {
+            color: #475569;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .map-picker-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .map-picker-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 40px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 1px solid #fdba74;
+            background: #fff;
+            color: #c2410c;
+            font-size: 0.84rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .map-picker-btn:hover {
+            background: #fff7ed;
+            border-color: #fb923c;
+        }
+
+        .map-picker-btn.is-confirmed {
+            border-color: #86efac;
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .map-picker-help {
+            color: #64748b;
+            font-size: 0.8rem;
             font-weight: 600;
+        }
+
+        .map-picker-canvas {
+            width: 100%;
+            height: 300px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            background: linear-gradient(180deg, #eff6ff 0%, #fff 100%);
+        }
+
+        .leaflet-container {
+            font-family: inherit;
+        }
+
+        .map-picker-hall-pin {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border: 3px solid rgba(255, 255, 255, 0.96);
+            box-shadow: 0 10px 22px rgba(234, 88, 12, 0.28);
+        }
+
+        .map-picker-selected-pin {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 35% 35%, #86efac 0%, #22c55e 45%, #15803d 100%);
+            border: 4px solid rgba(255, 255, 255, 0.98);
+            box-shadow: 0 16px 30px rgba(21, 128, 61, 0.32);
+        }
+
+        .review-notice__close {
+            width: 32px;
+            height: 32px;
+            margin-left: auto;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
         .summary-grid {
@@ -120,6 +401,28 @@
             gap: 8px;
         }
 
+        .filters-group--compact {
+            gap: 0;
+        }
+
+        .filter-control {
+            position: relative;
+        }
+
+        .filter-control__icon {
+            position: absolute;
+            top: 50%;
+            left: 12px;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #f97316;
+            pointer-events: none;
+        }
+
         .filters-group label {
             font-size: 0.76rem;
             font-weight: 700;
@@ -138,6 +441,11 @@
             font-size: 0.95rem;
             color: #0f172a;
             background: #fff;
+        }
+
+        .filter-control > input,
+        .filter-control > select {
+            padding-left: 38px;
         }
 
         .filters-group input:focus,
@@ -351,8 +659,40 @@
             color: #64748b;
         }
 
+        .empty-state__hint {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .empty-state__link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 30px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #c2410c;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .empty-state__link:hover {
+            background: #ffedd5;
+        }
+
         .pagination-wrap {
             margin-top: 20px;
+        }
+
+        #riskReviewResults.is-loading {
+            opacity: 0.56;
+            transition: opacity 0.18s ease;
+            pointer-events: none;
         }
 
         .review-trigger {
@@ -367,6 +707,13 @@
             box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
         }
 
+        .create-entry-trigger {
+            min-height: 30px;
+            padding: 0 10px;
+            font-size: 0.86rem;
+            box-shadow: none;
+        }
+
         .review-modal {
             position: fixed;
             inset: 0;
@@ -376,6 +723,8 @@
             padding: 20px;
             background: rgba(15, 23, 42, 0.56);
             z-index: 5000;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .review-modal.is-open {
@@ -391,6 +740,16 @@
             border: 1px solid #e2e8f0;
             box-shadow: 0 28px 70px rgba(15, 23, 42, 0.24);
             padding: 24px;
+        }
+
+        .review-modal__panel form[data-create-form] {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .review-modal__panel form[data-create-form] .manage-form-grid {
+            flex: 1 1 auto;
         }
 
         .review-modal__head {
@@ -443,6 +802,17 @@
             background: #f8fafc;
         }
 
+        .review-form-errors {
+            margin-bottom: 16px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
         .manage-form-card h4 {
             margin: 0 0 8px;
             font-size: 1rem;
@@ -455,6 +825,13 @@
             color: #64748b;
             font-size: 0.9rem;
             line-height: 1.6;
+        }
+
+        .create-entry-actions {
+            position: sticky;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, #f8fafc 30%);
+            padding-top: 10px;
         }
 
         .manage-field-grid {
@@ -551,22 +928,144 @@
         }
 
         @media (max-width: 768px) {
+            html,
+            body.chief-dashboard-page {
+                height: auto !important;
+                min-height: 100% !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch;
+            }
+
             .review-shell {
                 grid-template-columns: 1fr;
             }
 
+            .review-notice-layer {
+                top: auto;
+                right: 10px;
+                left: 10px;
+                bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+            }
+
+            .review-notice {
+                min-width: 0;
+                max-width: none;
+                width: 100%;
+                padding: 12px 14px;
+                border-radius: 16px;
+                transform: translateY(16px);
+                box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+            }
+
+            .review-notice.show {
+                transform: translateY(0);
+            }
+
+            .review-notice__icon {
+                width: 34px;
+                height: 34px;
+            }
+
+            .review-notice__title {
+                font-size: 11px;
+            }
+
+            .review-notice__message {
+                font-size: 12px;
+            }
+
+            .review-notice__close {
+                width: 28px;
+                height: 28px;
+            }
+
+            .lector-top-bar,
             .review-topbar,
             .review-page {
                 padding-left: 16px;
                 padding-right: 16px;
             }
 
-            .main-content {
-                margin-left: 0 !important;
+            .lector-top-bar {
+                gap: 10px;
+                margin: 16px 16px 8px;
+                padding: 10px 12px;
+                border-radius: 16px;
             }
 
-            .summary-grid,
-            .filters-grid,
+            .main-content,
+            body.chief-dashboard-page .main-content.review-main {
+                margin-left: 0 !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                overflow-y: auto !important;
+                padding: 12px 10px calc(var(--mobile-bottom-nav-h) + 18px) !important;
+            }
+
+            .user-dropdown-toggle {
+                gap: 8px;
+                padding: 6px 10px;
+            }
+
+            .user-dropdown-menu {
+                width: min(240px, calc(100vw - 24px));
+            }
+
+            .review-topbar {
+                align-items: flex-start;
+            }
+
+            .review-topbar__actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .summary-card {
+                padding: 14px 12px;
+                border-radius: 18px;
+            }
+
+            .summary-card__label {
+                gap: 6px;
+                font-size: 0.68rem;
+                letter-spacing: 0.05em;
+            }
+
+            .summary-card__value {
+                margin-top: 10px;
+                font-size: 1.35rem;
+            }
+
+            .filters-card,
+            .queue-card {
+                border-radius: 20px;
+                box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+            }
+
+            .filters-card {
+                padding: 12px;
+                overflow-x: auto;
+                scrollbar-width: none;
+            }
+
+            .filters-card::-webkit-scrollbar {
+                display: none;
+            }
+
+            .filters-grid {
+                display: grid;
+                grid-template-columns: minmax(150px, 1.15fr) repeat(3, minmax(118px, 0.78fr));
+                gap: 8px;
+                align-items: stretch;
+                min-width: 520px;
+            }
+
             .request-grid,
             .review-form__row,
             .manage-form-grid,
@@ -575,11 +1074,93 @@
                 grid-template-columns: 1fr;
             }
 
+            .filters-group {
+                gap: 6px;
+            }
+
+            .filters-group label {
+                display: none;
+            }
+
+            .filters-group--compact {
+                min-width: 0;
+            }
+
+            .filters-group input,
+            .filters-group select,
+            .review-notes {
+                min-height: 38px;
+                padding: 8px 10px;
+                border-radius: 12px;
+                font-size: 0.84rem;
+            }
+
+            .map-picker-canvas {
+                height: 220px;
+                border-radius: 18px;
+            }
+
+            .map-picker-status {
+                padding: 10px 12px;
+                border-radius: 14px;
+            }
+
+            .map-picker-btn {
+                min-height: 36px;
+                padding: 0 12px;
+                font-size: 0.78rem;
+            }
+
+            .filter-control__icon {
+                left: 10px;
+                width: 16px;
+                height: 16px;
+                font-size: 0.78rem;
+            }
+
+            .filter-control > input,
+            .filter-control > select {
+                padding-left: 32px;
+            }
+
             .queue-head,
-            .review-modal__head,
             .request-tile {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+
+            .review-modal__head {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: start;
+                gap: 10px;
+            }
+
+            .queue-card {
+                padding: 14px;
+            }
+
+            .queue-head {
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+
+            .queue-head h2 {
+                font-size: 0.98rem;
+            }
+
+            .queue-head p {
+                font-size: 0.76rem;
+                line-height: 1.4;
+            }
+
+            .queue-count {
+                padding: 6px 9px;
+                font-size: 0.74rem;
+            }
+
+            .request-list {
+                gap: 10px;
             }
 
             .mobile-menu-btn {
@@ -590,70 +1171,392 @@
 
             .request-tile {
                 grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 12px 11px;
+                border-radius: 16px;
+                border-color: #fde7cf;
+                background:
+                    linear-gradient(180deg, rgba(255, 247, 237, 0.52) 0%, #ffffff 32%),
+                    linear-gradient(90deg, #f97316 0 3px, transparent 3px 100%);
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
             }
 
             .request-tile__trailing {
                 width: 100%;
-                justify-content: stretch;
+                justify-content: flex-end;
+            }
+
+            .request-tile__title {
+                font-size: 0.9rem;
+                line-height: 1.3;
+            }
+
+            .request-tile__sub {
+                margin-top: 3px;
+                font-size: 0.74rem;
+                line-height: 1.35;
+            }
+
+            .request-tile__meta {
+                gap: 6px;
+                margin-top: 8px;
+            }
+
+            .chip {
+                min-height: 24px;
+                padding: 0 8px;
+                font-size: 0.62rem;
+                gap: 5px;
+                letter-spacing: 0.01em;
             }
 
             .review-trigger {
+                width: auto;
+                min-width: 92px;
+                min-height: 34px;
+                border-radius: 10px;
+                font-size: 0.76rem;
+                padding: 0 11px;
+                background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+                box-shadow: 0 8px 18px rgba(249, 115, 22, 0.18);
+            }
+
+            .action-btn {
+                min-height: 40px;
+                padding: 0 12px;
+                border-radius: 12px;
+                font-size: 0.82rem;
+            }
+
+            .review-modal {
+                align-items: flex-start;
+                padding: max(10px, env(safe-area-inset-top, 0px)) 10px max(10px, env(safe-area-inset-bottom, 0px));
+                overflow-y: auto;
+            }
+
+            .review-modal__panel {
                 width: 100%;
+                max-height: min(86dvh, calc(100vh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+                margin-top: 0;
+                padding: 0;
+                border-radius: 20px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .review-modal__title {
+                font-size: 1rem;
+            }
+
+            .review-modal__copy {
+                font-size: 0.82rem;
+                line-height: 1.45;
+            }
+
+            .review-modal__close {
+                width: 36px;
+                height: 36px;
+                position: absolute;
+                top: 12px;
+                right: 12px;
+            }
+
+            .review-modal__head {
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                margin-bottom: 0;
+                padding: 14px 52px 12px 14px;
+                background: linear-gradient(180deg, #fff7ed 0%, #fffdf8 100%);
+                border-bottom: 1px solid #fde7cf;
+            }
+
+            .review-modal__panel form[data-create-form],
+            .review-modal__panel form[data-manage-form],
+            .review-modal__panel form[data-final-classification-form] {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                padding: 14px;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .manage-form-card {
+                padding: 14px 12px;
+                border-radius: 16px;
+            }
+
+            .manage-form-card h4 {
+                font-size: 0.92rem;
+                margin-bottom: 6px;
+            }
+
+            .manage-form-card p,
+            .manage-inline-note,
+            .review-history,
+            .request-copy {
+                font-size: 0.8rem;
+                line-height: 1.45;
+            }
+
+            .manage-toggle {
+                gap: 8px;
+            }
+
+            .manage-toggle__btn {
+                min-height: 34px;
+                padding: 0 12px;
+                font-size: 0.78rem;
+            }
+
+            .manage-chip {
+                min-height: 36px;
+                padding: 8px 10px;
+                border-radius: 12px;
+                font-size: 0.76rem;
+                gap: 8px;
+            }
+
+            .manage-chip input {
+                width: 14px;
+                height: 14px;
+            }
+
+            .create-entry-actions {
+                position: sticky;
+                bottom: 0;
+                margin-top: 6px;
+                padding-top: 10px;
+                background: linear-gradient(180deg, rgba(248, 250, 252, 0.08) 0%, #f8fafc 24%);
+            }
+
+            .request-field {
+                padding: 10px;
+                border-radius: 14px;
+            }
+
+            .request-field__label {
+                font-size: 0.62rem;
+                letter-spacing: 0.05em;
+            }
+
+            .request-field__value {
+                margin-top: 6px;
+                font-size: 0.82rem;
+                line-height: 1.4;
+            }
+
+            .photo-strip {
+                gap: 8px;
+            }
+
+            .photo-strip img {
+                width: 72px;
+                height: 72px;
+                border-radius: 12px;
+            }
+
+            .empty-state {
+                padding: 26px 12px;
+            }
+
+            .empty-state p {
+                font-size: 0.84rem;
+                line-height: 1.45;
+            }
+
+            .pagination-wrap {
+                overflow-x: auto;
+                padding-bottom: 2px;
+            }
+
+            .pagination-wrap nav {
+                transform: scale(0.94);
+                transform-origin: left top;
+            }
+
+            .pagination-wrap::-webkit-scrollbar {
+                height: 4px;
+            }
+
+            .pagination-wrap::-webkit-scrollbar-thumb {
+                background: rgba(249, 115, 22, 0.25);
+                border-radius: 999px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                overflow-y: auto;
+            }
+
+            .main-content,
+            body.chief-dashboard-page .main-content.review-main {
+                padding: 12px 10px calc(var(--mobile-bottom-nav-h) + 28px) !important;
+                overflow-y: auto !important;
+            }
+
+            .summary-grid {
+                gap: 8px;
+            }
+
+            .summary-card {
+                padding: 12px 10px;
+            }
+
+            .summary-card__value {
+                font-size: 1.2rem;
+            }
+
+            .filters-card,
+            .queue-card {
+                border-radius: 18px;
+            }
+
+            .queue-card {
+                padding: 12px;
+            }
+
+            .request-tile {
+                padding: 10px 9px;
+                border-radius: 14px;
+            }
+
+            .request-tile__title {
+                font-size: 0.86rem;
+            }
+
+            .request-tile__sub {
+                font-size: 0.72rem;
+            }
+
+            .chip {
+                min-height: 22px;
+                padding: 0 7px;
+                font-size: 0.58rem;
+            }
+
+            .review-trigger {
+                min-width: 84px;
+                min-height: 32px;
+                font-size: 0.72rem;
+            }
+
+            .review-modal__panel {
+                border-radius: 18px;
+                max-height: min(82dvh, calc(100vh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+            }
+
+            .review-modal__panel form[data-create-form],
+            .review-modal__panel form[data-manage-form],
+            .review-modal__panel form[data-final-classification-form] {
+                padding: 12px;
+            }
+
+            .empty-state__hint {
+                font-size: 0.8rem;
+            }
+
+            .empty-state__link {
+                min-height: 28px;
+                padding: 0 8px;
+                font-size: 0.76rem;
             }
         }
     </style>
 </head>
 <body class="chief-dashboard-page">
+    @php
+        $reviewNoticeMessage = session('status') ?? session('error');
+        $reviewNoticeType = session('error') ? 'error' : 'success';
+        $reviewNoticeTitle = session('error') ? 'Action Needed' : 'Saved';
+        $reviewNoticeIcon = session('error') ? 'fa-triangle-exclamation' : 'fa-check';
+    @endphp
+    @if ($reviewNoticeMessage)
+        <div class="review-notice-layer" aria-live="polite" aria-atomic="true">
+            <div id="reviewPageNotice" class="review-notice {{ $reviewNoticeType === 'error' ? 'review-notice--error' : '' }}" role="status">
+                <div class="review-notice__icon">
+                    <i class="fa-solid {{ $reviewNoticeIcon }}"></i>
+                </div>
+                <div class="review-notice__content">
+                    <div class="review-notice__title">{{ $reviewNoticeTitle }}</div>
+                    <div class="review-notice__message">{{ $reviewNoticeMessage }}</div>
+                </div>
+                <button type="button" class="review-notice__close" id="reviewPageNoticeClose" aria-label="Close notification">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    @endif
+
     @include($sidebarPartial, ['active' => $activeNav])
     <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
 
     <main class="main-content review-main">
-        <div class="review-topbar">
-            <div class="flex items-start gap-4">
-                <button id="openSidebar" class="mobile-menu-btn" type="button" aria-label="Open menu">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <div>
-                    <h1>{{ $pageTitle }}</h1>
-                    <p>{{ $pageSubtitle }}</p>
+        @if ($mode === 'chief')
+            <nav class="lector-top-bar">
+                <div class="flex items-center gap-4">
+                    <button id="openSidebar" class="lg:hidden text-slate-600" type="button" aria-label="Open menu">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                    <div class="hidden lg:block">
+                        <h1 class="text-xl font-bold text-slate-800">{{ $pageTitle }}</h1>
+                        <p class="text-xs text-slate-500 font-medium">{{ now()->format('l, F j') }}</p>
+                    </div>
+                </div>
+
+                <div class="user-dropdown">
+                    <button id="userDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-haspopup="true">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
+                            {{ substr(auth()->user()->first_name ?? 'C', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'A', 0, 1) }}
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                    </button>
+
+                    <div id="userDropdownMenu" class="user-dropdown-menu">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p>
+                            <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
+                        </div>
+                        <div class="p-2">
+                            <a href="{{ route('station-admin.profile') }}" class="user-dropdown-item">
+                                <i class="fa-regular fa-user"></i>
+                                <span>Commander Profile</span>
+                            </a>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="user-dropdown-item text-red-600">
+                                    <i class="fa-solid fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        @else
+            <div class="review-topbar">
+                <div class="flex items-start gap-4">
+                    <button id="openSidebar" class="mobile-menu-btn" type="button" aria-label="Open menu">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div>
+                        <h1>{{ $pageTitle }}</h1>
+                        <p>{{ $pageSubtitle }}</p>
+                    </div>
+                </div>
+                <div class="review-topbar__actions">
+                    <div class="chip chip--neutral">
+                        <i class="fa-regular fa-calendar"></i>
+                        <span>{{ now()->format('l, F j, Y') }}</span>
+                    </div>
                 </div>
             </div>
-            <div class="chip chip--neutral">
-                <i class="fa-regular fa-calendar"></i>
-                <span>{{ now()->format('l, F j, Y') }}</span>
-            </div>
-        </div>
+        @endif
 
         <div class="review-page chief-theme-shell">
-            @if (session('status'))
-                <div class="review-alert">{{ session('status') }}</div>
-            @endif
-
-            <section class="chief-theme-hero">
-                <div>
-                    <span class="chief-theme-hero__eyebrow">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        Operations Review Queue
-                    </span>
-                    <h2 class="chief-theme-hero__title">{{ $pageTitle }}</h2>
-                    <p class="chief-theme-hero__copy">{{ $pageSubtitle }} Review barangay-submitted hazard and risk requests before they become part of station operations.</p>
-                </div>
-                <div class="chief-theme-summary-grid">
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Total Requests</div>
-                        <div class="chief-theme-summary-value">{{ $summaryCounts['all'] }}</div>
-                    </article>
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Pending</div>
-                        <div class="chief-theme-summary-value">{{ $summaryCounts['pending'] }}</div>
-                    </article>
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Approved</div>
-                        <div class="chief-theme-summary-value">{{ $summaryCounts['approved'] }}</div>
-                    </article>
-                </div>
-            </section>
-
             <section class="summary-grid">
                 <article class="summary-card">
                     <div class="summary-card__label"><i class="fa-solid fa-inbox"></i> Total Requests</div>
@@ -674,46 +1577,273 @@
             </section>
 
             <section class="filters-card">
-                <form method="GET" action="{{ route($indexRouteName) }}" class="filters-grid">
-                    <div class="filters-group">
+                <form method="GET" action="{{ route($indexRouteName) }}" class="filters-grid" id="reviewFiltersForm">
+                    <div class="filters-group filters-group--compact">
                         <label for="search">Search</label>
-                        <input id="search" type="search" name="search" value="{{ $filters['search'] }}" placeholder="Search title, barangay, station, sitio, or type">
+                        <div class="filter-control">
+                            <span class="filter-control__icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input id="search" type="search" name="search" value="{{ $filters['search'] }}" placeholder="Search" data-auto-submit-search>
+                        </div>
                     </div>
-                    <div class="filters-group">
+                    <div class="filters-group filters-group--compact">
                         <label for="review_status">Review Status</label>
-                        <select id="review_status" name="review_status">
-                            <option value="all" @selected($filters['review_status'] === 'all')>All statuses</option>
-                            <option value="pending" @selected($filters['review_status'] === 'pending')>Pending</option>
-                            <option value="approved" @selected($filters['review_status'] === 'approved')>Approved</option>
-                            <option value="rejected" @selected($filters['review_status'] === 'rejected')>Rejected</option>
-                        </select>
+                        <div class="filter-control">
+                            <span class="filter-control__icon"><i class="fa-regular fa-clock"></i></span>
+                            <select id="review_status" name="review_status" data-auto-submit-filter>
+                                <option value="all" @selected($filters['review_status'] === 'all')>All statuses</option>
+                                <option value="pending" @selected($filters['review_status'] === 'pending')>Pending</option>
+                                <option value="approved" @selected($filters['review_status'] === 'approved')>Approved</option>
+                                <option value="rejected" @selected($filters['review_status'] === 'rejected')>Rejected</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="filters-group">
+                    <div class="filters-group filters-group--compact">
                         <label for="entry_type">Entry Type</label>
-                        <select id="entry_type" name="entry_type">
-                            <option value="all" @selected($filters['entry_type'] === 'all')>All entries</option>
-                            <option value="hazard" @selected($filters['entry_type'] === 'hazard')>Hazard only</option>
-                            <option value="risk" @selected($filters['entry_type'] === 'risk')>Risk only</option>
-                        </select>
+                        <div class="filter-control">
+                            <span class="filter-control__icon"><i class="fa-solid fa-layer-group"></i></span>
+                            <select id="entry_type" name="entry_type" data-auto-submit-filter>
+                                <option value="all" @selected($filters['entry_type'] === 'all')>All entries</option>
+                                <option value="hazard" @selected($filters['entry_type'] === 'hazard')>Hazard only</option>
+                                <option value="risk" @selected($filters['entry_type'] === 'risk')>Risk only</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="filters-group">
-                        <label for="review_type">Request Type</label>
-                        <select id="review_type" name="review_type">
-                            <option value="all" @selected($filters['review_type'] === 'all')>All request types</option>
-                            <option value="create" @selected($filters['review_type'] === 'create')>Create</option>
-                            <option value="update" @selected($filters['review_type'] === 'update')>Update</option>
-                            <option value="delete" @selected($filters['review_type'] === 'delete')>Delete</option>
-                        </select>
+                    <div class="filters-group filters-group--compact">
+                        <label for="review_type">Change</label>
+                        <div class="filter-control">
+                            <span class="filter-control__icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></span>
+                            <select id="review_type" name="review_type" data-auto-submit-filter>
+                                <option value="all" @selected($filters['review_type'] === 'all')>All changes</option>
+                                <option value="create" @selected($filters['review_type'] === 'create')>Create</option>
+                                <option value="update" @selected($filters['review_type'] === 'update')>Update</option>
+                                <option value="delete" @selected($filters['review_type'] === 'delete')>Delete</option>
+                            </select>
+                        </div>
                     </div>
-                    <button type="submit" class="filter-submit">Apply Filters</button>
                 </form>
             </section>
 
+            <div class="review-modal" id="create-risk-area-modal" aria-hidden="true">
+                <div class="review-modal__panel">
+                    <div class="review-modal__head">
+                        <div>
+                            <h3 class="review-modal__title"><i class="fa-solid fa-plus" style="margin-right:10px;"></i>Create New Entry</h3>
+                            <p class="review-modal__copy">Add a live hazard or risk record directly from the review page.</p>
+                        </div>
+                        <button type="button" class="review-modal__close" data-review-close>
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    @php
+                        $createBarangayHallMapPayload = $createBarangayHalls->map(fn ($hall) => [
+                            'id' => (int) $hall->barangay_hall_id,
+                            'name' => $hall->barangay?->barangay_name ?? $hall->hall_name ?? 'Barangay hall',
+                            'city' => $hall->barangay?->city?->city_name,
+                            'lat' => $hall->marker?->lat !== null ? (float) $hall->marker->lat : null,
+                            'lng' => $hall->marker?->lng !== null ? (float) $hall->marker->lng : null,
+                        ])->values();
+                    @endphp
+
+                    <form method="POST" action="{{ route($createRouteName) }}" data-create-form>
+                        @csrf
+                        <input type="hidden" name="review_status" value="{{ $filters['review_status'] }}">
+                        <input type="hidden" name="entry_type_filter" value="{{ $filters['entry_type'] }}">
+                        <input type="hidden" name="review_type" value="{{ $filters['review_type'] }}">
+                        <input type="hidden" name="search" value="{{ $filters['search'] }}">
+                        <input type="hidden" name="page" value="{{ $reviewQueue->currentPage() }}">
+                        <input type="hidden" name="entry_type" value="{{ old('entry_type', 'risk') }}" data-entry-type-input>
+                        <input type="hidden" name="condition_code" value="{{ old('condition_code') }}" data-condition-code-input>
+                        <input id="create_lat" type="hidden" name="lat" value="{{ old('lat') }}" required>
+                        <input id="create_lng" type="hidden" name="lng" value="{{ old('lng') }}" required>
+
+                        @if ($errors->any() && old('title'))
+                            <div class="review-form-errors">
+                                <strong>Unable to save the entry.</strong><br>
+                                @foreach ($errors->all() as $error)
+                                    <div>{{ $error }}</div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <div class="manage-form-grid">
+                            <div class="manage-form-stack">
+                                <section class="manage-form-card">
+                                    <h4>Core details</h4>
+                                    <p>Set the location, type, and main details for this live record.</p>
+                                    <div class="manage-toggle">
+                                        <button type="button" class="manage-toggle__btn {{ old('entry_type', 'risk') === 'hazard' ? 'is-active' : '' }}" data-manage-mode="hazard">Hazard</button>
+                                        <button type="button" class="manage-toggle__btn {{ old('entry_type', 'risk') === 'risk' ? 'is-active' : '' }}" data-manage-mode="risk">Risk</button>
+                                    </div>
+                                    <div class="manage-field-grid">
+                                        <div class="filters-group full">
+                                            <label for="create_title">Title</label>
+                                            <input id="create_title" type="text" name="title" value="{{ old('title') }}" required>
+                                        </div>
+                                        <div class="filters-group full">
+                                            <label for="create_description">Location description</label>
+                                            <textarea id="create_description" name="location_description" class="review-notes" rows="4" placeholder="Landmark or exact spot." required>{{ old('location_description') }}</textarea>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_barangay_hall_id">Barangay</label>
+                                            <select id="create_barangay_hall_id" name="barangay_hall_id" required>
+                                                <option value="">Select barangay</option>
+                                                @foreach ($createBarangayHalls as $hall)
+                                                    <option value="{{ $hall->barangay_hall_id }}" @selected((string) old('barangay_hall_id') === (string) $hall->barangay_hall_id)>
+                                                        {{ $hall->barangay?->barangay_name ?? $hall->hall_name ?? 'Barangay hall' }}
+                                                        @if ($hall->barangay?->city?->city_name)
+                                                            - {{ $hall->barangay->city->city_name }}
+                                                        @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @if ($mode === 'admin')
+                                            <div class="filters-group">
+                                                <label for="create_station_id">Linked station</label>
+                                                <select id="create_station_id" name="station_id">
+                                                    <option value="">No linked station</option>
+                                                    @foreach ($stations as $station)
+                                                        <option value="{{ $station->station_id }}" @selected((string) old('station_id') === (string) $station->station_id)>{{ $station->station_name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @else
+                                            <input type="hidden" name="station_id" value="{{ $currentStationId }}">
+                                        @endif
+                                        <div class="filters-group">
+                                            <label for="create_street_or_sitio">Street / Purok / Sitio</label>
+                                            <input id="create_street_or_sitio" type="text" name="street_or_sitio" value="{{ old('street_or_sitio') }}" placeholder="Optional area name.">
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_status">Record status</label>
+                                            <select id="create_status" name="status" required>
+                                                <option value="pending" @selected(old('status', 'verified') === 'pending')>Pending</option>
+                                                <option value="verified" @selected(old('status', 'verified') === 'verified')>Verified</option>
+                                                <option value="resolved" @selected(old('status', 'verified') === 'resolved')>Resolved</option>
+                                            </select>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_visibility">Visibility</label>
+                                            <select id="create_visibility" name="visibility" required>
+                                                <option value="active" @selected(old('visibility', 'active') === 'active')>Visible / Active</option>
+                                                <option value="inactive" @selected(old('visibility') === 'inactive')>Hidden / Inactive</option>
+                                            </select>
+                                        </div>
+                                        <div class="map-picker-card">
+                                            <label>Select area on map</label>
+                                            <div class="map-picker-status">
+                                                <div id="createMapSelectionState" class="map-picker-status__label">
+                                                    <i class="fa-regular fa-circle"></i>
+                                                    <span>Area not selected yet</span>
+                                                </div>
+                                                <div id="createMapSelectionCoords" class="map-picker-status__coords">Tap the map to choose a spot.</div>
+                                            </div>
+                                            <div class="map-picker-toolbar">
+                                                <button type="button" id="confirmCreateMapSelection" class="map-picker-btn">
+                                                    <i class="fa-solid fa-check"></i>
+                                                    Use This Spot
+                                                </button>
+                                                <span class="map-picker-help">Orange pins show barangays in your allowed city. Tap anywhere on the map, then confirm.</span>
+                                            </div>
+                                            <div
+                                                id="createEntryMapPicker"
+                                                class="map-picker-canvas"
+                                                data-halls='@json($createBarangayHallMapPayload)'
+                                                data-initial-lat="{{ old('lat') }}"
+                                                data-initial-lng="{{ old('lng') }}"
+                                            ></div>
+                                        </div>
+                                        <div class="filters-group full">
+                                            <label for="create_remarks">Notes</label>
+                                            <textarea id="create_remarks" name="remarks" class="review-notes" rows="3" placeholder="Short notes if needed.">{{ old('remarks') }}</textarea>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="manage-form-card" data-mode-section="risk" style="{{ old('entry_type', 'risk') === 'risk' ? '' : 'display:none;' }}">
+                                    <h4>Risk details</h4>
+                                    <p>Choose the risk classification used by the live marker.</p>
+                                    <div class="manage-field-grid">
+                                        <div class="filters-group">
+                                            <label for="create_risk_type">Risk type</label>
+                                            <select id="create_risk_type" name="risk_type" data-risk-type-select>
+                                                <option value="">Select risk type</option>
+                                                @foreach ($riskTypeGroups as $groupLabel => $groupValues)
+                                                    <optgroup label="{{ $groupLabel }}">
+                                                        @foreach ($groupValues as $value)
+                                                            <option value="{{ $value }}" @selected(old('risk_type') === $value)>{{ $riskTypeOptions[$value] ?? $value }}</option>
+                                                        @endforeach
+                                                    </optgroup>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_risk_condition">Risk condition</label>
+                                            <select id="create_risk_condition" data-risk-condition-select data-current-value="{{ old('condition_code') }}">
+                                                <option value="">Select risk condition</option>
+                                            </select>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_assessment_level">Assessment level</label>
+                                            <select id="create_assessment_level" name="assessment_level">
+                                                <option value="">Select level</option>
+                                                @foreach (['low' => 'Low', 'moderate' => 'Moderate', 'high' => 'High'] as $value => $label)
+                                                    <option value="{{ $value }}" @selected(old('assessment_level') === $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_risk_score">Risk score</label>
+                                            <input id="create_risk_score" type="number" step="0.01" min="0" max="100" name="risk_score" value="{{ old('risk_score') }}">
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="manage-form-card" data-mode-section="hazard" style="{{ old('entry_type', 'risk') === 'hazard' ? '' : 'display:none;' }}">
+                                    <h4>Hazard details</h4>
+                                    <p>Choose the hazard classification used by the live marker.</p>
+                                    <div class="manage-field-grid">
+                                        <div class="filters-group">
+                                            <label for="create_hazard_category">Hazard type</label>
+                                            <select id="create_hazard_category" name="hazard_category" data-hazard-type-select>
+                                                <option value="">Select hazard type</option>
+                                                @foreach ($hazardTypeOptions as $value => $label)
+                                                    <option value="{{ $value }}" @selected(old('hazard_category') === $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="filters-group">
+                                            <label for="create_hazard_condition">Hazard condition</label>
+                                            <select id="create_hazard_condition" data-hazard-condition-select data-current-value="{{ old('condition_code') }}">
+                                                <option value="">Select hazard condition</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <aside class="manage-form-stack">
+                                <section class="manage-form-card create-entry-actions">
+                                    <h4>Save behavior</h4>
+                                    <p>This creates a live entry directly on this page, without leaving risk reviews.</p>
+                                    <div class="review-actions">
+                                        <button type="submit" class="action-btn action-btn--approve">
+                                            <i class="fa-solid fa-plus mr-2"></i>Create Entry
+                                        </button>
+                                    </div>
+                                </section>
+                            </aside>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="riskReviewResults">
             <section class="queue-card">
                 <div class="queue-head">
                     <div>
-                        <h2>Review Request List</h2>
-                        <p>Use this queue to inspect barangay-submitted hazard and risk entries before they are finalized in operations.</p>
+                        <h2>{{ $mode === 'chief' ? 'Requests' : 'Review Request List' }}</h2>
+                        <p>{{ $mode === 'chief' ? 'Review incoming hazard and risk requests.' : 'Use this queue to inspect barangay-submitted hazard and risk entries before they are finalized in operations.' }}</p>
                     </div>
                     <div class="queue-count">{{ $reviewQueue->total() }} item{{ $reviewQueue->total() === 1 ? '' : 's' }}</div>
                 </div>
@@ -722,6 +1852,10 @@
                     <div class="empty-state">
                         <i class="fa-regular fa-folder-open text-3xl mb-3"></i>
                         <p>No hazard or risk requests matched the current filters.</p>
+                        <p class="empty-state__hint">
+                            Need one?
+                            <button type="button" class="empty-state__link create-entry-trigger" data-review-open="create-risk-area-modal">Create a new hazard or risk entry.</button>
+                        </p>
                     </div>
                 @else
                     <div class="request-list">
@@ -946,7 +2080,7 @@
                                                     name="review_notes"
                                                     class="review-notes"
                                                     rows="3"
-                                                    placeholder="Add review remarks, validation notes, or next-step instructions."
+                                                    placeholder="Short review note."
                                                 ></textarea>
                                             </div>
 
@@ -974,8 +2108,8 @@
             <section class="queue-card" style="margin-top: 22px;">
                 <div class="queue-head">
                     <div>
-                        <h2>Active Hazards & Risks</h2>
-                        <p>These are already live records. Chief and admin can still adjust visibility, update details, or remove them from the system here.</p>
+                        <h2>{{ $mode === 'chief' ? 'Live Entries' : 'Active Hazards & Risks' }}</h2>
+                        <p>{{ $mode === 'chief' ? 'Manage active hazard and risk records for your station.' : 'These are already live records. Chief and admin can still adjust visibility, update details, or remove them from the system here.' }}</p>
                     </div>
                     <div class="queue-count">{{ $activeEntries->count() }} active</div>
                 </div>
@@ -984,6 +2118,10 @@
                     <div class="empty-state">
                         <i class="fa-solid fa-shield-heart text-3xl mb-3"></i>
                         <p>No active hazard or risk entries matched the current filters.</p>
+                        <p class="empty-state__hint">
+                            Need one?
+                            <button type="button" class="empty-state__link create-entry-trigger" data-review-open="create-risk-area-modal">Create a new hazard or risk entry.</button>
+                        </p>
                     </div>
                 @else
                     <div class="request-list">
@@ -1297,18 +2435,83 @@
                     </div>
                 @endif
             </section>
+            </div>
         </div>
     </main>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const dropdownButton = document.getElementById('userDropdownBtn');
+            const dropdownMenu = document.getElementById('userDropdownMenu');
+            const filtersForm = document.getElementById('reviewFiltersForm');
+            const searchInput = filtersForm?.querySelector('[data-auto-submit-search]');
+            const filterInputs = filtersForm?.querySelectorAll('[data-auto-submit-filter]');
+            const pageNotice = document.getElementById('reviewPageNotice');
+            const pageNoticeClose = document.getElementById('reviewPageNoticeClose');
             const sidebar = document.getElementById('sidebar');
             const sidebarBackdrop = document.getElementById('sidebarBackdrop');
             const openSidebar = document.getElementById('openSidebar');
-            const reviewOpenButtons = document.querySelectorAll('[data-review-open]');
-            const reviewCloseButtons = document.querySelectorAll('[data-review-close]');
+            const createRiskAreaModal = document.getElementById('create-risk-area-modal');
+            const resultsContainer = document.getElementById('riskReviewResults');
             const riskConditionOptions = @json($riskConditionOptions);
             const hazardConditionOptions = @json($hazardConditionOptions);
+            const shouldOpenCreateModal = @json((bool) old('title'));
+            const createForm = document.querySelector('[data-create-form]');
+            const createLatInput = document.getElementById('create_lat');
+            const createLngInput = document.getElementById('create_lng');
+            const createBarangaySelect = document.getElementById('create_barangay_hall_id');
+            const createMapElement = document.getElementById('createEntryMapPicker');
+            const createMapConfirmButton = document.getElementById('confirmCreateMapSelection');
+            const createMapSelectionState = document.getElementById('createMapSelectionState');
+            const createMapSelectionCoords = document.getElementById('createMapSelectionCoords');
+            const createMapHalls = (() => {
+                try {
+                    return JSON.parse(createMapElement?.dataset.halls || '[]');
+                } catch (error) {
+                    return [];
+                }
+            })();
+            let searchSubmitTimeout = null;
+            let createEntryMap = null;
+            let createEntrySelectedMarker = null;
+            let createEntryTentativeLatLng = null;
+            let createEntryConfirmed = false;
+
+            const showNotice = (notice) => {
+                if (!notice) {
+                    return;
+                }
+
+                requestAnimationFrame(() => {
+                    notice.classList.add('show');
+                });
+
+                const dismiss = () => {
+                    notice.classList.remove('show');
+                    window.setTimeout(() => {
+                        notice.parentElement?.remove();
+                    }, 220);
+                };
+
+                pageNoticeClose?.addEventListener('click', dismiss, { once: true });
+                window.setTimeout(dismiss, window.innerWidth <= 768 ? 3200 : 3800);
+            };
+
+            if (dropdownButton && dropdownMenu) {
+                dropdownButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isOpen = dropdownMenu.classList.toggle('show');
+                    dropdownButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (!dropdownButton.contains(event.target) && !dropdownMenu.contains(event.target)) {
+                        dropdownMenu.classList.remove('show');
+                        dropdownButton.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            }
 
             if (sidebar && sidebarBackdrop && openSidebar) {
                 openSidebar.addEventListener('click', () => {
@@ -1331,7 +2534,13 @@
 
                 modal.classList.remove('is-open');
                 modal.setAttribute('aria-hidden', 'true');
-                document.body.style.overflow = '';
+                if (window.innerWidth > 768) {
+                    document.body.style.overflow = '';
+                } else {
+                    document.body.style.overflow = '';
+                    document.body.style.position = '';
+                    document.body.style.width = '';
+                }
             };
 
             const openModal = (modal) => {
@@ -1341,29 +2550,173 @@
 
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
+                if (window.innerWidth > 768) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                    document.body.style.position = '';
+                    document.body.style.width = '';
+                }
+
+                if (modal === createRiskAreaModal && createEntryMap) {
+                    window.setTimeout(() => {
+                        createEntryMap.invalidateSize();
+                    }, 80);
+                }
             };
 
-            reviewOpenButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    const modal = document.getElementById(button.dataset.reviewOpen);
-                    openModal(modal);
-                });
+            const hallIcon = L.divIcon({
+                className: '',
+                html: '<div class="map-picker-hall-pin"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9],
             });
 
-            reviewCloseButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    closeModal(button.closest('.review-modal'));
-                });
+            const selectedIcon = L.divIcon({
+                className: '',
+                html: '<div class="map-picker-selected-pin"></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
             });
 
-            document.querySelectorAll('.review-modal').forEach((modal) => {
-                modal.addEventListener('click', (event) => {
-                    if (event.target === modal) {
-                        closeModal(modal);
-                    }
-                });
-            });
+            const updateCreateSelectionStatus = () => {
+                if (!createMapSelectionState || !createMapSelectionCoords) {
+                    return;
+                }
+
+                const icon = createMapSelectionState.querySelector('i');
+                const text = createMapSelectionState.querySelector('span');
+                const hasSelection = !!createEntryTentativeLatLng;
+
+                createMapSelectionState.classList.toggle('is-ready', hasSelection && createEntryConfirmed);
+
+                if (icon) {
+                    icon.className = hasSelection && createEntryConfirmed
+                        ? 'fa-solid fa-circle-check'
+                        : hasSelection
+                            ? 'fa-solid fa-location-dot'
+                            : 'fa-regular fa-circle';
+                }
+
+                if (text) {
+                    text.textContent = hasSelection
+                        ? (createEntryConfirmed ? 'Area selected' : 'Spot picked, confirm it')
+                        : 'Area not selected yet';
+                }
+
+                if (hasSelection) {
+                    createMapSelectionCoords.textContent = `${Number(createEntryTentativeLatLng.lat).toFixed(6)}, ${Number(createEntryTentativeLatLng.lng).toFixed(6)}`;
+                } else {
+                    createMapSelectionCoords.textContent = 'Tap the map to choose a spot.';
+                }
+
+                if (createMapConfirmButton) {
+                    createMapConfirmButton.classList.toggle('is-confirmed', hasSelection && createEntryConfirmed);
+                    createMapConfirmButton.innerHTML = hasSelection && createEntryConfirmed
+                        ? '<i class="fa-solid fa-check"></i> Spot Confirmed'
+                        : '<i class="fa-solid fa-check"></i> Use This Spot';
+                }
+            };
+
+            const setCreateTentativeSelection = (lat, lng, shouldConfirm = false) => {
+                const parsedLat = Number(lat);
+                const parsedLng = Number(lng);
+
+                if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
+                    return;
+                }
+
+                createEntryTentativeLatLng = { lat: parsedLat, lng: parsedLng };
+                createEntryConfirmed = shouldConfirm;
+
+                if (!createEntrySelectedMarker && createEntryMap) {
+                    createEntrySelectedMarker = L.marker([parsedLat, parsedLng], { icon: selectedIcon }).addTo(createEntryMap);
+                } else if (createEntrySelectedMarker) {
+                    createEntrySelectedMarker.setLatLng([parsedLat, parsedLng]);
+                }
+
+                if (createLatInput) {
+                    createLatInput.value = shouldConfirm ? parsedLat.toFixed(7) : '';
+                }
+
+                if (createLngInput) {
+                    createLngInput.value = shouldConfirm ? parsedLng.toFixed(7) : '';
+                }
+
+                updateCreateSelectionStatus();
+            };
+
+            const centerCreateMapForHall = (hallId) => {
+                if (!createEntryMap) {
+                    return;
+                }
+
+                const selectedHall = createMapHalls.find((hall) => String(hall.id) === String(hallId));
+
+                if (!selectedHall || selectedHall.lat === null || selectedHall.lng === null) {
+                    return;
+                }
+
+                const lat = Number(selectedHall.lat);
+                const lng = Number(selectedHall.lng);
+
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                    return;
+                }
+
+                createEntryMap.setView([lat, lng], 16, { animate: true });
+            };
+
+            const initCreateMap = () => {
+                if (!createMapElement || typeof L === 'undefined') {
+                    return;
+                }
+
+                if (!createEntryMap) {
+                    const firstHallWithCoords = createMapHalls.find((hall) => hall.lat !== null && hall.lng !== null);
+                    const initialLat = Number(createMapElement.dataset.initialLat || firstHallWithCoords?.lat || 16.0432);
+                    const initialLng = Number(createMapElement.dataset.initialLng || firstHallWithCoords?.lng || 120.3331);
+
+                    createEntryMap = L.map(createMapElement, {
+                        zoomControl: true,
+                        attributionControl: true,
+                    }).setView([initialLat, initialLng], firstHallWithCoords ? 15 : 13);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap contributors',
+                    }).addTo(createEntryMap);
+
+                    createEntryHallMarkers = createMapHalls
+                        .filter((hall) => hall.lat !== null && hall.lng !== null)
+                        .map((hall) => {
+                            const marker = L.marker([Number(hall.lat), Number(hall.lng)], { icon: hallIcon }).addTo(createEntryMap);
+                            marker.bindPopup(`<strong>${hall.name}</strong>${hall.city ? `<br>${hall.city}` : ''}`);
+                            marker.on('click', () => {
+                                if (createBarangaySelect) {
+                                    createBarangaySelect.value = String(hall.id);
+                                }
+                                centerCreateMapForHall(hall.id);
+                            });
+
+                            return marker;
+                        });
+
+                    createEntryMap.on('click', (event) => {
+                        setCreateTentativeSelection(event.latlng.lat, event.latlng.lng, false);
+                    });
+                }
+
+                if (createLatInput?.value && createLngInput?.value) {
+                    setCreateTentativeSelection(createLatInput.value, createLngInput.value, true);
+                    createEntryMap.setView([Number(createLatInput.value), Number(createLngInput.value)], 16, { animate: false });
+                } else if (createBarangaySelect?.value) {
+                    centerCreateMapForHall(createBarangaySelect.value);
+                }
+
+                updateCreateSelectionStatus();
+                window.setTimeout(() => createEntryMap?.invalidateSize(), 80);
+            };
 
             document.addEventListener('keydown', (event) => {
                 if (event.key !== 'Escape') {
@@ -1397,92 +2750,264 @@
                 });
             };
 
-            document.querySelectorAll('[data-manage-form], [data-final-classification-form]').forEach((form) => {
-                const entryTypeInput = form.querySelector('[data-entry-type-input]');
-                const conditionCodeInput = form.querySelector('[data-condition-code-input]');
-                const modeButtons = form.querySelectorAll('[data-manage-mode]');
-                const riskTypeSelect = form.querySelector('[data-risk-type-select]');
-                const hazardTypeSelect = form.querySelector('[data-hazard-type-select]');
-                const riskConditionSelect = form.querySelector('[data-risk-condition-select]');
-                const hazardConditionSelect = form.querySelector('[data-hazard-condition-select]');
-                const riskSection = form.querySelector('[data-mode-section="risk"]');
-                const hazardSection = form.querySelector('[data-mode-section="hazard"]');
-
-                const setMode = (mode) => {
-                    if (entryTypeInput) {
-                        entryTypeInput.value = mode;
+            const initializeManagedForms = (root = document) => {
+                root.querySelectorAll('[data-manage-form], [data-final-classification-form], [data-create-form]').forEach((form) => {
+                    if (form.dataset.reviewFormBound === 'true') {
+                        return;
                     }
+
+                    form.dataset.reviewFormBound = 'true';
+
+                    const entryTypeInput = form.querySelector('[data-entry-type-input]');
+                    const conditionCodeInput = form.querySelector('[data-condition-code-input]');
+                    const modeButtons = form.querySelectorAll('[data-manage-mode]');
+                    const riskTypeSelect = form.querySelector('[data-risk-type-select]');
+                    const hazardTypeSelect = form.querySelector('[data-hazard-type-select]');
+                    const riskConditionSelect = form.querySelector('[data-risk-condition-select]');
+                    const hazardConditionSelect = form.querySelector('[data-hazard-condition-select]');
+                    const riskSection = form.querySelector('[data-mode-section="risk"]');
+                    const hazardSection = form.querySelector('[data-mode-section="hazard"]');
+
+                    const setMode = (mode) => {
+                        if (entryTypeInput) {
+                            entryTypeInput.value = mode;
+                        }
+
+                        modeButtons.forEach((button) => {
+                            button.classList.toggle('is-active', button.dataset.manageMode === mode);
+                        });
+
+                        if (riskSection) {
+                            riskSection.style.display = mode === 'risk' ? '' : 'none';
+                        }
+
+                        if (hazardSection) {
+                            hazardSection.style.display = mode === 'hazard' ? '' : 'none';
+                        }
+
+                        if (mode === 'risk') {
+                            const options = riskConditionOptions[riskTypeSelect?.value || ''] || {};
+                            const selected = riskConditionSelect?.dataset.currentValue || conditionCodeInput?.value || '';
+                            populateConditionSelect(riskConditionSelect, options, selected);
+                            if (conditionCodeInput && riskConditionSelect) {
+                                conditionCodeInput.value = riskConditionSelect.value || '';
+                            }
+                        } else {
+                            const options = hazardConditionOptions[hazardTypeSelect?.value || ''] || {};
+                            const selected = hazardConditionSelect?.dataset.currentValue || conditionCodeInput?.value || '';
+                            populateConditionSelect(hazardConditionSelect, options, selected);
+                            if (conditionCodeInput && hazardConditionSelect) {
+                                conditionCodeInput.value = hazardConditionSelect.value || '';
+                            }
+                        }
+                    };
 
                     modeButtons.forEach((button) => {
-                        button.classList.toggle('is-active', button.dataset.manageMode === mode);
+                        button.addEventListener('click', () => {
+                            if (riskConditionSelect) {
+                                riskConditionSelect.dataset.currentValue = '';
+                            }
+                            if (hazardConditionSelect) {
+                                hazardConditionSelect.dataset.currentValue = '';
+                            }
+                            setMode(button.dataset.manageMode || 'risk');
+                        });
                     });
 
-                    if (riskSection) {
-                        riskSection.style.display = mode === 'risk' ? '' : 'none';
-                    }
-
-                    if (hazardSection) {
-                        hazardSection.style.display = mode === 'hazard' ? '' : 'none';
-                    }
-
-                    if (mode === 'risk') {
-                        const options = riskConditionOptions[riskTypeSelect?.value || ''] || {};
-                        const selected = riskConditionSelect?.dataset.currentValue || conditionCodeInput?.value || '';
-                        populateConditionSelect(riskConditionSelect, options, selected);
-                        if (conditionCodeInput && riskConditionSelect) {
+                    riskTypeSelect?.addEventListener('change', () => {
+                        populateConditionSelect(riskConditionSelect, riskConditionOptions[riskTypeSelect.value || ''] || {}, '');
+                        if ((entryTypeInput?.value || 'risk') === 'risk' && conditionCodeInput && riskConditionSelect) {
                             conditionCodeInput.value = riskConditionSelect.value || '';
                         }
-                    } else {
-                        const options = hazardConditionOptions[hazardTypeSelect?.value || ''] || {};
-                        const selected = hazardConditionSelect?.dataset.currentValue || conditionCodeInput?.value || '';
-                        populateConditionSelect(hazardConditionSelect, options, selected);
-                        if (conditionCodeInput && hazardConditionSelect) {
+                    });
+
+                    hazardTypeSelect?.addEventListener('change', () => {
+                        populateConditionSelect(hazardConditionSelect, hazardConditionOptions[hazardTypeSelect.value || ''] || {}, '');
+                        if ((entryTypeInput?.value || 'risk') === 'hazard' && conditionCodeInput && hazardConditionSelect) {
                             conditionCodeInput.value = hazardConditionSelect.value || '';
                         }
+                    });
+
+                    riskConditionSelect?.addEventListener('change', () => {
+                        if ((entryTypeInput?.value || 'risk') === 'risk' && conditionCodeInput) {
+                            conditionCodeInput.value = riskConditionSelect.value || '';
+                        }
+                    });
+
+                    hazardConditionSelect?.addEventListener('change', () => {
+                        if ((entryTypeInput?.value || 'risk') === 'hazard' && conditionCodeInput) {
+                            conditionCodeInput.value = hazardConditionSelect.value || '';
+                        }
+                    });
+
+                    setMode(entryTypeInput?.value || 'risk');
+                });
+            };
+
+            const fetchReviewResults = async (url, options = {}) => {
+                if (!resultsContainer) {
+                    window.location.href = url;
+                    return;
+                }
+
+                resultsContainer.classList.add('is-loading');
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'text/html, application/xhtml+xml',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Request failed with status ${response.status}`);
                     }
+
+                    const html = await response.text();
+                    const parsed = new DOMParser().parseFromString(html, 'text/html');
+                    const incomingResults = parsed.getElementById('riskReviewResults');
+
+                    if (!incomingResults) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    resultsContainer.innerHTML = incomingResults.innerHTML;
+                    initializeManagedForms(resultsContainer);
+
+                    if (options.pushHistory) {
+                        window.history.pushState({ riskReviewDynamic: true }, '', url);
+                    } else {
+                        window.history.replaceState({ riskReviewDynamic: true }, '', url);
+                    }
+                } catch (error) {
+                    window.location.href = url;
+                } finally {
+                    resultsContainer.classList.remove('is-loading');
+                }
+            };
+
+            if (filtersForm) {
+                const submitFilters = () => {
+                    if (searchSubmitTimeout) {
+                        clearTimeout(searchSubmitTimeout);
+                        searchSubmitTimeout = null;
+                    }
+
+                    const actionUrl = new URL(filtersForm.action || window.location.href, window.location.origin);
+                    const formData = new FormData(filtersForm);
+                    actionUrl.search = new URLSearchParams(formData).toString();
+                    fetchReviewResults(actionUrl.toString());
                 };
 
-                modeButtons.forEach((button) => {
-                    button.addEventListener('click', () => {
-                        if (riskConditionSelect) {
-                            riskConditionSelect.dataset.currentValue = '';
-                        }
-                        if (hazardConditionSelect) {
-                            hazardConditionSelect.dataset.currentValue = '';
-                        }
-                        setMode(button.dataset.manageMode || 'risk');
-                    });
+                filtersForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    submitFilters();
                 });
 
-                riskTypeSelect?.addEventListener('change', () => {
-                    populateConditionSelect(riskConditionSelect, riskConditionOptions[riskTypeSelect.value || ''] || {}, '');
-                    if ((entryTypeInput?.value || 'risk') === 'risk' && conditionCodeInput && riskConditionSelect) {
-                        conditionCodeInput.value = riskConditionSelect.value || '';
+                searchInput?.addEventListener('input', () => {
+                    if (searchSubmitTimeout) {
+                        clearTimeout(searchSubmitTimeout);
                     }
+
+                    searchSubmitTimeout = setTimeout(() => {
+                        submitFilters();
+                    }, 350);
                 });
 
-                hazardTypeSelect?.addEventListener('change', () => {
-                    populateConditionSelect(hazardConditionSelect, hazardConditionOptions[hazardTypeSelect.value || ''] || {}, '');
-                    if ((entryTypeInput?.value || 'risk') === 'hazard' && conditionCodeInput && hazardConditionSelect) {
-                        conditionCodeInput.value = hazardConditionSelect.value || '';
+                filterInputs?.forEach((input) => {
+                    input.addEventListener('change', submitFilters);
+                });
+            }
+
+            document.addEventListener('click', (event) => {
+                const openTrigger = event.target.closest('[data-review-open]');
+                if (openTrigger) {
+                    const modal = document.getElementById(openTrigger.dataset.reviewOpen);
+                    if (openTrigger.dataset.reviewOpen === 'create-risk-area-modal') {
+                        initCreateMap();
                     }
-                });
+                    openModal(modal);
+                    return;
+                }
 
-                riskConditionSelect?.addEventListener('change', () => {
-                    if ((entryTypeInput?.value || 'risk') === 'risk' && conditionCodeInput) {
-                        conditionCodeInput.value = riskConditionSelect.value || '';
-                    }
-                });
+                const closeTrigger = event.target.closest('[data-review-close]');
+                if (closeTrigger) {
+                    closeModal(closeTrigger.closest('.review-modal'));
+                    return;
+                }
 
-                hazardConditionSelect?.addEventListener('change', () => {
-                    if ((entryTypeInput?.value || 'risk') === 'hazard' && conditionCodeInput) {
-                        conditionCodeInput.value = hazardConditionSelect.value || '';
-                    }
-                });
+                const modalBackdrop = event.target.classList?.contains('review-modal') ? event.target : null;
+                if (modalBackdrop) {
+                    closeModal(modalBackdrop);
+                    return;
+                }
 
-                setMode(entryTypeInput?.value || 'risk');
+                const paginationLink = event.target.closest('#riskReviewResults .pagination-wrap a');
+                if (paginationLink?.href) {
+                    event.preventDefault();
+                    fetchReviewResults(paginationLink.href, { pushHistory: true });
+                }
             });
+
+            window.addEventListener('popstate', () => {
+                if (!resultsContainer) {
+                    return;
+                }
+
+                fetchReviewResults(window.location.href);
+            });
+
+            createBarangaySelect?.addEventListener('change', () => {
+                if (!createEntryMap) {
+                    return;
+                }
+
+                centerCreateMapForHall(createBarangaySelect.value);
+            });
+
+            createMapConfirmButton?.addEventListener('click', () => {
+                if (!createEntryTentativeLatLng) {
+                    updateCreateSelectionStatus();
+                    return;
+                }
+
+                setCreateTentativeSelection(createEntryTentativeLatLng.lat, createEntryTentativeLatLng.lng, true);
+            });
+
+            createForm?.addEventListener('submit', (event) => {
+                if (!createEntryTentativeLatLng || !createEntryConfirmed || !createLatInput?.value || !createLngInput?.value) {
+                    event.preventDefault();
+                    updateCreateSelectionStatus();
+                    createMapSelectionCoords.textContent = 'Choose a map spot and confirm it first.';
+                    createMapSelectionState?.classList.remove('is-ready');
+                    const selectionIcon = createMapSelectionState?.querySelector('i');
+                    const selectionText = createMapSelectionState?.querySelector('span');
+
+                    if (selectionIcon) {
+                        selectionIcon.className = 'fa-solid fa-circle-exclamation';
+                    }
+
+                    if (selectionText) {
+                        selectionText.textContent = 'Map location required';
+                    }
+                    initCreateMap();
+                    openModal(createRiskAreaModal);
+                }
+            });
+
+            initializeManagedForms(document);
+            showNotice(pageNotice);
+
+            if (shouldOpenCreateModal && createRiskAreaModal) {
+                initCreateMap();
+                openModal(createRiskAreaModal);
+            }
         });
     </script>
+    @if ($mode === 'chief')
+        @include('chief.partials.logout-confirmation')
+    @endif
 </body>
 </html>

@@ -250,6 +250,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
         Route::get('/schedule', [AdminController::class, 'schedule'])->name('schedule');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'adminIndex'])->name('risk-reviews.index');
+        Route::post('/risk-reviews', [RiskAreaReviewController::class, 'adminStore'])->name('risk-reviews.store');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'adminReview'])->name('risk-reviews.review');
         Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminUpdateActive'])->name('risk-reviews.active.update');
         Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminDeleteActive'])->name('risk-reviews.active.delete');
@@ -323,6 +324,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::put('/mitigations/{mitigationActionId}', [StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
         Route::delete('/mitigations/{mitigationActionId}', [StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'chiefIndex'])->name('risk-reviews.index');
+        Route::post('/risk-reviews', [RiskAreaReviewController::class, 'chiefStore'])->name('risk-reviews.store');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'chiefReview'])->name('risk-reviews.review');
         Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'chiefUpdateActive'])->name('risk-reviews.active.update');
         Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'chiefDeleteActive'])->name('risk-reviews.active.delete');
@@ -333,6 +335,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/profile', [StationAdminController::class, 'profile'])->name('profile');
         Route::put('/profile', [StationAdminController::class, 'updateProfile'])->name('profile.update');
         Route::get('/api/dashboard-stats', [StationAdminController::class, 'dashboardStats'])->name('dashboard-stats');
+        Route::get('/api/incidents/map', [StationAdminController::class, 'incidentMapData'])->name('incidents.map');
+        Route::get('/api/incidents/map/changes', [StationAdminController::class, 'incidentMapChanges'])->name('incidents.map.changes');
         Route::get('/api/management/equipment', [App\Http\Controllers\Chief\ManagementController::class, 'getEquipment'])->name('management.equipment');
                 Route::resource('management', App\Http\Controllers\Chief\ManagementController::class);
         Route::get('/management', [App\Http\Controllers\Chief\ManagementController::class,'index']) ->name('management');
@@ -409,6 +413,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/barangays/create', [BarangayController::class, 'create'])->name('barangays.create');
         Route::post('/barangays', [BarangayController::class, 'store'])->name('barangays.store');
         Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
+        Route::put('/barangays/{barangay}', [BarangayController::class, 'update'])->name('barangays.update');
+        Route::delete('/barangays/{barangay}', [BarangayController::class, 'destroy'])->name('barangays.destroy');
         Route::post('/resource-management/assign-equipment', [App\Http\Controllers\Chief\ResourceManagementController::class, 'assignEquipmentToStation'])
             ->name('resource-management.assign-equipment');
         Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])

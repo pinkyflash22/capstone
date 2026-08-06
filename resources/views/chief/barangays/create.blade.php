@@ -29,6 +29,83 @@
             margin: 0 auto;
         }
 
+        .lector-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+            padding: 14px 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+        }
+
+        .user-dropdown {
+            position: relative;
+        }
+
+        .user-dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border: 1px solid #fcd9bd;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #334155;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .user-dropdown-toggle:hover {
+            background: #ffedd5;
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 260px;
+            background: #fff;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 18px;
+            box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            overflow: hidden;
+            z-index: 30;
+        }
+
+        .user-dropdown-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 12px 18px;
+            background: transparent;
+            border: 0;
+            color: #1e293b;
+            text-decoration: none;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .user-dropdown-item:hover {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
         .barangay-form-card {
             background: rgba(255, 255, 255, 0.94);
             border: 1px solid rgba(226, 232, 240, 0.95);
@@ -157,6 +234,10 @@
                 padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(112px + env(safe-area-inset-bottom, 0px));
             }
 
+            .lector-top-bar {
+                padding: 12px 14px;
+            }
+
             .barangay-form-card {
                 border-radius: 24px;
             }
@@ -185,6 +266,48 @@
 
     <main class="main-content">
         <div class="barangay-form-shell">
+            <nav class="lector-top-bar">
+                <div class="flex items-center gap-4">
+                    <button id="openSidebar" class="lg:hidden text-slate-600" type="button">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                    <div class="hidden lg:block">
+                        <h1 class="text-xl font-bold text-slate-800">Add Barangay</h1>
+                        <p class="text-xs text-slate-500 font-medium">Station coverage setup · {{ now()->format('l, F j') }}</p>
+                    </div>
+                </div>
+
+                <div class="user-dropdown">
+                    <button id="userDropdownBtn" class="user-dropdown-toggle" type="button">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
+                            {{ substr(auth()->user()->first_name ?? 'C', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'A', 0, 1) }}
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                    </button>
+
+                    <div id="userDropdownMenu" class="user-dropdown-menu">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p>
+                            <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
+                        </div>
+                        <div class="p-2">
+                            <a href="{{ route('station-admin.profile') }}" class="user-dropdown-item">
+                                <i class="fa-regular fa-user"></i>
+                                <span>Commander Profile</span>
+                            </a>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="user-dropdown-item text-red-600">
+                                    <i class="fa-solid fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
             <section class="barangay-form-card">
                 <header class="barangay-form-head">
                     <div>
@@ -239,5 +362,42 @@
             </section>
         </div>
     </main>
+
+    <script>
+        (() => {
+            const dropdownButton = document.getElementById('userDropdownBtn');
+            const dropdownMenu = document.getElementById('userDropdownMenu');
+            const sidebar = document.getElementById('sidebar');
+            const openSidebar = document.getElementById('openSidebar');
+            const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+            if (dropdownButton && dropdownMenu) {
+                dropdownButton.addEventListener('click', () => {
+                    dropdownMenu.classList.toggle('show');
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (!dropdownButton.contains(event.target) && !dropdownMenu.contains(event.target)) {
+                        dropdownMenu.classList.remove('show');
+                    }
+                });
+            }
+
+            if (openSidebar && sidebar && sidebarBackdrop) {
+                openSidebar.addEventListener('click', () => {
+                    sidebar.classList.add('open');
+                    sidebarBackdrop.classList.remove('hidden');
+                    document.body.classList.add('menu-open');
+                });
+
+                sidebarBackdrop.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    sidebarBackdrop.classList.add('hidden');
+                    document.body.classList.remove('menu-open');
+                });
+            }
+        })();
+    </script>
+    @include('chief.partials.logout-confirmation')
 </body>
 </html>

@@ -58,6 +58,11 @@
             background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
         }
 
+        body.modal-open {
+            overflow: hidden;
+            touch-action: none;
+        }
+
         .main-content {
             margin-left: 280px;
             padding: 20px 24px 28px;
@@ -236,6 +241,8 @@
             display: block;
             width: 100%;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
         }
 
         .station-table th {
@@ -680,6 +687,9 @@
             justify-content: center;
             align-items: center;
             padding: 20px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         .modal.active { display: flex; }
@@ -691,6 +701,8 @@
             max-width: 560px;
             max-height: min(84vh, 820px);
             overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
             border: 1px solid rgba(245, 158, 11, 0.12);
             box-shadow: 0 28px 54px rgba(15, 23, 42, 0.16);
         }
@@ -738,6 +750,9 @@
             background: linear-gradient(135deg, #d14b24 0%, #dd8a11 100%);
             color: white;
             border-radius: 24px 24px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
 
         .modal-header h2 { font-size: 1rem; margin: 0; line-height: 1.3; }
@@ -759,6 +774,11 @@
             display: flex;
             justify-content: flex-end;
             gap: 12px;
+            position: sticky;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(255,248,239,0.9) 0%, #fff 28%);
+            backdrop-filter: blur(8px);
+            z-index: 2;
         }
 
         .form-group { margin-bottom: 20px; }
@@ -1313,9 +1333,95 @@
                 scrollbar-width: thin;
             }
 
+            .table-responsive.mobile-card-table {
+                overflow: visible;
+            }
+
             .station-table {
                 font-size: 0.66rem;
                 min-width: 620px;
+            }
+
+            .mobile-card-table .station-table {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .mobile-card-table .station-table thead {
+                display: none;
+            }
+
+            .mobile-card-table .station-table,
+            .mobile-card-table .station-table tbody,
+            .mobile-card-table .station-table tr,
+            .mobile-card-table .station-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .mobile-card-table .station-table tbody {
+                padding: 8px;
+            }
+
+            .mobile-card-table .station-table tr {
+                margin-bottom: 10px;
+                padding: 10px 12px;
+                border: 1px solid rgba(245, 158, 11, 0.12);
+                border-radius: 14px;
+                background: linear-gradient(135deg, #fffaf4 0%, #ffffff 100%);
+                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+            }
+
+            .mobile-card-table .station-table tr:last-child {
+                margin-bottom: 0;
+            }
+
+            .mobile-card-table .station-table td {
+                min-height: 0;
+                padding: 7px 0;
+                border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+                font-size: 0.72rem;
+                white-space: normal;
+            }
+
+            .mobile-card-table .station-table td:last-child {
+                border-bottom: 0;
+                padding-bottom: 0;
+            }
+
+            .mobile-card-table .station-table td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 4px;
+                font-size: 0.6rem;
+                font-weight: 800;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #64748b;
+            }
+
+            .mobile-card-table .station-table td.actions {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 8px;
+                flex-wrap: wrap;
+                padding-top: 10px;
+            }
+
+            .mobile-card-table .station-table td.actions::before {
+                width: 100%;
+            }
+
+            .mobile-card-table .station-table td .status-select,
+            .mobile-card-table .station-table td .status {
+                max-width: 100%;
+            }
+
+            .mobile-card-table .station-table td small {
+                display: inline-block;
+                margin-top: 2px;
+                line-height: 1.35;
             }
 
             .station-table th,
@@ -1376,7 +1482,7 @@
 
             .modal {
                 align-items: flex-start;
-                padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 112px);
+                padding: max(8px, env(safe-area-inset-top, 0px)) 10px calc(env(safe-area-inset-bottom, 0px) + 104px);
             }
 
             .modal-content,
@@ -1395,8 +1501,8 @@
             #deleteUserModal .modal-content {
                 width: 100%;
                 max-width: 100% !important;
-                max-height: calc(100dvh - 136px);
-                margin-top: 6px;
+                max-height: calc(100dvh - 118px);
+                margin-top: 0;
                 border-radius: 18px;
             }
 
@@ -1422,6 +1528,7 @@
 
             .modal-body {
                 padding: 12px;
+                overscroll-behavior: contain;
             }
 
             .modal-footer {
@@ -1431,6 +1538,12 @@
                 gap: 8px;
                 background: linear-gradient(180deg, rgba(255,248,239,0.9) 0%, #fff 28%);
                 backdrop-filter: blur(8px);
+            }
+
+            #editTeamModal .modal-content,
+            #editEquipmentModal .modal-content {
+                width: 100%;
+                max-width: 100% !important;
             }
 
             .modal-footer .btn-outline,
@@ -1796,7 +1909,7 @@
                     <h3><i class="fa-solid fa-user"></i> Personnel Management</h3>
                     <span class="stat-badge" id="personnelCount">{{ $stationOfficers->count() }} total</span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive mobile-card-table">
                     <table class="station-table">
                         <thead>
                             <tr>
@@ -1827,10 +1940,10 @@
                             @endphp
                             <tr class="personnel-row" data-officer-id="{{ $officer->station_officer_id }}" data-station-id="{{ $officer->station_id }}" data-status="{{ $statusClass }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $officer->user?->user_id ?? 'N/A' }}</td>
-                                <td class="personnel-name"><strong>{{ $officer->user?->first_name ?? '' }} {{ $officer->user?->middle_name ?? '' }} {{ $officer->user?->last_name ?? '' }}</strong></td>
-                                <td>{{ $officer->station?->station_name ?? 'N/A' }}</td>
-                                <td>{{ $officer->rank ?? 'N/A' }}</td>
-                                <td>
+                                <td class="personnel-name" data-label="Officer Name"><strong>{{ $officer->user?->first_name ?? '' }} {{ $officer->user?->middle_name ?? '' }} {{ $officer->user?->last_name ?? '' }}</strong></td>
+                                <td data-label="Station">{{ $officer->station?->station_name ?? 'N/A' }}</td>
+                                <td data-label="Rank">{{ $officer->rank ?? 'N/A' }}</td>
+                                <td data-label="Status">
                                     <select class="status-select" data-officer-id="{{ $officer->station_officer_id }}" style="background: {{ $bgColor }}; color: {{ $textColor }}; border-color: {{ $textColor }}40;">
                                         <option value="available" {{ $officer->status == 'available' ? 'selected' : '' }}>Available</option>
                                         <option value="dispatched" {{ $officer->status == 'dispatched' ? 'selected' : '' }}>Dispatched</option>
@@ -1843,7 +1956,7 @@
                                         <option value="resigned" {{ $officer->status == 'resigned' ? 'selected' : '' }}>Resigned</option>
                                     </select>
                                 </td>
-                                <td class="actions">
+                                <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewOfficer({{ $officer->station_officer_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
                                     <button class="action-btn edit-resource" onclick="editOfficer({{ $officer->station_officer_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                     @if((int) ($officer->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
@@ -1863,7 +1976,7 @@
                     <h3><i class="fa-solid fa-people-group"></i> Team Management</h3>
                     <span class="stat-badge" id="teamsCount">{{ $allTeam->count() }} teams</span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive mobile-card-table">
                     <table class="station-table">
                         <thead>
                             <tr>
@@ -1895,14 +2008,14 @@
                             @endphp
                             <tr class="team-row" data-team-id="{{ $team->team_id }}" data-status="{{ $teamStatusClass }}" data-station-id="{{ $team->station_id ?? '' }}">
                                 <td class="plain-sight-hidden" aria-hidden="true"><strong>{{ $team->team_id ?? 'N/A' }}</strong></td>
-                                <td>{{ $team->teamLeader?->first_name ?? '' }} {{ $team->teamLeader?->last_name ?? '' }}<br><small>({{ $team->teamLeader?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->commander?->first_name ?? '' }} {{ $team->commander?->last_name ?? '' }}<br><small>({{ $team->commander?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->pumpers?->first_name ?? '' }} {{ $team->pumpers?->last_name ?? '' }}<br><small>({{ $team->pumpers?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->officer1?->first_name ?? '' }} {{ $team->officer1?->last_name ?? '' }}<br><small>({{ $team->officer1?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->officer2?->first_name ?? '' }} {{ $team->officer2?->last_name ?? '' }}<br><small>({{ $team->officer2?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->officer3?->first_name ?? '' }} {{ $team->officer3?->last_name ?? '' }}<br><small>({{ $team->officer3?->account_code ?? 'N/A' }})</small></td>
-                                <td>{{ $team->rescueRadio?->first_name ?? '' }} {{ $team->rescueRadio?->last_name ?? '' }}<br><small>({{ $team->rescueRadio?->account_code ?? 'N/A' }})</small></td>
-                                <td>
+                                <td data-label="Team Leader">{{ $team->teamLeader?->first_name ?? '' }} {{ $team->teamLeader?->last_name ?? '' }}<br><small>({{ $team->teamLeader?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Driver">{{ $team->commander?->first_name ?? '' }} {{ $team->commander?->last_name ?? '' }}<br><small>({{ $team->commander?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Pumper">{{ $team->pumpers?->first_name ?? '' }} {{ $team->pumpers?->last_name ?? '' }}<br><small>({{ $team->pumpers?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Officer 1">{{ $team->officer1?->first_name ?? '' }} {{ $team->officer1?->last_name ?? '' }}<br><small>({{ $team->officer1?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Officer 2">{{ $team->officer2?->first_name ?? '' }} {{ $team->officer2?->last_name ?? '' }}<br><small>({{ $team->officer2?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Officer 3">{{ $team->officer3?->first_name ?? '' }} {{ $team->officer3?->last_name ?? '' }}<br><small>({{ $team->officer3?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Rescue/Radio">{{ $team->rescueRadio?->first_name ?? '' }} {{ $team->rescueRadio?->last_name ?? '' }}<br><small>({{ $team->rescueRadio?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Status">
                                     <select class="status-select" data-team-id="{{ $team->team_id }}" style="background: {{ $teamBgColor }}; color: {{ $teamTextColor }}; border-color: {{ $teamTextColor }}40;">
                                         <option value="available" {{ $team->status == 'available' ? 'selected' : '' }}>Available</option>
                                         {{-- <option value="dispatched" {{ $team->status == 'dispatched' ? 'selected' : '' }}>Dispatched</option> --}}
@@ -1912,7 +2025,7 @@
                                         {{-- <option value="training" {{ $team->status == 'training' ? 'selected' : '' }}>Training</option> --}}
                                     </select>
                                 </td>
-                                <td class="actions">
+                                <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewTeam({{ $team->team_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
                                     <button class="action-btn edit-resource" onclick="openEditTeamModal({{ $team->team_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                 </td>
@@ -1957,7 +2070,7 @@
                         <span class="stat-badge" id="usersCount">{{ $systemUsers->count() }} total</span>
                     </div>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive mobile-card-table">
                     <table class="station-table" id="usersTable">
                         <thead>
                             <tr>
@@ -1976,11 +2089,11 @@
                             @foreach ($systemUsers as $user)
                             <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
-                                <td><strong>{{ $user->account_code ?? 'N/A' }}</strong></td>
-                                <td>{{ $user->first_name ?? '' }} {{ $user->middle_name ?? '' }} {{ $user->last_name ?? '' }}</td>
-                                <td>{{ $user->email ?? 'N/A' }}</td>
-                                <td>{{ $user->contact_number ?? 'N/A' }}</td>
-                                <td>
+                                <td data-label="Account Code"><strong>{{ $user->account_code ?? 'N/A' }}</strong></td>
+                                <td data-label="Full Name">{{ $user->first_name ?? '' }} {{ $user->middle_name ?? '' }} {{ $user->last_name ?? '' }}</td>
+                                <td data-label="Email">{{ $user->email ?? 'N/A' }}</td>
+                                <td data-label="Contact Number">{{ $user->contact_number ?? 'N/A' }}</td>
+                                <td data-label="Role">
                                     <span class="status" style="background: {{ 
                                         ($user->role->role ?? '') == 'admin' ? '#dc2626' : 
                                         (($user->role->role ?? '') == 'firefighter' ? '#3b82f6' : 
@@ -1992,13 +2105,13 @@
                                         {{ ucfirst($user->role->role ?? 'Unknown') }}
                                     </span>
                                 </td>
-                                <td>
+                                <td data-label="Status">
                                     <span class="status {{ $user->email_verified_at ? 'active' : 'inactive' }}" style="background: {{ $user->email_verified_at ? '#10b981' : '#ef4444' }}; color: white;">
                                         {{ $user->email_verified_at ? 'Verified' : 'Pending' }}
                                     </span>
                                 </td>
-                                <td><small>{{ \Carbon\Carbon::parse($user->updated_at ?? $user->created_at)->format('Y-m-d H:i') }}</small></td>
-                                <td class="actions">
+                                <td data-label="Date Modified"><small>{{ \Carbon\Carbon::parse($user->updated_at ?? $user->created_at)->format('Y-m-d H:i') }}</small></td>
+                                <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewUser({{ $user->user_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
                                     <button class="action-btn edit-resource" onclick="openEditUserModal({{ $user->user_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                     @if((int) ($user->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
@@ -2018,7 +2131,7 @@
                     <h3><i class="fa-solid fa-kit-medical"></i> Equipment Items</h3>
                     <span class="stat-badge" id="equipmentCount">{{ $equipments->count() }} items</span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive mobile-card-table">
                     <table class="station-table">
                         <thead>
                             <tr>
@@ -2062,12 +2175,12 @@
                             @foreach ($stationEquipment as $items)
                                 @foreach ($items as $item)
                                 <tr class="equipment-row" data-equipment-id="{{ $item['equipment_id'] }}" data-station-id="{{ $item['station_id'] }}" data-category="{{ $item['category'] }}" data-type="{{ $item['type'] }}">
-                                    <td><strong>{{ $item['name'] }}</strong></td>
-                                    <td>{{ $item['category'] }}</td>
+                                    <td data-label="Equipment Name"><strong>{{ $item['name'] }}</strong></td>
+                                    <td data-label="Category">{{ $item['category'] }}</td>
                                     {{-- <td class="equipment-station">{{ $item['station_name'] }}</td> --}}
                                     {{-- <td><span class="status-badge" style="background: #10b98120; color: #065f46; padding: 4px 10px; border-radius: 20px; font-weight: 600;">{{ $item['quantity'] }}</span></td> --}}
                                     {{-- <td><span class="status operational">Available</span></td> --}}
-                                    <td>
+                                    <td class="actions" data-label="Actions">
                                         <button class="action-btn edit-resource" onclick="editEquipment({{ $item['equipment_id'] }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                         <button class="action-btn delete-resource" onclick="deleteEquipment({{ $item['equipment_id'] }})" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                     </td>
@@ -3253,6 +3366,24 @@ if (officerForm) {
                 modal.style.display = 'none';
                 modal.classList.remove('active');
             }
+
+            syncModalBodyState();
+        }
+
+        function openModalElement(modal) {
+            if (!modal) return;
+
+            modal.style.display = 'flex';
+            modal.classList.add('active');
+            syncModalBodyState();
+        }
+
+        function syncModalBodyState() {
+            const hasActiveModal = Array.from(document.querySelectorAll('.modal')).some((modal) =>
+                modal.classList.contains('active') && modal.style.display !== 'none'
+            );
+
+            document.body.classList.toggle('modal-open', hasActiveModal);
         }
 
         // User Filtering and Sorting Functions
@@ -5170,14 +5301,38 @@ function validateTeamMembers(formData) {
                         e.preventDefault();
                         const modalId = link.dataset.modal;
                         const modal = document.getElementById(modalId);
-                        if (modal) { 
-                            modal.style.display = 'flex'; 
-                            modal.classList.add('active'); 
-                        }
+                        openModalElement(modal);
                         dropdown.classList.remove('show');
                     });
                 });
             }
+
+            document.querySelectorAll('.modal').forEach((modal) => {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) {
+                        closeModal(modal.id);
+                    }
+                });
+
+                const observer = new MutationObserver(() => syncModalBodyState());
+                observer.observe(modal, {
+                    attributes: true,
+                    attributeFilter: ['class', 'style'],
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+
+                const activeModal = Array.from(document.querySelectorAll('.modal.active'))
+                    .find((modal) => modal.style.display !== 'none');
+
+                if (activeModal) {
+                    closeModal(activeModal.id);
+                }
+            });
+
+            syncModalBodyState();
 
             // Export button
             document.getElementById('exportBtn')?.addEventListener('click', () => showToast('Export feature - implement CSV export', 'info'));

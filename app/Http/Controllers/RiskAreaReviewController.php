@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\RiskArea;
 use App\Models\RiskAreaPhoto;
+use App\Models\Marker;
+use App\Models\BarangayHall;
 use App\Models\StationOfficer;
 use App\Support\BarangayNotificationService;
 use App\Support\MediaPath;
@@ -29,7 +31,21 @@ class RiskAreaReviewController extends Controller
             ->where('user_id', Auth::id())
             ->value('station_id');
 
-        return $this->renderQueue($request, 'chief', $stationId);
+        return $this->renderQueue($request, 'chief', $stationId, $this->getChiefCityId());
+    }
+
+    public function adminStore(Request $request): RedirectResponse
+    {
+        return $this->handleCreateLiveEntry($request, 'admin.risk-reviews.index');
+    }
+
+    public function chiefStore(Request $request): RedirectResponse
+    {
+        $stationId = StationOfficer::query()
+            ->where('user_id', Auth::id())
+            ->value('station_id');
+
+        return $this->handleCreateLiveEntry($request, 'station-admin.risk-reviews.index', $stationId, $this->getChiefCityId());
     }
 
     public function adminReview(Request $request, int $riskAreaId): RedirectResponse
@@ -86,7 +102,7 @@ class RiskAreaReviewController extends Controller
         return $this->handleActiveDelete($request, $riskArea, 'station-admin.risk-reviews.index');
     }
 
-    protected function renderQueue(Request $request, string $mode, ?int $stationId = null): View
+    protected function renderQueue(Request $request, string $mode, ?int $stationId = null, ?int $chiefCityId = null): View
     {
         $statusFilter = strtolower((string) $request->string('review_status', 'pending'));
         $typeFilter = strtolower((string) $request->string('entry_type', 'all'));
@@ -184,8 +200,25 @@ class RiskAreaReviewController extends Controller
             ->latest('created_at')
             ->get();
 
+        $createBarangayHalls = BarangayHall::query()
+            ->with(['barangay.city', 'marker'])
+            ->when($mode === 'chief', function ($query) use ($chiefCityId) {
+                if (! $chiefCityId) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->whereHas('barangay', function ($barangayQuery) use ($chiefCityId) {
+                    $barangayQuery->where('city_id', $chiefCityId);
+                });
+            })
+            ->orderByRaw("COALESCE(hall_name, '') asc")
+            ->get();
+
         return view('reviews.risk-area-queue', [
             'mode' => $mode,
+            'currentStationId' => $stationId,
             'activeNav' => 'risk-reviews',
             'reviewQueue' => $reviewQueue,
             'activeEntries' => $activeEntries,
@@ -203,10 +236,10 @@ class RiskAreaReviewController extends Controller
             ],
             'pageTitle' => $mode === 'admin'
                 ? 'Hazard & Risk Review Queue'
-                : 'Station Hazard & Risk Review Queue',
+                : 'Risk Reviews',
             'pageSubtitle' => $mode === 'admin'
                 ? 'Review barangay-submitted hazard and risk requests across the system.'
-                : 'Review hazard and risk requests assigned to your station before they move forward.',
+                : 'Review requests assigned to your station.',
             'indexRouteName' => $mode === 'admin'
                 ? 'admin.risk-reviews.index'
                 : 'station-admin.risk-reviews.index',
@@ -219,6 +252,10 @@ class RiskAreaReviewController extends Controller
             'activeDeleteRouteName' => $mode === 'admin'
                 ? 'admin.risk-reviews.active.delete'
                 : 'station-admin.risk-reviews.active.delete',
+            'createRouteName' => $mode === 'admin'
+                ? 'admin.risk-reviews.store'
+                : 'station-admin.risk-reviews.store',
+            'createBarangayHalls' => $createBarangayHalls,
             'stations' => \App\Models\Station::query()->orderBy('station_name')->get(),
             'riskTypeOptions' => $this->riskTypeOptions(),
             'riskTypeGroups' => $this->riskTypeGroups(),
@@ -315,6 +352,99 @@ class RiskAreaReviewController extends Controller
         return redirect()
             ->route($redirectRoute, $request->only(['review_status', 'entry_type', 'review_type', 'search', 'page']))
             ->with('status', $message);
+    }
+
+    protected function handleCreateLiveEntry(Request $request, string $redirectRoute, ?int $forcedStationId = null, ?int $chiefCityId = null): RedirectResponse
+    {
+        $validated = $request->validate($this->createRiskAreaValidationRules($forcedStationId !== null));
+        $this->assertRiskAreaSelectionValidity($validated);
+
+        $barangayHall = BarangayHall::query()
+            ->with('barangay')
+            ->findOrFail((int) $validated['barangay_hall_id']);
+
+        if ($forcedStationId !== null) {
+            $belongsToChiefCity = $chiefCityId !== null
+                && (int) ($barangayHall->barangay?->city_id ?? 0) === (int) $chiefCityId;
+
+            if (! $belongsToChiefCity) {
+                throw ValidationException::withMessages([
+                    'barangay_hall_id' => 'Select a barangay from your assigned city.',
+                ]);
+            }
+        }
+
+        $structuredNotes = $this->buildRiskAreaStructuredNotes($validated);
+        $riskFactor = $this->deriveRiskFactor($validated['entry_type'], $validated['risk_type'] ?? null, $validated['hazard_category'] ?? null);
+        $conditionLabel = $this->resolveConditionLabel($validated['entry_type'], $validated['risk_type'] ?? null, $validated['hazard_category'] ?? null, $validated['condition_code']);
+        $legacyHazardType = $this->deriveLegacyHazardType($validated['entry_type'], $validated['hazard_category'] ?? null);
+        $legacyMode = $this->deriveLegacyMode($validated['entry_type'], $validated['condition_code'], $validated['hazard_category'] ?? null);
+        $markerCategory = $this->deriveMarkerCategory($validated['entry_type']);
+        $stationId = $forcedStationId ?? ($validated['station_id'] ?? null);
+
+        DB::transaction(function () use ($validated, $barangayHall, $structuredNotes, $riskFactor, $conditionLabel, $legacyHazardType, $legacyMode, $markerCategory, $stationId) {
+            $marker = Marker::create([
+                'title' => $validated['title'],
+                'description' => trim($validated['location_description'] . ($structuredNotes !== '' ? "\n\n" . $structuredNotes : '')),
+                'lat' => $validated['lat'],
+                'lng' => $validated['lng'],
+                'status' => $validated['visibility'],
+                'category' => $markerCategory,
+            ]);
+
+            RiskArea::create([
+                'marker_id' => $marker->marker_id,
+                'barangay_hall_id' => $barangayHall->barangay_hall_id,
+                'station_id' => $stationId,
+                'entry_type' => $validated['entry_type'],
+                'hazard_category' => $validated['hazard_category'] ?? null,
+                'risk_type' => $validated['risk_type'] ?? null,
+                'street_or_sitio' => $validated['street_or_sitio'] ?? null,
+                'risk_factor' => $riskFactor,
+                'mode' => $legacyMode,
+                'condition_code' => $validated['condition_code'],
+                'condition_label' => $conditionLabel,
+                'hazard_type' => $legacyHazardType,
+                'population_density_level' => $validated['population_density_level'] ?? null,
+                'building_density_level' => $validated['building_density_level'] ?? null,
+                'road_accessibility' => $validated['road_accessibility'] ?? null,
+                'distance_to_hydrant' => $validated['distance_to_hydrant'] ?? null,
+                'distance_to_water_source' => $validated['distance_to_water_source'] ?? null,
+                'nearby_establishments' => $validated['nearby_establishments'] ?? null,
+                'estimated_affected_households' => $validated['estimated_affected_households'] ?? null,
+                'risk_score' => $validated['risk_score'] ?? null,
+                'assessment_level' => $validated['assessment_level'] ?? null,
+                'assessment_description' => $validated['assessment_description'] ?? null,
+                'remarks' => $validated['remarks'] ?? null,
+                'near_hydrant' => (bool) ($validated['near_hydrant'] ?? false),
+                'near_water_source' => (bool) ($validated['near_water_source'] ?? false),
+                'blocked_hydrant' => (bool) ($validated['blocked_hydrant'] ?? false),
+                'informal_settlement' => (bool) ($validated['informal_settlement'] ?? false),
+                'cooking_fire_prone_activity' => (bool) ($validated['cooking_fire_prone_activity'] ?? false),
+                'combustible_materials_present' => (bool) ($validated['combustible_materials_present'] ?? false),
+                'poor_waste_disposal' => (bool) ($validated['poor_waste_disposal'] ?? false),
+                'previous_fire_prone_location' => (bool) ($validated['previous_fire_prone_location'] ?? false),
+                'status' => $validated['status'],
+                'review_status' => 'approved',
+                'review_type' => 'create',
+                'review_notes' => 'Live record created by ' . strtolower((string) (Auth::user()?->role->role ?? 'reviewer')) . '.',
+                'reviewed_at' => now(),
+                'reviewed_by' => Auth::id(),
+                'reported_by' => Auth::id(),
+            ]);
+        });
+
+        Cache::forget('map:markers:index:v2');
+
+        return redirect()
+            ->route($redirectRoute, [
+                'review_status' => $request->input('review_status'),
+                'entry_type' => $request->input('entry_type_filter'),
+                'review_type' => $request->input('review_type'),
+                'search' => $request->input('search'),
+                'page' => $request->input('page'),
+            ])
+            ->with('status', 'A new live hazard or risk entry has been created.');
     }
 
     protected function handleActiveUpdate(Request $request, RiskArea $riskArea, string $redirectRoute): RedirectResponse
@@ -435,6 +565,33 @@ class RiskAreaReviewController extends Controller
             'photos' => ['nullable', 'array', 'max:5'],
             'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
+    }
+
+    protected function getChiefCityId(): ?int
+    {
+        $user = Auth::user();
+        $user?->loadMissing('address.barangay.city');
+
+        $cityId = $user?->address?->barangay?->city?->city_id;
+
+        return $cityId ? (int) $cityId : null;
+    }
+
+    protected function createRiskAreaValidationRules(bool $stationLocked = false): array
+    {
+        $rules = $this->activeRiskAreaValidationRules();
+
+        unset($rules['photos'], $rules['photos.*']);
+
+        $rules['barangay_hall_id'] = ['required', 'exists:barangay_halls,barangay_hall_id'];
+        $rules['lat'] = ['required', 'numeric', 'between:-90,90'];
+        $rules['lng'] = ['required', 'numeric', 'between:-180,180'];
+
+        if ($stationLocked) {
+            $rules['station_id'] = ['nullable'];
+        }
+
+        return $rules;
     }
 
     protected function riskTypeOptions(): array

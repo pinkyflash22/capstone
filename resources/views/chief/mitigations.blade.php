@@ -66,30 +66,34 @@
         .tag { display:inline-flex; align-items:center; min-height:30px; padding:0 12px; border-radius:999px; font-size:.76rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
         .tag.critical { background:#fef2f2; color:#b91c1c; } .tag.high { background:#fff7ed; color:#c2410c; } .tag.medium { background:#eff6ff; color:#1d4ed8; } .tag.low { background:#ecfdf5; color:#047857; }
         .tag.planned { background:#fff7ed; color:#c2410c; } .tag.in_progress { background:#eff6ff; color:#1d4ed8; } .tag.blocked { background:#fef2f2; color:#b91c1c; } .tag.completed { background:#ecfdf5; color:#047857; } .tag.cancelled { background:#f1f5f9; color:#475569; }
-        .row-actions { display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:112px; }
-        .row-btn { width:100%; justify-content:center; min-height:34px; padding:0 14px; font-size:.76rem; white-space:nowrap; }
+        .row-actions { display:flex; align-items:center; justify-content:flex-start; gap:8px; min-width:0; }
+        .row-btn { width:40px; justify-content:center; min-height:40px; padding:0; font-size:.86rem; white-space:nowrap; border:1px solid transparent; }
         .row-btn.edit { background:#eff6ff; color:#1d4ed8; }
         .row-btn.delete { background:#fef2f2; color:#b91c1c; }
+        .row-btn i { pointer-events:none; }
         .attachments { display:flex; flex-direction:column; gap:8px; }
         .attachments a { display:block; color:#c2410c; font-weight:700; text-decoration:none; overflow-wrap:anywhere; }
         .source-cell,
         .proof-cell { min-width: 0; }
         .empty { padding:26px 24px; border-radius:22px; border:1px dashed rgba(203,213,225,.96); color:#64748b; text-align:center; background:#f8fafc; }
-        .form-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+        .form-grid { display:grid; grid-template-columns:1fr; gap:12px; }
         .mitigation-field { display:flex; flex-direction:column; gap:8px; }
         .mitigation-field--full { grid-column:1 / -1; }
-        .mitigation-field label { color:#334155; font-size:.82rem; font-weight:800; }
-        .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; border:1px solid rgba(203,213,225,.96); border-radius:16px; padding:12px 14px; font-size:.88rem; color:#0f172a; background:#fff; }
-        .mitigation-field textarea { min-height:120px; resize:vertical; }
+        .mitigation-field label { color:#334155; font-size:.78rem; font-weight:800; }
+        .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; min-height:44px; border:1px solid rgba(203,213,225,.96); border-radius:14px; padding:10px 12px; font-size:.84rem; color:#0f172a; background:#fff; }
+        .mitigation-field textarea { min-height:96px; resize:vertical; }
         .modal { position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(15,23,42,.52); backdrop-filter: blur(8px); }
         .modal.is-open { display:flex; }
-        .modal-card { width:min(980px, calc(100vw - 28px)); max-height:calc(100vh - 40px); overflow-y:auto; padding:24px; border-radius:30px; border:1px solid rgba(226,232,240,.94); background:rgba(255,255,255,.98); box-shadow:0 28px 60px rgba(15,23,42,.18); }
-        .modal-head { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:20px; }
-        .modal-head h3 { margin:0; color:#0f172a; font-size:1.2rem; font-weight:900; }
-        .modal-head p { margin:6px 0 0; color:#64748b; font-size:.9rem; line-height:1.55; max-width:68ch; }
+        .modal-card { width:min(560px, calc(100vw - 40px)); max-height:min(78vh, 720px); overflow-y:auto; padding:18px; border-radius:24px; border:1px solid rgba(226,232,240,.94); background:rgba(255,255,255,.98); box-shadow:0 28px 60px rgba(15,23,42,.18); }
+        .modal-head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(226,232,240,.92); }
+        .modal-head h3 { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
+        .modal-head p { margin:4px 0 0; color:#64748b; font-size:.82rem; line-height:1.5; max-width:42ch; }
         .modal-close { width:42px; height:42px; border:1px solid rgba(226,232,240,.94); border-radius:14px; background:#fff; color:#334155; }
         .form-actions { display:flex; justify-content:end; gap:12px; margin-top:20px; }
         .cancel-btn { min-height:44px; padding:0 18px; border:1px solid rgba(203,213,225,.96); background:#fff; color:#475569; }
+        .modal form { margin: 0; }
+        .modal .mitigation-field textarea { min-height: 88px; }
+        .modal .mitigation-field input[type="file"] { min-height: 0; padding: 10px 0; border: 0; background: transparent; }
         .user-dropdown { position:relative; }
         .user-dropdown-toggle { display:flex; align-items:center; gap:12px; padding:8px 16px; border-radius:999px; background:#fffbeb; border:1px solid #fef3c7; cursor:pointer; }
         .user-dropdown-menu { position:absolute; top:calc(100% + 12px); right:0; width:260px; background:white; border-radius:18px; box-shadow:0 24px 56px rgba(15,23,42,.14); border:1px solid rgba(226,232,240,.95); opacity:0; visibility:hidden; transform:translateY(10px); transition:all .2s ease; overflow:hidden; }
@@ -170,9 +174,11 @@
             .modal-card {
                 width: 100%;
                 max-width: 100%;
-                max-height: min(84dvh, 760px);
+                max-height: min(80dvh, 680px);
                 border-radius: 24px 24px 18px 18px;
+                padding: 14px;
             }
+            .modal-head { margin-bottom: 12px; padding-bottom: 10px; }
             .modal-card::before {
                 content: "";
                 display: block;
@@ -180,7 +186,7 @@
                 height: 5px;
                 border-radius: 999px;
                 background: #cbd5e1;
-                margin: 14px auto 0;
+                margin: 4px auto 10px;
             }
         }
     </style>
@@ -228,27 +234,27 @@
                     <div>
                         <span class="chief-theme-hero__eyebrow">
                             <i class="fa-solid fa-shield-halved"></i>
-                            Command Mitigation Workflow
+                            Mitigation Control
                         </span>
-                        <h2 class="mitigation-banner__title chief-theme-hero__title">Coordinate station-led mitigation work across covered barangays.</h2>
-                        <p class="mitigation-banner__copy chief-theme-hero__copy">Use this module to assign, track, and close mitigation actions connected to checklist findings, reported hazards, and mapped risk records. Barangays can monitor progress, but station command owns the operational decisions and completion workflow.</p>
+                        <h2 class="mitigation-banner__title chief-theme-hero__title">Track station mitigation work.</h2>
+                        <p class="mitigation-banner__copy chief-theme-hero__copy">Create, update, and close actions for covered barangays.</p>
                     </div>
                     <div class="mitigation-banner__meta chief-theme-summary-grid">
                         <div class="mitigation-banner__meta-card">
-                            <div class="mitigation-banner__meta-label">Coverage Area</div>
-                            <div class="mitigation-banner__meta-value">{{ $managedBarangays->count() }} barangay coverage area(s)</div>
+                            <div class="mitigation-banner__meta-label">Coverage</div>
+                            <div class="mitigation-banner__meta-value">{{ $managedBarangays->count() }} barangays</div>
                         </div>
                         <div class="mitigation-banner__meta-card">
-                            <div class="mitigation-banner__meta-label">Command Status</div>
-                            <div class="mitigation-banner__meta-value">Mitigation workflow active</div>
+                            <div class="mitigation-banner__meta-label">Status</div>
+                            <div class="mitigation-banner__meta-value">Active</div>
                         </div>
                         <div class="mitigation-banner__meta-card">
-                            <div class="mitigation-banner__meta-label">Open Actions</div>
-                            <div class="mitigation-banner__meta-value">{{ $openMitigations->count() }} active mitigation item(s)</div>
+                            <div class="mitigation-banner__meta-label">Open</div>
+                            <div class="mitigation-banner__meta-value">{{ $openMitigations->count() }} actions</div>
                         </div>
                         <div class="mitigation-banner__meta-card">
-                            <div class="mitigation-banner__meta-label">Priority Watch</div>
-                            <div class="mitigation-banner__meta-value">{{ $criticalMitigations->count() }} critical / high item(s)</div>
+                            <div class="mitigation-banner__meta-label">Priority</div>
+                            <div class="mitigation-banner__meta-value">{{ $criticalMitigations->count() }} high / critical</div>
                         </div>
                     </div>
                 </section>
@@ -258,8 +264,8 @@
                         <section class="panel" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
                             <div class="panel-head">
                                 <div>
-                                    <h3>Draft Ready From AI Action Plan</h3>
-                                    <p>The create form has been prefilled from <strong>{{ $mitigationDraft['source_title'] ?? ($mitigationDraft['title'] ?? 'the selected checklist') }}</strong>. This keeps the workflow aligned as Prediction -> Recommendation -> Checklist -> Mitigation Action Plan.</p>
+                                    <h3>Draft Ready</h3>
+                                    <p>Prefilled from <strong>{{ $mitigationDraft['source_title'] ?? ($mitigationDraft['title'] ?? 'the selected checklist') }}</strong>.</p>
                                 </div>
                                 <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-wand-magic-sparkles"></i><span>Open Draft</span></button>
                             </div>
@@ -267,35 +273,35 @@
                     @endif
 
                     <section class="summary-grid">
-                        <article class="card"><div class="card-label">Total Actions</div><div class="card-value">{{ $mitigationActions->count() }}</div><div class="card-copy">All mitigation records currently managed by station command.</div></article>
-                        <article class="card"><div class="card-label">Open Actions</div><div class="card-value">{{ $openMitigations->count() }}</div><div class="card-copy">Planned, in-progress, and blocked actions needing command follow-through.</div></article>
-                        <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $completedMitigations->count() }}</div><div class="card-copy">Mitigation actions already marked completed by station command.</div></article>
-                        <article class="card"><div class="card-label">Critical / High</div><div class="card-value">{{ $criticalMitigations->count() }}</div><div class="card-copy">Priority actions that should remain visible during operations planning.</div></article>
+                        <article class="card"><div class="card-label">Total</div><div class="card-value">{{ $mitigationActions->count() }}</div><div class="card-copy">All actions.</div></article>
+                        <article class="card"><div class="card-label">Open</div><div class="card-value">{{ $openMitigations->count() }}</div><div class="card-copy">Needs follow-up.</div></article>
+                        <article class="card"><div class="card-label">Done</div><div class="card-value">{{ $completedMitigations->count() }}</div><div class="card-copy">Completed.</div></article>
+                        <article class="card"><div class="card-label">Priority</div><div class="card-value">{{ $criticalMitigations->count() }}</div><div class="card-copy">High / critical.</div></article>
                     </section>
 
                     <section class="panel">
                         <div class="panel-head">
                             <div>
-                                <h3>Mitigation Action Register</h3>
-                                <p>Only station command can create, update, and close mitigation actions. Each action can be tied to a barangay checklist item, hazard, or risk record.</p>
+                                <h3>Action Register</h3>
+                                <p>Station-managed mitigation actions.</p>
                             </div>
-                            <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation Action</span></button>
+                            <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Action</span></button>
                         </div>
 
                         @if($mitigationActions->isEmpty())
-                            <div class="empty">No mitigation actions have been created yet for your station coverage area.</div>
+                            <div class="empty">No actions yet.</div>
                         @else
                             <div class="table-wrap">
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Mitigation Action</th>
+                                            <th>Action</th>
                                             <th>Barangay</th>
                                             <th>Category</th>
                                             <th>Priority</th>
                                             <th>Status</th>
                                             <th>Target</th>
-                                            <th>Linked Source</th>
+                                            <th>Source</th>
                                             <th>Proof</th>
                                             <th>Actions</th>
                                         </tr>
@@ -322,7 +328,7 @@
                                                 <td>
                                                     <div class="title">{{ $action->title }}</div>
                                                     <div class="note note--clamp">{{ $action->description }}</div>
-                                                    <div class="note">Created by: {{ $action->creator?->full_name ?? 'Station command' }}</div>
+                                                    <div class="note">{{ $action->creator?->full_name ?? 'Station command' }}</div>
                                                 </td>
                                                 <td>{{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</td>
                                                 <td>{{ $mitigationCategoryOptions[$action->category] ?? ucfirst(str_replace('_', ' ', $action->category)) }}</td>
@@ -332,7 +338,7 @@
                                                 <td class="source-cell">
                                                     <div class="chip-row">
                                                         @if($action->riskArea)
-                                                            <span class="chip"><i class="fa-solid fa-location-dot"></i> {{ $action->riskArea->marker?->title ?? 'Risk / hazard' }}</span>
+                                                            <span class="chip"><i class="fa-solid fa-location-dot"></i> {{ $action->riskArea->marker?->title ?? 'Risk' }}</span>
                                                         @endif
                                                         @if($action->checklist)
                                                             <span class="chip"><i class="fa-solid fa-list-check"></i> {{ $action->checklist->title }}</span>
@@ -341,13 +347,13 @@
                                                             <span class="chip"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ $action->aiActionPlanChecklist->plan_title }}</span>
                                                         @endif
                                                         @if(! $action->riskArea && ! $action->checklist && ! $action->aiActionPlanChecklist)
-                                                            <span class="chip">Direct station action</span>
+                                                            <span class="chip"><i class="fa-solid fa-shield-halved"></i> Direct</span>
                                                         @endif
                                                     </div>
                                                 </td>
                                                 <td class="proof-cell">
                                                     @if($action->attachments->isEmpty())
-                                                        <span class="note">No proof files</span>
+                                                        <span class="note">No files</span>
                                                     @else
                                                         <div class="attachments">
                                                             @foreach($action->attachments as $attachment)
@@ -358,8 +364,8 @@
                                                 </td>
                                                 <td>
                                                     <div class="row-actions">
-                                                        <button type="button" class="row-btn edit" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i> Edit</button>
-                                                        <button type="button" class="row-btn delete" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i> Delete</button>
+                                                        <button type="button" class="row-btn edit" title="Edit action" aria-label="Edit action" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i></button>
+                                                        <button type="button" class="row-btn delete" title="Delete action" aria-label="Delete action" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -378,7 +384,7 @@
     <div class="modal" id="createModal" aria-hidden="true">
         <div class="modal-card">
             <div class="modal-head">
-                <div><h3>Add Mitigation Action</h3><p>Create a command-owned mitigation action for a covered barangay and optionally link it to an existing checklist or hazard record.</p></div>
+                <div><h3>Add Action</h3><p>Create a station action.</p></div>
                 <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
@@ -386,7 +392,7 @@
                 <div class="form-grid">@include('chief.partials.mitigation-form-fields')</div>
                 <div class="form-actions">
                     <button type="button" class="cancel-btn" data-close-modal>Cancel</button>
-                    <button type="submit" class="submit-btn">Save Mitigation Action</button>
+                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Save</span></button>
                 </div>
             </form>
         </div>
@@ -395,7 +401,7 @@
     <div class="modal" id="editModal" aria-hidden="true">
         <div class="modal-card">
             <div class="modal-head">
-                <div><h3>Update Mitigation Action</h3><p>Adjust status, priority, ownership target, and proof attachments from the station command side.</p></div>
+                <div><h3>Edit Action</h3><p>Update this action.</p></div>
                 <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" id="editForm" action="{{ route('station-admin.mitigations.update', ['mitigationActionId' => 0]) }}" enctype="multipart/form-data">
@@ -404,7 +410,7 @@
                 <div class="form-grid">@include('chief.partials.mitigation-form-fields')</div>
                 <div class="form-actions">
                     <button type="button" class="cancel-btn" data-close-modal>Cancel</button>
-                    <button type="submit" class="submit-btn">Update Mitigation Action</button>
+                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Update</span></button>
                 </div>
             </form>
         </div>
@@ -413,7 +419,7 @@
     <div class="modal" id="deleteModal" aria-hidden="true">
         <div class="modal-card" style="width:min(520px, calc(100vw - 28px));">
             <div class="modal-head">
-                <div><h3>Delete Mitigation Action</h3><p id="deleteMessage">This action and its uploaded proof files will be removed.</p></div>
+                <div><h3>Delete Action</h3><p id="deleteMessage">This action and its proof files will be removed.</p></div>
                 <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" id="deleteForm" action="{{ route('station-admin.mitigations.destroy', ['mitigationActionId' => 0]) }}">
@@ -421,7 +427,7 @@
                 @method('DELETE')
                 <div class="form-actions" style="margin-top:0;">
                     <button type="button" class="cancel-btn" data-close-modal>Cancel</button>
-                    <button type="submit" class="row-btn delete" style="min-height:42px; padding:0 18px;">Delete</button>
+                    <button type="submit" class="hero-btn" style="background:#dc2626; box-shadow:none;"><i class="fa-solid fa-trash"></i><span>Delete</span></button>
                 </div>
             </form>
         </div>
@@ -496,7 +502,15 @@
             };
 
             const closeModal = (modal) => { if (!modal) return; modal.classList.remove('is-open'); modal.setAttribute('aria-hidden', 'true'); };
-            const openModal = (modal) => { if (!modal) return; modal.classList.add('is-open'); modal.setAttribute('aria-hidden', 'false'); };
+            const openModal = (modal) => {
+                if (!modal) return;
+                const modalCard = modal.querySelector('.modal-card');
+                if (modalCard) {
+                    modalCard.scrollTop = 0;
+                }
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+            };
 
             wireBarangayScopedSelectors(createModal?.querySelector('form'));
             wireBarangayScopedSelectors(editForm);
