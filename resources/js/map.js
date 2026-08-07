@@ -519,6 +519,21 @@ function mergeIncidentIntoClientState(incident) {
     return normalizedIncident;
 }
 
+window.mergeIncidentIntoClientState = mergeIncidentIntoClientState;
+
+async function refreshIncidentMapImmediately(options = {}) {
+    try {
+        await Promise.allSettled([
+            getLatestIncidentsData({ force: true, useLiveRequest: true }),
+            window.refreshMapMarkers ? window.refreshMapMarkers({ force: true, ...options }) : Promise.resolve()
+        ]);
+    } catch (error) {
+        console.warn('Immediate incident map refresh failed:', error);
+    }
+}
+
+window.refreshIncidentMapImmediately = refreshIncidentMapImmediately;
+
 function getCachedIncidentDetails(incidentId) {
     if (incidentId === null || incidentId === undefined) {
         return null;
@@ -6134,6 +6149,15 @@ async function fetchCoordinate(options = {}) {
     }
 }
 
+window.refreshMapMarkers = function(options = {}) {
+    return fetchCoordinate({
+        preferSeeded: false,
+        revalidate: true,
+        force: true,
+        ...options
+    });
+};
+
 function getIncidentVisibilityState(marker, incidents, incidentLookup = null) {
     if (!marker || !isIncidentMarker(marker)) {
         return { visible: true, incident: null };
@@ -8244,6 +8268,7 @@ async function updateIncidentStatusFromRoute(routeId, statusId) {
     truck.lastSentIncidentStatus = statusId;
     truck.incidentStatusId = statusId;
     syncIncidentStatusCaches(incidentId, statusId);
+    await refreshIncidentMapImmediately();
     if (typeof window.refreshFirefighterAssignedIncidents === 'function') {
         await window.refreshFirefighterAssignedIncidents();
     }
@@ -9556,6 +9581,44 @@ function removeMapPlacementMarker(options = {}) {
         selectedLng = null;
     }
 }
+
+window.focusMapOnExternalLocation = function(lat, lng, options = {}) {
+    if (!window.map || typeof L === 'undefined') {
+        return false;
+    }
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return false;
+    }
+
+    const zoom = Number.isFinite(Number(options.zoom)) ? Number(options.zoom) : Math.max(window.map.getZoom?.() || 15, 16);
+    const popupLabel = options.label || 'Selected location';
+    const popupDescription = options.description || '';
+
+    try {
+        window.map.setView([latitude, longitude], zoom, { animate: true });
+
+        const content = `
+            <div style="min-width: 170px;">
+                <div style="font-weight: 800; color: #0f172a;">${escapeHtml(String(popupLabel))}</div>
+                ${popupDescription ? `<div style="margin-top: 4px; font-size: 12px; color: #475569;">${escapeHtml(String(popupDescription))}</div>` : ''}
+                <div style="margin-top: 6px; font-size: 11px; color: #64748b;">${latitude.toFixed(6)}, ${longitude.toFixed(6)}</div>
+            </div>
+        `;
+
+        L.popup()
+            .setLatLng([latitude, longitude])
+            .setContent(content)
+            .openOn(window.map);
+
+        return true;
+    } catch (error) {
+        console.warn('Unable to focus map on external location:', error);
+        return false;
+    }
+};
 
 function shouldAllowDashboardMarkerPlacementClick() {
     const path = window.location?.pathname || '';

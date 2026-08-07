@@ -175,6 +175,84 @@
         .priority-high { background: #f59e0b; color: white; }
         .priority-medium { background: #10b981; color: white; }
         .priority-low { background: #94a3b8; color: white; }
+        .recommendation-run-list { display: grid; gap: 12px; }
+        .recommendation-run-group {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .recommendation-run-toggle {
+            width: 100%;
+            border: none;
+            background: linear-gradient(180deg, #fff, #fffaf5);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            text-align: left;
+            cursor: pointer;
+        }
+        .recommendation-run-toggle:hover { background: linear-gradient(180deg, #fffaf5, #fff7ed); }
+        .recommendation-run-meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .recommendation-run-title {
+            color: #0f172a;
+            font-size: 14px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .recommendation-run-subtitle {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .recommendation-run-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .recommendation-run-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .recommendation-run-arrow {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            background: #fff7ed;
+            color: #c2410c;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 160ms ease;
+        }
+        .recommendation-run-group.is-open .recommendation-run-arrow { transform: rotate(180deg); }
+        .recommendation-run-content {
+            display: none;
+            padding: 0 16px 16px;
+            border-top: 1px solid #f1f5f9;
+            background: #fff;
+        }
+        .recommendation-run-group.is-open .recommendation-run-content { display: block; }
+        .recommendation-run-summary {
+            padding: 12px 0;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.55;
+        }
         
         /* Explore Button */
         .explore-btn {
@@ -268,11 +346,11 @@
 
         #exploreModal,
         #predictionDetailModal {
-            padding: 24px;
+            padding: 18px;
         }
         .analytics-forecast-modal {
-            width: min(92vw, 780px);
-            max-height: min(78vh, 720px);
+            width: min(88vw, 680px);
+            max-height: min(74vh, 640px);
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -280,33 +358,125 @@
             box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
         }
         .analytics-forecast-modal--details {
-            width: min(92vw, 860px);
+            width: min(82vw, 620px);
+            max-height: min(70vh, 580px);
+        }
+        .analytics-forecast-modal--details .modal-body {
+            padding: 0.88rem 0.92rem;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="padding:18px"],
+        .analytics-forecast-modal--details .modal-body [style*="padding:16px"],
+        .analytics-forecast-modal--details .modal-body [style*="padding:14px"] {
+            padding: 10px !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="font-size:28px"] {
+            font-size: 1.16rem !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="font-size:24px"],
+        .analytics-forecast-modal--details .modal-body [style*="font-size:22px"] {
+            font-size: 1rem !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="font-size:16px"],
+        .analytics-forecast-modal--details .modal-body [style*="font-size:15px"],
+        .analytics-forecast-modal--details .modal-body [style*="font-size:14px"] {
+            font-size: 0.8rem !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="min-width:220px"] {
+            min-width: 0 !important;
         }
         .analytics-forecast-modal .modal-header {
             flex: 0 0 auto;
-            padding: 1rem 1.25rem;
+            padding: 0.9rem 1rem;
         }
         .analytics-forecast-modal .modal-header h3 {
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             line-height: 1.25;
         }
         .analytics-forecast-modal .modal-body {
             flex: 1 1 auto;
             min-height: 0;
             overflow-y: auto;
-            padding: 1.15rem 1.25rem;
+            padding: 0.95rem 1rem;
         }
         .analytics-forecast-modal .modal-footer {
             flex: 0 0 auto;
-            padding: 0.9rem 1.25rem;
+            padding: 0.78rem 1rem;
             background: rgba(255, 255, 255, 0.96);
         }
         .analytics-forecast-modal .modal-close {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             background: #fff7ed;
             border: 1px solid #fed7aa;
             color: #9a3412;
+        }
+        .analytics-forecast-modal .steps-container {
+            display: grid;
+            gap: 10px;
+        }
+        .analytics-forecast-modal .step-item {
+            display: grid;
+            grid-template-columns: 30px minmax(0, 1fr);
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+        }
+        .analytics-forecast-modal .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff7ed;
+            color: #c2410c;
+            font-size: 12px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .analytics-forecast-modal .step-content p {
+            margin: 0;
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: #334155;
+        }
+        .analytics-forecast-modal .resource-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin: 0 8px 8px 0;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            font-size: 12px;
+            color: #334155;
+        }
+        .analytics-forecast-modal .resources-title,
+        .analytics-forecast-modal .timeline-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+        }
+        .analytics-forecast-modal .timeline-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+        }
+        .analytics-forecast-modal .timeline-text {
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: #334155;
         }
 
         @media (max-width: 640px) {
@@ -314,89 +484,97 @@
             #predictionDetailModal.modal.show {
                 align-items: flex-end;
                 justify-content: center;
-                padding: 0 10px max(10px, env(safe-area-inset-bottom));
+                padding: 0 12px max(8px, env(safe-area-inset-bottom));
             }
             .analytics-forecast-modal,
             .analytics-forecast-modal--details {
-                width: 100%;
+                width: min(100%, 380px);
                 max-width: none;
-                max-height: min(84svh, 680px);
-                border-radius: 24px 24px 18px 18px;
+                max-height: min(72svh, 540px);
+                border-radius: 20px 20px 14px 14px;
                 animation: analyticsSheetIn 0.24s ease;
+            }
+            .analytics-forecast-modal--details {
+                width: min(100%, 360px);
+                max-height: min(68svh, 500px);
             }
             .analytics-forecast-modal::before {
                 content: "";
-                width: 54px;
-                height: 5px;
+                width: 44px;
+                height: 4px;
                 border-radius: 999px;
                 background: #cbd5e1;
                 align-self: center;
-                margin: 10px 0 2px;
+                margin: 8px 0 1px;
                 flex: 0 0 auto;
             }
             .analytics-forecast-modal .modal-header {
-                padding: 0.75rem 1rem 0.85rem;
+                padding: 0.65rem 0.82rem 0.72rem;
             }
             .analytics-forecast-modal .modal-header h3 {
-                font-size: 0.98rem;
+                font-size: 0.84rem;
                 max-width: calc(100% - 54px);
             }
             .analytics-forecast-modal .modal-close {
-                width: 44px;
-                height: 44px;
-                font-size: 1rem;
+                width: 34px;
+                height: 34px;
+                font-size: 0.85rem;
             }
             .analytics-forecast-modal .modal-body {
-                padding: 0.9rem 1rem;
+                padding: 0.72rem 0.82rem;
             }
             .analytics-forecast-modal .modal-footer {
-                padding: 0.75rem 1rem 0.95rem;
+                padding: 0.62rem 0.82rem 0.8rem;
                 display: grid;
                 grid-template-columns: 1fr;
-                gap: 8px;
+                gap: 7px;
             }
             .analytics-forecast-modal .modal-footer button {
                 width: 100%;
-                min-height: 42px;
+                min-height: 38px;
+                font-size: 12px;
             }
             .analytics-forecast-modal .modal-body > div {
-                gap: 12px !important;
+                gap: 10px !important;
             }
             .analytics-forecast-modal .modal-body [style*="grid-template-columns"] {
                 grid-template-columns: 1fr !important;
-                gap: 10px !important;
+                gap: 8px !important;
             }
             .analytics-forecast-modal .modal-body [style*="padding:18px"],
             .analytics-forecast-modal .modal-body [style*="padding:16px"],
             .analytics-forecast-modal .modal-body [style*="padding:14px"] {
-                padding: 12px !important;
+                padding: 10px !important;
             }
             .analytics-forecast-modal .modal-body [style*="font-size:28px"] {
-                font-size: 1.35rem !important;
+                font-size: 1.12rem !important;
             }
             .analytics-forecast-modal .modal-body [style*="font-size:22px"],
             .analytics-forecast-modal .modal-body [style*="font-size:24px"] {
-                font-size: 1.1rem !important;
+                font-size: 0.98rem !important;
             }
             .analytics-forecast-modal .modal-body [style*="font-size:15px"],
             .analytics-forecast-modal .modal-body [style*="font-size:14px"] {
-                font-size: 0.82rem !important;
+                font-size: 0.76rem !important;
             }
             .analytics-forecast-modal .modal-body [style*="font-size:13px"] {
-                font-size: 0.78rem !important;
+                font-size: 0.72rem !important;
             }
             .step-item {
-                gap: 10px;
-                padding: 12px;
-                margin-bottom: 8px;
+                gap: 8px;
+                padding: 9px;
+                margin-bottom: 7px;
             }
             .step-number {
-                width: 28px;
-                height: 28px;
-                font-size: 12px;
+                width: 22px;
+                height: 22px;
+                font-size: 10px;
             }
             .resource-tag {
                 width: 100%;
+                margin: 0 0 7px 0;
+                font-size: 11px;
+                padding: 7px 9px;
                 margin-right: 0;
                 padding: 8px 10px;
                 font-size: 12px;
@@ -619,6 +797,15 @@
             background: rgba(255,255,255,0.96);
             box-shadow: 0 14px 32px rgba(15,23,42,0.05);
         }
+        .analytics-focus-card {
+            width: min(100%, 1060px);
+            margin-inline: auto;
+        }
+        .prediction-summary-section {
+            max-width: 1060px;
+            margin-inline: auto;
+            box-shadow: 0 10px 24px rgba(15,23,42,0.04);
+        }
         .analytics-section {
             padding: 24px 26px;
         }
@@ -644,6 +831,7 @@
             font-size: 0.92rem;
             line-height: 1.65;
             max-width: 70ch;
+            display: none;
         }
 
         .analytics-control-grid {
@@ -745,11 +933,11 @@
         }
         .prediction-card {
             grid-column: span 3;
-            padding: 18px;
-            border-radius: 22px;
+            padding: 15px 16px;
+            border-radius: 18px;
             border: 1px solid rgba(226,232,240,0.9);
             background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
-            box-shadow: 0 10px 24px rgba(15,23,42,0.04);
+            box-shadow: 0 8px 18px rgba(15,23,42,0.035);
         }
         .prediction-card--wide { grid-column: span 6; }
         .prediction-card__head {
@@ -759,15 +947,15 @@
             gap: 12px;
         }
         .prediction-card__icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 14px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #fff;
-            font-size: 15px;
-            box-shadow: 0 10px 20px rgba(15,23,42,0.08);
+            font-size: 14px;
+            box-shadow: 0 8px 16px rgba(15,23,42,0.07);
         }
         .prediction-card__label {
             color: #64748b;
@@ -777,29 +965,29 @@
             text-transform: uppercase;
         }
         .prediction-card__value {
-            margin-top: 12px;
+            margin-top: 10px;
             color: #0f172a;
-            font-size: clamp(1.5rem, 2vw, 2.2rem);
+            font-size: clamp(1.32rem, 1.75vw, 1.9rem);
             line-height: 1.05;
             font-weight: 900;
             letter-spacing: -0.04em;
         }
         .prediction-card__copy {
-            margin-top: 8px;
+            margin-top: 7px;
             color: #64748b;
-            font-size: 13px;
-            line-height: 1.6;
+            font-size: 12px;
+            line-height: 1.55;
         }
         .prediction-card__trend {
-            margin-top: 10px;
+            margin-top: 9px;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 7px 10px;
+            padding: 6px 10px;
             border-radius: 999px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
             color: #334155;
         }
@@ -863,6 +1051,17 @@
             display: grid;
             grid-template-columns: 1.1fr 0.9fr;
             gap: 22px;
+        }
+        .analytics-priority-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
+            gap: 20px;
+            align-items: start;
+        }
+        .analytics-priority-grid,
+        .analytics-panel-grid {
+            width: min(100%, 1180px);
+            margin-inline: auto;
         }
         .analytics-chart-wrap {
             position: relative;
@@ -975,7 +1174,7 @@
         }
 
         .analytics-info-button {
-            display: none;
+            display: inline-flex;
             width: 38px;
             height: 38px;
             border: 1px solid rgba(251, 146, 60, 0.22);
@@ -986,6 +1185,16 @@
             justify-content: center;
             font-size: 14px;
             cursor: pointer;
+            transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+
+        .analytics-info-button:hover,
+        .analytics-info-button:focus-visible {
+            background: #ffffff;
+            border-color: rgba(194, 65, 12, 0.28);
+            color: #9a3412;
+            transform: translateY(-1px);
+            outline: none;
         }
 
         .analytics-info-popover {
@@ -1008,6 +1217,8 @@
             transition: opacity 160ms ease, transform 160ms ease;
         }
 
+        .analytics-info-wrap:hover .analytics-info-popover,
+        .analytics-info-wrap:focus-within .analytics-info-popover,
         .analytics-info-wrap.is-open .analytics-info-popover {
             opacity: 1;
             pointer-events: auto;
@@ -1241,7 +1452,7 @@
             .analytics-chart-wrap,
             .prediction-card,
             .analytics-ops-card { border-radius: 18px; }
-            .analytics-section { padding: 14px; }
+            .analytics-section { padding: 13px; }
             .analytics-hero { padding: 15px 14px; }
             .analytics-hero__eyebrow { padding: 6px 10px; font-size: 9.5px; }
             .analytics-hero__title { margin-top: 10px; font-size: 1.55rem; max-width: none; }
@@ -1252,6 +1463,10 @@
             .analytics-section__head { align-items: center; gap: 8px; margin-bottom: 10px; }
             .analytics-section__title { font-size: 0.94rem; gap: 8px; }
             .analytics-section__copy { display: none; }
+            .analytics-focus-card,
+            .prediction-summary-section,
+            .analytics-priority-grid,
+            .analytics-panel-grid { width: 100%; max-width: none; }
             .analytics-info-button { display: inline-flex; }
             .analytics-control-grid { display: flex; flex-direction: column; gap: 10px; }
             .analytics-control-field,
@@ -1260,10 +1475,10 @@
             .analytics-input,
             .analytics-select,
             .analytics-mobile-select-trigger {
-                min-height: 42px;
-                border-radius: 12px;
-                font-size: 13px;
-                padding: 0 11px;
+                min-height: 38px;
+                border-radius: 11px;
+                font-size: 12px;
+                padding: 0 10px;
             }
             .analytics-mobile-select-trigger {
                 width: 100%;
@@ -1284,8 +1499,8 @@
                 pointer-events: none;
             }
             .analytics-actions { grid-template-columns: 1fr; gap: 8px; width: 100%; }
-            .analytics-btn { min-height: 44px; padding: 10px 12px; border-radius: 13px; align-items: center; }
-            .analytics-btn__copy strong { font-size: 12.5px; }
+            .analytics-btn { min-height: 40px; padding: 9px 10px; border-radius: 12px; align-items: center; }
+            .analytics-btn__copy strong { font-size: 11.75px; }
             .analytics-btn__copy span { display: none; }
             .prediction-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
             .prediction-card,
@@ -1297,23 +1512,38 @@
             .prediction-card__copy { font-size: 11.5px; line-height: 1.35; }
             .prediction-driver-chip { padding: 6px 9px; font-size: 10.5px; }
             .analytics-dual-grid,
+            .analytics-priority-grid,
             .analytics-panel-grid { grid-template-columns: 1fr; gap: 10px; }
             .analytics-chart-wrap { padding: 10px; overflow: hidden; }
             .analytics-chart-canvas { width: 100%; min-width: 0 !important; min-height: 0 !important; height: 224px; }
             .analytics-chart-canvas canvas { width: 100% !important; height: 100% !important; }
             .analytics-insight { padding: 9px 10px; border-radius: 13px; font-size: 11.5px; line-height: 1.45; }
-            .analytics-ops-grid { grid-template-columns: 1fr; gap: 8px; }
-            .analytics-ops-card { padding: 12px; }
-            .analytics-ops-card__value { font-size: 1.28rem; }
+            .analytics-ops-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+            .analytics-ops-card { padding: 11px; }
+            .analytics-ops-card__title { font-size: 10px; }
+            .analytics-ops-card__value { font-size: 1.16rem; margin-top: 8px; }
             .analytics-legend-note { gap: 6px; font-size: 10.5px; }
             .recommendation-card { padding: 12px !important; border-radius: 15px !important; margin-bottom: 10px !important; }
+            .recommendation-run-toggle { padding: 12px; align-items: flex-start; }
+            .recommendation-run-title { font-size: 13px; }
+            .recommendation-run-subtitle { font-size: 11px; }
+            .recommendation-run-arrow { width: 30px; height: 30px; border-radius: 10px; }
+            .recommendation-run-content { padding: 0 12px 12px; }
             .explore-btn { width: 100%; justify-content: center; padding: 10px 12px; font-size: 12px; border-radius: 12px; }
+            #aiExplanation { margin-top: 12px !important; padding: 12px !important; font-size: 11.5px !important; border-radius: 14px !important; }
         }
 
         @media (max-width: 340px) {
             .analytics-hero__title { font-size: 1.38rem; }
-            .prediction-summary-grid { grid-template-columns: 1fr; }
             .analytics-section { padding: 12px; }
+            .prediction-summary-grid,
+            .analytics-ops-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+            .prediction-card,
+            .prediction-card--wide,
+            .analytics-ops-card { padding: 10px; }
+            .prediction-card__value,
+            .analytics-ops-card__value { font-size: 1.02rem; }
+            .prediction-card__copy { font-size: 10.5px; }
             .analytics-chart-canvas { height: 210px; }
         }
 
@@ -1469,21 +1699,22 @@
 
             .analytics-confirm {
                 align-items: flex-end;
-                padding: 14px;
+                padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
             }
 
             .analytics-confirm__panel {
-                border-radius: 24px;
+                width: min(100%, 400px);
+                border-radius: 20px;
             }
 
             .analytics-confirm__body {
-                padding: 20px 18px;
+                padding: 16px 15px;
             }
 
             .analytics-confirm__actions {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                padding: 12px 14px 14px;
+                padding: 10px 12px 12px;
             }
         }
     </style>
@@ -1605,7 +1836,7 @@
                     </div>
                 </section>
 
-                <section class="analytics-shell-card analytics-section chief-theme-panel">
+                <section class="analytics-shell-card analytics-section chief-theme-panel analytics-focus-card">
                     <div class="analytics-section__head">
                         <div>
                             <div class="analytics-section__title"><i class="fa-solid fa-sliders"></i> Filter and AI Actions</div>
@@ -1664,7 +1895,7 @@
                     </div>
                 </section>
 
-                <section class="analytics-shell-card analytics-section chief-theme-panel">
+                <section class="analytics-shell-card analytics-section chief-theme-panel prediction-summary-section">
                     <div class="analytics-section__head">
                         <div>
                             <div class="analytics-section__title"><i class="fa-solid fa-bolt"></i> Prediction Summary</div>
@@ -1740,23 +1971,41 @@
                     <div id="riskFactors" style="display:none;"></div>
                 </section>
 
-                <section class="analytics-shell-card analytics-section">
-                    <div class="analytics-section__head">
-                        <div>
-                            <div class="analytics-section__title"><i class="fa-solid fa-wand-magic-sparkles"></i> Forecast Narrative</div>
-                            <p class="analytics-section__copy">Readable command summary that explains the current forecast window, hotspot context, and key drivers behind the AI response.</p>
-                        </div>
-                    </div>
-                    <div id="aiPrediction">
-                        <div class="analytics-empty-state">
-                            <div class="analytics-empty-state__title">No prediction has been generated for this selection yet.</div>
-                            <p class="analytics-empty-state__copy">Select a station and optional barangay, choose a comparison range, and run AI analysis to produce a fire-risk forecast using historical incidents, current conditions, and model output.</p>
-                            <div class="analytics-empty-state__meta">
-                                <span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> <span id="predictionEmptyStation">Selected station will appear here</span></span>
-                                <span class="analytics-empty-pill"><i class="fa-solid fa-map"></i> <span id="predictionEmptyBarangay">All barangays</span></span>
-                                <span class="analytics-empty-pill"><i class="fa-solid fa-calendar-days"></i> <span id="predictionEmptyRange">Last 30 days</span></span>
+                <section class="analytics-priority-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-wand-magic-sparkles"></i> Forecast Narrative</div>
+                                <p class="analytics-section__copy">Readable command summary that explains the current forecast window, hotspot context, and key drivers behind the AI response.</p>
                             </div>
                         </div>
+                        <div id="aiPrediction">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No prediction has been generated for this selection yet.</div>
+                                <p class="analytics-empty-state__copy">Select a station and optional barangay, choose a comparison range, and run AI analysis to produce a fire-risk forecast using historical incidents, current conditions, and model output.</p>
+                                <div class="analytics-empty-state__meta">
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> <span id="predictionEmptyStation">Selected station will appear here</span></span>
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-map"></i> <span id="predictionEmptyBarangay">All barangays</span></span>
+                                    <span class="analytics-empty-pill"><i class="fa-solid fa-calendar-days"></i> <span id="predictionEmptyRange">Last 30 days</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> AI Recommendations</div>
+                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings.</p>
+                            </div>
+                            <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
+                        </div>
+                        <div id="recommendations">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No AI recommendations yet.</div>
+                                <p class="analytics-empty-state__copy">Run the station analysis first to generate recommendation cards and workflow-ready action items.</p>
+                            </div>
+                        </div>
+                        <div id="aiExplanation" style="margin-top: 20px; padding: 14px 16px; background: #f8fafc; border-radius: 16px; font-size: 13px; color: #475569; display: none;"></div>
                     </div>
                 </section>
 
@@ -1869,22 +2118,6 @@
                     <div class="analytics-shell-card analytics-section">
                         <div class="analytics-section__head">
                             <div>
-                                <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> AI Recommendations</div>
-                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings.</p>
-                            </div>
-                            <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
-                        </div>
-                        <div id="recommendations">
-                            <div class="analytics-empty-state">
-                                <div class="analytics-empty-state__title">No AI recommendations yet.</div>
-                                <p class="analytics-empty-state__copy">Run the station analysis first to generate recommendation cards and workflow-ready action items.</p>
-                            </div>
-                        </div>
-                        <div id="aiExplanation" style="margin-top: 20px; padding: 14px 16px; background: #f8fafc; border-radius: 16px; font-size: 13px; color: #475569; display: none;"></div>
-                    </div>
-                    <div class="analytics-shell-card analytics-section">
-                        <div class="analytics-section__head">
-                            <div>
                                 <div class="analytics-section__title"><i class="fa-solid fa-list-check"></i> Action Plan Checklist</div>
                                 <p class="analytics-section__copy">Saved checklist rows generated from the recommendations and prepared for review-to-mitigation handoff.</p>
                             </div>
@@ -1970,6 +2203,10 @@
         let currentBarangayPredictions = [];
         let currentPredictionDetails = null;
         let currentAiModels = null;
+        let lastAiWarningToastKey = null;
+        let recommendationRunGroups = [];
+        let recommendationRunCache = new Map();
+        let openRecommendationRunId = null;
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
@@ -2508,6 +2745,304 @@
             const heroModel = document.getElementById('analyticsHeroModel');
             if (heroModel) {
                 heroModel.textContent = label || 'Waiting for model metadata';
+            }
+        }
+
+        function formatRecommendationRunTimestamp(value) {
+            if (!value) return 'Saved analysis';
+            try {
+                return new Date(value).toLocaleString('en-US', {
+                    month: 'short',
+                    day: '2-digit',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+            } catch {
+                return 'Saved analysis';
+            }
+        }
+
+        function getRecommendationRunScopeLabel(group) {
+            const detail = group?.detail || {};
+            const predictionScope = detail.prediction_scope
+                || detail?.analysis_data?.raw_data?.prediction_scope
+                || detail?.predictions?.prediction_scope
+                || null;
+            return predictionScope === 'next_month' ? 'Predict Next Month' : 'Run AI Analysis';
+        }
+
+        function buildRecommendationRunGroup(analysisId, summary = {}, detail = null) {
+            const detailData = detail?.analysis_data?.raw_data || {};
+            const recommendations = Array.isArray(detail?.recommendations)
+                ? detail.recommendations
+                : (Array.isArray(summary?.recommendations) ? summary.recommendations : []);
+            const targetLabel = detail?.prediction_context?.target_period_label
+                || detailData?.prediction_context?.target_period_label
+                || detail?.predictions?.prediction_context?.target_period_label
+                || detail?.predictions?.forecast_window
+                || null;
+
+            return {
+                id: Number(analysisId),
+                createdAt: detail?.created_at || summary?.created_at || null,
+                sector: detail?.sector || summary?.sector || 'Station Analysis',
+                riskLevel: detail?.risk_level || summary?.risk_level || 'Unknown',
+                confidenceScore: detail?.confidence_score || summary?.confidence_score || summary?.confidence_data || null,
+                incidentCount: detail?.incident_count || summary?.incident_count || detail?.total_incidents || 0,
+                recommendations,
+                detail,
+                scopeLabel: getRecommendationRunScopeLabel({ detail }),
+                targetLabel,
+            };
+        }
+
+        async function fetchRecommendationRunDetail(analysisId, summary = {}) {
+            const cached = recommendationRunCache.get(Number(analysisId));
+            if (cached?.detail) {
+                return cached;
+            }
+
+            try {
+                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(analysisId)}`, {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to load analysis ${analysisId}`);
+                }
+                const payload = await response.json();
+                if (!payload.success || !payload.data) {
+                    throw new Error('Analysis detail is unavailable.');
+                }
+
+                const group = buildRecommendationRunGroup(analysisId, summary, payload.data);
+                recommendationRunCache.set(Number(analysisId), group);
+                return group;
+            } catch (error) {
+                console.error('Recommendation run detail load failed:', error);
+                const fallbackGroup = buildRecommendationRunGroup(analysisId, summary, null);
+                recommendationRunCache.set(Number(analysisId), fallbackGroup);
+                return fallbackGroup;
+            }
+        }
+
+        function openRecommendationFromRun(analysisId, recommendationIndex) {
+            const group = recommendationRunCache.get(Number(analysisId));
+            if (!group || !Array.isArray(group.recommendations) || !group.recommendations[recommendationIndex]) {
+                showAnalyticsToast('Recommendation details are unavailable for this analysis run.', 'warning');
+                return;
+            }
+
+            currentAnalysisId = Number(analysisId);
+            currentRecommendations = group.recommendations;
+            exploreRecommendation(group.recommendations[recommendationIndex], recommendationIndex);
+        }
+
+        function renderRecommendationRunGroups() {
+            const recContainer = document.getElementById('recommendations');
+            if (!recContainer) return;
+
+            if (!recommendationRunGroups.length) {
+                recContainer.innerHTML = `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">No AI recommendations yet.</div>
+                        <p class="analytics-empty-state__copy">Run the station analysis first to generate grouped recommendation sets for each saved forecast run.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            recContainer.innerHTML = `
+                <div class="recommendation-run-list">
+                    ${recommendationRunGroups.map((group) => {
+                        const isOpen = Number(openRecommendationRunId) === Number(group.id);
+                        const recommendations = Array.isArray(group.recommendations) ? group.recommendations : [];
+                        const summaryLine = `${group.sector} · ${formatRecommendationRunTimestamp(group.createdAt)}`;
+                        const chips = [
+                            group.targetLabel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-calendar-days" style="color:#dc2626;"></i>${escapeHtml(group.targetLabel)}</span>` : '',
+                            `<span class="recommendation-run-chip"><i class="fa-solid fa-list-check" style="color:#2563eb;"></i>${escapeHtml(String(recommendations.length))} recommendation(s)</span>`,
+                            group.riskLevel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(group.riskLevel)}</span>` : '',
+                            group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% confidence</span>` : ''
+                        ].filter(Boolean).join('');
+
+                        let contentHtml = `
+                            <div class="recommendation-run-summary">
+                                ${escapeHtml(group.scopeLabel)} recommendations for ${escapeHtml(group.sector)}.
+                            </div>
+                        `;
+
+                        if (!recommendations.length) {
+                            contentHtml += `
+                                <div class="analytics-empty-state" style="padding:14px 16px;">
+                                    <div class="analytics-empty-state__title">No recommendations saved for this run.</div>
+                                </div>
+                            `;
+                        } else {
+                            contentHtml += recommendations.map((rec, idx) => {
+                                const meta = extractRecommendationMeta(rec);
+                                const evidenceParts = [
+                                    meta.focus ? meta.focus : null,
+                                    meta.place ? meta.place : null,
+                                    !meta.place && meta.barangay ? meta.barangay : null,
+                                ].filter(Boolean);
+                                const evidenceLine = evidenceParts.length
+                                    ? `<div style="font-size:12px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                            <i class="fa-solid fa-magnifying-glass-chart" style="color:${meta.accent};"></i>
+                                            <span><strong style="color:#475569;">Based on:</strong> ${escapeHtml(evidenceParts.join(' • '))}</span>
+                                       </div>`
+                                    : '';
+                                let priorityClass = 'medium';
+                                let priorityLabel = 'MEDIUM';
+                                if (rec.priority === 'Critical') { priorityClass = 'critical'; priorityLabel = 'CRITICAL'; }
+                                else if (rec.priority === 'High') { priorityClass = 'high'; priorityLabel = 'HIGH'; }
+                                else if (rec.priority === 'Low') { priorityClass = 'low'; priorityLabel = 'LOW'; }
+
+                                const metaChips = [
+                                    meta.barangay ? `
+                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
+                                            <i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(meta.barangay)}
+                                        </span>
+                                    ` : '',
+                                    meta.place ? `
+                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
+                                            <i class="fa-solid fa-road" style="color:#2563eb;"></i>${escapeHtml(meta.place)}
+                                        </span>
+                                    ` : '',
+                                    meta.focus ? `
+                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
+                                            <i class="fa-solid ${meta.icon}" style="color:${meta.accent};"></i>${escapeHtml(meta.focus)}
+                                        </span>
+                                    ` : '',
+                                ].filter(Boolean).join('');
+
+                                return `
+                                    <div class="recommendation-card ${priorityClass}">
+                                        <div style="display: flex; gap: 12px;">
+                                            <div style="width: 28px; height: 28px; background: ${priorityClass === 'critical' ? '#dc2626' : (priorityClass === 'high' ? '#f59e0b' : (priorityClass === 'medium' ? '#10b981' : '#94a3b8'))}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${idx + 1}</div>
+                                            <div style="flex:1;">
+                                                <div style="display:flex; align-items:flex-start; gap:10px;">
+                                                    <div style="width:34px; height:34px; border-radius:12px; background:${meta.accent}15; color:${meta.accent}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                                        <i class="fa-solid ${meta.icon}"></i>
+                                                    </div>
+                                                    <div style="flex:1;">
+                                                        <strong style="display:block; color:#0f172a;">${escapeHtml(rec.title || 'Recommendation')}</strong>
+                                                        ${metaChips ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">${metaChips}</div>` : ''}
+                                                        ${evidenceLine}
+                                                    </div>
+                                                </div>
+                                                <p style="color: #4b5563; font-size: 13px; margin-top: 4px;">${escapeHtml(rec.description || '')}</p>
+                                                <span class="priority-badge priority-${priorityClass}">${priorityLabel} PRIORITY</span>
+                                                <button class="explore-btn" onclick="openRecommendationFromRun(${group.id}, ${idx})">
+                                                    <i class="fa-solid fa-chart-simple"></i> Explore & Get Detailed Suggestions
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                        }
+
+                        return `
+                            <div class="recommendation-run-group ${isOpen ? 'is-open' : ''}">
+                                <button type="button" class="recommendation-run-toggle" onclick="toggleRecommendationRunGroup(${group.id})">
+                                    <div class="recommendation-run-meta">
+                                        <div class="recommendation-run-title">
+                                            <i class="fa-solid fa-layer-group" style="color:#dc2626;"></i>
+                                            <span>${escapeHtml(group.scopeLabel)}</span>
+                                        </div>
+                                        <div class="recommendation-run-subtitle">${escapeHtml(summaryLine)}</div>
+                                        <div class="recommendation-run-chips">${chips}</div>
+                                    </div>
+                                    <span class="recommendation-run-arrow"><i class="fa-solid fa-chevron-down"></i></span>
+                                </button>
+                                <div class="recommendation-run-content">${contentHtml}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        async function toggleRecommendationRunGroup(analysisId) {
+            const normalizedId = Number(analysisId);
+            openRecommendationRunId = Number(openRecommendationRunId) === normalizedId ? null : normalizedId;
+            renderRecommendationRunGroups();
+
+            if (!openRecommendationRunId) {
+                return;
+            }
+
+            const existingGroup = recommendationRunGroups.find((group) => Number(group.id) === normalizedId);
+            if (existingGroup?.detail && Array.isArray(existingGroup.recommendations) && existingGroup.recommendations.length) {
+                return;
+            }
+
+            const updatedGroup = await fetchRecommendationRunDetail(normalizedId, existingGroup || {});
+            recommendationRunGroups = recommendationRunGroups.map((group) =>
+                Number(group.id) === normalizedId ? { ...group, ...updatedGroup } : group
+            );
+            renderRecommendationRunGroups();
+        }
+
+        async function loadRecommendationRunGroups(priorityAnalysisData = null) {
+            const recContainer = document.getElementById('recommendations');
+            if (recContainer) {
+                recContainer.innerHTML = `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">Loading recommendation runs...</div>
+                        <p class="analytics-empty-state__copy">Preparing grouped recommendation sets from recent forecast runs.</p>
+                    </div>
+                `;
+            }
+
+            try {
+                const response = await fetch('/station-admin/api/analyses/history', {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to load analysis history (${response.status})`);
+                }
+
+                const payload = await response.json();
+                const history = Array.isArray(payload?.data) ? payload.data : [];
+                const summaryMap = new Map(history.map((item) => [Number(item.analysis_id), item]));
+
+                if (priorityAnalysisData?.analysis_id) {
+                    summaryMap.set(Number(priorityAnalysisData.analysis_id), {
+                        analysis_id: priorityAnalysisData.analysis_id,
+                        sector: priorityAnalysisData.sector || priorityAnalysisData.location_name || document.getElementById('stationSelect')?.options?.[document.getElementById('stationSelect')?.selectedIndex]?.text || 'Selected station',
+                        risk_level: priorityAnalysisData.risk_level || null,
+                        confidence_score: priorityAnalysisData.confidence_score || null,
+                        incident_count: priorityAnalysisData.total_incidents || 0,
+                        created_at: new Date().toISOString(),
+                    });
+
+                    const priorityGroup = buildRecommendationRunGroup(priorityAnalysisData.analysis_id, summaryMap.get(Number(priorityAnalysisData.analysis_id)), priorityAnalysisData);
+                    recommendationRunCache.set(Number(priorityAnalysisData.analysis_id), priorityGroup);
+                }
+
+                const groups = await Promise.all(
+                    Array.from(summaryMap.values())
+                        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+                        .slice(0, 10)
+                        .map((summary) => fetchRecommendationRunDetail(summary.analysis_id, summary))
+                );
+
+                recommendationRunGroups = groups.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+                if (!openRecommendationRunId && recommendationRunGroups.length) {
+                    openRecommendationRunId = recommendationRunGroups[0].id;
+                }
+                renderRecommendationRunGroups();
+            } catch (error) {
+                console.error('Recommendation run history load error:', error);
+                if (recContainer) {
+                    recContainer.innerHTML = `
+                        <div class="analytics-empty-state">
+                            <div class="analytics-empty-state__title">Unable to load grouped recommendation runs.</div>
+                            <p class="analytics-empty-state__copy">${escapeHtml(error.message || 'Please try again.')}</p>
+                        </div>
+                    `;
+                }
             }
         }
 
@@ -3393,6 +3928,21 @@
             currentBarangayPredictions = Array.isArray(analysisData.barangay_predictions) ? analysisData.barangay_predictions : [];
             currentPredictionDetails = analysisData;
             renderBarangayPredictionPanel(currentBarangayPredictions);
+            const aiWarningMessage = analysisData.ai_warning || null;
+            const aiWarningDetails = analysisData.ai_failure_message || analysisData.note || null;
+            const aiWarningKey = aiWarningMessage
+                ? `${analysisData.analysis_id || 'live'}:${aiWarningMessage}:${aiWarningDetails || ''}`
+                : null;
+
+            if (aiWarningMessage && aiWarningKey !== lastAiWarningToastKey) {
+                lastAiWarningToastKey = aiWarningKey;
+                showAnalyticsToast(
+                    aiWarningDetails
+                        ? `${aiWarningMessage} ${aiWarningDetails}`
+                        : aiWarningMessage,
+                    'warning'
+                );
+            }
             const predictionContainer = document.getElementById('aiPrediction');
             const prediction = analysisData.predictions || null;
             updateTargetMonthDisplay(analysisData.prediction_scope || 'current_month', analysisData.prediction_context || null);
@@ -3489,84 +4039,9 @@
             renderPredictionSummary(analysisData);
             renderCharts(analysisData);
 
-            // Recommendations with Explore button
-            const recommendations = analysisData.recommendations || [];
-            const recContainer = document.getElementById('recommendations');
-            
-            if (recommendations.length === 0) {
-                recContainer.innerHTML = `
-                    <div class="analytics-empty-state">
-                        <div class="analytics-empty-state__title">No recommendations returned from this analysis.</div>
-                        <p class="analytics-empty-state__copy">The backend returned the prediction context, but there are no recommendation rows available for the current dataset.</p>
-                    </div>
-                `;
-            } else {
-                let recHtml = '<div>';
-                recommendations.forEach((rec, idx) => {
-                    const meta = extractRecommendationMeta(rec);
-                    const evidenceParts = [
-                        meta.focus ? meta.focus : null,
-                        meta.place ? meta.place : null,
-                        !meta.place && meta.barangay ? meta.barangay : null,
-                    ].filter(Boolean);
-                    const evidenceLine = evidenceParts.length
-                        ? `<div style="font-size:12px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                <i class="fa-solid fa-magnifying-glass-chart" style="color:${meta.accent};"></i>
-                                <span><strong style="color:#475569;">Based on:</strong> ${escapeHtml(evidenceParts.join(' • '))}</span>
-                           </div>`
-                        : '';
-                    let priorityClass = 'medium';
-                    let priorityLabel = 'MEDIUM';
-                    if (rec.priority === 'Critical') { priorityClass = 'critical'; priorityLabel = 'CRITICAL'; }
-                    else if (rec.priority === 'High') { priorityClass = 'high'; priorityLabel = 'HIGH'; }
-                    else if (rec.priority === 'Low') { priorityClass = 'low'; priorityLabel = 'LOW'; }
-
-                    const metaChips = [
-                        meta.barangay ? `
-                            <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                <i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(meta.barangay)}
-                            </span>
-                        ` : '',
-                        meta.place ? `
-                            <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                <i class="fa-solid fa-road" style="color:#2563eb;"></i>${escapeHtml(meta.place)}
-                            </span>
-                        ` : '',
-                        meta.focus ? `
-                            <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                <i class="fa-solid ${meta.icon}" style="color:${meta.accent};"></i>${escapeHtml(meta.focus)}
-                            </span>
-                        ` : '',
-                    ].filter(Boolean).join('');
-                    
-                    recHtml += `
-                        <div class="recommendation-card ${priorityClass}">
-                            <div style="display: flex; gap: 12px;">
-                                <div style="width: 28px; height: 28px; background: ${priorityClass === 'critical' ? '#dc2626' : (priorityClass === 'high' ? '#f59e0b' : (priorityClass === 'medium' ? '#10b981' : '#94a3b8'))}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${idx+1}</div>
-                                <div style="flex:1;">
-                                    <div style="display:flex; align-items:flex-start; gap:10px;">
-                                        <div style="width:34px; height:34px; border-radius:12px; background:${meta.accent}15; color:${meta.accent}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                            <i class="fa-solid ${meta.icon}"></i>
-                                        </div>
-                                         <div style="flex:1;">
-                                             <strong style="display:block; color:#0f172a;">${escapeHtml(rec.title || 'Recommendation')}</strong>
-                                             ${metaChips ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">${metaChips}</div>` : ''}
-                                             ${evidenceLine}
-                                         </div>
-                                     </div>
-                                    <p style="color: #4b5563; font-size: 13px; margin-top: 4px;">${escapeHtml(rec.description)}</p>
-                                    <span class="priority-badge priority-${priorityClass}">${priorityLabel} PRIORITY</span>
-                                    <button class="explore-btn" onclick="exploreRecommendation(${JSON.stringify(rec).replace(/"/g, '&quot;')}, ${idx})">
-                                        <i class="fa-solid fa-chart-simple"></i> Explore & Get Detailed Suggestions
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                recHtml += '</div>';
-                recContainer.innerHTML = recHtml;
-            }
+            loadRecommendationRunGroups(analysisData).catch((error) => {
+                console.error('Grouped recommendation render failed:', error);
+            });
             
             if (analysisData.ai_explanation) {
                 document.getElementById('aiExplanation').style.display = 'block';

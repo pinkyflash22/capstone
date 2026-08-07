@@ -243,6 +243,7 @@ class AnalyticController extends Controller
         $recommendationAiResponse = null;
         $predictionAiModel = null;
         $recommendationAiModel = null;
+        $aiFailureMessage = null;
         try {
             $predictionAiResponse = $this->callAIApi(
                 $this->buildAIPredictionPrompt($analysisData),
@@ -257,6 +258,7 @@ class AnalyticController extends Controller
             Log::info('AI prediction response received', ['response' => substr($predictionAiResponse, 0, 300)]);
             Log::info('AI recommendation response received', ['response' => substr($recommendationAiResponse, 0, 300)]);
         } catch (\Exception $aiError) {
+            $aiFailureMessage = $aiError->getMessage();
             Log::warning('AI API failed: ' . $aiError->getMessage());
         }
             
@@ -272,6 +274,8 @@ class AnalyticController extends Controller
                 $structuredAnalysis = $this->generateDataDrivenAnalysis($analysisData);
                 $structuredAnalysis['note'] = 'Analysis based on data patterns (AI service temporarily unavailable)';
                 $structuredAnalysis['ai_source'] = false;
+                $structuredAnalysis['ai_warning'] = 'DeepSeek forecast model failed. Showing data-driven fallback analysis instead.';
+                $structuredAnalysis['ai_failure_message'] = $aiFailureMessage ?: 'DeepSeek forecast model did not return a usable response.';
                 $structuredAnalysis['ai_models'] = [
                     'prediction' => $predictionAiModel,
                     'recommendation' => $recommendationAiModel,
@@ -1883,13 +1887,19 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
 private function getOpenRouterModelCandidates(): array
 {
     $models = array_filter([
-        env('OPENROUTER_MODEL'),
-        'deepseek/deepseek-r1-distill-llama-70b',
-        'openai/gpt-4o-mini',
-        'openai/gpt-4.1-mini',
-        'openai/gpt-3.5-turbo',
-        'deepseek/deepseek-r1-distill-qwen-32b',
+        env('OPENROUTER_MODEL') ?: 'deepseek/deepseek-r1-distill-llama-70b',
     ]);
+
+    /*
+     * Previously allowed fallback models for analytics:
+     * 'deepseek/deepseek-r1-distill-llama-70b',
+     * 'openai/gpt-4o-mini',
+     * 'openai/gpt-4.1-mini',
+     * 'openai/gpt-3.5-turbo',
+     * 'deepseek/deepseek-r1-distill-qwen-32b',
+     *
+     * Keep this block commented unless fallback behavior is explicitly re-approved.
+     */
 
     return array_values(array_unique($models));
 }

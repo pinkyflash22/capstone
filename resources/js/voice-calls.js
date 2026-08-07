@@ -243,6 +243,7 @@ function callLocation(call) {
 function candidateMaps() {
     return [
         window.map,
+        window.map,
         window.userMap,
         window.adminMap,
         window.chiefMap,
@@ -260,6 +261,20 @@ function viewCallerLocation(call) {
     }
 
     const latLng = [Number(location.lat), Number(location.lng)];
+    if (typeof window.focusMapOnExternalLocation === 'function') {
+        const focused = window.focusMapOnExternalLocation(location.lat, location.lng, {
+            label: location.label || 'Caller location',
+            description: call?.caller?.name ? `${call.caller.name} voice call` : 'Voice call origin',
+            zoom: 16,
+        });
+
+        if (focused) {
+            window.dispatchEvent(new CustomEvent('pyro:voice-caller-location', { detail: { call, latLng } }));
+            toast('Caller location centered.');
+            return;
+        }
+    }
+
     const targetMap = candidateMaps()[0];
     if (targetMap) {
         targetMap.setView(latLng, Math.max(targetMap.getZoom?.() || 15, 16), { animate: true });
@@ -272,9 +287,25 @@ function viewCallerLocation(call) {
 function refreshIncidentMarkersFromVoice(payload) {
     window.dispatchEvent(new CustomEvent('pyro:voice-call-incident-created', { detail: payload }));
 
-    const refresh = window.refreshMarkers || window.loadMarkers || window.refreshMapMarkers || window.reloadMapMarkers;
+    if (payload?.incident && typeof window.mergeIncidentIntoClientState === 'function') {
+        try {
+            window.mergeIncidentIntoClientState(payload.incident);
+        } catch (error) {
+            console.warn('Unable to merge voice-call incident into client state:', error);
+        }
+    }
+
+    if (typeof window.refreshChiefIncidentNotifications === 'function') {
+        window.refreshChiefIncidentNotifications().catch?.((error) => {
+            console.warn('Voice-call incident refresh failed:', error);
+        });
+    }
+
+    const refresh = window.refreshMapMarkers || window.refreshMarkers || window.loadMarkers || window.reloadMapMarkers;
     if (typeof refresh === 'function') {
-        refresh();
+        Promise.resolve(refresh({ force: true })).catch((error) => {
+            console.warn('Voice-call map refresh failed:', error);
+        });
     }
 }
 

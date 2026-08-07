@@ -1567,6 +1567,26 @@
     let icons = [];
 
     document.addEventListener('DOMContentLoaded', function() {
+        window.addEventListener('pyro:voice-caller-location', function(event) {
+            const latLng = Array.isArray(event?.detail?.latLng) ? event.detail.latLng : null;
+            if (!latLng || latLng.length < 2) {
+                return;
+            }
+
+            focusOnMarker(latLng[0], latLng[1]);
+        });
+
+        window.addEventListener('pyro:voice-call-incident-created', function() {
+            Promise.allSettled([
+                typeof window.refreshChiefIncidentNotifications === 'function'
+                    ? window.refreshChiefIncidentNotifications()
+                    : Promise.resolve(),
+                typeof window.refreshMapMarkers === 'function'
+                    ? window.refreshMapMarkers({ force: true })
+                    : Promise.resolve()
+            ]);
+        });
+
         const mobileWelcomeToast = document.getElementById('chiefMobileWelcomeToast');
         const insightsPanel = document.getElementById('chiefMobileInsightsPanel');
         const insightsContent = document.getElementById('chiefMobileInsightsContent');
