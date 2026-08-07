@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class VoiceCallController extends Controller
@@ -65,9 +66,22 @@ class VoiceCallController extends Controller
         abort_unless($this->isStationResponder($user), 403);
         $this->releaseSessionLock($request);
 
-        $this->expireStaleCalls($request);
+        try {
+            $this->expireStaleCalls($request);
 
-        return response()->json($this->responderPayload($user));
+            return response()->json($this->responderPayload($user));
+        } catch (\Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'active_call' => null,
+                'incoming_calls' => [],
+                'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
+                'server_time' => now()->toIso8601String(),
+                'message' => 'Voice call inbox is temporarily unavailable.',
+            ]);
+        }
     }
 
     public function stream(Request $request): StreamedResponse
@@ -84,8 +98,19 @@ class VoiceCallController extends Controller
                     break;
                 }
 
-                $this->expireStaleCalls($request);
-                $payload = $this->responderPayload($user);
+                try {
+                    $this->expireStaleCalls($request);
+                    $payload = $this->responderPayload($user);
+                } catch (\Throwable $error) {
+                    report($error);
+
+                    echo "event: error\n";
+                    echo 'data: {"success":false,"active_call":null,"incoming_calls":[],"message":"Voice call stream is temporarily unavailable."}' . "\n\n";
+                    @ob_flush();
+                    flush();
+                    break;
+                }
+
                 $fingerprint = md5(json_encode($payload));
 
                 if ($fingerprint !== $lastFingerprint || $iteration === 0) {
@@ -408,7 +433,7 @@ class VoiceCallController extends Controller
             ],
             'station' => [
                 'id' => $call->station?->station_id,
-                'name' => $call->station?->name,
+                'name' => $call->station?->station_name,
             ],
             'created_incident' => $call->createdIncident ? [
                 'id' => $call->createdIncident->incident_id,
@@ -428,6 +453,10 @@ class VoiceCallController extends Controller
 
     private function expireStaleCalls(?Request $request = null): void
     {
+        if (! $this->voiceCallsStorageReady()) {
+            return;
+        }
+
         $seconds = (int) config('services.voice_calls.missed_after_seconds', 45);
         $answeredSeconds = (int) config('services.voice_calls.stale_answered_after_seconds', 180);
         $cutoff = now()->subSeconds(max(15, $seconds));
@@ -465,6 +494,10 @@ class VoiceCallController extends Controller
 
     private function activeCallForAdmin(User $user): ?VoiceCall
     {
+        if (! $this->voiceCallsStorageReady()) {
+            return null;
+        }
+
         return VoiceCall::query()
             ->with($this->callRelations())
             ->where('assigned_admin_id', $user->user_id)
@@ -476,6 +509,17 @@ class VoiceCallController extends Controller
 
     private function responderPayload(User $user): array
     {
+        if (! $this->voiceCallsStorageReady()) {
+            return [
+                'success' => false,
+                'active_call' => null,
+                'incoming_calls' => [],
+                'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
+                'server_time' => now()->toIso8601String(),
+                'message' => 'Voice call storage is not ready on this server.',
+            ];
+        }
+
         $stationId = $this->adminStationId($user);
         $activeCall = $this->activeCallForAdmin($user);
 
@@ -642,6 +686,27 @@ class VoiceCallController extends Controller
             $request->session()->save();
         } catch (\Throwable $error) {
             report($error);
+        }
+    }
+
+    private function voiceCallsStorageReady(): bool
+    {
+        try {
+            if (! Schema::hasTable('voice_calls')) {
+                return false;
+            }
+
+            foreach (['status', 'answered_at', 'ended_at', 'flagged_at', 'assigned_admin_id'] as $column) {
+                if (! Schema::hasColumn('voice_calls', $column)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (\Throwable $error) {
+            report($error);
+
+            return false;
         }
     }
 }

@@ -1,3 +1,5 @@
+import AgoraRTC from 'agora-rtc-sdk-ng';
+
 const voiceConfig = window.PyroSenseVoiceCall || {};
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
@@ -21,12 +23,10 @@ let activeCallerTrigger = null;
 let callerVoicePrimeAttempted = false;
 let callerHasMicrophoneAccess = false;
 let agoraJoinState = 'idle';
-let incomingStream = null;
-let incomingStreamReconnectTimer = null;
+let incomingPollInFlight = null;
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
-const AGORA_LOAD_TIMEOUT_MS = 12000;
 const AGORA_JOIN_TIMEOUT_MS = 15000;
 const REQUEST_TIMEOUT_MS = 12000;
 
@@ -408,15 +408,30 @@ function renderIncoming(payload) {
 
 async function pollIncoming() {
     if (!routes.incoming) return;
-    try {
-        const payload = await jsonFetch(routes.incoming);
-        incomingPollFailureCount = 0;
-        renderIncoming(payload);
-    } catch (error) {
-        incomingPollFailureCount += 1;
-        if (incomingPollFailureCount === 1 || incomingPollFailureCount % 5 === 0) {
-            console.warn('Voice call incoming poll failed:', error);
+
+    if (incomingPollInFlight) {
+        return incomingPollInFlight;
+    }
+
+    incomingPollInFlight = (async () => {
+        try {
+            const payload = await jsonFetch(routes.incoming);
+            incomingPollFailureCount = 0;
+            renderIncoming(payload);
+        } catch (error) {
+            incomingPollFailureCount += 1;
+            if (incomingPollFailureCount === 1 || incomingPollFailureCount % 5 === 0) {
+                console.warn('Voice call incoming poll failed:', error);
+            }
+        } finally {
+            incomingPollInFlight = null;
         }
+    })();
+
+    try {
+        await incomingPollInFlight;
+    } finally {
+        return incomingPollInFlight;
     }
 }
 
@@ -425,18 +440,6 @@ function clearIncomingPollTimer() {
         clearTimeout(incomingPollTimer);
         incomingPollTimer = null;
     }
-}
-
-function clearIncomingStreamReconnectTimer() {
-    if (incomingStreamReconnectTimer) {
-        clearTimeout(incomingStreamReconnectTimer);
-        incomingStreamReconnectTimer = null;
-    }
-}
-
-function shouldUseIncomingStream() {
-    const host = String(window.location?.hostname || '').toLowerCase();
-    return !['127.0.0.1', 'localhost'].includes(host);
 }
 
 function getIncomingPollDelay() {
@@ -693,26 +696,6 @@ async function handleCallerDockClick(event) {
     }
 }
 
-async function loadAgora() {
-    if (window.AgoraRTC) return window.AgoraRTC;
-    await withTimeout(new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-agora-sdk]');
-        if (existing) {
-            existing.addEventListener('load', resolve, { once: true });
-            existing.addEventListener('error', reject, { once: true });
-            return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://download.agora.io/sdk/release/AgoraRTC_N.js';
-        script.async = true;
-        script.dataset.agoraSdk = 'true';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    }), AGORA_LOAD_TIMEOUT_MS, 'Agora SDK took too long to load.');
-    return window.AgoraRTC;
-}
-
 async function joinAgora(call, agora) {
     if (!agora?.app_id || !agora?.token) {
         setAgoraJoinState('failed');
@@ -722,7 +705,6 @@ async function joinAgora(call, agora) {
 
     setAgoraJoinState('connecting');
     await leaveAgora();
-    const AgoraRTC = await loadAgora();
     agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
     activeAgora = agora;
 
@@ -883,49 +865,6 @@ function requestNotificationPermissionOnGesture() {
     Notification.requestPermission().catch(() => {});
 }
 
-function disconnectIncomingStream() {
-    clearIncomingStreamReconnectTimer();
-    if (incomingStream) {
-        incomingStream.close();
-        incomingStream = null;
-    }
-}
-
-function connectIncomingStream() {
-    if (!isResponder || !routes.stream || typeof EventSource === 'undefined') {
-        return;
-    }
-
-    if (!shouldUseIncomingStream()) {
-        return;
-    }
-
-    disconnectIncomingStream();
-
-    try {
-        incomingStream = new EventSource(routes.stream, { withCredentials: true });
-        incomingStream.addEventListener('calls', (event) => {
-            try {
-                const payload = JSON.parse(event.data || '{}');
-                incomingPollFailureCount = 0;
-                renderIncoming(payload);
-            } catch (error) {
-                console.warn('Voice call stream payload parse failed:', error);
-            }
-        });
-        incomingStream.addEventListener('error', () => {
-            disconnectIncomingStream();
-            clearIncomingPollTimer();
-            scheduleIncomingPoll(pollMs);
-            incomingStreamReconnectTimer = setTimeout(() => {
-                connectIncomingStream();
-            }, Math.max(2000, pollMs));
-        });
-    } catch (error) {
-        console.warn('Voice call stream failed to initialize:', error);
-    }
-}
-
 function initVoiceCalls() {
     if (!voiceConfig.configured) {
         console.warn('PyroSense voice calls are disabled because AGORA_APP_ID is missing.');
@@ -941,9 +880,6 @@ function initVoiceCalls() {
         window.setTimeout(() => {
             pollIncoming().finally(() => {
                 scheduleIncomingPoll();
-                if (shouldUseIncomingStream()) {
-                    connectIncomingStream();
-                }
             });
         }, getResponderVoiceBootDelay());
         document.addEventListener('click', requestNotificationPermissionOnGesture, { once: true });
@@ -965,7 +901,6 @@ function initVoiceCalls() {
     window.addEventListener('pagehide', () => {
         stopRinging();
         clearIncomingPollTimer();
-        disconnectIncomingStream();
     });
 }
 

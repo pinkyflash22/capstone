@@ -1456,9 +1456,19 @@ public function storeFullAddress(Request $request)
             ]);
         }
 
-        $incidents = $this->getChiefIncidentMapCollection($stationId)
-            ->map(fn (Incident $incident) => $this->serializeChiefIncidentMapItem($incident))
-            ->values();
+        try {
+            $incidents = $this->getChiefIncidentMapCollection($stationId)
+                ->map(fn (Incident $incident) => $this->serializeChiefIncidentMapItem($incident))
+                ->values();
+        } catch (\Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'data' => [],
+                'message' => 'Incident map is temporarily unavailable.',
+            ]);
+        }
 
         return response()->json([
             'success' => true,
@@ -1493,7 +1503,23 @@ public function storeFullAddress(Request $request)
             ? Carbon::parse($validated['cursor_updated_at'])
             : null;
         $cursorIncidentId = (int) ($validated['cursor_incident_id'] ?? 0);
-        $incidents = $this->getChiefIncidentMapCollection($stationId);
+        try {
+            $incidents = $this->getChiefIncidentMapCollection($stationId);
+        } catch (\Throwable $error) {
+            report($error);
+
+            return response()->json([
+                'success' => false,
+                'data' => [],
+                'meta' => [
+                    'cursor' => [
+                        'updated_at' => null,
+                        'incident_id' => 0,
+                    ],
+                ],
+                'message' => 'Incident map updates are temporarily unavailable.',
+            ]);
+        }
 
         $changes = $incidents
             ->filter(function (Incident $incident) use ($cursorUpdatedAt, $cursorIncidentId) {
@@ -1573,6 +1599,7 @@ public function storeFullAddress(Request $request)
                 $query->whereNotNull('lat')
                     ->whereNotNull('lng');
             })
+            ->limit(500)
             ->get()
             ->filter(function (Incident $incident) use ($stationId, $teamIds, $stationMarkers) {
                 if ($teamIds->isNotEmpty() && $incident->team_id && $teamIds->contains((int) $incident->team_id)) {
