@@ -5,6 +5,7 @@ WORKDIR /var/www/html
 ENV PYTHONUNBUFFERED=1
 ENV AI_PYTHON_BINARY=python3
 
+# System dependencies + PostgreSQL support
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -14,34 +15,49 @@ RUN apt-get update && apt-get install -y \
     npm \
     python3 \
     python3-pip \
-    default-mysql-client \
+    postgresql-client \
+    libpq-dev \
     libzip-dev \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql zip gd \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql zip gd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Enable Apache rewrite
 RUN a2enmod rewrite
 
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Copy project
 COPY . .
 
+# Install PHP dependencies
 RUN composer config -g github-protocols https \
     && composer clear-cache \
-    && composer install --no-dev --optimize-autoloader --no-interaction --prefer-source
+    && composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
+# Build frontend
 RUN if [ -f package.json ]; then npm install && npm run build; fi
 
-RUN if [ -f requirements.txt ]; then pip3 install --break-system-packages --no-cache-dir -r requirements.txt; fi
+# Python dependencies
+RUN if [ -f requirements.txt ]; then \
+        pip3 install --break-system-packages --no-cache-dir -r requirements.txt; \
+    fi
 
-RUN if [ -f python/requirements.txt ]; then pip3 install --break-system-packages --no-cache-dir -r python/requirements.txt; fi
+RUN if [ -f python/requirements.txt ]; then \
+        pip3 install --break-system-packages --no-cache-dir -r python/requirements.txt; \
+    fi
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Laravel permissions
+RUN chown -R www-data:www-data \
+    /var/www/html/storage \
+    /var/www/html/bootstrap/cache
 
+# Apache + Render startup
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/render-start.sh /usr/local/bin/render-start.sh
 
