@@ -951,8 +951,24 @@ class PublicController extends Controller
 
 
     public function homepage(){
+        $anonymousUserId = null;
+        $totalStations = 0;
+        $totalHydrants = 0;
 
-    return view('dashboard');
+        try {
+            $anonymousUserId = User::resolveAnonymousUserId();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        try {
+            $totalStations = Marker::query()->where('category', 'station')->count();
+            $totalHydrants = Marker::query()->where('category', 'hydrant')->count();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return view('dashboard', compact('anonymousUserId', 'totalStations', 'totalHydrants'));
     }
         //     public function dashboard()
         // {

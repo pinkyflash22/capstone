@@ -1,7 +1,7 @@
 @php
     $pwaLogo = $pwaLogo ?? 'logo.png';
     $pwaThemeColor = $pwaThemeColor ?? '#d14b24';
-    $browserLogo = \App\Support\MediaPath::url(config('app.brand_logo_path'));
+    $browserLogo = \App\Support\MediaPath::url(config('app.brand_logo_path')) ?: asset('logo.png');
 @endphp
 
 <link rel="icon" type="image/png" href="{{ $browserLogo }}">

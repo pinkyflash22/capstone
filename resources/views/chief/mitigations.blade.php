@@ -10,11 +10,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
     <style>
+        html,
+        body,
+        body.chief-dashboard-page {
+            min-height: 100%;
+            height: auto;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
         body { margin: 0; background: #f8fafc; color: #0f172a; font-family: Inter, system-ui, sans-serif; }
         .mitigation-shell { min-height: 100vh; background: linear-gradient(180deg, #fff7ed 0%, #f8fafc 22%); }
-        .mitigation-main { min-width: 0; width: 100%; }
+        .mitigation-main { min-width: 0; width: 100%; overflow: visible; }
         .mitigation-wrap { width: 100%; max-width: 1440px; margin: 0 auto; }
-        .dashboard-container { padding: 28px; }
+        .dashboard-container { padding: 28px; overflow: visible; }
         .top-bar { background: rgba(255,255,255,.82); backdrop-filter: blur(12px); border: 1px solid rgba(226,232,240,.9); min-height: 72px; padding: 0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:16px; z-index:40; margin-bottom:24px; border-radius:24px; box-shadow:0 16px 36px rgba(15,23,42,.06); }
         .mitigation-banner { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:32px; margin-bottom:24px; border-radius:24px; border-left:4px solid #f59e0b; background: linear-gradient(135deg, rgba(255,247,237,.98), rgba(255,251,235,.95)); box-shadow: 0 18px 36px rgba(15,23,42,.05); }
         .mitigation-banner__title { margin:0; color:#78350f; font-size:1.9rem; font-weight:900; letter-spacing:-0.04em; }
@@ -82,24 +91,37 @@
         .mitigation-field label { color:#334155; font-size:.78rem; font-weight:800; }
         .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; min-height:44px; border:1px solid rgba(203,213,225,.96); border-radius:14px; padding:10px 12px; font-size:.84rem; color:#0f172a; background:#fff; }
         .mitigation-field textarea { min-height:96px; resize:vertical; }
-        .modal { position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(15,23,42,.52); backdrop-filter: blur(8px); }
-        .modal.is-open { display:flex; }
-        .modal-card { width:min(560px, calc(100vw - 40px)); max-height:min(78vh, 720px); overflow-y:auto; padding:18px; border-radius:24px; border:1px solid rgba(226,232,240,.94); background:rgba(255,255,255,.98); box-shadow:0 28px 60px rgba(15,23,42,.18); }
-        .modal-head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(226,232,240,.92); }
-        .modal-head h3 { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
-        .modal-head p { margin:4px 0 0; color:#64748b; font-size:.82rem; line-height:1.5; max-width:42ch; }
-        .modal-close { width:42px; height:42px; border:1px solid rgba(226,232,240,.94); border-radius:14px; background:#fff; color:#334155; }
+        .mitigation-dialog { position:fixed; inset:0; z-index:90; display:none; align-items:flex-start; justify-content:center; padding:28px 20px; background:rgba(15,23,42,.52); backdrop-filter: blur(8px); overflow-y:auto; }
+        .mitigation-dialog.is-open { display:flex; }
+        .mitigation-dialog__card { width:min(560px, calc(100vw - 40px)); max-width:560px; max-height:min(78vh, 720px); overflow-y:auto; padding:18px; border-radius:24px; border:1px solid rgba(226,232,240,.94); background:rgba(255,255,255,.98); box-shadow:0 28px 60px rgba(15,23,42,.18); flex:0 0 auto; margin:0 auto; }
+        .mitigation-dialog__head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(226,232,240,.92); }
+        .mitigation-dialog__head h3 { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
+        .mitigation-dialog__head p { margin:4px 0 0; color:#64748b; font-size:.82rem; line-height:1.5; max-width:42ch; }
+        .mitigation-dialog__close { width:42px; height:42px; border:1px solid rgba(226,232,240,.94); border-radius:14px; background:#fff; color:#334155; }
         .form-actions { display:flex; justify-content:end; gap:12px; margin-top:20px; }
         .cancel-btn { min-height:44px; padding:0 18px; border:1px solid rgba(203,213,225,.96); background:#fff; color:#475569; }
-        .modal form { margin: 0; }
-        .modal .mitigation-field textarea { min-height: 88px; }
-        .modal .mitigation-field input[type="file"] { min-height: 0; padding: 10px 0; border: 0; background: transparent; }
+        .mitigation-dialog form { margin: 0; }
+        .mitigation-dialog .mitigation-field textarea { min-height: 88px; }
+        .mitigation-dialog .mitigation-field input[type="file"] { min-height: 0; padding: 10px 0; border: 0; background: transparent; }
+        #createModal .mitigation-dialog__card,
+        #editModal .mitigation-dialog__card {
+            width: min(560px, calc(100vw - 40px)) !important;
+            max-width: 560px !important;
+        }
+        #deleteModal .mitigation-dialog__card {
+            width: min(420px, calc(100vw - 40px)) !important;
+            max-width: 420px !important;
+        }
         .user-dropdown { position:relative; }
         .user-dropdown-toggle { display:flex; align-items:center; gap:12px; padding:8px 16px; border-radius:999px; background:#fffbeb; border:1px solid #fef3c7; cursor:pointer; }
         .user-dropdown-menu { position:absolute; top:calc(100% + 12px); right:0; width:260px; background:white; border-radius:18px; box-shadow:0 24px 56px rgba(15,23,42,.14); border:1px solid rgba(226,232,240,.95); opacity:0; visibility:hidden; transform:translateY(10px); transition:all .2s ease; overflow:hidden; }
         .user-dropdown-menu.show { opacity:1; visibility:visible; transform:translateY(0); }
         .user-dropdown-item { display:flex; align-items:center; gap:12px; padding:12px 18px; color:#1e293b; text-decoration:none; font-size:14px; }
         .user-dropdown-item:hover { background:#fff0e8; color:#c63d26; }
+
+        .mobile-page-head {
+            display: none;
+        }
         
         @media (min-width: 768px) {
             .mitigation-main {
@@ -139,23 +161,91 @@
         }
 
         @media (max-width: 768px) {
+            body,
+            body.chief-dashboard-page,
+            .mitigation-shell,
+            .mitigation-main,
+            .dashboard-container,
+            .mitigation-wrap {
+                overflow: visible !important;
+            }
             .mitigation-main { margin-left: 0; width: 100%; }
-            .dashboard-container { width: min(100%, 760px); padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px); }
-            .top-bar,
+            .dashboard-container { width: min(100%, 760px); padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 92px); }
             .mitigation-banner,
             .card,
             .panel {
-                border-radius: 0;
-                box-shadow: none;
-                margin-inline: -14px;
+                border-radius: 20px;
+                box-shadow: 0 10px 24px rgba(15,23,42,.05);
+                margin-inline: 0;
             }
-            .top-bar { padding: 16px; }
-            .mitigation-banner { padding: 22px; }
-            .mitigation-banner__title { font-size: 1.55rem; }
-            .mitigation-banner__meta { grid-template-columns: 1fr; }
-            .summary-grid, .form-grid { grid-template-columns:1fr; }
-            .panel, .card { padding:20px; }
-            .table-wrap { max-height:none; }
+            .top-bar {
+                display: none;
+            }
+            .mobile-page-head {
+                display: block;
+                margin-bottom: 6px;
+                padding: 1px 2px 0;
+            }
+            .mobile-page-head__eyebrow {
+                color: #c2410c;
+                font-size: .56rem;
+                font-weight: 900;
+                letter-spacing: .07em;
+                text-transform: uppercase;
+            }
+            .mobile-page-head h1 {
+                margin: 2px 0 0;
+                color: #0f172a;
+                font-size: .94rem;
+                font-weight: 900;
+                line-height: 1.2;
+            }
+            .mitigation-banner {
+                padding: 11px;
+                gap: 8px;
+                margin-bottom: 8px;
+                border-left-width: 3px;
+            }
+            .chief-theme-hero__eyebrow {
+                padding: 5px 9px;
+                font-size: .54rem;
+                letter-spacing: .07em;
+            }
+            .mitigation-banner__title { font-size: .94rem; line-height: 1.16; }
+            .mitigation-banner__copy { font-size: .68rem; line-height: 1.32; margin-top: 4px; }
+            .mitigation-banner__meta {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px;
+                min-width: 0;
+            }
+            .mitigation-banner__meta-card {
+                padding: 7px 8px;
+                border-radius: 11px;
+            }
+            .mitigation-banner__meta-label {
+                font-size: .5rem;
+            }
+            .mitigation-banner__meta-value {
+                margin-top: 2px;
+                font-size: .64rem;
+                line-height: 1.28;
+            }
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 7px;
+            }
+            .mitigation-stack { gap: 8px; }
+            .panel, .card { padding: 10px; border-radius: 15px; }
+            .card-label { font-size: .58rem; }
+            .card-value { margin-top: 6px; font-size: 1rem; }
+            .card-copy { margin-top: 3px; font-size: .62rem; line-height: 1.28; }
+            .panel-head {
+                gap: 7px;
+                margin-bottom: 8px;
+            }
+            .panel-head h3 { font-size: .82rem; }
+            .panel-head p { font-size: .66rem; line-height: 1.28; }
+            .form-grid { grid-template-columns:1fr; }
             .panel-head,
             .form-actions {
                 flex-direction: column;
@@ -166,20 +256,128 @@
             .cancel-btn {
                 width: 100%;
                 justify-content: center;
+                min-height: 38px;
+                padding: 0 12px;
+                font-size: .72rem;
             }
-            .modal {
+            .panel-head .hero-btn {
+                min-height: 34px;
+            }
+            .chip {
+                min-height: 20px;
+                padding: 0 6px;
+                font-size: .58rem;
+                gap: 4px;
+            }
+            .tag {
+                min-height: 20px;
+                padding: 0 7px;
+                font-size: .56rem;
+            }
+            .title {
+                font-size: .74rem;
+            }
+            .note {
+                margin-top: 3px;
+                font-size: .63rem;
+                line-height: 1.28;
+            }
+            .table-wrap {
+                overflow: visible;
+                max-height:none;
+                border: 0;
+                background: transparent;
+                border-radius: 0;
+                padding: 0;
+            }
+            table {
+                min-width: 0;
+                width: 100%;
+                table-layout: auto;
+                border-spacing: 0;
+            }
+            thead {
+                display: none;
+            }
+            tbody {
+                display: grid;
+                gap: 7px;
+            }
+            tbody tr {
+                display: block;
+                border: 1px solid rgba(226,232,240,.92);
+                border-radius: 14px;
+                background: rgba(255,255,255,.98);
+                box-shadow: 0 8px 18px rgba(15,23,42,.035);
+                overflow: hidden;
+            }
+            tbody tr:hover td {
+                background: transparent;
+            }
+            td {
+                display: grid;
+                grid-template-columns: 58px minmax(0, 1fr);
+                gap: 6px;
+                width: 100% !important;
+                padding: 7px 9px;
+                font-size: .66rem;
+                background: transparent;
+                border-bottom: 1px solid rgba(241,245,249,1);
+            }
+            td::before {
+                content: attr(data-label);
+                color: #94a3b8;
+                font-size: .52rem;
+                font-weight: 800;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+                line-height: 1.35;
+                padding-top: 2px;
+            }
+            td:last-child {
+                border-bottom: 0;
+            }
+            td[data-label="Actions"] {
+                display: block;
+                padding-top: 6px;
+            }
+            td[data-label="Actions"]::before {
+                display: none;
+            }
+            .row-actions {
+                justify-content: flex-end;
+                gap: 5px;
+            }
+            .row-btn {
+                width: 28px;
+                min-height: 28px;
+                font-size: .62rem;
+            }
+            .attachments {
+                gap: 4px;
+            }
+            .attachments a {
+                font-size: .62rem;
+            }
+            .mitigation-dialog {
                 align-items: flex-end;
                 padding: 10px;
             }
-            .modal-card {
+            .mitigation-dialog__card {
                 width: 100%;
                 max-width: 100%;
-                max-height: min(80dvh, 680px);
-                border-radius: 24px 24px 18px 18px;
-                padding: 14px;
+                max-height: min(78dvh, 620px);
+                border-radius: 22px 22px 16px 16px;
+                padding: 11px;
             }
-            .modal-head { margin-bottom: 12px; padding-bottom: 10px; }
-            .modal-card::before {
+            #createModal .mitigation-dialog__card,
+            #editModal .mitigation-dialog__card,
+            #deleteModal .mitigation-dialog__card {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .mitigation-dialog__head { margin-bottom: 10px; padding-bottom: 8px; }
+            .mitigation-dialog__card::before {
                 content: "";
                 display: block;
                 width: 52px;
@@ -187,6 +385,28 @@
                 border-radius: 999px;
                 background: #cbd5e1;
                 margin: 4px auto 10px;
+            }
+            .mitigation-field {
+                gap: 5px;
+            }
+            .mitigation-field label {
+                font-size: .66rem;
+            }
+            .mitigation-field input,
+            .mitigation-field select,
+            .mitigation-field textarea {
+                min-height: 36px;
+                padding: 8px 9px;
+                border-radius: 12px;
+                font-size: .74rem;
+            }
+            .mitigation-dialog .mitigation-field textarea {
+                min-height: 68px;
+            }
+            .empty {
+                padding: 14px 12px;
+                border-radius: 16px;
+                font-size: .7rem;
             }
         }
     </style>
@@ -229,6 +449,11 @@
                         </div>
                     </div>
                 </div>
+
+                <section class="mobile-page-head" aria-hidden="true">
+                    <div class="mobile-page-head__eyebrow">Mitigation</div>
+                    <h1>Mitigation Control</h1>
+                </section>
 
                 <section class="mitigation-banner chief-theme-hero">
                     <div>
@@ -325,17 +550,17 @@
                                                 ];
                                             @endphp
                                             <tr>
-                                                <td>
+                                                <td data-label="Action">
                                                     <div class="title">{{ $action->title }}</div>
                                                     <div class="note note--clamp">{{ $action->description }}</div>
                                                     <div class="note">{{ $action->creator?->full_name ?? 'Station command' }}</div>
                                                 </td>
-                                                <td>{{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</td>
-                                                <td>{{ $mitigationCategoryOptions[$action->category] ?? ucfirst(str_replace('_', ' ', $action->category)) }}</td>
-                                                <td><span class="tag {{ $action->priority_level }}">{{ str_replace('_', ' ', strtoupper($action->priority_level)) }}</span></td>
-                                                <td><span class="tag {{ $action->status }}">{{ str_replace('_', ' ', strtoupper($action->status)) }}</span></td>
-                                                <td>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</td>
-                                                <td class="source-cell">
+                                                <td data-label="Barangay">{{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</td>
+                                                <td data-label="Category">{{ $mitigationCategoryOptions[$action->category] ?? ucfirst(str_replace('_', ' ', $action->category)) }}</td>
+                                                <td data-label="Priority"><span class="tag {{ $action->priority_level }}">{{ str_replace('_', ' ', strtoupper($action->priority_level)) }}</span></td>
+                                                <td data-label="Status"><span class="tag {{ $action->status }}">{{ str_replace('_', ' ', strtoupper($action->status)) }}</span></td>
+                                                <td data-label="Target">{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</td>
+                                                <td data-label="Source" class="source-cell">
                                                     <div class="chip-row">
                                                         @if($action->riskArea)
                                                             <span class="chip"><i class="fa-solid fa-location-dot"></i> {{ $action->riskArea->marker?->title ?? 'Risk' }}</span>
@@ -351,7 +576,7 @@
                                                         @endif
                                                     </div>
                                                 </td>
-                                                <td class="proof-cell">
+                                                <td data-label="Proof" class="proof-cell">
                                                     @if($action->attachments->isEmpty())
                                                         <span class="note">No files</span>
                                                     @else
@@ -362,7 +587,7 @@
                                                         </div>
                                                     @endif
                                                 </td>
-                                                <td>
+                                                <td data-label="Actions">
                                                     <div class="row-actions">
                                                         <button type="button" class="row-btn edit" title="Edit action" aria-label="Edit action" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i></button>
                                                         <button type="button" class="row-btn delete" title="Delete action" aria-label="Delete action" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i></button>
@@ -381,11 +606,11 @@
         </main>
     </div>
 
-    <div class="modal" id="createModal" aria-hidden="true">
-        <div class="modal-card">
-            <div class="modal-head">
+    <div class="mitigation-dialog" id="createModal" aria-hidden="true">
+        <div class="mitigation-dialog__card">
+            <div class="mitigation-dialog__head">
                 <div><h3>Add Action</h3><p>Create a station action.</p></div>
-                <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
                 @csrf
@@ -398,11 +623,11 @@
         </div>
     </div>
 
-    <div class="modal" id="editModal" aria-hidden="true">
-        <div class="modal-card">
-            <div class="modal-head">
+    <div class="mitigation-dialog" id="editModal" aria-hidden="true">
+        <div class="mitigation-dialog__card">
+            <div class="mitigation-dialog__head">
                 <div><h3>Edit Action</h3><p>Update this action.</p></div>
-                <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" id="editForm" action="{{ route('station-admin.mitigations.update', ['mitigationActionId' => 0]) }}" enctype="multipart/form-data">
                 @csrf
@@ -416,11 +641,11 @@
         </div>
     </div>
 
-    <div class="modal" id="deleteModal" aria-hidden="true">
-        <div class="modal-card" style="width:min(520px, calc(100vw - 28px));">
-            <div class="modal-head">
+    <div class="mitigation-dialog" id="deleteModal" aria-hidden="true">
+        <div class="mitigation-dialog__card">
+            <div class="mitigation-dialog__head">
                 <div><h3>Delete Action</h3><p id="deleteMessage">This action and its proof files will be removed.</p></div>
-                <button type="button" class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" id="deleteForm" action="{{ route('station-admin.mitigations.destroy', ['mitigationActionId' => 0]) }}">
                 @csrf
@@ -504,7 +729,7 @@
             const closeModal = (modal) => { if (!modal) return; modal.classList.remove('is-open'); modal.setAttribute('aria-hidden', 'true'); };
             const openModal = (modal) => {
                 if (!modal) return;
-                const modalCard = modal.querySelector('.modal-card');
+                const modalCard = modal.querySelector('.mitigation-dialog__card');
                 if (modalCard) {
                     modalCard.scrollTop = 0;
                 }

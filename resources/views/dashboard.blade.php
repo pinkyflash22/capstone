@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="anonymous-user-id" content="{{ \App\Models\User::resolveAnonymousUserId() ?? '' }}">
+    <meta name="anonymous-user-id" content="{{ $anonymousUserId ?? '' }}">
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -210,11 +210,11 @@
                     <!-- Stats -->
                     <div class="stats-grid">
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="340">
-                            <div class="stat-value" id="totalStations">{{ \App\Models\Marker::where('category', 'station')->count() }}</div>
+                            <div class="stat-value" id="totalStations">{{ $totalStations ?? 0 }}</div>
                             <div class="stat-label">Active Stations</div>
                         </div>
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="420">
-                            <div class="stat-value" id="totalHydrants">{{ \App\Models\Marker::where('category', 'hydrant')->count() }}</div>
+                            <div class="stat-value" id="totalHydrants">{{ $totalHydrants ?? 0 }}</div>
                             <div class="stat-label">Fire Hydrants</div>
                         </div>
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="500">
