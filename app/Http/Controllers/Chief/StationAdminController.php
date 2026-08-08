@@ -1316,162 +1316,185 @@ class StationAdminController extends Controller
 
     public function mitigations()
     {
-        $managedBarangays = $this->getManagedBarangaysForStationAdmin();
-        $stationOfficer = $this->getAuthenticatedStationOfficer();
-        $stationId = $stationOfficer?->station_id;
-        $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
-        $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
-
         try {
-            $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
+            $managedBarangays = $this->getManagedBarangaysForStationAdmin();
+            $stationOfficer = $this->getAuthenticatedStationOfficer();
+            $stationId = $stationOfficer?->station_id;
+            $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+            $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
+
+            try {
+                $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
+            } catch (\Throwable $e) {
+                Log::warning('Generated mitigation draft sync failed while loading mitigation page.', [
+                    'station_id' => $stationId,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+
+            $mitigationActions = MitigationAction::query()
+                ->select([
+                    'mitigation_action_id',
+                    'barangay_id',
+                    'risk_area_id',
+                    'barangay_prediction_checklist_id',
+                    'ai_action_plan_checklist_id',
+                    'title',
+                    'category',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'description',
+                    'remarks',
+                    'created_by',
+                    'created_at',
+                ])
+                ->with([
+                    'barangay:barangay_id,barangay_name,city_id',
+                    'barangay.city:city_id,city_name',
+                    'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
+                    'riskArea:risk_area_id,barangay_hall_id,marker_id',
+                    'riskArea.marker:marker_id,title',
+                    'checklist:barangay_prediction_checklist_id,title',
+                    'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
+                    'creator:user_id,first_name,middle_name,last_name',
+                ])
+                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
+                ->orderByRaw("
+                    CASE status
+                        WHEN 'in_progress' THEN 1
+                        WHEN 'planned' THEN 2
+                        WHEN 'blocked' THEN 3
+                        WHEN 'completed' THEN 4
+                        WHEN 'cancelled' THEN 5
+                        ELSE 6
+                    END
+                ")
+                ->orderBy('target_date')
+                ->orderByDesc('created_at')
+                ->get();
+
+            $riskAreas = RiskArea::query()
+                ->select(['risk_area_id', 'barangay_hall_id', 'marker_id'])
+                ->with([
+                    'marker:marker_id,title',
+                    'barangayHall:barangay_hall_id,barangay_id',
+                    'barangayHall.barangay:barangay_id,barangay_name',
+                ])
+                ->when(! empty($barangayIds), function ($query) use ($barangayIds) {
+                    $query->whereHas('barangayHall', fn ($hallQuery) => $hallQuery->whereIn('barangay_id', $barangayIds));
+                })
+                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderByDesc('created_at')
+                ->get();
+
+            $predictionChecklists = BarangayPredictionChecklist::query()
+                ->select([
+                    'barangay_prediction_checklist_id',
+                    'barangay_id',
+                    'title',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'assigned_to',
+                    'reviewed_by',
+                ])
+                ->with([
+                    'assignee:user_id,first_name,middle_name,last_name',
+                    'reviewer:user_id,first_name,middle_name,last_name',
+                    'barangay:barangay_id,barangay_name',
+                ])
+                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
+                ->orderBy('target_date')
+                ->get();
+
+            $aiActionPlanOptions = DB::table('ai_action_plan_checklists')
+                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderByDesc('created_at')
+                ->get(['ai_action_plan_checklist_id', 'barangay_id', 'plan_title', 'priority_level', 'status']);
+
+            $generatedMitigationDrafts = AiActionPlanChecklist::query()
+                ->with([
+                    'barangay:barangay_id,barangay_name',
+                    'riskArea:risk_area_id,marker_id',
+                    'riskArea.marker:marker_id,title',
+                ])
+                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->whereNotNull('source_signature')
+                ->where('status', 'pending')
+                ->orderByRaw("
+                    CASE priority_level
+                        WHEN 'critical' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                        ELSE 5
+                    END
+                ")
+                ->orderByDesc('created_at')
+                ->get();
+
+            $mitigationDraft = $draftActionPlanChecklistId
+                ? $this->buildMitigationDraftFromActionPlanChecklist($draftActionPlanChecklistId, $barangayIds)
+                : null;
+
+            return view('chief.mitigations', [
+                'managedBarangays' => $managedBarangays,
+                'mitigationActions' => $mitigationActions,
+                'riskAreas' => $riskAreas,
+                'predictionChecklists' => $predictionChecklists,
+                'aiActionPlanOptions' => $aiActionPlanOptions,
+                'generatedMitigationDrafts' => $generatedMitigationDrafts,
+                'mitigationDraft' => $mitigationDraft,
+                'autoOpenCreateModal' => (bool) $mitigationDraft,
+                'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
+                'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
+                'mitigationStatusOptions' => $this->mitigationStatusOptions(),
+            ]);
         } catch (\Throwable $e) {
-            Log::warning('Generated mitigation draft sync failed while loading mitigation page.', [
-                'station_id' => $stationId,
+            Log::error('Mitigation page load failed.', [
                 'message' => $e->getMessage(),
+                'user_id' => Auth::user()?->user_id,
+            ]);
+
+            return view('chief.mitigations', [
+                'managedBarangays' => collect(),
+                'mitigationActions' => collect(),
+                'riskAreas' => collect(),
+                'predictionChecklists' => collect(),
+                'aiActionPlanOptions' => collect(),
+                'generatedMitigationDrafts' => collect(),
+                'mitigationDraft' => null,
+                'autoOpenCreateModal' => false,
+                'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
+                'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
+                'mitigationStatusOptions' => $this->mitigationStatusOptions(),
+            ])->withErrors([
+                'mitigations' => 'Mitigation data could not be loaded right now. The page was opened in safe mode instead of returning a server error.',
             ]);
         }
-
-        $mitigationActions = MitigationAction::query()
-            ->select([
-                'mitigation_action_id',
-                'barangay_id',
-                'risk_area_id',
-                'barangay_prediction_checklist_id',
-                'ai_action_plan_checklist_id',
-                'title',
-                'category',
-                'priority_level',
-                'status',
-                'target_date',
-                'description',
-                'remarks',
-                'created_by',
-                'created_at',
-            ])
-            ->with([
-                'barangay:barangay_id,barangay_name,city_id',
-                'barangay.city:city_id,city_name',
-                'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
-                'riskArea:risk_area_id,barangay_hall_id,marker_id',
-                'riskArea.marker:marker_id,title',
-                'checklist:barangay_prediction_checklist_id,title',
-                'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
-                'creator:user_id,first_name,middle_name,last_name',
-            ])
-            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByRaw("
-                CASE priority_level
-                    WHEN 'critical' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
-                    ELSE 5
-                END
-            ")
-            ->orderByRaw("
-                CASE status
-                    WHEN 'in_progress' THEN 1
-                    WHEN 'planned' THEN 2
-                    WHEN 'blocked' THEN 3
-                    WHEN 'completed' THEN 4
-                    WHEN 'cancelled' THEN 5
-                    ELSE 6
-                END
-            ")
-            ->orderBy('target_date')
-            ->orderByDesc('created_at')
-            ->get();
-
-        $riskAreas = RiskArea::query()
-            ->select(['risk_area_id', 'barangay_hall_id', 'marker_id'])
-            ->with([
-                'marker:marker_id,title',
-                'barangayHall:barangay_hall_id,barangay_id',
-                'barangayHall.barangay:barangay_id,barangay_name',
-            ])
-            ->when(! empty($barangayIds), function ($query) use ($barangayIds) {
-                $query->whereHas('barangayHall', fn ($hallQuery) => $hallQuery->whereIn('barangay_id', $barangayIds));
-            })
-            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByDesc('created_at')
-            ->get();
-
-        $predictionChecklists = BarangayPredictionChecklist::query()
-            ->select([
-                'barangay_prediction_checklist_id',
-                'barangay_id',
-                'title',
-                'priority_level',
-                'status',
-                'target_date',
-                'assigned_to',
-                'reviewed_by',
-            ])
-            ->with([
-                'assignee:user_id,first_name,middle_name,last_name',
-                'reviewer:user_id,first_name,middle_name,last_name',
-                'barangay:barangay_id,barangay_name',
-            ])
-            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByRaw("
-                CASE priority_level
-                    WHEN 'critical' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
-                    ELSE 5
-                END
-            ")
-            ->orderBy('target_date')
-            ->get();
-
-        $aiActionPlanOptions = DB::table('ai_action_plan_checklists')
-            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderByDesc('created_at')
-            ->get(['ai_action_plan_checklist_id', 'barangay_id', 'plan_title', 'priority_level', 'status']);
-
-        $generatedMitigationDrafts = AiActionPlanChecklist::query()
-            ->with([
-                'barangay:barangay_id,barangay_name',
-                'riskArea:risk_area_id,marker_id',
-                'riskArea.marker:marker_id,title',
-            ])
-            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-            ->whereNotNull('source_signature')
-            ->where('status', 'pending')
-            ->orderByRaw("
-                CASE priority_level
-                    WHEN 'critical' THEN 1
-                    WHEN 'high' THEN 2
-                    WHEN 'medium' THEN 3
-                    WHEN 'low' THEN 4
-                    ELSE 5
-                END
-            ")
-            ->orderByDesc('created_at')
-            ->get();
-
-        $mitigationDraft = $draftActionPlanChecklistId
-            ? $this->buildMitigationDraftFromActionPlanChecklist($draftActionPlanChecklistId, $barangayIds)
-            : null;
-
-        return view('chief.mitigations', [
-            'managedBarangays' => $managedBarangays,
-            'mitigationActions' => $mitigationActions,
-            'riskAreas' => $riskAreas,
-            'predictionChecklists' => $predictionChecklists,
-            'aiActionPlanOptions' => $aiActionPlanOptions,
-            'generatedMitigationDrafts' => $generatedMitigationDrafts,
-            'mitigationDraft' => $mitigationDraft,
-            'autoOpenCreateModal' => (bool) $mitigationDraft,
-            'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
-            'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
-            'mitigationStatusOptions' => $this->mitigationStatusOptions(),
-        ]);
     }
 
     public function approveGeneratedMitigationDraft(Request $request, int $checklistId)

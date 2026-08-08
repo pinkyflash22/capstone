@@ -263,9 +263,9 @@
             font-weight: 800;
         }
         .analytics-run-modal {
-            width: min(92vw, 760px);
-            max-width: 760px;
-            max-height: min(82vh, 720px);
+            width: min(92vw, 620px) !important;
+            max-width: 620px !important;
+            max-height: min(78vh, 600px) !important;
         }
         .analytics-run-modal__hero {
             padding: 16px;
@@ -482,7 +482,9 @@
         .modal-close:hover { background: #f3f4f6; color: #dc2626; }
 
         #exploreModal,
-        #predictionDetailModal {
+        #predictionDetailModal,
+        #recommendationRunModal,
+        #barangayRankingModal {
             padding: 18px;
         }
         .analytics-forecast-modal {
@@ -498,6 +500,16 @@
             width: min(92vw, 560px) !important;
             max-width: 560px !important;
             max-height: min(78vh, 560px) !important;
+        }
+        #predictionDetailModal .modal-content.analytics-forecast-modal {
+            width: min(92vw, 600px) !important;
+            max-width: 600px !important;
+            max-height: min(77vh, 580px) !important;
+        }
+        #recommendationRunModal .modal-content.analytics-forecast-modal {
+            width: min(92vw, 620px) !important;
+            max-width: 620px !important;
+            max-height: min(78vh, 600px) !important;
         }
         #exploreModal .modal-body {
             padding: 0.9rem 1rem !important;
@@ -537,34 +549,34 @@
                 "opsz" 24;
         }
         .analytics-forecast-modal--details {
-            width: min(72vw, 500px) !important;
-            max-width: 500px !important;
-            max-height: min(64vh, 500px) !important;
+            width: min(92vw, 600px) !important;
+            max-width: 600px !important;
+            max-height: min(77vh, 580px) !important;
         }
         .analytics-forecast-modal--details .modal-body {
-            padding: 0.72rem 0.78rem;
+            padding: 0.88rem 0.95rem;
         }
         .analytics-forecast-modal--details .modal-body [style*="padding:18px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:16px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:14px"] {
-            padding: 8px !important;
+            padding: 10px !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:28px"] {
-            font-size: 0.98rem !important;
+            font-size: 1.08rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:24px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:22px"] {
-            font-size: 0.88rem !important;
+            font-size: 0.98rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:16px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:15px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:14px"] {
-            font-size: 0.74rem !important;
+            font-size: 0.82rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:13px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:12px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:11px"] {
-            font-size: 0.69rem !important;
+            font-size: 0.76rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="min-width:220px"] {
             min-width: 0 !important;
@@ -737,9 +749,9 @@
                 font-size: 12px;
             }
             .analytics-forecast-modal--details {
-                width: min(94vw, 390px) !important;
-                max-width: 390px !important;
-                max-height: min(68svh, 420px) !important;
+                width: min(95vw, 430px) !important;
+                max-width: 430px !important;
+                max-height: min(74svh, 500px) !important;
             }
             .analytics-forecast-modal--details .modal-body [style*="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))"] {
                 grid-template-columns: 1fr !important;
@@ -1801,9 +1813,9 @@
             .recommendation-run-subtitle { font-size: 11px; }
             .recommendation-run-arrow { width: 30px; height: 30px; border-radius: 10px; }
             .analytics-run-modal {
-                width: min(96vw, 420px) !important;
-                max-width: 420px !important;
-                max-height: min(78svh, 560px) !important;
+                width: min(95vw, 440px) !important;
+                max-width: 440px !important;
+                max-height: min(75svh, 520px) !important;
             }
             .analytics-run-modal__hero,
             .analytics-run-modal__checklist {
