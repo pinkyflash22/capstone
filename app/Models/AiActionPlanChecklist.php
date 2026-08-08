@@ -16,6 +16,7 @@ class AiActionPlanChecklist extends Model
         'analysis_id',
         'station_id',
         'barangay_id',
+        'risk_area_id',
         'source_type',
         'source_title',
         'source_description',
@@ -25,6 +26,7 @@ class AiActionPlanChecklist extends Model
         'success_indicator',
         'priority_level',
         'status',
+        'source_signature',
         'target_date',
         'assigned_to',
         'confirmed_by',
@@ -58,6 +60,11 @@ class AiActionPlanChecklist extends Model
     public function barangay()
     {
         return $this->belongsTo(Barangay::class, 'barangay_id', 'barangay_id');
+    }
+
+    public function riskArea()
+    {
+        return $this->belongsTo(RiskArea::class, 'risk_area_id', 'risk_area_id');
     }
 
     public function assignee()

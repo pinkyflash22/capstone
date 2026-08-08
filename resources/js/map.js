@@ -10123,11 +10123,15 @@ function buildFireRiskAreaPopup(area = {}) {
     const score = area.risk_score !== null && area.risk_score !== undefined
         ? Number(area.risk_score).toFixed(2)
         : 'N/A';
+    const radiusMeters = Number(metrics.cluster_radius_meters || area.radius_meters || 0);
+    const subtitle = area.geometry_type === 'circle'
+        ? `${escapeHtml(area.city_name || 'Clustered nearby evidence')} · ${radiusMeters > 0 ? `${Math.round(radiusMeters)}m prediction radius` : 'Predicted risk zone'}`
+        : escapeHtml(area.city_name || 'Mapped barangay boundary');
 
     return `
         <div class="fire-risk-area-popup">
             <div style="font-weight:800;color:#0f172a;font-size:15px;">${escapeHtml(area.name || 'Fire-risk area')}</div>
-            <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(area.city_name || 'Mapped barangay boundary')}</div>
+            <div style="margin-top:4px;font-size:12px;color:#64748b;">${subtitle}</div>
             <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:${area.risk_level === 'high' ? '#fee2e2' : '#fef3c7'};color:${area.risk_level === 'high' ? '#991b1b' : '#92400e'};font-weight:800;font-size:12px;">
                 ${level} FIRE RISK · ${score}
             </div>
@@ -10135,6 +10139,8 @@ function buildFireRiskAreaPopup(area = {}) {
                 <span><strong>${Number(metrics.verified_records || 0)}</strong><br>verified records</span>
                 <span><strong>${Number(metrics.hazards || 0)}</strong><br>hazards</span>
                 <span><strong>${Number(metrics.risks || 0)}</strong><br>risks</span>
+                <span><strong>${Number(metrics.historical_incidents || 0)}</strong><br>historical incidents</span>
+                <span><strong>${Number(metrics.support_points || 0)}</strong><br>support points</span>
                 <span><strong>${Number(metrics.affected_households || 0)}</strong><br>households</span>
             </div>
             <div style="margin-top:12px;font-size:12px;color:#334155;">
@@ -10143,6 +10149,36 @@ function buildFireRiskAreaPopup(area = {}) {
             </div>
         </div>
     `;
+}
+
+function createFireRiskAreaLayer(area = {}) {
+    if (String(area.geometry_type || '').toLowerCase() === 'circle') {
+        const centerLat = Number(area?.center?.lat);
+        const centerLng = Number(area?.center?.lng);
+        const radiusMeters = Number(area.radius_meters || area?.metrics?.cluster_radius_meters || 0);
+
+        if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+            return null;
+        }
+
+        return L.circle([centerLat, centerLng], {
+            ...getFireRiskAreaStyle(area),
+            radius: radiusMeters,
+            interactive: true,
+            pane: 'overlayPane'
+        });
+    }
+
+    const geojson = normalizeFireRiskAreaGeojson(area.geojson);
+    if (!geojson) {
+        return null;
+    }
+
+    return L.geoJSON(geojson, {
+        style: getFireRiskAreaStyle(area),
+        interactive: true,
+        pane: 'overlayPane'
+    });
 }
 
 async function loadFireRiskAreas() {
@@ -10167,17 +10203,11 @@ async function loadFireRiskAreas() {
         fireRiskAreaLayerGroup.clearLayers();
 
         areas.forEach((area) => {
-            const geojson = normalizeFireRiskAreaGeojson(area.geojson);
-            if (!geojson) {
-                return;
-            }
-
             try {
-                const layer = L.geoJSON(geojson, {
-                    style: getFireRiskAreaStyle(area),
-                    interactive: true,
-                    pane: 'overlayPane'
-                });
+                const layer = createFireRiskAreaLayer(area);
+                if (!layer) {
+                    return;
+                }
 
                 layer.bindTooltip(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk`, {
                     permanent: false,

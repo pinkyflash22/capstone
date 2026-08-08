@@ -497,6 +497,74 @@
                         </section>
                     @endif
 
+                    <section class="panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3>System Draft Recommendations</h3>
+                                <p>System-assisted drafts generated from meaningful predicted risk areas. Review them first before they become official mitigation actions.</p>
+                            </div>
+                        </div>
+
+                        @if(($generatedMitigationDrafts ?? collect())->isEmpty())
+                            <div class="empty">No pending system-generated mitigation drafts right now.</div>
+                        @else
+                            <div style="display:grid; gap:14px;">
+                                @foreach($generatedMitigationDrafts as $draftChecklist)
+                                    @php
+                                        $draftPayload = is_array($draftChecklist->ai_payload) ? $draftChecklist->ai_payload : [];
+                                        $draftDrivers = collect($draftPayload['drivers'] ?? [])->take(3)->values();
+                                        $draftFactors = collect($draftPayload['contributing_factors'] ?? [])->take(4)->map(fn ($factor) => ucwords(str_replace('_', ' ', (string) $factor)))->values();
+                                        $riskLevel = strtolower((string) ($draftPayload['risk_level'] ?? $draftChecklist->priority_level ?? 'medium'));
+                                        $riskLabel = strtoupper($riskLevel);
+                                        $categoryLabel = $mitigationCategoryOptions[$draftPayload['recommended_category'] ?? 'other'] ?? ucfirst(str_replace('_', ' ', $draftPayload['recommended_category'] ?? 'other'));
+                                    @endphp
+                                    <article class="card" style="padding:18px; border:1px solid rgba(226,232,240,.9);">
+                                        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:14px;">
+                                            <div style="min-width:0; flex:1 1 360px;">
+                                                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                                                    <span class="tag {{ $riskLevel === 'high' ? 'critical' : 'medium' }}">{{ $riskLabel }} RISK</span>
+                                                    <span class="tag">{{ strtoupper($draftChecklist->priority_level) }}</span>
+                                                    <span class="tag">{{ $categoryLabel }}</span>
+                                                </div>
+                                                <div class="title">{{ $draftChecklist->plan_title }}</div>
+                                                <div class="note" style="margin-top:6px;">
+                                                    {{ $draftChecklist->barangay?->barangay_name ?? 'Unknown barangay' }}
+                                                    @if($draftChecklist->riskArea?->marker?->title)
+                                                        · Linked marker: {{ $draftChecklist->riskArea->marker->title }}
+                                                    @endif
+                                                </div>
+                                                <div class="note" style="margin-top:10px; white-space:pre-line;">{{ \Illuminate\Support\Str::limit($draftChecklist->plan_description, 380) }}</div>
+                                                @if($draftDrivers->isNotEmpty())
+                                                    <div class="note" style="margin-top:10px;"><strong>Why generated:</strong> {{ $draftDrivers->implode(' | ') }}</div>
+                                                @endif
+                                                @if($draftFactors->isNotEmpty())
+                                                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                                                        @foreach($draftFactors as $factor)
+                                                            <span class="chip"><i class="fa-solid fa-circle-exclamation"></i> {{ $factor }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div style="display:flex; flex-direction:column; gap:10px; min-width:220px;">
+                                                <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.approve', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">
+                                                    @csrf
+                                                    <button type="submit" class="hero-btn" style="width:100%; justify-content:center;"><i class="fa-solid fa-circle-check"></i><span>Approve</span></button>
+                                                </form>
+                                                <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="row-btn edit" style="width:100%; justify-content:center; text-decoration:none; display:inline-flex;">
+                                                    <i class="fa-solid fa-pen"></i><span style="margin-left:8px;">Edit Draft</span>
+                                                </a>
+                                                <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">
+                                                    @csrf
+                                                    <button type="submit" class="row-btn delete" style="width:100%; justify-content:center;"><i class="fa-solid fa-ban"></i><span style="margin-left:8px;">Reject</span></button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </article>
+                                @endforeach
+                            </div>
+                        @endif
+                    </section>
+
                     <section class="summary-grid">
                         <article class="card"><div class="card-label">Total</div><div class="card-value">{{ $mitigationActions->count() }}</div><div class="card-copy">All actions.</div></article>
                         <article class="card"><div class="card-label">Open</div><div class="card-value">{{ $openMitigations->count() }}</div><div class="card-copy">Needs follow-up.</div></article>

@@ -2,6 +2,14 @@
     $draft = $mitigationDraft ?? [];
 @endphp
 
+@if(!empty($draft['workflow_note']))
+    <div class="mitigation-field mitigation-field--full">
+        <div style="padding:12px 14px; border-radius:14px; background:#fff7ed; border:1px solid rgba(249,115,22,.18); color:#9a3412; font-size:.78rem; line-height:1.55;">
+            <strong>Workflow:</strong> {{ $draft['workflow_note'] }}
+        </div>
+    </div>
+@endif
+
 <div class="mitigation-field">
     <label for="stationMitigationBarangay">Barangay</label>
     <select id="stationMitigationBarangay" name="barangay_id" required>

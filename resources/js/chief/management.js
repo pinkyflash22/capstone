@@ -21,6 +21,7 @@ class ManagementPage {
         this.rolesData ={
             allRoles: window.rolesData || [],
         };
+        this.managedBarangays = window.managedBarangays || [];
         this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || window.csrfToken;
         this.nextId = {
             reports: 100,
@@ -328,7 +329,10 @@ class ManagementPage {
     updateStats() {
         const stats = {
             totalIncidents: this.data.incidents.length,
-            activeIncidents: this.data.incidents.filter(i => i.status == 'Reported' || i.status == 'Responding').length,
+            activeIncidents: this.data.incidents.filter((incident) => {
+                const status = this.getIncidentStatusMeta(incident).value;
+                return ['reported', 'responding', 'active'].includes(status);
+            }).length,
             totalReports: this.data.reports.length,
             pendingReports: this.data.reports.filter(r => ['filed', 'conducting'].includes(r.status)).length,
             totalPersonnel: this.data.personnel.length,
@@ -395,7 +399,7 @@ class ManagementPage {
         if (!searchInput) return;
 
         const placeholders = {
-            incidents: 'Search by title, incident ID, or reporter...',
+            incidents: 'Search by title, incident ID, location, or source...',
             reports: 'Search by report stage, investigator, or incident...',
             personnel: 'Search by name, email, or account code...',
             equipment: 'Search by equipment name, type, or serial number...'
@@ -451,7 +455,15 @@ class ManagementPage {
         }
 
         if (addNewBtn) {
-            addNewBtn.style.display = this.currentTab === 'incidents' || this.currentTab === 'reports' ? 'none' : '';
+            if (this.currentTab === 'incidents') {
+                addNewBtn.style.display = '';
+                addNewBtn.title = 'Add historical fire record';
+                addNewBtn.innerHTML = '<i class="fa-solid fa-plus"></i><span class="btn-label">Add Historical Fire</span>';
+            } else {
+                addNewBtn.style.display = this.currentTab === 'reports' ? 'none' : '';
+                addNewBtn.title = `Add ${this.currentTab.slice(0, -1)}`;
+                addNewBtn.innerHTML = '<i class="fa-solid fa-plus"></i><span class="btn-label">Add New</span>';
+            }
         }
     }
 
@@ -559,10 +571,9 @@ class ManagementPage {
 
         if (this.filters.status) {
             data = data.filter(item => {
-                const statusValue = item.incident_status_id?.toString() || 
-                                   item.report_kind ||
-                                   (item.status_id?.toString()) || 
-                                   item.status || '';
+                const statusValue = this.currentTab === 'incidents'
+                    ? this.getIncidentStatusMeta(item).id?.toString() || this.getIncidentStatusMeta(item).value
+                    : (item.report_kind || (item.status_id?.toString()) || item.status || '');
                 return statusValue === this.filters.status;
             });
         }
@@ -585,7 +596,10 @@ class ManagementPage {
                     item.incident_id?.toString(),
                     item.marker?.title,
                     item.marker?.description,
-                    item.reported_by
+                    item.reported_by,
+                    item.historical_records?.[0]?.source_name,
+                    item.historical_records?.[0]?.incident_location,
+                    item.historical_records?.[0]?.fire_cause
                 ].filter(f => f).join(' ');
             case 'reports':
                 return [
@@ -692,8 +706,7 @@ class ManagementPage {
     }
 
     renderIncidentRow(incident) {
-        const priorityMap = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'};
-        const priority = priorityMap[incident.incident_type_id] || 'medium';
+        const priority = this.getIncidentPriorityValue(incident);
         
         const priorityClass = {
             'critical': 'priority-critical',
@@ -702,8 +715,8 @@ class ManagementPage {
             'low': 'priority-low'
         }[priority] || 'priority-medium';
 
-        const statusMap = {1: 'reported', 2: 'responding', 3: 'active', 4: 'resolved'};
-        const status = statusMap[incident.incident_status_id] || 'reported';
+        const historical = this.getPrimaryHistoricalRecord(incident);
+        const status = this.getIncidentStatusMeta(incident).value;
         
         const statusClass = {
             'active': 'status-badge active',
@@ -713,16 +726,19 @@ class ManagementPage {
         }[status] || 'status-badge pending';
 
         const title = incident.marker?.title || incident.title || 'Untitled';
-        const location = incident.marker ? `${incident.marker.lat}, ${incident.marker.lng}`: 'N/A';
+        const location = historical?.incident_location || (incident.marker ? `${incident.marker.lat}, ${incident.marker.lng}` : 'N/A');
         const reporterName = [incident.reporter?.first_name, incident.reporter?.last_name].filter(Boolean).join(' ').trim();
-        const reportedBy = reporterName || incident.reported_by || 'Unknown';
-        const date = incident.created_at ? new Date(incident.created_at).toLocaleDateString() : 'N/A';
+        const reportedBy = historical?.source_name || reporterName || incident.reported_by || 'Unknown';
+        const dateSource = historical?.incident_date || incident.created_at;
+        const date = dateSource ? new Date(dateSource).toLocaleDateString() : 'N/A';
+        const historicalBadge = historical ? '<span class="badge" style="margin-top:6px;display:inline-flex;">Historical Fire Record</span>' : '';
 
         return `
             <tr data-id="${incident.incident_id}">
                 <td data-label="Title">
                     <div class="cell-content">
                         <strong>${this.escapeHtml(title)}</strong>
+                        ${historicalBadge}
                         ${incident.marker?.description ? `<br><small>${this.escapeHtml(incident.marker.description.substring(0, 50))}${incident.marker.description.length > 50 ? '...' : ''}</small>` : ''}
                     </div>
                 </td>
@@ -1048,13 +1064,18 @@ class ManagementPage {
 
     openAddModal() {
         const titles = {
-            incidents: 'Add New Incident',
+            incidents: 'Add Historical Fire Record',
             personnel: 'Add Personnel',
             equipment: 'Add Equipment'
         };
 
         if (this.currentTab === 'reports') {
             this.showToast('Investigation reports are view-only in this registry.', 'info');
+            return;
+        }
+
+        if (this.currentTab === 'incidents' && !this.managedBarangays.length) {
+            this.showToast('No covered barangays are assigned to this station yet.', 'warning');
             return;
         }
 
@@ -1081,49 +1102,128 @@ class ManagementPage {
     }
 
     renderIncidentAddForm() {
+        const barangayOptions = this.managedBarangays.length
+            ? this.managedBarangays.map((barangay) => `<option value="${barangay.barangay_id}">${this.escapeHtml(barangay.barangay_name)}</option>`).join('')
+            : '<option value="">No covered barangays available</option>';
+
         return `
             <form id="dataForm" class="edit-form">
+                <input type="hidden" name="entry_mode" value="historical_fire_record">
+                <div class="info-card" style="margin-bottom:16px;">
+                    <div class="card-content">
+                        <p style="margin:0;font-size:0.92rem;color:#475569;">Use this form for fires that were already handled outside the live reporting flow. It will be saved as a historical BFP fire record on this incident registry page.</p>
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label class="form-label">Title *</label>
-                    <input type="text" class="form-input" name="title" placeholder="Enter incident title" required>
+                    <label class="form-label">Incident Title *</label>
+                    <input type="text" class="form-input" name="title" placeholder="Enter fire incident title" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Description</label>
-                    <textarea class="form-textarea" name="description" placeholder="Enter description" rows="4"></textarea>
+                    <textarea class="form-textarea" name="description" placeholder="Short summary of the fire incident" rows="3"></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Priority</label>
-                        <select class="form-select" name="priority">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                            <option value="critical">Critical</option>
-                        </select>
+                        <label class="form-label">Incident Date *</label>
+                        <input type="date" class="form-input" name="incident_date" max="${new Date().toISOString().split('T')[0]}" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" name="status">
-                            <option value="reported">Reported</option>
-                            <option value="responding">Responding</option>
-                            <option value="active">Active</option>
-                            <option value="resolved">Resolved</option>
-                        </select>
+                        <label class="form-label">Incident Time</label>
+                        <input type="time" class="form-input" name="incident_time">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Latitude</label>
-                        <input type="text" class="form-input" name="lat" placeholder="Latitude">
+                        <label class="form-label">Covered Barangay *</label>
+                        <select class="form-select" name="barangay_id" ${this.managedBarangays.length ? 'required' : 'disabled'}>
+                            <option value="">Select barangay</option>
+                            ${barangayOptions}
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Longitude</label>
-                        <input type="text" class="form-input" name="lng" placeholder="Longitude">
+                        <label class="form-label">Classification *</label>
+                        <select class="form-select" name="fire_classification" required>
+                            <option value="accidental">Accidental</option>
+                            <option value="intentional">Intentional</option>
+                            <option value="undetermined" selected>Undetermined</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Reported By</label>
-                    <input type="text" class="form-input" name="reported_by" placeholder="Reporter name">
+                    <label class="form-label">Incident Location *</label>
+                    <input type="text" class="form-input" name="incident_location" placeholder="Street, purok, sitio, or landmark" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fire Cause</label>
+                    <input type="text" class="form-input" name="fire_cause" placeholder="Known or suspected fire cause">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Latitude *</label>
+                        <input type="text" class="form-input" name="lat" placeholder="Latitude" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Longitude *</label>
+                        <input type="text" class="form-input" name="lng" placeholder="Longitude" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Incident Count</label>
+                        <input type="number" class="form-input" name="incident_count" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Estimated Damage</label>
+                        <input type="number" class="form-input" name="estimated_damage" min="0" step="0.01" placeholder="PHP amount">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Injured Count</label>
+                        <input type="number" class="form-input" name="injured_count" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Death Count</label>
+                        <input type="number" class="form-input" name="death_count" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Source Name</label>
+                        <input type="text" class="form-input" name="source_name" placeholder="BFP station logbook, after-action report, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Source Reference</label>
+                        <input type="text" class="form-input" name="source_reference" placeholder="Case number or reference">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Weather Condition</label>
+                        <input type="text" class="form-input" name="weather_condition" placeholder="Sunny, cloudy, rainy">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Wind Direction</label>
+                        <input type="text" class="form-input" name="wind_direction" placeholder="NE, East, etc.">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Temperature (°C)</label>
+                        <input type="number" class="form-input" name="temperature" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Humidity (%)</label>
+                        <input type="number" class="form-input" name="humidity" min="0" max="100" step="0.1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Wind Speed</label>
+                    <input type="number" class="form-input" name="wind_speed" min="0" step="0.1" placeholder="kph or recorded unit">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-textarea" name="notes" placeholder="Additional context for the historical record" rows="4"></textarea>
                 </div>
             </form>
         `;
@@ -1363,10 +1463,138 @@ class ManagementPage {
     }
 
     renderIncidentEditForm(incident) {
-        const priorityMap = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'};
-        const currentPriority = priorityMap[incident.incident_type_id] || 'medium';
-        const statusMap = {1: 'reported', 2: 'responding', 3: 'active', 4: 'resolved'};
-        const currentStatus = statusMap[incident.incident_status_id] || 'reported';
+        const historical = this.getPrimaryHistoricalRecord(incident);
+
+        if (historical) {
+            const barangayOptions = this.managedBarangays.length
+                ? this.managedBarangays.map((barangay) => `<option value="${barangay.barangay_id}" ${String(historical.barangay_id || '') === String(barangay.barangay_id) ? 'selected' : ''}>${this.escapeHtml(barangay.barangay_name)}</option>`).join('')
+                : '<option value="">No covered barangays available</option>';
+
+            return `
+                <form id="dataForm" class="edit-form">
+                    <input type="hidden" name="entry_mode" value="historical_fire_record">
+                    <div class="info-card" style="margin-bottom:16px;">
+                        <div class="card-content">
+                            <p style="margin:0;font-size:0.92rem;color:#475569;">This incident is stored as a historical BFP fire record. Updating this form will update both the linked incident marker and the historical fire details.</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Incident Title *</label>
+                        <input type="text" class="form-input" name="title" value="${this.escapeHtml(incident.marker?.title || incident.title || '')}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-textarea" name="description" rows="3">${this.escapeHtml(incident.marker?.description || incident.description || '')}</textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Incident Date *</label>
+                            <input type="date" class="form-input" name="incident_date" value="${historical.incident_date ? String(historical.incident_date).slice(0, 10) : ''}" max="${new Date().toISOString().split('T')[0]}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Incident Time</label>
+                            <input type="time" class="form-input" name="incident_time" value="${historical.incident_time ? String(historical.incident_time).slice(0, 5) : ''}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Covered Barangay *</label>
+                            <select class="form-select" name="barangay_id" ${this.managedBarangays.length ? 'required' : 'disabled'}>
+                                <option value="">Select barangay</option>
+                                ${barangayOptions}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Classification *</label>
+                            <select class="form-select" name="fire_classification" required>
+                                <option value="accidental" ${historical.fire_classification === 'accidental' ? 'selected' : ''}>Accidental</option>
+                                <option value="intentional" ${historical.fire_classification === 'intentional' ? 'selected' : ''}>Intentional</option>
+                                <option value="undetermined" ${historical.fire_classification === 'undetermined' ? 'selected' : ''}>Undetermined</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Incident Location *</label>
+                        <input type="text" class="form-input" name="incident_location" value="${this.escapeHtml(historical.incident_location || '')}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fire Cause</label>
+                        <input type="text" class="form-input" name="fire_cause" value="${this.escapeHtml(historical.fire_cause || '')}">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Latitude *</label>
+                            <input type="text" class="form-input" name="lat" value="${incident.marker?.lat || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Longitude *</label>
+                            <input type="text" class="form-input" name="lng" value="${incident.marker?.lng || ''}" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Incident Count</label>
+                            <input type="number" class="form-input" name="incident_count" min="1" value="${historical.incident_count ?? 1}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Estimated Damage</label>
+                            <input type="number" class="form-input" name="estimated_damage" min="0" step="0.01" value="${historical.estimated_damage ?? ''}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Injured Count</label>
+                            <input type="number" class="form-input" name="injured_count" min="0" value="${historical.injured_count ?? 0}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Death Count</label>
+                            <input type="number" class="form-input" name="death_count" min="0" value="${historical.death_count ?? 0}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Source Name</label>
+                            <input type="text" class="form-input" name="source_name" value="${this.escapeHtml(historical.source_name || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Source Reference</label>
+                            <input type="text" class="form-input" name="source_reference" value="${this.escapeHtml(historical.source_reference || '')}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Weather Condition</label>
+                            <input type="text" class="form-input" name="weather_condition" value="${this.escapeHtml(historical.weather_condition || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Wind Direction</label>
+                            <input type="text" class="form-input" name="wind_direction" value="${this.escapeHtml(historical.wind_direction || '')}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Temperature (°C)</label>
+                            <input type="number" class="form-input" name="temperature" step="0.1" value="${historical.temperature ?? ''}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Humidity (%)</label>
+                            <input type="number" class="form-input" name="humidity" min="0" max="100" step="0.1" value="${historical.humidity ?? ''}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Wind Speed</label>
+                        <input type="number" class="form-input" name="wind_speed" min="0" step="0.1" value="${historical.wind_speed ?? ''}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-textarea" name="notes" rows="4">${this.escapeHtml(historical.notes || '')}</textarea>
+                    </div>
+                </form>
+            `;
+        }
+
+        const currentPriority = this.getIncidentPriorityValue(incident);
+        const currentStatus = this.getIncidentStatusMeta(incident).value;
         
         return `
             <form id="dataForm" class="edit-form">
@@ -1646,11 +1874,33 @@ class ManagementPage {
     }
 
     renderIncidentDetail(item, viewContent, formatDate) {
-        const priorityMap = {1: 'low', 2: 'medium', 3: 'high', 4: 'critical'};
-        const priority = priorityMap[item.incident_type_id] || 'medium';
-        
-        const statusMap = {1: 'reported', 2: 'responding', 3: 'active', 4: 'resolved'};
-        const status = statusMap[item.incident_status_id] || 'reported';
+        const priority = this.getIncidentPriorityValue(item);
+        const status = this.getIncidentStatusMeta(item).value;
+        const historical = this.getPrimaryHistoricalRecord(item);
+        const reporterName = [item.reporter?.first_name, item.reporter?.last_name].filter(Boolean).join(' ').trim();
+        const sourceName = historical?.source_name || reporterName || item.reported_by || 'Unknown';
+        const recordedDate = historical?.incident_date || item.created_at;
+        const recordedTime = historical?.incident_time || null;
+        const location = historical?.incident_location || (item.marker ? `${item.marker.lat}, ${item.marker.lng}` : 'N/A');
+        const historyBlock = historical ? `
+            <div class="info-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-book-open"></i>
+                    <h3>Historical Fire Record</h3>
+                </div>
+                <div class="card-content">
+                    <div class="info-row"><span class="info-label">Source:</span><span class="info-value">${this.escapeHtml(historical.source_name || 'Station Historical Fire Entry')}</span></div>
+                    <div class="info-row"><span class="info-label">Reference:</span><span class="info-value">${this.escapeHtml(historical.source_reference || 'N/A')}</span></div>
+                    <div class="info-row"><span class="info-label">Barangay:</span><span class="info-value">${this.escapeHtml(historical.barangay?.barangay_name || 'N/A')}</span></div>
+                    <div class="info-row"><span class="info-label">Classification:</span><span class="info-value">${this.escapeHtml(historical.fire_classification || 'undetermined')}</span></div>
+                    <div class="info-row"><span class="info-label">Cause:</span><span class="info-value">${this.escapeHtml(historical.fire_cause || 'N/A')}</span></div>
+                    <div class="info-row"><span class="info-label">Impact:</span><span class="info-value">${Number(historical.incident_count || 1)} incident(s), ${Number(historical.injured_count || 0)} injured, ${Number(historical.death_count || 0)} death(s)</span></div>
+                    <div class="info-row"><span class="info-label">Estimated Damage:</span><span class="info-value">${historical.estimated_damage ? `PHP ${Number(historical.estimated_damage).toLocaleString()}` : 'N/A'}</span></div>
+                    <div class="info-row"><span class="info-label">Weather:</span><span class="info-value">${this.escapeHtml(historical.weather_condition || 'N/A')}</span></div>
+                    <div class="info-row"><span class="info-label">Notes:</span><span class="info-value">${this.escapeHtml(historical.notes || 'N/A')}</span></div>
+                </div>
+            </div>
+        ` : '';
 
         viewContent.innerHTML = `
             <div class="detail-container">
@@ -1658,7 +1908,7 @@ class ManagementPage {
                     <div>
                         <div class="incident-badge priority-${priority}">
                             <i class="fa-solid fa-fire"></i>
-                            <span>${priority.toUpperCase()} INCIDENT</span>
+                            <span>${historical ? 'HISTORICAL FIRE RECORD' : `${priority.toUpperCase()} INCIDENT`}</span>
                         </div>
                         <h2 class="incident-title">${this.escapeHtml(item.marker?.title || item.title || 'Untitled Incident')}</h2>
                     </div>
@@ -1675,22 +1925,22 @@ class ManagementPage {
                     <div class="quick-stat-card">
                         <div class="stat-icon"><i class="fa-regular fa-clock"></i></div>
                         <div class="stat-content">
-                            <span class="stat-label">Reported</span>
-                            <span class="stat-value">${formatDate(item.created_at)}</span>
+                            <span class="stat-label">${historical ? 'Incident Date' : 'Reported'}</span>
+                            <span class="stat-value">${formatDate(recordedDate)}${recordedTime ? ` ${recordedTime}` : ''}</span>
                         </div>
                     </div>
                     <div class="quick-stat-card">
                         <div class="stat-icon"><i class="fa-solid fa-location-dot"></i></div>
                         <div class="stat-content">
                             <span class="stat-label">Location</span>
-                            <span class="stat-value">${item.marker ? `${item.marker.lat}, ${item.marker.lng}` : 'N/A'}</span>
+                            <span class="stat-value">${this.escapeHtml(location)}</span>
                         </div>
                     </div>
                     <div class="quick-stat-card">
                         <div class="stat-icon"><i class="fa-solid fa-user"></i></div>
                         <div class="stat-content">
-                            <span class="stat-label">Reported By</span>
-                            <span class="stat-value">${this.escapeHtml(item.reported_by || 'Unknown')}</span>
+                            <span class="stat-label">${historical ? 'Source' : 'Reported By'}</span>
+                            <span class="stat-value">${this.escapeHtml(sourceName)}</span>
                         </div>
                     </div>
                 </div>
@@ -1704,6 +1954,7 @@ class ManagementPage {
                         <p>${this.escapeHtml(item.marker?.description || item.description || 'No description provided.')}</p>
                     </div>
                 </div>
+                ${historyBlock}
             </div>
         `;
     }
@@ -2060,15 +2311,43 @@ class ManagementPage {
                         // payload.password = data.password;
                     }
                 } else if (this.currentTab === 'incidents') {
-                    payload = {
-                        title: data.title,
-                        description: data.description,
-                        priority: data.priority,
-                        status: data.status,
-                        lat: data.lat,
-                        lng: data.lng,
-                        reported_by: data.reported_by
-                    };
+                    if (data.entry_mode === 'historical_fire_record') {
+                        payload = {
+                            entry_mode: data.entry_mode,
+                            title: data.title,
+                            description: data.description,
+                            incident_date: data.incident_date,
+                            incident_time: data.incident_time || null,
+                            barangay_id: data.barangay_id,
+                            incident_location: data.incident_location,
+                            fire_classification: data.fire_classification,
+                            fire_cause: data.fire_cause || null,
+                            incident_count: data.incident_count || 1,
+                            injured_count: data.injured_count || 0,
+                            death_count: data.death_count || 0,
+                            estimated_damage: data.estimated_damage || null,
+                            lat: data.lat,
+                            lng: data.lng,
+                            source_name: data.source_name || null,
+                            source_reference: data.source_reference || null,
+                            weather_condition: data.weather_condition || null,
+                            temperature: data.temperature || null,
+                            humidity: data.humidity || null,
+                            wind_speed: data.wind_speed || null,
+                            wind_direction: data.wind_direction || null,
+                            notes: data.notes || null
+                        };
+                    } else {
+                        payload = {
+                            title: data.title,
+                            description: data.description,
+                            priority: data.priority,
+                            status: data.status,
+                            lat: data.lat,
+                            lng: data.lng,
+                            reported_by: data.reported_by
+                        };
+                    }
                 } else if (this.currentTab === 'equipment') {
                     payload = {
                         equipment_name: data.equipment_name,
@@ -2207,6 +2486,31 @@ class ManagementPage {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    getIncidentStatusMeta(incident) {
+        const rawId = Number(incident?.incident_status_id ?? 0);
+        const rawStatus = String(incident?.status || '').trim().toLowerCase();
+
+        if (rawId === 1 || rawStatus === 'reported') return { id: 1, value: 'reported' };
+        if (rawId === 2 || rawStatus === 'responding') return { id: 2, value: 'responding' };
+        if (rawId === 3 || rawStatus === 'active' || rawStatus === 'controlled') return { id: 3, value: 'active' };
+        if (rawId === 4 || rawId === 5 || ['resolved', 'closed'].includes(rawStatus)) return { id: 4, value: 'resolved' };
+
+        return { id: rawId || null, value: rawStatus || 'reported' };
+    }
+
+    getIncidentPriorityValue(incident) {
+        const priorityMap = { 1: 'low', 2: 'medium', 3: 'high', 4: 'critical' };
+        return priorityMap[incident?.incident_type_id] || 'medium';
+    }
+
+    getPrimaryHistoricalRecord(incident) {
+        if (!Array.isArray(incident?.historical_records) || !incident.historical_records.length) {
+            return null;
+        }
+
+        return incident.historical_records[0];
     }
     
     async reverseGeocode(lat, lng) {

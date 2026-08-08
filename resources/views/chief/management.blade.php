@@ -3263,6 +3263,10 @@
                         <i class="fa-solid fa-download"></i>
                         <span class="btn-label">Export</span>
                     </button>
+                    <button class="btn-primary" id="addNewBtn" title="Add historical fire record">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="btn-label">Add Historical Fire</span>
+                    </button>
                 </div>
             </div>
 
@@ -3303,6 +3307,7 @@
                             window.equipmentDb = @json($equipment);
                             window.stationDb = @json($stations);
                             window.currentStationData = @json($currentStation);
+                            window.managedBarangays = @json($managedBarangays ?? []);
                             window.csrfToken = '{{ csrf_token() }}';
                         </script>
                             <tbody id="tableBody">

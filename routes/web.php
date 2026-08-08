@@ -321,6 +321,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
         Route::get('/mitigations', [StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::post('/mitigations', [StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
+        Route::post('/mitigations/generated-drafts/{checklistId}/approve', [StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
+        Route::post('/mitigations/generated-drafts/{checklistId}/reject', [StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
         Route::put('/mitigations/{mitigationActionId}', [StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
         Route::delete('/mitigations/{mitigationActionId}', [StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'chiefIndex'])->name('risk-reviews.index');
