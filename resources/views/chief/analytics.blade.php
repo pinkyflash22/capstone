@@ -400,31 +400,47 @@
                 "opsz" 24;
         }
         .analytics-forecast-modal--details {
-            width: min(82vw, 620px);
-            max-height: min(70vh, 580px);
+            width: min(78vw, 540px);
+            max-width: 540px;
+            max-height: min(68vh, 520px);
         }
         .analytics-forecast-modal--details .modal-body {
-            padding: 0.88rem 0.92rem;
+            padding: 0.78rem 0.82rem;
         }
         .analytics-forecast-modal--details .modal-body [style*="padding:18px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:16px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:14px"] {
-            padding: 10px !important;
+            padding: 9px !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:28px"] {
-            font-size: 1.16rem !important;
+            font-size: 1.02rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:24px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:22px"] {
-            font-size: 1rem !important;
+            font-size: 0.92rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:16px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:15px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:14px"] {
-            font-size: 0.8rem !important;
+            font-size: 0.76rem !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="font-size:13px"],
+        .analytics-forecast-modal--details .modal-body [style*="font-size:12px"],
+        .analytics-forecast-modal--details .modal-body [style*="font-size:11px"] {
+            font-size: 0.72rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="min-width:220px"] {
             min-width: 0 !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))"] {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+        }
+        .analytics-forecast-modal--details .modal-body [style*="display:grid; gap:18px"] {
+            gap: 10px !important;
+        }
+        .analytics-forecast-modal--details .modal-body button[onclick*="exploreRecommendation"] {
+            padding: 10px 12px !important;
         }
         .analytics-forecast-modal .modal-header {
             flex: 0 0 auto;
@@ -575,6 +591,14 @@
                 width: 100%;
                 min-height: 38px;
                 font-size: 12px;
+            }
+            .analytics-forecast-modal--details {
+                width: min(96vw, 420px) !important;
+                max-width: 420px !important;
+                max-height: min(74vh, 460px) !important;
+            }
+            .analytics-forecast-modal--details .modal-body [style*="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))"] {
+                grid-template-columns: 1fr !important;
             }
             .analytics-forecast-modal .modal-body > div {
                 gap: 10px !important;

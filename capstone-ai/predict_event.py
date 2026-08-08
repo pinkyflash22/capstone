@@ -59,6 +59,8 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         "average_humidity",
         "average_wind_speed",
         "near_water",
+        "near_hydrant",
+        "near_water_source",
         "verified_risk_area_count",
         "verified_hazard_count",
         "verified_risk_count",

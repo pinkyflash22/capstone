@@ -285,26 +285,55 @@ class AnalyticController extends Controller
             $structuredAnalysis['model_metadata'] = $this->buildModelMetadataContext();
             $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
             
+            $structuredAnalysis['checklist_debug'] = [
+                'attempted' => false,
+                'analysis_id' => null,
+                'recommendation_count' => count($structuredAnalysis['recommendations'] ?? []),
+                'persisted_checklist_rows' => 0,
+                'persisted_checklist_items' => 0,
+                'used_ai_generation' => false,
+                'used_fallback_generation' => false,
+                'warning' => null,
+            ];
+
             // Store analysis in database (optional, catch errors)
             $analysisId = null;
             try {
                 $analysisId = $this->storeAnalysis($locationId, $days, $structuredAnalysis, $analysisData);
                 if ($analysisId) {
                     $structuredAnalysis['analysis_id'] = $analysisId;
-                    $structuredAnalysis['action_plan_checklists'] = $this->generateAndStoreActionPlanChecklists(
+                    $structuredAnalysis['checklist_debug']['attempted'] = true;
+                    $structuredAnalysis['checklist_debug']['analysis_id'] = $analysisId;
+
+                    $checklistGeneration = $this->generateAndStoreActionPlanChecklists(
                         $analysisId,
                         $structuredAnalysis,
                         $analysisData
+                    );
+                    $structuredAnalysis['action_plan_checklists'] = $checklistGeneration['plans'];
+                    $structuredAnalysis['checklist_debug'] = array_merge(
+                        $structuredAnalysis['checklist_debug'],
+                        $checklistGeneration['debug']
                     );
                     $structuredAnalysis['recommendations'] = $this->attachChecklistIdsToRecommendations(
                         $structuredAnalysis['recommendations'] ?? [],
                         $structuredAnalysis['action_plan_checklists'] ?? []
                     );
                     $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
+                    $this->updateStoredAnalysisArtifacts($analysisId, $structuredAnalysis, $analysisData);
                 }
             } catch (\Exception $storeError) {
-                Log::warning('Failed to store analysis: ' . $storeError->getMessage());
-                // Don't fail the response if storage fails
+                Log::warning('Failed to store analysis/checklists: ' . $storeError->getMessage(), [
+                    'exception' => $storeError,
+                ]);
+                $structuredAnalysis['checklist_debug'] = array_merge(
+                    $structuredAnalysis['checklist_debug'],
+                    [
+                        'analysis_id' => $analysisId,
+                        'warning' => $storeError->getMessage(),
+                    ]
+                );
+                $structuredAnalysis['warnings'][] = 'Action-plan checklist could not be fully stored. Check checklist_debug for details.';
             }
             
             return response()->json([
@@ -574,7 +603,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     // Get station name
     $station = DB::table('stations')->where('station_id', $stationId)->first();
     $locationName = $station ? $station->station_name : 'My Station';
-    $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName);
+    $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName) ?? [];
     
     // Get all personnel in this station
     $allPersons = StationOfficer::where('station_id', $stationId)->get();
@@ -1354,20 +1383,53 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     ->orWhere('risk_areas.review_type', '!=', 'delete');
             })
             ->selectRaw("
-                MAX(CASE WHEN risk_areas.near_water_source = 1 OR risk_areas.near_hydrant = 1 THEN 1 ELSE 0 END) as near_water,
+                MAX(CASE WHEN risk_areas.near_water_source IS TRUE OR risk_areas.near_hydrant IS TRUE THEN 1 ELSE 0 END) as near_water,
                 COUNT(*) as verified_risk_area_count,
                 SUM(CASE WHEN risk_areas.entry_type = 'hazard' THEN 1 ELSE 0 END) as verified_hazard_count,
                 SUM(CASE WHEN risk_areas.entry_type = 'risk' OR risk_areas.entry_type IS NULL THEN 1 ELSE 0 END) as verified_risk_count,
                 SUM(CASE WHEN risk_areas.assessment_level = 'high' THEN 1 ELSE 0 END) as high_assessment_count,
-                SUM(CASE WHEN risk_areas.blocked_hydrant = 1 THEN 1 ELSE 0 END) as blocked_hydrant_count,
-                SUM(CASE WHEN risk_areas.combustible_materials_present = 1 THEN 1 ELSE 0 END) as combustible_material_count,
-                SUM(CASE WHEN risk_areas.informal_settlement = 1 THEN 1 ELSE 0 END) as informal_settlement_count,
-                SUM(CASE WHEN risk_areas.cooking_fire_prone_activity = 1 THEN 1 ELSE 0 END) as cooking_fire_activity_count,
-                SUM(CASE WHEN risk_areas.poor_waste_disposal = 1 THEN 1 ELSE 0 END) as poor_waste_disposal_count,
-                SUM(CASE WHEN risk_areas.previous_fire_prone_location = 1 THEN 1 ELSE 0 END) as previous_fire_prone_count,
+                SUM(CASE WHEN risk_areas.blocked_hydrant IS TRUE THEN 1 ELSE 0 END) as blocked_hydrant_count,
+                SUM(CASE WHEN risk_areas.combustible_materials_present IS TRUE THEN 1 ELSE 0 END) as combustible_material_count,
+                SUM(CASE WHEN risk_areas.informal_settlement IS TRUE THEN 1 ELSE 0 END) as informal_settlement_count,
+                SUM(CASE WHEN risk_areas.cooking_fire_prone_activity IS TRUE THEN 1 ELSE 0 END) as cooking_fire_activity_count,
+                SUM(CASE WHEN risk_areas.poor_waste_disposal IS TRUE THEN 1 ELSE 0 END) as poor_waste_disposal_count,
+                SUM(CASE WHEN risk_areas.previous_fire_prone_location IS TRUE THEN 1 ELSE 0 END) as previous_fire_prone_count,
                 SUM(CASE WHEN risk_areas.road_accessibility IN ('difficult', 'very_difficult') THEN 1 ELSE 0 END) as poor_access_count,
                 COALESCE(SUM(risk_areas.estimated_affected_households), 0) as affected_households
             ")
+            ->first();
+
+        $riskAreaProfile = DB::table('risk_areas')
+            ->join('barangay_halls', 'risk_areas.barangay_hall_id', '=', 'barangay_halls.barangay_hall_id')
+            ->where('risk_areas.station_id', $stationId)
+            ->where('barangay_halls.barangay_id', $barangay->barangay_id)
+            ->where(function ($query) {
+                $query->where('risk_areas.review_status', 'approved')
+                    ->orWhere('risk_areas.status', 'verified');
+            })
+            ->where(function ($query) {
+                $query->whereNull('risk_areas.review_type')
+                    ->orWhere('risk_areas.review_type', '!=', 'delete');
+            })
+            ->select(
+                'risk_areas.hazard_category',
+                'risk_areas.risk_type',
+                'risk_areas.condition_label',
+                'risk_areas.population_density_level',
+                'risk_areas.building_density_level',
+                'risk_areas.road_accessibility',
+                'risk_areas.near_hydrant',
+                'risk_areas.near_water_source'
+            )
+            ->orderByRaw("
+                CASE risk_areas.assessment_level
+                    WHEN 'high' THEN 1
+                    WHEN 'moderate' THEN 2
+                    WHEN 'medium' THEN 2
+                    ELSE 3
+                END
+            ")
+            ->orderByDesc('risk_areas.created_at')
             ->first();
 
         $verifiedRiskAreaCount = (int) ($riskAreaSignals->verified_risk_area_count ?? 0);
@@ -1417,6 +1479,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'weather_condition' => $weatherCondition,
             'season' => $stationHistoricalRow->season,
             'near_water' => $nearWater,
+            'near_hydrant' => (int) ($riskAreaProfile->near_hydrant ?? 0),
+            'near_water_source' => (int) ($riskAreaProfile->near_water_source ?? 0),
             'verified_risk_area_count' => $verifiedRiskAreaCount,
             'verified_hazard_count' => $verifiedHazardCount,
             'verified_risk_count' => $verifiedRiskCount,
@@ -1430,6 +1494,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'poor_access_count' => $poorAccessCount,
             'affected_households' => $affectedHouseholds,
             'risk_area_pressure_signal' => $riskAreaPressureSignal,
+            'hazard_category' => $riskAreaProfile->hazard_category ?? 'unknown',
+            'risk_type' => $riskAreaProfile->risk_type ?? 'unknown',
+            'condition_label' => $riskAreaProfile->condition_label ?? 'unknown',
+            'population_density_level' => $riskAreaProfile->population_density_level ?? 'unknown',
+            'building_density_level' => $riskAreaProfile->building_density_level ?? 'unknown',
+            'road_accessibility' => $riskAreaProfile->road_accessibility ?? 'unknown',
             'density' => $density,
             'materials' => $materials,
             'peak_hours' => $peakHours,
@@ -1908,15 +1978,28 @@ private function getOpenRouterModelCandidates(): array
     {
         $recommendations = array_slice($analysis['recommendations'] ?? [], 0, 10);
         if (empty($recommendations)) {
-            return [];
+            return [
+                'plans' => [],
+                'debug' => [
+                    'analysis_id' => $analysisId,
+                    'recommendation_count' => 0,
+                    'persisted_checklist_rows' => 0,
+                    'persisted_checklist_items' => 0,
+                    'used_ai_generation' => false,
+                    'used_fallback_generation' => false,
+                    'warning' => 'No recommendations were available to convert into checklist rows.',
+                ],
+            ];
         }
 
         $plans = [];
         $aiGenerated = false;
+        $usedFallbackGeneration = false;
         $shouldGenerateAiActionPlans = filter_var(
             env('AI_GENERATE_ACTION_PLAN_CHECKLISTS', false),
             FILTER_VALIDATE_BOOL
         );
+        $generationWarning = null;
 
         if ($shouldGenerateAiActionPlans) {
             try {
@@ -1927,24 +2010,33 @@ private function getOpenRouterModelCandidates(): array
                 $plans = $this->parseActionPlanChecklistResponse($aiResponse);
                 $aiGenerated = !empty($plans);
             } catch (\Throwable $e) {
-                Log::warning('Action-plan checklist AI generation failed: ' . $e->getMessage());
+                Log::warning('Action-plan checklist AI generation failed: ' . $e->getMessage(), [
+                    'analysis_id' => $analysisId,
+                    'exception' => $e,
+                ]);
+                $generationWarning = 'AI checklist generation failed; fallback checklist rows were used instead.';
             }
         } else {
             Log::info('Skipping checklist AI generation during analytics request and using recommendation-backed checklist rows.');
+            $generationWarning = 'AI checklist generation is disabled; fallback checklist rows were used.';
         }
 
+        $usedFallbackGeneration = empty($plans);
         $plans = $this->normalizeActionPlanCount($plans, $recommendations);
 
         AiActionPlanChecklist::query()->where('analysis_id', $analysisId)->delete();
 
         $savedPlans = [];
+        $resolvedChecklistBarangayId = $rawData['barangay_id']
+            ?? data_get($rawData, 'selected_barangay_prediction.barangay_id')
+            ?? data_get($rawData, 'barangay_predictions.0.barangay_id');
         foreach ($plans as $index => $plan) {
             $sourceRecommendation = $recommendations[$index] ?? $recommendations[0];
 
             $saved = AiActionPlanChecklist::create([
                 'analysis_id' => $analysisId,
                 'station_id' => $rawData['station_id'] ?? null,
-                'barangay_id' => $rawData['barangay_id'] ?? null,
+                'barangay_id' => $resolvedChecklistBarangayId ? (int) $resolvedChecklistBarangayId : null,
                 'source_type' => 'action_plan',
                 'source_title' => $plan['source_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan'),
                 'source_description' => $sourceRecommendation['description'] ?? null,
@@ -1965,7 +2057,32 @@ private function getOpenRouterModelCandidates(): array
             $savedPlans[] = $saved->fresh();
         }
 
-        return $savedPlans;
+        $persistedChecklistRows = AiActionPlanChecklist::query()
+            ->where('analysis_id', $analysisId)
+            ->count();
+        $persistedChecklistItems = AiActionPlanChecklistItem::query()
+            ->whereIn(
+                'ai_action_plan_checklist_id',
+                collect($savedPlans)->pluck('ai_action_plan_checklist_id')->filter()->all()
+            )
+            ->count();
+
+        if (!empty($plans) && ($persistedChecklistRows === 0 || $persistedChecklistItems === 0)) {
+            throw new \RuntimeException('Checklist rows were generated in memory but were not fully persisted.');
+        }
+
+        return [
+            'plans' => $savedPlans,
+            'debug' => [
+                'analysis_id' => $analysisId,
+                'recommendation_count' => count($recommendations),
+                'persisted_checklist_rows' => $persistedChecklistRows,
+                'persisted_checklist_items' => $persistedChecklistItems,
+                'used_ai_generation' => $aiGenerated,
+                'used_fallback_generation' => $usedFallbackGeneration,
+                'warning' => $generationWarning,
+            ],
+        ];
     }
 
     private function parseActionPlanChecklistResponse(string $content): array
@@ -2045,6 +2162,62 @@ private function getOpenRouterModelCandidates(): array
 
             return $recommendation;
         }, $recommendations);
+    }
+
+    private function buildPersistableRecommendations(array $recommendations): array
+    {
+        return array_map(function ($rec) {
+            return [
+                'title' => $rec['title'] ?? null,
+                'description' => $rec['description'] ?? null,
+                'priority' => $rec['priority'] ?? null,
+                'action_plan_checklist_id' => $rec['action_plan_checklist_id'] ?? null,
+            ];
+        }, $recommendations);
+    }
+
+    private function updateStoredAnalysisArtifacts(int $analysisId, array $analysis, array $rawData): void
+    {
+        $analysisRow = Analysis::query()->find($analysisId);
+        if (! $analysisRow) {
+            return;
+        }
+
+        $analysisData = [
+            'analysis_summary' => $analysis,
+            'raw_data' => [
+                'hourly_data' => $rawData['hourly_data'] ?? [],
+                'daily_data' => $rawData['daily_data'] ?? [],
+                'peak_hour' => $rawData['peak_hour'] ?? null,
+                'avg_response_time' => $rawData['avg_response_time'] ?? null,
+                'total_personnel' => $rawData['total_personnel'] ?? 0,
+                'available_personnel' => $rawData['available_personnel'] ?? 0,
+                'total_equipment' => $rawData['total_equipment'] ?? 0,
+                'available_equipment' => $rawData['available_equipment'] ?? 0,
+                'risk_factors' => $rawData['risk_factors'] ?? [],
+                'weather_context' => $rawData['weather_context'] ?? null,
+                'mitigation_context' => $rawData['mitigation_context'] ?? null,
+                'recommendation_context' => $rawData['recommendation_context'] ?? null,
+                'model_prediction' => $rawData['model_prediction'] ?? null,
+                'model_metadata' => $analysis['model_metadata'] ?? null,
+                'workflow_context' => $analysis['workflow_context'] ?? null,
+                'barangay_predictions' => $rawData['barangay_predictions'] ?? [],
+                'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
+                'prediction_context' => $rawData['prediction_context'] ?? null,
+                'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                'chart_context' => $rawData['chart_context'] ?? null,
+                'checklist_debug' => $analysis['checklist_debug'] ?? null,
+            ],
+            'ai_analysis' => $analysis['ai_explanation'] ?? null,
+            'generated_at' => now()->toISOString(),
+            'ai_source' => $analysis['ai_source'] ?? false,
+        ];
+
+        $analysisRow->update([
+            'analysis_data' => $analysisData,
+            'recommendations' => $this->buildPersistableRecommendations($analysis['recommendations'] ?? []),
+            'predictions' => $analysis['predictions'] ?? null,
+        ]);
     }
 
     private function syncChecklistItems(AiActionPlanChecklist $checklist, array $items): void
@@ -2574,7 +2747,7 @@ private function getOpenRouterModelCandidates(): array
                   'station_id' => $stationId,
                   'created_at' => now(),
                   'updated_at' => now()
-              ]);
+              ], 'analysis_id');
             
             Log::info('Analysis stored successfully', [
                 'analysis_id' => $analysisId,
@@ -2728,6 +2901,7 @@ private function getOpenRouterModelCandidates(): array
                 'prediction_context' => $rawData['prediction_context'] ?? null,
                 'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
                 'chart_context' => $rawData['chart_context'] ?? null,
+                'checklist_debug' => $rawData['checklist_debug'] ?? ($analysisSummary['checklist_debug'] ?? null),
                 'recommendations' => is_array($latestAnalysis->recommendations) ? $latestAnalysis->recommendations : [],
                 'predictions' => is_array($latestAnalysis->predictions) ? $latestAnalysis->predictions : null,
                 'risk_level' => $latestAnalysis->risk_level ?? ($analysisSummary['risk_level'] ?? null),
