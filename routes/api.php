@@ -36,6 +36,7 @@ use Illuminate\Http\Request;
 
 use App\Http\Controllers\IconController;
 use App\Http\Controllers\RouteController;
+use App\Http\Controllers\TelnyxWebhookController;
 
 
 // Route::get('/test-responded-team', function() {
@@ -178,6 +179,7 @@ Route::get('/incidents-for-spot', function() {
 //sms otp
 Route::post('/send-otp', [OTPController::class, 'sendOTP']);
 Route::post('/verify-otp', [OTPController::class, 'verifyOTP']);
+Route::post('/telnyx/webhook', TelnyxWebhookController::class);
 
 Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,chief'])
     ->prefix('station-admin')

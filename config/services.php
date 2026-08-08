@@ -51,6 +51,13 @@ return [
         'token_ttl' => (int) env('AGORA_TOKEN_TTL', 3600),
     ],
 
+    'telnyx' => [
+        'api_key' => env('TELNYX_API_KEY'),
+        'public_key' => env('TELNYX_PUBLIC_KEY'),
+        'verify_webhook_signature' => filter_var(env('TELNYX_VERIFY_WEBHOOK_SIGNATURE', true), FILTER_VALIDATE_BOOL),
+        'webhook_tolerance_seconds' => (int) env('TELNYX_WEBHOOK_TOLERANCE_SECONDS', 300),
+    ],
+
     'voice_calls' => [
         'missed_after_seconds' => (int) env('VOICE_CALL_MISSED_AFTER_SECONDS', 90),
         'poll_interval_ms' => (int) env('VOICE_CALL_POLL_INTERVAL_MS', 2000),
