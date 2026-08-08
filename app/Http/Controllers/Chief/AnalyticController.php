@@ -3261,6 +3261,25 @@ private function getOpenRouterModelCandidates(): array
             ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
             : null;
 
+        $existingSuggestion = $this->findExistingRecommendationSuggestion(
+            $analysis,
+            $actionPlanChecklist,
+            $recommendationTitle,
+            $recommendationDescription,
+            $priority
+        );
+
+        if ($existingSuggestion) {
+            return response()->json([
+                'success' => true,
+                'data' => $this->formatStoredRecommendationSuggestion($existingSuggestion),
+                'source' => 'saved_suggestion',
+                'model_used' => null,
+                'saved_suggestion_id' => $existingSuggestion->ai_recommendation_suggestion_id,
+                'note' => 'Showing the previously generated implementation plan for this recommendation.',
+            ]);
+        }
+
         $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
             'recommendation_title' => $recommendationTitle,
             'recommendation_description' => $recommendationDescription,
@@ -3434,6 +3453,46 @@ private function getOpenRouterModelCandidates(): array
             Log::warning('Failed to store AI recommendation suggestion: ' . $e->getMessage());
             return null;
         }
+    }
+
+    private function findExistingRecommendationSuggestion(
+        ?Analysis $analysis,
+        ?AiActionPlanChecklist $actionPlanChecklist,
+        string $recommendationTitle,
+        ?string $recommendationDescription,
+        string $priority
+    ): ?AiRecommendationSuggestion {
+        return AiRecommendationSuggestion::query()
+            ->when($analysis?->analysis_id, fn ($query) => $query->where('analysis_id', $analysis->analysis_id))
+            ->when(
+                $actionPlanChecklist?->ai_action_plan_checklist_id,
+                fn ($query) => $query->where('ai_action_plan_checklist_id', $actionPlanChecklist->ai_action_plan_checklist_id),
+                fn ($query) => $query->whereNull('ai_action_plan_checklist_id')
+            )
+            ->where('recommendation_title', $recommendationTitle)
+            ->where('recommendation_description', $recommendationDescription)
+            ->where('priority_level', strtolower($priority))
+            ->latest('created_at')
+            ->first();
+    }
+
+    private function formatStoredRecommendationSuggestion(AiRecommendationSuggestion $suggestion): array
+    {
+        $context = is_array($suggestion->request_context) ? $suggestion->request_context : [];
+        $rawResponse = trim((string) ($suggestion->ai_response ?? ''));
+        $cleanResponse = preg_replace('/^```[a-z]*\s*/i', '', $rawResponse) ?? $rawResponse;
+        $cleanResponse = preg_replace('/\s*```$/', '', $cleanResponse) ?? $cleanResponse;
+
+        return [
+            'how' => $context['action_plan_checklist']['plan_description'] ?? null,
+            'who' => data_get($context, 'action_plan_checklist.assigned_to'),
+            'when' => null,
+            'suggestions' => is_array($suggestion->suggestions) ? $suggestion->suggestions : [],
+            'steps' => is_array($suggestion->steps) ? $suggestion->steps : [],
+            'resources_needed' => is_array($suggestion->resources_needed) ? $suggestion->resources_needed : [],
+            'estimated_timeline' => $suggestion->estimated_timeline,
+            'explanation' => trim($cleanResponse),
+        ];
     }
 
     /**

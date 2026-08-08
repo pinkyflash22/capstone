@@ -414,10 +414,33 @@ class StationAdminController extends Controller
 
     protected function buildMitigationDraftFromActionPlanChecklist(int $checklistId, array $allowedBarangayIds): ?array
     {
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $checklist = AiActionPlanChecklist::query()
             ->with(['analysis', 'barangay', 'riskArea.marker', 'suggestions'])
-            ->whereIn('barangay_id', $allowedBarangayIds)
-            ->find($checklistId);
+            ->where('ai_action_plan_checklist_id', $checklistId)
+            ->where(function ($query) use ($allowedBarangayIds, $stationId) {
+                if (! empty($allowedBarangayIds)) {
+                    $query->whereIn('barangay_id', $allowedBarangayIds);
+
+                    if ($stationId) {
+                        $query->orWhere(function ($fallbackQuery) use ($stationId) {
+                            $fallbackQuery
+                                ->whereNull('barangay_id')
+                                ->where('station_id', $stationId);
+                        });
+                    }
+
+                    return;
+                }
+
+                if ($stationId) {
+                    $query->where('station_id', $stationId);
+                    return;
+                }
+
+                $query->whereRaw('1 = 0');
+            })
+            ->first();
 
         if (! $checklist) {
             return null;
@@ -1299,7 +1322,14 @@ class StationAdminController extends Controller
         $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
         $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
 
-        $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
+        try {
+            $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
+        } catch (\Throwable $e) {
+            Log::warning('Generated mitigation draft sync failed while loading mitigation page.', [
+                'station_id' => $stationId,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         $mitigationActions = MitigationAction::query()
             ->select([

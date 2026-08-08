@@ -181,6 +181,7 @@
             border-radius: 18px;
             background: #fff;
             overflow: hidden;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
         }
         .recommendation-run-toggle {
             width: 100%;
@@ -239,19 +240,155 @@
             flex-shrink: 0;
             transition: transform 160ms ease;
         }
-        .recommendation-run-group.is-open .recommendation-run-arrow { transform: rotate(180deg); }
-        .recommendation-run-content {
-            display: none;
-            padding: 0 16px 16px;
-            border-top: 1px solid #f1f5f9;
-            background: #fff;
+        .recommendation-run-toggle:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.18);
+            outline-offset: -3px;
         }
-        .recommendation-run-group.is-open .recommendation-run-content { display: block; }
         .recommendation-run-summary {
             padding: 12px 0;
             color: #64748b;
             font-size: 12px;
             line-height: 1.55;
+        }
+        .recommendation-run-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #c2410c;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .analytics-run-modal {
+            width: min(92vw, 760px);
+            max-width: 760px;
+            max-height: min(82vh, 720px);
+        }
+        .analytics-run-modal__hero {
+            padding: 16px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(245,158,11,0.12));
+            border: 1px solid rgba(245,158,11,0.24);
+        }
+        .analytics-run-modal__grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .analytics-run-modal__stat {
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+        }
+        .analytics-run-modal__checklists {
+            display: grid;
+            gap: 12px;
+        }
+        .analytics-run-modal__checklist {
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+        }
+        .analytics-run-modal__checklist-items {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .analytics-run-modal__checkbox {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        .analytics-run-modal__checkbox input {
+            margin-top: 2px;
+            accent-color: #dc2626;
+        }
+        .analytics-run-modal__checkbox-copy {
+            font-size: 13px;
+            line-height: 1.55;
+            color: #334155;
+        }
+        .analytics-run-modal__checkbox-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .analytics-barangay-modal {
+            width: min(90vw, 520px);
+            max-width: 520px;
+            max-height: min(76vh, 620px);
+        }
+        .barangay-ranking-list {
+            display: grid;
+            gap: 10px;
+        }
+        .barangay-ranking-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 14px;
+            background: #fff;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .barangay-ranking-card__rank {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            flex-shrink: 0;
+            background: #f59e0b;
+        }
+        .barangay-ranking-card__rank.is-top {
+            background: #dc2626;
+        }
+        .barangay-ranking-card__stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .barangay-ranking-card__stat {
+            padding: 9px 10px;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+        .barangay-ranking-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
+        .barangay-ranking-viewall {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border-radius: 999px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
         }
         
         /* Explore Button */
@@ -400,34 +537,34 @@
                 "opsz" 24;
         }
         .analytics-forecast-modal--details {
-            width: min(78vw, 540px);
-            max-width: 540px;
-            max-height: min(68vh, 520px);
+            width: min(72vw, 500px) !important;
+            max-width: 500px !important;
+            max-height: min(64vh, 500px) !important;
         }
         .analytics-forecast-modal--details .modal-body {
-            padding: 0.78rem 0.82rem;
+            padding: 0.72rem 0.78rem;
         }
         .analytics-forecast-modal--details .modal-body [style*="padding:18px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:16px"],
         .analytics-forecast-modal--details .modal-body [style*="padding:14px"] {
-            padding: 9px !important;
+            padding: 8px !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:28px"] {
-            font-size: 1.02rem !important;
+            font-size: 0.98rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:24px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:22px"] {
-            font-size: 0.92rem !important;
+            font-size: 0.88rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:16px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:15px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:14px"] {
-            font-size: 0.76rem !important;
+            font-size: 0.74rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="font-size:13px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:12px"],
         .analytics-forecast-modal--details .modal-body [style*="font-size:11px"] {
-            font-size: 0.72rem !important;
+            font-size: 0.69rem !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="min-width:220px"] {
             min-width: 0 !important;
@@ -437,10 +574,17 @@
             gap: 8px !important;
         }
         .analytics-forecast-modal--details .modal-body [style*="display:grid; gap:18px"] {
-            gap: 10px !important;
+            gap: 8px !important;
         }
         .analytics-forecast-modal--details .modal-body button[onclick*="exploreRecommendation"] {
-            padding: 10px 12px !important;
+            padding: 9px 11px !important;
+        }
+        .analytics-forecast-modal--details .modal-body ul {
+            margin-bottom: 0;
+            padding-left: 16px !important;
+        }
+        .analytics-forecast-modal--details .modal-body li {
+            margin-bottom: 5px;
         }
         .analytics-forecast-modal .modal-header {
             flex: 0 0 auto;
@@ -593,9 +737,9 @@
                 font-size: 12px;
             }
             .analytics-forecast-modal--details {
-                width: min(96vw, 420px) !important;
-                max-width: 420px !important;
-                max-height: min(74vh, 460px) !important;
+                width: min(94vw, 390px) !important;
+                max-width: 390px !important;
+                max-height: min(68svh, 420px) !important;
             }
             .analytics-forecast-modal--details .modal-body [style*="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))"] {
                 grid-template-columns: 1fr !important;
@@ -871,6 +1015,68 @@
             max-width: 1060px;
             margin-inline: auto;
             box-shadow: 0 10px 24px rgba(15,23,42,0.04);
+        }
+        .forecast-narrative-list {
+            display: grid;
+            gap: 12px;
+        }
+        .forecast-narrative-card {
+            width: 100%;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #fff, #fffaf5);
+            padding: 16px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .forecast-narrative-card:hover {
+            border-color: rgba(220, 38, 38, 0.22);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+            transform: translateY(-1px);
+        }
+        .forecast-narrative-card__head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .forecast-narrative-card__title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .forecast-narrative-card__meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+            line-height: 1.55;
+        }
+        .forecast-narrative-card__chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .forecast-narrative-card__summary {
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #334155;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .forecast-narrative-card__footer {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: #b91c1c;
+            font-size: 12px;
+            font-weight: 800;
         }
         .analytics-section {
             padding: 24px 26px;
@@ -1594,7 +1800,36 @@
             .recommendation-run-title { font-size: 13px; }
             .recommendation-run-subtitle { font-size: 11px; }
             .recommendation-run-arrow { width: 30px; height: 30px; border-radius: 10px; }
-            .recommendation-run-content { padding: 0 12px 12px; }
+            .analytics-run-modal {
+                width: min(96vw, 420px) !important;
+                max-width: 420px !important;
+                max-height: min(78svh, 560px) !important;
+            }
+            .analytics-run-modal__hero,
+            .analytics-run-modal__checklist {
+                padding: 12px;
+            }
+            .analytics-run-modal__checkbox {
+                padding: 9px 10px;
+            }
+            .analytics-barangay-modal {
+                width: min(95vw, 400px) !important;
+                max-width: 400px !important;
+                max-height: min(74svh, 500px) !important;
+            }
+            .barangay-ranking-card {
+                padding: 12px;
+            }
+            .forecast-narrative-card {
+                padding: 13px;
+            }
+            .forecast-narrative-card__title {
+                font-size: 14px;
+            }
+            .forecast-narrative-card__summary {
+                font-size: 12px;
+                -webkit-line-clamp: 4;
+            }
             .explore-btn { width: 100%; justify-content: center; padding: 10px 12px; font-size: 12px; border-radius: 12px; }
             #aiExplanation { margin-top: 12px !important; padding: 12px !important; font-size: 11.5px !important; border-radius: 14px !important; }
         }
@@ -2061,7 +2296,7 @@
                         <div class="analytics-section__head">
                             <div>
                                 <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> AI Recommendations</div>
-                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings.</p>
+                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings. Only the 3 latest saved analysis and prediction runs are shown here.</p>
                             </div>
                             <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
                         </div>
@@ -2235,6 +2470,36 @@
         </div>
     </div>
 
+    <div id="recommendationRunModal" class="modal">
+        <div class="modal-content analytics-forecast-modal analytics-run-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-layer-group" style="color: #dc2626;"></i> Clustered Recommendation Details</h3>
+                <button class="modal-close" onclick="closeRecommendationRunModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="recommendationRunModalBody">
+                <div class="text-center py-8 text-gray-500">No clustered recommendation details available.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeRecommendationRunModal()" style="padding: 8px 20px; background: #f1f5f9; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="barangayRankingModal" class="modal">
+        <div class="modal-content analytics-forecast-modal analytics-barangay-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-ranking-star" style="color: #dc2626;"></i> All Ranked Barangays</h3>
+                <button class="modal-close" onclick="closeBarangayRankingModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="barangayRankingModalBody">
+                <div class="text-center py-8 text-gray-500">No ranked barangays available.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeBarangayRankingModal()" style="padding: 8px 20px; background: #f1f5f9; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="loadingOverlay" class="loading-overlay">
         <div style="text-align: center;">
             <div class="loading-spinner"></div>
@@ -2272,7 +2537,11 @@
         let lastAiWarningToastKey = null;
         let recommendationRunGroups = [];
         let recommendationRunCache = new Map();
-        let openRecommendationRunId = null;
+        let recommendationRunChecklistCache = new Map();
+        let recommendationExploreCache = new Map();
+        let currentRecommendationRunGroup = null;
+        let currentSortedBarangayPredictions = [];
+        let forecastNarrativeRuns = [];
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
@@ -2645,6 +2914,7 @@
             if (!panel) return;
 
             if (!Array.isArray(predictions) || predictions.length === 0) {
+                currentSortedBarangayPredictions = [];
                 panel.innerHTML = '<div class="text-center py-8 text-gray-500">No recent saved barangay forecasts available yet.</div>';
                 return;
             }
@@ -2654,10 +2924,13 @@
                 const bScore = Number(b.probability_percent ?? b.risk_score ?? 0);
                 return bScore - aScore;
             });
+            currentSortedBarangayPredictions = sorted;
+            const visiblePredictions = sorted.slice(0, 5);
 
-            panel.innerHTML = `
-                <div style="display:grid; gap:12px;">
-                    ${sorted.map((prediction, index) => {
+            const buildBarangayPredictionCards = (items, startRank = 1) => `
+                <div class="barangay-ranking-list">
+                    ${items.map((prediction, index) => {
+                        const rank = startRank + index;
                         const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
                         const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
                         const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
@@ -2667,33 +2940,33 @@
                             : '';
 
                         return `
-                            <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #fff; display:flex; gap:14px; align-items:flex-start;">
-                                <div style="width:32px; height:32px; border-radius:50%; background:${index < 3 ? '#dc2626' : '#f59e0b'}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex-shrink:0;">
-                                    ${index + 1}
+                            <div class="barangay-ranking-card">
+                                <div class="barangay-ranking-card__rank ${rank <= 3 ? 'is-top' : ''}">
+                                    ${rank}
                                 </div>
                                 <div style="flex:1;">
                                     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
                                         <div>
-                                            <div style="font-size:16px; font-weight:800; color:#0f172a;">${escapeHtml(prediction.barangay_name || 'Barangay')}</div>
+                                            <div style="font-size:15px; font-weight:800; color:#0f172a;">${escapeHtml(prediction.barangay_name || 'Barangay')}</div>
                                             ${prediction.city_name ? `<div style="font-size:12px; color:#64748b; margin-top:2px;">${escapeHtml(prediction.city_name)}</div>` : ''}
                                         </div>
-                                        <span style="padding:6px 12px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:700; text-transform:uppercase;">
+                                        <span style="padding:6px 12px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:11px; font-weight:700; text-transform:uppercase;">
                                             ${escapeHtml(riskLevel)}
                                         </span>
                                     </div>
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-top:12px;">
-                                        <div style="padding:10px 12px; border-radius:12px; background:#f8fafc;">
+                                    <div class="barangay-ranking-card__stats">
+                                        <div class="barangay-ranking-card__stat">
                                             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Probability</div>
-                                            <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:4px;">${probability !== null ? `${escapeHtml(String(probability))}%` : 'N/A'}</div>
+                                            <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${probability !== null ? `${escapeHtml(String(probability))}%` : 'N/A'}</div>
                                         </div>
-                                        <div style="padding:10px 12px; border-radius:12px; background:#f8fafc;">
+                                        <div class="barangay-ranking-card__stat">
                                             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Possible Incidents</div>
-                                            <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
+                                            <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
                                         </div>
                                     </div>
                                     ${(targetLabel || updatedAt) ? `
-                                            <div style="margin-top:12px; font-size:12px; color:#64748b;">
-                                                ${targetLabel ? `Target period: <strong>${escapeHtml(targetLabel)}</strong>` : ''}
+                                        <div style="margin-top:10px; font-size:12px; color:#64748b; line-height:1.5;">
+                                            ${targetLabel ? `Target period: <strong>${escapeHtml(targetLabel)}</strong>` : ''}
                                             ${targetLabel && updatedAt ? ' · ' : ''}
                                             ${updatedAt ? `Saved: <strong>${escapeHtml(updatedAt)}</strong>` : ''}
                                         </div>
@@ -2704,6 +2977,72 @@
                     }).join('')}
                 </div>
             `;
+
+            panel.innerHTML = `
+                ${buildBarangayPredictionCards(visiblePredictions)}
+                ${sorted.length > 5 ? `
+                    <div class="barangay-ranking-actions">
+                        <button type="button" class="barangay-ranking-viewall" onclick="openBarangayRankingModal()">
+                            <i class="fa-solid fa-list"></i>
+                            View all ${escapeHtml(String(sorted.length))} barangays
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function openBarangayRankingModal() {
+            const modal = document.getElementById('barangayRankingModal');
+            const body = document.getElementById('barangayRankingModalBody');
+            if (!modal || !body) return;
+
+            if (!Array.isArray(currentSortedBarangayPredictions) || !currentSortedBarangayPredictions.length) {
+                body.innerHTML = '<div class="text-center py-8 text-gray-500">No ranked barangays available.</div>';
+            } else {
+                body.innerHTML = `
+                    <div class="barangay-ranking-list">
+                        ${currentSortedBarangayPredictions.map((prediction, index) => {
+                            const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
+                            const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
+                            const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
+                            const targetLabel = prediction.prediction_target_label || prediction.prediction_context?.target_period_label || '';
+                            return `
+                                <div class="barangay-ranking-card">
+                                    <div class="barangay-ranking-card__rank ${index < 3 ? 'is-top' : ''}">${index + 1}</div>
+                                    <div style="flex:1;">
+                                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                                            <div>
+                                                <div style="font-size:14px; font-weight:800; color:#0f172a;">${escapeHtml(prediction.barangay_name || 'Barangay')}</div>
+                                                ${prediction.city_name ? `<div style="font-size:11px; color:#64748b; margin-top:2px;">${escapeHtml(prediction.city_name)}</div>` : ''}
+                                            </div>
+                                            <span style="padding:5px 10px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:11px; font-weight:700; text-transform:uppercase;">
+                                                ${escapeHtml(riskLevel)}
+                                            </span>
+                                        </div>
+                                        <div class="barangay-ranking-card__stats">
+                                            <div class="barangay-ranking-card__stat">
+                                                <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Probability</div>
+                                                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${probability !== null ? `${escapeHtml(String(probability))}%` : 'N/A'}</div>
+                                            </div>
+                                            <div class="barangay-ranking-card__stat">
+                                                <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Incidents</div>
+                                                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
+                                            </div>
+                                        </div>
+                                        ${targetLabel ? `<div style="margin-top:8px; font-size:11px; color:#64748b;">Target period: <strong>${escapeHtml(targetLabel)}</strong></div>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            modal.classList.add('show');
+        }
+
+        function closeBarangayRankingModal() {
+            document.getElementById('barangayRankingModal')?.classList.remove('show');
         }
 
         async function loadLatestAnalysisSnapshot() {
@@ -2782,6 +3121,16 @@
                 .replace(/-/g, ' ');
         }
 
+        function buildRecommendationCacheKey(recommendation) {
+            return JSON.stringify({
+                analysisId: currentAnalysisId || null,
+                checklistId: recommendation?.action_plan_checklist_id || null,
+                title: getRecommendationTitle(recommendation),
+                description: getRecommendationDescription(recommendation),
+                priority: recommendation?.priority || null,
+            });
+        }
+
         function getSelectedScopeMeta() {
             const stationSelect = document.getElementById('stationSelect');
             const barangaySelect = document.getElementById('barangaySelect');
@@ -2827,6 +3176,179 @@
             } catch {
                 return 'Saved analysis';
             }
+        }
+
+        function getPredictionScopePriority(scope) {
+            return scope === 'next_month' ? 1 : 0;
+        }
+
+        function buildForecastNarrativeRun(analysisId, summary = {}, detail = null) {
+            const detailData = detail?.analysis_data?.raw_data || {};
+            const prediction = detail?.predictions || null;
+            const predictionContext = detail?.prediction_context
+                || detailData?.prediction_context
+                || prediction?.prediction_context
+                || {};
+            const predictionScope = detail?.prediction_scope
+                || detailData?.prediction_scope
+                || prediction?.prediction_scope
+                || 'current_month';
+            const hotspot = detail?.selected_barangay_prediction
+                || detailData?.selected_barangay_prediction
+                || (Array.isArray(detail?.barangay_predictions)
+                    ? [...detail.barangay_predictions].sort((a, b) => Number(b.probability_percent ?? 0) - Number(a.probability_percent ?? 0))[0]
+                    : null);
+
+            return {
+                id: Number(analysisId),
+                createdAt: detail?.created_at || summary?.created_at || null,
+                sector: detail?.sector || summary?.sector || 'Station Analysis',
+                predictionScope,
+                targetLabel: predictionContext?.target_period_label || prediction?.forecast_window || null,
+                summary: prediction?.summary || null,
+                outlook: prediction?.outlook || detail?.risk_level || summary?.risk_level || 'Forecast',
+                confidenceScore: detail?.confidence_score || summary?.confidence_score || summary?.confidence_data || null,
+                predictedIncidents: prediction?.predicted_fire_incidents ?? summary?.incident_count ?? null,
+                hotspotName: hotspot?.barangay_name || null,
+                probability: hotspot?.probability_percent ?? prediction?.model_prediction?.probability_percent ?? null,
+                detail,
+            };
+        }
+
+        function renderForecastNarrativeList() {
+            const predictionContainer = document.getElementById('aiPrediction');
+            if (!predictionContainer) return;
+
+            if (!forecastNarrativeRuns.length) {
+                setPredictionEmptyState(
+                    'No prediction has been generated for this dataset yet.',
+                    'Historical, current, and predicted values stay separated on this page. Run the analysis to load a forecast narrative, command summary, and chart comparisons.'
+                );
+                return;
+            }
+
+            predictionContainer.innerHTML = `
+                <div class="forecast-narrative-list">
+                    ${forecastNarrativeRuns.map((run) => `
+                        <button type="button" class="forecast-narrative-card" onclick="openForecastNarrativeModal(${run.id})">
+                            <div class="forecast-narrative-card__head">
+                                <div>
+                                    <div class="forecast-narrative-card__title">${escapeHtml(run.targetLabel || (run.predictionScope === 'next_month' ? 'Next Month Forecast' : 'Current Month Forecast'))}</div>
+                                    <div class="forecast-narrative-card__meta">
+                                        ${escapeHtml(run.sector || 'Station Analysis')} · ${escapeHtml(formatRecommendationRunTimestamp(run.createdAt))}
+                                    </div>
+                                </div>
+                                <span class="recommendation-run-chip">
+                                    <i class="fa-solid ${run.predictionScope === 'next_month' ? 'fa-calendar-plus' : 'fa-calendar-day'}" style="color:${run.predictionScope === 'next_month' ? '#2563eb' : '#dc2626'};"></i>
+                                    ${escapeHtml(run.predictionScope === 'next_month' ? 'Next month' : 'Current month')}
+                                </span>
+                            </div>
+                            <div class="forecast-narrative-card__chips">
+                                <span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(run.outlook || 'Forecast')}</span>
+                                ${run.confidenceScore !== null && run.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(run.confidenceScore))}% confidence</span>` : ''}
+                                ${run.predictedIncidents !== null && run.predictedIncidents !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-fire-flame-curved" style="color:#dc2626;"></i>${escapeHtml(String(run.predictedIncidents))} possible incident(s)</span>` : ''}
+                                ${run.hotspotName ? `<span class="recommendation-run-chip"><i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(run.hotspotName)}</span>` : ''}
+                            </div>
+                            <div class="forecast-narrative-card__summary">${escapeHtml(run.summary || 'No saved forecast narrative is available for this analysis yet.')}</div>
+                            <div class="forecast-narrative-card__footer">
+                                <i class="fa-solid fa-up-right-from-square"></i>
+                                Open forecast details
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function loadForecastNarrativeRuns(priorityAnalysisData = null) {
+            const predictionContainer = document.getElementById('aiPrediction');
+            if (predictionContainer) {
+                predictionContainer.innerHTML = `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">Loading forecast narratives...</div>
+                        <p class="analytics-empty-state__copy">Preparing the saved current-month and next-month forecast narratives for review.</p>
+                    </div>
+                `;
+            }
+
+            try {
+                const response = await fetch('/station-admin/api/analyses/history', {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to load analysis history (${response.status})`);
+                }
+
+                const payload = await response.json();
+                const history = Array.isArray(payload?.data) ? payload.data : [];
+                const summaryMap = new Map(history.map((item) => [Number(item.analysis_id), item]));
+
+                if (priorityAnalysisData?.analysis_id) {
+                    summaryMap.set(Number(priorityAnalysisData.analysis_id), {
+                        analysis_id: priorityAnalysisData.analysis_id,
+                        sector: priorityAnalysisData.sector || priorityAnalysisData.location_name || 'Selected station',
+                        risk_level: priorityAnalysisData.risk_level || null,
+                        confidence_score: priorityAnalysisData.confidence_score || null,
+                        incident_count: priorityAnalysisData.total_incidents || 0,
+                        created_at: new Date().toISOString(),
+                    });
+                }
+
+                const runs = await Promise.all(
+                    Array.from(summaryMap.values())
+                        .slice(0, 10)
+                        .map(async (summary) => {
+                            const detailGroup = await fetchRecommendationRunDetail(summary.analysis_id, summary);
+                            return buildForecastNarrativeRun(summary.analysis_id, summary, detailGroup?.detail || detailGroup);
+                        })
+                );
+
+                forecastNarrativeRuns = runs
+                    .filter((run) => run.summary || run.targetLabel || run.detail)
+                    .sort((a, b) => {
+                        const scopeSort = getPredictionScopePriority(a.predictionScope) - getPredictionScopePriority(b.predictionScope);
+                        if (scopeSort !== 0) {
+                            return scopeSort;
+                        }
+                        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                    });
+
+                renderForecastNarrativeList();
+            } catch (error) {
+                console.error('Forecast narrative history load error:', error);
+                if (predictionContainer) {
+                    predictionContainer.innerHTML = `
+                        <div class="analytics-empty-state">
+                            <div class="analytics-empty-state__title">Unable to load forecast narratives.</div>
+                            <p class="analytics-empty-state__copy">${escapeHtml(error.message || 'Please try again.')}</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        async function openForecastNarrativeModal(analysisId) {
+            const normalizedId = Number(analysisId);
+            const selectedRun = forecastNarrativeRuns.find((run) => Number(run.id) === normalizedId);
+            if (!selectedRun) {
+                showAnalyticsToast('Forecast narrative details are unavailable for this analysis run.', 'warning');
+                return;
+            }
+
+            const detailGroup = await fetchRecommendationRunDetail(normalizedId, selectedRun.detail || selectedRun);
+            const detail = detailGroup?.detail || detailGroup;
+            if (!detail) {
+                showAnalyticsToast('Forecast detail payload could not be loaded.', 'warning');
+                return;
+            }
+
+            currentPredictionDetails = detail;
+            currentAnalysisId = normalizedId;
+            currentRecommendations = Array.isArray(detail.recommendations) ? detail.recommendations : [];
+            currentBarangayPredictions = Array.isArray(detail.barangay_predictions)
+                ? detail.barangay_predictions
+                : (Array.isArray(detail.analysis_data?.raw_data?.barangay_predictions) ? detail.analysis_data.raw_data.barangay_predictions : []);
+            openPredictionDetailModal();
         }
 
         function getRecommendationRunScopeLabel(group) {
@@ -2901,7 +3423,218 @@
 
             currentAnalysisId = Number(analysisId);
             currentRecommendations = group.recommendations;
+            closeRecommendationRunModal();
             exploreRecommendation(group.recommendations[recommendationIndex], recommendationIndex);
+        }
+
+        async function loadRecommendationRunChecklists(analysisId) {
+            const normalizedId = Number(analysisId);
+            if (recommendationRunChecklistCache.has(normalizedId)) {
+                return recommendationRunChecklistCache.get(normalizedId);
+            }
+
+            try {
+                const response = await fetch(`/station-admin/api/action-plan-checklists?analysis_id=${encodeURIComponent(normalizedId)}`, {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to load checklist rows for analysis ${normalizedId}`);
+                }
+
+                const payload = await response.json();
+                const checklists = Array.isArray(payload?.data) ? payload.data : [];
+                recommendationRunChecklistCache.set(normalizedId, checklists);
+                return checklists;
+            } catch (error) {
+                console.error('Recommendation run checklist load failed:', error);
+                recommendationRunChecklistCache.set(normalizedId, []);
+                return [];
+            }
+        }
+
+        function renderRecommendationRunChecklistItems(checklist) {
+            const items = Array.isArray(checklist?.items) && checklist.items.length
+                ? checklist.items
+                : (Array.isArray(checklist?.checklist_items)
+                    ? checklist.checklist_items.map((label) => ({ item_text: label, status: 'pending' }))
+                    : []);
+
+            if (!items.length) {
+                return '<div class="analytics-empty-state" style="padding:12px;"><div class="analytics-empty-state__title">No checklist items saved.</div></div>';
+            }
+
+            return `
+                <div class="analytics-run-modal__checklist-items">
+                    ${items.map((item) => {
+                        const itemText = item?.item_text || item?.title || item?.label || 'Checklist item';
+                        const itemStatus = String(item?.status || 'pending').toLowerCase();
+                        const isChecked = itemStatus === 'followed' || itemStatus === 'confirmed';
+                        const statusLabel = itemStatus.replace(/_/g, ' ');
+
+                        return `
+                            <label class="analytics-run-modal__checkbox">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} disabled>
+                                <span class="analytics-run-modal__checkbox-copy">
+                                    ${escapeHtml(itemText)}
+                                    <span class="analytics-run-modal__checkbox-meta">
+                                        <i class="fa-solid ${isChecked ? 'fa-circle-check' : 'fa-clock'}" style="color:${isChecked ? '#16a34a' : '#f59e0b'};"></i>
+                                        ${escapeHtml(statusLabel)}
+                                    </span>
+                                </span>
+                            </label>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function renderRecommendationRunModalBody(group, checklists = []) {
+            const prediction = group?.detail?.predictions || null;
+            const summaryText = prediction?.summary || 'No saved prediction summary is available for this analysis run.';
+            const recommendations = Array.isArray(group?.recommendations) ? group.recommendations : [];
+            const checklistHtml = checklists.length
+                ? `
+                    <div class="analytics-run-modal__checklists">
+                        ${checklists.map((checklist) => {
+                            const progress = checklist?.checklist_progress || {};
+                            const linkedMitigationCount = Number(checklist?.linked_mitigation_count || 0);
+                            return `
+                                <div class="analytics-run-modal__checklist">
+                                    <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+                                        <div>
+                                            <div style="font-size:14px; font-weight:800; color:#0f172a;">${escapeHtml(checklist?.plan_title || checklist?.source_title || 'Action Plan Checklist')}</div>
+                                            <div style="font-size:12px; color:#64748b; margin-top:4px;">${escapeHtml(checklist?.status || 'pending')}</div>
+                                        </div>
+                                        <span style="padding:6px 10px; border-radius:999px; background:#fff7ed; color:#9a3412; font-size:11px; font-weight:800;">
+                                            ${escapeHtml(String(progress.percent ?? 0))}% progress
+                                        </span>
+                                    </div>
+                                    ${checklist?.plan_description ? `<div style="font-size:13px; line-height:1.6; color:#475569; margin-top:8px;">${escapeHtml(checklist.plan_description)}</div>` : ''}
+                                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                                        <span class="recommendation-run-chip"><i class="fa-solid fa-list-check" style="color:#2563eb;"></i>${escapeHtml(String((Array.isArray(checklist?.items) && checklist.items.length) || (Array.isArray(checklist?.checklist_items) ? checklist.checklist_items.length : 0)))} checklist item(s)</span>
+                                        <span class="recommendation-run-chip"><i class="fa-solid fa-shield-halved" style="color:#dc2626;"></i>${escapeHtml(String(linkedMitigationCount))} mitigation link(s)</span>
+                                    </div>
+                                    ${renderRecommendationRunChecklistItems(checklist)}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `
+                : `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">No checklist rows saved for this analysis yet.</div>
+                        <p class="analytics-empty-state__copy">Run details and recommendations are available, but no stored action-plan checklist rows were found for this saved analysis.</p>
+                    </div>
+                `;
+
+            return `
+                <div style="display:grid; gap:14px;">
+                    <div class="analytics-run-modal__hero">
+                        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                            <div>
+                                <div style="font-size:12px; font-weight:800; color:#9a3412; text-transform:uppercase; letter-spacing:0.08em;">${escapeHtml(group.scopeLabel || 'Run AI Analysis')}</div>
+                                <div style="font-size:22px; font-weight:900; color:#0f172a; margin-top:4px;">${escapeHtml(group.sector || 'Station Analysis')}</div>
+                                <div style="font-size:12px; color:#64748b; margin-top:6px;">${escapeHtml(formatRecommendationRunTimestamp(group.createdAt))}</div>
+                            </div>
+                            <span style="padding:7px 12px; border-radius:999px; background:#fff; border:1px solid rgba(220,38,38,0.12); color:#b91c1c; font-size:12px; font-weight:800;">
+                                ${escapeHtml(group.targetLabel || 'Current forecast')}
+                            </span>
+                        </div>
+                        <p style="margin-top:12px; font-size:13px; line-height:1.7; color:#334155;">${escapeHtml(summaryText)}</p>
+                    </div>
+
+                    <div class="analytics-run-modal__grid">
+                        <div class="analytics-run-modal__stat">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Risk Level</div>
+                            <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(group.riskLevel || 'Unknown')}</div>
+                        </div>
+                        <div class="analytics-run-modal__stat">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Confidence</div>
+                            <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${group.confidenceScore !== null && group.confidenceScore !== undefined ? `${escapeHtml(String(group.confidenceScore))}%` : 'N/A'}</div>
+                        </div>
+                        <div class="analytics-run-modal__stat">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Predicted Incidents</div>
+                            <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(String(prediction?.predicted_fire_incidents ?? group.incidentCount ?? 'N/A'))}</div>
+                        </div>
+                        <div class="analytics-run-modal__stat">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Recommendations</div>
+                            <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(String(recommendations.length))}</div>
+                        </div>
+                    </div>
+
+                    <div style="padding:14px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
+                        <div style="font-size:12px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">AI Recommendations</div>
+                        ${recommendations.length ? recommendations.map((rec, idx) => {
+                            const meta = extractRecommendationMeta(rec);
+                            let priorityClass = 'medium';
+                            let priorityLabel = 'MEDIUM';
+                            if (rec.priority === 'Critical') { priorityClass = 'critical'; priorityLabel = 'CRITICAL'; }
+                            else if (rec.priority === 'High') { priorityClass = 'high'; priorityLabel = 'HIGH'; }
+                            else if (rec.priority === 'Low') { priorityClass = 'low'; priorityLabel = 'LOW'; }
+
+                            return `
+                                <div class="recommendation-card ${priorityClass}">
+                                    <div style="display:flex; gap:12px;">
+                                        <div style="width:28px; height:28px; border-radius:50%; background:${priorityClass === 'critical' ? '#dc2626' : (priorityClass === 'high' ? '#f59e0b' : (priorityClass === 'medium' ? '#10b981' : '#94a3b8'))}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800;">${idx + 1}</div>
+                                        <div style="flex:1;">
+                                            <div style="display:flex; align-items:flex-start; gap:10px;">
+                                                <div style="width:34px; height:34px; border-radius:12px; background:${meta.accent}15; color:${meta.accent}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                                    <i class="fa-solid ${meta.icon}"></i>
+                                                </div>
+                                                <div style="flex:1;">
+                                                    <strong style="display:block; color:#0f172a;">${escapeHtml(rec.title || 'Recommendation')}</strong>
+                                                    <p style="color:#4b5563; font-size:13px; margin-top:6px;">${escapeHtml(rec.description || '')}</p>
+                                                </div>
+                                            </div>
+                                            <span class="priority-badge priority-${priorityClass}">${priorityLabel} PRIORITY</span>
+                                            <button class="explore-btn" onclick="openRecommendationFromRun(${group.id}, ${idx})">
+                                                <i class="fa-solid fa-chart-simple"></i> Explore & Get Detailed Suggestions
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('') : '<div class="analytics-empty-state"><div class="analytics-empty-state__title">No saved recommendations found.</div></div>'}
+                    </div>
+
+                    <div style="padding:14px; border-radius:16px; border:1px solid #e2e8f0; background:#fff;">
+                        <div style="font-size:12px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">Action Plan Checklist</div>
+                        ${checklistHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function openRecommendationRunModal(analysisId) {
+            const normalizedId = Number(analysisId);
+            const modal = document.getElementById('recommendationRunModal');
+            const body = document.getElementById('recommendationRunModalBody');
+            const existingGroup = recommendationRunGroups.find((group) => Number(group.id) === normalizedId) || recommendationRunCache.get(normalizedId);
+
+            if (!modal || !body || !existingGroup) {
+                showAnalyticsToast('Recommendation run details are unavailable right now.', 'warning');
+                return;
+            }
+
+            body.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="loading-spinner" style="width: 34px; height: 34px;"></div>
+                    <p class="mt-3 text-gray-500">Loading clustered recommendation details...</p>
+                </div>
+            `;
+            modal.classList.add('show');
+
+            const detailedGroup = await fetchRecommendationRunDetail(normalizedId, existingGroup.detail ? existingGroup : existingGroup);
+            const checklists = await loadRecommendationRunChecklists(normalizedId);
+            currentRecommendationRunGroup = detailedGroup;
+            recommendationRunGroups = recommendationRunGroups.map((group) =>
+                Number(group.id) === normalizedId ? { ...group, ...detailedGroup } : group
+            );
+            body.innerHTML = renderRecommendationRunModalBody(detailedGroup, checklists);
+        }
+
+        function closeRecommendationRunModal() {
+            document.getElementById('recommendationRunModal')?.classList.remove('show');
         }
 
         function renderRecommendationRunGroups() {
@@ -2921,7 +3654,6 @@
             recContainer.innerHTML = `
                 <div class="recommendation-run-list">
                     ${recommendationRunGroups.map((group) => {
-                        const isOpen = Number(openRecommendationRunId) === Number(group.id);
                         const recommendations = Array.isArray(group.recommendations) ? group.recommendations : [];
                         const summaryLine = `${group.sector} · ${formatRecommendationRunTimestamp(group.createdAt)}`;
                         const chips = [
@@ -2931,86 +3663,9 @@
                             group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% confidence</span>` : ''
                         ].filter(Boolean).join('');
 
-                        let contentHtml = `
-                            <div class="recommendation-run-summary">
-                                ${escapeHtml(group.scopeLabel)} recommendations for ${escapeHtml(group.sector)}.
-                            </div>
-                        `;
-
-                        if (!recommendations.length) {
-                            contentHtml += `
-                                <div class="analytics-empty-state" style="padding:14px 16px;">
-                                    <div class="analytics-empty-state__title">No recommendations saved for this run.</div>
-                                </div>
-                            `;
-                        } else {
-                            contentHtml += recommendations.map((rec, idx) => {
-                                const meta = extractRecommendationMeta(rec);
-                                const evidenceParts = [
-                                    meta.focus ? meta.focus : null,
-                                    meta.place ? meta.place : null,
-                                    !meta.place && meta.barangay ? meta.barangay : null,
-                                ].filter(Boolean);
-                                const evidenceLine = evidenceParts.length
-                                    ? `<div style="font-size:12px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                            <i class="fa-solid fa-magnifying-glass-chart" style="color:${meta.accent};"></i>
-                                            <span><strong style="color:#475569;">Based on:</strong> ${escapeHtml(evidenceParts.join(' • '))}</span>
-                                       </div>`
-                                    : '';
-                                let priorityClass = 'medium';
-                                let priorityLabel = 'MEDIUM';
-                                if (rec.priority === 'Critical') { priorityClass = 'critical'; priorityLabel = 'CRITICAL'; }
-                                else if (rec.priority === 'High') { priorityClass = 'high'; priorityLabel = 'HIGH'; }
-                                else if (rec.priority === 'Low') { priorityClass = 'low'; priorityLabel = 'LOW'; }
-
-                                const metaChips = [
-                                    meta.barangay ? `
-                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                            <i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(meta.barangay)}
-                                        </span>
-                                    ` : '',
-                                    meta.place ? `
-                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                            <i class="fa-solid fa-road" style="color:#2563eb;"></i>${escapeHtml(meta.place)}
-                                        </span>
-                                    ` : '',
-                                    meta.focus ? `
-                                        <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#fff; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#334155;">
-                                            <i class="fa-solid ${meta.icon}" style="color:${meta.accent};"></i>${escapeHtml(meta.focus)}
-                                        </span>
-                                    ` : '',
-                                ].filter(Boolean).join('');
-
-                                return `
-                                    <div class="recommendation-card ${priorityClass}">
-                                        <div style="display: flex; gap: 12px;">
-                                            <div style="width: 28px; height: 28px; background: ${priorityClass === 'critical' ? '#dc2626' : (priorityClass === 'high' ? '#f59e0b' : (priorityClass === 'medium' ? '#10b981' : '#94a3b8'))}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${idx + 1}</div>
-                                            <div style="flex:1;">
-                                                <div style="display:flex; align-items:flex-start; gap:10px;">
-                                                    <div style="width:34px; height:34px; border-radius:12px; background:${meta.accent}15; color:${meta.accent}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                                        <i class="fa-solid ${meta.icon}"></i>
-                                                    </div>
-                                                    <div style="flex:1;">
-                                                        <strong style="display:block; color:#0f172a;">${escapeHtml(rec.title || 'Recommendation')}</strong>
-                                                        ${metaChips ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">${metaChips}</div>` : ''}
-                                                        ${evidenceLine}
-                                                    </div>
-                                                </div>
-                                                <p style="color: #4b5563; font-size: 13px; margin-top: 4px;">${escapeHtml(rec.description || '')}</p>
-                                                <span class="priority-badge priority-${priorityClass}">${priorityLabel} PRIORITY</span>
-                                                <button class="explore-btn" onclick="openRecommendationFromRun(${group.id}, ${idx})">
-                                                    <i class="fa-solid fa-chart-simple"></i> Explore & Get Detailed Suggestions
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('');
-                        }
-
                         return `
-                            <div class="recommendation-run-group ${isOpen ? 'is-open' : ''}">
-                                <button type="button" class="recommendation-run-toggle" onclick="toggleRecommendationRunGroup(${group.id})">
+                            <div class="recommendation-run-group">
+                                <button type="button" class="recommendation-run-toggle" onclick="openRecommendationRunModal(${group.id})">
                                     <div class="recommendation-run-meta">
                                         <div class="recommendation-run-title">
                                             <i class="fa-solid fa-layer-group" style="color:#dc2626;"></i>
@@ -3018,36 +3673,18 @@
                                         </div>
                                         <div class="recommendation-run-subtitle">${escapeHtml(summaryLine)}</div>
                                         <div class="recommendation-run-chips">${chips}</div>
+                                        <div class="recommendation-run-action">
+                                            <i class="fa-solid fa-up-right-from-square"></i>
+                                            Open clustered recommendations
+                                        </div>
                                     </div>
-                                    <span class="recommendation-run-arrow"><i class="fa-solid fa-chevron-down"></i></span>
+                                    <span class="recommendation-run-arrow"><i class="fa-solid fa-up-right-from-square"></i></span>
                                 </button>
-                                <div class="recommendation-run-content">${contentHtml}</div>
                             </div>
                         `;
                     }).join('')}
                 </div>
             `;
-        }
-
-        async function toggleRecommendationRunGroup(analysisId) {
-            const normalizedId = Number(analysisId);
-            openRecommendationRunId = Number(openRecommendationRunId) === normalizedId ? null : normalizedId;
-            renderRecommendationRunGroups();
-
-            if (!openRecommendationRunId) {
-                return;
-            }
-
-            const existingGroup = recommendationRunGroups.find((group) => Number(group.id) === normalizedId);
-            if (existingGroup?.detail && Array.isArray(existingGroup.recommendations) && existingGroup.recommendations.length) {
-                return;
-            }
-
-            const updatedGroup = await fetchRecommendationRunDetail(normalizedId, existingGroup || {});
-            recommendationRunGroups = recommendationRunGroups.map((group) =>
-                Number(group.id) === normalizedId ? { ...group, ...updatedGroup } : group
-            );
-            renderRecommendationRunGroups();
         }
 
         async function loadRecommendationRunGroups(priorityAnalysisData = null) {
@@ -3090,14 +3727,11 @@
                 const groups = await Promise.all(
                     Array.from(summaryMap.values())
                         .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-                        .slice(0, 10)
+                        .slice(0, 3)
                         .map((summary) => fetchRecommendationRunDetail(summary.analysis_id, summary))
                 );
 
                 recommendationRunGroups = groups.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-                if (!openRecommendationRunId && recommendationRunGroups.length) {
-                    openRecommendationRunId = recommendationRunGroups[0].id;
-                }
                 renderRecommendationRunGroups();
             } catch (error) {
                 console.error('Recommendation run history load error:', error);
@@ -3154,6 +3788,8 @@
             const dailyContext = chartContext.daily || {};
             const previousSeries = Array.isArray(dailyContext.previous_period) ? dailyContext.previous_period : [];
             const currentSeries = Array.isArray(dailyContext.current_period) ? dailyContext.current_period : [];
+            const hasPreviousWindow = previousSeries.length > 0;
+            const hasCurrentWindow = currentSeries.length > 0;
             const previousTotal = previousSeries.reduce((sum, value) => sum + Number(value || 0), 0);
             const currentTotal = currentSeries.reduce((sum, value) => sum + Number(value || 0), 0);
             const trendDelta = previousTotal > 0 ? (((currentTotal - previousTotal) / previousTotal) * 100) : null;
@@ -3179,10 +3815,18 @@
             const trendCopy = document.getElementById('summaryTrendCopy');
             const trendIndicator = document.getElementById('summaryTrendIndicator');
             if (trendDirection && trendCopy && trendIndicator) {
-                if (trendDelta === null || !Number.isFinite(trendDelta)) {
+                if (!hasPreviousWindow || !hasCurrentWindow) {
                     trendDirection.textContent = 'Comparison unavailable';
                     trendCopy.textContent = 'A previous seven-day comparison will appear once the backend has both current and previous actual incident periods available.';
                     trendIndicator.innerHTML = '<i class="fa-solid fa-chart-simple"></i><span>No previous period data available</span>';
+                } else if (previousTotal === 0 && currentTotal === 0) {
+                    trendDirection.textContent = 'Holding steady';
+                    trendCopy.textContent = 'Both the current and previous seven-day periods recorded 0 incidents.';
+                    trendIndicator.innerHTML = '<i class="fa-solid fa-equals"></i><span>0 incidents in both periods</span>';
+                } else if (previousTotal === 0) {
+                    trendDirection.textContent = 'Rising against previous period';
+                    trendCopy.textContent = `Current seven-day activity totals ${currentTotal} incidents after a previous seven-day baseline of 0 incidents.`;
+                    trendIndicator.innerHTML = '<i class="fa-solid fa-arrow-trend-up"></i><span>Previous period had 0 incidents</span>';
                 } else {
                     const directionLabel = trendDelta > 0 ? 'Rising against previous period' : (trendDelta < 0 ? 'Lower than previous period' : 'Holding steady');
                     trendDirection.textContent = directionLabel;
@@ -3488,8 +4132,21 @@
             const modal = document.getElementById('exploreModal');
             const modalBody = document.getElementById('exploreModalBody');
             const recommendationTitle = getRecommendationTitle(recommendation);
+            const cacheKey = buildRecommendationCacheKey(recommendation);
+            const cached = recommendationExploreCache.get(cacheKey);
             
             modal.classList.add('show');
+            if (cached) {
+                displayExploreResults(
+                    cached.data,
+                    recommendation,
+                    cached.source || null,
+                    cached.note || null,
+                    cached.model_used || null
+                );
+                return;
+            }
+
             modalBody.setAttribute('data-state', 'loading');
             modalBody.innerHTML = `
                 <div class="text-center py-8">
@@ -3523,6 +4180,12 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    recommendationExploreCache.set(cacheKey, {
+                        data: result.data,
+                        source: result.source || null,
+                        note: result.note || null,
+                        model_used: result.model_used || null,
+                    });
                     displayExploreResults(result.data, recommendation, result.source || null, result.note || null, result.model_used || null);
                     if (currentAnalysisId) {
                         loadActionPlanChecklistPanel(currentAnalysisId);
@@ -4144,69 +4807,15 @@
             const prediction = analysisData.predictions || null;
             updateTargetMonthDisplay(analysisData.prediction_scope || 'current_month', analysisData.prediction_context || null);
             updateHeroModelLabel(formatAiModelLabel(analysisData?.ai_models?.recommendation || analysisData?.ai_models?.prediction) || analysisData?.model_metadata?.dataset_kind || 'Latest saved model');
-
-            if (predictionContainer) {
-                if (!prediction || !prediction.summary) {
+            loadForecastNarrativeRuns(analysisData).catch((error) => {
+                console.error('Forecast narrative list load failed:', error);
+                if (predictionContainer) {
                     setPredictionEmptyState(
-                        'No prediction has been generated for this dataset yet.',
-                        'Historical, current, and predicted values stay separated on this page. Run the analysis to load a forecast narrative, command summary, and chart comparisons.'
+                        'Forecast narrative could not be loaded.',
+                        'Please try running the analysis again or refresh the saved forecast history.'
                     );
-                } else {
-                    const primaryDriver = Array.isArray(prediction.drivers) && prediction.drivers.length ? prediction.drivers[0] : null;
-                    const scopeCaption = prediction.prediction_context?.target_period_label || prediction.forecast_window || 'Forecast window';
-                    const selectedBarangay = analysisData.selected_barangay_prediction || null;
-                    const topHotspot = !selectedBarangay && Array.isArray(currentBarangayPredictions) && currentBarangayPredictions.length
-                        ? [...currentBarangayPredictions].sort((a, b) => Number(b.probability_percent ?? 0) - Number(a.probability_percent ?? 0))[0]
-                        : null;
-                    const focusBarangayLabel = selectedBarangay?.barangay_name ? selectedBarangay.barangay_name : (topHotspot?.barangay_name || null);
-                    const recommendationCount = Array.isArray(currentRecommendations) ? currentRecommendations.length : 0;
-                    const modelMetadata = analysisData.model_metadata || null;
-
-                    predictionContainer.innerHTML = `
-                        <div style="padding:22px; border-radius:22px; background:linear-gradient(135deg, rgba(220,38,38,0.08), rgba(245,158,11,0.12)); border:1px solid rgba(245,158,11,0.22);">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
-                                <div>
-                                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase; letter-spacing:0.08em;">Forecast window</div>
-                                    <div style="font-size:24px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(scopeCaption)}</div>
-                                </div>
-                                <div style="display:flex; flex-wrap:wrap; gap:10px;">
-                                    <span class="analytics-empty-pill"><i class="fa-solid fa-shield-heart"></i> ${escapeHtml(prediction.outlook || 'Forecast Outlook')}</span>
-                                    ${focusBarangayLabel ? `<span class="analytics-empty-pill"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(focusBarangayLabel)}</span>` : ''}
-                                </div>
-                            </div>
-                            <p style="margin-top:16px; font-size:14px; line-height:1.8; color:#334155;">${escapeHtml(prediction.summary)}</p>
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:18px;">
-                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(220,38,38,0.12);">
-                                    <div style="font-size:11px; font-weight:800; color:#9a3412; text-transform:uppercase;">Predicted incidents</div>
-                                    <div style="font-size:28px; font-weight:900; color:#7f1d1d; margin-top:8px;">${prediction.predicted_fire_incidents ?? 'N/A'}</div>
-                                </div>
-                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(234,88,12,0.12);">
-                                    <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase;">Estimated damage</div>
-                                    <div style="font-size:20px; font-weight:900; color:#9a3412; margin-top:8px;">${prediction.predicted_damage !== undefined && prediction.predicted_damage !== null ? `PHP ${Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Unavailable'}</div>
-                                </div>
-                                <div style="padding:14px; border-radius:16px; background:rgba(255,255,255,0.65); border:1px solid rgba(148,163,184,0.16);">
-                                    <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase;">Recommendation count</div>
-                                    <div style="font-size:28px; font-weight:900; color:#0f172a; margin-top:8px;">${recommendationCount}</div>
-                                </div>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px;">
-                                <div style="font-size:13px; color:#475569; max-width:72%;">
-                                    ${primaryDriver ? `<strong style="color:#9a3412;">Main contributing factor:</strong> ${escapeHtml(typeof primaryDriver === 'string' ? primaryDriver : (primaryDriver?.summary || 'Driver'))}` : 'Open the detailed forecast to review model drivers, weather context, and stored AI recommendations.'}
-                                </div>
-                                <button type="button" onclick="openPredictionDetailModal()" style="padding: 10px 16px; background: #fff; color: #b91c1c; border: 1px solid rgba(220,38,38,0.16); border-radius: 12px; cursor: pointer; font-weight: 800;">
-                                    View Forecast Details
-                                </button>
-                            </div>
-                            ${modelMetadata ? `
-                                <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-                                    <span class="analytics-empty-pill"><i class="fa-solid fa-microchip"></i> ${escapeHtml(modelMetadata.dataset_kind || 'model')}</span>
-                                    <span class="analytics-empty-pill"><i class="fa-solid fa-database"></i> ${escapeHtml(String(modelMetadata.records_used || 'N/A'))} records used</span>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
                 }
-            }
+            });
 
             document.getElementById('riskScore').textContent = `${analysisData.risk_score || 0}/100`;
             document.getElementById('totalIncidents').textContent = analysisData.total_incidents || 0;
