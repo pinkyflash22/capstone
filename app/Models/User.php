@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use App\Models\FullAddress;
 use App\Models\Role;
 use App\Models\Shift;
@@ -232,5 +234,33 @@ public static function resolveAnonymousUserId(): ?int
         ->anonymous()
         ->orderBy('user_id')
         ->value('user_id');
+}
+
+public static function createAnonymousCaller(): self
+{
+    $anonymousRoleId = Role::query()->where('role', 'anonymous')->value('role_id');
+
+    if (! $anonymousRoleId) {
+        throw new \RuntimeException('Anonymous role is not configured.');
+    }
+
+    do {
+        $accountCode = 'ANON-' . strtoupper(Str::random(10));
+    } while (static::query()->where('account_code', $accountCode)->exists());
+
+    return static::query()->create([
+        'account_code' => $accountCode,
+        'first_name' => 'Anonymous',
+        'middle_name' => '',
+        'last_name' => 'Caller',
+        'role_id' => $anonymousRoleId,
+        'address_id' => null,
+        'contact_number' => '09' . str_pad((string) random_int(0, 999999999), 9, '0', STR_PAD_LEFT),
+        'email' => null,
+        'email_verified_at' => null,
+        'is_verified' => true,
+        'password' => Hash::make(Str::random(40)),
+        'image' => null,
+    ]);
 }
 }

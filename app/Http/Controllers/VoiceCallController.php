@@ -15,34 +15,62 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class VoiceCallController extends Controller
 {
+    private const ANONYMOUS_VOICE_USER_SESSION_KEY = 'anonymous_voice_user_id';
+    private const ANONYMOUS_VOICE_USER_COOKIE = 'anonymous_voice_user_id';
+    private const ANONYMOUS_VOICE_USER_COOKIE_MINUTES = 60 * 24 * 30;
+
     public function bootstrapAnonymousSession(Request $request): JsonResponse
     {
         $user = $request->user();
+        $sessionAnonymousUserId = $request->session()->get(self::ANONYMOUS_VOICE_USER_SESSION_KEY);
+        $cookieAnonymousUserId = $request->cookie(self::ANONYMOUS_VOICE_USER_COOKIE);
 
         if ($user && ! in_array(Str::lower((string) $user->role?->role), ['citizen', 'anonymous'], true)) {
             abort(403);
         }
 
-        if (! $user) {
-            $user = User::query()->anonymous()->with('role')->first();
-
-            abort_unless($user, 503, 'Anonymous voice calling is not configured.');
-
-            Auth::login($user);
-            $request->session()->regenerate();
+        if ($user && Str::lower((string) $user->role?->role) === 'anonymous') {
+            $request->session()->put(self::ANONYMOUS_VOICE_USER_SESSION_KEY, (int) $user->user_id);
         }
 
-        return response()->json([
+        if (! $user) {
+            $candidateUserId = $sessionAnonymousUserId ?: $cookieAnonymousUserId;
+            $user = $candidateUserId
+                ? User::query()->anonymous()->with('role')->find((int) $candidateUserId)
+                : null;
+
+            if (! $user) {
+                $user = User::createAnonymousCaller()->load('role');
+            }
+
+            $request->session()->put(self::ANONYMOUS_VOICE_USER_SESSION_KEY, (int) $user->user_id);
+            Auth::login($user);
+            $request->session()->regenerate();
+            $request->session()->put(self::ANONYMOUS_VOICE_USER_SESSION_KEY, (int) $user->user_id);
+        }
+
+        $response = response()->json([
             'success' => true,
             'user_id' => (int) $user->user_id,
             'role' => Str::lower((string) $user->role?->role),
         ]);
+
+        if ($this->isAnonymousUser($user)) {
+            Cookie::queue(cookie(
+                self::ANONYMOUS_VOICE_USER_COOKIE,
+                (string) $user->user_id,
+                self::ANONYMOUS_VOICE_USER_COOKIE_MINUTES
+            ));
+        }
+
+        return $response;
     }
 
     public function store(Request $request): JsonResponse
