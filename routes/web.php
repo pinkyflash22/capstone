@@ -106,8 +106,9 @@ Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-ap
     // AJAX routes for address selection
     Route::get('/api/cities/{provinceId}', [RegisterController::class, 'getCities'])->name('api.cities');
     Route::get('/api/barangays/{cityId}', [RegisterController::class, 'getBarangays'])->name('api.barangays');
-    Route::get('/api/postal-codes/{cityId}', [RegisterController::class, 'getPostalCodes'])->name('api.postal-codes');
-    Route::get('/api/default-postal/{cityId}', [RegisterController::class, 'getDefaultPostalCode'])->name('api.default-postal');
+Route::get('/api/postal-codes/{cityId}', [RegisterController::class, 'getPostalCodes'])->name('api.postal-codes');
+Route::get('/api/default-postal/{cityId}', [RegisterController::class, 'getDefaultPostalCode'])->name('api.default-postal');
+Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'bootstrapAnonymousSession'])->name('voice-calls.anonymous-session');
 
     //locations based
     Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations']);

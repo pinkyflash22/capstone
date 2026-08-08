@@ -15,6 +15,10 @@ class RedirectIfAuthenticated
             $id = Auth::user()->user_id;
             $userRole = $user->role->role;
 
+            if (strtolower((string) $userRole) === 'anonymous') {
+                return $next($request);
+            }
+
             // if (!$user->phone_verified_at) {
             //         return response()->json([
             //             'message' => 'Please verify your phone first'

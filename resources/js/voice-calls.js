@@ -4,7 +4,7 @@ const voiceConfig = window.PyroSenseVoiceCall || {};
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
 const isResponder = ['station admin', 'chief', 'chief station admin'].includes(role);
-const isCitizen = role === 'citizen';
+const isCitizen = ['citizen', 'anonymous'].includes(role);
 
 let incomingPollTimer = null;
 let callerPollTimer = null;
@@ -24,6 +24,7 @@ let callerVoicePrimeAttempted = false;
 let callerHasMicrophoneAccess = false;
 let agoraJoinState = 'idle';
 let incomingPollInFlight = null;
+let voiceSessionBootstrapPromise = null;
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
@@ -32,6 +33,30 @@ const REQUEST_TIMEOUT_MS = 12000;
 
 function routeFor(name, callId = '') {
     return String(routes[name] || '').replace('__CALL__', callId);
+}
+
+async function ensureCitizenVoiceSession() {
+    if (!isCitizen || role !== 'anonymous' || !routes.anonymousSession) {
+        return true;
+    }
+
+    if (voiceSessionBootstrapPromise) {
+        return voiceSessionBootstrapPromise;
+    }
+
+    voiceSessionBootstrapPromise = jsonFetch(routes.anonymousSession, {
+        method: 'POST',
+        timeoutMs: 10000,
+        timeoutMessage: 'Anonymous voice session setup timed out.',
+    }).then((payload) => {
+        voiceConfig.userId = payload.user_id || voiceConfig.userId;
+        return true;
+    }).catch((error) => {
+        voiceSessionBootstrapPromise = null;
+        throw error;
+    });
+
+    return voiceSessionBootstrapPromise;
 }
 
 function ensureToastStack() {
@@ -640,17 +665,17 @@ function callerStatusText(call) {
     return 'Connecting...';
 }
 
-async function startCitizenCall(event) {
+async function triggerCitizenCall(trigger, event = null) {
     if (!voiceConfig.configured || !routes.store) return;
-    event.preventDefault();
+    event?.preventDefault?.();
 
-    const trigger = event.currentTarget;
     activeCallerTrigger = trigger;
     setCallerTriggerState(trigger, 'calling');
     toast('Calling station...');
     await primeCallerVoiceAccess();
 
     try {
+        await ensureCitizenVoiceSession();
         const payload = await jsonFetch(routes.store, {
             method: 'POST',
             body: {
@@ -667,6 +692,10 @@ async function startCitizenCall(event) {
         setCallerTriggerState(trigger, 'idle');
         toast(error.message || 'Unable to start voice call.', 'error');
     }
+}
+
+async function startCitizenCall(event) {
+    return triggerCitizenCall(event.currentTarget, event);
 }
 
 function startCallerPolling(callId) {
@@ -935,4 +964,5 @@ function initVoiceCalls() {
     });
 }
 
+window.pyroStartVoiceCall = triggerCitizenCall;
 document.addEventListener('DOMContentLoaded', initVoiceCalls);

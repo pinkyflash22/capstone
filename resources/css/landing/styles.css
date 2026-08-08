@@ -421,9 +421,50 @@ body {
     line-height: 1.45;
 }
 
+.emergency-call-confirm__panel {
+    margin-bottom: 1rem;
+    padding: 0.9rem;
+    border-radius: 18px;
+    background: rgba(255, 247, 237, 0.92);
+    border: 1px solid rgba(198, 61, 38, 0.12);
+    text-align: left;
+}
+
+.emergency-call-confirm__detail + .emergency-call-confirm__detail {
+    margin-top: 0.7rem;
+}
+
+.emergency-call-confirm__detail strong {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--gray-900);
+    font-size: 0.92rem;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.emergency-call-confirm__detail--warning strong {
+    color: var(--primary);
+}
+
+.emergency-call-confirm__label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.emergency-call-confirm__note {
+    margin: 0.85rem 0 0;
+    font-size: 0.82rem;
+    color: var(--gray-600);
+}
+
 .emergency-call-confirm__actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.65rem;
 }
 
@@ -439,6 +480,12 @@ body {
     background: #fff;
     color: var(--gray-700);
     border-color: rgba(203, 213, 225, 0.9);
+}
+
+.emergency-call-confirm__btn--secondary {
+    background: #fff1f2;
+    color: #b91c1c;
+    border-color: rgba(248, 113, 113, 0.24);
 }
 
 .emergency-call-confirm__btn--primary {
@@ -1679,6 +1726,10 @@ html.js .reveal-on-scroll[data-reveal="up"] {
 
     .landing-toast.is-visible {
         transform: translate(-50%, 0);
+    }
+
+    .emergency-call-confirm__actions {
+        grid-template-columns: 1fr;
     }
 
     .hero-action-btn {

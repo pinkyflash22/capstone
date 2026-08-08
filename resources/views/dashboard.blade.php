@@ -61,10 +61,31 @@
                 <i class="fa-solid fa-phone-volume"></i>
             </div>
             <h2 id="emergencyCallConfirmTitle">Call emergency?</h2>
-            <p>This will open your phone app and dial 911.</p>
+            <p id="emergencyCallConfirmMessage">This will open your phone app and dial 911.</p>
+            <div id="emergencyCallLocationPanel" class="emergency-call-confirm__panel" hidden>
+                <div class="emergency-call-confirm__detail">
+                    <span class="emergency-call-confirm__label">Current coordinates</span>
+                    <strong id="emergencyCallCoords">Unavailable</strong>
+                </div>
+                <div class="emergency-call-confirm__detail" id="emergencyCallCachedLocationWrap" hidden>
+                    <span class="emergency-call-confirm__label">Cached area</span>
+                    <strong id="emergencyCallCachedLocation">Unavailable</strong>
+                </div>
+                <div class="emergency-call-confirm__detail emergency-call-confirm__detail--warning">
+                    <span class="emergency-call-confirm__label">Instruction</span>
+                    <strong>Tell the BFP dispatcher this location during the call.</strong>
+                </div>
+                <p class="emergency-call-confirm__note">PyroSense cannot automatically transmit GPS through a normal phone call.</p>
+            </div>
             <div class="emergency-call-confirm__actions">
                 <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--ghost" data-emergency-call-cancel>
                     Cancel
+                </button>
+                <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--ghost" id="emergencyCallCopyCoords" hidden>
+                    Copy Coordinates
+                </button>
+                <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--secondary" id="emergencyCallBfpButton" hidden>
+                    Call BFP
                 </button>
                 <button type="button" class="emergency-call-confirm__btn emergency-call-confirm__btn--primary" data-emergency-call-confirm>
                     Call 911
@@ -429,7 +450,30 @@
 
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        window.PyroSenseVoiceCall = {
+            configured: @json(filled(config('services.agora.app_id')) && filled(config('services.agora.app_certificate'))),
+            role: @json($anonymousUserId ? 'anonymous' : ''),
+            userId: @json($anonymousUserId ? (int) $anonymousUserId : null),
+            stationId: null,
+            pollIntervalMs: @json((int) config('services.voice_calls.poll_interval_ms', 2000)),
+            routes: {
+                store: @json(route('voice-calls.store')),
+                incoming: @json(route('voice-calls.incoming')),
+                stream: @json(route('voice-calls.stream')),
+                show: @json(url('/voice-calls/__CALL__')),
+                accept: @json(url('/voice-calls/__CALL__/accept')),
+                reject: @json(url('/voice-calls/__CALL__/reject')),
+                end: @json(url('/voice-calls/__CALL__/end')),
+                createIncident: @json(url('/voice-calls/__CALL__/create-incident')),
+                flagPrank: @json(url('/voice-calls/__CALL__/flag-prank')),
+                token: @json(url('/voice-calls/__CALL__/token')),
+                anonymousSession: @json(route('voice-calls.anonymous-session')),
+            },
+        };
+    </script>
     @vite(['resources/js/landing/main.js'])
+    @vite(['resources/css/voice-calls.css', 'resources/js/voice-calls.js'])
     @include('partials.pwa-body', ['showPwaInstallButton' => true])
 </body>
 </html>

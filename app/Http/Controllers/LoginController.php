@@ -604,6 +604,7 @@ class LoginController extends Controller
             'chief' => 'Welcome back Chief!',
             'barangay' => 'Welcome back, Barangay Officer!',
             'barangay captain' => 'Welcome back, Barangay Captain!',
+            'anonymous' => 'Welcome back!',
         ];
 
         $routes = [
@@ -615,6 +616,7 @@ class LoginController extends Controller
             'barangay' => 'barangay.dashboard',
             'barangay captain' => 'barangay.dashboard',
             'dispatcher' => 'dispatcher.dashboard',
+            'anonymous' => 'home',
         ];
 
         if ($role === 'citizen' && session()->pull('redirect_to_citizen_mobile_hub', false)) {

@@ -14,12 +14,37 @@ use App\Support\UserActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class VoiceCallController extends Controller
 {
+    public function bootstrapAnonymousSession(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user && ! in_array(Str::lower((string) $user->role?->role), ['citizen', 'anonymous'], true)) {
+            abort(403);
+        }
+
+        if (! $user) {
+            $user = User::query()->anonymous()->with('role')->first();
+
+            abort_unless($user, 503, 'Anonymous voice calling is not configured.');
+
+            Auth::login($user);
+            $request->session()->regenerate();
+        }
+
+        return response()->json([
+            'success' => true,
+            'user_id' => (int) $user->user_id,
+            'role' => Str::lower((string) $user->role?->role),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -401,6 +426,7 @@ class VoiceCallController extends Controller
     {
         $createdAt = $call->created_at ?: now();
         $caller = $call->caller;
+        $anonymousCaller = $this->isAnonymousUser($caller);
         $hasLocation = $call->caller_latitude !== null && $call->caller_longitude !== null;
         $locationDisplay = $call->caller_location_label ?: (
             $hasLocation
@@ -420,8 +446,8 @@ class VoiceCallController extends Controller
             'caller' => [
                 'id' => $caller?->user_id,
                 'name' => $this->callerName($call),
-                'email' => $caller?->email,
-                'contact_number' => $caller?->contact_number,
+                'email' => $anonymousCaller ? null : $caller?->email,
+                'contact_number' => $anonymousCaller ? null : $caller?->contact_number,
             ],
             'caller_location' => [
                 'has_location' => $hasLocation,
@@ -599,7 +625,12 @@ class VoiceCallController extends Controller
 
     private function isCitizen(User $user): bool
     {
-        return Str::lower((string) $user->role?->role) === 'citizen';
+        return in_array(Str::lower((string) $user->role?->role), ['citizen', 'anonymous'], true);
+    }
+
+    private function isAnonymousUser(?User $user): bool
+    {
+        return Str::lower((string) $user?->role?->role) === 'anonymous';
     }
 
     private function isStationResponder(User $user): bool
@@ -615,6 +646,10 @@ class VoiceCallController extends Controller
     private function callerName(VoiceCall $call): string
     {
         $caller = $call->caller;
+
+        if ($this->isAnonymousUser($caller)) {
+            return 'Anonymous caller';
+        }
 
         return trim(($caller?->first_name ?? '') . ' ' . ($caller?->last_name ?? ''))
             ?: ($caller?->email ?? 'Anonymous caller');

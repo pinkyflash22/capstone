@@ -28,6 +28,10 @@ const LANDING_INCIDENT_VISIBILITY_RADIUS_METERS = 300;
 const LANDING_RESPONDER_CACHE_KEY = 'pyrosense:nearestResponder';
 const LANDING_RESPONDER_CACHE_MAX_AGE_MS = 60 * 1000;
 const LANDING_RESPONDER_CACHE_MAX_DISTANCE_METERS = 150;
+const OFFLINE_EMERGENCY_QUEUE_TYPE = 'offline_emergency_fire_report';
+const OFFLINE_BFP_DIAL_NUMBER = '09171891611';
+const OFFLINE_EMERGENCY_TITLE = 'Offline Fire Emergency';
+let offlineEmergencyCallInFlight = false;
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -547,6 +551,14 @@ function initMobileEntryPage() {
     const emergencyCallModal = document.getElementById('emergencyCallConfirm');
     const emergencyCallConfirmButton = document.querySelector('[data-emergency-call-confirm]');
     const emergencyCallCancelButtons = document.querySelectorAll('[data-emergency-call-cancel]');
+    const emergencyCallTitle = document.getElementById('emergencyCallConfirmTitle');
+    const emergencyCallMessage = document.getElementById('emergencyCallConfirmMessage');
+    const emergencyCallLocationPanel = document.getElementById('emergencyCallLocationPanel');
+    const emergencyCallCoords = document.getElementById('emergencyCallCoords');
+    const emergencyCallCachedLocationWrap = document.getElementById('emergencyCallCachedLocationWrap');
+    const emergencyCallCachedLocation = document.getElementById('emergencyCallCachedLocation');
+    const emergencyCallCopyCoordsButton = document.getElementById('emergencyCallCopyCoords');
+    const emergencyCallBfpButton = document.getElementById('emergencyCallBfpButton');
     const mobileMapModal = document.getElementById('mobileMapModal');
     const mobileMapCloseButtons = document.querySelectorAll('[data-mobile-map-close]');
     const mobileMapFilterButtons = document.querySelectorAll('[data-mobile-map-filter]');
@@ -559,8 +571,49 @@ function initMobileEntryPage() {
         button.addEventListener('click', submitAnonymousIncidentReport);
     });
 
+    function resetEmergencyCallModal() {
+        if (emergencyCallTitle) {
+            emergencyCallTitle.textContent = 'Call emergency?';
+        }
+
+        if (emergencyCallMessage) {
+            emergencyCallMessage.textContent = 'This will open your phone app and dial 911.';
+        }
+
+        if (emergencyCallLocationPanel) {
+            emergencyCallLocationPanel.hidden = true;
+        }
+
+        if (emergencyCallCoords) {
+            emergencyCallCoords.textContent = 'Unavailable';
+        }
+
+        if (emergencyCallCachedLocationWrap) {
+            emergencyCallCachedLocationWrap.hidden = true;
+        }
+
+        if (emergencyCallCachedLocation) {
+            emergencyCallCachedLocation.textContent = 'Unavailable';
+        }
+
+        if (emergencyCallCopyCoordsButton) {
+            emergencyCallCopyCoordsButton.hidden = true;
+            emergencyCallCopyCoordsButton.disabled = true;
+            delete emergencyCallCopyCoordsButton.dataset.coords;
+        }
+
+        if (emergencyCallBfpButton) {
+            emergencyCallBfpButton.hidden = true;
+        }
+
+        if (emergencyCallConfirmButton) {
+            emergencyCallConfirmButton.textContent = 'Call 911';
+        }
+    }
+
     function closeEmergencyCallConfirm() {
         if (!emergencyCallModal) return;
+        resetEmergencyCallModal();
         emergencyCallModal.classList.remove('is-open');
         emergencyCallModal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
@@ -578,18 +631,165 @@ function initMobileEntryPage() {
         emergencyCallConfirmButton?.focus?.({ preventScroll: true });
     }
 
+    function openEmergencyDialer(number) {
+        if (!number) {
+            return;
+        }
+
+        closeEmergencyCallConfirm();
+        window.location.href = `tel:${number}`;
+    }
+
+    async function copyEmergencyCoordinates() {
+        const coords = emergencyCallCopyCoordsButton?.dataset.coords || '';
+        if (!coords) {
+            return;
+        }
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(coords);
+            } else {
+                const helper = document.createElement('textarea');
+                helper.value = coords;
+                helper.setAttribute('readonly', 'readonly');
+                helper.style.position = 'absolute';
+                helper.style.left = '-9999px';
+                document.body.appendChild(helper);
+                helper.select();
+                document.execCommand('copy');
+                helper.remove();
+            }
+
+            showLandingToast('Coordinates copied. Tell the dispatcher this location.', false, 2800);
+        } catch (error) {
+            console.warn('Unable to copy emergency coordinates:', error);
+            showLandingToast('Unable to copy coordinates on this device.', true, 3200);
+        }
+    }
+
+    function renderOfflineEmergencyModal(context = {}) {
+        if (emergencyCallTitle) {
+            emergencyCallTitle.textContent = 'Offline emergency call';
+        }
+
+        if (emergencyCallLocationPanel) {
+            emergencyCallLocationPanel.hidden = false;
+        }
+
+        if (emergencyCallCoords) {
+            emergencyCallCoords.textContent = context.coordsText || 'Location could not be determined.';
+        }
+
+        if (emergencyCallCachedLocationWrap) {
+            emergencyCallCachedLocationWrap.hidden = !context.cachedLocation;
+        }
+
+        if (emergencyCallCachedLocation) {
+            emergencyCallCachedLocation.textContent = context.cachedLocation || 'Unavailable';
+        }
+
+        if (emergencyCallCopyCoordsButton) {
+            const hasCoords = Boolean(context.coordsText);
+            emergencyCallCopyCoordsButton.hidden = !hasCoords;
+            emergencyCallCopyCoordsButton.disabled = !hasCoords;
+            emergencyCallCopyCoordsButton.dataset.coords = context.coordsText || '';
+        }
+
+        if (emergencyCallBfpButton) {
+            emergencyCallBfpButton.hidden = false;
+        }
+
+        if (emergencyCallMessage) {
+            emergencyCallMessage.textContent = context.message;
+        }
+    }
+
+    async function openOfflineEmergencyCallFlow(event) {
+        event?.preventDefault();
+
+        if (offlineEmergencyCallInFlight) {
+            showLandingToast('Emergency fallback is already preparing...', false, 2200);
+            return;
+        }
+
+        offlineEmergencyCallInFlight = true;
+        setEmergencyCallButtonsLoading(true);
+        showLandingToast('No internet. Getting your location...', false, 2400);
+
+        let coords = null;
+
+        try {
+            coords = await getEmergencyGpsLocation();
+        } catch (error) {
+            console.warn('Offline emergency GPS capture failed:', error);
+        }
+
+        const cachedLocation = getCachedEmergencyLocationLabel(coords);
+
+        if (coords) {
+            const queued = queueOfflineEmergencyIncident(coords, cachedLocation);
+            renderOfflineEmergencyModal({
+                coordsText: formatEmergencyCoordinates(coords),
+                cachedLocation,
+                message: queued.queueItem
+                    ? (
+                        queued.wasAlreadyQueued
+                            ? 'This offline fire emergency report is already waiting to sync. Your phone app can still call BFP or 911 now.'
+                            : 'A pending fire emergency report was saved on this device and will sync automatically when internet returns.'
+                    )
+                    : 'Your location is ready for the call, but PyroSense could not save an offline report on this screen.',
+            });
+            showLandingToast(
+                queued.queueItem
+                    ? (
+                        queued.wasAlreadyQueued
+                            ? 'Offline report already pending sync.'
+                            : 'Offline fire report saved. You can call BFP or 911 now.'
+                    )
+                    : 'Coordinates ready. You can call BFP or 911 now.',
+                false,
+                3400
+            );
+        } else {
+            renderOfflineEmergencyModal({
+                coordsText: '',
+                cachedLocation,
+                message: 'Location could not be determined, so no offline fire report was saved. You can still call BFP or 911 immediately.',
+            });
+            showLandingToast('Location could not be determined. Call BFP or 911 now.', true, 3600);
+        }
+
+        openEmergencyCallConfirm();
+        offlineEmergencyCallInFlight = false;
+        setEmergencyCallButtonsLoading(false);
+    }
+
     emergencyCallButtons.forEach((button) => {
-        button.addEventListener('click', openEmergencyCallConfirm);
+        button.addEventListener('click', (event) => {
+            if (!window.navigator.onLine) {
+                openOfflineEmergencyCallFlow(event);
+                return;
+            }
+
+            if (window.PyroSenseVoiceCall?.configured && typeof window.pyroStartVoiceCall === 'function') {
+                event.preventDefault();
+                window.pyroStartVoiceCall(button, event);
+                return;
+            }
+
+            resetEmergencyCallModal();
+            openEmergencyCallConfirm(event);
+        });
     });
 
     emergencyCallCancelButtons.forEach((button) => {
         button.addEventListener('click', closeEmergencyCallConfirm);
     });
 
-    emergencyCallConfirmButton?.addEventListener('click', () => {
-        closeEmergencyCallConfirm();
-        window.location.href = 'tel:911';
-    });
+    emergencyCallConfirmButton?.addEventListener('click', () => openEmergencyDialer('911'));
+    emergencyCallCopyCoordsButton?.addEventListener('click', copyEmergencyCoordinates);
+    emergencyCallBfpButton?.addEventListener('click', () => openEmergencyDialer(OFFLINE_BFP_DIAL_NUMBER));
 
     function closeMobileMapModal() {
         if (!mobileMapModal) return;
@@ -1343,6 +1543,27 @@ function getAnonymousUserId() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function setEmergencyCallButtonsLoading(isLoading) {
+    const buttons = document.querySelectorAll('[data-emergency-call]');
+
+    buttons.forEach((button) => {
+        if (!button.dataset.defaultLabel) {
+            button.dataset.defaultLabel = button.innerHTML;
+        }
+
+        button.classList.toggle('is-loading', isLoading);
+        if (button.tagName === 'BUTTON') {
+            button.disabled = isLoading;
+        } else {
+            button.setAttribute('aria-disabled', isLoading ? 'true' : 'false');
+        }
+
+        button.innerHTML = isLoading
+            ? '<i class="fa-solid fa-spinner fa-spin"></i> Preparing call...'
+            : button.dataset.defaultLabel;
+    });
+}
+
 function setAnonymousReportButtonsLoading(isLoading) {
     const buttons = document.querySelectorAll('[data-anonymous-report-trigger]');
 
@@ -1387,6 +1608,170 @@ function showLandingToast(message, isError = false, timeoutMs = 3600) {
     showLandingToast.hideTimer = window.setTimeout(() => {
         toast.classList.remove('is-visible');
     }, timeoutMs);
+}
+
+function formatEmergencyCoordinates(coords) {
+    if (!coords || !Number.isFinite(Number(coords.lat)) || !Number.isFinite(Number(coords.lng))) {
+        return '';
+    }
+
+    return `${Number(coords.lat).toFixed(6)}, ${Number(coords.lng).toFixed(6)}`;
+}
+
+function getEmergencyGpsLocation() {
+    if (!navigator.geolocation) {
+        return Promise.reject(new Error('Location services are not available on this device.'));
+    }
+
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = Number(position.coords.latitude);
+                const lng = Number(position.coords.longitude);
+                persistVisitorLocation(lat, lng);
+                resolve({
+                    lat,
+                    lng,
+                    accuracy: Number(position.coords.accuracy || 0) || null,
+                });
+            },
+            () => {
+                reject(new Error('Unable to get your current location.'));
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 0,
+            }
+        );
+    });
+}
+
+function getNearestLandingMarkerByCategory(coords, category) {
+    if (!coords || !Array.isArray(landingResourceMarkers) || !landingResourceMarkers.length) {
+        return null;
+    }
+
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    landingResourceMarkers.forEach((marker) => {
+        if (normalizeLandingCategory(marker) !== category) {
+            return;
+        }
+
+        const lat = Number(marker.lat);
+        const lng = Number(marker.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return;
+        }
+
+        const distance = getLandingDistanceMeters(coords.lat, coords.lng, lat, lng);
+        if (distance < nearestDistance) {
+            nearest = marker;
+            nearestDistance = distance;
+        }
+    });
+
+    return nearest;
+}
+
+function getCachedEmergencyLocationLabel(coords = null) {
+    const sourceCoords = coords || readCachedVisitorLocation();
+    if (!sourceCoords || !Number.isFinite(Number(sourceCoords.lat)) || !Number.isFinite(Number(sourceCoords.lng))) {
+        return '';
+    }
+
+    const lookupCoords = {
+        lat: Number(sourceCoords.lat),
+        lng: Number(sourceCoords.lng),
+    };
+    const barangayMarker = getNearestLandingMarkerByCategory(lookupCoords, 'barangay');
+    if (barangayMarker) {
+        const title = landingResourceTitle(barangayMarker);
+        const description = landingResourceDescription(barangayMarker);
+        return [title, description].filter(Boolean).join(' - ');
+    }
+
+    const responder = readCachedLandingResponder(lookupCoords.lat, lookupCoords.lng);
+    if (responder?.stationName) {
+        return responder.stationName;
+    }
+
+    return '';
+}
+
+function buildOfflineEmergencyDedupeKey(coords, userId) {
+    const normalizedLat = Number(coords.lat).toFixed(4);
+    const normalizedLng = Number(coords.lng).toFixed(4);
+    return `${OFFLINE_EMERGENCY_QUEUE_TYPE}:${userId || 'anonymous'}:${normalizedLat}:${normalizedLng}`;
+}
+
+function queueOfflineEmergencyIncident(coords, cachedLocation) {
+    const userId = getAnonymousUserId();
+    if (!userId || !window.pyroPwa?.enqueueOfflineReport || !window.pyroPwa?.getQueuedReports) {
+        return {
+            queueItem: null,
+            wasAlreadyQueued: false,
+        };
+    }
+
+    const dedupeKey = buildOfflineEmergencyDedupeKey(coords, userId);
+    const existingQueueItem = window.pyroPwa.getQueuedReports().find((item) => (
+        item.type === OFFLINE_EMERGENCY_QUEUE_TYPE
+        && item.meta?.dedupe_key === dedupeKey
+        && item.meta?.status === 'pending_sync'
+    ));
+
+    if (existingQueueItem) {
+        return {
+            queueItem: existingQueueItem,
+            wasAlreadyQueued: true,
+        };
+    }
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const createdAt = new Date().toISOString();
+    const queueItem = window.pyroPwa.enqueueOfflineReport({
+        type: OFFLINE_EMERGENCY_QUEUE_TYPE,
+        url: '/api/incidents',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({
+            lat: coords.lat,
+            lng: coords.lng,
+            title: OFFLINE_EMERGENCY_TITLE,
+            description: cachedLocation
+                ? `Offline emergency call fallback. Cached area: ${cachedLocation}.`
+                : 'Offline emergency call fallback.',
+            status: 'reported',
+            reported_by: userId,
+        }),
+        created_at: createdAt,
+        meta: {
+            status: 'pending_sync',
+            source: 'offline_emergency_call',
+            user_id: userId,
+            queued_at: createdAt,
+            timestamp: createdAt,
+            dedupe_key: dedupeKey,
+            coords: {
+                lat: coords.lat,
+                lng: coords.lng,
+                accuracy: coords.accuracy,
+            },
+            cached_location: cachedLocation || null,
+        },
+    });
+
+    return {
+        queueItem,
+        wasAlreadyQueued: false,
+    };
 }
 
 function getFreshVisitorLocation(maxAgeMs = 10 * 60 * 1000) {
@@ -1509,6 +1894,15 @@ async function submitAnonymousIncidentReport() {
         setAnonymousReportButtonsLoading(false);
     }
 }
+
+window.addEventListener('pyrosense:report-synced', (event) => {
+    const queueItem = event.detail?.queueItem;
+    if (queueItem?.type !== OFFLINE_EMERGENCY_QUEUE_TYPE) {
+        return;
+    }
+
+    showLandingToast('Your offline emergency report has synced successfully.', false, 3800);
+});
 
 // Search location
 function searchLocation() {
