@@ -2021,7 +2021,7 @@ private function getOpenRouterModelCandidates(): array
         }
 
         $usedFallbackGeneration = empty($plans);
-        $plans = $this->normalizeActionPlanCount($plans, $recommendations);
+        $plans = $this->normalizeActionPlanCount($plans, $recommendations, $rawData);
 
         AiActionPlanChecklist::query()->where('analysis_id', $analysisId)->delete();
 
@@ -2100,10 +2100,32 @@ private function getOpenRouterModelCandidates(): array
         return is_array($plans) ? $plans : [];
     }
 
-    private function buildFallbackActionPlanChecklists(array $recommendations): array
+    private function buildFallbackActionPlanChecklists(array $recommendations, array $rawData = []): array
     {
-        return array_map(function ($recommendation) {
+        return array_map(function ($recommendation) use ($rawData) {
             $priority = strtolower($recommendation['priority'] ?? 'medium');
+            $contextPayload = [
+                'recommendation' => $recommendation,
+                'prediction_summary' => data_get($rawData, 'predictions.summary')
+                    ?? data_get($rawData, 'model_prediction.output.summary')
+                    ?? data_get($rawData, 'recommendation_context.summary')
+                    ?? null,
+                'action_plan_checklist' => [
+                    'barangay_name' => data_get($rawData, 'selected_barangay_prediction.barangay_name')
+                        ?? data_get($rawData, 'barangay_predictions.0.barangay_name')
+                        ?? null,
+                ],
+            ];
+            $fallbackData = $this->getFallbackExploreData(
+                $recommendation['title'] ?? 'AI Recommendation',
+                $recommendation['priority'] ?? 'Medium',
+                $recommendation['description'] ?? null,
+                $contextPayload
+            );
+            $steps = array_values(array_filter(array_map(
+                fn ($step) => is_string($step) ? trim($step) : null,
+                $fallbackData['steps'] ?? []
+            )));
 
             return [
                 'source_title' => $recommendation['title'] ?? 'AI Recommendation',
@@ -2112,20 +2134,20 @@ private function getOpenRouterModelCandidates(): array
                 'priority_level' => $priority,
                 'success_indicator' => 'BFP confirms the action was completed and documented.',
                 'target_days' => $priority === 'critical' ? 7 : ($priority === 'high' ? 14 : 30),
-                'checklist_items' => [
-                    'Assign a responsible officer or team for this action.',
-                    'Document the current risk condition and affected area.',
-                    'Complete the recommended mitigation activity.',
-                    'Record proof of compliance for BFP review.',
+                'checklist_items' => ! empty($steps) ? array_slice($steps, 0, 6) : [
+                    'Validate the recommendation in the field and confirm the exact risk condition.',
+                    'Assign the responding officer or coordination lead for this recommendation.',
+                    'Implement the corrective action described in the recommendation.',
+                    'Recheck the affected area and record proof of completion for BFP review.',
                 ],
             ];
         }, $recommendations);
     }
 
-    private function normalizeActionPlanCount(array $plans, array $recommendations): array
+    private function normalizeActionPlanCount(array $plans, array $recommendations, array $rawData = []): array
     {
         if (empty($plans)) {
-            return $this->buildFallbackActionPlanChecklists($recommendations);
+            return $this->buildFallbackActionPlanChecklists($recommendations, $rawData);
         }
 
         $normalizedPlans = [];
@@ -2137,7 +2159,7 @@ private function getOpenRouterModelCandidates(): array
                 continue;
             }
 
-            $fallbackPlan = $this->buildFallbackActionPlanChecklists([$recommendation])[0];
+            $fallbackPlan = $this->buildFallbackActionPlanChecklists([$recommendation], $rawData)[0];
             $normalizedPlans[] = $fallbackPlan;
         }
 
