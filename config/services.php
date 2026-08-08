@@ -45,6 +45,11 @@ return [
         'key' => env('GEOAPIFY_KEY'),
     ],
 
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL', 'deepseek/deepseek-r1-distill-llama-70b'),
+    ],
+
     'agora' => [
         'app_id' => env('AGORA_APP_ID'),
         'app_certificate' => env('AGORA_APP_CERTIFICATE'),

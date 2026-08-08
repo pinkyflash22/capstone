@@ -43,8 +43,7 @@ class AnalyticController extends Controller
         $this->forecastModelService = $forecastModelService;
         $this->barangayPredictionService = $barangayPredictionService;
         $this->predictionFeedbackSignalService = $predictionFeedbackSignalService;
-        // Load API key from .env file
-        $this->apiKey = env('OPENROUTER_API_KEY');
+        $this->apiKey = (string) config('services.openrouter.api_key', '');
         
         if (!$this->apiKey) {
             Log::warning('OpenRouter API key not found in .env file');
@@ -1957,7 +1956,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
 private function getOpenRouterModelCandidates(): array
 {
     $models = array_filter([
-        env('OPENROUTER_MODEL') ?: 'deepseek/deepseek-r1-distill-llama-70b',
+        config('services.openrouter.model', 'deepseek/deepseek-r1-distill-llama-70b'),
     ]);
 
     /*
