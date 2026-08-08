@@ -21,19 +21,18 @@ class IncidentAutoAssignmentService
             ->orderBy('created_at', 'asc')
             ->get();
 
-        $assignedIncident = null;
+        $assignedIncidents = [];
 
         foreach ($incidents as $incident) {
             $assignedIncident = $this->assignSingleIncident($incident);
-
             if ($assignedIncident !== null) {
-                break;
+                $assignedIncidents[] = $assignedIncident;
             }
         }
 
         return [
             'checked' => $incidents->count(),
-            'assigned' => $assignedIncident ? [$assignedIncident] : [],
+            'assigned' => $assignedIncidents,
         ];
     }
 

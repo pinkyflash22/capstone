@@ -568,6 +568,7 @@ class VoiceCallController extends Controller
                 'success' => false,
                 'active_call' => null,
                 'incoming_calls' => [],
+                'missed_calls' => [],
                 'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
                 'server_time' => now()->toIso8601String(),
                 'message' => 'Voice call storage is not ready on this server.',
@@ -592,10 +593,21 @@ class VoiceCallController extends Controller
                 }
             });
 
+        $missedCalls = VoiceCall::query()
+            ->with($this->callRelations())
+            ->where('status', VoiceCall::STATUS_MISSED)
+            ->when($stationId, fn ($query) => $query->where(function ($inner) use ($stationId) {
+                $inner->where('station_id', $stationId)->orWhereNull('station_id');
+            }))
+            ->latest('ended_at')
+            ->limit(8)
+            ->get();
+
         return [
             'success' => true,
             'active_call' => $activeCall ? $this->serializeCall($activeCall->load($this->callRelations()), $user) : null,
             'incoming_calls' => $incoming->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
+            'missed_calls' => $missedCalls->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
             'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
             'server_time' => now()->toIso8601String(),
         ];

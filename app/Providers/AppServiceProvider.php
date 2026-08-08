@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\BarangayPredictionChecklist;
+use App\Models\Incident;
+use App\Observers\IncidentObserver;
 use App\Observers\BarangayPredictionChecklistObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
@@ -23,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         BarangayPredictionChecklist::observe(BarangayPredictionChecklistObserver::class);
+        Incident::observe(IncidentObserver::class);
 
         if (app()->environment('production')) {
             $appUrl = rtrim((string) config('app.url'), '/');

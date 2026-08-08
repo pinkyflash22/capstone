@@ -9058,45 +9058,65 @@ function refreshRealtimeTrackedTrucks() {
 async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppedToast = true) {
     const truck = activeTrucks.get(routeId);
     if (!truck) return;
-    
-    if (truck.animationFrame) cancelAnimationFrame(truck.animationFrame);
-    if (truck.realTimeLocationWatch) clearInterval(truck.realTimeLocationWatch);
-    unregisterRouteRendering(routeId);
-    
-    truck.isSimulating = false;
-    if (syncWithServer) {
-        try {
-            await updateRouteStatus(routeId, 'inactive');
 
-            const shouldReturnToReported = truck.incidentId
-                && !truck.arrivalHandled
-                && truck.statusChangedByRoute
-                && Number(truck.lastSentIncidentStatus) === 2;
-
-            if (shouldReturnToReported) {
-                await updateIncidentStatusFromRoute(routeId, 1);
-                truck.incidentStatusId = 1;
-                truck.statusChangedByRoute = false;
-            }
-        } catch (error) {
-            console.error(`Failed to stop simulation for route ${routeId}:`, error);
-            showToast(error.message || 'Failed to stop route simulation cleanly', 'error');
-            return;
+    if (truck.isStoppingSimulation) {
+        return truck.stopPromise || null;
+    }
+    
+    truck.isStoppingSimulation = true;
+    truck.stopPromise = (async () => {
+        if (truck.animationFrame) {
+            cancelAnimationFrame(truck.animationFrame);
+            truck.animationFrame = null;
         }
-    }
-    activeTrucks.delete(routeId);
-    
+        if (truck.realTimeLocationWatch) {
+            clearInterval(truck.realTimeLocationWatch);
+            truck.realTimeLocationWatch = null;
+        }
 
-    updateRouteInfoCard();
-    if (showStoppedToast) {
-        showToast(`Truck ${routeId} simulation stopped`, 'info');
-    }
+        truck.isSimulating = false;
+        unregisterRouteRendering(routeId);
+        activeTrucks.delete(routeId);
+
+        if (syncWithServer) {
+            try {
+                await updateRouteStatus(routeId, 'inactive');
+
+                const shouldReturnToReported = truck.incidentId
+                    && !truck.arrivalHandled
+                    && truck.statusChangedByRoute
+                    && Number(truck.lastSentIncidentStatus) === 2;
+
+                if (shouldReturnToReported) {
+                    await updateIncidentStatusFromRoute(routeId, 1);
+                    truck.incidentStatusId = 1;
+                    truck.statusChangedByRoute = false;
+                }
+            } catch (error) {
+                console.error(`Failed to stop simulation for route ${routeId}:`, error);
+                showToast(error.message || 'Failed to stop route simulation cleanly', 'error');
+                activeTrucks.set(routeId, truck);
+                truck.isStoppingSimulation = false;
+                truck.stopPromise = null;
+                return;
+            }
+        }
+
+        truck.isStoppingSimulation = false;
+        truck.stopPromise = null;
+        updateRouteInfoCard();
+
+        if (showStoppedToast) {
+            showToast(`Truck ${routeId} simulation stopped`, 'info');
+        }
+    })();
+
+    return truck.stopPromise;
 }
 
-function stopAllSimulations() {
-    for (const [routeId] of activeTrucks) {
-        stopSimulationForRoute(routeId);
-    }
+async function stopAllSimulations() {
+    const routeIds = Array.from(activeTrucks.keys());
+    await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId)));
 }
 
 function createFireTruckIcon(color = '#dc2626') {

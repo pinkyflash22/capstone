@@ -3341,7 +3341,12 @@
     }
 
     if (typeof window.stopSimulation !== 'function') {
-        window.stopSimulation = function() {
+        window.stopSimulation = async function() {
+            if (typeof window.stopAllSimulations === 'function') {
+                await window.stopAllSimulations();
+                return;
+            }
+
             if (window.unifiedMap) {
                 window.unifiedMap.stopSimulation();
             }

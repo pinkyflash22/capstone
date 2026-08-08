@@ -1545,7 +1545,7 @@
     async function stopSimulation() {
         try {
             if (typeof window.stopAllSimulations === 'function') {
-                window.stopAllSimulations();
+                await window.stopAllSimulations();
             } else if (typeof window.stopSimulationForRoute === 'function' && window.activeRoute?.route_id) {
                 await window.stopSimulationForRoute(window.activeRoute.route_id);
             }

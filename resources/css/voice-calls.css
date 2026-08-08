@@ -90,6 +90,25 @@
     padding: 12px;
 }
 
+.pyro-voice-section {
+    display: grid;
+    gap: 10px;
+}
+
+.pyro-voice-section__label {
+    color: #9a3412;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 4px 0;
+}
+
+.pyro-voice-section__cards {
+    display: grid;
+    gap: 10px;
+}
+
 .pyro-voice-call-card {
     display: grid;
     gap: 10px;
@@ -107,6 +126,11 @@
 .pyro-voice-call-card--flagged {
     border-color: rgba(245, 158, 11, 0.35);
     background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+}
+
+.pyro-voice-call-card--missed {
+    border-color: rgba(245, 158, 11, 0.28);
+    background: linear-gradient(135deg, #fffaf0 0%, #fff 100%);
 }
 
 .pyro-voice-call-card__top {

@@ -1214,7 +1214,7 @@ public function autoAssignRecentUnassignedIncidents(Request $request)
             'checked' => $result['checked'],
             'assigned' => count($result['assigned']),
             'window_minutes' => $minutes,
-            'mode' => 'single_oldest_fire_incident_per_cycle',
+            'mode' => 'assign_all_recent_pending_incidents_per_cycle',
             'assigned_incident' => $result['assigned'][0] ?? null,
             'data' => $result['assigned'],
         ]);

@@ -357,6 +357,48 @@
             border: 1px solid rgba(226, 232, 240, 0.95);
             box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
         }
+        #exploreModal .modal-content.analytics-forecast-modal {
+            width: min(92vw, 560px) !important;
+            max-width: 560px !important;
+            max-height: min(78vh, 560px) !important;
+        }
+        #exploreModal .modal-body {
+            padding: 0.9rem 1rem !important;
+        }
+        #exploreModal .modal-footer button {
+            min-width: 100px;
+        }
+        #exploreModalBody[data-state="loading"],
+        #exploreModalBody[data-state="error"] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+        }
+        #exploreModalBody[data-state="ready"] {
+            display: block;
+            min-height: 0;
+        }
+        .analytics-google-symbol {
+            font-family: "Material Symbols Rounded" !important;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 1.1em;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            direction: ltr;
+            -webkit-font-smoothing: antialiased;
+            font-variation-settings:
+                "FILL" 1,
+                "wght" 500,
+                "GRAD" 0,
+                "opsz" 24;
+        }
         .analytics-forecast-modal--details {
             width: min(82vw, 620px);
             max-height: min(70vh, 580px);
@@ -3421,14 +3463,17 @@
         async function exploreRecommendation(recommendation, index) {
             const modal = document.getElementById('exploreModal');
             const modalBody = document.getElementById('exploreModalBody');
+            const recommendationTitle = getRecommendationTitle(recommendation);
             
             modal.classList.add('show');
+            modalBody.setAttribute('data-state', 'loading');
             modalBody.innerHTML = `
                 <div class="text-center py-8">
                     <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
-                    <p class="mt-3 text-gray-500">Generating detailed implementation plan for "${recommendation.title}"...</p>
+                    <p class="mt-3 text-gray-500">Generating detailed implementation plan for "${escapeHtml(recommendationTitle)}"... </p>
                 </div>
             `;
+            replaceChiefAnalyticsFaIcons(modalBody);
             
             try {
                 const response = await fetch('/station-admin/api/explore-recommendation', {
@@ -3439,8 +3484,8 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({
-                        recommendation_title: recommendation.title,
-                        recommendation_description: recommendation.description,
+                        recommendation_title: recommendationTitle,
+                        recommendation_description: getRecommendationDescription(recommendation),
                         priority: recommendation.priority,
                         analysis_id: currentAnalysisId,
                         action_plan_checklist_id: recommendation.action_plan_checklist_id || null
@@ -3459,6 +3504,7 @@
                         loadActionPlanChecklistPanel(currentAnalysisId);
                     }
                 } else {
+                    modalBody.setAttribute('data-state', 'error');
                     modalBody.innerHTML = `
                         <div class="text-center py-8 text-red-500">
                             <i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i>
@@ -3466,10 +3512,12 @@
                             <button type="button" class="analytics-confirm__button analytics-confirm__button--accept" style="margin-top:14px;" onclick="exploreRecommendation(currentRecommendations[${index}], ${index})">Retry</button>
                         </div>
                     `;
+                    replaceChiefAnalyticsFaIcons(modalBody);
                     showAnalyticsToast(result.message || 'Implementation plan is unavailable right now.', 'warning');
                 }
             } catch (error) {
                 console.error('Explore error:', error);
+                modalBody.setAttribute('data-state', 'error');
                 modalBody.innerHTML = `
                     <div class="text-center py-8 text-red-500">
                         <i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i>
@@ -3477,6 +3525,7 @@
                         <button type="button" class="analytics-confirm__button analytics-confirm__button--accept" style="margin-top:14px;" onclick="exploreRecommendation(currentRecommendations[${index}], ${index})">Retry</button>
                     </div>
                 `;
+                replaceChiefAnalyticsFaIcons(modalBody);
                 showAnalyticsToast('Implementation plan request failed. You can retry from the modal.', 'error');
             }
         }
@@ -3484,6 +3533,9 @@
         function displayExploreResults(data, recommendation, source = null, note = null, modelUsed = null) {
             const modelLabel = formatAiModelLabel(modelUsed);
             const modalBody = document.getElementById('exploreModalBody');
+            const recommendationTitle = getRecommendationTitle(recommendation);
+            const recommendationDescription = getRecommendationDescription(recommendation);
+            modalBody.setAttribute('data-state', 'ready');
             
             // Priority color mapping
             const priorityColor = {
@@ -3502,8 +3554,8 @@
                         <strong style="font-size: 15px; color: #1e293b;">Original Recommendation</strong>
                         <span class="priority-badge priority-${recommendation.priority?.toLowerCase() || 'medium'}" style="background: ${priorityBg}; color: white;">${recommendation.priority || 'MEDIUM'} PRIORITY</span>
                     </div>
-                    <p style="font-size: 14px; color: #475569; margin-bottom: 8px;"><strong>Title:</strong> ${escapeHtml(recommendation.title)}</p>
-                    <p style="font-size: 13px; color: #64748b;"><strong>Description:</strong> ${escapeHtml(recommendation.description)}</p>
+                    <p style="font-size: 14px; color: #475569; margin-bottom: 8px;"><strong>Title:</strong> ${escapeHtml(recommendationTitle)}</p>
+                    <p style="font-size: 13px; color: #64748b;"><strong>Description:</strong> ${escapeHtml(recommendationDescription)}</p>
                 </div>
                 ${source === 'fallback' ? `
                     <div style="margin: 0 0 18px; padding: 12px 14px; border-radius: 14px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;">
@@ -3639,6 +3691,25 @@
             }
             
             modalBody.innerHTML = suggestionsHtml;
+            replaceChiefAnalyticsFaIcons(modalBody);
+        }
+
+        function getRecommendationTitle(recommendation = {}) {
+            return recommendation?.title
+                || recommendation?.recommendation_title
+                || recommendation?.source_title
+                || recommendation?.plan_title
+                || recommendation?.focus
+                || 'Recommendation';
+        }
+
+        function getRecommendationDescription(recommendation = {}) {
+            return recommendation?.description
+                || recommendation?.plan_description
+                || recommendation?.summary
+                || recommendation?.recommendation_description
+                || recommendation?.details
+                || 'No additional recommendation description was provided.';
         }
         
         function escapeHtml(text) {
@@ -3649,8 +3720,8 @@
         }
 
         function extractRecommendationMeta(recommendation) {
-            const title = recommendation?.title || '';
-            const description = recommendation?.description || '';
+            const title = getRecommendationTitle(recommendation);
+            const description = getRecommendationDescription(recommendation);
             const combined = `${title}. ${description}`;
 
             const placeMatch = combined.match(/\bin\s+([^.,]+(?:,\s*[^.,]+)?)/i)
@@ -3691,6 +3762,108 @@
 
         function closePredictionDetailModal() {
             document.getElementById('predictionDetailModal').classList.remove('show');
+        }
+
+        function getChiefAnalyticsMaterialSymbol(iconName) {
+            const icons = {
+                'fa-arrow-right': 'arrow_forward',
+                'fa-arrow-right-from-bracket': 'logout',
+                'fa-arrow-trend-down': 'trending_down',
+                'fa-arrow-trend-up': 'trending_up',
+                'fa-arrows-spin': 'autorenew',
+                'fa-bars': 'menu',
+                'fa-bolt': 'bolt',
+                'fa-brain': 'psychology',
+                'fa-bullhorn': 'campaign',
+                'fa-calendar-check': 'event_available',
+                'fa-calendar-days': 'calendar_month',
+                'fa-calendar-plus': 'event',
+                'fa-calendar-week': 'calendar_view_week',
+                'fa-chart-line': 'show_chart',
+                'fa-chart-simple': 'bar_chart',
+                'fa-check': 'check',
+                'fa-chevron-down': 'expand_more',
+                'fa-circle': 'radio_button_checked',
+                'fa-circle-check': 'task_alt',
+                'fa-circle-exclamation': 'error',
+                'fa-circle-info': 'info',
+                'fa-circle-nodes': 'hub',
+                'fa-clipboard-list': 'assignment',
+                'fa-clock': 'schedule',
+                'fa-clock-rotate-left': 'history',
+                'fa-crosshairs': 'my_location',
+                'fa-database': 'database',
+                'fa-file-certificate': 'workspace_premium',
+                'fa-fire': 'local_fire_department',
+                'fa-fire-burner': 'local_fire_department',
+                'fa-fire-flame-curved': 'local_fire_department',
+                'fa-faucet-drip': 'water_drop',
+                'fa-gears': 'settings',
+                'fa-gauge-high': 'speed',
+                'fa-house-crack': 'home',
+                'fa-info': 'info',
+                'fa-layer-group': 'layers',
+                'fa-lightbulb': 'lightbulb',
+                'fa-list-check': 'checklist',
+                'fa-location-dot': 'location_on',
+                'fa-magnifying-glass-chart': 'query_stats',
+                'fa-map': 'map',
+                'fa-microchip': 'memory',
+                'fa-quote-left': 'format_quote',
+                'fa-road': 'route',
+                'fa-rotate': 'refresh',
+                'fa-shield-halved': 'shield',
+                'fa-shield-heart': 'health_and_safety',
+                'fa-sign-out-alt': 'logout',
+                'fa-sliders': 'tune',
+                'fa-spinner': 'progress_activity',
+                'fa-times': 'close',
+                'fa-toolbox': 'inventory',
+                'fa-triangle-exclamation': 'warning',
+                'fa-user-group': 'groups',
+                'fa-users': 'groups',
+                'fa-wand-magic-sparkles': 'auto_fix_high',
+                'fa-wave-square': 'monitoring',
+                'fa-xmark': 'close',
+            };
+
+            return icons[iconName] || null;
+        }
+
+        function replaceChiefAnalyticsFaIcons(root = document) {
+            const icons = root.querySelectorAll('i[class*="fa-"]:not([data-chief-inline-fa-processed])');
+            const ignored = ['fa-solid', 'fa-regular', 'fa-brands', 'fa-spin', 'fa-pulse', 'fa-fw'];
+
+            icons.forEach((icon) => {
+                const iconClass = Array.from(icon.classList).find((cls) => cls.startsWith('fa-') && !ignored.includes(cls));
+                const materialSymbol = iconClass ? getChiefAnalyticsMaterialSymbol(iconClass) : null;
+
+                if (!materialSymbol) {
+                    icon.setAttribute('data-chief-inline-fa-processed', '1');
+                    return;
+                }
+
+                const replacement = document.createElement('span');
+                replacement.className = Array.from(icon.classList)
+                    .filter((cls) => !['fas', 'far', 'fab', 'fa-solid', 'fa-regular', 'fa-brands', 'fa-pulse', 'fa-spin', iconClass].includes(cls))
+                    .join(' ');
+                replacement.className = `${replacement.className} inline-fa-icon analytics-google-symbol`.trim();
+
+                if (['fa-spinner', 'fa-arrows-spin', 'fa-rotate'].includes(iconClass)) {
+                    replacement.classList.add('icon-spin');
+                }
+
+                replacement.setAttribute('aria-hidden', icon.getAttribute('aria-hidden') || 'true');
+
+                const style = icon.getAttribute('style');
+                if (style) {
+                    replacement.setAttribute('style', style);
+                }
+
+                replacement.textContent = materialSymbol;
+                icon.setAttribute('data-chief-inline-fa-processed', '1');
+                icon.replaceWith(replacement);
+            });
         }
 
         function openPredictionDetailModal() {
@@ -4130,6 +4303,31 @@
 
         document.getElementById('stationSelect')?.addEventListener('change', (e) => {
             populateBarangaySelectFromStation(e.target.value);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            replaceChiefAnalyticsFaIcons();
+
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType !== 1) {
+                            return;
+                        }
+
+                        if (node.matches && node.matches('i[class*="fa-"]')) {
+                            replaceChiefAnalyticsFaIcons(node.parentNode || document);
+                            return;
+                        }
+
+                        if (node.querySelectorAll) {
+                            replaceChiefAnalyticsFaIcons(node);
+                        }
+                    });
+                });
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
         });
 
         loadStations();

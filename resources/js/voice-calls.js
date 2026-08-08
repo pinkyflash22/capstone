@@ -25,6 +25,7 @@ let callerHasMicrophoneAccess = false;
 let agoraJoinState = 'idle';
 let incomingPollInFlight = null;
 let voiceSessionBootstrapPromise = null;
+let knownMissedIds = new Set();
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
@@ -427,12 +428,42 @@ function renderCallCard(call, active = false) {
     `;
 }
 
+function renderMissedCallCard(call) {
+    const callerName = call?.caller?.name || 'Anonymous caller';
+    const location = callLocation(call);
+    const locationText = location.has_location ? location.display : 'Location unavailable';
+    const hasIncident = Boolean(call.created_incident_id || call.incident_id);
+    return `
+        <article class="pyro-voice-call-card pyro-voice-call-card--missed" data-call-id="${call.id}">
+            <div class="pyro-voice-call-card__top">
+                <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
+                <div>
+                    <p class="pyro-voice-call-card__name">${escapeHtml(callerName)}</p>
+                    <p class="pyro-voice-call-card__meta">${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Citizen')} • Missed ${formatSeconds(callAge(call))} ago</p>
+                </div>
+                <span class="pyro-voice-badge">Missed</span>
+            </div>
+            <div class="pyro-voice-call-card__location">
+                <span class="pyro-voice-call-card__location-icon" aria-hidden="true">⌖</span>
+                <span>${escapeHtml(locationText)}</span>
+            </div>
+            <div class="pyro-voice-actions pyro-voice-actions--triage">
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--success" data-pyro-voice-create-incident ${hasIncident || call.is_flagged_prank || !location.has_location ? 'disabled' : ''}>
+                    ${hasIncident ? 'Incident created' : 'Create Incident from Missed Call'}
+                </button>
+                <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}>View caller location</button>
+            </div>
+        </article>
+    `;
+}
+
 function renderIncoming(payload) {
     const panel = ensureIncomingPanel();
     const list = panel.querySelector('[data-pyro-voice-list]');
     const count = panel.querySelector('[data-pyro-voice-count]');
     const calls = payload.incoming_calls || [];
-    const total = calls.length + (payload.active_call ? 1 : 0);
+    const missedCalls = payload.missed_calls || [];
+    const total = calls.length + (payload.active_call ? 1 : 0) + missedCalls.length;
 
     panel.hidden = total === 0;
     count.textContent = String(total);
@@ -441,25 +472,56 @@ function renderIncoming(payload) {
         stopRinging();
         knownIncomingIds = new Set();
         knownCallsById = new Map();
+        knownMissedIds = new Set();
         return;
     }
 
     knownCallsById = new Map([
         ...(payload.active_call ? [[payload.active_call.id, payload.active_call]] : []),
         ...calls.map((call) => [call.id, call]),
+        ...missedCalls.map((call) => [call.id, call]),
     ]);
 
     const newIds = calls.map((call) => call.id).filter((id) => !knownIncomingIds.has(id));
+    const newMissedIds = missedCalls.map((call) => call.id).filter((id) => !knownMissedIds.has(id));
     knownIncomingIds = new Set(calls.map((call) => call.id));
+    knownMissedIds = new Set(missedCalls.map((call) => call.id));
     if (newIds.length) {
         startRinging();
         notifyIncoming(calls.find((call) => call.id === newIds[0]));
     }
+    if (newMissedIds.length) {
+        toast(`${newMissedIds.length} missed call${newMissedIds.length === 1 ? '' : 's'} waiting for review.`, 'info');
+    }
 
-    list.innerHTML = [
-        payload.active_call ? renderCallCard(payload.active_call, true) : '',
-        ...calls.map((call) => renderCallCard(call)),
-    ].join('');
+    const sections = [];
+
+    if (payload.active_call || calls.length) {
+        sections.push(`
+            <section class="pyro-voice-section">
+                <div class="pyro-voice-section__label">Live calls</div>
+                <div class="pyro-voice-section__cards">
+                    ${[
+                        payload.active_call ? renderCallCard(payload.active_call, true) : '',
+                        ...calls.map((call) => renderCallCard(call)),
+                    ].join('')}
+                </div>
+            </section>
+        `);
+    }
+
+    if (missedCalls.length) {
+        sections.push(`
+            <section class="pyro-voice-section">
+                <div class="pyro-voice-section__label">Missed calls</div>
+                <div class="pyro-voice-section__cards">
+                    ${missedCalls.map((call) => renderMissedCallCard(call)).join('')}
+                </div>
+            </section>
+        `);
+    }
+
+    list.innerHTML = sections.join('');
 }
 
 async function pollIncoming() {
