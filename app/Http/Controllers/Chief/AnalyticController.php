@@ -1912,21 +1912,36 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
     Log::info('Calling OpenRouter API with key: ' . substr($this->apiKey, 0, 15) . '...');
 
     $errors = [];
+    $connectTimeout = max(3, (int) config('services.openrouter.connect_timeout', 8));
+    $timeout = max($connectTimeout + 2, (int) config('services.openrouter.timeout', 20));
+    $maxTokens = max(150, (int) config('services.openrouter.max_tokens', 450));
+    $prompt = $this->trimAiPrompt($prompt);
+
     foreach ($this->getOpenRouterModelCandidates() as $model) {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-            'HTTP-Referer' => url('/'),
-            'X-Title' => 'PyroSense Analytics'
-        ])->connectTimeout(10)->timeout(35)->post('https://openrouter.ai/api/v1/chat/completions', [
-            'model' => $model,
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $prompt]
-            ],
-            'temperature' => 0.3,
-            'max_tokens' => 700
-        ]);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+                'HTTP-Referer' => url('/'),
+                'X-Title' => 'PyroSense Analytics'
+            ])->connectTimeout($connectTimeout)->timeout($timeout)->post('https://openrouter.ai/api/v1/chat/completions', [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'temperature' => 0.2,
+                'max_tokens' => $maxTokens
+            ]);
+        } catch (\Throwable $e) {
+            $errors[] = "{$model}: {$e->getMessage()}";
+            Log::warning('OpenRouter API request threw an exception for model ' . $model, [
+                'message' => $e->getMessage(),
+                'timeout' => $timeout,
+                'connect_timeout' => $connectTimeout,
+            ]);
+            continue;
+        }
 
         if (!$response->successful()) {
             $errorBody = $response->body();
@@ -1955,22 +1970,28 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
 
 private function getOpenRouterModelCandidates(): array
 {
-    $models = array_filter([
-        config('services.openrouter.model', 'deepseek/deepseek-r1-distill-llama-70b'),
-    ]);
+    $configuredModel = config('services.openrouter.model', 'deepseek/deepseek-r1-distill-llama-70b');
+    $fallbackModels = config('services.openrouter.fallback_models', []);
 
-    /*
-     * Previously allowed fallback models for analytics:
-     * 'deepseek/deepseek-r1-distill-llama-70b',
-     * 'openai/gpt-4o-mini',
-     * 'openai/gpt-4.1-mini',
-     * 'openai/gpt-3.5-turbo',
-     * 'deepseek/deepseek-r1-distill-qwen-32b',
-     *
-     * Keep this block commented unless fallback behavior is explicitly re-approved.
-     */
+    return array_values(array_unique(array_filter([
+        $configuredModel,
+        ...$fallbackModels,
+    ])));
+}
 
-    return array_values(array_unique($models));
+private function trimAiPrompt(string $prompt): string
+{
+    $maxLength = 12000;
+    if (mb_strlen($prompt) <= $maxLength) {
+        return $prompt;
+    }
+
+    $headLength = 8000;
+    $tailLength = 3500;
+
+    return mb_substr($prompt, 0, $headLength)
+        . "\n\n[Prompt shortened to reduce API latency while preserving key analytics context.]\n\n"
+        . mb_substr($prompt, -$tailLength);
 }
 
     private function generateAndStoreActionPlanChecklists(int $analysisId, array $analysis, array $rawData): array

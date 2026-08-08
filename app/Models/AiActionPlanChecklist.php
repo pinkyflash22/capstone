@@ -82,6 +82,11 @@ class AiActionPlanChecklist extends Model
         return $this->hasMany(AiRecommendationSuggestion::class, 'ai_action_plan_checklist_id', 'ai_action_plan_checklist_id');
     }
 
+    public function mitigationActions()
+    {
+        return $this->hasMany(MitigationAction::class, 'ai_action_plan_checklist_id', 'ai_action_plan_checklist_id');
+    }
+
     public function items()
     {
         return $this->hasMany(AiActionPlanChecklistItem::class, 'ai_action_plan_checklist_id', 'ai_action_plan_checklist_id')

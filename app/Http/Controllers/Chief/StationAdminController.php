@@ -995,14 +995,40 @@ class StationAdminController extends Controller
         }
     }
 
-    protected function resolveGeneratedMitigationDraftChecklist(int $checklistId, array $allowedBarangayIds): AiActionPlanChecklist
+    protected function resolveMitigationDraftChecklist(int $checklistId, array $allowedBarangayIds): AiActionPlanChecklist
     {
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $checklist = AiActionPlanChecklist::query()
-            ->with(['barangay', 'riskArea.marker'])
-            ->whereIn('barangay_id', $allowedBarangayIds)
-            ->findOrFail($checklistId);
+            ->with(['barangay', 'riskArea.marker', 'mitigationActions'])
+            ->where('ai_action_plan_checklist_id', $checklistId)
+            ->where(function ($query) use ($allowedBarangayIds, $stationId) {
+                if (! empty($allowedBarangayIds)) {
+                    $query->whereIn('barangay_id', $allowedBarangayIds);
 
-        if (! $this->isGeneratedMitigationDraftChecklist($checklist)) {
+                    if ($stationId) {
+                        $query->orWhere(function ($fallbackQuery) use ($stationId) {
+                            $fallbackQuery
+                                ->whereNull('barangay_id')
+                                ->where('station_id', $stationId);
+                        });
+                    }
+
+                    return;
+                }
+
+                if ($stationId) {
+                    $query->where('station_id', $stationId);
+                    return;
+                }
+
+                $query->whereRaw('1 = 0');
+            })
+            ->firstOrFail();
+
+        $isEligibleDraft = $this->isGeneratedMitigationDraftChecklist($checklist)
+            || (($checklist->source_type ?? null) === 'action_plan' && $checklist->status === 'pending');
+
+        if (! $isEligibleDraft) {
             throw (new ModelNotFoundException())->setModel(AiActionPlanChecklist::class, [$checklistId]);
         }
 
@@ -1747,11 +1773,40 @@ class StationAdminController extends Controller
                     'barangay:barangay_id,barangay_name',
                     'riskArea:risk_area_id,marker_id',
                     'riskArea.marker:marker_id,title',
+                    'analysis:analysis_id,risk_level,barangay_scope,created_at',
+                    'suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description',
+                    'mitigationActions:mitigation_action_id,ai_action_plan_checklist_id,status',
                 ])
-                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
-                ->whereNotNull('source_signature')
+                ->where(function ($query) use ($barangayIds, $stationId) {
+                    if (! empty($barangayIds)) {
+                        $query->whereIn('barangay_id', $barangayIds);
+
+                        if ($stationId) {
+                            $query->orWhere(function ($fallbackQuery) use ($stationId) {
+                                $fallbackQuery
+                                    ->where('station_id', $stationId)
+                                    ->whereNull('barangay_id');
+                            });
+                        }
+
+                        return;
+                    }
+
+                    if ($stationId) {
+                        $query->where('station_id', $stationId);
+                        return;
+                    }
+
+                    $query->whereRaw('1 = 0');
+                })
                 ->where('status', 'pending')
+                ->where(function ($query) {
+                    $query->whereNotNull('source_signature')
+                        ->orWhere('source_type', 'action_plan');
+                })
+                ->whereDoesntHave('mitigationActions', function ($query) {
+                    $query->whereNotIn('status', ['cancelled']);
+                })
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1
@@ -1847,12 +1902,12 @@ class StationAdminController extends Controller
             ->pluck('barangay_id')
             ->map(fn ($id) => (int) $id)
             ->all();
-        $checklist = $this->resolveGeneratedMitigationDraftChecklist($checklistId, $allowedBarangayIds);
+        $checklist = $this->resolveMitigationDraftChecklist($checklistId, $allowedBarangayIds);
         $draft = $this->buildMitigationDraftFromActionPlanChecklist($checklistId, $allowedBarangayIds);
 
         if (! $draft) {
             return redirect()->route('station-admin.mitigations')
-                ->with('error', 'Unable to load the generated mitigation draft.');
+                ->with('error', 'Unable to load the mitigation draft.');
         }
 
         $existingAction = MitigationAction::query()
@@ -1863,7 +1918,7 @@ class StationAdminController extends Controller
             $this->markGeneratedMitigationDraftApproved($checklist, Auth::user()?->user_id, (int) $existingAction->mitigation_action_id);
 
             return redirect()->route('station-admin.mitigations')
-                ->with('success', 'This generated draft was already converted into an official mitigation action.');
+                ->with('success', 'This AI mitigation draft was already converted into an official mitigation action.');
         }
 
         DB::transaction(function () use ($draft, $checklist, $request) {
@@ -1897,7 +1952,7 @@ class StationAdminController extends Controller
         });
 
         return redirect()->route('station-admin.mitigations')
-            ->with('success', 'Generated mitigation draft approved and saved as an official mitigation action.');
+            ->with('success', 'AI mitigation draft approved and saved as an official mitigation action.');
     }
 
     public function rejectGeneratedMitigationDraft(Request $request, int $checklistId)
@@ -1906,7 +1961,7 @@ class StationAdminController extends Controller
             ->pluck('barangay_id')
             ->map(fn ($id) => (int) $id)
             ->all();
-        $checklist = $this->resolveGeneratedMitigationDraftChecklist($checklistId, $allowedBarangayIds);
+        $checklist = $this->resolveMitigationDraftChecklist($checklistId, $allowedBarangayIds);
 
         $this->markGeneratedMitigationDraftRejected(
             $checklist,
@@ -1915,7 +1970,7 @@ class StationAdminController extends Controller
         UserActivityLogger::log('rejected generated mitigation draft', Auth::user()?->user_id, $request);
 
         return redirect()->route('station-admin.mitigations')
-            ->with('success', 'Generated mitigation draft rejected.');
+            ->with('success', 'AI mitigation draft rejected.');
     }
 
     public function storeMitigation(Request $request)

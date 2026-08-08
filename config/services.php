@@ -48,6 +48,13 @@ return [
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_MODEL', 'deepseek/deepseek-r1-distill-llama-70b'),
+        'fallback_models' => array_values(array_filter(array_map(
+            static fn ($value) => trim((string) $value),
+            explode(',', (string) env('OPENROUTER_FALLBACK_MODELS', 'openai/gpt-4.1-mini,openai/gpt-4o-mini,deepseek/deepseek-r1-distill-qwen-32b'))
+        ))),
+        'connect_timeout' => (int) env('OPENROUTER_CONNECT_TIMEOUT', 8),
+        'timeout' => (int) env('OPENROUTER_TIMEOUT', 20),
+        'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 450),
     ],
 
     'agora' => [
