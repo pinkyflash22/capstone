@@ -77,7 +77,7 @@ return [
     ],
 
     'ai_prediction' => [
-        'python_binary' => env('AI_PYTHON_BINARY', 'python3'),
+        'python_binary' => env('AI_PYTHON_BINARY', 'python'),
         'prediction_script' => env('AI_PREDICTION_SCRIPT', 'capstone-ai/predict_event.py'),
         'training_script' => env('AI_TRAINING_SCRIPT', 'capstone-ai/train_model.py'),
         'dataset_path' => env('AI_DATASET_PATH', 'capstone-ai/station_barangay_monthly_db.json'),

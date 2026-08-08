@@ -26,7 +26,7 @@ class ForecastModelService
         $this->metadataPath = $this->resolvePath((string) config('services.ai_prediction.metadata_path', 'capstone-ai/fire_model_metadata.json'));
         $this->datasetPath = $this->resolvePath($this->datasetOption);
         $this->trainingScriptPath = $this->resolvePath((string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py'));
-        $this->pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+        $this->pythonBinary = (string) config('services.ai_prediction.python_binary', 'python');
     }
 
     public function ensureReady(): bool
@@ -93,7 +93,12 @@ class ForecastModelService
                     'diagnostics' => $this->readinessDiagnostics(includePaths: true),
                 ]);
 
-                return $this->recordTrainingReport(false, 'training_exception', 'Forecast model could not be prepared on this server.');
+                return $this->recordTrainingReport(
+                    false,
+                    'training_exception',
+                    'Forecast model could not be prepared on this server.',
+                    ['exception_message' => $e->getMessage()]
+                );
             }
         };
 

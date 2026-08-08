@@ -1420,6 +1420,113 @@
             height: 100%;
             border-radius: inherit;
         }
+        .analytics-loading-card {
+            width: min(92vw, 460px);
+            padding: 24px 22px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,237,0.96));
+            border: 1px solid rgba(251,146,60,0.22);
+            box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+            display: grid;
+            gap: 14px;
+            text-align: left;
+        }
+        .analytics-loading-card__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            width: fit-content;
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            color: #c2410c;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .analytics-loading-card__title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.3rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+        }
+        .analytics-loading-card__copy {
+            margin: 0;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+        .analytics-loading-card__meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #475569;
+        }
+        .analytics-loading-card__percent {
+            color: #dc2626;
+            font-size: 1.4rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+        }
+        .analytics-loading-card__bar {
+            height: 12px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #e2e8f0;
+            position: relative;
+        }
+        .analytics-loading-card__bar > span {
+            display: block;
+            height: 100%;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #f97316 0%, #dc2626 55%, #2563eb 100%);
+            transition: width 0.35s ease;
+            box-shadow: 0 6px 18px rgba(220, 38, 38, 0.25);
+        }
+        .analytics-loading-card__steps {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .analytics-loading-card__step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .analytics-loading-card__step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #cbd5e1;
+            transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+            flex-shrink: 0;
+        }
+        .analytics-loading-card__step.is-active {
+            color: #c2410c;
+        }
+        .analytics-loading-card__step.is-active .analytics-loading-card__step-dot {
+            background: #f97316;
+            transform: scale(1.15);
+            box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.16);
+        }
+        .analytics-loading-card__step.is-complete {
+            color: #0f766e;
+        }
+        .analytics-loading-card__step.is-complete .analytics-loading-card__step-dot {
+            background: #10b981;
+        }
         .analytics-legend-note {
             display: flex;
             flex-wrap: wrap;
@@ -1812,6 +1919,12 @@
             .recommendation-run-title { font-size: 13px; }
             .recommendation-run-subtitle { font-size: 11px; }
             .recommendation-run-arrow { width: 30px; height: 30px; border-radius: 10px; }
+            .analytics-loading-card { width: min(94vw, 420px); padding: 20px 18px; border-radius: 20px; }
+            .analytics-loading-card__title { font-size: 1.12rem; }
+            .analytics-loading-card__copy,
+            .analytics-loading-card__step,
+            .analytics-loading-card__meta { font-size: 12px; }
+            .analytics-loading-card__percent { font-size: 1.2rem; }
             .analytics-run-modal {
                 width: min(95vw, 440px) !important;
                 max-width: 440px !important;
@@ -2513,9 +2626,40 @@
     </div>
 
     <div id="loadingOverlay" class="loading-overlay">
-        <div style="text-align: center;">
-            <div class="loading-spinner"></div>
-            <p style="margin-top: 16px;">AI is analyzing real incident data...</p>
+        <div class="analytics-loading-card" role="status" aria-live="polite">
+            <div class="analytics-loading-card__eyebrow">
+                <i class="fa-solid fa-wave-square"></i>
+                Live Forecast Run
+            </div>
+            <div>
+                <h3 id="analyticsLoadingTitle" class="analytics-loading-card__title">Preparing analysis request...</h3>
+                <p id="analyticsLoadingCopy" class="analytics-loading-card__copy">PyroSense is collecting the selected station, barangay, and forecast context.</p>
+            </div>
+            <div class="analytics-loading-card__meta">
+                <span id="analyticsLoadingPhase">Initializing</span>
+                <span id="analyticsLoadingPercent" class="analytics-loading-card__percent">0%</span>
+            </div>
+            <div class="analytics-loading-card__bar">
+                <span id="analyticsLoadingBar"></span>
+            </div>
+            <ul class="analytics-loading-card__steps">
+                <li id="analyticsLoadingStep1" class="analytics-loading-card__step is-active">
+                    <span class="analytics-loading-card__step-dot"></span>
+                    Collecting selected forecast inputs
+                </li>
+                <li id="analyticsLoadingStep2" class="analytics-loading-card__step">
+                    <span class="analytics-loading-card__step-dot"></span>
+                    Reading incidents, weather, resources, and risk data
+                </li>
+                <li id="analyticsLoadingStep3" class="analytics-loading-card__step">
+                    <span class="analytics-loading-card__step-dot"></span>
+                    Building prediction, recommendation, and checklist results
+                </li>
+                <li id="analyticsLoadingStep4" class="analytics-loading-card__step">
+                    <span class="analytics-loading-card__step-dot"></span>
+                    Saving the latest analysis snapshot
+                </li>
+            </ul>
         </div>
     </div>
 
@@ -2551,6 +2695,12 @@
         let recommendationRunCache = new Map();
         let recommendationRunChecklistCache = new Map();
         let recommendationExploreCache = new Map();
+        let analyticsLoadingState = {
+            active: false,
+            percent: 0,
+            timer: null,
+            startedAt: null,
+        };
         let currentRecommendationRunGroup = null;
         let currentSortedBarangayPredictions = [];
         let forecastNarrativeRuns = [];
@@ -3194,6 +3344,26 @@
             return scope === 'next_month' ? 1 : 0;
         }
 
+        function getAnalysisScopeMeta(detail = {}, summary = {}) {
+            const detailData = detail?.analysis_data?.raw_data || {};
+            const selectedBarangay = detail?.selected_barangay_prediction
+                || detailData?.selected_barangay_prediction
+                || null;
+            const selectedBarangayName = selectedBarangay?.barangay_name || null;
+            const isBarangaySpecific = Boolean(selectedBarangayName);
+            const sectorName = detail?.sector || summary?.sector || 'the selected station';
+
+            return {
+                isBarangaySpecific,
+                barangayName: selectedBarangayName,
+                shortLabel: isBarangaySpecific ? 'Barangay-specific run' : 'Station-wide run',
+                chipLabel: isBarangaySpecific ? selectedBarangayName : 'All barangays',
+                detailLabel: isBarangaySpecific
+                    ? `Saved under barangay focus: ${selectedBarangayName}`
+                    : `Saved under station-wide scope for ${sectorName}`,
+            };
+        }
+
         function buildForecastNarrativeRun(analysisId, summary = {}, detail = null) {
             const detailData = detail?.analysis_data?.raw_data || {};
             const prediction = detail?.predictions || null;
@@ -3223,6 +3393,7 @@
                 predictedIncidents: prediction?.predicted_fire_incidents ?? summary?.incident_count ?? null,
                 hotspotName: hotspot?.barangay_name || null,
                 probability: hotspot?.probability_percent ?? prediction?.model_prediction?.probability_percent ?? null,
+                scopeMeta: getAnalysisScopeMeta(detail, summary),
                 detail,
             };
         }
@@ -3239,35 +3410,72 @@
                 return;
             }
 
+            const barangayRuns = forecastNarrativeRuns.filter((run) => run.scopeMeta?.isBarangaySpecific);
+            const stationRuns = forecastNarrativeRuns.filter((run) => !run.scopeMeta?.isBarangaySpecific);
+            const renderForecastRunCard = (run) => `
+                <button type="button" class="forecast-narrative-card" onclick="openForecastNarrativeModal(${run.id})">
+                    <div class="forecast-narrative-card__head">
+                        <div>
+                            <div class="forecast-narrative-card__title">${escapeHtml(run.targetLabel || (run.predictionScope === 'next_month' ? 'Next Month Forecast' : 'Current Month Forecast'))}</div>
+                            <div class="forecast-narrative-card__meta">
+                                ${escapeHtml(run.sector || 'Station Analysis')} · ${escapeHtml(formatRecommendationRunTimestamp(run.createdAt))}
+                            </div>
+                            <div class="forecast-narrative-card__meta" style="margin-top:4px; font-weight:700; color:${run.scopeMeta?.isBarangaySpecific ? '#dc2626' : '#475569'};">
+                                ${escapeHtml(run.scopeMeta?.detailLabel || 'Saved analysis run')}
+                            </div>
+                        </div>
+                        <span class="recommendation-run-chip">
+                            <i class="fa-solid ${run.predictionScope === 'next_month' ? 'fa-calendar-plus' : 'fa-calendar-day'}" style="color:${run.predictionScope === 'next_month' ? '#2563eb' : '#dc2626'};"></i>
+                            ${escapeHtml(run.predictionScope === 'next_month' ? 'Next month' : 'Current month')}
+                        </span>
+                    </div>
+                    <div class="forecast-narrative-card__chips">
+                        <span class="recommendation-run-chip">
+                            <i class="fa-solid ${run.scopeMeta?.isBarangaySpecific ? 'fa-map-pin' : 'fa-map'}" style="color:${run.scopeMeta?.isBarangaySpecific ? '#dc2626' : '#475569'};"></i>
+                            ${escapeHtml(run.scopeMeta?.chipLabel || 'All barangays')}
+                        </span>
+                        <span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(run.outlook || 'Forecast')}</span>
+                        ${run.confidenceScore !== null && run.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(run.confidenceScore))}% confidence</span>` : ''}
+                        ${run.predictedIncidents !== null && run.predictedIncidents !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-fire-flame-curved" style="color:#dc2626;"></i>${escapeHtml(String(run.predictedIncidents))} possible incident(s)</span>` : ''}
+                        ${run.hotspotName ? `<span class="recommendation-run-chip"><i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(run.hotspotName)}</span>` : ''}
+                    </div>
+                    <div class="forecast-narrative-card__summary">${escapeHtml(run.summary || 'No saved forecast narrative is available for this analysis yet.')}</div>
+                    <div class="forecast-narrative-card__footer">
+                        <i class="fa-solid fa-up-right-from-square"></i>
+                        Open forecast details
+                    </div>
+                </button>
+            `;
+            const renderForecastRunSection = (title, copy, runs) => {
+                if (!runs.length) {
+                    return '';
+                }
+
+                return `
+                    <section class="forecast-narrative-section" style="display:grid; gap:12px;">
+                        <div class="analytics-section-heading" style="display:grid; gap:4px;">
+                            <div style="font-size:0.9rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:#475569;">${escapeHtml(title)}</div>
+                            <p style="margin:0; color:#64748b; font-size:0.92rem;">${escapeHtml(copy)}</p>
+                        </div>
+                        <div class="forecast-narrative-list">
+                            ${runs.map((run) => renderForecastRunCard(run)).join('')}
+                        </div>
+                    </section>
+                `;
+            };
+
             predictionContainer.innerHTML = `
-                <div class="forecast-narrative-list">
-                    ${forecastNarrativeRuns.map((run) => `
-                        <button type="button" class="forecast-narrative-card" onclick="openForecastNarrativeModal(${run.id})">
-                            <div class="forecast-narrative-card__head">
-                                <div>
-                                    <div class="forecast-narrative-card__title">${escapeHtml(run.targetLabel || (run.predictionScope === 'next_month' ? 'Next Month Forecast' : 'Current Month Forecast'))}</div>
-                                    <div class="forecast-narrative-card__meta">
-                                        ${escapeHtml(run.sector || 'Station Analysis')} · ${escapeHtml(formatRecommendationRunTimestamp(run.createdAt))}
-                                    </div>
-                                </div>
-                                <span class="recommendation-run-chip">
-                                    <i class="fa-solid ${run.predictionScope === 'next_month' ? 'fa-calendar-plus' : 'fa-calendar-day'}" style="color:${run.predictionScope === 'next_month' ? '#2563eb' : '#dc2626'};"></i>
-                                    ${escapeHtml(run.predictionScope === 'next_month' ? 'Next month' : 'Current month')}
-                                </span>
-                            </div>
-                            <div class="forecast-narrative-card__chips">
-                                <span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(run.outlook || 'Forecast')}</span>
-                                ${run.confidenceScore !== null && run.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(run.confidenceScore))}% confidence</span>` : ''}
-                                ${run.predictedIncidents !== null && run.predictedIncidents !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-fire-flame-curved" style="color:#dc2626;"></i>${escapeHtml(String(run.predictedIncidents))} possible incident(s)</span>` : ''}
-                                ${run.hotspotName ? `<span class="recommendation-run-chip"><i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(run.hotspotName)}</span>` : ''}
-                            </div>
-                            <div class="forecast-narrative-card__summary">${escapeHtml(run.summary || 'No saved forecast narrative is available for this analysis yet.')}</div>
-                            <div class="forecast-narrative-card__footer">
-                                <i class="fa-solid fa-up-right-from-square"></i>
-                                Open forecast details
-                            </div>
-                        </button>
-                    `).join('')}
+                <div style="display:grid; gap:20px;">
+                    ${renderForecastRunSection(
+                        'Latest Barangay-Specific Runs',
+                        'Saved analyses created for one selected barangay appear here first.',
+                        barangayRuns
+                    )}
+                    ${renderForecastRunSection(
+                        'Latest Station-Wide Runs',
+                        'Saved analyses covering all barangays under the station appear here.',
+                        stationRuns
+                    )}
                 </div>
             `;
         }
@@ -3393,6 +3601,7 @@
                 recommendations,
                 detail,
                 scopeLabel: getRecommendationRunScopeLabel({ detail }),
+                scopeMeta: getAnalysisScopeMeta(detail, summary),
                 targetLabel,
             };
         }
@@ -3663,38 +3872,72 @@
                 return;
             }
 
-            recContainer.innerHTML = `
-                <div class="recommendation-run-list">
-                    ${recommendationRunGroups.map((group) => {
-                        const recommendations = Array.isArray(group.recommendations) ? group.recommendations : [];
-                        const summaryLine = `${group.sector} · ${formatRecommendationRunTimestamp(group.createdAt)}`;
-                        const chips = [
-                            group.targetLabel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-calendar-days" style="color:#dc2626;"></i>${escapeHtml(group.targetLabel)}</span>` : '',
-                            `<span class="recommendation-run-chip"><i class="fa-solid fa-list-check" style="color:#2563eb;"></i>${escapeHtml(String(recommendations.length))} recommendation(s)</span>`,
-                            group.riskLevel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(group.riskLevel)}</span>` : '',
-                            group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% confidence</span>` : ''
-                        ].filter(Boolean).join('');
+            const barangayGroups = recommendationRunGroups.filter((group) => group.scopeMeta?.isBarangaySpecific);
+            const stationGroups = recommendationRunGroups.filter((group) => !group.scopeMeta?.isBarangaySpecific);
+            const renderRecommendationRunCard = (group) => {
+                const recommendations = Array.isArray(group.recommendations) ? group.recommendations : [];
+                const summaryLine = `${group.sector} · ${formatRecommendationRunTimestamp(group.createdAt)}`;
+                const chips = [
+                    group.targetLabel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-calendar-days" style="color:#dc2626;"></i>${escapeHtml(group.targetLabel)}</span>` : '',
+                    `<span class="recommendation-run-chip"><i class="fa-solid ${group.scopeMeta?.isBarangaySpecific ? 'fa-map-pin' : 'fa-map'}" style="color:${group.scopeMeta?.isBarangaySpecific ? '#dc2626' : '#475569'};"></i>${escapeHtml(group.scopeMeta?.chipLabel || 'All barangays')}</span>`,
+                    `<span class="recommendation-run-chip"><i class="fa-solid fa-list-check" style="color:#2563eb;"></i>${escapeHtml(String(recommendations.length))} recommendation(s)</span>`,
+                    group.riskLevel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(group.riskLevel)}</span>` : '',
+                    group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% confidence</span>` : ''
+                ].filter(Boolean).join('');
 
-                        return `
-                            <div class="recommendation-run-group">
-                                <button type="button" class="recommendation-run-toggle" onclick="openRecommendationRunModal(${group.id})">
-                                    <div class="recommendation-run-meta">
-                                        <div class="recommendation-run-title">
-                                            <i class="fa-solid fa-layer-group" style="color:#dc2626;"></i>
-                                            <span>${escapeHtml(group.scopeLabel)}</span>
-                                        </div>
-                                        <div class="recommendation-run-subtitle">${escapeHtml(summaryLine)}</div>
-                                        <div class="recommendation-run-chips">${chips}</div>
-                                        <div class="recommendation-run-action">
-                                            <i class="fa-solid fa-up-right-from-square"></i>
-                                            Open clustered recommendations
-                                        </div>
-                                    </div>
-                                    <span class="recommendation-run-arrow"><i class="fa-solid fa-up-right-from-square"></i></span>
-                                </button>
+                return `
+                    <div class="recommendation-run-group">
+                        <button type="button" class="recommendation-run-toggle" onclick="openRecommendationRunModal(${group.id})">
+                            <div class="recommendation-run-meta">
+                                <div class="recommendation-run-title">
+                                    <i class="fa-solid fa-layer-group" style="color:#dc2626;"></i>
+                                    <span>${escapeHtml(group.scopeLabel)}</span>
+                                </div>
+                                <div class="recommendation-run-subtitle">${escapeHtml(summaryLine)}</div>
+                                <div class="recommendation-run-subtitle" style="color:${group.scopeMeta?.isBarangaySpecific ? '#dc2626' : '#64748b'}; font-weight:700;">
+                                    ${escapeHtml(group.scopeMeta?.detailLabel || 'Saved analysis run')}
+                                </div>
+                                <div class="recommendation-run-chips">${chips}</div>
+                                <div class="recommendation-run-action">
+                                    <i class="fa-solid fa-up-right-from-square"></i>
+                                    Open clustered recommendations
+                                </div>
                             </div>
-                        `;
-                    }).join('')}
+                            <span class="recommendation-run-arrow"><i class="fa-solid fa-up-right-from-square"></i></span>
+                        </button>
+                    </div>
+                `;
+            };
+            const renderRecommendationRunSection = (title, copy, groups) => {
+                if (!groups.length) {
+                    return '';
+                }
+
+                return `
+                    <section class="recommendation-run-section" style="display:grid; gap:12px;">
+                        <div class="analytics-section-heading" style="display:grid; gap:4px;">
+                            <div style="font-size:0.9rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:#475569;">${escapeHtml(title)}</div>
+                            <p style="margin:0; color:#64748b; font-size:0.92rem;">${escapeHtml(copy)}</p>
+                        </div>
+                        <div class="recommendation-run-list">
+                            ${groups.map((group) => renderRecommendationRunCard(group)).join('')}
+                        </div>
+                    </section>
+                `;
+            };
+
+            recContainer.innerHTML = `
+                <div style="display:grid; gap:20px;">
+                    ${renderRecommendationRunSection(
+                        'Latest Barangay-Specific Runs',
+                        'Clustered recommendation sets tied to one selected barangay appear here.',
+                        barangayGroups
+                    )}
+                    ${renderRecommendationRunSection(
+                        'Latest Station-Wide Runs',
+                        'Clustered recommendation sets for the whole station appear here.',
+                        stationGroups
+                    )}
                 </div>
             `;
         }
@@ -4078,9 +4321,148 @@
             showAnalyticsToast(details ? `${fallbackMessage} ${details}` : fallbackMessage, 'error');
         }
 
-        async function runAIAnalysis(locationId, predictionScope = 'current_month') {
+        function setAnalyticsLoadingStep(stepNumber, state) {
+            const element = document.getElementById(`analyticsLoadingStep${stepNumber}`);
+            if (!element) return;
+
+            element.classList.remove('is-active', 'is-complete');
+            if (state === 'active') {
+                element.classList.add('is-active');
+            } else if (state === 'complete') {
+                element.classList.add('is-complete');
+            }
+        }
+
+        function updateAnalyticsLoadingUI(percent, mode = 'analysis') {
+            const normalizedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+            const title = document.getElementById('analyticsLoadingTitle');
+            const copy = document.getElementById('analyticsLoadingCopy');
+            const phase = document.getElementById('analyticsLoadingPhase');
+            const percentLabel = document.getElementById('analyticsLoadingPercent');
+            const bar = document.getElementById('analyticsLoadingBar');
+
+            if (percentLabel) {
+                percentLabel.textContent = `${normalizedPercent}%`;
+            }
+
+            if (bar) {
+                bar.style.width = `${normalizedPercent}%`;
+            }
+
+            const modeLabel = mode === 'next_month' ? 'next-month forecast' : 'station analysis';
+
+            if (normalizedPercent < 18) {
+                title.textContent = mode === 'next_month'
+                    ? 'Preparing next-month forecast request...'
+                    : 'Preparing analysis request...';
+                copy.textContent = 'PyroSense is collecting the selected station, barangay, and forecast context.';
+                phase.textContent = 'Initializing';
+                setAnalyticsLoadingStep(1, 'active');
+                setAnalyticsLoadingStep(2, null);
+                setAnalyticsLoadingStep(3, null);
+                setAnalyticsLoadingStep(4, null);
+            } else if (normalizedPercent < 52) {
+                title.textContent = mode === 'next_month'
+                    ? 'Loading live data for the forward-looking forecast...'
+                    : 'Loading live operational data...';
+                copy.textContent = 'Reading incidents, weather, personnel, equipment, and validated risk signals from the selected scope.';
+                phase.textContent = 'Gathering data';
+                setAnalyticsLoadingStep(1, 'complete');
+                setAnalyticsLoadingStep(2, 'active');
+                setAnalyticsLoadingStep(3, null);
+                setAnalyticsLoadingStep(4, null);
+            } else if (normalizedPercent < 85) {
+                title.textContent = mode === 'next_month'
+                    ? 'Building the next-month prediction and recommendations...'
+                    : 'Building prediction and recommendation results...';
+                copy.textContent = `Generating the ${modeLabel}, recommendations, and action-plan checklist suggestions from the available evidence.`;
+                phase.textContent = 'Analyzing';
+                setAnalyticsLoadingStep(1, 'complete');
+                setAnalyticsLoadingStep(2, 'complete');
+                setAnalyticsLoadingStep(3, 'active');
+                setAnalyticsLoadingStep(4, null);
+            } else if (normalizedPercent < 100) {
+                title.textContent = 'Finalizing and saving the latest forecast snapshot...';
+                copy.textContent = 'The response is taking a little longer, so PyroSense is waiting for the server to finish and save the latest artifacts.';
+                phase.textContent = 'Finalizing';
+                setAnalyticsLoadingStep(1, 'complete');
+                setAnalyticsLoadingStep(2, 'complete');
+                setAnalyticsLoadingStep(3, 'complete');
+                setAnalyticsLoadingStep(4, 'active');
+            } else {
+                title.textContent = 'Forecast ready.';
+                copy.textContent = 'The latest prediction, recommendations, and saved workflow context are now available.';
+                phase.textContent = 'Complete';
+                setAnalyticsLoadingStep(1, 'complete');
+                setAnalyticsLoadingStep(2, 'complete');
+                setAnalyticsLoadingStep(3, 'complete');
+                setAnalyticsLoadingStep(4, 'complete');
+            }
+        }
+
+        function startAnalyticsLoading(mode = 'analysis') {
             const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+
+            if (analyticsLoadingState.timer) {
+                clearInterval(analyticsLoadingState.timer);
+            }
+
+            analyticsLoadingState = {
+                active: true,
+                percent: 4,
+                timer: null,
+                startedAt: Date.now(),
+            };
+
             overlay.classList.add('active');
+            updateAnalyticsLoadingUI(analyticsLoadingState.percent, mode);
+
+            analyticsLoadingState.timer = window.setInterval(() => {
+                if (!analyticsLoadingState.active) {
+                    return;
+                }
+
+                const elapsed = Date.now() - analyticsLoadingState.startedAt;
+                let nextPercent = analyticsLoadingState.percent;
+
+                if (elapsed < 4000) {
+                    nextPercent += 7;
+                } else if (elapsed < 9000) {
+                    nextPercent += 4;
+                } else if (elapsed < 16000) {
+                    nextPercent += 2;
+                } else if (elapsed < 26000) {
+                    nextPercent += 1;
+                } else {
+                    nextPercent += 0.4;
+                }
+
+                analyticsLoadingState.percent = Math.min(95, nextPercent);
+                updateAnalyticsLoadingUI(analyticsLoadingState.percent, mode);
+            }, 450);
+        }
+
+        async function finishAnalyticsLoading(mode = 'analysis') {
+            const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+
+            analyticsLoadingState.active = false;
+
+            if (analyticsLoadingState.timer) {
+                clearInterval(analyticsLoadingState.timer);
+                analyticsLoadingState.timer = null;
+            }
+
+            analyticsLoadingState.percent = 100;
+            updateAnalyticsLoadingUI(100, mode);
+
+            await new Promise((resolve) => window.setTimeout(resolve, 220));
+            overlay.classList.remove('active');
+        }
+
+        async function runAIAnalysis(locationId, predictionScope = 'current_month') {
+            startAnalyticsLoading(predictionScope);
 
             const periodDays = document.getElementById('periodSelect').value;
 
@@ -4136,7 +4518,7 @@
                 console.error('Analysis error:', error);
                 showPredictionApiError('Failed to run AI analysis.', error.message);
             } finally {
-                overlay.classList.remove('active');
+                await finishAnalyticsLoading(predictionScope);
             }
         }
 
@@ -4914,7 +5296,13 @@
                 const result = await response.json().catch(() => ({}));
 
                 if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Model retraining failed.');
+                    const detailParts = [
+                        result.message || 'Model retraining failed.',
+                        result.details || '',
+                        result.diagnostics?.paths?.python_binary ? `Python: ${result.diagnostics.paths.python_binary}` : '',
+                        result.exception_message || '',
+                    ].filter(Boolean);
+                    throw new Error(detailParts.join(' '));
                 }
 
                 const trainedAt = result.model_metadata?.trained_at

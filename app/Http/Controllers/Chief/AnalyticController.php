@@ -294,6 +294,20 @@ class AnalyticController extends Controller
                 'used_fallback_generation' => false,
                 'warning' => null,
             ];
+            $structuredAnalysis['suggestion_debug'] = [
+                'attempted' => false,
+                'analysis_id' => null,
+                'persisted_suggestion_rows' => 0,
+                'warning' => null,
+            ];
+            $structuredAnalysis['mitigation_debug'] = [
+                'attempted' => false,
+                'analysis_id' => null,
+                'created_draft_rows' => 0,
+                'updated_draft_rows' => 0,
+                'skipped_existing_rows' => 0,
+                'warning' => null,
+            ];
 
             // Store analysis in database (optional, catch errors)
             $analysisId = null;
@@ -318,6 +332,27 @@ class AnalyticController extends Controller
                         $structuredAnalysis['recommendations'] ?? [],
                         $structuredAnalysis['action_plan_checklists'] ?? []
                     );
+                    $structuredAnalysis['suggestion_debug']['attempted'] = true;
+                    $structuredAnalysis['suggestion_debug']['analysis_id'] = $analysisId;
+                    $suggestionGeneration = $this->generateAndStoreRecommendationSuggestions(
+                        $analysisId,
+                        $structuredAnalysis['recommendations'] ?? [],
+                        $structuredAnalysis['action_plan_checklists'] ?? []
+                    );
+                    $structuredAnalysis['recommendation_suggestions'] = $suggestionGeneration['suggestions'];
+                    $structuredAnalysis['suggestion_debug'] = array_merge(
+                        $structuredAnalysis['suggestion_debug'],
+                        $suggestionGeneration['debug']
+                    );
+                    $structuredAnalysis['mitigation_debug']['attempted'] = true;
+                    $structuredAnalysis['mitigation_debug']['analysis_id'] = $analysisId;
+                    $mitigationDraftGeneration = $this->syncMitigationDraftActionsForAnalysis(
+                        $structuredAnalysis['action_plan_checklists'] ?? []
+                    );
+                    $structuredAnalysis['mitigation_debug'] = array_merge(
+                        $structuredAnalysis['mitigation_debug'],
+                        $mitigationDraftGeneration
+                    );
                     $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
                     $this->updateStoredAnalysisArtifacts($analysisId, $structuredAnalysis, $analysisData);
                 }
@@ -327,6 +362,20 @@ class AnalyticController extends Controller
                 ]);
                 $structuredAnalysis['checklist_debug'] = array_merge(
                     $structuredAnalysis['checklist_debug'],
+                    [
+                        'analysis_id' => $analysisId,
+                        'warning' => $storeError->getMessage(),
+                    ]
+                );
+                $structuredAnalysis['suggestion_debug'] = array_merge(
+                    $structuredAnalysis['suggestion_debug'],
+                    [
+                        'analysis_id' => $analysisId,
+                        'warning' => $storeError->getMessage(),
+                    ]
+                );
+                $structuredAnalysis['mitigation_debug'] = array_merge(
+                    $structuredAnalysis['mitigation_debug'],
                     [
                         'analysis_id' => $analysisId,
                         'warning' => $storeError->getMessage(),
@@ -402,6 +451,7 @@ class AnalyticController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $report['message'] ?? 'Model retraining failed. Check server logs for details.',
+                    'details' => $report['exception_message'] ?? null,
                     'diagnostics' => $report['diagnostics'] ?? [],
                     'code' => $report['status'] ?? 'training_failed',
                 ], 500);
@@ -947,6 +997,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     ->orWhereNotIn('risk_areas.review_status', ['rejected']);
             })
             ->select(
+                'risk_areas.risk_area_id',
                 'barangays.barangay_id',
                 'barangays.barangay_name',
                 'risk_areas.entry_type',
@@ -1005,6 +1056,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             ])->filter()->values();
 
             return [
+                'risk_area_id' => (int) $record->risk_area_id,
                 'barangay_id' => (int) $record->barangay_id,
                 'barangay_name' => $record->barangay_name,
                 'entry_type' => $record->entry_type,
@@ -2052,11 +2104,24 @@ private function trimAiPrompt(string $prompt): string
             ?? data_get($rawData, 'barangay_predictions.0.barangay_id');
         foreach ($plans as $index => $plan) {
             $sourceRecommendation = $recommendations[$index] ?? $recommendations[0];
+            $riskAreaId = $this->resolveChecklistRiskAreaId($rawData, (array) $sourceRecommendation, $index);
+            $planPayload = array_merge($plan, [
+                'workflow_type' => 'analysis_action_plan',
+                'analysis_id' => $analysisId,
+                'risk_area_id' => $riskAreaId,
+                'matched_risk_area' => $this->resolveChecklistRiskAreaSummary($rawData, $riskAreaId),
+                'source_recommendation' => [
+                    'title' => $sourceRecommendation['title'] ?? null,
+                    'description' => $sourceRecommendation['description'] ?? null,
+                    'priority' => $sourceRecommendation['priority'] ?? null,
+                ],
+            ]);
 
             $saved = AiActionPlanChecklist::create([
                 'analysis_id' => $analysisId,
                 'station_id' => $rawData['station_id'] ?? null,
                 'barangay_id' => $resolvedChecklistBarangayId ? (int) $resolvedChecklistBarangayId : null,
+                'risk_area_id' => $riskAreaId,
                 'source_type' => 'action_plan',
                 'source_title' => $plan['source_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan'),
                 'source_description' => $sourceRecommendation['description'] ?? null,
@@ -2067,7 +2132,7 @@ private function trimAiPrompt(string $prompt): string
                 'priority_level' => strtolower($plan['priority_level'] ?? ($sourceRecommendation['priority'] ?? 'medium')),
                 'status' => 'pending',
                 'target_date' => isset($plan['target_days']) ? now()->addDays((int) $plan['target_days'])->toDateString() : null,
-                'ai_payload' => $plan,
+                'ai_payload' => $planPayload,
                 'is_ai_generated' => $aiGenerated,
             ]);
 
@@ -2103,6 +2168,327 @@ private function trimAiPrompt(string $prompt): string
                 'warning' => $generationWarning,
             ],
         ];
+    }
+
+    private function generateAndStoreRecommendationSuggestions(int $analysisId, array $recommendations, array $savedPlans): array
+    {
+        $recommendations = array_values(array_filter($recommendations, fn ($recommendation) => is_array($recommendation)));
+        if (empty($recommendations) || empty($savedPlans)) {
+            return [
+                'suggestions' => [],
+                'debug' => [
+                    'analysis_id' => $analysisId,
+                    'persisted_suggestion_rows' => 0,
+                    'warning' => empty($recommendations)
+                        ? 'No recommendations were available to convert into implementation suggestions.'
+                        : 'No saved action-plan checklist rows were available for suggestion linkage.',
+                ],
+            ];
+        }
+
+        $analysis = Analysis::query()->find($analysisId);
+        AiRecommendationSuggestion::query()->where('analysis_id', $analysisId)->delete();
+
+        $savedSuggestions = [];
+
+        foreach ($recommendations as $index => $recommendation) {
+            $actionPlanChecklist = $savedPlans[$index] ?? $savedPlans[0] ?? null;
+            if (! $actionPlanChecklist instanceof AiActionPlanChecklist) {
+                continue;
+            }
+
+            $recommendationTitle = $this->normalizeRecommendationTitle($recommendation['title'] ?? null);
+            $recommendationDescription = $recommendation['description'] ?? $actionPlanChecklist->plan_description;
+            $priority = strtolower((string) ($recommendation['priority'] ?? $actionPlanChecklist->priority_level ?? 'medium'));
+            $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
+                'recommendation_title' => $recommendationTitle,
+                'recommendation_description' => $recommendationDescription,
+                'priority' => $priority,
+                'barangay_name' => $actionPlanChecklist->barangay?->barangay_name,
+                'street_or_sitio' => data_get($actionPlanChecklist->ai_payload, 'matched_risk_area.street_or_sitio'),
+            ]);
+            $parsedData = $this->getFallbackExploreData(
+                $recommendationTitle,
+                ucfirst($priority),
+                $recommendationDescription,
+                $contextPayload
+            );
+
+            $savedSuggestion = $this->storeRecommendationSuggestion(
+                $analysis,
+                $actionPlanChecklist,
+                $recommendationTitle,
+                $recommendationDescription,
+                $priority,
+                $contextPayload,
+                $parsedData,
+                'auto_generated_from_analysis',
+                false
+            );
+
+            if ($savedSuggestion) {
+                $savedSuggestions[] = $savedSuggestion->fresh();
+            }
+        }
+
+        return [
+            'suggestions' => $savedSuggestions,
+            'debug' => [
+                'analysis_id' => $analysisId,
+                'persisted_suggestion_rows' => count($savedSuggestions),
+                'warning' => count($savedSuggestions) === 0
+                    ? 'Implementation suggestions were not persisted for this analysis.'
+                    : null,
+            ],
+        ];
+    }
+
+    private function resolveChecklistRiskAreaId(array $rawData, array $sourceRecommendation = [], int $index = 0): ?int
+    {
+        $focusFindings = collect($rawData['recommendation_context']['focus_findings'] ?? [])
+            ->filter(fn ($finding) => ! empty($finding['risk_area_id']));
+
+        if ($focusFindings->isEmpty()) {
+            return null;
+        }
+
+        $selectedBarangayId = (int) ($rawData['barangay_id']
+            ?? data_get($rawData, 'selected_barangay_prediction.barangay_id')
+            ?? 0);
+
+        $candidateFindings = $selectedBarangayId > 0
+            ? $focusFindings->filter(fn ($finding) => (int) ($finding['barangay_id'] ?? 0) === $selectedBarangayId)->values()
+            : $focusFindings->values();
+
+        if ($candidateFindings->isEmpty()) {
+            $candidateFindings = $focusFindings->values();
+        }
+
+        $haystack = Str::lower(trim(implode(' ', array_filter([
+            $sourceRecommendation['title'] ?? null,
+            $sourceRecommendation['description'] ?? null,
+        ]))));
+
+        if ($haystack !== '') {
+            $matched = $candidateFindings->first(function ($finding) use ($haystack) {
+                $needles = array_filter([
+                    Str::lower((string) ($finding['type_label'] ?? '')),
+                    Str::lower((string) ($finding['condition_label'] ?? '')),
+                    Str::lower((string) ($finding['street_or_sitio'] ?? '')),
+                ]);
+
+                foreach ($needles as $needle) {
+                    if ($needle !== '' && str_contains($haystack, $needle)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+
+            if ($matched) {
+                return (int) $matched['risk_area_id'];
+            }
+        }
+
+        $fallback = $candidateFindings->get($index) ?? $candidateFindings->first();
+
+        return $fallback ? (int) ($fallback['risk_area_id'] ?? 0) : null;
+    }
+
+    private function resolveChecklistRiskAreaSummary(array $rawData, ?int $riskAreaId): ?array
+    {
+        if (! $riskAreaId) {
+            return null;
+        }
+
+        $matched = collect($rawData['recommendation_context']['focus_findings'] ?? [])
+            ->first(fn ($finding) => (int) ($finding['risk_area_id'] ?? 0) === (int) $riskAreaId);
+
+        return is_array($matched) ? $matched : null;
+    }
+
+    private function syncMitigationDraftActionsForAnalysis(array $savedPlans): array
+    {
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($savedPlans as $savedPlan) {
+            if (! $savedPlan instanceof AiActionPlanChecklist) {
+                continue;
+            }
+
+            $payload = $this->buildMitigationDraftPayloadFromChecklist($savedPlan);
+            if (! $payload) {
+                $skipped++;
+                continue;
+            }
+
+            $existingAction = MitigationAction::query()
+                ->where('ai_action_plan_checklist_id', $savedPlan->ai_action_plan_checklist_id)
+                ->first();
+
+            if ($existingAction) {
+                if (in_array($existingAction->status, ['draft', 'planned'], true) && $this->resolveMitigationSourceTypeForAnalysis($existingAction->toArray()) === 'ai_action_plan') {
+                    $hasManualEdits = filled($existingAction->responsible_team_id)
+                        || filled($existingAction->responsible_user_id)
+                        || filled($existingAction->implementation_notes)
+                        || filled($existingAction->completion_notes)
+                        || filled($existingAction->outcome_result)
+                        || filled($existingAction->follow_up_notes)
+                        || trim((string) ($existingAction->remarks ?? '')) !== trim((string) ($payload['remarks'] ?? ''))
+                        || trim((string) ($existingAction->description ?? '')) !== trim((string) ($payload['description'] ?? ''))
+                        || trim((string) ($existingAction->title ?? '')) !== trim((string) ($payload['title'] ?? ''))
+                        || strtolower((string) ($existingAction->category ?? '')) !== strtolower((string) ($payload['category'] ?? ''))
+                        || strtolower((string) ($existingAction->priority_level ?? '')) !== strtolower((string) ($payload['priority_level'] ?? ''))
+                        || (string) optional($existingAction->target_date)->format('Y-m-d') !== (string) ($payload['target_date'] ?? null);
+
+                    if ($hasManualEdits) {
+                        $skipped++;
+                    } else {
+                        $existingAction->update(array_merge($payload, [
+                            'responsible_team_id' => $existingAction->responsible_team_id,
+                            'responsible_user_id' => $existingAction->responsible_user_id,
+                            'created_by' => $existingAction->created_by,
+                        ]));
+                        $updated++;
+                    }
+                } else {
+                    $skipped++;
+                }
+
+                continue;
+            }
+
+            MitigationAction::query()->create($payload);
+            $created++;
+        }
+
+        return [
+            'created_draft_rows' => $created,
+            'updated_draft_rows' => $updated,
+            'skipped_existing_rows' => $skipped,
+            'warning' => null,
+        ];
+    }
+
+    private function buildMitigationDraftPayloadFromChecklist(AiActionPlanChecklist $checklist): ?array
+    {
+        if (! $checklist->barangay_id) {
+            return null;
+        }
+
+        $checklist->loadMissing(['suggestions', 'riskArea.marker']);
+        $firstSuggestion = $checklist->suggestions->sortByDesc('created_at')->first();
+        $steps = collect($firstSuggestion?->steps ?: $checklist->checklist_items ?: [])
+            ->filter()
+            ->map(fn ($step) => '- ' . trim((string) $step))
+            ->values()
+            ->all();
+        $resources = collect($firstSuggestion?->resources_needed ?: [])
+            ->filter()
+            ->map(fn ($resource) => '- ' . trim((string) $resource))
+            ->values()
+            ->all();
+
+        $descriptionParts = array_filter([
+            $checklist->plan_description ?: $checklist->source_description,
+            ! empty($steps) ? "Suggested steps:\n" . implode("\n", $steps) : null,
+            ! empty($resources) ? "Resources needed:\n" . implode("\n", $resources) : null,
+            $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
+        ]);
+
+        return [
+            'barangay_id' => (int) $checklist->barangay_id,
+            'risk_area_id' => $checklist->risk_area_id ? (int) $checklist->risk_area_id : null,
+            'barangay_prediction_checklist_id' => null,
+            'ai_action_plan_checklist_id' => (int) $checklist->ai_action_plan_checklist_id,
+            'responsible_team_id' => null,
+            'responsible_user_id' => null,
+            'title' => $checklist->plan_title ?: ($checklist->source_title ?: 'AI Mitigation Draft'),
+            'category' => $this->inferMitigationCategoryFromChecklistForAnalysis($checklist),
+            'priority_level' => strtolower((string) ($checklist->priority_level ?: 'medium')),
+            'status' => 'draft',
+            'source_type' => 'ai_action_plan',
+            'target_date' => optional($checklist->target_date)->format('Y-m-d'),
+            'completed_at' => null,
+            'description' => implode("\n\n", $descriptionParts),
+            'remarks' => $firstSuggestion?->estimated_timeline
+                ? 'Auto-generated from AI action-plan checklist. Review before approval. Timeline suggestion: ' . $firstSuggestion->estimated_timeline
+                : 'Auto-generated from AI action-plan checklist. Review before approval.',
+            'implementation_notes' => null,
+            'completion_notes' => null,
+            'outcome_result' => null,
+            'effectiveness' => 'pending_evaluation',
+            'follow_up_required' => false,
+            'follow_up_notes' => null,
+            'created_by' => Auth::user()?->user_id,
+            'approved_by' => null,
+            'approved_at' => null,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+        ];
+    }
+
+    private function inferMitigationCategoryFromChecklistForAnalysis(AiActionPlanChecklist $checklist): string
+    {
+        $payloadCategory = data_get($checklist->ai_payload, 'recommended_category');
+        $allowedCategories = [
+            'electrical_safety',
+            'water_supply',
+            'response_readiness',
+            'access_routing',
+            'inspection_enforcement',
+            'community_prevention',
+            'evacuation_life_safety',
+            'high_risk_area_monitoring',
+            'environmental_preparedness',
+            'other',
+        ];
+
+        if (is_string($payloadCategory) && in_array($payloadCategory, $allowedCategories, true)) {
+            return $payloadCategory;
+        }
+
+        $haystack = Str::lower(trim(implode(' ', array_filter([
+            $checklist->plan_title,
+            $checklist->plan_description,
+            $checklist->source_title,
+            $checklist->source_description,
+        ]))));
+
+        return match (true) {
+            str_contains($haystack, 'inspect') || str_contains($haystack, 'inspection') || str_contains($haystack, 'enforcement') => 'inspection_enforcement',
+            str_contains($haystack, 'awareness') || str_contains($haystack, 'brief') || str_contains($haystack, 'campaign') => 'community_prevention',
+            str_contains($haystack, 'route') || str_contains($haystack, 'access') || str_contains($haystack, 'dispatch') => 'access_routing',
+            str_contains($haystack, 'hydrant') || str_contains($haystack, 'water') => 'water_supply',
+            str_contains($haystack, 'electrical') || str_contains($haystack, 'wiring') => 'electrical_safety',
+            str_contains($haystack, 'waste') || str_contains($haystack, 'housekeeping') || str_contains($haystack, 'combustible') => 'community_prevention',
+            str_contains($haystack, 'community') || str_contains($haystack, 'resident') || str_contains($haystack, 'volunteer') => 'community_prevention',
+            str_contains($haystack, 'training') || str_contains($haystack, 'drill') || str_contains($haystack, 'readiness') => 'response_readiness',
+            str_contains($haystack, 'evacu') || str_contains($haystack, 'life safety') => 'evacuation_life_safety',
+            str_contains($haystack, 'monitor') || str_contains($haystack, 'surveillance') => 'high_risk_area_monitoring',
+            str_contains($haystack, 'rain') || str_contains($haystack, 'weather') || str_contains($haystack, 'environment') => 'environmental_preparedness',
+            default => 'other',
+        };
+    }
+
+    private function resolveMitigationSourceTypeForAnalysis(array $attributes): string
+    {
+        if (! empty($attributes['ai_action_plan_checklist_id'])) {
+            return 'ai_action_plan';
+        }
+
+        if (! empty($attributes['barangay_prediction_checklist_id'])) {
+            return 'prediction';
+        }
+
+        if (! empty($attributes['risk_area_id'])) {
+            return 'hazard_report';
+        }
+
+        return $attributes['source_type'] ?? 'manual';
     }
 
     private function parseActionPlanChecklistResponse(string $content): array
@@ -3473,13 +3859,14 @@ private function trimAiPrompt(string $prompt): string
         string $priority,
         array $contextPayload,
         array $parsedData,
-        string $aiResponse
+        string $aiResponse,
+        bool $isAiGenerated = true
     ): ?AiRecommendationSuggestion {
         try {
             return AiRecommendationSuggestion::create([
                 'analysis_id' => $analysis?->analysis_id,
                 'ai_action_plan_checklist_id' => $actionPlanChecklist?->ai_action_plan_checklist_id,
-                'station_id' => $analysis?->station_id,
+                'station_id' => $analysis?->station_id ?? $actionPlanChecklist?->station_id,
                 'barangay_id' => $actionPlanChecklist?->barangay_id,
                 'recommendation_title' => $recommendationTitle,
                 'recommendation_description' => $recommendationDescription,
@@ -3490,7 +3877,7 @@ private function trimAiPrompt(string $prompt): string
                 'resources_needed' => $parsedData['resources_needed'] ?? [],
                 'estimated_timeline' => $parsedData['estimated_timeline'] ?? null,
                 'ai_response' => $aiResponse,
-                'is_ai_generated' => true,
+                'is_ai_generated' => $isAiGenerated,
             ]);
         } catch (\Throwable $e) {
             Log::warning('Failed to store AI recommendation suggestion: ' . $e->getMessage());

@@ -1689,6 +1689,15 @@ class StationAdminController extends Controller
                     $action->source_type = $this->resolveMitigationSourceType($action->toArray());
                 });
 
+            $newAiDraftMitigations = $mitigationActions
+                ->filter(function (MitigationAction $action) {
+                    return $action->status === 'draft'
+                        && $action->source_type === 'ai_action_plan';
+                })
+                ->sortByDesc('created_at')
+                ->take(6)
+                ->values();
+
             $summaryCounts = [
                 'total' => $summaryActions->count(),
                 'awaiting_approval' => $summaryActions->whereIn('status', ['draft', 'planned'])->count(),
@@ -1841,6 +1850,7 @@ class StationAdminController extends Controller
             return view('chief.mitigations', [
                 'managedBarangays' => $managedBarangays,
                 'mitigationActions' => $mitigationActions,
+                'newAiDraftMitigations' => $newAiDraftMitigations,
                 'mitigationSummaryCounts' => $summaryCounts,
                 'riskAreas' => $riskAreas,
                 'predictionChecklists' => $predictionChecklists,
@@ -1867,6 +1877,7 @@ class StationAdminController extends Controller
             return view('chief.mitigations', [
                 'managedBarangays' => collect(),
                 'mitigationActions' => collect(),
+                'newAiDraftMitigations' => collect(),
                 'mitigationSummaryCounts' => [
                     'total' => 0,
                     'awaiting_approval' => 0,

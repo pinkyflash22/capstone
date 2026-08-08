@@ -262,6 +262,137 @@
                             </section>
                         @endif
 
+                        <section class="panel" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
+                            <div class="panel-head">
+                                <div>
+                                    <h3>New AI Drafts Awaiting Review</h3>
+                                    <p>These are auto-created mitigation draft records generated after recent analysis runs. Review them first before moving them into planning or approval.</p>
+                                </div>
+                            </div>
+                            @if(($newAiDraftMitigations ?? collect())->isEmpty())
+                                <div class="empty">No new AI-linked draft mitigation records are waiting for review right now.</div>
+                            @else
+                                <div style="display:grid; gap:14px;">
+                                    @foreach($newAiDraftMitigations as $action)
+                                        @php
+                                            $linkedChecklist = $action->aiActionPlanChecklist;
+                                            $linkedSuggestion = optional($linkedChecklist?->suggestions)->sortByDesc('created_at')->first();
+                                            $linkedAnalysis = $linkedChecklist?->analysis;
+                                            $riskLevel = strtolower((string) ($linkedAnalysis?->risk_level ?? $linkedChecklist?->priority_level ?? $action->priority_level ?? 'medium'));
+                                            $sourceLabel = $mitigationSourceOptions[$action->source_type] ?? ucfirst(str_replace('_', ' ', (string) $action->source_type));
+                                            $categoryLabel = $mitigationCategoryOptions[$action->category] ?? ucfirst(str_replace('_', ' ', (string) $action->category));
+                                            $draftTasks = collect($linkedChecklist?->items ?? [])->map(function ($item) {
+                                                return [
+                                                    'text' => $item->item_text,
+                                                    'status' => $item->status,
+                                                ];
+                                            })->values()->all();
+                                            $draftFactors = collect($linkedAnalysis?->contributing_factors ?? data_get($linkedChecklist, 'ai_payload.contributing_factors', []))
+                                                ->flatten()
+                                                ->filter()
+                                                ->map(fn ($factor) => ucwords(str_replace('_', ' ', (string) $factor)))
+                                                ->values()
+                                                ->all();
+                                            $draftSourceRefs = array_values(array_filter([
+                                                $linkedChecklist?->plan_title ? 'AI Action Plan: ' . $linkedChecklist->plan_title : null,
+                                                $linkedSuggestion?->recommendation_title ? 'AI Recommendation: ' . $linkedSuggestion->recommendation_title : null,
+                                                $linkedAnalysis?->analysis_id ? 'Analysis #' . $linkedAnalysis->analysis_id : null,
+                                                $action->riskArea?->marker?->title ? 'Hazard / Risk: ' . $action->riskArea->marker->title : null,
+                                            ]));
+                                            $draftPayload = [
+                                                'id' => $action->mitigation_action_id,
+                                                'barangay_id' => $action->barangay_id,
+                                                'title' => $action->title,
+                                                'category' => $action->category,
+                                                'category_label' => $categoryLabel,
+                                                'priority_level' => $action->priority_level,
+                                                'status' => $action->status,
+                                                'status_label' => $mitigationStatusLabels[$action->status] ?? ucfirst(str_replace('_', ' ', (string) $action->status)),
+                                                'source_type' => $action->source_type,
+                                                'source_label' => $sourceLabel,
+                                                'target_date' => optional($action->target_date)->format('Y-m-d'),
+                                                'target_date_label' => $action->target_date?->format('M d, Y'),
+                                                'completed_at_label' => optional($action->completed_at)->format('M d, Y h:i A'),
+                                                'description' => $action->description,
+                                                'remarks' => $action->remarks,
+                                                'implementation_notes' => $action->implementation_notes,
+                                                'completion_notes' => $action->completion_notes,
+                                                'outcome_result' => $action->outcome_result,
+                                                'effectiveness_key' => $action->effectiveness ?: 'pending_evaluation',
+                                                'effectiveness' => $mitigationEffectivenessOptions[$action->effectiveness ?: 'pending_evaluation'] ?? 'Pending Evaluation',
+                                                'follow_up_required' => (bool) $action->follow_up_required,
+                                                'follow_up_notes' => $action->follow_up_notes,
+                                                'risk_area_id' => $action->risk_area_id,
+                                                'barangay_prediction_checklist_id' => $action->barangay_prediction_checklist_id,
+                                                'ai_action_plan_checklist_id' => $action->ai_action_plan_checklist_id,
+                                                'responsible_team_id' => $action->responsible_team_id,
+                                                'responsible_user_id' => $action->responsible_user_id,
+                                                'responsible_team_label' => $action->responsibleTeam?->team_name,
+                                                'responsible_user_label' => $action->responsibleUser?->full_name,
+                                                'barangay_label' => $action->barangay?->barangay_name,
+                                                'location_label' => $action->riskArea?->marker?->title,
+                                                'risk_level' => strtoupper($riskLevel),
+                                                'recommendation' => $linkedChecklist?->source_description,
+                                                'analysis_id' => $linkedAnalysis?->analysis_id,
+                                                'analysis_label' => $linkedAnalysis ? ('Analysis #' . $linkedAnalysis->analysis_id . ' · ' . ($linkedAnalysis->barangay_scope ?: 'Station scope')) : null,
+                                                'checklist_label' => $linkedChecklist?->plan_title,
+                                                'prediction_checklist_label' => null,
+                                                'source_references' => $draftSourceRefs,
+                                                'factors' => $draftFactors,
+                                                'tasks' => $draftTasks,
+                                                'tasks_done' => $action->status === 'completed' ? count($draftTasks) : collect($draftTasks)->where('status', 'followed')->count(),
+                                                'tasks_total' => count($draftTasks),
+                                                'progress_percent' => 0,
+                                                'attachments' => [],
+                                                'approval_label' => $action->approver?->full_name,
+                                                'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
+                                            ];
+                                        @endphp
+                                        <article class="card" style="padding:18px; border:1px solid rgba(226,232,240,.9);">
+                                            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:14px;">
+                                                <div style="min-width:0; flex:1 1 360px;">
+                                                    <div class="chip-row" style="margin-bottom:10px;">
+                                                        <span class="tag {{ $riskLevel === 'high' ? 'critical' : ($riskLevel === 'low' ? 'low' : 'medium') }}">{{ strtoupper($riskLevel) }} RISK</span>
+                                                        <span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span>
+                                                        <span class="tag ai_action_plan">{{ $sourceLabel }}</span>
+                                                        <span class="tag draft">DRAFT</span>
+                                                    </div>
+                                                    <div class="title">{{ $action->title }}</div>
+                                                    <div class="note">
+                                                        {{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}
+                                                        @if($action->riskArea?->marker?->title)
+                                                            · Linked marker: {{ $action->riskArea->marker->title }}
+                                                        @endif
+                                                        · Category: {{ $categoryLabel }}
+                                                    </div>
+                                                    <div class="note" style="margin-top:10px; white-space:pre-line;">{{ \Illuminate\Support\Str::limit($action->description, 360) }}</div>
+                                                    @if($linkedSuggestion?->estimated_timeline)
+                                                        <div class="note" style="margin-top:10px;"><strong>Suggested timeline:</strong> {{ $linkedSuggestion->estimated_timeline }}</div>
+                                                    @endif
+                                                    @if($action->target_date)
+                                                        <div class="note" style="margin-top:6px;"><strong>Target date:</strong> {{ optional($action->target_date)->format('M d, Y') }}</div>
+                                                    @endif
+                                                </div>
+                                                <div style="display:flex; flex-direction:column; gap:10px; min-width:220px;">
+                                                    <button
+                                                        type="button"
+                                                        class="hero-btn"
+                                                        style="width:100%; justify-content:center;"
+                                                        data-open-details-modal
+                                                        data-payload='@json($draftPayload)'>
+                                                        <i class="fa-solid fa-eye"></i><span>Review Draft</span>
+                                                    </button>
+                                                    <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary" style="width:100%; justify-content:center;">
+                                                        <i class="fa-solid fa-table-list"></i><span>Locate in Register</span>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </section>
+
                         <section class="panel">
                             <div class="panel-head">
                                 <div>
@@ -529,7 +660,7 @@
                                                     ];
                                                     $isOverdue = $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true);
                                                 @endphp
-                                                <tr>
+                                                <tr id="mitigation-row-{{ $action->mitigation_action_id }}">
                                                     <td data-label="Title">
                                                         <div class="title">{{ $action->title }}</div>
                                                         <div class="note note--clamp">{{ $action->description }}</div>
