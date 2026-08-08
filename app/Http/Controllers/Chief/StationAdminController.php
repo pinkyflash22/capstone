@@ -290,17 +290,15 @@ class StationAdminController extends Controller
     protected function mitigationCategoryOptions(): array
     {
         return [
-            'awareness' => 'Awareness Campaign',
-            'inspection' => 'Inspection / Patrol',
-            'infrastructure' => 'Infrastructure Upgrade',
-            'equipment' => 'Equipment / Supplies',
-            'policy' => 'Policy / Ordinance',
-            'training' => 'Training / Drill',
-            'emergency_access' => 'Emergency Access',
-            'hydrant_water' => 'Hydrant / Water Source',
-            'electrical' => 'Electrical Safety',
-            'housekeeping' => 'Housekeeping / Waste',
-            'community_response' => 'Community Response',
+            'electrical_safety' => 'Electrical Safety',
+            'water_supply' => 'Water Supply',
+            'response_readiness' => 'Response Readiness',
+            'access_routing' => 'Access & Routing',
+            'inspection_enforcement' => 'Inspection & Enforcement',
+            'community_prevention' => 'Community Prevention',
+            'evacuation_life_safety' => 'Evacuation & Life Safety',
+            'high_risk_area_monitoring' => 'High-Risk Area Monitoring',
+            'environmental_preparedness' => 'Environmental Preparedness',
             'other' => 'Other',
         ];
     }
@@ -318,11 +316,41 @@ class StationAdminController extends Controller
     protected function mitigationStatusOptions(): array
     {
         return [
+            'draft' => 'Draft',
             'planned' => 'Planned',
+            'approved' => 'Approved',
             'in_progress' => 'In Progress',
-            'blocked' => 'Blocked',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
+        ];
+    }
+
+    protected function mitigationStatusLabels(): array
+    {
+        return $this->mitigationStatusOptions() + [
+            'blocked' => 'Blocked',
+        ];
+    }
+
+    protected function mitigationEffectivenessOptions(): array
+    {
+        return [
+            'pending_evaluation' => 'Pending Evaluation',
+            'effective' => 'Effective',
+            'partially_effective' => 'Partially Effective',
+            'ineffective' => 'Ineffective',
+        ];
+    }
+
+    protected function mitigationSourceOptions(): array
+    {
+        return [
+            'ai_action_plan' => 'AI Action Plan',
+            'ai_recommendation' => 'AI Recommendation',
+            'prediction' => 'Prediction',
+            'hazard_report' => 'Hazard Report',
+            'incident_review' => 'Incident Review',
+            'manual' => 'Manual',
         ];
     }
 
@@ -333,13 +361,22 @@ class StationAdminController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', Rule::in(array_keys($this->mitigationCategoryOptions()))],
             'priority_level' => ['required', Rule::in(array_keys($this->mitigationPriorityOptions()))],
-            'status' => ['required', Rule::in(array_keys($this->mitigationStatusOptions()))],
+            'status' => ['required', Rule::in(array_keys($this->mitigationStatusLabels()))],
+            'source_type' => ['nullable', Rule::in(array_keys($this->mitigationSourceOptions()))],
             'description' => ['required', 'string', 'max:3000'],
             'remarks' => ['nullable', 'string', 'max:2000'],
+            'implementation_notes' => ['nullable', 'string', 'max:3000'],
+            'completion_notes' => ['nullable', 'string', 'max:3000'],
+            'outcome_result' => ['nullable', 'string', 'max:3000'],
+            'effectiveness' => ['nullable', Rule::in(array_keys($this->mitigationEffectivenessOptions()))],
+            'follow_up_required' => ['nullable', 'boolean'],
+            'follow_up_notes' => ['nullable', 'string', 'max:3000'],
             'target_date' => ['nullable', 'date'],
             'risk_area_id' => ['nullable', 'integer'],
             'barangay_prediction_checklist_id' => ['nullable', 'integer'],
             'ai_action_plan_checklist_id' => ['nullable', 'integer'],
+            'responsible_team_id' => ['nullable', 'integer'],
+            'responsible_user_id' => ['nullable', 'integer'],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx', 'max:10240'],
         ];
@@ -405,10 +442,150 @@ class StationAdminController extends Controller
         ];
     }
 
+    protected function validateMitigationAssignments(array $validated, ?int $stationId): array
+    {
+        $teamId = ! empty($validated['responsible_team_id']) ? (int) $validated['responsible_team_id'] : null;
+        $userId = ! empty($validated['responsible_user_id']) ? (int) $validated['responsible_user_id'] : null;
+
+        if ($teamId && $stationId) {
+            $teamExists = $this->getTeamsForStation($stationId)
+                ->where('team_id', $teamId)
+                ->exists();
+
+            if (! $teamExists) {
+                throw ValidationException::withMessages([
+                    'responsible_team_id' => 'Select a response team that belongs to your station.',
+                ]);
+            }
+        }
+
+        if ($userId && $stationId) {
+            $userExists = StationOfficer::query()
+                ->where('station_id', $stationId)
+                ->where('user_id', $userId)
+                ->exists();
+
+            if (! $userExists) {
+                throw ValidationException::withMessages([
+                    'responsible_user_id' => 'Select a station officer assigned to your station.',
+                ]);
+            }
+        }
+
+        return [
+            'responsible_team_id' => $teamId,
+            'responsible_user_id' => $userId,
+        ];
+    }
+
+    protected function normalizeMitigationCategory(?string $value): string
+    {
+        $value = trim((string) $value);
+        if ($value !== '' && array_key_exists($value, $this->mitigationCategoryOptions())) {
+            return $value;
+        }
+
+        return match ($value) {
+            'electrical' => 'electrical_safety',
+            'hydrant_water' => 'water_supply',
+            'equipment', 'training', 'community_response' => 'response_readiness',
+            'emergency_access' => 'access_routing',
+            'inspection', 'policy' => 'inspection_enforcement',
+            'awareness', 'housekeeping' => 'community_prevention',
+            'infrastructure' => 'environmental_preparedness',
+            default => 'other',
+        };
+    }
+
+    protected function mitigationCategoryFilterAliases(string $value): array
+    {
+        return match ($value) {
+            'electrical_safety' => ['electrical_safety', 'electrical'],
+            'water_supply' => ['water_supply', 'hydrant_water'],
+            'response_readiness' => ['response_readiness', 'equipment', 'training', 'community_response'],
+            'access_routing' => ['access_routing', 'emergency_access'],
+            'inspection_enforcement' => ['inspection_enforcement', 'inspection', 'policy'],
+            'community_prevention' => ['community_prevention', 'awareness', 'housekeeping'],
+            'environmental_preparedness' => ['environmental_preparedness', 'infrastructure'],
+            default => [$value],
+        };
+    }
+
+    protected function resolveMitigationSourceType(array $attributes): string
+    {
+        if (! empty($attributes['ai_action_plan_checklist_id'])) {
+            return 'ai_action_plan';
+        }
+
+        if (! empty($attributes['barangay_prediction_checklist_id'])) {
+            return 'prediction';
+        }
+
+        if (! empty($attributes['risk_area_id'])) {
+            return 'hazard_report';
+        }
+
+        return $attributes['source_type'] ?? 'manual';
+    }
+
+    protected function getMitigationSourceLabel(?string $sourceType): string
+    {
+        return $this->mitigationSourceOptions()[$sourceType ?: 'manual'] ?? ucfirst(str_replace('_', ' ', (string) $sourceType));
+    }
+
+    protected function getMitigationStatusLabel(?string $status): string
+    {
+        return $this->mitigationStatusLabels()[$status ?: 'draft'] ?? ucfirst(str_replace('_', ' ', (string) $status));
+    }
+
+    protected function buildMitigationProgressSnapshot(MitigationAction $action): array
+    {
+        $items = collect($action->aiActionPlanChecklist?->items ?? []);
+        $totalTasks = $items->count();
+        $completedTasks = $items->where('status', 'followed')->count();
+
+        if ($action->status === 'completed' && $totalTasks > 0) {
+            $completedTasks = $totalTasks;
+        }
+
+        $percent = match ($action->status) {
+            'draft' => 0,
+            'planned' => 15,
+            'approved' => 30,
+            'in_progress' => $totalTasks > 0 ? (int) round(($completedTasks / max(1, $totalTasks)) * 100) : 55,
+            'completed' => 100,
+            'cancelled' => 0,
+            'blocked' => $totalTasks > 0 ? (int) round(($completedTasks / max(1, $totalTasks)) * 100) : 40,
+            default => $totalTasks > 0 ? (int) round(($completedTasks / max(1, $totalTasks)) * 100) : 0,
+        };
+
+        if ($totalTasks > 0 && $percent === 0 && in_array($action->status, ['planned', 'approved'], true)) {
+            $percent = $action->status === 'approved' ? 30 : 15;
+        }
+
+        return [
+            'completed_tasks' => $completedTasks,
+            'total_tasks' => $totalTasks,
+            'percent' => min(100, max(0, $percent)),
+        ];
+    }
+
     protected function resolveManagedMitigationAction(int $mitigationActionId, array $allowedBarangayIds): MitigationAction
     {
         return MitigationAction::query()
-            ->with(['barangay.city', 'attachments', 'riskArea.marker', 'checklist', 'aiActionPlanChecklist', 'creator'])
+            ->with([
+                'barangay.city',
+                'attachments',
+                'riskArea.marker',
+                'checklist',
+                'aiActionPlanChecklist.analysis',
+                'aiActionPlanChecklist.suggestions',
+                'aiActionPlanChecklist.items',
+                'creator',
+                'responsibleTeam',
+                'responsibleUser',
+                'approver',
+            ])
             ->whereIn('barangay_id', $allowedBarangayIds)
             ->findOrFail($mitigationActionId);
     }
@@ -472,12 +649,21 @@ class StationAdminController extends Controller
             'title' => $checklist->plan_title,
             'category' => $this->inferMitigationCategoryFromChecklist($checklist),
             'priority_level' => $checklist->priority_level ?: 'medium',
-            'status' => 'planned',
+            'status' => 'draft',
+            'source_type' => 'ai_action_plan',
             'target_date' => optional($checklist->target_date)->format('Y-m-d'),
             'description' => implode("\n\n", $descriptionParts),
             'remarks' => $firstSuggestion?->estimated_timeline
                 ? 'Drafted from AI action-plan checklist. Timeline suggestion: ' . $firstSuggestion->estimated_timeline
                 : 'Drafted from AI action-plan checklist.',
+            'implementation_notes' => null,
+            'completion_notes' => null,
+            'outcome_result' => null,
+            'effectiveness' => 'pending_evaluation',
+            'follow_up_required' => false,
+            'follow_up_notes' => null,
+            'responsible_team_id' => null,
+            'responsible_user_id' => null,
             'risk_area_id' => $checklist->risk_area_id,
             'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
             'source_title' => $checklist->source_title,
@@ -502,15 +688,17 @@ class StationAdminController extends Controller
         ]))));
 
         return match (true) {
-            str_contains($haystack, 'inspect') || str_contains($haystack, 'inspection') => 'inspection',
-            str_contains($haystack, 'awareness') || str_contains($haystack, 'brief') || str_contains($haystack, 'campaign') => 'awareness',
-            str_contains($haystack, 'route') || str_contains($haystack, 'access') || str_contains($haystack, 'dispatch') => 'emergency_access',
-            str_contains($haystack, 'hydrant') || str_contains($haystack, 'water') => 'hydrant_water',
-            str_contains($haystack, 'equipment') => 'equipment',
-            str_contains($haystack, 'electrical') || str_contains($haystack, 'wiring') => 'electrical',
-            str_contains($haystack, 'waste') || str_contains($haystack, 'housekeeping') || str_contains($haystack, 'combustible') => 'housekeeping',
-            str_contains($haystack, 'community') || str_contains($haystack, 'resident') || str_contains($haystack, 'volunteer') => 'community_response',
-            str_contains($haystack, 'training') || str_contains($haystack, 'drill') => 'training',
+            str_contains($haystack, 'inspect') || str_contains($haystack, 'inspection') || str_contains($haystack, 'enforcement') => 'inspection_enforcement',
+            str_contains($haystack, 'awareness') || str_contains($haystack, 'brief') || str_contains($haystack, 'campaign') => 'community_prevention',
+            str_contains($haystack, 'route') || str_contains($haystack, 'access') || str_contains($haystack, 'dispatch') => 'access_routing',
+            str_contains($haystack, 'hydrant') || str_contains($haystack, 'water') => 'water_supply',
+            str_contains($haystack, 'electrical') || str_contains($haystack, 'wiring') => 'electrical_safety',
+            str_contains($haystack, 'waste') || str_contains($haystack, 'housekeeping') || str_contains($haystack, 'combustible') => 'community_prevention',
+            str_contains($haystack, 'community') || str_contains($haystack, 'resident') || str_contains($haystack, 'volunteer') => 'community_prevention',
+            str_contains($haystack, 'training') || str_contains($haystack, 'drill') || str_contains($haystack, 'readiness') => 'response_readiness',
+            str_contains($haystack, 'evacu') || str_contains($haystack, 'life safety') => 'evacuation_life_safety',
+            str_contains($haystack, 'monitor') || str_contains($haystack, 'surveillance') => 'high_risk_area_monitoring',
+            str_contains($haystack, 'rain') || str_contains($haystack, 'weather') || str_contains($haystack, 'environment') => 'environmental_preparedness',
             default => 'other',
         };
     }
@@ -635,15 +823,15 @@ class StationAdminController extends Controller
         $entryType = Str::lower((string) ($predictedArea['primary_entry_type'] ?? 'risk'));
 
         return match (true) {
-            $factors->contains('blocked_hydrant') => 'hydrant_water',
-            $factors->contains('poor_access') => 'emergency_access',
-            str_contains($condition, 'electrical') || str_contains($condition, 'wiring') => 'electrical',
-            str_contains($condition, 'gas') || str_contains($condition, 'lpg') => 'inspection',
-            $factors->contains('combustible_materials_present') || $factors->contains('poor_waste_disposal') => 'housekeeping',
-            $factors->contains('informal_settlement') || $factors->contains('previous_fire_prone_location') => 'awareness',
-            $factors->contains('cooking_fire_prone_activity') => 'awareness',
-            $entryType === 'hazard' => 'inspection',
-            default => 'inspection',
+            $factors->contains('blocked_hydrant') => 'water_supply',
+            $factors->contains('poor_access') => 'access_routing',
+            str_contains($condition, 'electrical') || str_contains($condition, 'wiring') => 'electrical_safety',
+            str_contains($condition, 'gas') || str_contains($condition, 'lpg') => 'inspection_enforcement',
+            $factors->contains('combustible_materials_present') || $factors->contains('poor_waste_disposal') => 'community_prevention',
+            $factors->contains('informal_settlement') || $factors->contains('previous_fire_prone_location') => 'high_risk_area_monitoring',
+            $factors->contains('cooking_fire_prone_activity') => 'community_prevention',
+            $entryType === 'hazard' => 'inspection_enforcement',
+            default => 'high_risk_area_monitoring',
         };
     }
 
@@ -654,13 +842,15 @@ class StationAdminController extends Controller
             ?: ($predictedArea['name'] ?? 'risk zone');
         $barangayName = collect($predictedArea['barangay_names'] ?? [])->first() ?: 'the affected barangay';
         $actionLabel = match ($category) {
-            'hydrant_water' => 'Restore hydrant and water access',
-            'emergency_access' => 'Clear emergency access routes',
-            'electrical' => 'Correct electrical fire hazards',
-            'housekeeping' => 'Reduce combustible and waste buildup',
-            'awareness' => 'Run focused fire-safety awareness',
-            'training' => 'Prepare targeted response drill',
-            'community_response' => 'Strengthen community response readiness',
+            'water_supply' => 'Restore hydrant and water access',
+            'access_routing' => 'Clear emergency access routes',
+            'electrical_safety' => 'Correct electrical fire hazards',
+            'community_prevention' => 'Run focused community prevention work',
+            'response_readiness' => 'Prepare targeted response readiness action',
+            'evacuation_life_safety' => 'Improve evacuation and life-safety readiness',
+            'high_risk_area_monitoring' => 'Monitor and reduce high-risk area exposure',
+            'environmental_preparedness' => 'Strengthen environmental fire preparedness',
+            'inspection_enforcement' => 'Inspect and enforce fire-safety compliance',
             default => 'Inspect and mitigate high-risk condition',
         };
 
@@ -675,33 +865,41 @@ class StationAdminController extends Controller
         ];
 
         $categoryItems = match ($category) {
-            'hydrant_water' => [
+            'water_supply' => [
                 'Inspect the nearby hydrant or alternate water source and clear any blockage or access issue.',
                 'Coordinate with barangay or utility partners if repair, access control, or water restoration is required.',
             ],
-            'emergency_access' => [
+            'access_routing' => [
                 'Survey roads, alleys, or obstructions limiting fire truck access within the predicted zone.',
                 'Coordinate clearing, signage, or temporary access control with local responders and barangay officials.',
             ],
-            'electrical' => [
+            'electrical_safety' => [
                 'Conduct focused inspection on exposed wiring, overloaded outlets, or illegal connections in the affected area.',
                 'Advise occupants or property managers on immediate electrical corrections and document compliance.',
             ],
-            'housekeeping' => [
+            'community_prevention' => [
                 'Remove or isolate combustible waste, improper storage, or flammable buildup contributing to the risk zone.',
                 'Coordinate recurring cleanup and follow-up inspection with barangay personnel or property occupants.',
             ],
-            'awareness' => [
-                'Conduct a short awareness briefing for residents or occupants inside the predicted risk zone.',
-                'Distribute fire prevention reminders focused on the specific conditions driving this recommendation.',
-            ],
-            'training' => [
+            'response_readiness' => [
                 'Schedule a targeted drill or readiness activity for the responding team assigned to this risk pattern.',
                 'Review resource gaps or staging needs identified from the current predicted risk context.',
             ],
-            'community_response' => [
-                'Coordinate local volunteers or barangay responders for early reporting and initial fire-safety support.',
-                'Confirm contact pathways and escalation steps for incidents emerging from this risk zone.',
+            'inspection_enforcement' => [
+                'Perform a focused inspection and document the code, hazard, or occupancy conditions driving the risk.',
+                'Coordinate notices, enforcement reminders, or corrective actions with the responsible occupants or barangay.',
+            ],
+            'evacuation_life_safety' => [
+                'Review evacuation paths, assembly points, and life-safety readiness around the affected area.',
+                'Coordinate signage, drills, or occupant reminders that improve safe evacuation behavior.',
+            ],
+            'high_risk_area_monitoring' => [
+                'Set a short-term monitoring cadence for the hotspot and verify whether the same drivers remain active.',
+                'Coordinate barangay reporting and rapid follow-up if the risk cluster intensifies or spreads.',
+            ],
+            'environmental_preparedness' => [
+                'Review weather-driven or environmental conditions contributing to the forecast and prepare preventive actions.',
+                'Coordinate seasonal readiness measures for dry conditions, vegetation, wind, or similar local factors.',
             ],
             default => [
                 'Perform a focused site inspection and validate the dominant factors contributing to the predicted zone.',
@@ -856,8 +1054,13 @@ class StationAdminController extends Controller
             return;
         }
 
-        if (in_array($action->status, ['planned', 'in_progress', 'blocked'], true) && $checklist->status === 'pending') {
+        if (in_array($action->status, ['approved', 'in_progress', 'blocked'], true) && $checklist->status === 'pending') {
             $checklist->update(['status' => 'in_progress']);
+            return;
+        }
+
+        if (in_array($action->status, ['draft', 'planned'], true) && $checklist->status === 'in_progress') {
+            $checklist->update(['status' => 'pending']);
         }
     }
 
@@ -1323,6 +1526,14 @@ class StationAdminController extends Controller
             $stationId = $stationOfficer?->station_id;
             $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
             $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
+            $filters = [
+                'barangay_id' => request()->integer('barangay_id') ?: null,
+                'category' => request()->string('category')->toString() ?: null,
+                'priority_level' => request()->string('priority_level')->toString() ?: null,
+                'status' => request()->string('status')->toString() ?: null,
+                'responsible_team_id' => request()->integer('responsible_team_id') ?: null,
+                'source_type' => request()->string('source_type')->toString() ?: null,
+            ];
 
             try {
                 $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
@@ -1333,35 +1544,89 @@ class StationAdminController extends Controller
                 ]);
             }
 
-            $mitigationActions = MitigationAction::query()
+            $mitigationBaseQuery = MitigationAction::query()
                 ->select([
                     'mitigation_action_id',
                     'barangay_id',
                     'risk_area_id',
                     'barangay_prediction_checklist_id',
                     'ai_action_plan_checklist_id',
+                    'responsible_team_id',
+                    'responsible_user_id',
                     'title',
                     'category',
                     'priority_level',
                     'status',
+                    'source_type',
                     'target_date',
+                    'completed_at',
                     'description',
                     'remarks',
+                    'implementation_notes',
+                    'completion_notes',
+                    'outcome_result',
+                    'effectiveness',
+                    'follow_up_required',
+                    'follow_up_notes',
                     'created_by',
+                    'approved_by',
+                    'approved_at',
+                    'reviewed_by',
+                    'reviewed_at',
                     'created_at',
                 ])
                 ->with([
                     'barangay:barangay_id,barangay_name,city_id',
                     'barangay.city:city_id,city_name',
-                    'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
+                    'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name,attachment_type',
                     'riskArea:risk_area_id,barangay_hall_id,marker_id',
                     'riskArea.marker:marker_id,title',
                     'checklist:barangay_prediction_checklist_id,title',
-                    'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
+                    'aiActionPlanChecklist:ai_action_plan_checklist_id,analysis_id,plan_title,plan_description,priority_level,source_title,source_description,risk_area_id,ai_payload',
+                    'aiActionPlanChecklist.analysis:analysis_id,station_id,barangay_scope,scope_level,risk_level,confidence_score,predictions,contributing_factors,recommendations,created_at',
+                    'aiActionPlanChecklist.suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description,steps,resources_needed,estimated_timeline',
+                    'aiActionPlanChecklist.items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order',
                     'creator:user_id,first_name,middle_name,last_name',
+                    'responsibleTeam:team_id',
+                    'responsibleUser:user_id,first_name,middle_name,last_name',
+                    'approver:user_id,first_name,middle_name,last_name',
                 ])
-                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
-                ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds));
+
+            if (empty($barangayIds)) {
+                $mitigationBaseQuery->whereRaw('1 = 0');
+            }
+
+            $summaryActions = (clone $mitigationBaseQuery)
+                ->get()
+                ->each(function (MitigationAction $action) {
+                    $action->category = $this->normalizeMitigationCategory($action->category);
+                    $action->source_type = $this->resolveMitigationSourceType($action->toArray());
+                });
+
+            $mitigationActions = (clone $mitigationBaseQuery)
+                ->when($filters['barangay_id'], fn ($query, $value) => $query->where('barangay_id', $value))
+                ->when($filters['category'], function ($query, $value) {
+                    $query->whereIn('category', $this->mitigationCategoryFilterAliases($value));
+                })
+                ->when($filters['priority_level'], fn ($query, $value) => $query->where('priority_level', $value))
+                ->when($filters['status'], fn ($query, $value) => $query->where('status', $value))
+                ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
+                ->when($filters['source_type'], function ($query, $value) {
+                    match ($value) {
+                        'ai_action_plan' => $query->whereNotNull('ai_action_plan_checklist_id'),
+                        'prediction' => $query->whereNotNull('barangay_prediction_checklist_id')->whereNull('ai_action_plan_checklist_id'),
+                        'hazard_report' => $query->whereNotNull('risk_area_id')->whereNull('barangay_prediction_checklist_id')->whereNull('ai_action_plan_checklist_id'),
+                        'manual' => $query
+                            ->whereNull('risk_area_id')
+                            ->whereNull('barangay_prediction_checklist_id')
+                            ->whereNull('ai_action_plan_checklist_id')
+                            ->where(function ($sourceQuery) {
+                                $sourceQuery->whereNull('source_type')->orWhere('source_type', 'manual');
+                            }),
+                        default => $query->where('source_type', $value),
+                    };
+                })
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1
@@ -1373,17 +1638,41 @@ class StationAdminController extends Controller
                 ")
                 ->orderByRaw("
                     CASE status
-                        WHEN 'in_progress' THEN 1
+                        WHEN 'draft' THEN 1
                         WHEN 'planned' THEN 2
-                        WHEN 'blocked' THEN 3
-                        WHEN 'completed' THEN 4
-                        WHEN 'cancelled' THEN 5
-                        ELSE 6
+                        WHEN 'approved' THEN 3
+                        WHEN 'in_progress' THEN 4
+                        WHEN 'blocked' THEN 5
+                        WHEN 'completed' THEN 6
+                        WHEN 'cancelled' THEN 7
+                        ELSE 8
+                    END
+                ")
+                ->orderByRaw("
+                    CASE
+                        WHEN target_date IS NULL THEN 2
+                        WHEN target_date < CURRENT_DATE AND status NOT IN ('completed', 'cancelled') THEN 1
+                        ELSE 3
                     END
                 ")
                 ->orderBy('target_date')
                 ->orderByDesc('created_at')
-                ->get();
+                ->get()
+                ->each(function (MitigationAction $action) {
+                    $action->category = $this->normalizeMitigationCategory($action->category);
+                    $action->source_type = $this->resolveMitigationSourceType($action->toArray());
+                });
+
+            $summaryCounts = [
+                'total' => $summaryActions->count(),
+                'awaiting_approval' => $summaryActions->whereIn('status', ['draft', 'planned'])->count(),
+                'in_progress' => $summaryActions->whereIn('status', ['approved', 'in_progress', 'blocked'])->count(),
+                'overdue' => $summaryActions
+                    ->filter(fn (MitigationAction $action) => $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true))
+                    ->count(),
+                'high_priority' => $summaryActions->whereIn('priority_level', ['critical', 'high'])->count(),
+                'completed' => $summaryActions->where('status', 'completed')->count(),
+            ];
 
             $riskAreas = RiskArea::query()
                 ->select(['risk_area_id', 'barangay_hall_id', 'marker_id'])
@@ -1429,11 +1718,29 @@ class StationAdminController extends Controller
                 ->orderBy('target_date')
                 ->get();
 
-            $aiActionPlanOptions = DB::table('ai_action_plan_checklists')
+            $aiActionPlanOptions = AiActionPlanChecklist::query()
+                ->with([
+                    'analysis:analysis_id,barangay_scope,scope_level,risk_level,created_at',
+                    'suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description',
+                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order',
+                ])
                 ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
                 ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
                 ->orderByDesc('created_at')
-                ->get(['ai_action_plan_checklist_id', 'barangay_id', 'plan_title', 'priority_level', 'status']);
+                ->get([
+                    'ai_action_plan_checklist_id',
+                    'analysis_id',
+                    'barangay_id',
+                    'risk_area_id',
+                    'plan_title',
+                    'plan_description',
+                    'priority_level',
+                    'status',
+                    'source_title',
+                    'source_description',
+                    'ai_payload',
+                    'created_at',
+                ]);
 
             $generatedMitigationDrafts = AiActionPlanChecklist::query()
                 ->with([
@@ -1461,9 +1768,25 @@ class StationAdminController extends Controller
                 ? $this->buildMitigationDraftFromActionPlanChecklist($draftActionPlanChecklistId, $barangayIds)
                 : null;
 
+            $stationTeams = $this->getTeamsForStation($stationId)
+                ->orderBy('team_id')
+                ->get(['team_id']);
+
+            $stationUsers = StationOfficer::query()
+                ->with(['user:user_id,first_name,middle_name,last_name'])
+                ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+                ->when(! $stationId, fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderBy('rank')
+                ->get()
+                ->pluck('user')
+                ->filter()
+                ->unique('user_id')
+                ->values();
+
             return view('chief.mitigations', [
                 'managedBarangays' => $managedBarangays,
                 'mitigationActions' => $mitigationActions,
+                'mitigationSummaryCounts' => $summaryCounts,
                 'riskAreas' => $riskAreas,
                 'predictionChecklists' => $predictionChecklists,
                 'aiActionPlanOptions' => $aiActionPlanOptions,
@@ -1473,6 +1796,12 @@ class StationAdminController extends Controller
                 'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
                 'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
                 'mitigationStatusOptions' => $this->mitigationStatusOptions(),
+                'mitigationStatusLabels' => $this->mitigationStatusLabels(),
+                'mitigationEffectivenessOptions' => $this->mitigationEffectivenessOptions(),
+                'mitigationSourceOptions' => $this->mitigationSourceOptions(),
+                'stationTeams' => $stationTeams,
+                'stationUsers' => $stationUsers,
+                'filters' => $filters,
             ]);
         } catch (\Throwable $e) {
             Log::error('Mitigation page load failed.', [
@@ -1483,6 +1812,14 @@ class StationAdminController extends Controller
             return view('chief.mitigations', [
                 'managedBarangays' => collect(),
                 'mitigationActions' => collect(),
+                'mitigationSummaryCounts' => [
+                    'total' => 0,
+                    'awaiting_approval' => 0,
+                    'in_progress' => 0,
+                    'overdue' => 0,
+                    'high_priority' => 0,
+                    'completed' => 0,
+                ],
                 'riskAreas' => collect(),
                 'predictionChecklists' => collect(),
                 'aiActionPlanOptions' => collect(),
@@ -1492,6 +1829,12 @@ class StationAdminController extends Controller
                 'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
                 'mitigationPriorityOptions' => $this->mitigationPriorityOptions(),
                 'mitigationStatusOptions' => $this->mitigationStatusOptions(),
+                'mitigationStatusLabels' => $this->mitigationStatusLabels(),
+                'mitigationEffectivenessOptions' => $this->mitigationEffectivenessOptions(),
+                'mitigationSourceOptions' => $this->mitigationSourceOptions(),
+                'stationTeams' => collect(),
+                'stationUsers' => collect(),
+                'filters' => [],
             ])->withErrors([
                 'mitigations' => 'Mitigation data could not be loaded right now. The page was opened in safe mode instead of returning a server error.',
             ]);
@@ -1529,14 +1872,23 @@ class StationAdminController extends Controller
                 'risk_area_id' => $draft['risk_area_id'] ?? null,
                 'barangay_prediction_checklist_id' => $draft['barangay_prediction_checklist_id'] ?? null,
                 'ai_action_plan_checklist_id' => $draft['ai_action_plan_checklist_id'] ?? null,
+                'responsible_team_id' => $draft['responsible_team_id'] ?? null,
+                'responsible_user_id' => $draft['responsible_user_id'] ?? null,
                 'title' => $draft['title'],
-                'category' => $draft['category'],
+                'category' => $this->normalizeMitigationCategory($draft['category'] ?? null),
                 'priority_level' => $draft['priority_level'],
                 'status' => 'planned',
+                'source_type' => $this->resolveMitigationSourceType($draft),
                 'target_date' => $draft['target_date'] ?? null,
                 'completed_at' => null,
                 'description' => $draft['description'],
                 'remarks' => $draft['remarks'] ?? null,
+                'implementation_notes' => $draft['implementation_notes'] ?? null,
+                'completion_notes' => $draft['completion_notes'] ?? null,
+                'outcome_result' => $draft['outcome_result'] ?? null,
+                'effectiveness' => $draft['effectiveness'] ?? 'pending_evaluation',
+                'follow_up_required' => (bool) ($draft['follow_up_required'] ?? false),
+                'follow_up_notes' => $draft['follow_up_notes'] ?? null,
                 'created_by' => Auth::user()?->user_id,
             ]);
 
@@ -1573,23 +1925,38 @@ class StationAdminController extends Controller
             ->pluck('barangay_id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
+        $assignmentIds = $this->validateMitigationAssignments($validated, $stationId);
+        $status = $validated['status'];
+        $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
-        DB::transaction(function () use ($validated, $linkedIds, $request) {
+        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $request) {
             $action = MitigationAction::create([
                 'barangay_id' => $linkedIds['barangay_id'],
                 'risk_area_id' => $linkedIds['risk_area_id'],
                 'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
                 'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
+                'responsible_team_id' => $assignmentIds['responsible_team_id'],
+                'responsible_user_id' => $assignmentIds['responsible_user_id'],
                 'title' => $validated['title'],
-                'category' => $validated['category'],
+                'category' => $this->normalizeMitigationCategory($validated['category']),
                 'priority_level' => $validated['priority_level'],
-                'status' => $validated['status'],
+                'status' => $status,
+                'source_type' => $sourceType,
                 'target_date' => $validated['target_date'] ?? null,
-                'completed_at' => ($validated['status'] ?? null) === 'completed' ? now() : null,
+                'completed_at' => $status === 'completed' ? now() : null,
                 'description' => $validated['description'],
                 'remarks' => $validated['remarks'] ?? null,
+                'implementation_notes' => $validated['implementation_notes'] ?? null,
+                'completion_notes' => $validated['completion_notes'] ?? null,
+                'outcome_result' => $validated['outcome_result'] ?? null,
+                'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_notes' => $validated['follow_up_notes'] ?? null,
                 'created_by' => Auth::user()?->user_id,
+                'approved_by' => in_array($status, ['approved', 'in_progress', 'completed'], true) ? Auth::user()?->user_id : null,
+                'approved_at' => in_array($status, ['approved', 'in_progress', 'completed'], true) ? now() : null,
             ]);
 
             $this->storeMitigationAttachments($action, $request);
@@ -1608,25 +1975,43 @@ class StationAdminController extends Controller
             ->pluck('barangay_id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
         $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
+        $assignmentIds = $this->validateMitigationAssignments($validated, $stationId);
+        $status = $validated['status'];
+        $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
-        DB::transaction(function () use ($validated, $linkedIds, $action, $request) {
+        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $action, $request) {
+            $approvalTriggered = in_array($status, ['approved', 'in_progress', 'completed'], true)
+                && ! $action->approved_at;
+
             $action->update([
                 'barangay_id' => $linkedIds['barangay_id'],
                 'risk_area_id' => $linkedIds['risk_area_id'],
                 'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
                 'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
+                'responsible_team_id' => $assignmentIds['responsible_team_id'],
+                'responsible_user_id' => $assignmentIds['responsible_user_id'],
                 'title' => $validated['title'],
-                'category' => $validated['category'],
+                'category' => $this->normalizeMitigationCategory($validated['category']),
                 'priority_level' => $validated['priority_level'],
-                'status' => $validated['status'],
+                'status' => $status,
+                'source_type' => $sourceType,
                 'target_date' => $validated['target_date'] ?? null,
-                'completed_at' => ($validated['status'] ?? null) === 'completed'
+                'completed_at' => $status === 'completed'
                     ? ($action->completed_at ?? now())
                     : null,
                 'description' => $validated['description'],
                 'remarks' => $validated['remarks'] ?? null,
+                'implementation_notes' => $validated['implementation_notes'] ?? null,
+                'completion_notes' => $validated['completion_notes'] ?? null,
+                'outcome_result' => $validated['outcome_result'] ?? null,
+                'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+                'approved_by' => $approvalTriggered ? Auth::user()?->user_id : $action->approved_by,
+                'approved_at' => $approvalTriggered ? now() : $action->approved_at,
                 'reviewed_by' => Auth::user()?->user_id,
                 'reviewed_at' => now(),
             ]);

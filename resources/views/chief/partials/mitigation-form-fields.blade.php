@@ -48,8 +48,8 @@
 <div class="mitigation-field">
     <label for="stationMitigationStatus">Status</label>
     <select id="stationMitigationStatus" name="status" required>
-        @foreach($mitigationStatusOptions as $value => $label)
-            <option value="{{ $value }}" @selected(old('status', $draft['status'] ?? 'planned') === $value)>{{ $label }}</option>
+        @foreach(($mitigationStatusLabels ?? $mitigationStatusOptions) as $value => $label)
+            <option value="{{ $value }}" @selected(old('status', $draft['status'] ?? 'draft') === $value)>{{ $label }}</option>
         @endforeach
     </select>
 </div>
@@ -57,6 +57,39 @@
 <div class="mitigation-field">
     <label for="stationMitigationTargetDate">Target Date</label>
     <input id="stationMitigationTargetDate" name="target_date" type="date" value="{{ old('target_date', $draft['target_date'] ?? '') }}">
+</div>
+
+<div class="mitigation-field">
+    <label for="stationMitigationResponsibleTeam">Responsible Team</label>
+    <select id="stationMitigationResponsibleTeam" name="responsible_team_id">
+        <option value="">Not assigned</option>
+        @foreach(($stationTeams ?? collect()) as $team)
+            <option value="{{ $team->team_id }}" @selected((string) old('responsible_team_id', $draft['responsible_team_id'] ?? '') === (string) $team->team_id)>
+                {{ $team->team_name ?? ('Team #' . $team->team_id) }}
+            </option>
+        @endforeach
+    </select>
+</div>
+
+<div class="mitigation-field">
+    <label for="stationMitigationResponsibleUser">Responsible Person</label>
+    <select id="stationMitigationResponsibleUser" name="responsible_user_id">
+        <option value="">Not assigned</option>
+        @foreach(($stationUsers ?? collect()) as $stationUser)
+            <option value="{{ $stationUser->user_id }}" @selected((string) old('responsible_user_id', $draft['responsible_user_id'] ?? '') === (string) $stationUser->user_id)>
+                {{ $stationUser->full_name }}
+            </option>
+        @endforeach
+    </select>
+</div>
+
+<div class="mitigation-field">
+    <label for="stationMitigationSource">Source</label>
+    <select id="stationMitigationSource" name="source_type">
+        @foreach(($mitigationSourceOptions ?? []) as $value => $label)
+            <option value="{{ $value }}" @selected(old('source_type', $draft['source_type'] ?? 'manual') === $value)>{{ $label }}</option>
+        @endforeach
+    </select>
 </div>
 
 <div class="mitigation-field">
@@ -96,13 +129,50 @@
 </div>
 
 <div class="mitigation-field mitigation-field--full">
-    <label for="stationMitigationDescription">Description / Mitigation Plan</label>
+    <label for="stationMitigationDescription">Objective / Mitigation Plan</label>
     <textarea id="stationMitigationDescription" name="description" required>{{ old('description', $draft['description'] ?? '') }}</textarea>
 </div>
 
 <div class="mitigation-field mitigation-field--full">
-    <label for="stationMitigationRemarks">Remarks</label>
+    <label for="stationMitigationRemarks">Planning Remarks</label>
     <textarea id="stationMitigationRemarks" name="remarks">{{ old('remarks', $draft['remarks'] ?? '') }}</textarea>
+</div>
+
+<div class="mitigation-field mitigation-field--full">
+    <label for="stationMitigationImplementationNotes">Implementation Updates</label>
+    <textarea id="stationMitigationImplementationNotes" name="implementation_notes">{{ old('implementation_notes', $draft['implementation_notes'] ?? '') }}</textarea>
+</div>
+
+<div class="mitigation-field mitigation-field--full">
+    <label for="stationMitigationCompletionNotes">Completion Notes</label>
+    <textarea id="stationMitigationCompletionNotes" name="completion_notes">{{ old('completion_notes', $draft['completion_notes'] ?? '') }}</textarea>
+</div>
+
+<div class="mitigation-field mitigation-field--full">
+    <label for="stationMitigationOutcome">Outcome / Result</label>
+    <textarea id="stationMitigationOutcome" name="outcome_result">{{ old('outcome_result', $draft['outcome_result'] ?? '') }}</textarea>
+</div>
+
+<div class="mitigation-field">
+    <label for="stationMitigationEffectiveness">Effectiveness</label>
+    <select id="stationMitigationEffectiveness" name="effectiveness">
+        @foreach(($mitigationEffectivenessOptions ?? []) as $value => $label)
+            <option value="{{ $value }}" @selected(old('effectiveness', $draft['effectiveness'] ?? 'pending_evaluation') === $value)>{{ $label }}</option>
+        @endforeach
+    </select>
+</div>
+
+<div class="mitigation-field">
+    <label for="stationMitigationFollowUpRequired">Follow-up Required</label>
+    <select id="stationMitigationFollowUpRequired" name="follow_up_required">
+        <option value="0" @selected((string) old('follow_up_required', $draft['follow_up_required'] ?? '0') === '0')>No</option>
+        <option value="1" @selected((string) old('follow_up_required', $draft['follow_up_required'] ?? '0') === '1')>Yes</option>
+    </select>
+</div>
+
+<div class="mitigation-field mitigation-field--full">
+    <label for="stationMitigationFollowUpNotes">Follow-up Notes</label>
+    <textarea id="stationMitigationFollowUpNotes" name="follow_up_notes">{{ old('follow_up_notes', $draft['follow_up_notes'] ?? '') }}</textarea>
 </div>
 
 <div class="mitigation-field mitigation-field--full">
