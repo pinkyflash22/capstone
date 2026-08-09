@@ -274,17 +274,69 @@ class StationAdminController extends Controller
 
     protected function getManagedBarangaysForStationAdmin()
     {
-        $user = Auth::user();
-        $user?->loadMissing('address.barangay.city');
-        $cityId = $user?->address?->barangay?->city?->city_id;
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
 
-        return Barangay::query()
-            ->select(['barangay_id', 'barangay_name', 'city_id'])
-            ->when($cityId, fn ($query) => $query->where('city_id', $cityId))
-            ->when(! $cityId, fn ($query) => $query->whereRaw('1 = 0'))
-            ->with(['city:city_id,city_name'])
-            ->orderBy('barangay_name')
+        if (! $stationId) {
+            return collect();
+        }
+
+        $coverageBarangays = DB::table('station_barangay_coverage')
+            ->join('barangays', 'station_barangay_coverage.barangay_id', '=', 'barangays.barangay_id')
+            ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+            ->where('station_barangay_coverage.station_id', $stationId)
+            ->where('station_barangay_coverage.is_active', true)
+            ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
+            ->orderBy('barangays.barangay_name')
             ->get();
+
+        if ($coverageBarangays->isNotEmpty()) {
+            return $coverageBarangays
+                ->unique('barangay_id')
+                ->values();
+        }
+
+        $barangays = collect();
+
+        $stationAddressBarangays = DB::table('stations')
+            ->leftJoin('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+            ->leftJoin('barangays', 'full_addresses.barangay_id', '=', 'barangays.barangay_id')
+            ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+            ->where('stations.station_id', $stationId)
+            ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
+            ->get()
+            ->filter(fn ($row) => ! empty($row->barangay_id));
+
+        $barangays = $barangays->merge($stationAddressBarangays);
+
+        $cityIds = $stationAddressBarangays
+            ->pluck('city_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($cityIds->isNotEmpty()) {
+            $barangays = $barangays->merge(
+                DB::table('barangays')
+                    ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+                    ->whereIn('barangays.city_id', $cityIds)
+                    ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
+                    ->get()
+            );
+        }
+
+        $riskAreaBarangays = DB::table('risk_areas')
+            ->join('barangay_halls', 'risk_areas.barangay_hall_id', '=', 'barangay_halls.barangay_hall_id')
+            ->join('barangays', 'barangay_halls.barangay_id', '=', 'barangays.barangay_id')
+            ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+            ->where('risk_areas.station_id', $stationId)
+            ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
+            ->get();
+
+        return $barangays
+            ->merge($riskAreaBarangays)
+            ->unique('barangay_id')
+            ->sortBy('barangay_name')
+            ->values();
     }
 
     protected function mitigationCategoryOptions(): array

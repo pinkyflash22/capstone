@@ -153,7 +153,44 @@
         .emergency-btn { background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.2s; }
         .emergency-btn:hover { background: #b91c1c; }
 
-        .content-container { max-width: 1400px; margin: 0 auto; padding: 24px; width: 100%; }
+        .content-container { max-width: 1400px; margin: 0 auto; padding: 24px; width: 100%; position: relative; }
+        .analytics-scope-loading {
+            position: absolute;
+            top: 18px;
+            right: 24px;
+            z-index: 60;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(252, 165, 165, 0.55);
+            background: rgba(255, 247, 237, 0.96);
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.10);
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .analytics-scope-loading.is-active { display: inline-flex; }
+        .analytics-scope-loading__spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 2px solid rgba(217, 119, 6, 0.18);
+            border-top-color: #dc2626;
+            animation: spin 0.9s linear infinite;
+            flex-shrink: 0;
+        }
+        .analytics-stack.is-scope-loading .analytics-shell-card,
+        .analytics-stack.is-scope-loading .analytics-hero {
+            opacity: 0.58;
+            transition: opacity 140ms ease;
+        }
+        .analytics-stack.is-scope-loading canvas {
+            filter: saturate(0.85);
+        }
         .stat-card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.3s; }
         .risk-high { background: linear-gradient(135deg, #dc2626, #991b1b); color: white; }
         .risk-medium { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
@@ -243,6 +280,71 @@
         .recommendation-run-toggle:focus-visible {
             outline: 3px solid rgba(37, 99, 235, 0.18);
             outline-offset: -3px;
+        }
+        .historical-weather-preview-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .historical-weather-preview-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 14px;
+            background: linear-gradient(180deg, #fff, #fffaf5);
+        }
+        .historical-weather-preview-card__label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #9a3412;
+            margin-bottom: 6px;
+        }
+        .historical-weather-preview-card__value {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.5;
+        }
+        .historical-weather-preview-table-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            overflow: auto;
+            background: #fff;
+        }
+        .historical-weather-preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1020px;
+        }
+        .historical-weather-preview-table th,
+        .historical-weather-preview-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 13px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .historical-weather-preview-table th {
+            position: sticky;
+            top: 0;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            z-index: 1;
+        }
+        .historical-weather-preview-note {
+            margin-bottom: 16px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.6;
         }
         .recommendation-run-summary {
             padding: 12px 0;
@@ -1117,6 +1219,104 @@
             max-width: 70ch;
             display: none;
         }
+        .analytics-section-heading {
+            display: grid;
+            gap: 4px;
+            margin: 10px 4px 4px;
+        }
+        .analytics-section-heading__eyebrow {
+            color: #b45309;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .analytics-section-heading__title {
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+        }
+        .analytics-section-heading__copy {
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.65;
+            max-width: 72ch;
+        }
+        .prediction-factors-grid {
+            display: grid;
+            gap: 14px;
+        }
+        .prediction-factors-group {
+            display: grid;
+            gap: 10px;
+        }
+        .prediction-factors-group__title {
+            color: #334155;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .prediction-factors-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .prediction-factor-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid rgba(251, 146, 60, 0.22);
+            color: #9a3412;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.45;
+        }
+        .prediction-factor-chip--muted {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #64748b;
+        }
+        .analytics-pattern-group {
+            border-radius: 28px;
+            border: 1px solid rgba(226,232,240,0.88);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,250,245,0.98));
+            box-shadow: 0 16px 36px rgba(15,23,42,0.05);
+            padding: 18px;
+            display: grid;
+            gap: 16px;
+        }
+        .analytics-pattern-group .analytics-section-heading {
+            margin: 0;
+        }
+        .analytics-mini-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .analytics-mini-stat {
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #fff;
+            padding: 12px 14px;
+        }
+        .analytics-mini-stat__label {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .analytics-mini-stat__value {
+            margin-top: 6px;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 900;
+        }
 
         .analytics-control-grid {
             display: grid;
@@ -1858,6 +2058,8 @@
             .prediction-summary-section,
             .analytics-priority-grid,
             .analytics-panel-grid { width: 100%; max-width: none; }
+            .analytics-pattern-group { padding: 12px; border-radius: 20px; gap: 12px; }
+            .analytics-mini-stat-grid { grid-template-columns: 1fr; }
             .analytics-info-button { display: inline-flex; }
             .analytics-control-grid { display: flex; flex-direction: column; gap: 10px; }
             .analytics-control-field,
@@ -2040,7 +2242,7 @@
         .analytics-confirm {
             position: fixed;
             inset: 0;
-            z-index: 9999;
+            z-index: 10050;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2112,6 +2314,192 @@
             background: linear-gradient(135deg, #dc2626, #f59e0b);
             color: #fff;
             box-shadow: 0 14px 30px rgba(220, 38, 38, 0.18);
+        }
+
+        .analytics-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .analytics-metric-card {
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .analytics-metric-card__label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .analytics-metric-card__value {
+            margin-top: 8px;
+            font-size: 24px;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+
+        .analytics-metric-card__copy {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .analytics-model-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .analytics-model-training-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .analytics-model-training-card {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 18px;
+            padding: 16px;
+        }
+
+        .analytics-model-training-card__label {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+        }
+
+        .analytics-model-training-card__value {
+            margin-top: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .analytics-model-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .analytics-model-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .analytics-model-notes {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .analytics-model-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .analytics-model-note i {
+            color: #dc2626;
+            margin-top: 3px;
+        }
+
+        .analytics-model-explainer {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #fed7aa;
+            background: linear-gradient(180deg, #fff7ed, #fffbeb);
+            color: #9a3412;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .analytics-model-explainer strong {
+            color: #7c2d12;
+        }
+
+        .analytics-model-meta__pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: #fff;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .analytics-model-chart-note {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+
+        .analytics-model-status {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #fde68a;
+            background: linear-gradient(135deg, rgba(254, 243, 199, 0.92), rgba(255, 251, 235, 0.96));
+            color: #92400e;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .analytics-model-status.is-ready {
+            border-color: rgba(16, 185, 129, 0.22);
+            background: linear-gradient(135deg, rgba(220, 252, 231, 0.92), rgba(240, 253, 244, 0.96));
+            color: #166534;
+        }
+
+        .analytics-chart-empty-note {
+            display: none;
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .analytics-chart-empty-note.is-visible {
+            display: block;
         }
 
         @media (max-width: 640px) {
@@ -2236,6 +2624,10 @@
         </nav>
 
         <div class="content-container chief-theme-shell">
+            <div id="analyticsScopeLoading" class="analytics-scope-loading" role="status" aria-live="polite" aria-hidden="true">
+                <span class="analytics-scope-loading__spinner"></span>
+                <span id="analyticsScopeLoadingLabel">Loading scoped forecast…</span>
+            </div>
             <div class="analytics-stack">
                 <section class="analytics-hero chief-theme-hero">
                     <div>
@@ -2292,6 +2684,14 @@
                             </select>
                         </div>
                         <div class="analytics-control-field">
+                            <label class="analytics-control-label" for="historicalWindowSelect">Historical Window</label>
+                            <select id="historicalWindowSelect" class="analytics-select">
+                                <option value="3" selected>Last 3 years</option>
+                                <option value="5">Last 5 years</option>
+                                <option value="all">All available history</option>
+                            </select>
+                        </div>
+                        <div class="analytics-control-field">
                             <label class="analytics-control-label" for="targetMonthDisplay">Target Month</label>
                             <input id="targetMonthDisplay" class="analytics-input" type="text" value="Current month forecast" readonly>
                         </div>
@@ -2316,6 +2716,13 @@
                                     <span>Rebuilds the station forecasting model using the latest exported training dataset.</span>
                                 </div>
                                 <i class="fa-solid fa-gears"></i>
+                            </button>
+                            <button id="previewHistoricalWeatherBtn" class="analytics-btn analytics-btn--secondary" type="button">
+                                <div class="analytics-btn__copy">
+                                    <strong><i class="fa-solid fa-cloud-sun-rain"></i> Preview Historical Weather</strong>
+                                    <span>Temporarily queries Open-Meteo archive weather for the selected barangay before any save step.</span>
+                                </div>
+                                <i class="fa-solid fa-magnifying-glass-chart"></i>
                             </button>
                         </div>
                     </div>
@@ -2435,33 +2842,137 @@
                     </div>
                 </section>
 
+                <section class="analytics-pattern-group">
+                    <div class="analytics-section-heading">
+                        <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                        <div class="analytics-section-heading__title">Historical and Seasonal Patterns</div>
+                        <div class="analytics-section-heading__copy">Use actual historical incident records to see how the current forecast fits the longer fire trend, seasonality, recurring calendar pressure, and recent saved model behavior.</div>
+                        <div id="historicalWindowBadge" class="analytics-empty-pill">Historical window: Last 3 years</div>
+                    </div>
+
+                    <section class="analytics-dual-grid">
+                        <div class="analytics-shell-card analytics-section">
+                            <div class="analytics-section__head">
+                                <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-chart-line"></i> Historical vs Current Actual</div>
+                                <p class="analytics-section__copy">Calendar-aligned same-month comparison using the current month or month-to-date window against the previous 3 available historical years and their baseline average.</p>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <div class="analytics-chart-canvas">
+                                    <canvas id="historicalTrendChart"></canvas>
+                                </div>
+                            </div>
+                            <div id="historicalTrendInsights" class="analytics-insight-list">
+                                <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Historical monthly trend will appear after the first analysis response is loaded.</span></div>
+                            </div>
+                        </div>
+                        <div class="analytics-shell-card analytics-section">
+                            <div class="analytics-section__head">
+                                <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-cloud-sun-rain"></i> Seasonal Fire Pattern</div>
+                                <p class="analytics-section__copy">Compares the current season against the historical seasonal average from the available multi-year fire dataset.</p>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <div class="analytics-chart-canvas">
+                                    <canvas id="seasonalPatternChart"></canvas>
+                                </div>
+                            </div>
+                            <div id="seasonalPatternInsights" class="analytics-insight-list">
+                                <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Seasonal comparison will appear after the first analysis response is loaded.</span></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="analytics-panel-grid">
+                        <div class="analytics-shell-card analytics-section">
+                            <div class="analytics-section__head">
+                                <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-calendar-days"></i> Monthly Pattern</div>
+                                <p class="analytics-section__copy">Compares the current year's monthly actual pattern against the historical average for the same months across the previous available years.</p>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <div class="analytics-chart-canvas">
+                                    <canvas id="monthlyPatternChart"></canvas>
+                                </div>
+                            </div>
+                            <div id="monthlyPatternInsights" class="analytics-insight-list">
+                                <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Monthly pattern analysis will appear after the first analysis response is loaded.</span></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="analytics-panel-grid">
+                        <div class="analytics-shell-card analytics-section">
+                            <div class="analytics-section__head">
+                                <div>
+                                    <div class="analytics-section__title"><i class="fa-solid fa-brain"></i> ML Trend Analysis</div>
+                                    <p class="analytics-section__copy">Reuses the dashboard trend-analysis pattern to compare saved analysis runs, their actual incident counts, predicted fire incidents, and confidence trend over time.</p>
+                                </div>
+                                <span id="mlTrendRunCount" class="analytics-empty-pill">0 saved model run(s)</span>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <div class="analytics-chart-canvas">
+                                    <canvas id="mlTrendAnalysisChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="analytics-mini-stat-grid">
+                                <div class="analytics-mini-stat">
+                                    <div class="analytics-mini-stat__label">Latest Risk</div>
+                                    <div id="mlTrendLatestRisk" class="analytics-mini-stat__value">No data</div>
+                                </div>
+                                <div class="analytics-mini-stat">
+                                    <div class="analytics-mini-stat__label">Latest Confidence</div>
+                                    <div id="mlTrendLatestConfidence" class="analytics-mini-stat__value">0%</div>
+                                </div>
+                                <div class="analytics-mini-stat">
+                                    <div class="analytics-mini-stat__label">Forecast Runs</div>
+                                    <div id="mlTrendForecastRuns" class="analytics-mini-stat__value">0</div>
+                                </div>
+                            </div>
+                            <div id="mlTrendInsights" class="analytics-insight-list">
+                                <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Saved-run ML trend analysis will appear after the first analysis response is loaded.</span></div>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+                <div class="analytics-section-heading">
+                    <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                    <div class="analytics-section-heading__title">Weather and Incident Patterns</div>
+                    <div class="analytics-section-heading__copy">Compare weather-linked historical fire activity with time-based incident patterns to understand how current conditions align with prior fire behavior.</div>
+                </div>
+
                 <section class="analytics-dual-grid">
                     <div class="analytics-shell-card analytics-section">
                         <div class="analytics-section__head">
                             <div>
-                                <div class="analytics-section__title"><i class="fa-solid fa-calendar-week"></i> Daily Trend — 7 Days</div>
-                                <p class="analytics-section__copy">Compares previous-period actuals, current seven-day incident activity, and the forecast probability signal returned by the backend.</p>
+                                <div class="analytics-section__title"><i class="fa-solid fa-temperature-three-quarters"></i> Weather and Fire Pattern</div>
+                                <p class="analytics-section__copy">Compares equivalent historical periods and the current actual period using available incident-linked temperature, humidity, and wind history.</p>
                             </div>
                         </div>
                         <div class="analytics-chart-wrap">
                             <div class="analytics-chart-canvas">
-                                <canvas id="dailyChart"></canvas>
+                                <canvas id="weatherPatternChart"></canvas>
                             </div>
                             <div class="analytics-legend-note">
-                                <span><i class="analytics-legend-swatch" style="background:#94a3b8;"></i> Previous period actual incidents</span>
-                                <span><i class="analytics-legend-swatch" style="background:#dc2626;"></i> Current seven-day actual incidents</span>
-                                <span><i class="analytics-legend-swatch" style="background:#f59e0b;"></i> Predicted probability (%)</span>
+                                <span><i class="analytics-legend-swatch" style="background:#dc2626;"></i> Historical actual incidents</span>
+                                <span><i class="analytics-legend-swatch" style="background:#f59e0b;"></i> Average temperature</span>
+                                <span><i class="analytics-legend-swatch" style="background:#2563eb;"></i> Average humidity</span>
+                                <span><i class="analytics-legend-swatch" style="background:#14b8a6;"></i> Average wind speed</span>
                             </div>
                         </div>
-                        <div id="dailyTrendInsights" class="analytics-insight-list">
-                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Insights will appear after the first analysis response is loaded.</span></div>
+                        <div id="weatherPatternInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Weather-linked incident patterns will appear after the first analysis response is loaded.</span></div>
                         </div>
                     </div>
                     <div class="analytics-shell-card analytics-section">
                         <div class="analytics-section__head">
                             <div>
-                                <div class="analytics-section__title"><i class="fa-solid fa-clock"></i> Hourly Incident Pattern</div>
-                                <p class="analytics-section__copy">Shows previous-month hourly activity, the current-month hourly pattern, and predicted peak-hour emphasis when the model returns hourly watch windows.</p>
+                                <div class="analytics-section__title"><i class="fa-solid fa-clock"></i> Time-of-Day Pattern</div>
+                                <p class="analytics-section__copy">Compares current hourly incident behavior against the 3-year historical hourly baseline for the same calendar-aligned period.</p>
                             </div>
                         </div>
                         <div class="analytics-chart-wrap">
@@ -2479,6 +2990,31 @@
                         </div>
                     </div>
                 </section>
+
+                <section class="analytics-panel-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-calendar-day"></i> Day-of-Week Pattern</div>
+                                <p class="analytics-section__copy">Compares current weekday behavior against the 3-year historical weekday baseline for the same aligned period.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="dayOfWeekPatternChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="dayOfWeekPatternInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Weekday comparison will appear after the first analysis response is loaded.</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="analytics-section-heading">
+                    <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                    <div class="analytics-section-heading__title">Barangay Comparison</div>
+                    <div class="analytics-section-heading__copy">Keep the hotspot ranking and station-readiness view together so you can compare forecast pressure against the current operational picture.</div>
+                </div>
 
                 <section class="analytics-dual-grid">
                     <div class="analytics-shell-card analytics-section">
@@ -2537,6 +3073,186 @@
                             </article>
                         </div>
                         <div id="incidentTypes" class="prediction-card__copy" style="margin-top:14px;"></div>
+                    </div>
+                </section>
+
+                <div class="analytics-section-heading">
+                    <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                    <div class="analytics-section-heading__title">Historical vs Predicted</div>
+                    <div class="analytics-section-heading__copy">Keep actual historical activity and forecast values visually separate so decision-makers can see what already happened versus what the model expects next.</div>
+                </div>
+
+                <section class="analytics-dual-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-calendar-week"></i> Recent Trend</div>
+                                <p class="analytics-section__copy">Rolling last-7-day operational trend. This is separate from the calendar-aligned historical comparison panels above.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="dailyChart"></canvas>
+                            </div>
+                            <div class="analytics-legend-note">
+                                <span><i class="analytics-legend-swatch" style="background:#94a3b8;"></i> Historical actual incidents</span>
+                                <span><i class="analytics-legend-swatch" style="background:#dc2626;"></i> Current actual incidents</span>
+                                <span><i class="analytics-legend-swatch" style="background:#f59e0b;"></i> Forecast probability (%)</span>
+                            </div>
+                        </div>
+                        <div id="dailyTrendInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Insights will appear after the first analysis response is loaded.</span></div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-chart-column"></i> Historical vs Forecast Window</div>
+                                <p class="analytics-section__copy">Compares recent historical monthly fire incidents against the current forecast month prediction, keeping actual and forecast values clearly separated.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="forecastCompareChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="forecastCompareInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Historical versus forecast comparison will appear after the first analysis response is loaded.</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="analytics-section-heading">
+                    <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                    <div class="analytics-section-heading__title">Prediction Factors</div>
+                    <div class="analytics-section-heading__copy">Expose the main model drivers, watch items, and current operational contributors behind the fire-risk forecast when the backend returns them.</div>
+                </div>
+
+                <section class="analytics-panel-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-circle-nodes"></i> Prediction Factors</div>
+                                <p class="analytics-section__copy">Primary ML/model drivers, forecast watch items, and current risk signals linked to the loaded forecast.</p>
+                            </div>
+                        </div>
+                        <div id="predictionFactorsPanel" class="prediction-factors-grid">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No prediction factors yet.</div>
+                                <p class="analytics-empty-state__copy">Run an analysis to load model drivers, watch items, and current operational contributors.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="analytics-section-heading">
+                    <div class="analytics-section-heading__eyebrow">Predictive analytics</div>
+                    <div class="analytics-section-heading__title">Model Learning & Performance</div>
+                    <div class="analytics-section-heading__copy">Separate the model-learning evidence from the historical fire patterns so commanders can see how the current Random Forest forecast model performs on real saved evaluation data.</div>
+                </div>
+
+                <section class="analytics-panel-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-microchip"></i> Model Performance Summary</div>
+                                <p class="analytics-section__copy">Uses the currently saved forecast model metadata and cached evaluation artifact. This does not retrain the model when the page loads.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-metric-grid" id="modelPerformanceMetricGrid">
+                            <div class="analytics-metric-card">
+                                <div class="analytics-metric-card__label">Model type</div>
+                                <div class="analytics-metric-card__value" style="font-size:20px;">Waiting for model</div>
+                                <div class="analytics-metric-card__copy">The active forecast model will appear after the latest snapshot loads.</div>
+                            </div>
+                        </div>
+                        <div id="modelPerformanceStatus" class="analytics-model-status">
+                            Waiting for saved model metadata and evaluation cache.
+                        </div>
+                        <div id="modelPerformanceMeta" class="analytics-model-meta"></div>
+                        <div id="modelPerformanceExplainer" class="analytics-model-explainer" style="display:none;"></div>
+                        <div id="modelTrainingEvidence" class="analytics-model-training-grid">
+                            <div class="analytics-model-training-card">
+                                <div class="analytics-model-training-card__label">Training dataset</div>
+                                <div class="analytics-model-training-card__value">Waiting for model metadata</div>
+                            </div>
+                        </div>
+                        <div id="modelTrainingFeatures" class="analytics-model-chip-list"></div>
+                        <div id="modelTrainingNotes" class="analytics-model-notes"></div>
+                    </div>
+                </section>
+
+                <section class="analytics-dual-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-bars-progress"></i> Feature Importance</div>
+                                <p class="analytics-section__copy">Top variables contributing the most to the current Random Forest forecast model.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="featureImportanceChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="featureImportanceEmptyNote" class="analytics-chart-empty-note"></div>
+                        <div id="featureImportanceInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Feature importance will appear once model metadata is loaded.</span></div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-shield-heart"></i> Cross-validation Performance</div>
+                                <p class="analytics-section__copy">Fold-by-fold ROC AUC from the saved training pipeline when cross-validation scores are available.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="crossValidationChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="crossValidationEmptyNote" class="analytics-chart-empty-note"></div>
+                        <div id="crossValidationInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Cross-validation scores will appear if the saved model metadata contains them.</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="analytics-dual-grid">
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-chart-line"></i> Actual vs Predicted</div>
+                                <p class="analytics-section__copy">Compares actual historical incident counts against the saved regression output for the same held-out evaluation periods.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="actualVsPredictedChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="actualVsPredictedEmptyNote" class="analytics-chart-empty-note"></div>
+                        <div id="actualVsPredictedInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Actual versus predicted evaluation points will appear when the row-level evaluation artifact is available.</span></div>
+                        </div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-wave-square"></i> Prediction Error / Residual Pattern</div>
+                                <p class="analytics-section__copy">Shows where the regression forecast is above or below actual historical incident counts on the held-out evaluation periods.</p>
+                            </div>
+                        </div>
+                        <div class="analytics-chart-wrap">
+                            <div class="analytics-chart-canvas">
+                                <canvas id="residualPatternChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="residualPatternEmptyNote" class="analytics-chart-empty-note"></div>
+                        <div id="residualPatternInsights" class="analytics-insight-list">
+                            <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Residual patterns will appear once the cached evaluation artifact is generated.</span></div>
+                        </div>
                     </div>
                 </section>
 
@@ -2625,6 +3341,22 @@
         </div>
     </div>
 
+    <div id="historicalWeatherPreviewModal" class="modal">
+        <div class="modal-content analytics-forecast-modal analytics-barangay-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-cloud-sun-rain" style="color: #dc2626;"></i> Historical Weather Preview</h3>
+                <button class="modal-close" onclick="closeHistoricalWeatherPreviewModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="historicalWeatherPreviewBody">
+                <div class="text-center py-8 text-gray-500">Choose a barangay and preview the Open-Meteo archive weather first.</div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveHistoricalWeatherBtn" class="btn-primary" style="padding: 8px 20px; background: #dc2626; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Save Previewed Weather</button>
+                <button class="btn-outline" onclick="closeHistoricalWeatherPreviewModal()" style="padding: 8px 20px; background: #f1f5f9; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="loadingOverlay" class="loading-overlay">
         <div class="analytics-loading-card" role="status" aria-live="polite">
             <div class="analytics-loading-card__eyebrow">
@@ -2683,7 +3415,8 @@
     </div>
 
     <script>
-        let hourlyChart, dailyChart;
+        let hourlyChart, dailyChart, historicalTrendChart, seasonalPatternChart, monthlyPatternChart, weatherPatternChart, forecastCompareChart, mlTrendAnalysisChart, dayOfWeekPatternChart;
+        let featureImportanceChart, crossValidationChart, actualVsPredictedChart, residualPatternChart;
         let currentRecommendations = [];
         let currentAnalysisId = null;
         let analyticsStations = [];
@@ -2695,6 +3428,7 @@
         let recommendationRunCache = new Map();
         let recommendationRunChecklistCache = new Map();
         let recommendationExploreCache = new Map();
+        let historicalWeatherPreviewState = null;
         let analyticsLoadingState = {
             active: false,
             percent: 0,
@@ -2708,6 +3442,7 @@
         let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
         const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
+        let analyticsScopeLoadingDepth = 0;
 
         function isAnalyticsMobile() {
             return analyticsMobileQuery.matches;
@@ -2743,6 +3478,30 @@
             sheet.setAttribute('aria-hidden', 'true');
             document.body.style.removeProperty('overflow');
             document.querySelector('[data-analytics-barangay-trigger]')?.focus({ preventScroll: true });
+        }
+
+        function setScopedForecastLoading(isActive, label = 'Loading scoped forecast...') {
+            const loadingChip = document.getElementById('analyticsScopeLoading');
+            const loadingLabel = document.getElementById('analyticsScopeLoadingLabel');
+            const analyticsStack = document.querySelector('.analytics-stack');
+
+            if (isActive) {
+                analyticsScopeLoadingDepth += 1;
+            } else {
+                analyticsScopeLoadingDepth = Math.max(0, analyticsScopeLoadingDepth - 1);
+            }
+
+            const shouldShow = analyticsScopeLoadingDepth > 0;
+            if (loadingChip) {
+                loadingChip.classList.toggle('is-active', shouldShow);
+                loadingChip.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+            }
+            if (loadingLabel && label) {
+                loadingLabel.textContent = label;
+            }
+            if (analyticsStack) {
+                analyticsStack.classList.toggle('is-scope-loading', shouldShow);
+            }
         }
 
         function renderMobileBarangayOptions(searchTerm = '') {
@@ -3096,6 +3855,7 @@
                         const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
                         const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
                         const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
+                        const historicalBaseline = prediction.historical_baseline_incidents ?? null;
                         const targetLabel = prediction.prediction_target_label || prediction.prediction_context?.target_period_label || '';
                         const updatedAt = prediction.analysis_created_at
                             ? new Date(prediction.analysis_created_at).toLocaleString()
@@ -3124,6 +3884,10 @@
                                         <div class="barangay-ranking-card__stat">
                                             <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Possible Incidents</div>
                                             <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
+                                        </div>
+                                        <div class="barangay-ranking-card__stat">
+                                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Historical Baseline</div>
+                                            <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${historicalBaseline !== null ? escapeHtml(String(historicalBaseline)) : 'N/A'}</div>
                                         </div>
                                     </div>
                                     ${(targetLabel || updatedAt) ? `
@@ -3167,6 +3931,7 @@
                             const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
                             const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
                             const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
+                            const historicalBaseline = prediction.historical_baseline_incidents ?? null;
                             const targetLabel = prediction.prediction_target_label || prediction.prediction_context?.target_period_label || '';
                             return `
                                 <div class="barangay-ranking-card">
@@ -3190,6 +3955,10 @@
                                                 <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Incidents</div>
                                                 <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
                                             </div>
+                                            <div class="barangay-ranking-card__stat">
+                                                <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Baseline</div>
+                                                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${historicalBaseline !== null ? escapeHtml(String(historicalBaseline)) : 'N/A'}</div>
+                                            </div>
                                         </div>
                                         ${targetLabel ? `<div style="margin-top:8px; font-size:11px; color:#64748b;">Target period: <strong>${escapeHtml(targetLabel)}</strong></div>` : ''}
                                     </div>
@@ -3207,17 +3976,279 @@
             document.getElementById('barangayRankingModal')?.classList.remove('show');
         }
 
-        async function loadLatestAnalysisSnapshot() {
+        function closeHistoricalWeatherPreviewModal() {
+            document.getElementById('historicalWeatherPreviewModal')?.classList.remove('show');
+        }
+
+        function setHistoricalWeatherSaveButtonState(isDisabled, label = 'Save Previewed Weather') {
+            const button = document.getElementById('saveHistoricalWeatherBtn');
+            if (!button) return;
+
+            button.disabled = isDisabled;
+            button.style.opacity = isDisabled ? '0.7' : '';
+            button.textContent = label;
+        }
+
+        function formatHistoricalWeatherPreviewValue(value, digits = 1) {
+            if (value === null || value === undefined || value === '') {
+                return '—';
+            }
+
+            const numericValue = Number(value);
+            if (Number.isNaN(numericValue)) {
+                return escapeHtml(String(value));
+            }
+
+            return numericValue.toFixed(digits);
+        }
+
+        function renderHistoricalWeatherPreviewModal(result) {
+            const modal = document.getElementById('historicalWeatherPreviewModal');
+            const body = document.getElementById('historicalWeatherPreviewBody');
+            if (!modal || !body) return;
+
+            const rows = Array.isArray(result?.rows) ? result.rows : [];
+            const barangayName = result?.barangay?.name || 'Selected barangay';
+            const cityName = result?.barangay?.city_name || 'Unknown city';
+            const latitude = result?.coordinates?.latitude;
+            const longitude = result?.coordinates?.longitude;
+            const years = Array.isArray(result?.years) ? result.years : [];
+            historicalWeatherPreviewState = result;
+            setHistoricalWeatherSaveButtonState(false);
+
+            body.innerHTML = `
+                <div class="historical-weather-preview-note">
+                    Preview only. This does not save anything yet. Monthly incident totals come from the exact matching rows in <strong>historical_fire_incidents</strong> for the selected <strong>barangay_id</strong>. The table shows both the number of matched historical rows and the summed <strong>incident_count</strong> from those rows, while weather values are aggregated from the Open-Meteo archive query built from the barangay hall marker coordinates.
+                </div>
+                <div class="historical-weather-preview-meta">
+                    <div class="historical-weather-preview-card">
+                        <div class="historical-weather-preview-card__label">Barangay</div>
+                        <div class="historical-weather-preview-card__value">${escapeHtml(barangayName)}${cityName ? `, ${escapeHtml(cityName)}` : ''}</div>
+                    </div>
+                    <div class="historical-weather-preview-card">
+                        <div class="historical-weather-preview-card__label">Coordinates</div>
+                        <div class="historical-weather-preview-card__value">${formatHistoricalWeatherPreviewValue(latitude, 6)}, ${formatHistoricalWeatherPreviewValue(longitude, 6)}</div>
+                    </div>
+                    <div class="historical-weather-preview-card">
+                        <div class="historical-weather-preview-card__label">Historical Window</div>
+                        <div class="historical-weather-preview-card__value">${escapeHtml(result?.historical_window?.label || 'Historical preview')}</div>
+                    </div>
+                    <div class="historical-weather-preview-card">
+                        <div class="historical-weather-preview-card__label">Years Queried</div>
+                        <div class="historical-weather-preview-card__value">${years.length ? escapeHtml(years.join(', ')) : 'None found'}</div>
+                    </div>
+                </div>
+                <div class="historical-weather-preview-table-wrap">
+                    <table class="historical-weather-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Matched Rows</th>
+                                <th>Incident Count Total</th>
+                                <th>temperature_2m avg</th>
+                                <th>relative_humidity_2m avg</th>
+                                <th>precipitation total</th>
+                                <th>rain total</th>
+                                <th>vapour_pressure_deficit avg</th>
+                                <th>wind_speed_10m avg</th>
+                                <th>wind_gusts_10m avg</th>
+                                <th>weather_code mode</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.length ? rows.map((row) => `
+                                <tr>
+                                    <td>${escapeHtml(row.month_label || '')}</td>
+                                    <td>${escapeHtml(String(row.historical_row_count ?? 0))}</td>
+                                    <td>${escapeHtml(String(row.incident_count ?? 0))}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.temperature_2m)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.relative_humidity_2m)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.precipitation, 2)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.rain, 2)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.vapour_pressure_deficit, 2)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.wind_speed_10m, 2)}</td>
+                                    <td>${formatHistoricalWeatherPreviewValue(row.wind_gusts_10m, 2)}</td>
+                                    <td>${row.weather_code ?? '—'}</td>
+                                </tr>
+                            `).join('') : `
+                                <tr>
+                                    <td colspan="11" style="text-align:center; color:#64748b; padding: 24px;">No historical weather preview rows are available for this barangay yet.</td>
+                                </tr>
+                            `}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            modal.classList.add('show');
+        }
+
+        async function previewHistoricalWeatherArchive() {
+            const stationSelect = document.getElementById('stationSelect');
+            const barangaySelect = document.getElementById('barangaySelect');
+            const historicalWindowSelect = document.getElementById('historicalWindowSelect');
+            const button = document.getElementById('previewHistoricalWeatherBtn');
+
+            if (!stationSelect?.value) {
+                showAnalyticsToast('Please select a station first.', 'warning');
+                return;
+            }
+
+            if (!barangaySelect?.value || barangaySelect.value === 'all') {
+                showAnalyticsToast('Choose one barangay first so the archive preview can use its marker coordinates.', 'warning');
+                return;
+            }
+
+            const originalHtml = button?.innerHTML;
+            const modal = document.getElementById('historicalWeatherPreviewModal');
+            const body = document.getElementById('historicalWeatherPreviewBody');
+
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = '0.7';
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Previewing...';
+            }
+
+            if (body) {
+                body.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="loading-spinner" style="width: 34px; height: 34px;"></div>
+                        <p class="mt-3 text-gray-500">Querying Open-Meteo archive weather for the selected barangay...</p>
+                    </div>
+                `;
+            }
+            historicalWeatherPreviewState = null;
+            setHistoricalWeatherSaveButtonState(true, 'Save Previewed Weather');
+            modal?.classList.add('show');
+
             try {
-                const response = await fetch('/station-admin/api/analyses/latest-snapshot', {
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                const params = new URLSearchParams({
+                    station_id: stationSelect.value,
+                    barangay_id: barangaySelect.value,
+                    historical_window: historicalWindowSelect?.value || '3',
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                const response = await fetch(`/station-admin/api/historical-weather-preview?${params.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || result.details || 'Historical weather preview failed.');
                 }
 
-                const result = await response.json();
+                renderHistoricalWeatherPreviewModal(result);
+                showAnalyticsToast(result.message || 'Historical weather preview is ready.', 'success');
+            } catch (error) {
+                closeHistoricalWeatherPreviewModal();
+                historicalWeatherPreviewState = null;
+                showAnalyticsToast(error.message || 'Unable to preview historical weather right now.', 'error');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.style.opacity = '';
+                    button.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        async function saveHistoricalWeatherArchive() {
+            const state = historicalWeatherPreviewState;
+            if (!state?.barangay?.id) {
+                showAnalyticsToast('Preview the archive weather first before saving.', 'warning');
+                return;
+            }
+
+            const confirmed = await showAnalyticsConfirm({
+                eyebrow: 'Historical weather save',
+                title: 'Save previewed weather to historical fire incidents?',
+                message: 'This will update existing monthly rows for the selected barangay and create one zero-incident weather placeholder only for months that have no historical incident rows.',
+                cancelText: 'Cancel',
+                acceptText: 'Save weather',
+            });
+
+            if (!confirmed) {
+                return;
+            }
+
+            setHistoricalWeatherSaveButtonState(true, 'Saving...');
+
+            try {
+                const payload = {
+                    station_id: document.getElementById('stationSelect')?.value || '',
+                    barangay_id: state.barangay.id,
+                    historical_window: document.getElementById('historicalWindowSelect')?.value || '3',
+                };
+
+                const response = await fetch('/station-admin/api/historical-weather-save', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || result.details || 'Historical weather save failed.');
+                }
+
+                const updatedRows = result?.summary?.updated_rows ?? 0;
+                const createdPlaceholders = result?.summary?.created_placeholders ?? 0;
+                showAnalyticsToast(`${result.message || 'Historical weather saved.'} Updated ${updatedRows} row(s), created ${createdPlaceholders} placeholder month row(s).`, 'success');
+                setHistoricalWeatherSaveButtonState(false, 'Saved');
+                closeHistoricalWeatherPreviewModal();
+            } catch (error) {
+                setHistoricalWeatherSaveButtonState(false, 'Save Previewed Weather');
+                showAnalyticsToast(error.message || 'Unable to save historical weather right now.', 'error');
+            }
+        }
+
+        function buildAnalysisScopeQuery(predictionScope = 'current_month') {
+            const scopeMeta = getSelectedScopeMeta();
+            const params = new URLSearchParams();
+
+            if (scopeMeta.stationId) {
+                params.set('station_id', scopeMeta.stationId);
+            }
+
+            params.set('prediction_scope', predictionScope || 'current_month');
+
+            if (scopeMeta.barangayId && scopeMeta.barangayId !== 'all') {
+                params.set('barangay_id', scopeMeta.barangayId);
+            }
+
+            if (scopeMeta.historicalWindowValue) {
+                params.set('historical_window', scopeMeta.historicalWindowValue);
+            }
+
+            return params.toString();
+        }
+
+        async function fetchScopedAnalysisSnapshot(predictionScope = 'current_month') {
+            const query = buildAnalysisScopeQuery(predictionScope);
+            const response = await fetch(`/station-admin/api/analyses/latest-snapshot?${query}`, {
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response.json();
+        }
+
+        async function loadLatestAnalysisSnapshot(predictionScope = 'current_month') {
+            setScopedForecastLoading(true, 'Loading forecast scope...');
+            try {
+                const result = await fetchScopedAnalysisSnapshot(predictionScope);
                 if (!result.success || !result.data) {
                     return;
                 }
@@ -3233,6 +4264,8 @@
                 updateRecommendationScopeLabel();
             } catch (error) {
                 console.error('Latest analysis snapshot load error:', error);
+            } finally {
+                setScopedForecastLoading(false);
             }
         }
 
@@ -3296,13 +4329,24 @@
         function getSelectedScopeMeta() {
             const stationSelect = document.getElementById('stationSelect');
             const barangaySelect = document.getElementById('barangaySelect');
+            const historicalWindowSelect = document.getElementById('historicalWindowSelect');
             return {
                 stationId: stationSelect?.value || '',
                 stationName: stationSelect?.options?.[stationSelect.selectedIndex]?.text || 'Selected station',
                 barangayId: barangaySelect?.value || 'all',
                 barangayName: barangaySelect?.options?.[barangaySelect.selectedIndex]?.text || 'All barangays',
                 dateRangeLabel: document.getElementById('periodSelect')?.options?.[document.getElementById('periodSelect').selectedIndex]?.text || 'Last 30 days',
+                historicalWindowValue: historicalWindowSelect?.value || '3',
+                historicalWindowLabel: historicalWindowSelect?.options?.[historicalWindowSelect.selectedIndex]?.text || 'Last 3 years',
             };
+        }
+
+        function updateHistoricalWindowBadge(label = null) {
+            const badge = document.getElementById('historicalWindowBadge');
+            if (!badge) return;
+
+            const fallback = getSelectedScopeMeta().historicalWindowLabel;
+            badge.textContent = `Historical window: ${label || fallback}`;
         }
 
         function updateTargetMonthDisplay(predictionScope = 'current_month', predictionContext = null) {
@@ -3492,7 +4536,7 @@
             }
 
             try {
-                const response = await fetch('/station-admin/api/analyses/history', {
+                const response = await fetch(`/station-admin/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -3954,7 +4998,7 @@
             }
 
             try {
-                const response = await fetch('/station-admin/api/analyses/history', {
+                const response = await fetch(`/station-admin/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -4017,6 +5061,460 @@
                     <span>${escapeHtml(insight)}</span>
                 </div>
             `).join('');
+        }
+
+        function formatLearningMetric(value, suffix = '', decimals = 4) {
+            if (value === null || value === undefined || value === '') {
+                return 'Unavailable';
+            }
+
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return String(value);
+            }
+
+            return `${numericValue.toFixed(decimals)}${suffix}`;
+        }
+
+        function setChartEmptyNote(containerId, message = '') {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const normalized = String(message || '').trim();
+            container.textContent = normalized;
+            container.classList.toggle('is-visible', normalized !== '');
+        }
+
+        function renderModelLearningPerformance(analysisData) {
+            const modelMetadata = analysisData?.model_metadata || {};
+            const learning = modelMetadata.learning_performance || {};
+            const featureImportance = Array.isArray(learning.feature_importance) && learning.feature_importance.length
+                ? learning.feature_importance
+                : (Array.isArray(modelMetadata.global_feature_importance) ? modelMetadata.global_feature_importance : []);
+            const classification = learning.classification_performance || {};
+            const crossValidation = learning.cross_validation || {};
+            const actualVsPredicted = learning.actual_vs_predicted || null;
+            const residualPattern = learning.residual_pattern || null;
+            const regressionMetrics = learning.regression_performance || modelMetadata.regression_metrics || {};
+            const compactChart = isAnalyticsMobile();
+            const chartFontSize = compactChart ? 10 : 12;
+            const chartPointRadius = compactChart ? 2 : 3;
+            const chartLegend = {
+                position: compactChart ? 'bottom' : 'top',
+                labels: {
+                    usePointStyle: true,
+                    boxWidth: compactChart ? 7 : 10,
+                    padding: compactChart ? 8 : 12,
+                    font: { size: chartFontSize, weight: compactChart ? '600' : '700' }
+                }
+            };
+            const chartTicks = {
+                color: '#64748b',
+                font: { size: chartFontSize },
+                maxTicksLimit: compactChart ? 5 : 8
+            };
+
+            const metricGrid = document.getElementById('modelPerformanceMetricGrid');
+            const modelMeta = document.getElementById('modelPerformanceMeta');
+            const modelStatus = document.getElementById('modelPerformanceStatus');
+            const modelPerformanceExplainer = document.getElementById('modelPerformanceExplainer');
+            const modelTrainingEvidence = document.getElementById('modelTrainingEvidence');
+            const modelTrainingFeatures = document.getElementById('modelTrainingFeatures');
+            const modelTrainingNotes = document.getElementById('modelTrainingNotes');
+            const precisionValue = Number(classification.precision);
+            const recallValue = Number(classification.recall);
+            const rocAucValue = Number(classification.roc_auc ?? modelMetadata.metrics?.roc_auc);
+            const testPositiveSupport = Number(
+                classification.classification_report?.['1']?.support
+                ?? modelMetadata.metrics?.classification_report?.['1']?.support
+                ?? 0
+            );
+
+            if (modelStatus) {
+                const statusMessage = learning.available
+                    ? 'Saved model metadata and cached row-level evaluation data are ready. The charts below are using the current trained model without retraining on page load.'
+                    : (learning.partial
+                        ? 'The page is currently using saved model metadata. Row-level evaluation charts will appear after the cached evaluation artifact is generated successfully for this trained model.'
+                        : 'Saved model performance metadata is limited right now, so only supported sections will be shown.');
+                modelStatus.textContent = statusMessage;
+                modelStatus.classList.toggle('is-ready', Boolean(learning.available));
+            }
+
+            if (metricGrid) {
+                const incidentRegression = regressionMetrics.predicted_incident_count || {};
+                metricGrid.innerHTML = `
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Model type</div>
+                        <div class="analytics-metric-card__value" style="font-size:20px;">${escapeHtml(learning.model_type || 'Random Forest')}</div>
+                        <div class="analytics-metric-card__copy">The current forecast stack uses tree-based learning, so epoch curves are intentionally not shown.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Train / test rows</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(String(classification.train_rows ?? modelMetadata.metrics?.train_rows ?? '0'))} / ${escapeHtml(String(classification.test_rows ?? modelMetadata.metrics?.test_rows ?? '0'))}</div>
+                        <div class="analytics-metric-card__copy">Saved split from the most recent model training run.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Accuracy</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(classification.accuracy ?? modelMetadata.metrics?.accuracy, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">Classification accuracy on the saved test split.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">ROC AUC</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(classification.roc_auc ?? modelMetadata.metrics?.roc_auc, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">Probability discrimination score for the high-risk classification target.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Incident-count MAE</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(incidentRegression.mae, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">Average absolute error for the saved incident-count regression output.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Incident-count R²</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(incidentRegression.r2_score, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">Explains how closely the regression output follows actual incident-count variation.</div>
+                    </div>
+                `;
+            }
+
+            if (modelMeta) {
+                const pills = [
+                    learning.available
+                        ? `<span class="analytics-model-meta__pill"><i class="fa-solid fa-database"></i> Cached evaluation artifact ready</span>`
+                        : `<span class="analytics-model-meta__pill"><i class="fa-solid fa-clock-rotate-left"></i> Using saved metadata${learning.partial ? ' until row-level cache is ready' : ''}</span>`,
+                    `<span class="analytics-model-meta__pill"><i class="fa-solid fa-calendar-check"></i> Trained at ${escapeHtml(modelMetadata.trained_at || learning.trained_at || 'Unavailable')}</span>`,
+                    `<span class="analytics-model-meta__pill"><i class="fa-solid fa-ruler-combined"></i> Cross-validation metric: ${escapeHtml(crossValidation.metric || 'ROC AUC')}</span>`,
+                    `<span class="analytics-model-meta__pill"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(learning.supports_epoch_learning_curve ? 'Epoch learning curves supported' : 'No epoch learning curves for Random Forest')}</span>`,
+                ];
+
+                modelMeta.innerHTML = pills.join('');
+            }
+
+            if (modelPerformanceExplainer) {
+                let explainerHtml = '';
+
+                if (Number.isFinite(rocAucValue) && rocAucValue >= 0.8 && precisionValue === 0 && recallValue === 0) {
+                    explainerHtml = `
+                        <strong>How to read this:</strong> the saved cross-validation ROC-AUC is strong, which means the model is generally ranking higher-risk records above lower-risk ones.
+                        But the saved test-split precision and recall are both 0.0000, so on the final yes/no classification step it did not correctly flag the positive high-risk class.
+                        ${testPositiveSupport > 0 ? `The saved test split only had <strong>${escapeHtml(String(testPositiveSupport))}</strong> positive case(s), so this usually points to class imbalance or a threshold that is too conservative.` : 'This usually points to class imbalance or a threshold that is too conservative.'}
+                    `;
+                } else if (Number.isFinite(rocAucValue)) {
+                    explainerHtml = `
+                        <strong>How to read this:</strong> ROC-AUC shows how well the model separates higher-risk from lower-risk records across thresholds, while precision and recall show how well it performs after converting scores into a final class decision.
+                    `;
+                }
+
+                modelPerformanceExplainer.innerHTML = explainerHtml;
+                modelPerformanceExplainer.style.display = explainerHtml ? 'block' : 'none';
+            }
+
+            if (modelTrainingEvidence) {
+                const datasetKind = modelMetadata.dataset_kind || 'Unknown';
+                const datasetPath = modelMetadata.dataset_path || 'Unavailable';
+                const targetColumn = modelMetadata.target_column || 'Unavailable';
+                const targetDescription = modelMetadata.target_description || 'No saved target description found.';
+                const recordsUsed = modelMetadata.records_used ?? 'N/A';
+                const featureCount = modelMetadata.feature_count ?? 0;
+                const topSignals = Array.isArray(modelMetadata.top_global_signals)
+                    ? modelMetadata.top_global_signals.map((signal) => signal?.feature).filter(Boolean).slice(0, 5)
+                    : [];
+
+                modelTrainingEvidence.innerHTML = `
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Training dataset</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(datasetKind))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Dataset file</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(datasetPath))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Prediction target</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(targetColumn))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Target meaning</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(targetDescription))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Records used</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(recordsUsed))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Input features</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(featureCount))} feature${Number(featureCount) === 1 ? '' : 's'}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Model family</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(learning.model_type || 'RandomForestClassifier + RandomForestRegressor'))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Top contributing signals</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(topSignals.join(', ') || 'Unavailable')}</div>
+                    </div>
+                `;
+            }
+
+            if (modelTrainingFeatures) {
+                const featureColumns = Array.isArray(modelMetadata.feature_columns) ? modelMetadata.feature_columns : [];
+                modelTrainingFeatures.innerHTML = featureColumns.length
+                    ? featureColumns.map((feature) => `
+                        <span class="analytics-model-chip">
+                            <i class="fa-solid fa-diagram-project"></i>${escapeHtml(String(feature))}
+                        </span>
+                    `).join('')
+                    : `
+                        <span class="analytics-model-chip">
+                            <i class="fa-solid fa-circle-info"></i>No saved feature column list is available.
+                        </span>
+                    `;
+            }
+
+            if (modelTrainingNotes) {
+                const notes = Array.isArray(modelMetadata.notes) ? modelMetadata.notes.filter(Boolean) : [];
+                modelTrainingNotes.innerHTML = notes.length
+                    ? notes.map((note) => `
+                        <div class="analytics-model-note">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>${escapeHtml(String(note))}</span>
+                        </div>
+                    `).join('')
+                    : `
+                        <div class="analytics-model-note">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>No saved training notes were found in the current model metadata.</span>
+                        </div>
+                    `;
+            }
+
+            if (featureImportanceChart) featureImportanceChart.destroy();
+            if (crossValidationChart) crossValidationChart.destroy();
+            if (actualVsPredictedChart) actualVsPredictedChart.destroy();
+            if (residualPatternChart) residualPatternChart.destroy();
+
+            setChartEmptyNote('featureImportanceEmptyNote', '');
+            setChartEmptyNote('crossValidationEmptyNote', '');
+            setChartEmptyNote('actualVsPredictedEmptyNote', '');
+            setChartEmptyNote('residualPatternEmptyNote', '');
+
+            const featureCtx = document.getElementById('featureImportanceChart')?.getContext('2d');
+            if (featureCtx && featureImportance.length) {
+                const reversed = [...featureImportance].slice(0, 8).reverse();
+                featureImportanceChart = new Chart(featureCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: reversed.map((item) => item.feature || 'Feature'),
+                        datasets: [{
+                            label: 'Importance',
+                            data: reversed.map((item) => Number(item.importance || 0)),
+                            backgroundColor: 'rgba(220,38,38,0.78)',
+                            borderRadius: compactChart ? 5 : 7,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: chartTicks,
+                                title: { display: !compactChart, text: 'Relative importance' }
+                            },
+                            y: {
+                                ticks: chartTicks,
+                            }
+                        }
+                    }
+                });
+            } else {
+                setChartEmptyNote(
+                    'featureImportanceEmptyNote',
+                    'Feature importance is unavailable because the current saved metadata does not contain aggregated importance values.'
+                );
+            }
+
+            setInsightList(
+                'featureImportanceInsights',
+                [
+                    featureImportance[0]?.feature ? `${featureImportance[0].feature} is currently the strongest global signal in the saved model.` : null,
+                    featureImportance[1]?.feature ? `${featureImportance[1].feature} is the next strongest contributor in the current model metadata.` : null,
+                    learning.warning || null,
+                ].filter(Boolean),
+                'Feature importance is unavailable for the current saved model metadata.'
+            );
+
+            const cvScores = Array.isArray(crossValidation.scores) ? crossValidation.scores : [];
+            const crossValidationCtx = document.getElementById('crossValidationChart')?.getContext('2d');
+            if (crossValidationCtx && cvScores.length) {
+                crossValidationChart = new Chart(crossValidationCtx, {
+                    type: 'line',
+                    data: {
+                        labels: cvScores.map((_, index) => `Fold ${index + 1}`),
+                        datasets: [{
+                            label: crossValidation.metric || 'ROC AUC',
+                            data: cvScores,
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37,99,235,0.12)',
+                            pointBackgroundColor: '#2563eb',
+                            pointRadius: chartPointRadius,
+                            tension: 0.25,
+                            fill: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: chartLegend },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: chartTicks,
+                                title: { display: !compactChart, text: crossValidation.metric || 'ROC AUC' }
+                            },
+                            x: {
+                                ticks: chartTicks,
+                            }
+                        }
+                    }
+                });
+            } else {
+                setChartEmptyNote(
+                    'crossValidationEmptyNote',
+                    'Cross-validation cannot be displayed yet because the current saved training metadata does not include fold-by-fold validation scores.'
+                );
+            }
+
+            setInsightList(
+                'crossValidationInsights',
+                [
+                    cvScores.length ? `The saved cross-validation mean is ${formatLearningMetric(crossValidation.mean, '', 4)} across ${cvScores.length} fold(s).` : null,
+                    classification.precision !== undefined && classification.recall !== undefined
+                        ? `Precision is ${formatLearningMetric(classification.precision, '', 4)} while recall is ${formatLearningMetric(classification.recall, '', 4)} on the classification test split.`
+                        : null,
+                ].filter(Boolean),
+                'Cross-validation scores are unavailable for the current saved model metadata.'
+            );
+
+            const actualVsPredictedCtx = document.getElementById('actualVsPredictedChart')?.getContext('2d');
+            if (actualVsPredictedCtx && actualVsPredicted?.labels?.length) {
+                actualVsPredictedChart = new Chart(actualVsPredictedCtx, {
+                    type: 'line',
+                    data: {
+                        labels: actualVsPredicted.labels,
+                        datasets: [
+                            {
+                                label: 'Actual',
+                                data: actualVsPredicted.actual || [],
+                                borderColor: '#dc2626',
+                                backgroundColor: 'rgba(220,38,38,0.10)',
+                                pointRadius: chartPointRadius,
+                                tension: 0.3,
+                                fill: false,
+                            },
+                            {
+                                label: 'Predicted',
+                                data: actualVsPredicted.predicted || [],
+                                borderColor: '#0f766e',
+                                backgroundColor: 'rgba(15,118,110,0.10)',
+                                pointRadius: chartPointRadius,
+                                tension: 0.3,
+                                borderDash: [6, 5],
+                                fill: false,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: chartLegend },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: chartTicks,
+                                title: { display: !compactChart, text: actualVsPredicted.metric_label || 'Actual vs predicted' }
+                            },
+                            x: {
+                                ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                                title: { display: !compactChart, text: actualVsPredicted.x_axis_label || 'Held-out evaluation period' }
+                            }
+                        }
+                    }
+                });
+            } else {
+                setChartEmptyNote(
+                    'actualVsPredictedEmptyNote',
+                    learning.partial
+                        ? 'Actual-versus-predicted points are waiting for the cached row-level evaluation artifact. The model summary above is still based on the saved trained metadata.'
+                        : 'Actual-versus-predicted evaluation points are unavailable for the current saved model output.'
+                );
+            }
+
+            setInsightList(
+                'actualVsPredictedInsights',
+                [
+                    actualVsPredicted?.labels?.length
+                        ? (actualVsPredicted.source === 'saved_forecast_runs'
+                            ? 'This chart is currently using saved forecast runs for the selected scope while the row-level training evaluation cache is unavailable.'
+                            : `This chart uses held-out evaluation points from the saved ${actualVsPredicted.target_column || 'incident_count'} regression target.`)
+                        : null,
+                    actualVsPredicted?.actual?.length ? `Actual historical observations and predicted values are displayed separately for the same evaluation periods.` : null,
+                    !actualVsPredicted ? (learning.warning || 'Row-level actual-versus-predicted data has not been cached yet.') : null,
+                ].filter(Boolean),
+                'Actual versus predicted evaluation data is unavailable for the current saved model.'
+            );
+
+            const residualPatternCtx = document.getElementById('residualPatternChart')?.getContext('2d');
+            if (residualPatternCtx && residualPattern?.labels?.length) {
+                residualPatternChart = new Chart(residualPatternCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: residualPattern.labels,
+                        datasets: [{
+                            label: residualPattern.metric_label || 'Residual',
+                            data: residualPattern.residuals || [],
+                            backgroundColor: (residualPattern.residuals || []).map((value) => Number(value || 0) >= 0 ? 'rgba(37,99,235,0.78)' : 'rgba(220,38,38,0.78)'),
+                            borderRadius: compactChart ? 4 : 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: chartLegend },
+                        scales: {
+                            y: {
+                                ticks: chartTicks,
+                                title: { display: !compactChart, text: residualPattern.metric_label || 'Prediction error' }
+                            },
+                            x: {
+                                ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                                title: { display: !compactChart, text: residualPattern.x_axis_label || 'Held-out evaluation period' }
+                            }
+                        }
+                    }
+                });
+            } else {
+                setChartEmptyNote(
+                    'residualPatternEmptyNote',
+                    learning.partial
+                        ? 'Residual analysis will appear after the cached row-level regression evaluation is generated for this trained model.'
+                        : 'Residual analysis is unavailable because the current saved model output does not include regression evaluation rows.'
+                );
+            }
+
+            const residuals = Array.isArray(residualPattern?.residuals) ? residualPattern.residuals.map((value) => Number(value || 0)) : [];
+            const positiveResiduals = residuals.filter((value) => value > 0).length;
+            const negativeResiduals = residuals.filter((value) => value < 0).length;
+            setInsightList(
+                'residualPatternInsights',
+                [
+                    residuals.length ? `${positiveResiduals} held-out periods were over-predicted, while ${negativeResiduals} were under-predicted by the incident-count regression output.` : null,
+                    residuals.length ? 'Positive bars mean the model predicted more incidents than actually occurred; negative bars mean it predicted fewer.' : null,
+                    !residuals.length ? (learning.warning || 'Residual data has not been cached yet.') : null,
+                ].filter(Boolean),
+                'Residual data is unavailable for the current saved model.'
+            );
         }
 
         function setPredictionEmptyState(messageTitle, messageCopy) {
@@ -4108,6 +5606,13 @@
             const chartContext = analysisData.chart_context || {};
             const daily = chartContext.daily || {};
             const hourly = chartContext.hourly || {};
+            const historicalTrend = chartContext.historical_trend || {};
+            const seasonalPattern = chartContext.seasonal_pattern || {};
+            const monthlyPattern = chartContext.monthly_pattern || {};
+            const mlTrendAnalysis = chartContext.ml_trend_analysis || {};
+            const weatherPattern = chartContext.weather_pattern || {};
+            const dayOfWeekPattern = chartContext.day_of_week_pattern || {};
+            const historicalVsPredicted = chartContext.historical_vs_predicted || {};
             const compactChart = isAnalyticsMobile();
             const chartFontSize = compactChart ? 10 : 12;
             const chartPointRadius = compactChart ? 2 : 4;
@@ -4128,6 +5633,339 @@
 
             if (hourlyChart) hourlyChart.destroy();
             if (dailyChart) dailyChart.destroy();
+            if (historicalTrendChart) historicalTrendChart.destroy();
+            if (seasonalPatternChart) seasonalPatternChart.destroy();
+            if (monthlyPatternChart) monthlyPatternChart.destroy();
+            if (weatherPatternChart) weatherPatternChart.destroy();
+            if (forecastCompareChart) forecastCompareChart.destroy();
+            if (mlTrendAnalysisChart) mlTrendAnalysisChart.destroy();
+            if (dayOfWeekPatternChart) dayOfWeekPatternChart.destroy();
+
+            const historicalTrendCtx = document.getElementById('historicalTrendChart').getContext('2d');
+            historicalTrendChart = new Chart(historicalTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: historicalTrend.labels || [],
+                    datasets: [
+                        {
+                            label: 'Current Actual',
+                            data: historicalTrend.current_actual || [],
+                            borderColor: '#dc2626',
+                            backgroundColor: 'rgba(220,38,38,0.08)',
+                            pointBackgroundColor: '#dc2626',
+                            pointRadius: chartPointRadius,
+                            tension: 0.3,
+                            fill: false,
+                        },
+                        {
+                            label: '3-Year Historical Average',
+                            data: historicalTrend.historical_average || [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.1)',
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            tension: 0.25,
+                            fill: false,
+                        },
+                        ...((historicalTrend.historical_years || []).map((yearSeries, index) => ({
+                            label: `Historical ${yearSeries.label || yearSeries.year}`,
+                            data: yearSeries.values || [],
+                            borderColor: ['#94a3b8', '#64748b', '#475569'][index % 3],
+                            backgroundColor: 'rgba(148,163,184,0.05)',
+                            pointRadius: compactChart ? 1 : 2,
+                            tension: 0.2,
+                            borderDash: [3, 5],
+                            fill: false,
+                        })))
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        x: {
+                            ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                            title: { display: !compactChart, text: 'Calendar-aligned date' }
+                        }
+                    }
+                }
+            });
+
+            const seasonalPatternCtx = document.getElementById('seasonalPatternChart').getContext('2d');
+            seasonalPatternChart = new Chart(seasonalPatternCtx, {
+                type: 'bar',
+                data: {
+                    labels: seasonalPattern.labels || [],
+                    datasets: [
+                        {
+                            label: 'Current Actual',
+                            data: seasonalPattern.current_actual || [],
+                            backgroundColor: 'rgba(220,38,38,0.78)',
+                            borderRadius: compactChart ? 6 : 8,
+                        },
+                        {
+                            label: 'Historical Average',
+                            data: seasonalPattern.historical_average || [],
+                            backgroundColor: 'rgba(37,99,235,0.78)',
+                            borderRadius: compactChart ? 6 : 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        x: {
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Season' }
+                        }
+                    }
+                }
+            });
+
+            const monthlyPatternCtx = document.getElementById('monthlyPatternChart').getContext('2d');
+            monthlyPatternChart = new Chart(monthlyPatternCtx, {
+                type: 'bar',
+                data: {
+                    labels: monthlyPattern.labels || [],
+                    datasets: [
+                        {
+                            label: 'Current Actual',
+                            data: monthlyPattern.current_actual || [],
+                            backgroundColor: 'rgba(220,38,38,0.72)',
+                            borderRadius: compactChart ? 5 : 7,
+                        },
+                        {
+                            label: 'Historical Average',
+                            data: monthlyPattern.historical_average || [],
+                            backgroundColor: 'rgba(249,115,22,0.68)',
+                            borderRadius: compactChart ? 5 : 7,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        x: {
+                            ticks: { ...chartTicks, maxRotation: 0 },
+                            title: { display: !compactChart, text: 'Calendar month' }
+                        }
+                    }
+                }
+            });
+
+            const weatherPatternCtx = document.getElementById('weatherPatternChart').getContext('2d');
+            weatherPatternChart = new Chart(weatherPatternCtx, {
+                type: 'line',
+                data: {
+                    labels: weatherPattern.labels || [],
+                    datasets: [
+                        {
+                            label: 'Historical actual incidents',
+                            data: weatherPattern.actual_incidents || [],
+                            borderColor: '#dc2626',
+                            backgroundColor: 'rgba(220,38,38,0.12)',
+                            pointRadius: chartPointRadius,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'temperature_2m (C)',
+                            data: weatherPattern.temperature_2m || [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.12)',
+                            pointRadius: chartPointRadius,
+                            tension: 0.25,
+                            yAxisID: 'y1',
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'relative_humidity_2m (%)',
+                            data: weatherPattern.relative_humidity_2m || [],
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37,99,235,0.12)',
+                            pointRadius: chartPointRadius,
+                            tension: 0.25,
+                            yAxisID: 'y1',
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'wind_speed_10m',
+                            data: weatherPattern.wind_speed_10m || [],
+                            borderColor: '#14b8a6',
+                            backgroundColor: 'rgba(20,184,166,0.12)',
+                            pointRadius: chartPointRadius,
+                            tension: 0.25,
+                            yAxisID: 'y1',
+                            spanGaps: true,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            ticks: chartTicks,
+                            grid: { drawOnChartArea: false },
+                            title: { display: !compactChart, text: 'Weather signal' }
+                        },
+                        x: {
+                            ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                            title: { display: !compactChart, text: 'Historical month' }
+                        }
+                    }
+                }
+            });
+
+            const dayOfWeekCtx = document.getElementById('dayOfWeekPatternChart').getContext('2d');
+            dayOfWeekPatternChart = new Chart(dayOfWeekCtx, {
+                type: 'bar',
+                data: {
+                    labels: dayOfWeekPattern.labels || [],
+                    datasets: [
+                        {
+                            label: 'Current Actual',
+                            data: dayOfWeekPattern.current_actual || [],
+                            backgroundColor: 'rgba(220,38,38,0.78)',
+                            borderRadius: compactChart ? 4 : 6,
+                        },
+                        {
+                            label: '3-Year Historical Average',
+                            data: dayOfWeekPattern.historical_average || [],
+                            backgroundColor: 'rgba(37,99,235,0.72)',
+                            borderRadius: compactChart ? 4 : 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        x: {
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Weekday' }
+                        }
+                    }
+                }
+            });
+
+            const mlTrendSeries = Array.isArray(mlTrendAnalysis.series) ? mlTrendAnalysis.series : [];
+            const mlTrendCtx = document.getElementById('mlTrendAnalysisChart').getContext('2d');
+            mlTrendAnalysisChart = new Chart(mlTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: mlTrendSeries.map((item) => item.label),
+                    datasets: [
+                        {
+                            label: 'Actual Incidents',
+                            data: mlTrendSeries.map((item) => item.incident_count),
+                            borderColor: '#c63d26',
+                            backgroundColor: 'rgba(198, 61, 38, 0.08)',
+                            borderWidth: compactChart ? 2 : 3,
+                            pointRadius: chartPointRadius,
+                            tension: 0.35,
+                            fill: false
+                        },
+                        {
+                            label: 'Predicted Fire Incidents',
+                            data: mlTrendSeries.map((item) => item.predicted_fire_incidents),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                            borderWidth: compactChart ? 2 : 3,
+                            pointRadius: chartPointRadius,
+                            tension: 0.35,
+                            borderDash: [8, 6],
+                            fill: false
+                        },
+                        {
+                            label: 'Confidence %',
+                            data: mlTrendSeries.map((item) => item.confidence),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            borderWidth: compactChart ? 1.5 : 2,
+                            pointRadius: compactChart ? 2 : 3,
+                            tension: 0.3,
+                            yAxisID: 'confidenceAxis',
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: chartLegend,
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e5e7eb' },
+                            ticks: { ...chartTicks, precision: 0 },
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        confidenceAxis: {
+                            beginAtZero: true,
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            grid: { display: false },
+                            ticks: {
+                                ...chartTicks,
+                                callback: (value) => `${value}%`
+                            },
+                            title: { display: !compactChart, text: 'Confidence %' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 }
+                        }
+                    }
+                }
+            });
+
+            const mlTrendRunCount = document.getElementById('mlTrendRunCount');
+            const mlTrendLatestRisk = document.getElementById('mlTrendLatestRisk');
+            const mlTrendLatestConfidence = document.getElementById('mlTrendLatestConfidence');
+            const mlTrendForecastRuns = document.getElementById('mlTrendForecastRuns');
+            if (mlTrendRunCount) mlTrendRunCount.textContent = `${Number(mlTrendAnalysis.run_count || 0)} saved model run(s)`;
+            if (mlTrendLatestRisk) mlTrendLatestRisk.textContent = mlTrendAnalysis.latest_risk || 'No data';
+            if (mlTrendLatestConfidence) mlTrendLatestConfidence.textContent = `${Number(mlTrendAnalysis.latest_confidence || 0)}%`;
+            if (mlTrendForecastRuns) mlTrendForecastRuns.textContent = String(Number(mlTrendAnalysis.run_count || 0));
 
             const dailyCtx = document.getElementById('dailyChart').getContext('2d');
             dailyChart = new Chart(dailyCtx, {
@@ -4215,7 +6053,7 @@
                     datasets: [
                         {
                             type: 'line',
-                            label: 'Previous month baseline',
+                            label: '3-Year historical baseline',
                             data: hourly.historical_baseline || [],
                             borderColor: '#475569',
                             backgroundColor: 'rgba(71,85,105,0.12)',
@@ -4226,7 +6064,7 @@
                         },
                         {
                             type: 'bar',
-                            label: 'Current month actual',
+                            label: 'Current actual',
                             data: hourly.current_period || [],
                             backgroundColor: 'rgba(37,99,235,0.78)',
                             borderRadius: compactChart ? 4 : 6,
@@ -4286,7 +6124,146 @@
                 }
             });
 
+            const forecastCompareCtx = document.getElementById('forecastCompareChart').getContext('2d');
+            forecastCompareChart = new Chart(forecastCompareCtx, {
+                type: 'bar',
+                data: {
+                    labels: historicalVsPredicted.labels || [],
+                    datasets: [
+                        {
+                            label: 'Historical',
+                            data: historicalVsPredicted.historical_values || [],
+                            backgroundColor: 'rgba(148,163,184,0.82)',
+                            borderRadius: compactChart ? 5 : 7,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: '3-Year Historical Baseline',
+                            data: historicalVsPredicted.historical_baseline || [],
+                            backgroundColor: 'rgba(245,158,11,0.72)',
+                            borderRadius: compactChart ? 5 : 7,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Current Actual',
+                            data: historicalVsPredicted.current_actual || [],
+                            backgroundColor: 'rgba(220,38,38,0.78)',
+                            borderRadius: compactChart ? 5 : 7,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Forecast / Predicted',
+                            data: historicalVsPredicted.forecast_incidents || [],
+                            backgroundColor: 'rgba(37,99,235,0.82)',
+                            borderRadius: compactChart ? 5 : 7,
+                            yAxisID: 'y',
+                        },
+                        {
+                            type: 'line',
+                            label: 'Forecast probability (%)',
+                            data: historicalVsPredicted.forecast_probability || [],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.12)',
+                            pointRadius: chartPointRadius,
+                            tension: 0,
+                            spanGaps: true,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: chartTicks,
+                            title: { display: !compactChart, text: 'Incident count' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            ticks: chartTicks,
+                            grid: { drawOnChartArea: false },
+                            title: { display: !compactChart, text: 'Forecast probability (%)' }
+                        },
+                        x: {
+                            ticks: { ...chartTicks, maxRotation: compactChart ? 0 : 45 },
+                            title: { display: !compactChart, text: 'Historical month vs forecast window' }
+                        }
+                    }
+                }
+            });
+
             const chartInsights = Array.isArray(chartContext.insights) ? chartContext.insights : [];
+            const historicalTotals = Array.isArray(historicalTrend.current_actual) ? historicalTrend.current_actual : [];
+            const topHistoricalIndex = historicalTotals.length ? historicalTotals.indexOf(Math.max(...historicalTotals)) : -1;
+            const monthlyTotals = Array.isArray(monthlyPattern.historical_average) ? monthlyPattern.historical_average.filter((value) => value !== null) : [];
+            const topMonthlyValue = monthlyTotals.length ? Math.max(...monthlyTotals) : null;
+            const topMonthlyIndex = topMonthlyValue !== null && Array.isArray(monthlyPattern.historical_average)
+                ? monthlyPattern.historical_average.indexOf(topMonthlyValue)
+                : -1;
+
+            setInsightList(
+                'historicalTrendInsights',
+                [
+                    historicalTrend?.missing?.historical_average ? 'Calendar-aligned historical comparisons are not available for the current scope yet.' : null,
+                    topHistoricalIndex >= 0 && historicalTrend.labels?.[topHistoricalIndex]
+                        ? `The strongest current actual day in the aligned comparison window appears around ${historicalTrend.labels[topHistoricalIndex]}.`
+                        : null,
+                ].filter(Boolean),
+                'Calendar-aligned historical comparison is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'seasonalPatternInsights',
+                [
+                    seasonalPattern?.missing?.historical_average ? 'Seasonal comparison data is unavailable for the current scope.' : null,
+                    !seasonalPattern?.missing?.historical_average
+                        ? `${seasonalPattern.current_season === 'dry' ? 'Dry' : 'Wet'} season is being compared against its historical average from the available multi-year dataset.`
+                        : null,
+                ].filter(Boolean),
+                'Seasonal fire pattern is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'monthlyPatternInsights',
+                [
+                    monthlyPattern?.missing?.historical_average ? 'There is not enough historical monthly data to identify recurring same-month baselines.' : null,
+                    topMonthlyIndex >= 0 && monthlyPattern.labels?.[topMonthlyIndex]
+                        ? `${monthlyPattern.labels[topMonthlyIndex]} shows the highest historical baseline average in the stored monthly dataset.`
+                        : null,
+                ].filter(Boolean),
+                'Monthly fire pattern is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'dayOfWeekPatternInsights',
+                [
+                    dayOfWeekPattern?.missing?.historical_average ? 'Historical weekday baseline data is unavailable for the current scope.' : null,
+                    !dayOfWeekPattern?.missing?.historical_average ? 'Weekday activity is compared against the 3-year average for equivalent calendar-aligned periods.' : null,
+                ].filter(Boolean),
+                'Weekday pattern is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'mlTrendInsights',
+                [
+                    mlTrendAnalysis?.missing?.series ? 'No saved analysis history is available yet for the ML trend comparison chart.' : null,
+                    mlTrendSeries.length > 1 ? `This panel compares ${mlTrendSeries.length} saved analysis run(s) so you can track how incident counts, predicted incidents, and confidence have been moving over time.` : null,
+                ].filter(Boolean),
+                'ML trend analysis is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'weatherPatternInsights',
+                [
+                    weatherPattern?.missing?.actual_incidents ? 'Historical incident-weather records are unavailable for the current scope.' : null,
+                    weatherPattern?.missing?.temperature_2m ? 'temperature_2m history is missing from the available incident-weather records.' : null,
+                    weatherPattern?.missing?.relative_humidity_2m ? 'relative_humidity_2m history is missing from the available incident-weather records.' : null,
+                    weatherPattern?.missing?.wind_speed_10m ? 'wind_speed_10m history is missing from the available incident-weather records.' : null,
+                    !weatherPattern?.missing?.precipitation ? 'Open-Meteo precipitation readings are now available for newer live incident contexts.' : null,
+                    !weatherPattern?.missing?.wind_gusts_10m ? 'Open-Meteo wind_gusts_10m readings are available for newer live incident contexts.' : null,
+                ].filter(Boolean),
+                'Weather and fire pattern data is unavailable for the current dataset.'
+            );
             setInsightList(
                 'dailyTrendInsights',
                 [
@@ -4300,11 +6277,86 @@
                 'hourlyPatternInsights',
                 [
                     chartInsights[3],
-                    hourly?.missing?.historical_baseline ? 'Historical baseline data is unavailable for the hourly comparison chart.' : null,
+                    hourly?.missing?.historical_baseline ? '3-year historical time-of-day baseline data is unavailable for the hourly comparison chart.' : null,
                     hourly?.missing?.predicted_probability ? 'Predicted peak-hour probability data is unavailable for the current selection.' : null,
                 ].filter(Boolean),
                 'Hourly pattern insight is unavailable for the current dataset.'
             );
+            setInsightList(
+                'forecastCompareInsights',
+                [
+                    historicalVsPredicted?.missing?.actual_incidents ? 'Calendar-aligned historical totals are unavailable for the comparison panel.' : null,
+                    historicalVsPredicted?.missing?.historical_baseline ? 'The 3-year historical baseline could not be calculated for this scope.' : null,
+                    historicalVsPredicted?.missing?.current_actual ? 'Current actual totals are not available for this target period.' : null,
+                    historicalVsPredicted?.missing?.forecast_incidents ? 'Forecast incident count is unavailable for this selection, so only the historical series can be reviewed.' : null,
+                    historicalVsPredicted?.forecast_label
+                        ? `The forecast column is reserved for ${historicalVsPredicted.forecast_label} so Historical, 3-Year Baseline, Current Actual, and Forecast stay visually separate.`
+                        : null,
+                ].filter(Boolean),
+                'Historical versus forecast comparison is unavailable for the current dataset.'
+            );
+
+            renderModelLearningPerformance(analysisData);
+        }
+
+        function renderPredictionFactors(analysisData) {
+            const panel = document.getElementById('predictionFactorsPanel');
+            if (!panel) return;
+
+            const chartContext = analysisData.chart_context || {};
+            const factorContext = chartContext.prediction_factors || {};
+            const prediction = analysisData.predictions || {};
+            const drivers = Array.isArray(factorContext.drivers) && factorContext.drivers.length
+                ? factorContext.drivers
+                : (Array.isArray(prediction.drivers)
+                    ? prediction.drivers.map((driver) => typeof driver === 'string' ? driver : (driver?.summary || null)).filter(Boolean)
+                    : []);
+            const watchItems = Array.isArray(factorContext.watch_items) ? factorContext.watch_items : [];
+            const operationalFactors = Array.isArray(analysisData.risk_factors) ? analysisData.risk_factors.filter(Boolean) : [];
+            const targetLabel = factorContext.target_label || 'Current forecast window';
+            const selectedBarangay = factorContext.selected_barangay || 'Station-wide scope';
+            const confidenceBand = factorContext.confidence_band || analysisData.confidence_score || 'Unavailable';
+
+            const renderChipList = (items, icon, emptyText) => {
+                if (!items.length) {
+                    return `<span class="prediction-factor-chip prediction-factor-chip--muted"><i class="fa-solid fa-circle-info"></i>${escapeHtml(emptyText)}</span>`;
+                }
+
+                return items.map((item) => `
+                    <span class="prediction-factor-chip">
+                        <i class="fa-solid ${icon}"></i>${escapeHtml(String(item))}
+                    </span>
+                `).join('');
+            };
+
+            panel.innerHTML = `
+                <div class="prediction-factors-group">
+                    <div class="prediction-factors-group__title">Forecast context</div>
+                    <div class="prediction-factors-chips">
+                        <span class="prediction-factor-chip"><i class="fa-solid fa-calendar"></i>${escapeHtml(String(targetLabel))}</span>
+                        <span class="prediction-factor-chip"><i class="fa-solid fa-location-dot"></i>${escapeHtml(String(selectedBarangay))}</span>
+                        <span class="prediction-factor-chip"><i class="fa-solid fa-shield-halved"></i>${escapeHtml(String(confidenceBand))}</span>
+                    </div>
+                </div>
+                <div class="prediction-factors-group">
+                    <div class="prediction-factors-group__title">Main model drivers</div>
+                    <div class="prediction-factors-chips">
+                        ${renderChipList(drivers, 'fa-circle-nodes', 'No model drivers were returned for this forecast yet.')}
+                    </div>
+                </div>
+                <div class="prediction-factors-group">
+                    <div class="prediction-factors-group__title">Forecast watch items</div>
+                    <div class="prediction-factors-chips">
+                        ${renderChipList(watchItems, 'fa-eye', 'No watch items were returned for this forecast yet.')}
+                    </div>
+                </div>
+                <div class="prediction-factors-group">
+                    <div class="prediction-factors-group__title">Current operational contributors</div>
+                    <div class="prediction-factors-chips">
+                        ${renderChipList(operationalFactors, 'fa-triangle-exclamation', 'No current operational contributors were identified for this scope.')}
+                    </div>
+                </div>
+            `;
         }
 
         function showPredictionApiError(message, details = null) {
@@ -4462,9 +6514,32 @@
         }
 
         async function runAIAnalysis(locationId, predictionScope = 'current_month') {
-            startAnalyticsLoading(predictionScope);
-
             const periodDays = document.getElementById('periodSelect').value;
+            const scopeMeta = getSelectedScopeMeta();
+
+            try {
+                const existingSnapshot = await fetchScopedAnalysisSnapshot(predictionScope);
+                if (existingSnapshot?.success && existingSnapshot?.data?.analysis_id) {
+                    const scopeLabel = scopeMeta.barangayId !== 'all'
+                        ? `${scopeMeta.barangayName} under ${scopeMeta.stationName}`
+                        : `${scopeMeta.stationName} station-wide`;
+                    const confirmed = await showAnalyticsConfirm({
+                        eyebrow: 'Replace saved forecast',
+                        title: 'Overwrite existing saved analysis?',
+                        message: `A saved ${predictionScope === 'next_month' ? 'next-month' : 'current-month'} forecast already exists for ${scopeLabel}. Running this again will replace that saved result for the same scope.`,
+                        cancelText: 'Keep existing',
+                        acceptText: 'Replace forecast',
+                    });
+
+                    if (!confirmed) {
+                        return;
+                    }
+                }
+            } catch (snapshotError) {
+                console.warn('Scoped snapshot pre-check skipped:', snapshotError);
+            }
+
+            startAnalyticsLoading(predictionScope);
 
             try {
                 const response = await fetch('/api/station-admin/predictions', {
@@ -4478,7 +6553,8 @@
                         location_id: locationId,
                         barangay_id: document.getElementById('barangaySelect')?.value || 'all',
                         days: parseInt(periodDays),
-                        prediction_scope: predictionScope
+                        prediction_scope: predictionScope,
+                        historical_window: document.getElementById('historicalWindowSelect')?.value || '3'
                     })
                 });
                 
@@ -4511,6 +6587,8 @@
                     const aiModelLabel = formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction);
                     document.getElementById('selectedStationBadge').innerHTML = `<i class="fa-solid fa-location-dot"></i> ${result.location_name || 'Selected Location'} · ${scopeLabel}${aiModelLabel ? ` · <i class="fa-solid fa-microchip"></i> ${aiModelLabel}` : ''}`;
                     updateRecommendationScopeLabel();
+                    loadForecastNarrativeRuns(result.data).catch((error) => console.error('Forecast narrative refresh error:', error));
+                    loadRecommendationRunGroups(result.data).catch((error) => console.error('Recommendation run refresh error:', error));
                 } else {
                     showPredictionApiError(result.message || 'Analysis failed', result.details || null);
                 }
@@ -5199,7 +7277,15 @@
             }
             const predictionContainer = document.getElementById('aiPrediction');
             const prediction = analysisData.predictions || null;
+            const historicalWindowSelect = document.getElementById('historicalWindowSelect');
+            if (historicalWindowSelect && analysisData.historical_window) {
+                historicalWindowSelect.value = String(analysisData.historical_window);
+            }
             updateTargetMonthDisplay(analysisData.prediction_scope || 'current_month', analysisData.prediction_context || null);
+            updateHistoricalWindowBadge(
+                analysisData.chart_context?.historical_window_meta?.label
+                    || getSelectedScopeMeta().historicalWindowLabel
+            );
             updateHeroModelLabel(formatAiModelLabel(analysisData?.ai_models?.recommendation || analysisData?.ai_models?.prediction) || analysisData?.model_metadata?.dataset_kind || 'Latest saved model');
             loadForecastNarrativeRuns(analysisData).catch((error) => {
                 console.error('Forecast narrative list load failed:', error);
@@ -5238,6 +7324,7 @@
 
             renderPredictionSummary(analysisData);
             renderCharts(analysisData);
+            renderPredictionFactors(analysisData);
 
             loadRecommendationRunGroups(analysisData).catch((error) => {
                 console.error('Grouped recommendation render failed:', error);
@@ -5333,13 +7420,33 @@
         });
 
         document.getElementById('retrainModelBtn')?.addEventListener('click', retrainForecastModel);
+        document.getElementById('previewHistoricalWeatherBtn')?.addEventListener('click', previewHistoricalWeatherArchive);
+        document.getElementById('saveHistoricalWeatherBtn')?.addEventListener('click', saveHistoricalWeatherArchive);
 
         document.getElementById('stationSelect')?.addEventListener('change', (e) => {
             populateBarangaySelectFromStation(e.target.value);
+            updateRecommendationScopeLabel();
+            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
+            loadForecastNarrativeRuns().catch((error) => console.error('Forecast narrative refresh error:', error));
+            loadRecommendationRunGroups().catch((error) => console.error('Recommendation run refresh error:', error));
+        });
+
+        document.getElementById('barangaySelect')?.addEventListener('change', () => {
+            updateRecommendationScopeLabel();
+            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
+            loadForecastNarrativeRuns().catch((error) => console.error('Forecast narrative refresh error:', error));
+            loadRecommendationRunGroups().catch((error) => console.error('Recommendation run refresh error:', error));
+        });
+
+        document.getElementById('historicalWindowSelect')?.addEventListener('change', () => {
+            updateHistoricalWindowBadge();
+            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
         });
 
         document.addEventListener('DOMContentLoaded', () => {
             replaceChiefAnalyticsFaIcons();
+            updateHistoricalWindowBadge();
+            setHistoricalWeatherSaveButtonState(true);
 
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {

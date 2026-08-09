@@ -513,14 +513,16 @@ class BarangayDashboardController extends Controller
                     'target_date',
                     'assigned_to',
                     'confirmed_by',
+                    'confirmed_at',
                     'confirmation_notes',
                 ])
                 ->with([
                     'assignee:user_id,first_name,middle_name,last_name',
                     'confirmer:user_id,first_name,middle_name,last_name',
-                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,status',
+                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,item_text,status',
                 ])
                 ->where('barangay_id', $barangay->barangay_id)
+                ->where('status', 'confirmed')
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1

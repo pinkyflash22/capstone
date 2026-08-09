@@ -10,6 +10,7 @@ use App\Models\StationOfficer;
 use App\Models\User;
 use App\Models\VoiceCall;
 use App\Services\AgoraTokenService;
+use App\Support\IncidentContextDispatcher;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -392,6 +393,10 @@ class VoiceCallController extends Controller
 
             return $call->load($this->callRelations());
         });
+
+        if ($call->createdIncident) {
+            IncidentContextDispatcher::dispatchFor($call->createdIncident);
+        }
 
         $this->logCallForParticipants($call, $request, 'station created incident from voice call', 'created incident from voice call');
 

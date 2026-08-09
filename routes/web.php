@@ -367,6 +367,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
+        Route::get('/api/historical-weather-preview', [App\Http\Controllers\Chief\AnalyticController::class, 'previewHistoricalWeatherArchive']);
+        Route::post('/api/historical-weather-save', [App\Http\Controllers\Chief\AnalyticController::class, 'saveHistoricalWeatherArchive']);
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);

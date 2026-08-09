@@ -56,10 +56,19 @@ class EnrichIncidentContextJob implements ShouldQueue
                 'is_holiday_or_event_period' => $eventPeriod['is_holiday_or_event_period'],
                 'event_period_label' => $eventPeriod['event_period_label'],
                 'temperature' => $weather['temperature'],
+                'temperature_2m' => $weather['temperature_2m'],
                 'humidity' => $weather['humidity'],
+                'relative_humidity_2m' => $weather['relative_humidity_2m'],
+                'precipitation' => $weather['precipitation'],
+                'rain' => $weather['rain'],
                 'rainfall' => $weather['rainfall'],
                 'wind_speed' => $weather['wind_speed'],
+                'wind_speed_10m' => $weather['wind_speed_10m'],
+                'wind_gusts' => $weather['wind_gusts'],
+                'wind_gusts_10m' => $weather['wind_gusts_10m'],
                 'wind_direction' => $weather['wind_direction'],
+                'wind_direction_10m' => $weather['wind_direction_10m'],
+                'weather_code' => $weather['weather_code'],
                 'weather_condition' => $weather['weather_condition'],
                 'is_dry_season' => $this->isDrySeason($timestamp),
                 'context_source' => $weather['context_source'],
@@ -141,34 +150,46 @@ class EnrichIncidentContextJob implements ShouldQueue
             return $this->emptyWeatherContext('derived');
         }
 
-        $apiKey = trim((string) env('WEATHER_API_KEY', '1432615e15a14140963113518261203'));
-
-        if ($apiKey === '') {
-            return $this->emptyWeatherContext('derived');
-        }
-
         try {
-            $response = Http::timeout(15)->get('http://api.weatherapi.com/v1/current.json', [
-                'key' => $apiKey,
-                'q' => $lat . ',' . $lng,
-                'aqi' => 'no',
+            $response = Http::timeout(15)->get('https://api.open-meteo.com/v1/forecast', [
+                'latitude' => (float) $lat,
+                'longitude' => (float) $lng,
+                'current' => 'temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+                'timezone' => 'Asia/Manila',
             ]);
 
             if (! $response->ok()) {
-                throw new \RuntimeException('Weather API returned status ' . $response->status());
+                throw new \RuntimeException('Open-Meteo API returned status ' . $response->status());
             }
 
             $payload = $response->json();
-            $current = $payload['current'] ?? [];
+            $current = is_array($payload['current'] ?? null) ? $payload['current'] : [];
+            $weatherCode = isset($current['weather_code']) ? (int) $current['weather_code'] : null;
+            $temperature2m = isset($current['temperature_2m']) ? (float) $current['temperature_2m'] : null;
+            $relativeHumidity2m = isset($current['relative_humidity_2m']) ? (float) $current['relative_humidity_2m'] : null;
+            $precipitation = isset($current['precipitation']) ? (float) $current['precipitation'] : null;
+            $rain = isset($current['rain']) ? (float) $current['rain'] : null;
+            $windSpeed10m = isset($current['wind_speed_10m']) ? (float) $current['wind_speed_10m'] : null;
+            $windDirection10m = isset($current['wind_direction_10m']) ? (float) $current['wind_direction_10m'] : null;
+            $windGusts10m = isset($current['wind_gusts_10m']) ? (float) $current['wind_gusts_10m'] : null;
 
             return [
-                'temperature' => isset($current['temp_c']) ? (float) $current['temp_c'] : null,
-                'humidity' => isset($current['humidity']) ? (float) $current['humidity'] : null,
-                'rainfall' => isset($current['precip_mm']) ? (float) $current['precip_mm'] : null,
-                'wind_speed' => isset($current['wind_kph']) ? (float) $current['wind_kph'] : null,
-                'wind_direction' => $current['wind_dir'] ?? null,
-                'weather_condition' => $current['condition']['text'] ?? null,
-                'context_source' => 'weatherapi',
+                'temperature' => $temperature2m,
+                'temperature_2m' => $temperature2m,
+                'humidity' => $relativeHumidity2m,
+                'relative_humidity_2m' => $relativeHumidity2m,
+                'precipitation' => $precipitation,
+                'rain' => $rain,
+                'rainfall' => $precipitation,
+                'wind_speed' => $windSpeed10m,
+                'wind_speed_10m' => $windSpeed10m,
+                'wind_gusts' => $windGusts10m,
+                'wind_gusts_10m' => $windGusts10m,
+                'wind_direction' => $windDirection10m !== null ? (string) $windDirection10m : null,
+                'wind_direction_10m' => $windDirection10m,
+                'weather_code' => $weatherCode,
+                'weather_condition' => $this->describeOpenMeteoWeatherCode($weatherCode),
+                'context_source' => 'open-meteo',
             ];
         } catch (\Throwable $exception) {
             Log::warning('Incident context weather enrichment failed: ' . $exception->getMessage(), [
@@ -183,13 +204,44 @@ class EnrichIncidentContextJob implements ShouldQueue
     {
         return [
             'temperature' => null,
+            'temperature_2m' => null,
             'humidity' => null,
+            'relative_humidity_2m' => null,
+            'precipitation' => null,
+            'rain' => null,
             'rainfall' => null,
             'wind_speed' => null,
+            'wind_speed_10m' => null,
+            'wind_gusts' => null,
+            'wind_gusts_10m' => null,
             'wind_direction' => null,
+            'wind_direction_10m' => null,
+            'weather_code' => null,
             'weather_condition' => null,
             'context_source' => $contextSource,
         ];
+    }
+
+    private function describeOpenMeteoWeatherCode(?int $code): ?string
+    {
+        return match ($code) {
+            0 => 'Clear sky',
+            1 => 'Mainly clear',
+            2 => 'Partly cloudy',
+            3 => 'Overcast',
+            45, 48 => 'Fog',
+            51, 53, 55 => 'Drizzle',
+            56, 57 => 'Freezing drizzle',
+            61, 63, 65 => 'Rain',
+            66, 67 => 'Freezing rain',
+            71, 73, 75 => 'Snow fall',
+            77 => 'Snow grains',
+            80, 81, 82 => 'Rain showers',
+            85, 86 => 'Snow showers',
+            95 => 'Thunderstorm',
+            96, 99 => 'Thunderstorm with hail',
+            default => null,
+        };
     }
 
     private function resolveSeason(Carbon $timestamp): string

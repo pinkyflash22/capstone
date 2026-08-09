@@ -73,12 +73,30 @@ class HistoricalFireIncidentSynchronizer
                 ?? $historical->estimated_damage,
             'temperature' => $historical->temperature
                 ?? ($context?->temperature !== null ? (float) $context->temperature : null),
+            'temperature_2m' => $historical->temperature_2m
+                ?? ($context?->temperature_2m !== null ? (float) $context->temperature_2m : null),
             'humidity' => $historical->humidity
                 ?? ($context?->humidity !== null ? (float) $context->humidity : null),
+            'relative_humidity_2m' => $historical->relative_humidity_2m
+                ?? ($context?->relative_humidity_2m !== null ? (float) $context->relative_humidity_2m : null),
+            'precipitation' => $historical->precipitation
+                ?? ($context?->precipitation !== null ? (float) $context->precipitation : null),
+            'rain' => $historical->rain
+                ?? ($context?->rain !== null ? (float) $context->rain : null),
             'wind_speed' => $historical->wind_speed
                 ?? ($context?->wind_speed !== null ? (float) $context->wind_speed : null),
+            'wind_speed_10m' => $historical->wind_speed_10m
+                ?? ($context?->wind_speed_10m !== null ? (float) $context->wind_speed_10m : null),
+            'wind_gusts' => $historical->wind_gusts
+                ?? ($context?->wind_gusts !== null ? (float) $context->wind_gusts : null),
+            'wind_gusts_10m' => $historical->wind_gusts_10m
+                ?? ($context?->wind_gusts_10m !== null ? (float) $context->wind_gusts_10m : null),
             'wind_direction' => $historical->wind_direction
                 ?? $context?->wind_direction,
+            'wind_direction_10m' => $historical->wind_direction_10m
+                ?? ($context?->wind_direction_10m !== null ? (float) $context->wind_direction_10m : null),
+            'weather_code' => $historical->weather_code
+                ?? $context?->weather_code,
             'weather_condition' => $historical->weather_condition
                 ?? $context?->weather_condition,
             'notes' => static::buildNotes($barangayFireRecord?->notes, $spotReport, $progressReport, $historical->notes),

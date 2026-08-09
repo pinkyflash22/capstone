@@ -30,20 +30,29 @@
 
     $aiChecklistRecords = $aiActionPlanChecklists->map(function ($item) use ($aiMitigationCountByChecklist) {
         $progress = $item->checklist_progress;
+        $checklistSteps = $item->items
+            ->pluck('item_text')
+            ->filter()
+            ->values();
+        $stepPreview = $checklistSteps->take(4)->map(fn ($step) => '• ' . $step)->implode(' ');
+        $detailText = $item->plan_description ?: $item->source_description ?: 'No AI action-plan description available.';
+        if ($stepPreview !== '') {
+            $detailText .= ' Steps to follow: ' . $stepPreview;
+        }
 
         return (object) [
             'source' => 'ai_action_plan',
-            'source_label' => 'AI Action-Plan Checklist',
-            'workflow_label' => 'Mitigation Action Plan',
+            'source_label' => 'Chief-Approved AI Action Plan',
+            'workflow_label' => 'Approved Barangay Checklist',
             'title' => $item->plan_title,
-            'detail' => $item->plan_description ?: $item->source_description ?: 'No AI action-plan description available.',
+            'detail' => $detailText,
             'priority_level' => $item->priority_level,
             'status_key' => $item->status,
-            'status_family' => in_array($item->status, ['confirmed'], true) ? 'completed' : (in_array($item->status, ['in_progress', 'submitted'], true) ? 'in_progress' : 'pending'),
+            'status_family' => ($progress['percent'] ?? 0) >= 100 ? 'completed' : (($progress['percent'] ?? 0) > 0 ? 'in_progress' : 'pending'),
             'target_date' => $item->target_date,
             'assignment' => $item->assignee?->full_name ?? 'Station command',
-            'reviewer' => $item->confirmer?->full_name ?? 'Awaiting command confirmation',
-            'completion_note' => $item->confirmation_notes ?: ($progress['followed'] ?? 0) . ' of ' . ($progress['total'] ?? 0) . ' checklist steps followed.',
+            'reviewer' => $item->confirmer?->full_name ?? 'Chief / Station command',
+            'completion_note' => $item->confirmation_notes ?: ($progress['followed'] ?? 0) . ' of ' . ($progress['total'] ?? 0) . ' approved checklist steps already marked followed.',
             'linked_mitigation_count' => (int) ($aiMitigationCountByChecklist[$item->ai_action_plan_checklist_id] ?? 0),
             'progress_percent' => (int) ($progress['percent'] ?? 0),
         ];
