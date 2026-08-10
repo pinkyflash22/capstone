@@ -6495,6 +6495,31 @@
             }, 450);
         }
 
+        function setAnalyticsActionButtonsBusy(isBusy, activeMode = 'current_month') {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const predictBtn = document.getElementById('predictNextMonthBtn');
+            const previewBtn = document.getElementById('previewHistoricalWeatherBtn');
+            const buttons = [analyzeBtn, predictBtn, previewBtn].filter(Boolean);
+
+            buttons.forEach((button) => {
+                button.disabled = isBusy;
+                button.style.opacity = isBusy ? '0.7' : '';
+                button.style.pointerEvents = isBusy ? 'none' : '';
+            });
+
+            if (analyzeBtn) {
+                analyzeBtn.style.boxShadow = isBusy && activeMode === 'current_month'
+                    ? '0 0 0 3px rgba(220, 38, 38, 0.12)'
+                    : '';
+            }
+
+            if (predictBtn) {
+                predictBtn.style.boxShadow = isBusy && activeMode === 'next_month'
+                    ? '0 0 0 3px rgba(234, 88, 12, 0.12)'
+                    : '';
+            }
+        }
+
         async function finishAnalyticsLoading(mode = 'analysis') {
             const overlay = document.getElementById('loadingOverlay');
             if (!overlay) return;
@@ -6516,6 +6541,12 @@
         async function runAIAnalysis(locationId, predictionScope = 'current_month') {
             const periodDays = document.getElementById('periodSelect').value;
             const scopeMeta = getSelectedScopeMeta();
+            const precheckLabel = predictionScope === 'next_month'
+                ? 'Checking saved next-month forecast…'
+                : 'Checking saved analysis…';
+
+            setAnalyticsActionButtonsBusy(true, predictionScope);
+            setScopedForecastLoading(true, precheckLabel);
 
             try {
                 const existingSnapshot = await fetchScopedAnalysisSnapshot(predictionScope);
@@ -6537,6 +6568,8 @@
                 }
             } catch (snapshotError) {
                 console.warn('Scoped snapshot pre-check skipped:', snapshotError);
+            } finally {
+                setScopedForecastLoading(false);
             }
 
             startAnalyticsLoading(predictionScope);
@@ -6597,6 +6630,7 @@
                 showPredictionApiError('Failed to run AI analysis.', error.message);
             } finally {
                 await finishAnalyticsLoading(predictionScope);
+                setAnalyticsActionButtonsBusy(false, predictionScope);
             }
         }
 

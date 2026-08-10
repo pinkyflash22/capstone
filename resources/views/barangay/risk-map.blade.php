@@ -608,7 +608,10 @@
                             <div class="barangay-risk-field barangay-risk-field--full">
                                 <label for="risk_area_photos">Photo Evidence</label>
                                 <input id="risk_area_photos" name="photos[]" type="file" multiple accept=".jpg,.jpeg,.png,.webp" class="barangay-risk-file bg-white">
-                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-camera text-orange-500 mr-1"></i>Add up to 5 clear photos, 5 MB each.</p>
+                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-camera text-orange-500 mr-1"></i>Optional: upload 1 to 3 clear photos, with a combined total of up to 5 MB.</p>
+                                <div id="barangayRiskPhotoUploadStatus" class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600" aria-live="polite">
+                                    No photos selected yet. You can save without photos, or add up to 3 images.
+                                </div>
                             </div>
                         </div>
 
@@ -696,7 +699,7 @@
                                     <strong>Optional evidence kept with the record</strong>
                                 </div>
                             </div>
-                            <button type="submit" class="barangay-risk-submit">
+                            <button type="submit" id="barangayRiskSubmitButton" class="barangay-risk-submit">
                                 <i class="fa-solid fa-floppy-disk"></i>
                                 Save Risk Marker
                             </button>
@@ -806,6 +809,111 @@
         if (typeof L === 'undefined') {
             return;
         }
+
+        function formatBarangayRiskFileSize(bytes = 0) {
+            const normalizedBytes = Number(bytes) || 0;
+
+            if (normalizedBytes >= 1024 * 1024) {
+                return `${(normalizedBytes / (1024 * 1024)).toFixed(2)} MB`;
+            }
+
+            if (normalizedBytes >= 1024) {
+                return `${Math.round(normalizedBytes / 1024)} KB`;
+            }
+
+            return `${normalizedBytes} B`;
+        }
+
+        function setBarangayRiskPhotoUploadStatus(message, tone = 'neutral') {
+            const statusNode = document.getElementById('barangayRiskPhotoUploadStatus');
+            if (!statusNode) {
+                return;
+            }
+
+            statusNode.textContent = message;
+            statusNode.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-amber-200', 'bg-amber-50', 'text-amber-700', 'border-red-200', 'bg-red-50', 'text-red-700');
+
+            if (tone === 'success') {
+                statusNode.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
+                return;
+            }
+
+            if (tone === 'loading') {
+                statusNode.classList.add('border-amber-200', 'bg-amber-50', 'text-amber-700');
+                return;
+            }
+
+            if (tone === 'error') {
+                statusNode.classList.add('border-red-200', 'bg-red-50', 'text-red-700');
+                return;
+            }
+
+            statusNode.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+        }
+
+        function setBarangayRiskSubmitAvailability(isEnabled) {
+            const submitButton = document.getElementById('barangayRiskSubmitButton');
+            if (!submitButton) {
+                return;
+            }
+
+            submitButton.disabled = !isEnabled;
+            submitButton.style.opacity = isEnabled ? '' : '0.6';
+            submitButton.style.pointerEvents = isEnabled ? '' : 'none';
+            submitButton.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
+        }
+
+        function evaluateBarangayRiskPhotoSelection() {
+            const maxPhotoCount = 3;
+            const maxPhotoTotalBytes = 5 * 1024 * 1024;
+            const photoInput = document.getElementById('risk_area_photos');
+            const files = Array.from(photoInput?.files || []);
+
+            if (files.length === 0) {
+                return {
+                    isValid: true,
+                    message: 'No photos selected yet. You can save without photos, or add up to 3 images.',
+                    tone: 'neutral',
+                };
+            }
+
+            if (files.length > maxPhotoCount) {
+                return {
+                    isValid: false,
+                    message: 'Too many photos selected. Upload up to 3 images only.',
+                    tone: 'error',
+                };
+            }
+
+            const totalBytes = files.reduce((sum, file) => sum + (Number(file?.size) || 0), 0);
+
+            if (totalBytes > maxPhotoTotalBytes) {
+                return {
+                    isValid: false,
+                    message: `Selected photos total ${formatBarangayRiskFileSize(totalBytes)}. Keep the combined upload within 5.00 MB.`,
+                    tone: 'error',
+                };
+            }
+
+            return {
+                isValid: true,
+                message: `${files.length} photo(s) ready to upload • ${formatBarangayRiskFileSize(totalBytes)} total`,
+                tone: 'success',
+            };
+        }
+
+        function refreshBarangayRiskPhotoUploadState() {
+            setBarangayRiskPhotoUploadStatus('Checking selected photos...', 'loading');
+
+            window.setTimeout(() => {
+                const result = evaluateBarangayRiskPhotoSelection();
+                setBarangayRiskPhotoUploadStatus(result.message, result.tone);
+                setBarangayRiskSubmitAvailability(result.isValid);
+            }, 60);
+        }
+
+        document.getElementById('risk_area_photos')?.addEventListener('change', refreshBarangayRiskPhotoUploadState);
+        refreshBarangayRiskPhotoUploadState();
 
         const riskAreaRecords = @json($riskAreaMapPayload);
         const fallbackMarkerRecords = @json($fallbackMarkerMapPayload);

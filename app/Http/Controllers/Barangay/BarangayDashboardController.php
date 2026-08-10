@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Barangay;
 
+use App\Http\Controllers\RiskAreaReviewController;
 use App\Http\Controllers\Controller;
 use App\Models\AiActionPlanChecklist;
 use App\Models\Barangay;
@@ -35,6 +36,10 @@ use Illuminate\Validation\ValidationException;
 
 class BarangayDashboardController extends Controller
 {
+    private const RISK_HAZARD_REPORTS_DIRECTORY = 'riskhazard';
+    private const RISK_HAZARD_REPORTS_MAX_FILES = 3;
+    private const RISK_HAZARD_REPORTS_MAX_TOTAL_BYTES = 5242880;
+
     protected function riskTypeOptions(): array
     {
         return [
@@ -808,9 +813,34 @@ class BarangayDashboardController extends Controller
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'photos' => ['nullable', 'array', 'max:5'],
-            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photos' => ['nullable', 'array', 'max:' . self::RISK_HAZARD_REPORTS_MAX_FILES],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp'],
         ];
+    }
+
+    protected function validateRiskHazardPhotoUpload(Request $request): void
+    {
+        $photos = collect($request->file('photos', []))
+            ->filter()
+            ->values();
+
+        if ($photos->isEmpty()) {
+            return;
+        }
+
+        if ($photos->count() > self::RISK_HAZARD_REPORTS_MAX_FILES) {
+            throw ValidationException::withMessages([
+                'photos' => 'You may upload up to 3 photos only.',
+            ]);
+        }
+
+        $totalBytes = $photos->sum(fn ($photo) => (int) $photo->getSize());
+
+        if ($totalBytes > self::RISK_HAZARD_REPORTS_MAX_TOTAL_BYTES) {
+            throw ValidationException::withMessages([
+                'photos' => 'The selected photos exceed the 5 MB total upload limit.',
+            ]);
+        }
     }
 
     protected function buildRiskAreaStructuredNotes(array $validated): string
@@ -1248,6 +1278,7 @@ class BarangayDashboardController extends Controller
             : 'barangay.risk-map';
 
         $validated = $request->validate($this->riskAreaValidationRules());
+        $this->validateRiskHazardPhotoUpload($request);
         $this->assertRiskAreaSelectionValidity($validated);
 
         $context = $this->resolveBarangayContext();
@@ -1322,7 +1353,7 @@ class BarangayDashboardController extends Controller
                 }
 
                 $storedPath = MediaPath::storeForDisk(
-                    $photo->store('risk-areas', 'supabase'),
+                    $photo->store(self::RISK_HAZARD_REPORTS_DIRECTORY, 'supabase'),
                     'supabase'
                 );
 
@@ -1338,6 +1369,7 @@ class BarangayDashboardController extends Controller
         });
 
         BarangayNotificationService::notifyRiskAreaSubmitted($riskArea);
+        RiskAreaReviewController::flushRiskReviewCache();
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -1355,6 +1387,7 @@ class BarangayDashboardController extends Controller
     public function updateRiskArea(Request $request, int $riskAreaId)
     {
         $validated = $request->validate($this->riskAreaValidationRules());
+        $this->validateRiskHazardPhotoUpload($request);
         $this->assertRiskAreaSelectionValidity($validated);
         $returnRoute = $request->input('return_to') === 'hazards'
             ? 'barangay.hazards'
@@ -1424,7 +1457,7 @@ class BarangayDashboardController extends Controller
                 }
 
                 $storedPath = MediaPath::storeForDisk(
-                    $photo->store('risk-areas', 'supabase'),
+                    $photo->store(self::RISK_HAZARD_REPORTS_DIRECTORY, 'supabase'),
                     'supabase'
                 );
 
@@ -1440,6 +1473,7 @@ class BarangayDashboardController extends Controller
         });
 
         BarangayNotificationService::notifyRiskAreaSubmitted($riskArea);
+        RiskAreaReviewController::flushRiskReviewCache();
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -1471,6 +1505,7 @@ class BarangayDashboardController extends Controller
 
         UserActivityLogger::log('requested risk area deletion', Auth::user()?->user_id, $request);
         BarangayNotificationService::notifyRiskAreaSubmitted($riskArea->fresh(['barangayHall.barangay']));
+        RiskAreaReviewController::flushRiskReviewCache();
 
         if ($request->expectsJson()) {
             return response()->json([

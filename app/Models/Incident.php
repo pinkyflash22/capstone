@@ -25,6 +25,7 @@ class Incident extends Model
     protected $fillable = [
         'marker_id',
         'status',
+        'station_id',
         'team_id',
         'reported_by',
         'barangay_id',

@@ -1514,7 +1514,7 @@
                 opacity: 0;
                 transform: translateY(12px) scale(0.9);
                 transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-                pointer-events: auto;
+                pointer-events: none;
             }
 
             .citizen-mobile-dock__burst-item::before {
@@ -1529,6 +1529,7 @@
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item {
                 opacity: 1;
                 transform: translateY(0) scale(1);
+                pointer-events: auto;
             }
 
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(2) { transition-delay: 24ms; }
@@ -1617,26 +1618,28 @@
             .citizen-mobile-nav-snackbar {
                 position: fixed;
                 left: 50%;
-                bottom: calc(var(--mobile-bottom-nav-h) + 18px);
+                bottom: calc(var(--mobile-bottom-nav-h) + 30px);
                 z-index: 340;
-                min-width: min(260px, calc(100vw - 40px));
-                max-width: calc(100vw - 32px);
-                min-height: 44px;
-                padding: 10px 14px;
-                border-radius: 14px;
+                min-width: min(220px, calc(100vw - 56px));
+                max-width: min(320px, calc(100vw - 40px));
+                min-height: 40px;
+                padding: 8px 12px;
+                border-radius: 12px;
                 background: rgba(15, 23, 42, 0.94);
                 color: #ffffff;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                gap: 10px;
-                font-size: 0.86rem;
+                gap: 8px;
+                font-size: 0.8rem;
                 font-weight: 800;
-                box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
+                line-height: 1.25;
+                box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
                 opacity: 0;
                 transform: translate(-50%, 12px);
                 pointer-events: none;
                 transition: opacity 0.18s ease, transform 0.18s ease;
+                text-align: center;
             }
 
             .citizen-mobile-nav-snackbar.is-visible {
@@ -1645,13 +1648,13 @@
             }
 
             .citizen-mobile-nav-snackbar__spinner {
-                width: 16px;
-                height: 16px;
+                width: 14px;
+                height: 14px;
                 border-radius: 999px;
                 border: 2px solid rgba(255, 255, 255, 0.32);
                 border-top-color: #ffffff;
                 animation: citizenNavSnackbarSpin 0.72s linear infinite;
-                flex: 0 0 16px;
+                flex: 0 0 14px;
             }
 
             @keyframes citizenNavSnackbarSpin {
@@ -1888,6 +1891,52 @@
     
     console.log('Markers loaded:', window.mapData.usermark.length);
     console.log('Incidents loaded:', window.incidentsData.length);
+
+    const serverOverviewSnapshot = {
+        summary: {
+            active_near_you: Number(@json($activeAlerts ?? 0)),
+            your_reports: Number(@json($userReports ?? 0)),
+            total_reports: Number(@json($overviewReportCount ?? 0)),
+            active_alerts: Number(@json($activeAlerts ?? 0)),
+            risk_percentage: Number(@json($riskPercentage ?? 0)),
+            risk_level: @json($riskLevel ?? 'moderate')
+        },
+        incidents: Array.isArray(window.incidentsData) ? window.incidentsData : [],
+        user_incidents: Array.isArray(window.myReportedIncidents) ? window.myReportedIncidents : [],
+        user_reports: Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [],
+        risk_map_reports: Array.isArray(window.citizenRiskMapReports) ? window.citizenRiskMapReports : [],
+        nearby_incidents: Array.isArray(window.nearbyAlertsData) ? window.nearbyAlertsData : [],
+        requests_count: Number(@json($fsicRequests?->count() ?? 0)),
+    };
+
+    const hydrateCitizenDashboardFromOfflineCache = () => {
+        const cachedOverview = window.pyroPwa?.loadDataset?.('citizen-overview', null);
+        const cachedMarkers = window.pyroPwa?.loadDataset?.('citizen-map-markers', null);
+
+        if (cachedMarkers && Array.isArray(cachedMarkers) && cachedMarkers.length) {
+            window.mapData.usermark = cachedMarkers;
+        } else {
+            window.pyroPwa?.storeDataset?.('citizen-map-markers', window.mapData.usermark || []);
+        }
+
+        if (!cachedOverview) {
+            window.persistCitizenOverviewOfflineData?.(serverOverviewSnapshot);
+            return;
+        }
+
+        window.applyCitizenOverviewData?.(cachedOverview, { fromCache: true });
+
+        if (window.pyroPwa?.isOffline?.()) {
+            window.showCitizenToast?.('Showing your last saved dashboard snapshot while offline.', false, 4200);
+        }
+    };
+
+    if (window.pyroPwa?.isOffline?.()) {
+        hydrateCitizenDashboardFromOfflineCache();
+    } else {
+        window.persistCitizenOverviewOfflineData?.(serverOverviewSnapshot);
+        window.pyroPwa?.storeDataset?.('citizen-map-markers', window.mapData.usermark || []);
+    }
 
 });
 
@@ -2563,10 +2612,42 @@
 
                     <!-- right side -->
                     <div class="flex items-center space-x-6">
-                        <button class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition flex items-center gap-2">
-                            <i class="fa-solid fa-phone-alt"></i>
-                            <span class="hidden sm:inline">SOS</span>
-                        </button>
+                        <div class="relative">
+                            <button id="citizenSosBtn" type="button" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition flex items-center gap-2" aria-expanded="false" aria-haspopup="true" aria-controls="citizenSosMenu">
+                                <i class="fa-solid fa-phone-alt"></i>
+                                <span class="hidden sm:inline">SOS</span>
+                            </button>
+                            <div id="citizenSosMenu" class="hidden absolute right-0 top-full mt-3 w-64 rounded-2xl border border-orange-100 bg-white p-3 shadow-2xl z-[120]" role="menu" aria-label="Emergency actions">
+                                <div class="mb-2 px-1">
+                                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Emergency Actions</p>
+                                    <p class="mt-1 text-xs text-slate-500">Use the same quick emergency actions from the mobile hub.</p>
+                                </div>
+                                <div class="grid gap-2">
+                                    <button type="button" class="w-full rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-left text-amber-900 hover:bg-amber-100 transition" data-pyro-voice-call role="menuitem">
+                                        <span class="flex items-center gap-3">
+                                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shrink-0">
+                                                <i class="fa-solid fa-phone-volume"></i>
+                                            </span>
+                                            <span class="mobile-hub-btn__copy">
+                                                <strong class="block text-sm font-bold">Call BFP</strong>
+                                                <small class="block text-xs text-amber-700/80">Agora voice call with your existing fallback flow</small>
+                                            </span>
+                                        </span>
+                                    </button>
+                                    <a href="tel:911" class="block w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-left text-rose-900 hover:bg-rose-100 transition" data-citizen-sos-close role="menuitem">
+                                        <span class="flex items-center gap-3">
+                                            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 shrink-0">
+                                                <i class="fa-solid fa-phone"></i>
+                                            </span>
+                                            <span>
+                                                <strong class="block text-sm font-bold">Call 911</strong>
+                                                <small class="block text-xs text-rose-700/80">Open your phone dialer immediately</small>
+                                            </span>
+                                        </span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- User Profile Dropdown -->
                         <div class="user-dropdown">
@@ -2839,6 +2920,15 @@
                             <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location status</p>
                                 <p id="hazardLocationStatus" class="mt-2 text-sm text-slate-700">Safety concern reports will use your current location unless you pick another point on the map.</p>
+                            </div>
+                        </div>
+
+                        <div class="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
+                            <label for="concernPhotosInput" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Optional photos</label>
+                            <input id="concernPhotosInput" name="photos[]" type="file" multiple accept=".jpg,.jpeg,.png,.webp" class="mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                            <p class="mt-2 text-xs text-slate-500">Last step before submitting: upload 1 to 3 photos, with a combined total of up to 5 MB.</p>
+                            <div id="concernPhotoUploadStatus" class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600" aria-live="polite">
+                                No photos selected yet. You can submit without photos, or add up to 3 images.
                             </div>
                         </div>
                     </div>
@@ -3753,6 +3843,8 @@ if (navigator.geolocation) {
         });
 
         // User Dropdown Toggle
+        const citizenSosBtn = document.getElementById('citizenSosBtn');
+        const citizenSosMenu = document.getElementById('citizenSosMenu');
         const userDropdownBtn = document.getElementById('userDropdownBtn');
         const userDropdownMenu = document.getElementById('userDropdownMenu');
         const myLogsModal = document.getElementById('myLogsModal');
@@ -3761,14 +3853,58 @@ if (navigator.geolocation) {
         const refreshMyLogsBtn = document.getElementById('refreshMyLogsBtn');
         const closeMyLogsModalBtn = document.getElementById('closeMyLogsModal');
 
+        function closeCitizenSosMenu() {
+            if (!citizenSosMenu || !citizenSosBtn) {
+                return;
+            }
+
+            citizenSosMenu.classList.add('hidden');
+            citizenSosBtn.setAttribute('aria-expanded', 'false');
+        }
+
+        function openCitizenSosMenu() {
+            if (!citizenSosMenu || !citizenSosBtn) {
+                return;
+            }
+
+            citizenSosMenu.classList.remove('hidden');
+            citizenSosBtn.setAttribute('aria-expanded', 'true');
+            userDropdownMenu?.classList.remove('show');
+        }
+
+        citizenSosBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            const isOpen = citizenSosMenu && !citizenSosMenu.classList.contains('hidden');
+            if (isOpen) {
+                closeCitizenSosMenu();
+                return;
+            }
+
+            openCitizenSosMenu();
+        });
+
         if (userDropdownBtn) {
             userDropdownBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                closeCitizenSosMenu();
                 userDropdownMenu.classList.toggle('show');
             });
         }
 
+        citizenSosMenu?.querySelectorAll('[data-pyro-voice-call], [data-citizen-sos-close]').forEach((node) => {
+            node.addEventListener('click', () => {
+                closeCitizenSosMenu();
+            });
+        });
+
         document.addEventListener('click', (e) => {
+            if (citizenSosMenu && citizenSosBtn && !citizenSosMenu.classList.contains('hidden')) {
+                if (!citizenSosBtn.contains(e.target) && !citizenSosMenu.contains(e.target)) {
+                    closeCitizenSosMenu();
+                }
+            }
+
             if (userDropdownMenu && userDropdownMenu.classList.contains('show')) {
                 if (!userDropdownBtn.contains(e.target) && !userDropdownMenu.contains(e.target)) {
                     userDropdownMenu.classList.remove('show');
@@ -3823,14 +3959,43 @@ if (navigator.geolocation) {
             return trimmed.length > 140 ? `${trimmed.slice(0, 137)}...` : trimmed;
         }
 
-        function renderMyLogs(logs = []) {
+        let citizenLogsCurrentPage = 1;
+        const citizenLogsPerPage = 10;
+
+        function renderLogsPagination(meta = {}, onPageChange = 'loadMyLogs') {
+            const currentPage = Number(meta?.current_page || 1);
+            const lastPage = Number(meta?.last_page || 1);
+
+            if (lastPage <= 1) {
+                return '';
+            }
+
+            return `
+                <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage <= 1 ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage <= 1 ? 'disabled' : `onclick="${onPageChange}(${currentPage - 1})"`}>
+                        Previous
+                    </button>
+                    <span class="text-xs font-medium text-slate-500">Page ${currentPage} of ${lastPage}</span>
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage >= lastPage ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage >= lastPage ? 'disabled' : `onclick="${onPageChange}(${currentPage + 1})"`}>
+                        Next
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderMyLogs(logs = [], meta = {}) {
             window.citizenUserLogs = logs;
 
             if (!myLogsContainer || !myLogsSummary) {
                 return;
             }
 
-            myLogsSummary.textContent = `${logs.length} log entr${logs.length === 1 ? 'y' : 'ies'} found`;
+            const totalLogs = Number(meta?.total || logs.length || 0);
+            const from = Number(meta?.from || 0);
+            const to = Number(meta?.to || 0);
+            myLogsSummary.textContent = totalLogs
+                ? `Showing ${from}-${to} of ${totalLogs} log entries`
+                : '0 log entries found';
 
             if (!logs.length) {
                 myLogsContainer.innerHTML = `
@@ -3875,19 +4040,21 @@ if (navigator.geolocation) {
                         </div>
                     `).join('')}
                 </div>
+                ${renderLogsPagination(meta, 'loadMyLogs')}
             `;
         }
 
-        async function loadMyLogs() {
+        async function loadMyLogs(page = 1) {
             if (!myLogsContainer || !myLogsSummary) {
                 return;
             }
 
+            citizenLogsCurrentPage = Math.max(1, Number(page || 1));
             myLogsSummary.textContent = 'Loading your activity logs...';
             myLogsContainer.innerHTML = '<div class="text-sm text-slate-500">Loading logs...</div>';
 
             try {
-                const response = await fetch('{{ route('user-logs.index') }}', {
+                const response = await fetch(`{{ route('user-logs.index') }}?page=${citizenLogsCurrentPage}&limit=${citizenLogsPerPage}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -3899,7 +4066,7 @@ if (navigator.geolocation) {
                 }
 
                 const payload = await response.json();
-                renderMyLogs(Array.isArray(payload?.data) ? payload.data : []);
+                renderMyLogs(Array.isArray(payload?.data) ? payload.data : [], payload?.meta || {});
             } catch (error) {
                 console.error('Error loading user logs:', error);
                 myLogsSummary.textContent = 'Unable to load your activity logs';
@@ -3920,8 +4087,10 @@ if (navigator.geolocation) {
                 myLogsModal.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
             }
-            loadMyLogs();
+            loadMyLogs(1);
         }
+
+        window.loadMyLogs = loadMyLogs;
 
         function closeMyLogsModal() {
             if (myLogsModal) {
@@ -4134,6 +4303,32 @@ if (navigator.geolocation) {
             updateCitizenFireLocationUi();
         }
 
+        function cancelCitizenHazardReportFlow() {
+            stopCitizenHazardMapPick();
+            citizenHazardDraft.mode = 'current';
+            citizenHazardDraft.selectedLat = window.userCoords?.ready
+                ? Number(window.userCoords.currentLatitude)
+                : null;
+            citizenHazardDraft.selectedLng = window.userCoords?.ready
+                ? Number(window.userCoords.currentLongitude)
+                : null;
+            updateCitizenHazardLocationUi();
+            hideCitizenModal(document.getElementById('concernReportModal'));
+        }
+
+        function cancelCitizenFireReportFlow() {
+            stopCitizenFireMapPick();
+            citizenFireDraft.mode = 'current';
+            citizenFireDraft.selectedLat = window.userCoords?.ready
+                ? Number(window.userCoords.currentLatitude)
+                : null;
+            citizenFireDraft.selectedLng = window.userCoords?.ready
+                ? Number(window.userCoords.currentLongitude)
+                : null;
+            updateCitizenFireLocationUi();
+            hideCitizenModal(document.getElementById('fireIncidentModal'));
+        }
+
         function startCitizenHazardMapPick() {
             if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
                 window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
@@ -4166,8 +4361,8 @@ if (navigator.geolocation) {
 
                 citizenHazardDraft.circle = L.circle([originLat, originLng], {
                     radius: 100,
-                    color: '#f59e0b',
-                    fillColor: '#fbbf24',
+                    color: '#16a34a',
+                    fillColor: '#22c55e',
                     fillOpacity: 0.16,
                     weight: 2,
                 }).addTo(window.usermap);
@@ -4244,8 +4439,8 @@ if (navigator.geolocation) {
 
                 citizenFireDraft.circle = L.circle([originLat, originLng], {
                     radius: 100,
-                    color: '#c63d26',
-                    fillColor: '#f97316',
+                    color: '#16a34a',
+                    fillColor: '#22c55e',
                     fillOpacity: 0.14,
                     weight: 2,
                 }).addTo(window.usermap);
@@ -4416,13 +4611,13 @@ if (navigator.geolocation) {
 
         document.querySelectorAll('[data-fire-modal-close], #closeFireModal').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
-                hideCitizenModal(document.getElementById('fireIncidentModal'));
+                cancelCitizenFireReportFlow();
             });
         });
 
         document.querySelectorAll('[data-concern-modal-close], #closeConcernModal').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
-                hideCitizenModal(document.getElementById('concernReportModal'));
+                cancelCitizenHazardReportFlow();
             });
         });
 
@@ -4432,6 +4627,10 @@ if (navigator.geolocation) {
 
         document.getElementById('hazardPickOnMapButton')?.addEventListener('click', function() {
             startCitizenHazardMapPick();
+        });
+
+        document.getElementById('concernPhotosInput')?.addEventListener('change', function() {
+            refreshConcernPhotoUploadState();
         });
 
         document.querySelectorAll('.citizen-concern-chip').forEach((chip) => {
@@ -4450,6 +4649,7 @@ if (navigator.geolocation) {
         });
 
         setCitizenConcernType(document.getElementById('concernTypeSelect')?.value || 'unsure');
+        refreshConcernPhotoUploadState();
 
         document.getElementById('fireUseCurrentLocationButton')?.addEventListener('click', function() {
             setCitizenFireCurrentLocation();
@@ -4769,6 +4969,116 @@ function removeOptimisticCitizenConcernMarker(optimisticId) {
     }
 }
 
+function formatCitizenFileSize(bytes = 0) {
+    const normalizedBytes = Number(bytes) || 0;
+
+    if (normalizedBytes >= 1024 * 1024) {
+        return `${(normalizedBytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    if (normalizedBytes >= 1024) {
+        return `${Math.round(normalizedBytes / 1024)} KB`;
+    }
+
+    return `${normalizedBytes} B`;
+}
+
+function setConcernPhotoUploadStatus(message, tone = 'neutral') {
+    const statusNode = document.getElementById('concernPhotoUploadStatus');
+    if (!statusNode) {
+        return;
+    }
+
+    statusNode.textContent = message;
+    statusNode.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-amber-200', 'bg-amber-50', 'text-amber-700', 'border-red-200', 'bg-red-50', 'text-red-700');
+
+    if (tone === 'success') {
+        statusNode.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
+        return;
+    }
+
+    if (tone === 'loading') {
+        statusNode.classList.add('border-amber-200', 'bg-amber-50', 'text-amber-700');
+        return;
+    }
+
+    if (tone === 'error') {
+        statusNode.classList.add('border-red-200', 'bg-red-50', 'text-red-700');
+        return;
+    }
+
+    statusNode.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+}
+
+function setCitizenConcernSubmitAvailability(isEnabled) {
+    const submitButton = document.querySelector('.js-citizen-report-action[data-report-kind="concern"]');
+    if (!submitButton) {
+        return;
+    }
+
+    submitButton.disabled = !isEnabled;
+    submitButton.style.opacity = isEnabled ? '' : '0.6';
+    submitButton.style.pointerEvents = isEnabled ? '' : 'none';
+    submitButton.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
+}
+
+function evaluateConcernPhotoSelection() {
+    const maxConcernPhotoCount = 3;
+    const maxConcernPhotoTotalBytes = 5 * 1024 * 1024;
+    const concernPhotosInput = document.getElementById('concernPhotosInput');
+    const concernFiles = Array.from(concernPhotosInput?.files || []);
+
+    if (concernFiles.length === 0) {
+        return {
+            isValid: true,
+            files: concernFiles,
+            totalBytes: 0,
+            message: 'No photos selected yet. You can submit without photos, or add up to 3 images.',
+            tone: 'neutral',
+        };
+    }
+
+    if (concernFiles.length > maxConcernPhotoCount) {
+        return {
+            isValid: false,
+            files: concernFiles,
+            totalBytes: 0,
+            message: 'Too many photos selected. Upload up to 3 images only.',
+            tone: 'error',
+        };
+    }
+
+    const totalBytes = concernFiles.reduce((sum, file) => sum + (Number(file?.size) || 0), 0);
+
+    if (totalBytes > maxConcernPhotoTotalBytes) {
+        return {
+            isValid: false,
+            files: concernFiles,
+            totalBytes,
+            message: `Selected photos total ${formatCitizenFileSize(totalBytes)}. Keep the combined upload within 5.00 MB.`,
+            tone: 'error',
+        };
+    }
+
+    return {
+        isValid: true,
+        files: concernFiles,
+        totalBytes,
+        message: `${concernFiles.length} photo(s) ready to upload • ${formatCitizenFileSize(totalBytes)} total`,
+        tone: 'success',
+    };
+}
+
+function refreshConcernPhotoUploadState() {
+    setConcernPhotoUploadStatus('Checking selected photos...', 'loading');
+
+    window.setTimeout(() => {
+        const result = evaluateConcernPhotoSelection();
+        setConcernPhotoUploadStatus(result.message, result.tone);
+        setCitizenConcernSubmitAvailability(result.isValid);
+    }, 60);
+}
+
 async function submitCitizenQuickReport(reportKind) {
     const description = '';
     const incidentTypeId = 1;
@@ -4776,6 +5086,7 @@ async function submitCitizenQuickReport(reportKind) {
     const concernType = document.getElementById('concernTypeSelect')?.value || 'unsure';
     const concernDetail = document.getElementById('concernConditionDetail')?.value || '';
     const concernNotes = document.getElementById('concernNotesInput')?.value?.trim() || '';
+    const concernPhotosInput = document.getElementById('concernPhotosInput');
     const loadingOverlay = document.getElementById('incidentReportLoadingOverlay');
     const loadingTitle = document.getElementById('incidentReportLoadingTitle');
     const loadingMessage = document.getElementById('incidentReportLoadingMessage');
@@ -4808,6 +5119,17 @@ async function submitCitizenQuickReport(reportKind) {
         return;
     }
 
+    const concernPhotoState = reportKind === 'concern'
+        ? evaluateConcernPhotoSelection()
+        : { isValid: true, files: [] };
+
+    if (reportKind === 'concern' && !concernPhotoState.isValid) {
+        setConcernPhotoUploadStatus(concernPhotoState.message, concernPhotoState.tone);
+        setCitizenConcernSubmitAvailability(false);
+        showIncidentToast?.(concernPhotoState.message, true);
+        return;
+    }
+
     const fireLat = citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null
         ? Number(citizenFireDraft.selectedLat)
         : Number(window.userCoords.currentLatitude);
@@ -4824,6 +5146,11 @@ async function submitCitizenQuickReport(reportKind) {
     let optimisticConcernMarkerId = null;
 
     if (window.pyroPwa?.isOffline?.()) {
+        if (reportKind === 'concern' && concernPhotoState.files.length > 0) {
+            showIncidentToast?.('Photo uploads for risk or hazard reports require an internet connection.', true, 4200);
+            return;
+        }
+
         const firePayload = {
             lat: fireLat,
             lng: fireLng,
@@ -4895,7 +5222,9 @@ async function submitCitizenQuickReport(reportKind) {
     if (loadingTitle) loadingTitle.textContent = reportKind === 'fire' ? 'Sending fire report' : `Submitting ${reportLabels[reportKind] || 'report'}`;
     if (loadingMessage) loadingMessage.textContent = reportKind === 'fire'
         ? 'Saving your fire report now...'
-        : 'Saving your safety concern...';
+        : (concernPhotoState.files.length > 0
+            ? `Uploading ${concernPhotoState.files.length} photo(s) and saving your safety concern...`
+            : 'Saving your safety concern...');
     loadingOverlay?.classList.remove('hidden');
     loadingOverlay?.classList.add('flex');
 
@@ -4922,24 +5251,27 @@ async function submitCitizenQuickReport(reportKind) {
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
         } else {
+            const formData = new FormData();
+            formData.append('report_kind', reportKind);
+            formData.append('concern_type', concernType);
+            formData.append('condition_detail', concernDetail);
+            formData.append('notes', concernNotes);
+            formData.append('lat', String(concernLat));
+            formData.append('lng', String(concernLng));
+            formData.append('user_lat', String(Number(window.userCoords.currentLatitude)));
+            formData.append('user_lng', String(Number(window.userCoords.currentLongitude)));
+            concernPhotoState.files.forEach((file) => {
+                formData.append('photos[]', file);
+            });
+
             const response = await fetch('{{ route('citizen.risk-reports.store') }}', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({
-                    report_kind: reportKind,
-                    concern_type: concernType,
-                    condition_detail: concernDetail,
-                    notes: concernNotes,
-                    lat: concernLat,
-                    lng: concernLng,
-                    user_lat: Number(window.userCoords.currentLatitude),
-                    user_lng: Number(window.userCoords.currentLongitude)
-                })
+                body: formData
             });
 
             const payload = await response.json().catch(() => ({}));
@@ -4982,6 +5314,7 @@ async function submitCitizenQuickReport(reportKind) {
                 document.getElementById('concernIncidentForm')?.reset();
                 setCitizenConcernType('unsure');
                 setCitizenConcernDetail('');
+                refreshConcernPhotoUploadState();
             }
             if (reportKind === 'concern') {
                 citizenHazardDraft.mode = 'current';

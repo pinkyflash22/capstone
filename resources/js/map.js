@@ -2414,6 +2414,10 @@ const currentUserMetaId = String(document.querySelector('meta[name="user-id"]')?
 const currentStationMetaId = String(document.querySelector('meta[name="station-id"]')?.getAttribute('content') || window.userStationId || '').trim();
 window.thisToken = roleToken;
 
+function getMarkerFeedEndpoint() {
+    return currentUserMetaId !== 'guest' ? '/map/markers/feed' : '/api/markers';
+}
+
 const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
     || [2, 3, 4].includes(Number(roleToken));
 const apiKey = "83677a1086d44c4e82f903fd2fe2ea9b";
@@ -3609,6 +3613,16 @@ function inferMarkerImagePath(marker = null, iconConfig = null) {
     if (haystack.includes('station')) return '/station.png';
 
     return null;
+}
+
+function getMarkerPopupImagePath(marker = {}, coord = {}) {
+    return marker?.risk_area_public?.primary_photo_url
+        || marker?.risk_area_public?.photos?.[0]?.photo_url
+        || coord?.risk_area_public?.primary_photo_url
+        || coord?.risk_area_public?.photos?.[0]?.photo_url
+        || marker?.multimedia?.path
+        || coord?.image?.path
+        || null;
 }
 
 function buildImageBackedMarkerHtml({ width, height, borderRadius, imagePath, fallbackIconClass, bgColor, iconFontSize, wrapperClass = '' }) {
@@ -6125,7 +6139,7 @@ async function fetchCoordinate(options = {}) {
             return;
         }
 
-        const response = await fetch('/api/markers');
+        const response = await fetch(getMarkerFeedEndpoint());
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         let coordinates;
@@ -6221,7 +6235,7 @@ async function pollMarkerStateChanges() {
 
     try {
         const [markersResponse, incidentsResponse] = await Promise.all([
-            fetchLiveResponseOnce('markers-poll', '/api/markers', {
+            fetchLiveResponseOnce('markers-poll', getMarkerFeedEndpoint(), {
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken
@@ -6588,10 +6602,6 @@ async function updateCoordinate(data, options = {}) {
             }
             
             addMarkerToFeatureGroup(marker, newMarker);
-            const markerImagePath = marker.multimedia?.path
-                ? '/storage/' + marker.multimedia.path
-                : null;
-
             newMarker.on('click', async () => {
                 const resolvedIncident = findIncidentForMarker(marker, incident);
                 const incidentId = resolvedIncident?.incident_id ?? resolvedIncident?.id ?? marker?.incident_id ?? null;
@@ -6763,7 +6773,10 @@ function generatePopupContent(coord, incidents) {
     const loadingMarkup = coord?.isLoadingDetails && isIncidentMarker(marker)
         ? buildIncidentPopupLoadingMarkup(coord.loadingMessage || 'Loading latest incident details...')
         : '';
-    const imagePath = marker.multimedia?.path ? '/storage/' + marker.multimedia.path : (coord.image?.path ? '/storage/' + coord.image.path : null);
+    const popupImageSource = getMarkerPopupImagePath(marker, coord);
+    const imagePath = popupImageSource && /^https?:\/\//i.test(String(popupImageSource))
+        ? popupImageSource
+        : (popupImageSource ? '/storage/' + String(popupImageSource).replace(/^\/+/, '') : null);
     const sidebarGradient = 'linear-gradient(135deg, #c63d26 0%, #d18a16 100%)';
     const sidebarSoftSurface = 'linear-gradient(135deg, #fff0e8 0%, #fff5dc 100%)';
     const isMobilePopup = window.innerWidth <= 768;
@@ -9515,7 +9528,10 @@ function addPopupEventListeners(coord) {
         if (viewDetailsBtn) {
             viewDetailsBtn.addEventListener('click', async () => {
                 showToast('Fetching details...', 'info');
-                const imagePath = coord.image?.path ? '/storage/' + coord.image.path : (marker.multimedia?.path ? '/storage/' + marker.multimedia.path : null);
+                const popupImageSource = getMarkerPopupImagePath(marker, coord);
+                const imagePath = popupImageSource && /^https?:\/\//i.test(String(popupImageSource))
+                    ? popupImageSource
+                    : (popupImageSource ? '/storage/' + String(popupImageSource).replace(/^\/+/, '') : null);
                 const markerData = { ...marker, category: getCategoryName(marker), created_at: coord.created_at || marker.created_at };
                 let resolvedIncident = findIncidentForMarker(marker, coord.incident);
                 const incidentId = resolvedIncident?.incident_id ?? resolvedIncident?.id ?? marker?.incident_id ?? null;
@@ -9803,7 +9819,7 @@ function deleteMarker(value) {
 async function saveMarker(lat, lng, title, description, categoryId) {
     try {
         const category = getMarkerCategoryEnumValue(categoryId) || categoryId;
-        const markerRes = await fetch('/api/markers', {
+        const markerRes = await fetch(getMarkerFeedEndpoint(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
             body: JSON.stringify({ lat, lng, title, description, category, status: 'active', multimedia_id: 1 })
@@ -11360,7 +11376,7 @@ async function saveMarkerOptimisticallyFromForm(saveButton) {
     showMarkerFeedback('Marker is saving in the background.', 'info', 'Saving marker');
 
     try {
-        const markerResponse = await fetch('/api/markers', {
+        const markerResponse = await fetch(getMarkerFeedEndpoint(), {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -11490,7 +11506,7 @@ setTimeout(() => {
             };
             
             try {
-                const markerResponse = await fetch('/api/markers', {
+                const markerResponse = await fetch(getMarkerFeedEndpoint(), {
                     method: 'POST',
                     headers: jsonHeaders,
                     body: JSON.stringify({ title, description, lat: selectedLat, lng: selectedLng, category: categoryEnum, status: 'active' })

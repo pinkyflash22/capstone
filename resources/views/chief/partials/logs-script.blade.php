@@ -13,6 +13,8 @@
         const showMyChiefLogsBtn = document.getElementById('showMyChiefLogsBtn');
         const showAllChiefLogsBtn = document.getElementById('showAllChiefLogsBtn');
         let chiefLogsMode = 'mine';
+        const chiefLogsPerPage = 10;
+        const chiefLogsPageByMode = { mine: 1, all: 1 };
 
         function formatChiefLogDate(value) {
             const date = value ? new Date(value) : null;
@@ -90,12 +92,38 @@
             showAllChiefLogsBtn?.classList.toggle('border-amber-100', chiefLogsMode !== 'all');
         }
 
-        function renderChiefLogs(logs = []) {
+        function renderChiefLogsPagination(meta = {}) {
+            const currentPage = Number(meta?.current_page || 1);
+            const lastPage = Number(meta?.last_page || 1);
+
+            if (lastPage <= 1) {
+                return '';
+            }
+
+            return `
+                <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage <= 1 ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage <= 1 ? 'disabled' : `onclick="loadChiefLogsPage(${currentPage - 1})"`}>
+                        Previous
+                    </button>
+                    <span class="text-xs font-medium text-slate-500">Page ${currentPage} of ${lastPage}</span>
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage >= lastPage ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage >= lastPage ? 'disabled' : `onclick="loadChiefLogsPage(${currentPage + 1})"`}>
+                        Next
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderChiefLogs(logs = [], meta = {}) {
             if (!chiefLogsContainer || !chiefLogsSummary) {
                 return;
             }
 
-            chiefLogsSummary.textContent = `${logs.length} log entr${logs.length === 1 ? 'y' : 'ies'} found`;
+            const totalLogs = Number(meta?.total || logs.length || 0);
+            const from = Number(meta?.from || 0);
+            const to = Number(meta?.to || 0);
+            chiefLogsSummary.textContent = totalLogs
+                ? `Showing ${from}-${to} of ${totalLogs} log entries`
+                : '0 log entries found';
 
             if (!logs.length) {
                 chiefLogsContainer.innerHTML = `
@@ -150,20 +178,23 @@
                         </div>
                     `).join('')}
                 </div>
+                ${renderChiefLogsPagination(meta)}
             `;
         }
 
-        async function loadChiefLogs(mode = chiefLogsMode) {
+        async function loadChiefLogs(mode = chiefLogsMode, page = 1) {
             if (!chiefLogsContainer || !chiefLogsSummary) {
                 return;
             }
 
             setChiefLogsMode(mode);
+            chiefLogsPageByMode[chiefLogsMode] = Math.max(1, Number(page || 1));
             chiefLogsSummary.textContent = chiefLogsMode === 'all' ? 'Loading all user activities...' : 'Loading your activity logs...';
             renderChiefLogsLoadingState();
 
             try {
-                const response = await fetch(chiefLogsAllowAll && chiefLogsMode === 'all' ? '{{ route('user-logs.all') }}' : '{{ route('user-logs.index') }}', {
+                const endpoint = chiefLogsAllowAll && chiefLogsMode === 'all' ? '{{ route('user-logs.all') }}' : '{{ route('user-logs.index') }}';
+                const response = await fetch(`${endpoint}?page=${chiefLogsPageByMode[chiefLogsMode]}&limit=${chiefLogsPerPage}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -175,7 +206,7 @@
                 }
 
                 const payload = await response.json();
-                renderChiefLogs(Array.isArray(payload?.data) ? payload.data : []);
+                renderChiefLogs(Array.isArray(payload?.data) ? payload.data : [], payload?.meta || {});
             } catch (error) {
                 console.error('Error loading chief logs:', error);
                 chiefLogsSummary.textContent = chiefLogsMode === 'all'
@@ -196,7 +227,7 @@
                 chiefLogsModal.classList.remove('hidden');
                 chiefLogsModal.classList.add('flex');
             }
-            loadChiefLogs(mode);
+            loadChiefLogs(mode, 1);
         }
 
         function closeChiefLogsModal() {
@@ -208,6 +239,9 @@
 
         window.openChiefLogsModal = openChiefLogsModal;
         window.closeChiefLogsModal = closeChiefLogsModal;
+        window.loadChiefLogsPage = function (page) {
+            loadChiefLogs(chiefLogsMode, page);
+        };
 
         logTriggers.forEach(function (trigger) {
             trigger.addEventListener('click', function (event) {
@@ -217,14 +251,14 @@
         });
 
         refreshChiefLogsBtn?.addEventListener('click', function () {
-            loadChiefLogs(chiefLogsMode);
+            loadChiefLogs(chiefLogsMode, chiefLogsPageByMode[chiefLogsMode] || 1);
         });
         showMyChiefLogsBtn?.addEventListener('click', function () {
-            loadChiefLogs('mine');
+            loadChiefLogs('mine', 1);
         });
         if (chiefLogsAllowAll) {
             showAllChiefLogsBtn?.addEventListener('click', function () {
-                loadChiefLogs('all');
+                loadChiefLogs('all', 1);
             });
         }
         closeChiefLogsModalBtn?.addEventListener('click', closeChiefLogsModal);

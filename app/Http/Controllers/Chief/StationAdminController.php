@@ -28,6 +28,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\EventActivity;
+use App\Support\MarkerFeedBuilder;
 
 
 use Illuminate\Support\Facades\DB;
@@ -1469,7 +1470,7 @@ class StationAdminController extends Controller
     {   
         $accountId = Auth::user()->user_id;
 
-        $mapmarker = Marker::with('stations')->get();
+        $mapmarker = MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all();
         $incidents = Incident::with(['marker', 'team', 'reporter'])
             ->orderBy('created_at')
             ->get();

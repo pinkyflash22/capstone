@@ -25,6 +25,8 @@
         padding: clamp(0.85rem, 1.45vw, 1.35rem);
         padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
         color: var(--aoc-ink);
+        position: relative;
+        z-index: 1;
     }
 
     #section-alerts .aoc-shell {
@@ -214,6 +216,8 @@
     #section-alerts .aoc-snapshot {
         overflow: hidden;
         border-radius: 1.75rem;
+        position: relative;
+        z-index: 0;
     }
 
     #section-alerts .aoc-panel-head,
@@ -312,6 +316,16 @@
         min-height: 24rem;
         border-radius: 1.4rem !important;
         border-color: rgba(198, 61, 38, 0.14) !important;
+        position: relative;
+        z-index: 0;
+    }
+
+    #section-alerts #areasConcernRiskMap .leaflet-pane,
+    #section-alerts #areasConcernRiskMap .leaflet-top,
+    #section-alerts #areasConcernRiskMap .leaflet-bottom,
+    #section-alerts #areasConcernRiskMap .leaflet-control,
+    #section-alerts #areasConcernRiskMap .leaflet-popup {
+        z-index: 1;
     }
 
     #section-alerts .aoc-map-pill {

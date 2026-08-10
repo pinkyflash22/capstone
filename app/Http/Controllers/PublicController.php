@@ -16,6 +16,7 @@ use App\Models\Province;
 use App\Models\Barangay;
 use App\Models\BarangayHall;
 use App\Models\RiskArea;
+use App\Models\RiskAreaPhoto;
 use App\Models\User;
 use App\Models\City;
 use App\Models\FullAddress;
@@ -24,6 +25,7 @@ use App\Support\BarangayNotificationService;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Support\RiskAreaFollowUpDispatcher;
+use App\Http\Controllers\RiskAreaReviewController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +35,10 @@ use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
 {
+    private const RISK_HAZARD_REPORTS_DIRECTORY = 'riskhazard';
+    private const RISK_HAZARD_REPORTS_MAX_FILES = 3;
+    private const RISK_HAZARD_REPORTS_MAX_TOTAL_BYTES = 5242880;
+
     private const CITIZEN_DASHBOARD_SECTIONS = [
         'overview',
         'alerts',
@@ -660,9 +666,19 @@ class PublicController extends Controller
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'user_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'user_lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'photos' => ['nullable', 'array', 'max:' . self::RISK_HAZARD_REPORTS_MAX_FILES],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp'],
         ]);
 
-        $user = User::with('address.barangay.hall')->findOrFail(Auth::user()->user_id);
+        $photoValidationError = $this->validateRiskHazardPhotoUpload($request);
+        if ($photoValidationError) {
+            return response()->json([
+                'success' => false,
+                'message' => $photoValidationError,
+            ], 422);
+        }
+
+        $user = User::with('address.barangay.hall.barangay')->findOrFail(Auth::user()->user_id);
         $reportKind = $validated['report_kind'] === 'concern'
             ? 'hazard'
             : $validated['report_kind'];
@@ -676,6 +692,7 @@ class PublicController extends Controller
         if ($reportKind === 'hazard') {
             $userLat = isset($validated['user_lat']) ? (float) $validated['user_lat'] : null;
             $userLng = isset($validated['user_lng']) ? (float) $validated['user_lng'] : null;
+            $citizenHall = $user->address?->barangay?->hall;
 
             if ($userLat === null || $userLng === null) {
                 return response()->json([
@@ -696,22 +713,49 @@ class PublicController extends Controller
             $boundary = $boundaryMatcherService->locateBarangayBoundary($targetLat, $targetLng);
 
             if (! $boundary || ! $boundary->barangay_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The selected hazard point is outside the saved barangay boundaries.',
-                ], 422);
-            }
+                if (! $citizenHall) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The selected hazard point is outside the saved barangay boundaries.',
+                    ], 422);
+                }
 
-            $hall = BarangayHall::query()
-                ->with('barangay')
-                ->where('barangay_id', $boundary->barangay_id)
-                ->first();
+                $hall = $citizenHall;
 
-            if (! $hall) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The matched barangay does not have a linked barangay hall yet.',
-                ], 422);
+                logger()->warning('Citizen concern point did not match a saved barangay boundary. Falling back to the citizen barangay hall.', [
+                    'user_id' => $user->user_id,
+                    'target_lat' => $targetLat,
+                    'target_lng' => $targetLng,
+                    'user_lat' => $userLat,
+                    'user_lng' => $userLng,
+                    'fallback_barangay_hall_id' => $citizenHall->barangay_hall_id,
+                    'fallback_barangay_id' => $citizenHall->barangay_id,
+                ]);
+            } else {
+                $hall = BarangayHall::query()
+                    ->with('barangay')
+                    ->where('barangay_id', $boundary->barangay_id)
+                    ->first();
+
+                if (! $hall) {
+                    if (! $citizenHall) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'The matched barangay does not have a linked barangay hall yet.',
+                        ], 422);
+                    }
+
+                    $hall = $citizenHall;
+
+                    logger()->warning('Citizen concern point matched a barangay boundary without a linked barangay hall. Falling back to the citizen barangay hall.', [
+                        'user_id' => $user->user_id,
+                        'target_lat' => $targetLat,
+                        'target_lng' => $targetLng,
+                        'matched_barangay_id' => $boundary->barangay_id,
+                        'fallback_barangay_hall_id' => $citizenHall->barangay_hall_id,
+                        'fallback_barangay_id' => $citizenHall->barangay_id,
+                    ]);
+                }
             }
         } else {
             $hall = $user->address?->barangay?->hall;
@@ -724,7 +768,7 @@ class PublicController extends Controller
             }
         }
 
-        $riskArea = DB::transaction(function () use ($validated, $template, $hall, $user, $targetLat, $targetLng) {
+        $riskArea = DB::transaction(function () use ($validated, $template, $hall, $user, $targetLat, $targetLng, $request) {
             $citizenDetail = ! empty($validated['condition_detail'])
                 ? $this->formatCitizenLabel((string) $validated['condition_detail'], '')
                 : null;
@@ -753,10 +797,10 @@ class PublicController extends Controller
                 'category' => $template['marker_category'],
             ]);
 
-            return RiskArea::create([
+            $riskArea = RiskArea::create([
                 'marker_id' => $marker->marker_id,
                 'barangay_hall_id' => $hall->barangay_hall_id,
-                'station_id' => null,
+                'station_id' => $this->resolveRiskAreaStationId($hall),
                 'entry_type' => $template['entry_type'],
                 'hazard_category' => $template['hazard_category'],
                 'risk_type' => $template['risk_type'],
@@ -773,10 +817,30 @@ class PublicController extends Controller
                 'review_notes' => $reviewNotes,
                 'reported_by' => $user->user_id,
             ]);
+
+            foreach ($request->file('photos', []) as $photo) {
+                if (! $photo) {
+                    continue;
+                }
+
+                $storedPath = MediaPath::storeForDisk(
+                    $photo->store(self::RISK_HAZARD_REPORTS_DIRECTORY, 'supabase'),
+                    'supabase'
+                );
+
+                RiskAreaPhoto::create([
+                    'risk_area_id' => $riskArea->risk_area_id,
+                    'photo_path' => $storedPath,
+                    'photo_name' => $photo->getClientOriginalName(),
+                ]);
+            }
+
+            return $riskArea;
         });
 
-        $riskArea->loadMissing(['marker', 'barangayHall.barangay']);
+        $riskArea->loadMissing(['marker', 'barangayHall.barangay', 'photos']);
         Cache::forget('map:markers:index:v2');
+        RiskAreaReviewController::flushRiskReviewCache();
         RiskAreaFollowUpDispatcher::dispatchFor($riskArea);
         UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
 
@@ -789,6 +853,63 @@ class PublicController extends Controller
                 'report' => $this->serializeCitizenRiskReport($riskArea),
             ],
         ]);
+    }
+
+    private function validateRiskHazardPhotoUpload(Request $request): ?string
+    {
+        $photos = collect($request->file('photos', []))
+            ->filter()
+            ->values();
+
+        if ($photos->isEmpty()) {
+            return null;
+        }
+
+        if ($photos->count() > self::RISK_HAZARD_REPORTS_MAX_FILES) {
+            return 'You may upload up to 3 photos only.';
+        }
+
+        $totalBytes = $photos->sum(fn ($photo) => (int) $photo->getSize());
+
+        if ($totalBytes > self::RISK_HAZARD_REPORTS_MAX_TOTAL_BYTES) {
+            return 'The selected photos exceed the 5 MB total upload limit.';
+        }
+
+        return null;
+    }
+
+    private function resolveRiskAreaStationId(?BarangayHall $hall): int
+    {
+        $barangayId = (int) ($hall?->barangay_id ?? 0);
+
+        if ($barangayId) {
+            $coveredStationId = DB::table('station_barangay_coverage')
+                ->where('barangay_id', $barangayId)
+                ->where('is_active', true)
+                ->orderByRaw("CASE WHEN LOWER(COALESCE(coverage_type, '')) = 'primary' THEN 0 ELSE 1 END")
+                ->orderBy('station_barangay_coverage_id')
+                ->value('station_id');
+
+            if ($coveredStationId) {
+                return (int) $coveredStationId;
+            }
+
+            $cityId = (int) ($hall?->barangay?->city_id ?? 0);
+
+            if ($cityId) {
+                $cityStationId = Station::query()
+                    ->leftJoin('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+                    ->where('full_addresses.city_id', $cityId)
+                    ->orderBy('stations.station_name')
+                    ->value('stations.station_id');
+
+                if ($cityStationId) {
+                    return (int) $cityStationId;
+                }
+            }
+        }
+
+        return 1;
     }
 
     public function updateProfile(Request $request)

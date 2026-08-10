@@ -249,19 +249,44 @@
         border-bottom: 1px solid rgba(148, 163, 184, 0.16);
     }
 
+    #section-fsic .fsic-row {
+        cursor: pointer;
+        transition: background-color 0.18s ease;
+    }
+
+    #section-fsic .fsic-row:hover {
+        background: #fffaf5;
+    }
+
     #section-fsic .fsic-actions {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
         gap: 0.45rem;
     }
 
     #section-fsic .fsic-action {
+        display: inline-flex;
+        min-width: 2.25rem;
+        min-height: 2.25rem;
+        align-items: center;
+        justify-content: center;
         border-radius: 999px;
         background: #fff7ed;
-        padding: 0.45rem 0.7rem;
+        padding: 0.45rem;
         font-size: 0.78rem;
         font-weight: 800;
         color: #c2410c;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    #section-fsic .fsic-action:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 18px rgba(154, 52, 18, 0.12);
+    }
+
+    #section-fsic .fsic-action i {
+        font-size: 0.85rem;
     }
 
     #section-fsic .fsic-action--green {
@@ -447,7 +472,9 @@
         }
 
         #section-fsic .fsic-action {
-            padding: 0.38rem 0.48rem;
+            min-width: 2.05rem;
+            min-height: 2.05rem;
+            padding: 0.38rem;
             font-size: 0.68rem;
         }
 
@@ -543,7 +570,7 @@
 
                 <tbody id="fsicRequestsTableBody">
                     @forelse($fsicRequests ?? [] as $request)
-                    <tr class="border-b hover:bg-gray-50" id="request-row-{{ $request->id }}">
+                    <tr class="border-b hover:bg-gray-50 fsic-row" id="request-row-{{ $request->id }}" onclick="viewFsicDetails({{ $request->id }})" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); viewFsicDetails({{ $request->id }}); }" tabindex="0" role="button" aria-label="View FSIC request {{ $request->request_code }}">
                         <td class="px-6 py-4 font-medium">
                             {{ $request->request_code }}
                         </td>
@@ -572,21 +599,18 @@
                         </td>
                         <td class="px-6 py-4">
                             <div class="fsic-actions">
-                                <button class="fsic-action" onclick="viewFsicDetails({{ $request->id }})">
-                                    View
-                                </button>
                                 @if($request->status == 'approved' && optional($request->approval)->date_issued === null)
-                                <button class="fsic-action fsic-action--green" onclick="claimFsicRequest({{ $request->id }})">
-                                    Claim
+                                <button class="fsic-action fsic-action--green" type="button" onclick="event.stopPropagation(); claimFsicRequest({{ $request->id }})" title="Claim certificate" aria-label="Claim certificate">
+                                    <i class="fa-solid fa-hand-holding"></i>
                                 </button>
                                 @endif
                                 
                                 @if($request->status == 'pending')
-                                <button class="fsic-action fsic-action--blue" onclick="editFsicRequest({{ $request->id }})">
-                                    Edit
+                                <button class="fsic-action fsic-action--blue" type="button" onclick="event.stopPropagation(); editFsicRequest({{ $request->id }})" title="Edit request" aria-label="Edit request">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
-                                <button class="fsic-action fsic-action--red" onclick="cancelFsicRequest({{ $request->id }})">
-                                    Cancel
+                                <button class="fsic-action fsic-action--red" type="button" onclick="event.stopPropagation(); cancelFsicRequest({{ $request->id }})" title="Cancel request" aria-label="Cancel request">
+                                    <i class="fa-solid fa-ban"></i>
                                 </button>
                                 @endif
                             </div>
@@ -609,9 +633,12 @@
 
 {{-- EDIT FSIC REQUEST MODAL --}}
 <div id="editFsicModal" class="modal">
-    <div class="modal-content" style="max-width: 850px; max-height: 90vh; overflow-y: auto;">
-        <div class="modal-header flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
-            <h2 class="text-xl font-bold">Edit FSIC Request</h2>
+    <div class="modal-content fsic-request-modal">
+        <div class="modal-header fsic-request-modal__header flex justify-between items-start p-4 border-b bg-white">
+            <div class="fsic-request-modal__header-copy">
+                <h2 class="text-xl font-bold">Edit FSIC Request</h2>
+                <p class="fsic-request-modal__subtitle">Update your request details using the same validation rules as the application form.</p>
+            </div>
             <button onclick="closeEditFsicModal()" class="text-gray-500 hover:text-gray-700">
                 <i class="fa-solid fa-times text-xl"></i>
             </button>
@@ -627,11 +654,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1 required">Business Name</label>
-                        <input type="text" name="business_name" id="edit_business_name" class="w-full border rounded-lg p-2" required>
+                        <input type="text" name="business_name" id="edit_business_name" class="w-full border rounded-lg p-2" required pattern="[A-Za-z0-9 ]+" inputmode="text" title="Business name can only contain letters, numbers, and spaces.">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1 required">Owner/Applicant Name</label>
-                        <input type="text" name="owner_name" id="edit_owner_name" class="w-full border rounded-lg p-2" required>
+                        <input type="text" name="owner_name" id="edit_owner_name" class="w-full border rounded-lg p-2" required pattern="[A-Za-z ]+" inputmode="text" title="Owner or applicant name can only contain letters and spaces.">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
@@ -657,7 +684,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1 required">Building/Street Address</label>
-                        <input type="text" name="building_address" id="edit_building_address" class="w-full border rounded-lg p-2" required>
+                        <input type="text" name="building_address" id="edit_building_address" class="w-full border rounded-lg p-2" required pattern="[A-Za-z0-9 ,.\-]+" inputmode="text" title="Address can only contain letters, numbers, spaces, commas, hyphens, and periods.">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1 required">Province</label>
@@ -680,15 +707,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">DTI / SEC Registration No.</label>
-                        <input type="text" name="dti_sec_registration_no" id="edit_dti_sec_registration_no" class="w-full border rounded-lg p-2">
+                        <input type="text" name="dti_sec_registration_no" id="edit_dti_sec_registration_no" class="w-full border rounded-lg p-2" pattern="[A-Za-z0-9 ]*" inputmode="text" title="DTI or SEC registration number can only contain letters, numbers, and spaces.">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Mayor's Permit No.</label>
-                        <input type="text" name="mayors_permit_no" id="edit_mayors_permit_no" class="w-full border rounded-lg p-2">
+                        <input type="text" name="mayors_permit_no" id="edit_mayors_permit_no" class="w-full border rounded-lg p-2" pattern="[A-Za-z0-9 ]*" inputmode="text" title="Mayor's permit number can only contain letters, numbers, and spaces.">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">TIN Number</label>
-                        <input type="text" name="tin_number" id="edit_tin_number" class="w-full border rounded-lg p-2">
+                        <input type="text" name="tin_number" id="edit_tin_number" class="w-full border rounded-lg p-2" inputmode="numeric" pattern="[0-9]*" title="TIN number must contain numbers only.">
                     </div>
                 </div>
             </div>
@@ -733,28 +760,31 @@
 
 {{-- NEW FSIC REQUEST MODAL WITH PROGRESS BAR --}}
 <div id="newFsicModal" class="modal">
-    <div class="modal-content" style="max-width: 850px; max-height: 90vh; overflow-y: auto;">
-        <div class="modal-header flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
-            <h2 class="text-xl font-bold">New FSIC Request</h2>
+    <div class="modal-content fsic-request-modal">
+        <div class="modal-header fsic-request-modal__header flex justify-between items-start p-4 border-b bg-white">
+            <div class="fsic-request-modal__header-copy">
+                <h2 class="text-xl font-bold">FSIC Application</h2>
+                <p class="fsic-request-modal__subtitle">Complete the steps below to submit your fire safety certificate request.</p>
+            </div>
             <button onclick="closeNewFsicModal()" class="text-gray-500 hover:text-gray-700">
                 <i class="fa-solid fa-times text-xl"></i>
             </button>
         </div>
 
         <!-- Progress Bar -->
-        <div class="px-4 pt-4">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex-1 text-center">
+        <div class="fsic-request-modal__steps px-4 pt-4">
+            <div class="fsic-request-modal__step-track flex items-center justify-between mb-2">
+                <div class="flex-1 text-center min-w-0">
                     <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-sm font-bold step-1 active-step bg-orange-600 text-white">1</div>
                     <span class="text-xs mt-1 block">Input Details</span>
                 </div>
                 <div class="flex-1 h-0.5 bg-gray-200 step-1-line"></div>
-                <div class="flex-1 text-center">
+                <div class="flex-1 text-center min-w-0">
                     <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-sm font-bold step-2 bg-gray-200 text-gray-500">2</div>
                     <span class="text-xs mt-1 block">Review & Submit</span>
                 </div>
                 <div class="flex-1 h-0.5 bg-gray-200 step-2-line"></div>
-                <div class="flex-1 text-center">
+                <div class="flex-1 text-center min-w-0">
                     <div class="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-sm font-bold step-3 bg-gray-200 text-gray-500">3</div>
                     <span class="text-xs mt-1 block">Confirmation</span>
                 </div>
@@ -775,11 +805,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 mb-1 required">Business Name</label>
-                            <input type="text" name="business_name" class="w-full border rounded-lg p-2" required>
+                            <input type="text" name="business_name" class="w-full border rounded-lg p-2" required pattern="[A-Za-z0-9 ]+" inputmode="text" title="Business name can only contain letters, numbers, and spaces.">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1 required">Owner/Applicant Name</label>
-                            <input type="text" name="owner_name" class="w-full border rounded-lg p-2" required>
+                            <input type="text" name="owner_name" class="w-full border rounded-lg p-2" required pattern="[A-Za-z ]+" inputmode="text" title="Owner or applicant name can only contain letters and spaces.">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
@@ -805,7 +835,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 mb-1 required">Building/Street Address</label>
-                            <input type="text" name="building_address" class="w-full border rounded-lg p-2" required placeholder="House/Block/Lot number, Street, Subdivision">
+                            <input type="text" name="building_address" class="w-full border rounded-lg p-2" required placeholder="House/Block/Lot number, Street, Subdivision" pattern="[A-Za-z0-9 ,.\-]+" inputmode="text" title="Address can only contain letters, numbers, spaces, commas, hyphens, and periods.">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1 required">Province</label>
@@ -837,15 +867,15 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">DTI / SEC Registration No.</label>
-                            <input type="text" name="dti_sec_registration_no" class="w-full border rounded-lg p-2">
+                            <input type="text" name="dti_sec_registration_no" class="w-full border rounded-lg p-2" pattern="[A-Za-z0-9 ]*" inputmode="text" title="DTI or SEC registration number can only contain letters, numbers, and spaces.">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Mayor's Permit No.</label>
-                            <input type="text" name="mayors_permit_no" class="w-full border rounded-lg p-2">
+                            <input type="text" name="mayors_permit_no" class="w-full border rounded-lg p-2" pattern="[A-Za-z0-9 ]*" inputmode="text" title="Mayor's permit number can only contain letters, numbers, and spaces.">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">TIN Number</label>
-                            <input type="text" name="tin_number" class="w-full border rounded-lg p-2">
+                            <input type="text" name="tin_number" class="w-full border rounded-lg p-2" inputmode="numeric" pattern="[0-9]*" title="TIN number must contain numbers only.">
                         </div>
                     </div>
                 </div>
@@ -895,14 +925,14 @@
                         <i class="fa-solid fa-chevron-left mr-1"></i> Previous
                     </button>
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" class="px-4 py-2 bg-gray-300 rounded-lg" onclick="closeNewFsicModal()">Cancel</button>
-                    <button type="button" id="nextBtn" class="px-4 py-2 bg-orange-600 text-white rounded-lg" onclick="changeStep(1)">
+                <div class="flex gap-2 fsic-request-modal__action-group">
+                    <button type="button" id="nextBtn" class="px-4 py-2 bg-orange-600 text-white rounded-lg fsic-request-modal__action-next" onclick="changeStep(1)">
                         Next <i class="fa-solid fa-chevron-right ml-1"></i>
                     </button>
-                    <button type="submit" id="submitBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg" style="display: none;">
+                    <button type="submit" id="submitBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg fsic-request-modal__action-submit" style="display: none;">
                         <i class="fa-regular fa-paper-plane mr-1"></i> Submit Request
                     </button>
+                    <button type="button" class="px-4 py-2 bg-gray-300 rounded-lg fsic-request-modal__action-cancel" onclick="closeNewFsicModal()">Cancel</button>
                 </div>
             </div>
         </form>
@@ -911,9 +941,12 @@
 
 {{-- FSIC DETAILS MODAL --}}
 <div id="fsicDetailsModal" class="modal">
-    <div class="modal-content" style="max-width: 700px;">
-        <div class="modal-header flex justify-between items-center p-4 border-b">
-            <h2 class="text-xl font-bold">FSIC Request Details</h2>
+    <div class="modal-content fsic-request-modal">
+        <div class="modal-header fsic-request-modal__header flex justify-between items-start p-4 border-b bg-white">
+            <div class="fsic-request-modal__header-copy">
+                <h2 class="text-xl font-bold">FSIC Request Details</h2>
+                <p class="fsic-request-modal__subtitle">Review the submitted FSIC information in the same compact layout used by the request form.</p>
+            </div>
             <button onclick="closeFsicDetailsModal()" class="text-gray-500 hover:text-gray-700">
                 <i class="fa-solid fa-times text-xl"></i>
             </button>
@@ -956,6 +989,120 @@
     overflow-y: auto;
     position: relative;
 }
+.fsic-request-modal {
+    width: min(92vw, 760px);
+    max-width: 760px !important;
+    max-height: min(86vh, 820px) !important;
+    border-radius: 20px;
+}
+.fsic-request-modal__header {
+    position: static;
+    padding-bottom: 0.9rem;
+}
+.fsic-request-modal__header-copy {
+    min-width: 0;
+    padding-right: 0.75rem;
+}
+.fsic-request-modal__subtitle {
+    margin-top: 0.28rem;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: #64748b;
+}
+.fsic-request-modal__steps {
+    padding-top: 0.9rem;
+}
+.fsic-request-modal__step-track {
+    gap: 0.35rem;
+}
+.fsic-request-modal .modal-body {
+    padding-top: 1rem;
+}
+.fsic-request-modal .modal-footer {
+    gap: 0.75rem;
+}
+.fsic-request-modal .modal-footer .flex.gap-2 {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.fsic-request-modal__action-group {
+    align-items: center;
+}
+@media (max-width: 768px) {
+    .fsic-request-modal {
+        width: min(94vw, 540px);
+        max-height: 82vh !important;
+        border-radius: 18px;
+    }
+
+    .fsic-request-modal__header {
+        padding: 0.95rem 0.95rem 0.7rem;
+    }
+
+    .fsic-request-modal__header h2 {
+        font-size: 1rem;
+        line-height: 1.3;
+    }
+
+    .fsic-request-modal__subtitle {
+        font-size: 0.78rem;
+        line-height: 1.35;
+    }
+
+    .fsic-request-modal__steps {
+        padding: 0.65rem 0.95rem 0 0.95rem;
+    }
+
+    .fsic-request-modal__steps .w-8.h-8 {
+        width: 1.8rem;
+        height: 1.8rem;
+        font-size: 0.72rem;
+    }
+
+    .fsic-request-modal__steps span.text-xs {
+        font-size: 0.66rem;
+        line-height: 1.15;
+        padding-inline: 0.15rem;
+    }
+
+    .fsic-request-modal .modal-body {
+        padding: 0.95rem;
+    }
+
+    .fsic-request-modal .modal-footer {
+        padding: 0.95rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .fsic-request-modal .modal-footer > div,
+    .fsic-request-modal .modal-footer .flex.gap-2 {
+        width: 100%;
+    }
+
+    .fsic-request-modal .modal-footer .flex.gap-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.55rem;
+    }
+
+    .fsic-request-modal__action-next {
+        order: 1;
+    }
+
+    .fsic-request-modal__action-submit {
+        order: 2;
+    }
+
+    .fsic-request-modal__action-cancel {
+        order: 3;
+    }
+
+    .fsic-request-modal .modal-footer button {
+        width: 100%;
+        justify-content: center;
+    }
+}
 .required:after {
     content: " *";
     color: red;
@@ -975,6 +1122,92 @@ const totalSteps = 3;
 let countdownInterval = null;
 let currentEditId = null;
 let currentCancelId = null;
+const fsicDetailsCache = new Map();
+const FSIC_DETAILS_CACHE_TTL_MS = 2 * 60 * 1000;
+const FSIC_FIELD_PATTERNS = {
+    business_name: /^[A-Za-z0-9 ]+$/,
+    owner_name: /^[A-Za-z ]+$/,
+    building_address: /^[A-Za-z0-9 ,.-]+$/,
+    dti_sec_registration_no: /^[A-Za-z0-9 ]+$/,
+    mayors_permit_no: /^[A-Za-z0-9 ]+$/,
+    tin_number: /^[0-9]+$/
+};
+const FSIC_FIELD_MESSAGES = {
+    business_name: 'Business name can only contain letters, numbers, and spaces.',
+    owner_name: 'Owner or applicant name can only contain letters and spaces.',
+    building_address: 'Building or street address can only contain letters, numbers, spaces, commas, hyphens, and periods.',
+    dti_sec_registration_no: 'DTI or SEC registration number can only contain letters, numbers, and spaces.',
+    mayors_permit_no: 'Mayor\'s permit number can only contain letters, numbers, and spaces.',
+    tin_number: 'TIN number must contain numbers only.'
+};
+
+function sanitizeFsicInputValue(fieldName, value) {
+    const rawValue = String(value ?? '');
+
+    switch (fieldName) {
+        case 'business_name':
+            return rawValue.replace(/[^A-Za-z0-9 ]+/g, '');
+        case 'owner_name':
+            return rawValue.replace(/[^A-Za-z ]+/g, '');
+        case 'building_address':
+            return rawValue.replace(/[^A-Za-z0-9 ,.-]+/g, '');
+        case 'dti_sec_registration_no':
+        case 'mayors_permit_no':
+            return rawValue.replace(/[^A-Za-z0-9 ]+/g, '');
+        case 'tin_number':
+            return rawValue.replace(/[^0-9]+/g, '');
+        default:
+            return rawValue;
+    }
+}
+
+function validateFsicFieldValue(fieldName, value, { required = false } = {}) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+        return required ? 'This field is required.' : '';
+    }
+
+    const pattern = FSIC_FIELD_PATTERNS[fieldName];
+    if (!pattern) {
+        return '';
+    }
+
+    return pattern.test(normalized) ? '' : (FSIC_FIELD_MESSAGES[fieldName] || 'Invalid input.');
+}
+
+function applyFsicFieldValidation(input, { required = false } = {}) {
+    if (!input?.name) {
+        return true;
+    }
+
+    const message = validateFsicFieldValue(input.name, input.value, { required });
+    input.setCustomValidity(message);
+    input.classList.toggle('border-red-500', Boolean(message));
+    return !message;
+}
+
+function bindFsicInputSanitizers(scope = document) {
+    ['business_name', 'owner_name', 'building_address', 'dti_sec_registration_no', 'mayors_permit_no', 'tin_number'].forEach((fieldName) => {
+        scope.querySelectorAll(`[name="${fieldName}"]`).forEach((input) => {
+            if (input.dataset.fsicValidationBound === 'true') {
+                return;
+            }
+
+            const isRequired = input.hasAttribute('required');
+            const syncValue = () => {
+                const sanitized = sanitizeFsicInputValue(fieldName, input.value);
+                if (sanitized !== input.value) {
+                    input.value = sanitized;
+                }
+                applyFsicFieldValidation(input, { required: isRequired });
+            };
+
+            input.addEventListener('input', syncValue);
+            input.addEventListener('blur', syncValue);
+            input.dataset.fsicValidationBound = 'true';
+        });
+    });
+}
 
 function getFsicStatusClass(status) {
     const statusColors = {
@@ -999,12 +1232,73 @@ function formatFsicDate(dateValue) {
     return date.toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
+function getCachedFsicRequest(id) {
+    const cacheKey = String(id);
+    const cachedEntry = fsicDetailsCache.get(cacheKey);
+
+    if (!cachedEntry) {
+        return null;
+    }
+
+    if ((Date.now() - cachedEntry.cachedAt) > FSIC_DETAILS_CACHE_TTL_MS) {
+        fsicDetailsCache.delete(cacheKey);
+        return null;
+    }
+
+    return cachedEntry.data;
+}
+
+function primeFsicRequestCache(id, data) {
+    if (!id || !data) {
+        return;
+    }
+
+    fsicDetailsCache.set(String(id), {
+        data,
+        cachedAt: Date.now(),
+    });
+}
+
+function invalidateFsicRequestCache(id = null) {
+    if (id === null || typeof id === 'undefined') {
+        fsicDetailsCache.clear();
+        return;
+    }
+
+    fsicDetailsCache.delete(String(id));
+}
+
+async function getFsicRequestDetails(id, { force = false } = {}) {
+    if (!force) {
+        const cached = getCachedFsicRequest(id);
+        if (cached) {
+            return cached;
+        }
+    }
+
+    const response = await fetch(`/citizen/api/fsic/${id}`, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    primeFsicRequestCache(id, data);
+
+    return data;
+}
+
 function getFsicRowMarkup(request) {
     const canEdit = String(request.status) === 'pending';
     const canClaim = String(request.status) === 'approved' && !request?.approval?.date_issued;
 
     return `
-        <tr class="border-b hover:bg-gray-50" id="request-row-${request.id}">
+        <tr class="border-b hover:bg-gray-50 fsic-row" id="request-row-${request.id}" onclick="viewFsicDetails(${request.id})" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); viewFsicDetails(${request.id}); }" tabindex="0" role="button" aria-label="View FSIC request ${escapeHtml(request.request_code || 'N/A')}">
             <td class="px-6 py-4 font-medium">${escapeHtml(request.request_code || 'N/A')}</td>
             <td class="px-6 py-4 fsic-mobile-hide">${formatFsicDate(request.date_requested)}</td>
             <td class="px-6 py-4 font-medium fsic-mobile-hide">${escapeHtml(request.business_name || 'N/A')}</td>
@@ -1016,13 +1310,18 @@ function getFsicRowMarkup(request) {
             </td>
             <td class="px-6 py-4">
                 <div class="fsic-actions">
-                    <button type="button" class="fsic-action" onclick="viewFsicDetails(${request.id})">View</button>
                     ${canClaim ? `
-                        <button type="button" class="fsic-action fsic-action--green" onclick="claimFsicRequest(${request.id})">Claim</button>
+                        <button type="button" class="fsic-action fsic-action--green" onclick="event.stopPropagation(); claimFsicRequest(${request.id})" title="Claim certificate" aria-label="Claim certificate">
+                            <i class="fa-solid fa-hand-holding"></i>
+                        </button>
                     ` : ''}
                     ${canEdit ? `
-                        <button type="button" class="fsic-action fsic-action--blue" onclick="editFsicRequest(${request.id})">Edit</button>
-                        <button type="button" class="fsic-action fsic-action--red" onclick="cancelFsicRequest(${request.id})">Cancel</button>
+                        <button type="button" class="fsic-action fsic-action--blue" onclick="event.stopPropagation(); editFsicRequest(${request.id})" title="Edit request" aria-label="Edit request">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button type="button" class="fsic-action fsic-action--red" onclick="event.stopPropagation(); cancelFsicRequest(${request.id})" title="Cancel request" aria-label="Cancel request">
+                            <i class="fa-solid fa-ban"></i>
+                        </button>
                     ` : ''}
                 </div>
             </td>
@@ -1089,8 +1388,7 @@ function ensureFsicEmptyState() {
 ========================= */
 window.editFsicRequest = async function(id) {
     try {
-        const response = await fetch(`/citizen/api/fsic/${id}`);
-        const data = await response.json();
+        const data = await getFsicRequestDetails(id);
         
         if (data) {
             document.getElementById('edit_request_id').value = id;
@@ -1123,6 +1421,22 @@ window.closeEditFsicModal = function() {
 // Submit edit form
 document.getElementById('editFsicForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    const editFields = [
+        [document.getElementById('edit_business_name'), true],
+        [document.getElementById('edit_owner_name'), true],
+        [document.getElementById('edit_building_address'), true],
+        [document.getElementById('edit_dti_sec_registration_no'), false],
+        [document.getElementById('edit_mayors_permit_no'), false],
+        [document.getElementById('edit_tin_number'), false],
+    ];
+
+    for (const [field, required] of editFields) {
+        if (field && !applyFsicFieldValidation(field, { required })) {
+            field.reportValidity();
+            return;
+        }
+    }
     
     const id = document.getElementById('edit_request_id').value;
     const submitBtn = this.querySelector('button[type="submit"]');
@@ -1171,6 +1485,7 @@ document.getElementById('editFsicForm')?.addEventListener('submit', async functi
                 tin_number: updateData.tin_number,
             };
 
+            invalidateFsicRequestCache(id);
             upsertFsicRow(updatedRequest, 'append');
             closeEditFsicModal();
             window.showCitizenToast?.('FSIC request updated successfully.');
@@ -1192,8 +1507,7 @@ document.getElementById('editFsicForm')?.addEventListener('submit', async functi
 window.cancelFsicRequest = async function(id) {
     try {
         // Fetch request details to show request code in modal
-        const response = await fetch(`/citizen/api/fsic/${id}`);
-        const data = await response.json();
+        const data = await getFsicRequestDetails(id);
         
         if (data) {
             currentCancelId = id;
@@ -1237,6 +1551,7 @@ document.getElementById('confirmCancelBtn')?.addEventListener('click', async fun
         const result = await response.json();
         
         if (response.ok && result.success) {
+            invalidateFsicRequestCache(currentCancelId);
             document.getElementById(`request-row-${currentCancelId}`)?.remove();
             closeCancelConfirmModal();
             ensureFsicEmptyState();
@@ -1353,9 +1668,23 @@ function validateCurrentStep() {
                 input.classList.remove('border-red-500');
             }
         });
+
+        ['business_name', 'owner_name', 'building_address', 'dti_sec_registration_no', 'mayors_permit_no', 'tin_number'].forEach(field => {
+            const input = form.querySelector(`[name="${field}"]`);
+            if (!input) {
+                return;
+            }
+
+            const fieldIsRequired = requiredFields.includes(field);
+            const fieldValid = applyFsicFieldValidation(input, { required: fieldIsRequired });
+            if (!fieldValid) {
+                isValid = false;
+                missingFields.push(FSIC_FIELD_MESSAGES[field]);
+            }
+        });
         
         if (!isValid) {
-            alert(`Please fill in: ${missingFields.join(', ')}`);
+            alert(`Please check the FSIC form:\n- ${[...new Set(missingFields)].join('\n- ')}`);
             return false;
         }
     }
@@ -1551,6 +1880,8 @@ function resetFsicForm() {
         barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
         barangaySelect.disabled = true;
     }
+
+    bindFsicInputSanitizers(form || document);
 }
 
 /* =========================
@@ -1592,16 +1923,35 @@ window.submitFsicRequest = async function(event) {
     const barangay_name = barangaySelect?.options[barangaySelect.selectedIndex]?.text;
     
     // Validate required fields
+    const businessNameError = validateFsicFieldValue('business_name', business_name, { required: true });
+    const ownerNameError = validateFsicFieldValue('owner_name', owner_name, { required: true });
+    const buildingAddressError = validateFsicFieldValue('building_address', building_address, { required: true });
+    const dtiSecError = validateFsicFieldValue('dti_sec_registration_no', dti_sec_registration_no, { required: false });
+    const mayorsPermitError = validateFsicFieldValue('mayors_permit_no', mayors_permit_no, { required: false });
+    const tinNumberError = validateFsicFieldValue('tin_number', tin_number, { required: false });
+
     if (!business_name) {
         alert('Please enter Business Name');
+        return;
+    }
+    if (businessNameError) {
+        alert(businessNameError);
         return;
     }
     if (!owner_name) {
         alert('Please enter Owner Name');
         return;
     }
+    if (ownerNameError) {
+        alert(ownerNameError);
+        return;
+    }
     if (!building_address) {
         alert('Please enter Building Address');
+        return;
+    }
+    if (buildingAddressError) {
+        alert(buildingAddressError);
         return;
     }
     if (!province_id) {
@@ -1614,6 +1964,18 @@ window.submitFsicRequest = async function(event) {
     }
     if (!barangay_id) {
         alert('Please select Barangay');
+        return;
+    }
+    if (dtiSecError) {
+        alert(dtiSecError);
+        return;
+    }
+    if (mayorsPermitError) {
+        alert(mayorsPermitError);
+        return;
+    }
+    if (tinNumberError) {
+        alert(tinNumberError);
         return;
     }
     
@@ -1770,13 +2132,7 @@ window.viewFsicDetails = async function(id) {
     contentDiv.innerHTML = '<div class="text-center py-8"><i class="fa-solid fa-spinner fa-spin text-2xl text-orange-600"></i><p class="mt-2">Loading details...</p></div>';
     
     try {
-        const response = await fetch(`/citizen/api/fsic/${id}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = await getFsicRequestDetails(id);
         console.log('Data received:', data);
         
         const statusColors = {
@@ -1957,10 +2313,12 @@ window.claimFsicRequest = async function(id, keepModalOpen = false) {
             throw new Error(result.message || 'Failed to claim certificate.');
         }
 
+        invalidateFsicRequestCache(id);
         upsertFsicRow(result.data);
         window.showCitizenToast?.(result.message || 'FSIC certificate claimed successfully.');
 
         if (keepModalOpen) {
+            await getFsicRequestDetails(id, { force: true });
             await window.viewFsicDetails(id);
         }
     } catch (error) {
@@ -1987,11 +2345,10 @@ window.changeStep = changeStep;
 window.loadCities = loadCities;
 window.loadBarangays = loadBarangays;
 window.editFsicRequest = editFsicRequest;
-window.closeEditFsicModal = closeEditFsicModal;
 window.cancelFsicRequest = cancelFsicRequest;
-window.closeCancelConfirmModal = closeCancelConfirmModal;
 
 document.addEventListener('DOMContentLoaded', function() {
+    bindFsicInputSanitizers(document);
     updateProgressBar();
     
     const form = document.getElementById('fsicRequestForm');

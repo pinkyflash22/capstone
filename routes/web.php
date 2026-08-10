@@ -214,6 +214,8 @@ Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-db
 //     }
 // });
 Route::middleware(['auth', 'prevent.back.history'])->group(function () {
+    Route::get('/map/markers/feed', [MarkerController::class, 'index'])->name('map.markers.feed');
+
     Route::prefix('voice-calls')->name('voice-calls.')->group(function () {
         Route::post('/', [VoiceCallController::class, 'store'])->name('store');
         Route::get('/incoming', [VoiceCallController::class, 'incoming'])->name('incoming');

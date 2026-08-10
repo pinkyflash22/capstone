@@ -11,11 +11,12 @@ class UserLogController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) min(max($request->integer('limit', 10), 1), 50);
+
         $logs = UserLog::query()
             ->where('user_id', auth()->id())
             ->orderByDesc('created_at')
-            ->limit((int) min(max($request->integer('limit', 100), 1), 200))
-            ->get([
+            ->paginate($perPage, [
                 'id as user_log_id',
                 'action',
                 'ip_address',
@@ -25,7 +26,15 @@ class UserLogController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $logs,
+            'data' => $logs->items(),
+            'meta' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'per_page' => $logs->perPage(),
+                'total' => $logs->total(),
+                'from' => $logs->firstItem(),
+                'to' => $logs->lastItem(),
+            ],
         ]);
     }
 
@@ -50,10 +59,12 @@ class UserLogController extends Controller
 
         abort_unless(in_array($roleName, ['chief', 'station admin'], true), 403);
 
+        $perPage = (int) min(max($request->integer('limit', 10), 1), 50);
+
         $logs = UserLog::query()
             ->with(['user.role'])
             ->orderByDesc('created_at')
-            ->get([
+            ->paginate($perPage, [
                 'id as user_log_id',
                 'user_id',
                 'action',
@@ -62,9 +73,8 @@ class UserLogController extends Controller
                 'created_at',
             ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $logs->map(function (UserLog $log) {
+        $logs->setCollection(
+            $logs->getCollection()->map(function (UserLog $log) {
                 return [
                     'user_log_id' => $log->user_log_id,
                     'user_id' => $log->user_id,
@@ -76,7 +86,20 @@ class UserLogController extends Controller
                     'role' => $log->user?->role?->role ?? 'Unknown role',
                     'email' => $log->user?->email,
                 ];
-            }),
+            })
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $logs->items(),
+            'meta' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'per_page' => $logs->perPage(),
+                'total' => $logs->total(),
+                'from' => $logs->firstItem(),
+                'to' => $logs->lastItem(),
+            ],
         ]);
     }
 }

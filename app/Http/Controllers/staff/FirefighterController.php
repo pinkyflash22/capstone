@@ -20,6 +20,7 @@ use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\EventActivity;
 use App\Support\MediaPath;
+use App\Support\MarkerFeedBuilder;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -1832,9 +1833,11 @@ public function getAssignedIncidents(string $id){
                     $incidentCoords = $this->loadTeamIncidentsForRegistry((int) $resolvedTeam->team_id, true);
                 }
 
-                $allMarkers = \App\Models\Marker::query()
-                    ->select(['marker_id', 'title', 'description', 'lat', 'lng', 'status', 'category', 'image'])
-                    ->get();
+                $viewer = User::query()
+                    ->with('role')
+                    ->find($userId);
+
+                $allMarkers = MarkerFeedBuilder::buildForViewer($viewer)->values();
 
                 $stations = \App\Models\Station::query()
                     ->select(['station_id', 'station_name', 'marker_id'])

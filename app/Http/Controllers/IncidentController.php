@@ -517,6 +517,7 @@ class IncidentController extends Controller
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string|max:1000',
             'status' => 'nullable|in:reported,en-route,on-scene,controlled,closed,completed,Reported,Responding,On Scene,Controlled,Closed',
+            'station_id' => 'nullable|exists:stations,station_id',
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
         ]);
@@ -555,6 +556,25 @@ class IncidentController extends Controller
 
             unset($validated['lat'], $validated['lng'], $validated['title'], $validated['description']);
 
+            if (empty($validated['station_id'])) {
+                $resolvedLat = $createdMarker?->lat ?? null;
+                $resolvedLng = $createdMarker?->lng ?? null;
+
+                if (($resolvedLat === null || $resolvedLng === null) && ! empty($validated['marker_id'])) {
+                    $existingMarker = Marker::query()
+                        ->select(['marker_id', 'lat', 'lng'])
+                        ->find($validated['marker_id']);
+
+                    $resolvedLat = $existingMarker?->lat;
+                    $resolvedLng = $existingMarker?->lng;
+                }
+
+                $validated['station_id'] = $this->resolveNearestStationIdOrDefault(
+                    $resolvedLat !== null ? (float) $resolvedLat : null,
+                    $resolvedLng !== null ? (float) $resolvedLng : null
+                );
+            }
+
             $validated['status'] = empty($validated['status'])
                 ? self::STATUS_DB_REPORTED
                 : $this->resolveDatabaseStatusName($validated['status']);
@@ -588,6 +608,19 @@ class IncidentController extends Controller
             'message' => 'Fire report submitted. BFP processing has started.',
             'data' => $this->serializeIncident($data->fresh($this->getIncidentRelations())),
         ]);
+    }
+
+    private function resolveNearestStationIdOrDefault(?float $lat, ?float $lng): int
+    {
+        if ($lat !== null && $lng !== null) {
+            $nearestStation = $this->getStationsSortedByDistance($lat, $lng)->first();
+
+            if ($nearestStation?->station_id) {
+                return (int) $nearestStation->station_id;
+            }
+        }
+
+        return 1;
     }
 
     public function nearestAvailableResponder(Request $request)

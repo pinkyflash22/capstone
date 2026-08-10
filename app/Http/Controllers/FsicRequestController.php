@@ -18,6 +18,11 @@ use App\Support\UserActivityLogger;
 
 class FsicRequestController extends Controller
 {
+    private const BUSINESS_NAME_PATTERN = "/^[A-Za-z0-9 ]+$/";
+    private const OWNER_NAME_PATTERN = "/^[A-Za-z ]+$/";
+    private const BUILDING_ADDRESS_PATTERN = "/^[A-Za-z0-9 ,.-]+$/";
+    private const ALPHANUMERIC_CODE_PATTERN = "/^[A-Za-z0-9 ]+$/";
+    private const TIN_PATTERN = "/^[0-9]+$/";
     /**
      * Display the FSIC request form data
      */
@@ -149,17 +154,24 @@ public function store(Request $request)
             'user_id' => 'required|exists:users,user_id',
             'request_code' => 'required|unique:fsic_requests,request_code',
             'date_requested' => 'required|date',
-            'business_name' => 'required|string|max:255',
-            'owner_name' => 'required|string|max:255',
+            'business_name' => ['required', 'string', 'max:255', 'regex:' . self::BUSINESS_NAME_PATTERN],
+            'owner_name' => ['required', 'string', 'max:255', 'regex:' . self::OWNER_NAME_PATTERN],
             'business_type' => 'nullable|string|max:255',
-            'building_address' => 'required|string|max:255',
+            'building_address' => ['required', 'string', 'max:255', 'regex:' . self::BUILDING_ADDRESS_PATTERN],
             'barangay' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'province' => 'required|string|max:255',
-            'dti_sec_registration_no' => 'nullable|string|max:255',
-            'mayors_permit_no' => 'nullable|string|max:255',
-            'tin_number' => 'nullable|string|max:255',
+            'dti_sec_registration_no' => ['nullable', 'string', 'max:255', 'regex:' . self::ALPHANUMERIC_CODE_PATTERN],
+            'mayors_permit_no' => ['nullable', 'string', 'max:255', 'regex:' . self::ALPHANUMERIC_CODE_PATTERN],
+            'tin_number' => ['nullable', 'string', 'max:255', 'regex:' . self::TIN_PATTERN],
             'status' => 'required|in:pending,for_inspection,inspected,approved,rejected'
+        ], [
+            'business_name.regex' => 'Business name can only contain letters, numbers, and spaces.',
+            'owner_name.regex' => 'Owner or applicant name can only contain letters and spaces.',
+            'building_address.regex' => 'Building or street address can only contain letters, numbers, spaces, commas, hyphens, and periods.',
+            'dti_sec_registration_no.regex' => 'DTI or SEC registration number can only contain letters, numbers, and spaces.',
+            'mayors_permit_no.regex' => 'Mayor\'s permit number can only contain letters, numbers, and spaces.',
+            'tin_number.regex' => 'TIN number must contain numbers only.',
         ]);
         
         if ($validator->fails()) {
@@ -319,13 +331,20 @@ public function store(Request $request)
                 ->findOrFail($id);
             
             $validator = Validator::make($request->all(), [
-                'business_name' => 'sometimes|string|max:255',
-                'owner_name' => 'sometimes|string|max:255',
+                'business_name' => ['sometimes', 'string', 'max:255', 'regex:' . self::BUSINESS_NAME_PATTERN],
+                'owner_name' => ['sometimes', 'string', 'max:255', 'regex:' . self::OWNER_NAME_PATTERN],
                 'business_type' => 'nullable|string|max:255',
-                'building_address' => 'sometimes|string|max:500',
-                'dti_sec_registration_no' => 'nullable|string|max:255',
-                'mayors_permit_no' => 'nullable|string|max:255',
-                'tin_number' => 'nullable|string|max:255',
+                'building_address' => ['sometimes', 'string', 'max:500', 'regex:' . self::BUILDING_ADDRESS_PATTERN],
+                'dti_sec_registration_no' => ['nullable', 'string', 'max:255', 'regex:' . self::ALPHANUMERIC_CODE_PATTERN],
+                'mayors_permit_no' => ['nullable', 'string', 'max:255', 'regex:' . self::ALPHANUMERIC_CODE_PATTERN],
+                'tin_number' => ['nullable', 'string', 'max:255', 'regex:' . self::TIN_PATTERN],
+            ], [
+                'business_name.regex' => 'Business name can only contain letters, numbers, and spaces.',
+                'owner_name.regex' => 'Owner or applicant name can only contain letters and spaces.',
+                'building_address.regex' => 'Building or street address can only contain letters, numbers, spaces, commas, hyphens, and periods.',
+                'dti_sec_registration_no.regex' => 'DTI or SEC registration number can only contain letters, numbers, and spaces.',
+                'mayors_permit_no.regex' => 'Mayor\'s permit number can only contain letters, numbers, and spaces.',
+                'tin_number.regex' => 'TIN number must contain numbers only.',
             ]);
             
             if ($validator->fails()) {

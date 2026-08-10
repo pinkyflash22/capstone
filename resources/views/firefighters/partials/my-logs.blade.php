@@ -67,6 +67,8 @@
         const myLogsSummary = document.getElementById('firefighterMyLogsSummary');
         const refreshMyLogsBtn = document.getElementById('refreshFirefighterMyLogsBtn');
         const closeMyLogsModalBtn = document.getElementById('closeFirefighterMyLogsModal');
+        let firefighterLogsCurrentPage = 1;
+        const firefighterLogsPerPage = 10;
 
         function formatLogDate(value) {
             const date = value ? new Date(value) : null;
@@ -92,12 +94,38 @@
             return trimmed.length > 140 ? `${trimmed.slice(0, 137)}...` : trimmed;
         }
 
-        function renderMyLogs(logs) {
+        function renderMyLogsPagination(meta = {}) {
+            const currentPage = Number(meta?.current_page || 1);
+            const lastPage = Number(meta?.last_page || 1);
+
+            if (lastPage <= 1) {
+                return '';
+            }
+
+            return `
+                <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage <= 1 ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage <= 1 ? 'disabled' : `onclick="loadFirefighterLogsPage(${currentPage - 1})"`}>
+                        Previous
+                    </button>
+                    <span class="text-xs font-medium text-slate-500">Page ${currentPage} of ${lastPage}</span>
+                    <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 ${currentPage >= lastPage ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50'}" ${currentPage >= lastPage ? 'disabled' : `onclick="loadFirefighterLogsPage(${currentPage + 1})"`}>
+                        Next
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderMyLogs(logs, meta = {}) {
             if (!myLogsContainer || !myLogsSummary) {
                 return;
             }
 
-            myLogsSummary.textContent = `${logs.length} log entr${logs.length === 1 ? 'y' : 'ies'} found`;
+            const totalLogs = Number(meta?.total || logs.length || 0);
+            const from = Number(meta?.from || 0);
+            const to = Number(meta?.to || 0);
+            myLogsSummary.textContent = totalLogs
+                ? `Showing ${from}-${to} of ${totalLogs} log entries`
+                : '0 log entries found';
 
             if (!logs.length) {
                 myLogsContainer.innerHTML = `
@@ -142,19 +170,21 @@
                         </div>
                     `).join('')}
                 </div>
+                ${renderMyLogsPagination(meta)}
             `;
         }
 
-        async function loadMyLogs() {
+        async function loadMyLogs(page = 1) {
             if (!myLogsContainer || !myLogsSummary) {
                 return;
             }
 
+            firefighterLogsCurrentPage = Math.max(1, Number(page || 1));
             myLogsSummary.textContent = 'Loading your activity logs...';
             myLogsContainer.innerHTML = '<div class="text-sm text-slate-500">Loading logs...</div>';
 
             try {
-                const response = await fetch('{{ route('user-logs.index') }}', {
+                const response = await fetch(`{{ route('user-logs.index') }}?page=${firefighterLogsCurrentPage}&limit=${firefighterLogsPerPage}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -166,7 +196,7 @@
                 }
 
                 const payload = await response.json();
-                renderMyLogs(Array.isArray(payload?.data) ? payload.data : []);
+                renderMyLogs(Array.isArray(payload?.data) ? payload.data : [], payload?.meta || {});
             } catch (error) {
                 console.error('Error loading firefighter user logs:', error);
                 myLogsSummary.textContent = 'Unable to load your activity logs';
@@ -187,7 +217,7 @@
                 myLogsModal.classList.add('flex');
                 document.body.classList.add('menu-open');
             }
-            loadMyLogs();
+            loadMyLogs(1);
         }
 
         function closeMyLogsModal() {
@@ -200,8 +230,13 @@
 
         window.openMyLogsModal = openMyLogsModal;
         window.closeMyLogsModal = closeMyLogsModal;
+        window.loadFirefighterLogsPage = function (page) {
+            loadMyLogs(page);
+        };
 
-        refreshMyLogsBtn?.addEventListener('click', loadMyLogs);
+        refreshMyLogsBtn?.addEventListener('click', function () {
+            loadMyLogs(firefighterLogsCurrentPage);
+        });
         closeMyLogsModalBtn?.addEventListener('click', closeMyLogsModal);
         myLogsModal?.addEventListener('click', function (event) {
             if (event.target === myLogsModal) {

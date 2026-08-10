@@ -6,9 +6,11 @@ use App\Models\Marker;
 
 use App\Models\Status;
 use App\Models\Multimedia;
+use App\Support\MarkerFeedBuilder;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class MarkerController extends Controller
@@ -146,67 +148,9 @@ class MarkerController extends Controller
 
     public function index()
     {
-        $markers = Marker::with([
-                'stations.address.barangay.city',
-                'stations.stationOfficers.user.role',
-                'barangayHall.address.barangay.city',
-                'barangayHall.barangay.city',
-                'hydrants.station',
-            ])
-            ->get();
-
-        $payload = $markers->map(function (Marker $marker) {
-            $station = $marker->stations->first();
-            $hydrant = $marker->hydrants->first();
-
-            return [
-                'marker_id' => $marker->marker_id,
-                'title' => $marker->title,
-                'description' => $marker->description,
-                'lat' => $marker->lat,
-                'lng' => $marker->lng,
-                'category' => $marker->category,
-            
-                'status' => $marker->status,
-              
-                'image' => $marker->image,
-              
-                'station' => $station ? [
-                    'station_name' => $this->publicValue($station->station_name),
-                    'contact_number' => $this->publicValue($station->contact_number),
-                ] : null,
-                'station_public' => $station ? [
-                    'name' => $this->publicValue($station->station_name),
-                    'address' => $this->formatFullAddress($station->address),
-                    'contact_number' => $this->publicValue($station->contact_number),
-                    'operating_hours' => $this->publicValue($station->operating_hours ?? $station->office_hours ?? null),
-                    'chief_name' => $this->resolveStationChiefName($station),
-                ] : null,
-                'hydrant' => $hydrant ? [
-                    'hydrant_code' => $this->publicValue($hydrant->hydrant_code),
-                    'type' => $this->publicValue($hydrant->type),
-                ] : null,
-                'hydrant_public' => $hydrant ? [
-                    'code' => $this->publicValue($hydrant->hydrant_code),
-                    'type' => $this->publicValue($hydrant->type),
-                    'station_name' => $this->publicValue($hydrant->station?->station_name),
-                ] : null,
-                'barangay_public' => $marker->barangayHall ? [
-                    'name' => $this->publicValue($marker->barangayHall->hall_name)
-                        ?: $this->publicValue($marker->barangayHall->barangay?->barangay_name),
-                    'address' => $this->formatFullAddress($marker->barangayHall->address),
-                    'contact_number' => $this->publicValue($marker->barangayHall->contact_number),
-                    'office_hours' => $this->publicValue($marker->barangayHall->office_hours ?? $marker->barangayHall->operating_hours ?? null),
-                    'barangay_name' => $this->publicValue($marker->barangayHall->barangay?->barangay_name),
-                ] : null,
-                'created_at' => $marker->created_at,
-                'updated_at' => $marker->updated_at,
-            ];
-        });
-
         return response()->json([
             'success' => true,
-            'data' => $payload,
+            'data' => MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all(),
         ]);
     }
 

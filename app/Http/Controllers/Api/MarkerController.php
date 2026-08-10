@@ -7,30 +7,15 @@ use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Marker;
+use App\Support\MarkerFeedBuilder;
 
 class MarkerController extends Controller
 {
     // GET markers
     public function index()
     {
-        $markers = Cache::remember('map:markers:index:v2', now()->addSeconds(20), function () {
-            return Marker::query()
-                ->select([
-                    'marker_id',
-                    'title',
-                    'description',
-                    'lat',
-                    'lng',
-                    'status',
-                    'category',
-                    'image',
-                    'markerCategory_id',
-                    'multimedia_id',
-                    'created_at',
-                    'updated_at',
-                ])
-                ->orderBy('marker_id')
-                ->get();
+        $markers = Cache::remember('map:markers:index:v3_public', now()->addSeconds(20), function () {
+            return MarkerFeedBuilder::buildForViewer(null)->values()->all();
         });
 
         return response()->json($markers);

@@ -20,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class RiskAreaReviewController extends Controller
 {
+    public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version';
+
     public function adminIndex(Request $request): View
     {
         return $this->renderQueue($request, 'admin');
@@ -108,132 +110,93 @@ class RiskAreaReviewController extends Controller
         $typeFilter = strtolower((string) $request->string('entry_type', 'all'));
         $reviewTypeFilter = strtolower((string) $request->string('review_type', 'all'));
         $search = trim((string) $request->string('search', ''));
+        $chiefCoveredBarangayIds = $mode === 'chief'
+            ? $this->resolveChiefCoveredBarangayIds($stationId, $chiefCityId)
+            : collect();
+        $cachedPayload = Cache::remember(
+            $this->riskReviewCacheKey($mode, $stationId, $chiefCityId, $statusFilter, $typeFilter, $reviewTypeFilter, $search, (int) $request->integer('page', 1)),
+            now()->addSeconds(45),
+            function () use ($mode, $stationId, $chiefCityId, $chiefCoveredBarangayIds, $statusFilter, $typeFilter, $reviewTypeFilter, $search, $request) {
+                $baseQuery = $this->buildRiskReviewBaseQuery($mode, $stationId, $chiefCoveredBarangayIds);
 
-        $baseQuery = RiskArea::query()
-            ->with([
-                'marker',
-                'photos',
-                'station',
-                'reviewer',
-                'reporter',
-                'barangayHall.barangay.city',
-            ]);
+                $summaryCounts = (clone $baseQuery)
+                    ->selectRaw('review_status, COUNT(*) as total')
+                    ->groupBy('review_status')
+                    ->pluck('total', 'review_status');
 
-        if ($mode === 'chief') {
-            $baseQuery->where('station_id', $stationId ?: 0);
-        }
+                $reviewQueue = $this->applyRiskReviewFilters(
+                    (clone $baseQuery)
+                        ->where(function ($query) {
+                            $query
+                                ->where('review_status', '!=', 'approved')
+                                ->orWhere('review_type', 'delete');
+                        }),
+                    $statusFilter,
+                    $typeFilter,
+                    $reviewTypeFilter,
+                    $search
+                )
+                    ->latest('updated_at')
+                    ->latest('created_at')
+                    ->paginate(10)
+                    ->withQueryString();
 
-        $summaryCounts = (clone $baseQuery)
-            ->selectRaw('review_status, COUNT(*) as total')
-            ->groupBy('review_status')
-            ->pluck('total', 'review_status');
+                $activeEntries = $this->applyRiskReviewFilters(
+                    (clone $baseQuery)
+                        ->where('review_status', 'approved')
+                        ->where('review_type', '!=', 'delete'),
+                    'all',
+                    $typeFilter,
+                    'all',
+                    $search
+                )
+                    ->latest('updated_at')
+                    ->latest('created_at')
+                    ->get();
 
-        $reviewQueue = (clone $baseQuery)
-            ->where(function ($query) {
-                $query
-                    ->where('review_status', '!=', 'approved')
-                    ->orWhere('review_type', 'delete');
-            })
-            ->when(in_array($statusFilter, ['pending', 'approved', 'rejected'], true), function ($query) use ($statusFilter) {
-                $query->where('review_status', $statusFilter);
-            })
-            ->when(in_array($typeFilter, ['hazard', 'risk'], true), function ($query) use ($typeFilter) {
-                $query->where('entry_type', $typeFilter);
-            })
-            ->when(in_array($reviewTypeFilter, ['create', 'update', 'delete'], true), function ($query) use ($reviewTypeFilter) {
-                $query->where('review_type', $reviewTypeFilter);
-            })
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($searchQuery) use ($search) {
-                    $searchQuery
-                        ->whereHas('marker', function ($markerQuery) use ($search) {
-                            $markerQuery
-                                ->where('title', 'like', '%' . $search . '%')
-                                ->orWhere('description', 'like', '%' . $search . '%');
-                        })
-                        ->orWhere('street_or_sitio', 'like', '%' . $search . '%')
-                        ->orWhere('risk_type', 'like', '%' . $search . '%')
-                        ->orWhere('hazard_category', 'like', '%' . $search . '%')
-                        ->orWhere('condition_label', 'like', '%' . $search . '%')
-                        ->orWhere('remarks', 'like', '%' . $search . '%')
-                        ->orWhereHas('barangayHall.barangay', function ($barangayQuery) use ($search) {
-                            $barangayQuery->where('barangay_name', 'like', '%' . $search . '%');
-                        })
-                        ->orWhereHas('station', function ($stationQuery) use ($search) {
-                            $stationQuery->where('station_name', 'like', '%' . $search . '%');
+                $createBarangayHalls = BarangayHall::query()
+                    ->with(['barangay.city', 'marker'])
+                    ->when($mode === 'chief', function ($query) use ($chiefCityId) {
+                        if (! $chiefCityId) {
+                            $query->whereRaw('1 = 0');
+
+                            return;
+                        }
+
+                        $query->whereHas('barangay', function ($barangayQuery) use ($chiefCityId) {
+                            $barangayQuery->where('city_id', $chiefCityId);
                         });
-                });
-            })
-            ->latest('updated_at')
-            ->latest('created_at')
-            ->paginate(10)
-            ->withQueryString();
+                    })
+                    ->orderByRaw("COALESCE(hall_name, '') asc")
+                    ->get();
 
-        $activeEntries = (clone $baseQuery)
-            ->where('review_status', 'approved')
-            ->where('review_type', '!=', 'delete')
-            ->when(in_array($typeFilter, ['hazard', 'risk'], true), function ($query) use ($typeFilter) {
-                $query->where('entry_type', $typeFilter);
-            })
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($searchQuery) use ($search) {
-                    $searchQuery
-                        ->whereHas('marker', function ($markerQuery) use ($search) {
-                            $markerQuery
-                                ->where('title', 'like', '%' . $search . '%')
-                                ->orWhere('description', 'like', '%' . $search . '%');
-                        })
-                        ->orWhere('street_or_sitio', 'like', '%' . $search . '%')
-                        ->orWhere('risk_type', 'like', '%' . $search . '%')
-                        ->orWhere('hazard_category', 'like', '%' . $search . '%')
-                        ->orWhere('condition_label', 'like', '%' . $search . '%')
-                        ->orWhere('remarks', 'like', '%' . $search . '%')
-                        ->orWhereHas('barangayHall.barangay', function ($barangayQuery) use ($search) {
-                            $barangayQuery->where('barangay_name', 'like', '%' . $search . '%');
-                        })
-                        ->orWhereHas('station', function ($stationQuery) use ($search) {
-                            $stationQuery->where('station_name', 'like', '%' . $search . '%');
-                        });
-                });
-            })
-            ->latest('updated_at')
-            ->latest('created_at')
-            ->get();
-
-        $createBarangayHalls = BarangayHall::query()
-            ->with(['barangay.city', 'marker'])
-            ->when($mode === 'chief', function ($query) use ($chiefCityId) {
-                if (! $chiefCityId) {
-                    $query->whereRaw('1 = 0');
-
-                    return;
-                }
-
-                $query->whereHas('barangay', function ($barangayQuery) use ($chiefCityId) {
-                    $barangayQuery->where('city_id', $chiefCityId);
-                });
-            })
-            ->orderByRaw("COALESCE(hall_name, '') asc")
-            ->get();
+                return [
+                    'reviewQueue' => $reviewQueue,
+                    'activeEntries' => $activeEntries,
+                    'createBarangayHalls' => $createBarangayHalls,
+                    'summaryCounts' => [
+                        'all' => (int) (clone $baseQuery)->count(),
+                        'pending' => (int) ($summaryCounts['pending'] ?? 0),
+                        'approved' => (int) ($summaryCounts['approved'] ?? 0),
+                        'rejected' => (int) ($summaryCounts['rejected'] ?? 0),
+                    ],
+                ];
+            }
+        );
 
         return view('reviews.risk-area-queue', [
             'mode' => $mode,
             'currentStationId' => $stationId,
             'activeNav' => 'risk-reviews',
-            'reviewQueue' => $reviewQueue,
-            'activeEntries' => $activeEntries,
+            'reviewQueue' => $cachedPayload['reviewQueue'],
+            'activeEntries' => $cachedPayload['activeEntries'],
             'filters' => [
                 'review_status' => $statusFilter,
                 'entry_type' => $typeFilter,
                 'review_type' => $reviewTypeFilter,
                 'search' => $search,
             ],
-            'summaryCounts' => [
-                'all' => (int) (clone $baseQuery)->count(),
-                'pending' => (int) ($summaryCounts['pending'] ?? 0),
-                'approved' => (int) ($summaryCounts['approved'] ?? 0),
-                'rejected' => (int) ($summaryCounts['rejected'] ?? 0),
-            ],
+            'summaryCounts' => $cachedPayload['summaryCounts'],
             'pageTitle' => $mode === 'admin'
                 ? 'Hazard & Risk Review Queue'
                 : 'Risk Reviews',
@@ -255,7 +218,7 @@ class RiskAreaReviewController extends Controller
             'createRouteName' => $mode === 'admin'
                 ? 'admin.risk-reviews.store'
                 : 'station-admin.risk-reviews.store',
-            'createBarangayHalls' => $createBarangayHalls,
+            'createBarangayHalls' => $cachedPayload['createBarangayHalls'],
             'stations' => \App\Models\Station::query()->orderBy('station_name')->get(),
             'riskTypeOptions' => $this->riskTypeOptions(),
             'riskTypeGroups' => $this->riskTypeGroups(),
@@ -279,10 +242,56 @@ class RiskAreaReviewController extends Controller
 
     protected function resolveRiskAreaForChief(int $riskAreaId, ?int $stationId): RiskArea
     {
+        $chiefCoveredBarangayIds = $this->resolveChiefCoveredBarangayIds($stationId, $this->getChiefCityId());
+
         return RiskArea::query()
             ->with(['marker', 'photos'])
-            ->where('station_id', $stationId ?: 0)
+            ->where(function ($query) use ($stationId, $chiefCoveredBarangayIds) {
+                $query->where('station_id', $stationId ?: 0);
+
+                if ($chiefCoveredBarangayIds->isNotEmpty()) {
+                    $query->orWhere(function ($legacyQuery) use ($chiefCoveredBarangayIds) {
+                        $legacyQuery
+                            ->whereNull('station_id')
+                            ->whereHas('barangayHall', function ($barangayHallQuery) use ($chiefCoveredBarangayIds) {
+                                $barangayHallQuery->whereIn('barangay_id', $chiefCoveredBarangayIds->all());
+                            });
+                    });
+                }
+            })
             ->findOrFail($riskAreaId);
+    }
+
+    protected function resolveChiefCoveredBarangayIds(?int $stationId, ?int $chiefCityId = null)
+    {
+        if (! $stationId) {
+            return collect();
+        }
+
+        $coverageBarangayIds = DB::table('station_barangay_coverage')
+            ->where('station_id', $stationId)
+            ->where('is_active', true)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($barangayId) => (int) $barangayId)
+            ->unique()
+            ->values();
+
+        if ($coverageBarangayIds->isNotEmpty()) {
+            return $coverageBarangayIds;
+        }
+
+        if (! $chiefCityId) {
+            return collect();
+        }
+
+        return DB::table('barangays')
+            ->where('city_id', $chiefCityId)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($barangayId) => (int) $barangayId)
+            ->unique()
+            ->values();
     }
 
     protected function handleReview(Request $request, RiskArea $riskArea, string $redirectRoute): RedirectResponse
@@ -342,6 +351,7 @@ class RiskAreaReviewController extends Controller
         });
 
         Cache::forget('map:markers:index:v2');
+        self::flushRiskReviewCache();
 
         BarangayNotificationService::notifyRiskAreaReviewed($riskArea->fresh(['barangayHall.barangay']), $validated['decision']);
 
@@ -435,6 +445,7 @@ class RiskAreaReviewController extends Controller
         });
 
         Cache::forget('map:markers:index:v2');
+        self::flushRiskReviewCache();
 
         return redirect()
             ->route($redirectRoute, [
@@ -524,9 +535,102 @@ class RiskAreaReviewController extends Controller
 
         BarangayNotificationService::notifyRiskAreaReviewed($riskArea->fresh(['barangayHall.barangay']), 'approved');
 
+        self::flushRiskReviewCache();
+
         return redirect()
             ->route($redirectRoute, $request->only(['review_status', 'entry_type', 'review_type', 'search', 'page']))
             ->with('status', 'The live hazard or risk entry has been updated.');
+    }
+
+    protected function buildRiskReviewBaseQuery(string $mode, ?int $stationId, $chiefCoveredBarangayIds)
+    {
+        $baseQuery = RiskArea::query()
+            ->with([
+                'marker',
+                'photos',
+                'station',
+                'reviewer',
+                'reporter',
+                'barangayHall.barangay.city',
+            ]);
+
+        if ($mode === 'chief') {
+            $baseQuery->where(function ($query) use ($stationId, $chiefCoveredBarangayIds) {
+                $query->where('station_id', $stationId ?: 0);
+
+                if ($chiefCoveredBarangayIds->isNotEmpty()) {
+                    $query->orWhere(function ($legacyQuery) use ($chiefCoveredBarangayIds) {
+                        $legacyQuery
+                            ->whereNull('station_id')
+                            ->whereHas('barangayHall', function ($barangayHallQuery) use ($chiefCoveredBarangayIds) {
+                                $barangayHallQuery->whereIn('barangay_id', $chiefCoveredBarangayIds->all());
+                            });
+                    });
+                }
+            });
+        }
+
+        return $baseQuery;
+    }
+
+    protected function applyRiskReviewFilters($query, string $statusFilter, string $typeFilter, string $reviewTypeFilter, string $search)
+    {
+        return $query
+            ->when(in_array($statusFilter, ['pending', 'approved', 'rejected'], true), function ($innerQuery) use ($statusFilter) {
+                $innerQuery->where('review_status', $statusFilter);
+            })
+            ->when(in_array($typeFilter, ['hazard', 'risk'], true), function ($innerQuery) use ($typeFilter) {
+                $innerQuery->where('entry_type', $typeFilter);
+            })
+            ->when(in_array($reviewTypeFilter, ['create', 'update', 'delete'], true), function ($innerQuery) use ($reviewTypeFilter) {
+                $innerQuery->where('review_type', $reviewTypeFilter);
+            })
+            ->when($search !== '', function ($innerQuery) use ($search) {
+                $innerQuery->where(function ($searchQuery) use ($search) {
+                    $searchQuery
+                        ->whereHas('marker', function ($markerQuery) use ($search) {
+                            $markerQuery
+                                ->where('title', 'like', '%' . $search . '%')
+                                ->orWhere('description', 'like', '%' . $search . '%');
+                        })
+                        ->orWhere('street_or_sitio', 'like', '%' . $search . '%')
+                        ->orWhere('risk_type', 'like', '%' . $search . '%')
+                        ->orWhere('hazard_category', 'like', '%' . $search . '%')
+                        ->orWhere('condition_label', 'like', '%' . $search . '%')
+                        ->orWhere('remarks', 'like', '%' . $search . '%')
+                        ->orWhereHas('barangayHall.barangay', function ($barangayQuery) use ($search) {
+                            $barangayQuery->where('barangay_name', 'like', '%' . $search . '%');
+                        })
+                        ->orWhereHas('station', function ($stationQuery) use ($search) {
+                            $stationQuery->where('station_name', 'like', '%' . $search . '%');
+                        });
+                });
+            });
+    }
+
+    protected function riskReviewCacheKey(string $mode, ?int $stationId, ?int $chiefCityId, string $statusFilter, string $typeFilter, string $reviewTypeFilter, string $search, int $page): string
+    {
+        $version = (int) Cache::get(self::RISK_REVIEW_CACHE_VERSION_KEY, 1);
+
+        return implode(':', [
+            'risk-reviews',
+            $version,
+            $mode,
+            (int) ($stationId ?? 0),
+            (int) ($chiefCityId ?? 0),
+            $statusFilter,
+            $typeFilter,
+            $reviewTypeFilter,
+            md5($search),
+            max(1, $page),
+        ]);
+    }
+
+    public static function flushRiskReviewCache(): void
+    {
+        if (! Cache::add(self::RISK_REVIEW_CACHE_VERSION_KEY, 1, now()->addDays(30))) {
+            Cache::increment(self::RISK_REVIEW_CACHE_VERSION_KEY);
+        }
     }
 
     protected function activeRiskAreaValidationRules(): array
@@ -874,6 +978,8 @@ class RiskAreaReviewController extends Controller
         DB::transaction(function () use ($riskArea) {
             $this->deleteRiskArea($riskArea);
         });
+
+        self::flushRiskReviewCache();
 
         return redirect()
             ->route($redirectRoute, $request->only(['review_status', 'entry_type', 'review_type', 'search', 'page']))
