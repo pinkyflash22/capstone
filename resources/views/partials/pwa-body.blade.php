@@ -345,18 +345,95 @@
     </span>
 </div>
 
+<style>
+    .pyrosense-page-snapshot-badge {
+        position: fixed;
+        right: 16px;
+        bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+        z-index: 1545;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        max-width: min(420px, calc(100vw - 32px));
+        padding: 12px 15px;
+        border-radius: 18px;
+        background: rgba(255, 250, 244, 0.97);
+        color: #7c2d12;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14);
+        backdrop-filter: blur(14px);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .pyrosense-page-snapshot-badge.is-visible {
+        display: inline-flex;
+    }
+
+    .pyrosense-page-snapshot-badge__icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, rgba(198, 61, 38, 0.12), rgba(209, 138, 22, 0.2));
+        color: #c2410c;
+        font-weight: 800;
+    }
+
+    .pyrosense-page-snapshot-badge__copy strong,
+    .pyrosense-page-snapshot-badge__copy span {
+        display: block;
+    }
+
+    .pyrosense-page-snapshot-badge__copy strong {
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .pyrosense-page-snapshot-badge__copy span {
+        margin-top: 2px;
+        color: #9a3412;
+    }
+
+    @media (max-width: 640px) {
+        .pyrosense-page-snapshot-badge {
+            left: 12px;
+            right: 12px;
+            bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+            max-width: none;
+        }
+    }
+</style>
+
+<div id="pyrosensePageSnapshotBadge" class="pyrosense-page-snapshot-badge" role="status" aria-live="polite">
+    <span id="pyrosensePageSnapshotBadgeIcon" class="pyrosense-page-snapshot-badge__icon">
+        <i class="fa-solid fa-database"></i>
+    </span>
+    <span class="pyrosense-page-snapshot-badge__copy">
+        <strong id="pyrosensePageSnapshotBadgeTitle">Offline snapshot ready</strong>
+        <span id="pyrosensePageSnapshotBadgeText">Last loaded data is available for this page.</span>
+    </span>
+</div>
+
 <script>
     (function () {
         const STORAGE_PREFIX = 'pyrosense-pwa';
         const DATASET_KEY = `${STORAGE_PREFIX}:datasets`;
         const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue`;
         const STATUS_KEY = `${STORAGE_PREFIX}:status`;
+        const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
         const AUTH_URL = @json(url('/auth'));
         const pill = document.getElementById('pyrosenseConnectionPill');
         const pillIcon = document.getElementById('pyrosenseConnectionPillIcon');
         const pillTitle = document.getElementById('pyrosenseConnectionPillTitle');
         const pillText = document.getElementById('pyrosenseConnectionPillText');
+        const pageSnapshotBadge = document.getElementById('pyrosensePageSnapshotBadge');
+        const pageSnapshotBadgeTitle = document.getElementById('pyrosensePageSnapshotBadgeTitle');
+        const pageSnapshotBadgeText = document.getElementById('pyrosensePageSnapshotBadgeText');
         if (!window.__pyroNativeFetch) {
             window.__pyroNativeFetch = window.fetch.bind(window);
         }
@@ -483,6 +560,97 @@
 
         function setDatasets(nextDatasets) {
             safeWriteJson(DATASET_KEY, nextDatasets && typeof nextDatasets === 'object' ? nextDatasets : {});
+        }
+
+        function getPageSnapshots() {
+            const snapshots = safeReadJson(PAGE_SNAPSHOT_KEY, {});
+            return snapshots && typeof snapshots === 'object' ? snapshots : {};
+        }
+
+        function setPageSnapshots(nextSnapshots) {
+            safeWriteJson(PAGE_SNAPSHOT_KEY, nextSnapshots && typeof nextSnapshots === 'object' ? nextSnapshots : {});
+        }
+
+        function formatSnapshotTimestamp(savedAt) {
+            if (!savedAt) {
+                return null;
+            }
+
+            const date = new Date(savedAt);
+            if (Number.isNaN(date.getTime())) {
+                return null;
+            }
+
+            return date.toLocaleString([], {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+
+        function renderPageSnapshotBadge(snapshot = null, options = {}) {
+            if (!pageSnapshotBadge || !pageSnapshotBadgeTitle || !pageSnapshotBadgeText) {
+                return;
+            }
+
+            if (!snapshot || (!options.forceVisible && window.navigator.onLine)) {
+                pageSnapshotBadge.classList.remove('is-visible');
+                return;
+            }
+
+            const savedLabel = formatSnapshotTimestamp(snapshot.saved_at);
+            pageSnapshotBadgeTitle.textContent = options.title || `${snapshot.label || 'Page'} offline snapshot`;
+            pageSnapshotBadgeText.textContent = savedLabel
+                ? `Showing the last loaded data saved on ${savedLabel}.`
+                : 'Showing the last loaded data saved on this device.';
+            pageSnapshotBadge.classList.add('is-visible');
+        }
+
+        function updatePageSnapshot(config = {}) {
+            const key = config.key || window.location.pathname;
+            if (!key) {
+                return null;
+            }
+
+            const snapshots = getPageSnapshots();
+            const snapshot = {
+                key,
+                label: config.label || snapshots[key]?.label || document.title || 'Page',
+                path: window.location.pathname,
+                saved_at: config.savedAt || new Date().toISOString(),
+            };
+
+            snapshots[key] = snapshot;
+            setPageSnapshots(snapshots);
+            return snapshot;
+        }
+
+        function readPageSnapshot(key = null) {
+            const snapshots = getPageSnapshots();
+            return snapshots[key || window.location.pathname] || null;
+        }
+
+        function registerPageSnapshot(config = {}) {
+            const key = config.key || window.location.pathname;
+            const snapshot = readPageSnapshot(key);
+
+            if (window.navigator.onLine) {
+                renderPageSnapshotBadge(snapshot, { forceVisible: false });
+                const updated = updatePageSnapshot({
+                    key,
+                    label: config.label || document.title || 'Page'
+                });
+                return updated;
+            }
+
+            renderPageSnapshotBadge(snapshot, {
+                forceVisible: true,
+                title: config.offlineTitle || `${config.label || document.title || 'Page'} offline snapshot`
+            });
+
+            return snapshot;
         }
 
         function showConnectionState(title, message, icon) {
@@ -705,6 +873,9 @@
             syncQueuedReports,
             updateConnectionState,
             attachMapOfflineNotice,
+            updatePageSnapshot,
+            readPageSnapshot,
+            registerPageSnapshot,
             getPendingReportCount: () => getQueue().length,
             getQueuedReports: () => getQueue().slice(),
             isOffline: () => !window.navigator.onLine
@@ -717,6 +888,7 @@
 
         window.addEventListener('offline', function () {
             updateConnectionState(true);
+            renderPageSnapshotBadge(readPageSnapshot(), { forceVisible: true });
         });
 
         document.addEventListener('DOMContentLoaded', function () {

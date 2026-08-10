@@ -1290,6 +1290,10 @@
     function writeDashboardCache(key, value) {
         try {
             window.localStorage?.setItem(key, JSON.stringify(value));
+            window.pyroPwa?.updatePageSnapshot?.({
+                key: 'firefighter-dashboard',
+                label: 'Firefighter Dashboard'
+            });
         } catch (error) {
             console.warn('Unable to write dashboard cache:', key, error);
         }
@@ -3056,6 +3060,14 @@ document.addEventListener('DOMContentLoaded', function () {
     --}}
     </div>
     @include('partials.pwa-body')
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        window.pyroPwa?.registerPageSnapshot?.({
+            key: 'firefighter-dashboard',
+            label: 'Firefighter Dashboard'
+        });
+    });
+    </script>
 </body>
 </html>
 

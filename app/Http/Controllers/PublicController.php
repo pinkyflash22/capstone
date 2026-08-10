@@ -19,6 +19,7 @@ use App\Models\RiskArea;
 use App\Models\RiskAreaPhoto;
 use App\Models\User;
 use App\Models\City;
+use App\Models\CommunityActivityRequest;
 use App\Models\FullAddress;
 use App\Services\BoundaryMatcherService;
 use App\Support\BarangayNotificationService;
@@ -63,13 +64,10 @@ class PublicController extends Controller
             return redirect()->route('citizen.mobile-hub');
         }
 
-        if ($user) {
-            return redirect()->route('home');
-        }
-
-        return redirect()->route('auth.login', [
-            'post_login_action' => 'citizen-mobile-hub',
-        ]);
+        // Keep the installed PWA boot route cache-safe for offline launch.
+        // Non-citizen users and guests can still open the public landing shell
+        // even when the network is unavailable.
+        return $this->homepage();
     }
 
     public static function citizenDashboardSections(): array
@@ -413,13 +411,13 @@ class PublicController extends Controller
     {
         $incidents = $preloadedIncidents instanceof \Illuminate\Support\Collection
             ? $preloadedIncidents
-            : Incident::with(['marker', 'barangay.city'])
+            : Incident::with(['marker', 'station', 'barangay.city'])
                 ->orderByDesc('created_at')
                 ->get();
 
         $userIncidents = $preloadedUserIncidents instanceof \Illuminate\Support\Collection
             ? $preloadedUserIncidents
-            : Incident::with(['marker', 'barangay.city'])
+            : Incident::with(['marker', 'station', 'barangay.city'])
                 ->where('reported_by', $accountId)
                 ->orderByDesc('created_at')
                 ->get();
@@ -578,7 +576,7 @@ class PublicController extends Controller
         $initialSection = in_array($section, self::CITIZEN_DASHBOARD_SECTIONS, true) ? $section : 'overview';
 
         $citizenUser = User::with(['role', 'address.barangay.city'])->findOrFail($accountId);
-        $incidents = Incident::with(['marker', 'barangay.city'])
+        $incidents = Incident::with(['marker', 'station', 'barangay.city'])
             ->orderByDesc('created_at')
             ->get();
         $myReports = $incidents
@@ -608,6 +606,12 @@ class PublicController extends Controller
         $overviewReportCount = $dashboardData['summary']['total_reports'];
         $citizenCombinedReports = $dashboardData['user_reports'];
         $riskMapReports = $dashboardData['risk_map_reports'];
+        $citizenCommunityActivityRequests = CommunityActivityRequest::query()
+            ->with(['station:station_id,station_name', 'barangay:barangay_id,barangay_name', 'convertedEvent:event_id,event,event_date,schedule'])
+            ->where('requester_user_id', $accountId)
+            ->latest()
+            ->limit(6)
+            ->get();
 
 
         //request
@@ -615,7 +619,7 @@ class PublicController extends Controller
         $fsicRequests = FsicRequest::query()->where('user_id', $accountId)->latest()->get();
 
         return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
-        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports'));
+        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports', 'citizenCommunityActivityRequests'));
         // return view('citizen.dashboard', compact('usermarker'));
 
     }

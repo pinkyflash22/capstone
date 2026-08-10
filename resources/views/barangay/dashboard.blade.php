@@ -88,6 +88,24 @@
     <span class="hero-badge"><i class="bi bi-clipboard-data"></i> Preparedness action tracking</span>
 @endsection
 
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    window.pyroPwa?.registerPageSnapshot?.({
+        key: 'barangay-dashboard',
+        label: 'Barangay Dashboard'
+    });
+
+    if (!window.pyroPwa?.isOffline?.()) {
+        window.pyroPwa?.updatePageSnapshot?.({
+            key: 'barangay-dashboard',
+            label: 'Barangay Dashboard'
+        });
+    }
+});
+</script>
+@endpush
+
 @section('content')
     <style>
         .barangay-dashboard-stack {

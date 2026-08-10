@@ -337,6 +337,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/schedule/events', [StationAdminController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::put('/schedule/events/{eventActivity}', [StationAdminController::class, 'updateScheduleEvent'])->name('schedule.events.update');
         Route::delete('/schedule/events/{eventActivity}', [StationAdminController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
+        Route::post('/community-activity-requests/{requestId}/approve', [App\Http\Controllers\CommunityActivityRequestController::class, 'approve'])->name('community-activity-requests.approve');
+        Route::post('/community-activity-requests/{requestId}/reject', [App\Http\Controllers\CommunityActivityRequestController::class, 'reject'])->name('community-activity-requests.reject');
         Route::get('/profile', [StationAdminController::class, 'profile'])->name('profile');
         Route::put('/profile', [StationAdminController::class, 'updateProfile'])->name('profile.update');
         Route::get('/api/dashboard-stats', [StationAdminController::class, 'dashboardStats'])->name('dashboard-stats');
@@ -522,6 +524,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard/{section?}', [PublicController::class, 'index'])
             ->where('section', implode('|', PublicController::citizenDashboardSections()))
             ->name('dashboard');
+        Route::post('/community-activity-requests', [App\Http\Controllers\CommunityActivityRequestController::class, 'storeCitizen'])->name('community-activity-requests.store');
         Route::post('/risk-reports', [PublicController::class, 'storeCitizenRiskReport'])->name('risk-reports.store');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');
@@ -561,6 +564,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/reports/fire/{recordId}', [BarangayDashboardController::class, 'destroyFireReport'])->name('reports.fire.destroy');
         Route::post('/reports/quick', [BarangayDashboardController::class, 'storeQuickFireReport'])->name('reports.quick');
         Route::get('/awareness', [BarangayDashboardController::class, 'awareness'])->name('awareness');
+        Route::post('/community-activity-requests', [App\Http\Controllers\CommunityActivityRequestController::class, 'storeBarangay'])->name('community-activity-requests.store');
         Route::get('/profile', [BarangayDashboardController::class, 'profile'])->name('profile');
         Route::put('/profile', [BarangayDashboardController::class, 'updateProfile'])->name('profile.update');
     });

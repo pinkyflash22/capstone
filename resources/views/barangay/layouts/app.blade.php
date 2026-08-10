@@ -1620,6 +1620,7 @@
     </script>
     @include('chief.partials.logs-modal', ['chiefLogsAllowAll' => false])
     @include('chief.partials.logs-script', ['chiefLogsAllowAll' => false])
+    @include('partials.pwa-body')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     @stack('scripts')
 </body>

@@ -195,6 +195,132 @@
             grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
             gap: 22px;
         }
+        .request-flash {
+            border-radius: 18px;
+            padding: 14px 18px;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .request-flash.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-color: rgba(16, 185, 129, 0.18);
+        }
+        .request-flash.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: rgba(239, 68, 68, 0.18);
+        }
+        .request-review-card {
+            background: rgba(255, 255, 255, 0.94);
+            border-radius: 30px;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+            padding: 24px;
+        }
+        .request-review-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+        .request-item {
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            border-radius: 24px;
+            padding: 18px;
+            background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+        }
+        .request-item h4 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+        }
+        .request-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .request-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid rgba(245, 158, 11, 0.12);
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+        .request-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .request-form-grid label,
+        .request-reject-form label {
+            display: grid;
+            gap: 6px;
+            color: #334155;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        .request-form-grid input,
+        .request-form-grid select,
+        .request-reject-form textarea {
+            width: 100%;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: #0f172a;
+            background: white;
+        }
+        .request-reject-form {
+            margin-top: 12px;
+            display: grid;
+            gap: 10px;
+        }
+        .request-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .request-btn {
+            border: 0;
+            border-radius: 14px;
+            min-height: 42px;
+            padding: 0 16px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .request-btn.approve {
+            background: linear-gradient(135deg, #ea580c, #f59e0b);
+            color: #fff;
+        }
+        .request-btn.reject {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .request-history-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .request-history-item {
+            border: 1px solid rgba(226, 232, 240, 0.88);
+            border-radius: 18px;
+            padding: 14px 16px;
+            background: #fff;
+        }
+        @media (max-width: 980px) {
+            .request-review-grid,
+            .request-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
         .calendar-card,
         .agenda-card {
@@ -896,6 +1022,18 @@
         </nav>
 
         <div class="schedule-shell">
+            @if(session('success'))
+                <div class="request-flash success">{{ session('success') }}</div>
+            @endif
+
+            @if(session('error'))
+                <div class="request-flash error">{{ session('error') }}</div>
+            @endif
+
+            @if($errors->any())
+                <div class="request-flash error">{{ $errors->first() }}</div>
+            @endif
+
             <section class="schedule-hero">
                 <div>
                     <h1>Coordinate drills, inspections, and command activities in one view.</h1>
@@ -921,6 +1059,120 @@
                         <div class="schedule-summary-value" id="scheduleNextHighlight" style="font-size:1.1rem;">Loading...</div>
                     </div>
                 </div>
+            </section>
+
+            <section class="request-review-card">
+                <div class="calendar-toolbar" style="padding:0 0 18px;border-bottom:1px solid rgba(226,232,240,0.9);margin-bottom:18px;background:none;">
+                    <div class="calendar-toolbar-title">
+                        <h2>Community Activity Requests</h2>
+                        <p>Review barangay and citizen requests here, then approve them into the official station schedule.</p>
+                    </div>
+                    <div class="calendar-toolbar-actions">
+                        <span class="schedule-badge"><i class="fa-solid fa-inbox"></i> {{ ($pendingCommunityActivityRequests ?? collect())->count() }} pending</span>
+                        <span class="schedule-badge"><i class="fa-solid fa-check"></i> {{ ($reviewedCommunityActivityRequests ?? collect())->where('status', 'approved')->count() }} approved recently</span>
+                    </div>
+                </div>
+
+                <div class="request-review-grid">
+                    @forelse(($pendingCommunityActivityRequests ?? collect()) as $requestItem)
+                        <article class="request-item">
+                            <h4>{{ $requestItem->title }}</h4>
+                            <p style="margin:10px 0 0;color:#475569;line-height:1.6;">{{ $requestItem->description }}</p>
+                            <div class="request-meta">
+                                <span class="request-pill">{{ strtoupper(str_replace('_', ' ', $requestItem->request_type)) }}</span>
+                                <span class="request-pill">{{ strtoupper($requestItem->submitted_from ?? 'REQUEST') }}</span>
+                                <span class="request-pill">{{ $requestItem->barangay?->barangay_name ?? 'No barangay linked' }}</span>
+                            </div>
+                            <p style="margin:12px 0 0;color:#64748b;font-size:0.86rem;">
+                                Requested by {{ $requestItem->contact_name ?: ($requestItem->requester?->full_name ?? 'Unknown requester') }}
+                                @if($requestItem->contact_number)
+                                    · {{ $requestItem->contact_number }}
+                                @endif
+                                @if($requestItem->preferred_date)
+                                    · Preferred {{ optional($requestItem->preferred_date)->format('M d, Y') }}
+                                @endif
+                                @if($requestItem->preferred_start_time && $requestItem->preferred_end_time)
+                                    · {{ \Carbon\Carbon::parse($requestItem->preferred_start_time)->format('g:i A') }} - {{ \Carbon\Carbon::parse($requestItem->preferred_end_time)->format('g:i A') }}
+                                @endif
+                            </p>
+
+                            <form method="POST" action="{{ route('station-admin.community-activity-requests.approve', ['requestId' => $requestItem->community_activity_request_id]) }}">
+                                @csrf
+                                <div class="request-form-grid">
+                                    <label style="grid-column:1 / -1;">
+                                        <span>Approved activity title</span>
+                                        <input type="text" name="event" value="{{ $requestItem->title }}">
+                                    </label>
+                                    <label>
+                                        <span>Schedule date</span>
+                                        <input type="date" name="event_date" value="{{ optional($requestItem->preferred_date)->toDateString() }}" min="2026-08-10">
+                                    </label>
+                                    <label>
+                                        <span>Activity type</span>
+                                        <select name="activity_type">
+                                            <option value="community" @selected(in_array($requestItem->request_type, ['orientation', 'seminar', 'community_meeting', 'other'], true))>Community</option>
+                                            <option value="drill" @selected($requestItem->request_type === 'drill')>Drill</option>
+                                            <option value="inspection" @selected($requestItem->request_type === 'inspection')>Inspection</option>
+                                            <option value="operations">Operations</option>
+                                            <option value="command">Command</option>
+                                            <option value="logistics">Logistics</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Start time</span>
+                                        <input type="time" name="start_time" value="{{ $requestItem->preferred_start_time ? \Illuminate\Support\Str::substr((string) $requestItem->preferred_start_time, 0, 5) : '' }}">
+                                    </label>
+                                    <label>
+                                        <span>End time</span>
+                                        <input type="time" name="end_time" value="{{ $requestItem->preferred_end_time ? \Illuminate\Support\Str::substr((string) $requestItem->preferred_end_time, 0, 5) : '' }}">
+                                    </label>
+                                    <label style="grid-column:1 / -1;">
+                                        <span>Review notes</span>
+                                        <input type="text" name="review_notes" placeholder="Optional approval note">
+                                    </label>
+                                </div>
+                                <div class="request-actions">
+                                    <button type="submit" class="request-btn approve">Approve and add to schedule</button>
+                                </div>
+                            </form>
+
+                            <form method="POST" action="{{ route('station-admin.community-activity-requests.reject', ['requestId' => $requestItem->community_activity_request_id]) }}" class="request-reject-form">
+                                @csrf
+                                <label>
+                                    <span>Rejection note</span>
+                                    <textarea name="review_notes" rows="3" placeholder="Tell the requester why this cannot be scheduled now."></textarea>
+                                </label>
+                                <div class="request-actions">
+                                    <button type="submit" class="request-btn reject">Reject request</button>
+                                </div>
+                            </form>
+                        </article>
+                    @empty
+                        <article class="request-item" style="grid-column:1 / -1;">
+                            <h4>No pending community activity requests</h4>
+                            <p style="margin-top:10px;color:#64748b;">Citizen and barangay orientation or seminar requests will appear here once submitted.</p>
+                        </article>
+                    @endforelse
+                </div>
+
+                @if(($reviewedCommunityActivityRequests ?? collect())->isNotEmpty())
+                    <div class="request-history-list">
+                        @foreach($reviewedCommunityActivityRequests as $requestItem)
+                            <div class="request-history-item">
+                                <strong>{{ $requestItem->title }}</strong>
+                                <p style="margin:6px 0 0;color:#64748b;">
+                                    {{ strtoupper(str_replace('_', ' ', $requestItem->status)) }}
+                                    @if($requestItem->barangay)
+                                        · {{ $requestItem->barangay->barangay_name }}
+                                    @endif
+                                    @if($requestItem->convertedEvent)
+                                        · Scheduled as {{ $requestItem->convertedEvent->event }} on {{ optional($requestItem->convertedEvent->event_date)->format('M d, Y') }}
+                                    @endif
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </section>
 
             <section class="schedule-layout">

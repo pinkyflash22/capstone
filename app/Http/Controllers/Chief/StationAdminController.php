@@ -27,6 +27,7 @@ use App\Models\RiskArea;
 use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
+use App\Models\CommunityActivityRequest;
 use App\Models\EventActivity;
 use App\Support\MarkerFeedBuilder;
 
@@ -1234,11 +1235,44 @@ class StationAdminController extends Controller
                 ->values();
         }
 
+        $pendingCommunityActivityRequests = collect();
+        $reviewedCommunityActivityRequests = collect();
+
+        if ($stationId) {
+            $pendingCommunityActivityRequests = CommunityActivityRequest::query()
+                ->with([
+                    'requester:user_id,first_name,middle_name,last_name,contact_number',
+                    'barangay:barangay_id,barangay_name',
+                    'station:station_id,station_name',
+                ])
+                ->where('station_id', $stationId)
+                ->where('status', 'pending')
+                ->orderByRaw('CASE WHEN preferred_date IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('preferred_date')
+                ->latest()
+                ->limit(12)
+                ->get();
+
+            $reviewedCommunityActivityRequests = CommunityActivityRequest::query()
+                ->with([
+                    'requester:user_id,first_name,middle_name,last_name',
+                    'barangay:barangay_id,barangay_name',
+                    'convertedEvent:event_id,event,event_date,schedule',
+                ])
+                ->where('station_id', $stationId)
+                ->whereIn('status', ['approved', 'rejected'])
+                ->latest('reviewed_at')
+                ->limit(8)
+                ->get();
+        }
+
         return view('chief.schedule', [
             'scheduleEvents' => $scheduleEvents,
             'stationId' => $stationId,
             'stationName' => $stationName,
             'urbiztondoBarangays' => $urbiztondoBarangays,
+            'pendingCommunityActivityRequests' => $pendingCommunityActivityRequests,
+            'reviewedCommunityActivityRequests' => $reviewedCommunityActivityRequests,
         ]);
     }
 

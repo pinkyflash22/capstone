@@ -1,25 +1,23 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260810-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260810-3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const TILE_CACHE = `${CACHE_VERSION}-tiles`;
 const OFFLINE_URL = '/offline.html';
 const LANDING_URL = '/';
+const PWA_START_URL = '/pwa/start';
+const PWA_QUICK_REPORT_URL = '/pwa/quick-report';
 
 const NO_CACHE_HTML_PATTERNS = [
     /^\/auth(?:\/.*)?$/i,
     /^\/login$/i,
-    /^\/logout$/i,
-    /^\/firefighter(?:\/.*)?$/i,
-    /^\/admin(?:\/.*)?$/i,
-    /^\/chief(?:\/.*)?$/i,
-    /^\/citizen\/mobile-hub(?:\/.*)?$/i
+    /^\/logout$/i
 ];
 
 const APP_SHELL_URLS = [
     LANDING_URL,
-    '/pwa/start',
-    '/pwa/quick-report',
+    PWA_START_URL,
+    PWA_QUICK_REPORT_URL,
     '/manifest.json',
     OFFLINE_URL,
     '/logo.png',
@@ -119,6 +117,11 @@ self.addEventListener('fetch', (event) => {
         || url.pathname === '/check-auth'
     );
 
+    if (isStaticAsset) {
+        event.respondWith(cacheFirst(request, STATIC_CACHE));
+        return;
+    }
+
     if (isTileRequest) {
         event.respondWith(cacheFirst(request, TILE_CACHE));
         return;
@@ -128,14 +131,9 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    if (isStaticAsset) {
-        event.respondWith(cacheFirst(request, STATIC_CACHE));
-        return;
-    }
-
     if (isNavigation) {
         if (isProtectedHtmlRoute || isAuthRequest) {
-            event.respondWith(handleProtectedNavigationRequest(request));
+            event.respondWith(handleNoCacheNavigationRequest(request));
             return;
         }
 
@@ -158,7 +156,7 @@ self.addEventListener('fetch', (event) => {
     }
 });
 
-async function handleProtectedNavigationRequest(request) {
+async function handleNoCacheNavigationRequest(request) {
     try {
         return await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
     } catch (error) {
@@ -176,15 +174,33 @@ async function handleProtectedNavigationRequest(request) {
 }
 
 async function handleNavigationRequest(request) {
+    const requestUrl = new URL(request.url);
+
     try {
-        const response = await fetch(request);
-        const cache = await caches.open(DYNAMIC_CACHE);
-        cache.put(request, response.clone());
+        const response = await fetch(request, { credentials: 'same-origin' });
+        if (response && response.ok) {
+            const cache = await caches.open(DYNAMIC_CACHE);
+            cache.put(request, response.clone());
+        }
         return response;
     } catch (error) {
         const cachedPage = await caches.match(request, { ignoreSearch: true });
         if (cachedPage) {
             return cachedPage;
+        }
+
+        if (
+            requestUrl.pathname === PWA_START_URL
+            || requestUrl.pathname === PWA_QUICK_REPORT_URL
+            || (requestUrl.pathname === LANDING_URL && requestUrl.searchParams.get('source') === 'installed')
+        ) {
+            const cachedStartPage = await caches.match(PWA_START_URL, { ignoreSearch: true })
+                || await caches.match(PWA_QUICK_REPORT_URL, { ignoreSearch: true })
+                || await caches.match(LANDING_URL, { ignoreSearch: true });
+
+            if (cachedStartPage) {
+                return cachedStartPage;
+            }
         }
 
         const cachedLanding = await caches.match(LANDING_URL, { ignoreSearch: true });

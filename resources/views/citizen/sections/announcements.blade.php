@@ -1,5 +1,11 @@
 <div id="section-announcements" class="content-section announcements-page">
     <div class="citizen-announcements-shell">
+        @if($errors->any())
+            <div class="citizen-request-card" style="border-color:rgba(239,68,68,0.18);background:#fff7ed;color:#9a3412;">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
         <section class="citizen-announcements-hero">
             <div class="citizen-announcements-hero-grid">
                 <div>
@@ -54,6 +60,97 @@
                 </div>
                 <p class="citizen-announcements-stat-copy">Citizen discussion and feedback count.</p>
             </div>
+        </section>
+
+        <section class="citizen-request-shell">
+            <article class="citizen-request-card">
+                <div class="citizen-request-head">
+                    <div>
+                        <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-people-roof"></i> Community request</span>
+                        <h2 class="citizen-request-title">Request an orientation, seminar, or community activity</h2>
+                        <p class="citizen-request-copy">Citizens can ask the assigned station for fire safety orientations, seminars, drills, or similar preparedness activities.</p>
+                    </div>
+                </div>
+                <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form">
+                    @csrf
+                    <div class="citizen-request-grid">
+                        <label>
+                            <span>Request type</span>
+                            <select name="request_type">
+                                <option value="orientation">Orientation</option>
+                                <option value="seminar">Seminar</option>
+                                <option value="drill">Drill</option>
+                                <option value="inspection">Inspection</option>
+                                <option value="community_meeting">Community meeting</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Preferred date</span>
+                            <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="2026-08-10">
+                        </label>
+                        <label>
+                            <span>Start time</span>
+                            <input type="time" name="preferred_start_time" value="{{ old('preferred_start_time') }}">
+                        </label>
+                        <label>
+                            <span>End time</span>
+                            <input type="time" name="preferred_end_time" value="{{ old('preferred_end_time') }}">
+                        </label>
+                    </div>
+                    <label>
+                        <span>Title</span>
+                        <input type="text" name="title" value="{{ old('title') }}" placeholder="Example: Fire safety seminar for our neighborhood">
+                    </label>
+                    <label>
+                        <span>Reason for request</span>
+                        <textarea name="description" rows="4" placeholder="Describe the audience, concern, and what support is needed.">{{ old('description') }}</textarea>
+                    </label>
+                    <label>
+                        <span>Contact number</span>
+                        <input type="text" name="contact_number" value="{{ old('contact_number', auth()->user()->contact_number) }}" placeholder="Optional contact number">
+                    </label>
+                    <button type="submit" class="citizen-request-submit">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        Send request to station
+                    </button>
+                </form>
+            </article>
+
+            <article class="citizen-request-card">
+                <div class="citizen-request-head">
+                    <div>
+                        <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-list-check"></i> My requests</span>
+                        <h2 class="citizen-request-title">Recent community activity requests</h2>
+                    </div>
+                </div>
+                <div class="citizen-request-list">
+                    @forelse(($citizenCommunityActivityRequests ?? collect()) as $requestItem)
+                        <div class="citizen-request-item">
+                            <div class="citizen-request-item-top">
+                                <strong>{{ $requestItem->title }}</strong>
+                                <span class="citizen-request-status status-{{ $requestItem->status }}">{{ strtoupper(str_replace('_', ' ', $requestItem->status)) }}</span>
+                            </div>
+                            <p>{{ \Illuminate\Support\Str::limit($requestItem->description, 140) }}</p>
+                            <div class="citizen-request-meta">
+                                <span>{{ strtoupper(str_replace('_', ' ', $requestItem->request_type)) }}</span>
+                                <span>{{ $requestItem->barangay?->barangay_name ?? 'No barangay linked' }}</span>
+                                <span>{{ $requestItem->station?->station_name ?? 'Station 1' }}</span>
+                            </div>
+                            @if($requestItem->convertedEvent)
+                                <p class="citizen-request-note">Scheduled as {{ $requestItem->convertedEvent->event }} on {{ optional($requestItem->convertedEvent->event_date)->format('M d, Y') }} {{ $requestItem->convertedEvent->schedule ? '· ' . $requestItem->convertedEvent->schedule : '' }}</p>
+                            @elseif($requestItem->review_notes)
+                                <p class="citizen-request-note">Review note: {{ $requestItem->review_notes }}</p>
+                            @endif
+                        </div>
+                    @empty
+                        <div class="citizen-announcements-empty">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p>No community activity requests yet.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </article>
         </section>
 
         <div class="citizen-announcements-toolbar">
@@ -207,6 +304,112 @@
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.85rem;
+    }
+    .citizen-request-shell {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 0.9rem;
+    }
+    .citizen-request-card {
+        border: 1px solid rgba(120, 53, 15, 0.11);
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 18px 40px rgba(88, 43, 20, 0.075);
+        border-radius: 1.7rem;
+        padding: 1.1rem;
+    }
+    .citizen-request-head {
+        margin-bottom: 0.9rem;
+    }
+    .citizen-request-title {
+        margin: 0.7rem 0 0;
+        font-size: 1.18rem;
+        font-weight: 850;
+        color: var(--ann-ink);
+    }
+    .citizen-request-copy {
+        margin-top: 0.45rem;
+        color: var(--ann-muted);
+        line-height: 1.6;
+    }
+    .citizen-request-form,
+    .citizen-request-list {
+        display: grid;
+        gap: 0.8rem;
+    }
+    .citizen-request-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .citizen-request-form label {
+        display: grid;
+        gap: 0.4rem;
+        color: var(--ann-ink);
+        font-size: 0.84rem;
+        font-weight: 700;
+    }
+    .citizen-request-form input,
+    .citizen-request-form select,
+    .citizen-request-form textarea {
+        width: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 1rem;
+        padding: 0.82rem 0.95rem;
+        font: inherit;
+        color: var(--ann-ink);
+        background: #fff;
+    }
+    .citizen-request-submit {
+        border: 0;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, var(--ann-red), var(--ann-orange));
+        color: #fff;
+        padding: 0.92rem 1.1rem;
+        font-weight: 850;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+    }
+    .citizen-request-item {
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 1.1rem;
+        padding: 0.95rem;
+        background: linear-gradient(180deg, #fffaf6 0%, #ffffff 100%);
+    }
+    .citizen-request-item-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.45rem;
+    }
+    .citizen-request-status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 0.75rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 800;
+    }
+    .citizen-request-status.status-pending { background: #fffbeb; color: #b45309; }
+    .citizen-request-status.status-approved { background: #ecfdf5; color: #047857; }
+    .citizen-request-status.status-rejected { background: #fef2f2; color: #b91c1c; }
+    .citizen-request-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        color: var(--ann-muted);
+        font-size: 0.78rem;
+        margin-top: 0.55rem;
+    }
+    .citizen-request-note {
+        margin-top: 0.55rem;
+        color: #475569;
+        font-size: 0.84rem;
+        line-height: 1.55;
     }
     .citizen-announcements-stat {
         position: relative;
@@ -752,6 +955,10 @@
         .citizen-announcements-stats {
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.55rem;
+        }
+        .citizen-request-shell,
+        .citizen-request-grid {
+            grid-template-columns: 1fr;
         }
         .citizen-announcements-stat {
             min-height: 8.25rem;

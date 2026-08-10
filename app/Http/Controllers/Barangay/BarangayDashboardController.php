@@ -10,6 +10,7 @@ use App\Models\BarangayFireRecord;
 use App\Models\BarangayHall;
 use App\Models\BarangayPredictionChecklist;
 use App\Models\City;
+use App\Models\CommunityActivityRequest;
 use App\Models\FullAddress;
 use App\Models\HistoricalFireIncident;
 use App\Models\Incident;
@@ -448,6 +449,7 @@ class BarangayDashboardController extends Controller
         $historicalIncidents = collect();
         $predictionChecklists = collect();
         $aiActionPlanChecklists = collect();
+        $communityActivityRequests = collect();
         $fireRecords = collect();
         $riskAreas = collect();
         $mitigationActions = collect();
@@ -546,6 +548,13 @@ class BarangayDashboardController extends Controller
                 ->whereIn('category', ['barangay', 'fire', 'school', 'hydrant', 'bridge', 'station', 'risk', 'hazard'])
                 ->orderByDesc('marker_id')
                 ->limit(18)
+                ->get();
+
+            $communityActivityRequests = CommunityActivityRequest::query()
+                ->with(['station:station_id,station_name', 'convertedEvent:event_id,event,event_date,schedule'])
+                ->where('barangay_id', $barangay->barangay_id)
+                ->latest()
+                ->limit(6)
                 ->get();
 
         }
@@ -735,6 +744,7 @@ class BarangayDashboardController extends Controller
             'historicalIncidents' => $historicalIncidents,
             'predictionChecklists' => $predictionChecklists,
             'aiActionPlanChecklists' => $aiActionPlanChecklists,
+            'communityActivityRequests' => $communityActivityRequests,
             'fireRecords' => $fireRecords,
             'riskAreas' => $riskAreas,
             'mitigationActions' => $mitigationActions,

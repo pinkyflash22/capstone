@@ -3008,6 +3008,10 @@
                 stats,
                 saved_at: Date.now()
             }));
+            window.pyroPwa?.updatePageSnapshot?.({
+                key: 'chief-dashboard',
+                label: 'Chief Command Dashboard'
+            });
         } catch (error) {
             console.warn('Unable to write chief dashboard stats cache:', error);
         }
@@ -3392,6 +3396,15 @@
             window.map.invalidateSize();
         }
     };
+</script>
+@include('partials.pwa-body')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    window.pyroPwa?.registerPageSnapshot?.({
+        key: 'chief-dashboard',
+        label: 'Chief Command Dashboard'
+    });
+});
 </script>
 @include('chief.partials.logout-confirmation')
 </body>

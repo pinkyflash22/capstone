@@ -160,9 +160,33 @@ class IncidentAutoAssignmentService
     private function getCandidateStationsForIncident(Incident $incident, float $lat, float $lng)
     {
         $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 3 : 1;
+        $nearbyStations = $this->getStationsSortedByDistance($lat, $lng);
+        $primaryStationId = (int) ($incident->station_id ?? 0);
+        $orderedStations = collect();
 
-        return $this->getStationsSortedByDistance($lat, $lng)
-            ->take($stationLimit);
+        if ($primaryStationId > 0) {
+            $primaryStation = Station::with('marker')->find($primaryStationId);
+            if ($primaryStation) {
+                if ($primaryStation->marker && $primaryStation->marker->lat !== null && $primaryStation->marker->lng !== null) {
+                    $primaryStation->distance_meters = $this->calculateDistanceMeters(
+                        $lat,
+                        $lng,
+                        (float) $primaryStation->marker->lat,
+                        (float) $primaryStation->marker->lng
+                    );
+                } else {
+                    $primaryStation->distance_meters = 0;
+                }
+
+                $orderedStations->push($primaryStation);
+            }
+        }
+
+        return $orderedStations
+            ->concat($nearbyStations->reject(fn ($station) => (int) $station->station_id === $primaryStationId))
+            ->unique(fn ($station) => (int) $station->station_id)
+            ->take($stationLimit)
+            ->values();
     }
 
     private function markTeamResponding(Team $team): void

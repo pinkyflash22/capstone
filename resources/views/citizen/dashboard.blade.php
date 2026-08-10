@@ -5756,6 +5756,10 @@ window.persistCitizenOverviewOfflineData = function(data = {}) {
     window.pyroPwa?.storeDataset?.('citizen-incidents', Array.isArray(data.incidents) ? data.incidents : []);
     window.pyroPwa?.storeDataset?.('citizen-user-reports', Array.isArray(data.user_reports) ? data.user_reports : []);
     window.pyroPwa?.storeDataset?.('citizen-risk-map-reports', Array.isArray(data.risk_map_reports) ? data.risk_map_reports : []);
+    window.pyroPwa?.updatePageSnapshot?.({
+        key: 'citizen-dashboard',
+        label: 'Citizen Dashboard'
+    });
 };
 
 window.refreshCitizenOverviewData = async function() {
@@ -6143,5 +6147,13 @@ document.addEventListener('click', function(event) {
 @include('citizen.partials.logout-confirmation')
 @include('firefighters.partials.icon-fallback')
 @include('partials.pwa-body')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    window.pyroPwa?.registerPageSnapshot?.({
+        key: 'citizen-dashboard',
+        label: 'Citizen Dashboard'
+    });
+});
+</script>
 </body>
 </html>

@@ -16,6 +16,7 @@ use App\Models\IncidentStatus;
 use App\Models\IncidentReport;
 use App\Models\IncidentContext;
 use App\Models\Barangay;
+use App\Models\Station;
 
 class Incident extends Model
 {
@@ -46,6 +47,11 @@ class Incident extends Model
     public function team()
     {
         return $this->belongsTo(Team::class, 'team_id', 'team_id');
+    }
+
+    public function station()
+    {
+        return $this->belongsTo(Station::class, 'station_id', 'station_id');
     }
 
   

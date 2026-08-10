@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\Station;
 use App\Models\User;
+use App\Services\BoundaryMatcherService;
 use App\Support\IncidentContextDispatcher;
 use App\Support\IncidentFollowUpDispatcher;
 use App\Support\UserActivityLogger;
@@ -142,7 +143,7 @@ class IncidentController extends Controller
 
     private function getIncidentRelations(): array
     {
-        return ['marker', 'team', 'reporter', 'barangay.city'];
+        return ['marker', 'team', 'station', 'reporter', 'barangay.city'];
     }
 
     private function supportsBarangayResolution(): bool
@@ -346,9 +347,33 @@ class IncidentController extends Controller
     private function getCandidateStationsForIncident(Incident $incident, float $lat, float $lng)
     {
         $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 3 : 1;
+        $nearbyStations = $this->getStationsSortedByDistance($lat, $lng);
+        $primaryStationId = (int) ($incident->station_id ?? 0);
+        $orderedStations = collect();
 
-        return $this->getStationsSortedByDistance($lat, $lng)
-            ->take($stationLimit);
+        if ($primaryStationId > 0) {
+            $primaryStation = Station::with('marker')->find($primaryStationId);
+            if ($primaryStation) {
+                if ($primaryStation->marker && $primaryStation->marker->lat !== null && $primaryStation->marker->lng !== null) {
+                    $primaryStation->distance_meters = $this->calculateDistanceMeters(
+                        $lat,
+                        $lng,
+                        (float) $primaryStation->marker->lat,
+                        (float) $primaryStation->marker->lng
+                    );
+                } else {
+                    $primaryStation->distance_meters = 0;
+                }
+
+                $orderedStations->push($primaryStation);
+            }
+        }
+
+        return $orderedStations
+            ->concat($nearbyStations->reject(fn ($station) => (int) $station->station_id === $primaryStationId))
+            ->unique(fn ($station) => (int) $station->station_id)
+            ->take($stationLimit)
+            ->values();
     }
 
     private function markTeamResponding(Team $team): void
@@ -508,7 +533,7 @@ class IncidentController extends Controller
             'incidentTypes', 'teams', 'reporters'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, BoundaryMatcherService $boundaryMatcherService)
     {
         $validated = $request->validate([
             'marker_id' => 'nullable|exists:markers,marker_id',
@@ -556,20 +581,40 @@ class IncidentController extends Controller
 
             unset($validated['lat'], $validated['lng'], $validated['title'], $validated['description']);
 
-            if (empty($validated['station_id'])) {
-                $resolvedLat = $createdMarker?->lat ?? null;
-                $resolvedLng = $createdMarker?->lng ?? null;
+            $resolvedLat = $createdMarker?->lat ?? null;
+            $resolvedLng = $createdMarker?->lng ?? null;
 
-                if (($resolvedLat === null || $resolvedLng === null) && ! empty($validated['marker_id'])) {
-                    $existingMarker = Marker::query()
-                        ->select(['marker_id', 'lat', 'lng'])
-                        ->find($validated['marker_id']);
+            if (($resolvedLat === null || $resolvedLng === null) && ! empty($validated['marker_id'])) {
+                $existingMarker = Marker::query()
+                    ->select(['marker_id', 'lat', 'lng'])
+                    ->find($validated['marker_id']);
 
-                    $resolvedLat = $existingMarker?->lat;
-                    $resolvedLng = $existingMarker?->lng;
+                $resolvedLat = $existingMarker?->lat;
+                $resolvedLng = $existingMarker?->lng;
+            }
+
+            if ($this->supportsBarangayResolution() && $resolvedLat !== null && $resolvedLng !== null) {
+                $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
+                    (float) $resolvedLat,
+                    (float) $resolvedLng
+                );
+
+                if ($matchedBoundary?->barangay_id) {
+                    $validated['barangay_id'] = (int) $matchedBoundary->barangay_id;
+                    $validated['barangay_resolution_status'] = 'matched';
+                    $validated['barangay_resolution_source'] = $matchedBoundary->source ?: 'boundary-location';
+                    $validated['barangay_resolved_at'] = now();
+                } else {
+                    $validated['barangay_id'] = null;
+                    $validated['barangay_resolution_status'] = 'unmatched';
+                    $validated['barangay_resolution_source'] = 'boundary-location';
+                    $validated['barangay_resolved_at'] = now();
                 }
+            }
 
-                $validated['station_id'] = $this->resolveNearestStationIdOrDefault(
+            if (empty($validated['station_id'])) {
+                $validated['station_id'] = $this->resolveJurisdictionStationIdOrDefault(
+                    isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
                     $resolvedLat !== null ? (float) $resolvedLat : null,
                     $resolvedLng !== null ? (float) $resolvedLng : null
                 );
@@ -610,8 +655,35 @@ class IncidentController extends Controller
         ]);
     }
 
-    private function resolveNearestStationIdOrDefault(?float $lat, ?float $lng): int
+    private function resolveJurisdictionStationIdOrDefault(?int $barangayId, ?float $lat, ?float $lng): int
     {
+        if ($barangayId) {
+            $coveredStationId = DB::table('station_barangay_coverage')
+                ->where('barangay_id', $barangayId)
+                ->where('is_active', true)
+                ->orderByRaw("CASE WHEN LOWER(COALESCE(coverage_type, '')) = 'primary' THEN 0 ELSE 1 END")
+                ->orderBy('station_barangay_coverage_id')
+                ->value('station_id');
+
+            if ($coveredStationId) {
+                return (int) $coveredStationId;
+            }
+
+            $barangayCityId = DB::table('barangays')
+                ->where('barangay_id', $barangayId)
+                ->value('city_id');
+
+            $cityStationId = Station::query()
+                ->leftJoin('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+                ->where('full_addresses.city_id', $barangayCityId)
+                ->orderBy('stations.station_name')
+                ->value('stations.station_id');
+
+            if ($cityStationId) {
+                return (int) $cityStationId;
+            }
+        }
+
         if ($lat !== null && $lng !== null) {
             $nearestStation = $this->getStationsSortedByDistance($lat, $lng)->first();
 
@@ -909,6 +981,7 @@ class IncidentController extends Controller
                 ->select([
                     'incident_id',
                     'marker_id',
+                    'station_id',
                     'team_id',
                     'reported_by',
                     'barangay_id',
@@ -921,6 +994,7 @@ class IncidentController extends Controller
                 ])
                 ->with([
                     'marker:marker_id,title,description,lat,lng,status,category,image,updated_at,created_at',
+                    'station:station_id,station_name',
                     'barangay:barangay_id,barangay_name,city_id',
                 ])
                 ->latest('created_at')
@@ -948,6 +1022,11 @@ class IncidentController extends Controller
                     return [
                         'incident_id' => $incident->incident_id,
                         'marker_id' => $incident->marker_id,
+                        'station_id' => $incident->station_id,
+                        'station' => $incident->station ? [
+                            'station_id' => $incident->station->station_id,
+                            'station_name' => $incident->station->station_name,
+                        ] : null,
                         'team_id' => $incident->team_id,
                         'reported_by' => $incident->reported_by,
                         'barangay_id' => $incident->barangay_id,
