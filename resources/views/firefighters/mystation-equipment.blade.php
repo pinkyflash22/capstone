@@ -52,7 +52,7 @@
                             <span class="equipment-icon"><i class="fa-solid fa-toolbox"></i></span>
                             <div>
                                 <div class="equipment-name">{{ $assignment->equipment?->equipment_name ?? 'Unnamed equipment' }}</div>
-                                <div class="equipment-category">{{ $assignment->equipment?->category?->category_name ?? 'Uncategorized equipment' }}</div>
+                                <div class="equipment-category">{{ $assignment->equipment?->category ?? 'Uncategorized equipment' }}</div>
                             </div>
                         </div>
                         <div class="equipment-qty-row">

@@ -296,6 +296,42 @@
     padding: 14px 16px 16px;
 }
 
+.pyro-voice-caller-dock__hero {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: 10px;
+}
+
+.pyro-voice-caller-dock__avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #d6421d, #e39a0a);
+    color: #fff;
+    box-shadow: 0 18px 36px rgba(214, 66, 29, 0.24);
+    font-size: 30px;
+}
+
+.pyro-voice-caller-dock__label {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.pyro-voice-caller-dock__station {
+    margin: 0;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
 .pyro-voice-status-line {
     margin: 0;
     color: #475569;
@@ -307,6 +343,113 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+}
+
+.pyro-voice-caller-dock__footer {
+    display: grid;
+}
+
+.pyro-voice-btn--icon {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 72px;
+}
+
+.pyro-voice-btn--icon i {
+    font-size: 18px;
+}
+
+.pyro-voice-btn--icon.is-active {
+    border-color: rgba(214, 66, 29, 0.28);
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    color: #9a3412;
+}
+
+.pyro-voice-btn--endcall {
+    min-height: 52px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-color: transparent;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock {
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    background:
+        radial-gradient(circle at top, rgba(245, 158, 11, 0.18), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(198, 61, 38, 0.14), transparent 28%),
+        linear-gradient(180deg, #fff7ef 0%, #fff 100%);
+    box-shadow: none;
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__header {
+    padding: calc(env(safe-area-inset-top) + 20px) 22px 14px;
+    border-bottom: 0;
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__body {
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 90px);
+    align-content: center;
+    gap: 18px;
+    padding: 18px 24px calc(env(safe-area-inset-bottom) + 28px);
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__hero {
+    gap: 12px;
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__avatar {
+    width: 112px;
+    height: 112px;
+    font-size: 40px;
+    box-shadow: 0 24px 44px rgba(214, 66, 29, 0.24);
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__station {
+    font-size: 30px;
+    letter-spacing: -0.04em;
+}
+
+body.mobile-hub-page .pyro-voice-status-line {
+    max-width: 320px;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+body.mobile-hub-page .pyro-voice-controls {
+    max-width: 320px;
+    margin: 0 auto;
+    gap: 12px;
+}
+
+body.mobile-hub-page .pyro-voice-btn--icon {
+    min-height: 92px;
+    border-radius: 24px;
+}
+
+body.mobile-hub-page .pyro-voice-btn--icon i {
+    font-size: 22px;
+}
+
+body.mobile-hub-page .pyro-voice-caller-dock__footer {
+    max-width: 320px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+body.mobile-hub-page .pyro-voice-btn--endcall {
+    min-height: 56px;
+    border-radius: 18px;
 }
 
 @media (max-width: 768px) {
@@ -392,5 +535,58 @@
         min-height: 40px;
         border-radius: 13px;
         font-size: 12px;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock {
+        inset: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock::before {
+        display: none;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock__header {
+        padding: calc(env(safe-area-inset-top) + 18px) 18px 10px;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock__title {
+        font-size: 18px;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock__body {
+        min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 78px);
+        gap: 16px;
+        padding: 12px 18px calc(env(safe-area-inset-bottom) + 22px);
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock__avatar {
+        width: 94px;
+        height: 94px;
+        font-size: 34px;
+    }
+
+    body.mobile-hub-page .pyro-voice-caller-dock__station {
+        font-size: 24px;
+    }
+
+    body.mobile-hub-page .pyro-voice-status-line {
+        max-width: 280px;
+        font-size: 13px;
+    }
+
+    body.mobile-hub-page .pyro-voice-controls,
+    body.mobile-hub-page .pyro-voice-caller-dock__footer {
+        max-width: 280px;
+    }
+
+    body.mobile-hub-page .pyro-voice-btn--icon {
+        min-height: 82px;
+        border-radius: 20px;
     }
 }

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260810-3';
+const CACHE_VERSION = 'pyrosense-pwa-v20260811-1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -15,9 +15,6 @@ const NO_CACHE_HTML_PATTERNS = [
 ];
 
 const APP_SHELL_URLS = [
-    LANDING_URL,
-    PWA_START_URL,
-    PWA_QUICK_REPORT_URL,
     '/manifest.json',
     OFFLINE_URL,
     '/logo.png',
@@ -28,6 +25,93 @@ const APP_SHELL_URLS = [
     '/pwa-screenshot-wide.svg'
 ];
 
+const MAX_CACHE_ENTRIES = {
+    [SHELL_CACHE]: 20,
+    [STATIC_CACHE]: 120,
+    [DYNAMIC_CACHE]: 40,
+    [TILE_CACHE]: 80,
+};
+
+const MAX_CACHEABLE_BYTES = 1024 * 1024;
+const quotaWarnings = new Set();
+
+function isQuotaExceededError(error) {
+    return error?.name === 'QuotaExceededError'
+        || error?.message?.includes?.('Quota exceeded')
+        || error?.message?.includes?.('quota');
+}
+
+function getMaxEntries(cacheName) {
+    return MAX_CACHE_ENTRIES[cacheName] || 40;
+}
+
+function shouldSkipCacheWrite(response) {
+    const contentLength = Number(response?.headers?.get?.('content-length') || 0);
+    return Number.isFinite(contentLength) && contentLength > MAX_CACHEABLE_BYTES;
+}
+
+async function trimCache(cacheName, maxEntries = getMaxEntries(cacheName)) {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+
+    if (keys.length <= maxEntries) {
+        return;
+    }
+
+    const overflow = keys.length - maxEntries;
+    await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
+}
+
+async function reclaimQuota(targetCacheName) {
+    if (targetCacheName !== TILE_CACHE) {
+        await trimCache(DYNAMIC_CACHE, Math.min(18, getMaxEntries(DYNAMIC_CACHE)));
+    }
+
+    await trimCache(TILE_CACHE, Math.min(30, getMaxEntries(TILE_CACHE)));
+
+    if (targetCacheName === STATIC_CACHE) {
+        await trimCache(STATIC_CACHE, Math.min(70, getMaxEntries(STATIC_CACHE)));
+    }
+}
+
+async function safeCachePut(cacheName, request, response) {
+    if (!response || !(response.ok || response.type === 'opaque') || shouldSkipCacheWrite(response)) {
+        return;
+    }
+
+    const cache = await caches.open(cacheName);
+    const requestLabel = typeof request === 'string'
+        ? request
+        : (request?.url || '[unknown-request]');
+
+    try {
+        await cache.put(request, response.clone());
+        await trimCache(cacheName);
+    } catch (error) {
+        if (!isQuotaExceededError(error)) {
+            console.warn('[PyroSense PWA] Cache write skipped:', cacheName, requestLabel, error);
+            return;
+        }
+
+        const quotaWarningKey = `${cacheName}:${requestLabel}`;
+        if (!quotaWarnings.has(quotaWarningKey)) {
+            console.warn('[PyroSense PWA] Storage quota reached, trimming cache:', cacheName, requestLabel);
+            quotaWarnings.add(quotaWarningKey);
+        }
+
+        try {
+            await reclaimQuota(cacheName);
+            await cache.put(request, response.clone());
+            await trimCache(cacheName);
+        } catch (retryError) {
+            if (!quotaWarnings.has(`${quotaWarningKey}:retry`)) {
+                console.warn('[PyroSense PWA] Cache retry skipped after quota trim:', cacheName, requestLabel, retryError);
+                quotaWarnings.add(`${quotaWarningKey}:retry`);
+            }
+        }
+    }
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(SHELL_CACHE);
@@ -36,7 +120,7 @@ self.addEventListener('install', (event) => {
             try {
                 const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
                 if (response && (response.ok || response.type === 'opaque')) {
-                    await cache.put(url, response.clone());
+                    await safeCachePut(SHELL_CACHE, url, response);
                 }
             } catch (error) {
                 console.warn('[PyroSense PWA] Failed to precache:', url, error);
@@ -179,8 +263,7 @@ async function handleNavigationRequest(request) {
     try {
         const response = await fetch(request, { credentials: 'same-origin' });
         if (response && response.ok) {
-            const cache = await caches.open(DYNAMIC_CACHE);
-            cache.put(request, response.clone());
+            await safeCachePut(DYNAMIC_CACHE, request, response);
         }
         return response;
     } catch (error) {
@@ -230,8 +313,7 @@ async function cacheFirst(request, cacheName) {
     try {
         const response = await fetch(request);
         if (response && (response.ok || response.type === 'opaque')) {
-            const cache = await caches.open(cacheName);
-            cache.put(request, response.clone());
+            await safeCachePut(cacheName, request, response);
         }
         return response;
     } catch (error) {
@@ -250,8 +332,7 @@ async function networkFirst(request, cacheName) {
     try {
         const response = await fetch(request);
         if (response && response.ok) {
-            const cache = await caches.open(cacheName);
-            cache.put(request, response.clone());
+            await safeCachePut(cacheName, request, response);
         }
         return response;
     } catch (error) {

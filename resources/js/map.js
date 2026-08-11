@@ -19,6 +19,7 @@ let thisLat = null;
 let i = 0;
 let tempMarker = null;
 let stationLayer = L.featureGroup();
+let riskHazardFeatureGroup = null;
 let incidentLayer = L.layerGroup();
 let hydrantLayer = L.layerGroup();
 let otherLayer = L.layerGroup();
@@ -2078,6 +2079,7 @@ function createFirefighterMapLegend() {
             ${createLegendItemHtml({ bgColor: '#0f766e', imagePath: '/hall.png', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
             ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', imagePath: '/hydrant.png', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
             ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
+            ${createLegendItemHtml({ iconClass: 'fa-triangle-exclamation', imagePath: '/hazard.png', bgColor: '#c2410c', label: 'Risk & Hazard Report' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
             <div class="ff-clean-map-legend__item">
@@ -2105,6 +2107,7 @@ function createChiefMapLegend() {
             ${createLegendItemHtml({ bgColor: '#0f766e', imagePath: '/hall.png', label: 'Barangay Hall', iconHtml: BARANGAY_GROUP_ICON_SVG })}
             ${createLegendItemHtml({ iconClass: 'fa-fire-extinguisher', imagePath: '/hydrant.png', bgColor: '#ef4444', label: 'Hydrant', shape: 'square' })}
             ${createLegendItemHtml({ ...getIncidentTypePresentation('Fire'), imagePath: '/fire.png' })}
+            ${createLegendItemHtml({ iconClass: 'fa-triangle-exclamation', imagePath: '/hazard.png', bgColor: '#c2410c', label: 'Risk & Hazard Report' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
             <div class="ff-clean-map-legend__item">
@@ -2352,11 +2355,13 @@ function initializePyroMapRuntime() {
     stationFeatureGroup = L.featureGroup().addTo(window.map);
     incidentFeatureGroup = L.featureGroup().addTo(window.map);
     hydrantFeatureGroup = L.featureGroup().addTo(window.map);
+    riskHazardFeatureGroup = L.featureGroup().addTo(window.map);
     otherFeatureGroup = L.featureGroup().addTo(window.map);
     
     window.stationFeatureGroup = stationFeatureGroup;
     window.incidentFeatureGroup = incidentFeatureGroup;
     window.hydrantFeatureGroup = hydrantFeatureGroup;
+    window.riskHazardFeatureGroup = riskHazardFeatureGroup;
     window.otherFeatureGroup = otherFeatureGroup;
     
     window.setName = setName;
@@ -2370,7 +2375,7 @@ function initializePyroMapRuntime() {
     });
     fetchCoordinate({
         preferSeeded: true,
-        revalidate: !isFirefighterDashboardMapInstance()
+        revalidate: true
     });
     
     // Ensure the map repaints correctly after layout settles.
@@ -2410,12 +2415,26 @@ const roleName = String(document.querySelector('meta[name="user-role"]')?.getAtt
             : window.location.pathname.includes('/citizen') ? 'citizen'
             : ''
     );
-const currentUserMetaId = String(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || 'guest').trim() || 'guest';
+function resolveCurrentUserMapId() {
+    const metaUserId = String(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || '').trim();
+    if (metaUserId) {
+        return metaUserId;
+    }
+
+    const runtimeUserId = window.currentUserId ?? window.currentCitizenId ?? null;
+    if (runtimeUserId !== null && runtimeUserId !== undefined && String(runtimeUserId).trim() !== '') {
+        return String(runtimeUserId).trim();
+    }
+
+    return 'guest';
+}
+
+const currentUserMetaId = resolveCurrentUserMapId();
 const currentStationMetaId = String(document.querySelector('meta[name="station-id"]')?.getAttribute('content') || window.userStationId || '').trim();
 window.thisToken = roleToken;
 
 function getMarkerFeedEndpoint() {
-    return currentUserMetaId !== 'guest' ? '/map/markers/feed' : '/api/markers';
+    return resolveCurrentUserMapId() !== 'guest' ? '/map/markers/feed' : '/api/markers';
 }
 
 const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
@@ -3618,11 +3637,41 @@ function inferMarkerImagePath(marker = null, iconConfig = null) {
 function getMarkerPopupImagePath(marker = {}, coord = {}) {
     return marker?.risk_area_public?.primary_photo_url
         || marker?.risk_area_public?.photos?.[0]?.photo_url
+        || marker?.risk_area_public?.photos?.[0]?.url
         || coord?.risk_area_public?.primary_photo_url
         || coord?.risk_area_public?.photos?.[0]?.photo_url
+        || coord?.risk_area_public?.photos?.[0]?.url
+        || marker?.photo_url
+        || marker?.photos?.[0]?.photo_url
+        || marker?.photos?.[0]?.url
+        || coord?.photo_url
+        || coord?.photos?.[0]?.photo_url
+        || coord?.photos?.[0]?.url
         || marker?.multimedia?.path
         || coord?.image?.path
         || null;
+}
+
+function normalizePopupImageUrl(imageSource) {
+    if (!imageSource) {
+        return null;
+    }
+
+    const normalizedSource = String(imageSource).trim();
+
+    if (!normalizedSource) {
+        return null;
+    }
+
+    if (/^https?:\/\//i.test(normalizedSource) || normalizedSource.startsWith('/')) {
+        return normalizedSource;
+    }
+
+    if (/^storage\//i.test(normalizedSource)) {
+        return `/${normalizedSource.replace(/^\/+/, '')}`;
+    }
+
+    return '/storage/' + normalizedSource.replace(/^\/+/, '');
 }
 
 function buildImageBackedMarkerHtml({ width, height, borderRadius, imagePath, fallbackIconClass, bgColor, iconFontSize, wrapperClass = '' }) {
@@ -5877,7 +5926,7 @@ export function getName(lat, lon) {
 
 function clearAllMarkers() {
     try {
-        const groups = [stationFeatureGroup, incidentFeatureGroup, hydrantFeatureGroup, otherFeatureGroup].filter(Boolean);
+        const groups = [stationFeatureGroup, incidentFeatureGroup, hydrantFeatureGroup, riskHazardFeatureGroup, otherFeatureGroup].filter(Boolean);
 
         groups.forEach((group) => {
             try {
@@ -6107,7 +6156,9 @@ async function fetchCoordinate(options = {}) {
             window.removeMapPlacementMarker?.({ clearCoordinates: false });
         }
 
-        const seededMarkers = window.mapData?.marker;
+        const seededMarkers = Array.isArray(window.mapData?.marker) && window.mapData.marker.length > 0
+            ? window.mapData.marker
+            : window.mapData?.usermark;
         if (preferSeeded && Array.isArray(seededMarkers) && seededMarkers.length > 0) {
             // Paint markers immediately for fast first render.
             renderMarkersQuick(seededMarkers);
@@ -6324,7 +6375,16 @@ function renderMarkersQuick(data) {
             </div>
         `;
 
-        const newMarker = L.marker([lat, lng], { icon: tempIcon }).bindPopup(popupContent, {
+        const markerOptions = {
+            icon: tempIcon,
+            riseOnHover: true,
+        };
+
+        if (['risk', 'hazard'].includes(getMarkerCategoryKey(marker))) {
+            markerOptions.zIndexOffset = 850;
+        }
+
+        const newMarker = L.marker([lat, lng], markerOptions).bindPopup(popupContent, {
             minWidth: 100,
             maxWidth: 260
         });
@@ -6586,7 +6646,16 @@ async function updateCoordinate(data, options = {}) {
             
             const incident = findIncidentInLookup(marker, incidentLookup);
             const tempIcon = getIconByCategoryId(marker.markerCategory_id, '', marker);
-            const newMarker = L.marker([lat, lng], { icon: tempIcon });
+            const markerOptions = {
+                icon: tempIcon,
+                riseOnHover: true,
+            };
+
+            if (['risk', 'hazard'].includes(getMarkerCategoryKey(marker))) {
+                markerOptions.zIndexOffset = 850;
+            }
+
+            const newMarker = L.marker([lat, lng], markerOptions);
             const popupContent = generatePopupContent({ marker: marker, incident }, incidents);
             const popupMaxWidth = window.innerWidth <= 768 ? 264 : 340;
             const popupOptions = { minWidth: 100, maxWidth: popupMaxWidth };
@@ -6774,9 +6843,7 @@ function generatePopupContent(coord, incidents) {
         ? buildIncidentPopupLoadingMarkup(coord.loadingMessage || 'Loading latest incident details...')
         : '';
     const popupImageSource = getMarkerPopupImagePath(marker, coord);
-    const imagePath = popupImageSource && /^https?:\/\//i.test(String(popupImageSource))
-        ? popupImageSource
-        : (popupImageSource ? '/storage/' + String(popupImageSource).replace(/^\/+/, '') : null);
+    const imagePath = normalizePopupImageUrl(popupImageSource);
     const sidebarGradient = 'linear-gradient(135deg, #c63d26 0%, #d18a16 100%)';
     const sidebarSoftSurface = 'linear-gradient(135deg, #fff0e8 0%, #fff5dc 100%)';
     const isMobilePopup = window.innerWidth <= 768;
@@ -7122,6 +7189,24 @@ function getResponderPopupPresentation(marker) {
         };
     }
 
+    if (getMarkerCategoryKey(marker) === 'risk') {
+        return {
+            label: 'Risk Report',
+            icon: 'fa-shield-heart',
+            color: '#c2410c',
+            accentClass: 'default'
+        };
+    }
+
+    if (getMarkerCategoryKey(marker) === 'hazard') {
+        return {
+            label: 'Hazard Report',
+            icon: 'fa-triangle-exclamation',
+            color: '#c2410c',
+            accentClass: 'default'
+        };
+    }
+
     return {
         label: getCategoryName(marker),
         icon: 'fa-location-dot',
@@ -7245,6 +7330,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
     const compactValue = (...values) => values
         .map((value) => (value == null ? '' : String(value).trim()))
         .find((value) => value && !['N/A', 'Unavailable', 'Not available', 'Unknown'].includes(value)) || '';
+    const riskAreaPublic = marker?.risk_area_public || {};
     const locationValue = formatCoordinates();
     const reportedAt = formatDateTime(
         incident?.reported_at
@@ -7268,6 +7354,21 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
         marker.assigned_team,
         marker.station?.name
     );
+    const riskReviewStatus = compactValue(riskAreaPublic.review_status, marker.review_status);
+    const riskClassification = compactValue(
+        riskAreaPublic.condition_label,
+        riskAreaPublic.hazard_category,
+        riskAreaPublic.risk_type,
+        marker.condition_label,
+        marker.hazard_category,
+        marker.risk_type
+    );
+    const riskBarangay = compactValue(riskAreaPublic.barangay_name, marker.barangay_name);
+    const riskCitizenNote = compactValue(
+        riskAreaPublic.remarks,
+        marker.remarks,
+        marker.description
+    );
     const detailRows = isIncidentMarker(marker)
         ? [
             { label: 'Reported', value: reportedAt },
@@ -7275,6 +7376,14 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             { label: 'Assigned team', value: assignedTeam },
             { label: 'Location', value: locationValue }
         ]
+        : ['risk', 'hazard'].includes(getMarkerCategoryKey(marker))
+            ? [
+                { label: 'Review status', value: riskReviewStatus },
+                { label: 'Classification', value: riskClassification },
+                { label: 'Barangay', value: riskBarangay },
+                { label: 'Citizen note', value: riskCitizenNote },
+                { label: 'Location', value: locationValue }
+            ]
         : isStationMarker(marker)
             ? [
                 { label: 'Hotline', value: compactValue(marker.station?.contact_number, marker.contact_number) },
@@ -7366,6 +7475,17 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
         `;
 
         actionMarkup += managementMarkup;
+    } else if (['risk', 'hazard'].includes(getMarkerCategoryKey(marker))) {
+        actionMarkup += `
+            <button
+                type="button"
+                class="responder-marker-popup-btn secondary"
+                onclick="window.calculateRouteToStation(${marker.marker_id}, ${JSON.stringify(marker.title || markerPresentation.label)}, ${Number(marker.lat)}, ${Number(marker.lng)})"
+            >
+                <i class="fas fa-route"></i>
+                Get Directions
+            </button>
+        `;
     } else {
         actionMarkup += managementMarkup;
     }
@@ -9501,6 +9621,11 @@ function addMarkerToFeatureGroup(categoryInput, marker) {
             if (hydrantFeatureGroup) hydrantFeatureGroup.addLayer(marker);
             else if (window.map) marker.addTo(window.map);
             break;
+        case 'risk':
+        case 'hazard':
+            if (riskHazardFeatureGroup) riskHazardFeatureGroup.addLayer(marker);
+            else if (window.map) marker.addTo(window.map);
+            break;
         default:
             if (otherFeatureGroup) otherFeatureGroup.addLayer(marker);
             else if (window.map) marker.addTo(window.map);
@@ -9529,9 +9654,7 @@ function addPopupEventListeners(coord) {
             viewDetailsBtn.addEventListener('click', async () => {
                 showToast('Fetching details...', 'info');
                 const popupImageSource = getMarkerPopupImagePath(marker, coord);
-                const imagePath = popupImageSource && /^https?:\/\//i.test(String(popupImageSource))
-                    ? popupImageSource
-                    : (popupImageSource ? '/storage/' + String(popupImageSource).replace(/^\/+/, '') : null);
+                const imagePath = normalizePopupImageUrl(popupImageSource);
                 const markerData = { ...marker, category: getCategoryName(marker), created_at: coord.created_at || marker.created_at };
                 let resolvedIncident = findIncidentForMarker(marker, coord.incident);
                 const incidentId = resolvedIncident?.incident_id ?? resolvedIncident?.id ?? marker?.incident_id ?? null;
@@ -10393,6 +10516,7 @@ function enhancePyroLayerControl() {
         Incidents: 'Incidents',
         Hydrants: 'Fire hydrants',
         'Fire Hydrants': 'Fire hydrants',
+        'Risk & Hazard Reports': 'Risk and hazard reports',
         'Other Markers': 'Other locations',
         'Water Reference': 'Water references',
         Shapes: 'Boundaries',
@@ -10402,6 +10526,7 @@ function enhancePyroLayerControl() {
         'Fire stations': 'fa-building-shield',
         Incidents: 'fa-fire-flame-curved',
         'Fire hydrants': 'fa-droplet',
+        'Risk and hazard reports': 'fa-triangle-exclamation',
         'Other locations': 'fa-location-dot',
         'Water references': 'fa-water',
         Boundaries: 'fa-draw-polygon',
@@ -10615,6 +10740,12 @@ function createResponderMobileMapLayersPanel() {
                         <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
                     </label>
                     <label class="firefighter-mobile-map-panel__chip">
+                        <input type="checkbox" data-ff-map-layer-toggle="Risk & Hazard Reports" checked>
+                        <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
+                        <span>Reports</span>
+                        <i class="fas fa-check firefighter-mobile-map-panel__chip-check" aria-hidden="true"></i>
+                    </label>
+                    <label class="firefighter-mobile-map-panel__chip">
                         <input type="checkbox" data-ff-map-layer-toggle="Other Markers" checked>
                         <span class="firefighter-mobile-map-panel__chip-icon"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
                         <span>Other</span>
@@ -10660,6 +10791,10 @@ function createResponderMobileMapLayersPanel() {
                         <div class="firefighter-mobile-map-panel__legend-item">
                             <span class="firefighter-mobile-map-panel__legend-swatch"><img src="/hydrant.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-droplet" aria-hidden="true" style="display:none;"></i></span>
                             <span>Hydrant</span>
+                        </div>
+                        <div class="firefighter-mobile-map-panel__legend-item">
+                            <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-other"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
+                            <span>Risk &amp; hazard report</span>
                         </div>
                         <div class="firefighter-mobile-map-panel__legend-item">
                             <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-other"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
@@ -10844,6 +10979,7 @@ function initAfterMapReady() {
             "Fire Stations": stationFeatureGroup,
             "Incidents": incidentFeatureGroup,
             "Fire Hydrants": hydrantFeatureGroup,
+            "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
             "Fire Risk Areas": fireRiskAreaLayerGroup,
             "Water Reference": waterReference
@@ -10862,6 +10998,7 @@ function initAfterMapReady() {
                 "Fire Stations": stationFeatureGroup,
                 "Incidents": incidentFeatureGroup,
                 "Fire Hydrants": hydrantFeatureGroup,
+                "Risk & Hazard Reports": riskHazardFeatureGroup,
                 "Other Markers": otherFeatureGroup,
                 "Fire Risk Areas": fireRiskAreaLayerGroup,
                 "Water Reference": waterReference,
@@ -10871,6 +11008,7 @@ function initAfterMapReady() {
             "Stations": stationFeatureGroup,
             "Incidents": incidentFeatureGroup,
             "Hydrants": hydrantFeatureGroup,
+            "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
             "Fire Risk Areas": fireRiskAreaLayerGroup,
             "Shapes": shapeFeatureGroup

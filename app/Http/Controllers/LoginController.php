@@ -83,7 +83,7 @@ class LoginController extends Controller
         // Validate credentials
         $credentials = $request->validate([
             'email' => ['required', 'email', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/'],
-            'password' => ['required', 'string', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/'],
+            'password' => ['required', 'string'],
         ]);
         $postLoginAction = $request->input('post_login_action');
 

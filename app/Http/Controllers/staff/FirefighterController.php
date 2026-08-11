@@ -575,8 +575,7 @@ class FirefighterController extends Controller
                 'damaged_quantity',
             ])
             ->with([
-                'equipment:equipment_id,equipment_name,category_id',
-                'equipment.category:equipment_category_id,category_name',
+                'equipment:equipment_id,equipment_name,category,type',
             ])
             ->where('station_id', $stationId)
             ->orderBy('equipment_station_id')
@@ -1021,8 +1020,9 @@ class FirefighterController extends Controller
         $userId = auth()->user()->user_id;
         $stationOfficer = $this->getStationOfficerForUserId($userId);
         $thisStation = $stationOfficer?->station_id;
+        $dashboardAnnouncementStories = $this->loadFirefighterDashboardRecentPosts();
 
-        return view('firefighters.dashboard', compact('thisStation'));
+        return view('firefighters.dashboard', compact('thisStation', 'dashboardAnnouncementStories'));
     }
 
     public function equipments(){
@@ -1971,18 +1971,20 @@ public function getAssignedIncidents(string $id){
             now()->addSeconds(self::DASHBOARD_CACHE_SECONDS),
             function () {
                 return Post::query()
-                    ->select(['id', 'user_id', 'content', 'likes_count', 'comments_count', 'created_at'])
+                    ->select(['id', 'user_id', 'content', 'images', 'likes_count', 'comments_count', 'created_at'])
                     ->with(['user:user_id,first_name,last_name'])
                     ->latest()
                     ->take(5)
                     ->get()
                     ->map(function (Post $post) {
+                        $firstImage = collect($post->images ?? [])->filter()->first();
                         return [
                             'id' => $post->id,
                             'author_initials' => substr($post->user->first_name ?? 'A', 0, 1) . substr($post->user->last_name ?? 'D', 0, 1),
                             'author_name' => trim(($post->user->first_name ?? 'Admin') . ' ' . ($post->user->last_name ?? 'Admin')),
                             'time' => optional($post->created_at)->diffForHumans(),
                             'content' => $post->content,
+                            'image_url' => $firstImage ? MediaPath::url($firstImage) : null,
                             'likes_count' => $post->likes_count ?? 0,
                             'comments_count' => $post->comments_count ?? 0,
                         ];

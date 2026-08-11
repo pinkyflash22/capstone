@@ -47,6 +47,7 @@ class MarkerController extends Controller
         ]);
 
         Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
 
         return response()->json([
             'message' => 'marker saved',
@@ -65,12 +66,14 @@ class MarkerController extends Controller
 
         $marker->update($request->all());
         Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
         return redirect()->back()->with('success', 'Marker updated!');
     }
     public function destroy($id){
          $marker = Marker::findOrFail($id);
     $marker->delete();
     Cache::forget('map:markers:index:v2');
+    Cache::forget('map:markers:index:v3_public');
 
     return response()->json([
         'message' => 'Marker deleted successfully'

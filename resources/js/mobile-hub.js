@@ -7,14 +7,34 @@ const locationHint = document.getElementById('mobileHubLocationHint');
 const stationLabel = document.getElementById('mobileHubStationLabel');
 const stationHint = document.getElementById('mobileHubStationHint');
 const clockNode = document.getElementById('mobileHubClock');
+const call911Button = document.getElementById('mobileHubCall911Button');
+const dashboardLink = document.querySelector('[data-mobile-hub-nav="map"]');
+const confirm911Sheet = document.getElementById('mobileHubConfirm911');
+const confirm911Cancel = document.getElementById('mobileHubConfirm911Cancel');
+const confirm911Proceed = document.getElementById('mobileHubConfirm911Proceed');
 const responderCacheKey = 'pyrosense:nearestResponder';
 const responderCacheMaxAgeMs = 60 * 1000;
 const responderCacheMaxDistanceMeters = 150;
+const reverseGeocodeCacheKey = 'pyrosense:mobileHubReverseGeocode';
 let hubToastTimer = null;
+let hubToastActionHandler = null;
 
 if (reportButton) {
     reportButton.addEventListener('click', submitMobileHubIncidentReport);
 }
+
+if (call911Button) {
+    call911Button.addEventListener('click', open911Confirm);
+}
+
+confirm911Cancel?.addEventListener('click', close911Confirm);
+confirm911Proceed?.addEventListener('click', proceed911Call);
+
+confirm911Sheet?.addEventListener('click', (event) => {
+    if (event.target === confirm911Sheet) {
+        close911Confirm();
+    }
+});
 
 document.querySelectorAll('[data-mobile-hub-nav]').forEach((link) => {
     link.addEventListener('click', () => {
@@ -29,6 +49,19 @@ document.addEventListener('DOMContentLoaded', () => {
     primeHubContext();
 });
 
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        close911Confirm();
+    }
+});
+
+window.addEventListener('pyro:mobile-hub-call-started', () => {
+    showHubToast('Call started. Do you want to view the dashboard?', 'success', {
+        actionLabel: 'View',
+        onAction: openDashboard,
+    });
+});
+
 function showHubStatus(message, type = 'error') {
     if (!statusBox) {
         return;
@@ -38,7 +71,16 @@ function showHubStatus(message, type = 'error') {
     statusBox.className = `mobile-hub-status is-visible ${type === 'success' ? 'is-success' : 'is-error'}`;
 }
 
-function showHubToast(message, type = 'success') {
+function openDashboard() {
+    if (dashboardLink?.href) {
+        window.location.href = dashboardLink.href;
+        return;
+    }
+
+    window.location.href = '/citizen/dashboard';
+}
+
+function showHubToast(message, type = 'success', options = {}) {
     let toast = document.getElementById('mobileHubToast');
 
     if (!toast) {
@@ -51,11 +93,39 @@ function showHubToast(message, type = 'success') {
     }
 
     window.clearTimeout(hubToastTimer);
-    toast.textContent = message;
+    hubToastActionHandler = null;
+
+    const actionLabel = typeof options.actionLabel === 'string' ? options.actionLabel.trim() : '';
+    const onAction = typeof options.onAction === 'function' ? options.onAction : null;
+
+    const messageNode = document.createElement('span');
+    messageNode.className = 'mobile-hub-toast__message';
+    messageNode.textContent = message;
+
+    const inner = document.createElement('div');
+    inner.className = 'mobile-hub-toast__inner';
+    inner.appendChild(messageNode);
+
+    if (actionLabel && onAction) {
+        const actionButton = document.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'mobile-hub-toast__action';
+        actionButton.textContent = actionLabel;
+        actionButton.addEventListener('click', () => {
+            toast.classList.remove('is-visible');
+            hubToastActionHandler = null;
+            onAction();
+        });
+        inner.appendChild(actionButton);
+        hubToastActionHandler = onAction;
+    }
+
+    toast.replaceChildren(inner);
     toast.className = `mobile-hub-toast is-visible ${type === 'error' ? 'is-error' : 'is-success'}`;
 
     hubToastTimer = window.setTimeout(() => {
         toast.classList.remove('is-visible');
+        hubToastActionHandler = null;
     }, 3200);
 }
 
@@ -66,6 +136,37 @@ function clearHubStatus() {
 
     statusBox.textContent = '';
     statusBox.className = 'mobile-hub-status';
+}
+
+function open911Confirm() {
+    if (!confirm911Sheet) {
+        window.location.href = 'tel:911';
+        return;
+    }
+
+    confirm911Sheet.classList.add('is-visible');
+    confirm911Sheet.setAttribute('aria-hidden', 'false');
+    showHubToast('Confirm to open the 911 dialer.', 'error');
+}
+
+function close911Confirm() {
+    if (!confirm911Sheet) {
+        return;
+    }
+
+    confirm911Sheet.classList.remove('is-visible');
+    confirm911Sheet.setAttribute('aria-hidden', 'true');
+}
+
+function proceed911Call() {
+    close911Confirm();
+    showHubToast('Opening 911 dialer. Do you want to view the dashboard?', 'success', {
+        actionLabel: 'View',
+        onAction: openDashboard,
+    });
+    window.setTimeout(() => {
+        window.location.href = 'tel:911';
+    }, 180);
 }
 
 function setReportButtonLoading(isLoading) {
@@ -103,23 +204,67 @@ function readCachedCoords() {
 
 function writeCachedCoords(lat, lng) {
     try {
+        const timestamp = Date.now();
         window.localStorage.setItem('pyrosense:lastKnownCoords', JSON.stringify({
             lat,
             lng,
-            timestamp: Date.now(),
+            timestamp,
         }));
         window.localStorage.setItem('pyrosense:current-location', JSON.stringify({
             lat,
             lng,
-            timestamp: Date.now(),
+            timestamp,
         }));
         window.currentLocation = {
             lat,
             lng,
-            timestamp: Date.now(),
+            timestamp,
         };
     } catch (error) {
         console.warn('Unable to cache coordinates:', error);
+    }
+}
+
+function getCoordsFallbackLabel(lat, lng) {
+    const normalizedLat = Number(lat);
+    const normalizedLng = Number(lng);
+
+    if (!Number.isFinite(normalizedLat) || !Number.isFinite(normalizedLng)) {
+        return 'Allow location access.';
+    }
+
+    return `${normalizedLat.toFixed(6)}, ${normalizedLng.toFixed(6)}`;
+}
+
+function readCachedReverseGeocode(lat, lng, maxAgeMs = 24 * 60 * 60 * 1000) {
+    try {
+        const raw = window.localStorage.getItem(reverseGeocodeCacheKey);
+        const cached = raw ? JSON.parse(raw) : null;
+
+        if (!cached?.label || !cached?.lat || !cached?.lng || !cached?.timestamp) {
+            return null;
+        }
+
+        const isFresh = Date.now() - Number(cached.timestamp) <= maxAgeMs;
+        const isNearby = getDistanceMeters(lat, lng, Number(cached.lat), Number(cached.lng)) <= 35;
+
+        return isFresh && isNearby ? String(cached.label) : null;
+    } catch (error) {
+        console.warn('Unable to read cached reverse geocode:', error);
+        return null;
+    }
+}
+
+function writeCachedReverseGeocode(lat, lng, label) {
+    try {
+        window.localStorage.setItem(reverseGeocodeCacheKey, JSON.stringify({
+            lat,
+            lng,
+            label,
+            timestamp: Date.now(),
+        }));
+    } catch (error) {
+        console.warn('Unable to cache reverse geocode:', error);
     }
 }
 
@@ -183,7 +328,7 @@ async function primeHubContext() {
     const cached = readCachedCoords();
 
     if (cached?.lat && cached?.lng) {
-        updateLocationContext(true);
+        refreshLocationContext(cached.lat, cached.lng);
         updateNearestStationContext('Dispatch matching');
         scheduleResponderPrefetch(cached.lat, cached.lng);
         return;
@@ -193,15 +338,70 @@ async function primeHubContext() {
     updateNearestStationContext('Dispatch matching');
 }
 
-function updateLocationContext(isReady) {
+function updateLocationContext(isReady, hintText = '') {
     if (locationLabel) {
         locationLabel.textContent = isReady ? 'Location ready' : 'Location needed';
     }
 
     if (locationHint) {
         locationHint.textContent = isReady
-            ? 'Ready for one-tap report.'
-            : 'Allow location access.';
+            ? (hintText || 'Ready for one-tap report.')
+            : (hintText || 'Allow location access.');
+    }
+}
+
+async function reverseGeocodeLocationLabel(lat, lng) {
+    const cachedLabel = readCachedReverseGeocode(lat, lng);
+    if (cachedLabel) {
+        return cachedLabel;
+    }
+
+    const response = await fetch('/api/reverse', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({
+            lat,
+            lon: lng,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Reverse geocode failed with status ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const feature = Array.isArray(payload?.features) ? payload.features[0] : null;
+    const properties = feature?.properties || {};
+    const label = String(
+        properties.formatted
+        || properties.address_line1
+        || properties.address_line2
+        || properties.name
+        || ''
+    ).trim();
+
+    if (!label) {
+        throw new Error('Reverse geocode returned no readable address.');
+    }
+
+    writeCachedReverseGeocode(lat, lng, label);
+    return label;
+}
+
+async function refreshLocationContext(lat, lng) {
+    const fallbackLabel = getCoordsFallbackLabel(lat, lng);
+    updateLocationContext(true, fallbackLabel);
+
+    try {
+        const readableLabel = await reverseGeocodeLocationLabel(lat, lng);
+        updateLocationContext(true, readableLabel);
+    } catch (error) {
+        console.warn('Mobile hub reverse geocode failed:', error);
+        updateLocationContext(true, fallbackLabel);
     }
 }
 
@@ -262,6 +462,7 @@ function getFreshCoords(maxAgeMs = 10 * 60 * 1000) {
                     timestamp: Date.now(),
                 };
                 writeCachedCoords(coords.lat, coords.lng);
+                refreshLocationContext(coords.lat, coords.lng);
                 resolve(coords);
             },
             () => {
@@ -517,7 +718,7 @@ async function submitMobileHubIncidentReport() {
         showHubStatus('Sending fire report...', 'success');
 
         const coords = await getFreshCoords();
-        updateLocationContext(true);
+        refreshLocationContext(coords.lat, coords.lng);
 
         let optimisticFeedbackShown = false;
         optimisticTimer = window.setTimeout(() => {
@@ -534,7 +735,14 @@ async function submitMobileHubIncidentReport() {
             : (incidentPayload?.message || 'Fire report sent. Dispatch matching is running.');
 
         showHubStatus(successMessage, 'success');
-        showHubToast(optimisticFeedbackShown ? 'Fire report confirmed.' : 'Fire report sent.', 'success');
+        showHubToast(
+            `${optimisticFeedbackShown ? 'Fire report confirmed.' : 'Fire report sent.'} Do you want to view the dashboard?`,
+            'success',
+            {
+                actionLabel: 'View',
+                onAction: openDashboard,
+            }
+        );
     } catch (error) {
         console.error('Mobile hub report failed:', error);
         showHubStatus(error.message || 'Failed to send the report. Please try again.');

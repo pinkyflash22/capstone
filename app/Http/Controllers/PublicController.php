@@ -847,6 +847,7 @@ class PublicController extends Controller
 
         $riskArea->loadMissing(['marker', 'barangayHall.barangay', 'photos']);
         Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
         RiskAreaReviewController::flushRiskReviewCache();
         RiskAreaFollowUpDispatcher::dispatchFor($riskArea);
         UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
@@ -937,12 +938,16 @@ class PublicController extends Controller
                 }),
             ],
             'street' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9\s,\.-]+$/'],
+            'profile_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], [
             'first_name.regex' => 'First name must contain letters only.',
             'middle_name.regex' => 'Middle name must contain letters only.',
             'last_name.regex' => 'Last name must contain letters only.',
             'contact_number.regex' => 'Phone number must be 11 digits and start with 09.',
             'street.regex' => 'Street address may only contain letters, numbers, spaces, commas, periods, and hyphens.',
+            'profile_image.image' => 'Profile photo must be a valid image file.',
+            'profile_image.mimes' => 'Profile photo must be a JPG, PNG, or WEBP image.',
+            'profile_image.max' => 'Profile photo must not exceed 5 MB.',
         ]);
 
         $user->first_name = $validated['first_name'];
@@ -972,6 +977,15 @@ class PublicController extends Controller
             $user->address_id = $address->address_id;
         }
 
+        if ($request->hasFile('profile_image')) {
+            if ($user->image && !str_starts_with((string) $user->image, 'http://') && !str_starts_with((string) $user->image, 'https://')) {
+                MediaPath::delete($user->image);
+            }
+
+            $storedPath = $request->file('profile_image')->store('profile', 'supabase');
+            $user->image = MediaPath::storeForDisk($storedPath, 'supabase');
+        }
+
         $user->save();
         UserActivityLogger::log('updated profile', Auth::user()?->user_id, $request);
 
@@ -995,6 +1009,8 @@ class PublicController extends Controller
                     'barangay_id' => $user->address?->barangay?->barangay_id,
                     'city' => $user->address?->barangay?->city?->city_name,
                     'city_id' => $user->address?->barangay?->city?->city_id,
+                    'image' => $user->image,
+                    'image_url' => MediaPath::url($user->image),
                 ],
             ]);
         }
@@ -1003,6 +1019,52 @@ class PublicController extends Controller
             ->route('citizen.dashboard', ['section' => 'profile'])
             ->with('success', 'Profile updated successfully.')
             ->with('open_section', 'profile');
+    }
+
+    public function updateProfilePhoto(Request $request)
+    {
+        $user = User::with(['role', 'address.barangay.city'])->findOrFail(Auth::id());
+
+        $validated = $request->validate([
+            'profile_image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'profile_image.required' => 'Please select a profile photo first.',
+            'profile_image.image' => 'Profile photo must be a valid image file.',
+            'profile_image.mimes' => 'Profile photo must be a JPG, PNG, or WEBP image.',
+            'profile_image.max' => 'Profile photo must not exceed 5 MB.',
+        ]);
+
+        if ($user->image && !str_starts_with((string) $user->image, 'http://') && !str_starts_with((string) $user->image, 'https://')) {
+            MediaPath::delete($user->image);
+        }
+
+        $storedPath = $validated['profile_image']->store('profile', 'supabase');
+        $user->image = MediaPath::storeForDisk($storedPath, 'supabase');
+        $user->save();
+
+        UserActivityLogger::log('updated profile photo', Auth::user()?->user_id, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile photo updated successfully.',
+            'user' => [
+                'first_name' => $user->first_name,
+                'middle_name' => $user->middle_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'contact_number' => $user->contact_number,
+                'full_name' => trim($user->first_name . ' ' . $user->last_name),
+                'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1) . substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
+                'role' => $user->role->role ?? 'Citizen',
+                'street' => $user->address?->street,
+                'barangay' => $user->address?->barangay?->barangay_name,
+                'barangay_id' => $user->address?->barangay?->barangay_id,
+                'city' => $user->address?->barangay?->city?->city_name,
+                'city_id' => $user->address?->barangay?->city?->city_id,
+                'image' => $user->image,
+                'image_url' => MediaPath::url($user->image),
+            ],
+        ]);
     }
 
     public function updateProfileEmail(Request $request)

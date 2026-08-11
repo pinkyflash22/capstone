@@ -31,7 +31,7 @@
         top: calc(env(safe-area-inset-top, 0px) + 8px);
         left: 14px;
         right: 14px;
-        z-index: 110;
+        z-index: 1300 !important;
         max-width: calc(100vw - 28px);
         padding: 10px 12px;
         border-radius: 18px;
@@ -52,6 +52,7 @@
         background: transparent !important;
         box-shadow: none !important;
         z-index: 1 !important;
+        isolation: isolate;
     }
 
     body.firefighter-dashboard-page .firefighter-map-stage__header,
@@ -92,7 +93,7 @@
         position: absolute;
         top: calc(env(safe-area-inset-top, 0px) + 42px);
         right: 16px;
-        z-index: 720;
+        z-index: 900;
         width: 48px;
         height: 48px;
         display: inline-flex;
@@ -131,7 +132,20 @@
 
 @media (max-width: 768px) {
     body.firefighter-dashboard-page .mobile-bottom-nav {
-        z-index: 120 !important;
+        z-index: 1200 !important;
+    }
+
+    body.firefighter-dashboard-page .firefighter-mobile-welcome-toast {
+        z-index: 1300 !important;
+    }
+
+    body.firefighter-dashboard-page .firefighter-mobile-assigned-fab {
+        z-index: 1320 !important;
+    }
+
+    body.firefighter-dashboard-page .firefighter-mobile-insights-panel,
+    body.firefighter-dashboard-page .firefighter-assigned-queue-modal {
+        z-index: 9988 !important;
     }
 
     body.firefighter-dashboard-page .mobile-bottom-nav--firefighter-app [data-ff-open-notifications],

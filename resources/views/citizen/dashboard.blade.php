@@ -1874,7 +1874,8 @@
     };
 
    window.mapData = {
-        usermark: @json($usermarker) || []
+        usermark: @json($usermarker) || [],
+        marker: @json($usermarker) || []
     };
     
     // Also pass incidents data to JavaScript
@@ -1915,6 +1916,7 @@
 
         if (cachedMarkers && Array.isArray(cachedMarkers) && cachedMarkers.length) {
             window.mapData.usermark = cachedMarkers;
+            window.mapData.marker = cachedMarkers;
         } else {
             window.pyroPwa?.storeDataset?.('citizen-map-markers', window.mapData.usermark || []);
         }
@@ -1955,6 +1957,7 @@
         $displayName = $displayName !== '' ? $displayName : ($fullName !== '' ? $fullName : 'Citizen');
         $initialSeedLast = $lastName !== '' ? $lastName : (count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : $firstName);
         $citizenInitials = strtoupper(substr($firstName ?: 'C', 0, 1) . substr($initialSeedLast ?: 'P', 0, 1));
+        $citizenProfileImageUrl = \App\Support\MediaPath::url($citizenUser->image);
     @endphp
 
     <!-- SIDE NAVIGATION – Dynamic Citizen Dashboard -->
@@ -1988,8 +1991,17 @@
             <!-- User Profile Summary -->
             <div class="px-4 py-4 border-b border-gray-200 bg-gray-50/50">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xl font-bold">
-                        {{ $citizenInitials }}
+                    <div class="w-12 h-12 rounded-full overflow-hidden bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold" data-citizen-avatar-frame>
+                        @if ($citizenProfileImageUrl)
+                            <img
+                                src="{{ $citizenProfileImageUrl }}"
+                                alt="{{ $displayName }}"
+                                class="w-full h-full object-cover"
+                                data-citizen-avatar-image
+                            >
+                        @else
+                            <span data-citizen-avatar-fallback>{{ $citizenInitials }}</span>
+                        @endif
                     </div>
                     <div class="flex-1">
                         <p class="font-semibold text-gray-800">{{ $displayName }}</p>
@@ -2029,12 +2041,6 @@
                             <span id="citizenNavRequestsBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $fsicRequests->count() }}</span>
                         </a>
                     </li>
-                    <li>
-                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="safety" data-citizen-switch-section="safety">
-                            <i class="fa-solid fa-book-open w-5 text-gray-400 group-hover:text-orange-600"></i>
-                            <span class="flex-1">Safety Guide</span>
-                        </a>
-                    </li> --}}
                 </ul>
 
                 <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-6 mb-2">COMMUNITY</p>
@@ -2641,8 +2647,17 @@
                         <!-- User Profile Dropdown -->
                         <div class="user-dropdown">
                             <button id="userDropdownBtn" class="user-dropdown-toggle">
-                                <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold">
-                                    {{ $citizenInitials }}
+                                <div class="w-8 h-8 rounded-full overflow-hidden bg-orange-100 flex items-center justify-center text-orange-600 text-sm font-bold" data-citizen-avatar-frame>
+                                    @if ($citizenProfileImageUrl)
+                                        <img
+                                            src="{{ $citizenProfileImageUrl }}"
+                                            alt="{{ $displayName }}"
+                                            class="w-full h-full object-cover"
+                                            data-citizen-avatar-image
+                                        >
+                                    @else
+                                        <span data-citizen-avatar-fallback>{{ $citizenInitials }}</span>
+                                    @endif
                                 </div>
                                 <span class="hidden md:inline text-sm font-semibold text-gray-700">{{ $displayName }}</span>
                                 <i class="fa-solid fa-chevron-down text-xs text-gray-400"></i>
@@ -2700,9 +2715,6 @@
             <!-- Emergency Contacts Section -->
             @include('citizen.sections.contacts')
             @include('citizen.sections.announcements')
-            
-            <!-- Safety Guide Section -->
-            @include('citizen.sections.safety')
             
             <!-- Neighborhood Watch Section -->
             @include('citizen.sections.neighborhood')
@@ -5286,7 +5298,11 @@ async function submitCitizenQuickReport(reportKind) {
             if (typeof window.refreshCitizenRiskConcernMap === 'function') {
                 window.refreshCitizenRiskConcernMap(window.citizenRiskMapReports);
             }
-            if (window.usermap && typeof window.loadMarkers === 'function') {
+            if (typeof window.refreshMapMarkers === 'function') {
+                window.refreshMapMarkers({ force: true }).catch((refreshError) => {
+                    console.error('Citizen marker refresh failed after risk/hazard report submit:', refreshError);
+                });
+            } else if (window.usermap && typeof window.loadMarkers === 'function') {
                 window.loadMarkers();
             }
         }

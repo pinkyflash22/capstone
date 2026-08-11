@@ -132,6 +132,12 @@
         }
         .incident-meta-item--secondary { display: block; }
         .incident-actions { display: flex; flex-direction: column; gap: 10px; min-width: 158px; }
+        .incident-item.is-clickable { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+        .incident-item.is-clickable:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+            border-color: rgba(198,61,38,.18);
+        }
         .action-btn {
             display: inline-flex; justify-content: center; align-items: center; gap: 8px; height: 42px; padding: 0 16px;
             border-radius: 14px; border: 0; cursor: pointer; font-size: .85rem; font-weight: 700; transition: all .2s ease;
@@ -166,38 +172,221 @@
         .shimmer-actions { display: grid; gap: 10px; }
         .shimmer-btn { height: 42px; width: 100%; }
         @keyframes shimmer { 100% { transform: translateX(100%); } }
+        .incident-list-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 24px 24px;
+            flex-wrap: wrap;
+        }
+        .incident-list-footer[hidden] { display: none !important; }
+        .incident-pagination-summary {
+            color: #64748b;
+            font-size: .82rem;
+            font-weight: 700;
+        }
+        .incident-pagination-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .incident-pagination-indicator {
+            color: #475569;
+            font-size: .82rem;
+            font-weight: 800;
+        }
+        .incident-pagination-button {
+            min-height: 40px;
+            padding: 0 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(226,232,240,.92);
+            background: #fff;
+            color: #172033;
+            font-size: .82rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all .18s ease;
+        }
+        .incident-pagination-button:hover:not(:disabled) {
+            border-color: rgba(198,61,38,.22);
+            color: #c63d26;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+        }
+        .incident-pagination-button:disabled {
+            cursor: not-allowed;
+            opacity: .5;
+            box-shadow: none;
+        }
         .incident-modal {
             position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-            background: rgba(15, 23, 42, .55); z-index: 2600; padding: 20px;
+            background: rgba(15, 23, 42, .58); z-index: 10030; padding: 20px; backdrop-filter: blur(10px);
         }
         .incident-modal.active { display: flex; }
         .incident-modal-panel {
-            width: min(920px, 100%); max-height: calc(100vh - 40px); overflow: hidden; border-radius: 26px; background: #fff;
-            border: 1px solid rgba(226,232,240,.9); box-shadow: 0 24px 56px rgba(15,23,42,.2);
+            width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: hidden;
+            border-radius: 24px; background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+            border: 1px solid rgba(226,232,240,.95); box-shadow: 0 30px 70px rgba(15,23,42,.28);
         }
         .incident-modal-header {
-            display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;
-            padding: 24px 24px 18px; border-bottom: 1px solid rgba(226,232,240,.86);
-            background: linear-gradient(135deg, #fff4ec 0%, #fff7f1 100%);
+            display: flex; justify-content: space-between; gap: 16px; align-items: center;
+            padding: 16px 20px; border-bottom: 1px solid rgba(226,232,240,.92);
         }
-        .incident-modal-title { font-size: 1.2rem; font-weight: 800; color: #172033; }
-        .incident-modal-subtitle { margin-top: 6px; color: #64748b; font-size: .9rem; }
-        .incident-modal-close { width: 42px; height: 42px; border-radius: 999px; border: 0; cursor: pointer; background: #fff; color: #9a3412; }
-        .incident-modal-body { padding: 24px; overflow-y: auto; max-height: calc(100vh - 180px); display: grid; gap: 20px; }
-        .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-        .detail-card {
-            padding: 16px; border-radius: 18px; background: linear-gradient(135deg, #fffaf6 0%, #fff 100%);
-            border: 1px solid rgba(226,232,240,.9);
+        .incident-modal-title { font-size: 1rem; font-weight: 900; color: #0f172a; display: inline-flex; align-items: center; gap: 10px; }
+        .incident-modal-subtitle { display: none; }
+        .incident-modal-close {
+            width: 42px; height: 42px; border-radius: 999px; border: 1px solid rgba(226,232,240,.92);
+            cursor: pointer; background: rgba(255,255,255,.94); color: #64748b; box-shadow: 0 10px 24px rgba(15,23,42,.08);
         }
-        .detail-label {
-            margin-bottom: 6px; color: #94a3b8; font-size: .72rem; font-weight: 800;
-            text-transform: uppercase; letter-spacing: .06em;
+        .incident-modal-body { padding: 18px 20px 20px; overflow-y: auto; max-height: calc(100vh - 140px); display: grid; gap: 16px; }
+        .incident-sheet {
+            display: grid;
+            gap: 16px;
         }
-        .detail-value { color: #172033; font-size: .92rem; font-weight: 600; line-height: 1.5; word-break: break-word; }
-        .detail-description { padding: 18px; border-radius: 18px; border: 1px solid rgba(226,232,240,.9); background: #fff; }
-        .detail-description h3 { margin: 0 0 10px; color: #172033; font-size: .98rem; font-weight: 800; }
-        .detail-description p { margin: 0; color: #475569; line-height: 1.7; font-size: .94rem; }
-        .detail-image { width: 100%; max-height: 260px; object-fit: cover; border-radius: 18px; border: 1px solid rgba(226,232,240,.9); }
+        .incident-sheet__hero {
+            display: grid;
+            gap: 14px;
+            padding: 18px;
+            border-radius: 22px;
+            background: linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.98));
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .incident-sheet__hero-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .incident-sheet__status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .4px;
+        }
+        .incident-sheet__type {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: .55rem .8rem;
+            border-radius: 999px;
+            border: 1px solid rgba(226,232,240,.92);
+            background: rgba(255,255,255,.92);
+            color: #c63d26;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+        }
+        .incident-sheet__hero-body { display: grid; gap: 10px; }
+        .incident-sheet__eyebrow {
+            margin: 0;
+            color: #d18a16;
+            font-size: .72rem;
+            font-weight: 900;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+        .incident-sheet__title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.2rem;
+            line-height: 1.2;
+            font-weight: 900;
+        }
+        .incident-sheet__subtitle {
+            margin: -4px 0 0;
+            color: #475569;
+            font-size: .9rem;
+            line-height: 1.45;
+            font-weight: 700;
+        }
+        .incident-sheet__summary {
+            margin: 0;
+            color: #334155;
+            font-size: .94rem;
+            line-height: 1.6;
+        }
+        .incident-sheet__section { display: grid; gap: 12px; }
+        .incident-sheet__section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .incident-sheet__section-head h3 {
+            margin: 0;
+            color: #0f172a;
+            font-size: .96rem;
+            font-weight: 900;
+        }
+        .incident-sheet__section-note {
+            color: #64748b;
+            font-size: .74rem;
+            font-weight: 700;
+        }
+        .incident-sheet__meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .incident-sheet__meta-item {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+            padding: 13px 14px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        }
+        .incident-sheet__meta-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(198,61,38,.08);
+            color: #c63d26;
+            font-size: 1rem;
+        }
+        .incident-sheet__meta-copy { display: grid; gap: 4px; min-width: 0; }
+        .incident-sheet__meta-label {
+            color: #64748b; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+        }
+        .incident-sheet__meta-value {
+            color: #0f172a; font-size: .92rem; font-weight: 800; line-height: 1.4; word-break: break-word;
+        }
+        .incident-sheet__notes {
+            padding: 14px 16px; border-radius: 16px; border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+            color: #334155; font-size: .92rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+        }
+        .incident-sheet__footnote {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+            padding: 12px 14px; border-radius: 14px; border: 1px dashed #cbd5e1; background: rgba(248,250,252,.88);
+        }
+        .incident-sheet__footnote-label {
+            display: inline-flex; align-items: center; gap: 8px; color: #64748b; font-size: .78rem; font-weight: 800;
+        }
+        .incident-sheet__footnote-value {
+            color: #0f172a; font-size: .84rem; font-weight: 800; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+        .status-badge-reported { background: #fef3c7; color: #92400e; }
+        .status-badge-responding { background: #dbeafe; color: #1d4ed8; }
+        .status-badge-resolved { background: #dcfce7; color: #166534; }
+        .status-badge-closed { background: #e5e7eb; color: #4b5563; }
         .incidents-mobile-title {
             display: none;
         }
@@ -346,6 +535,20 @@
             }
             .incident-list,
             .shimmer-grid { padding: 8px 10px 12px; gap: 9px; }
+            .incident-list-footer {
+                padding: 0 10px 12px;
+                gap: 8px;
+            }
+            .incident-pagination-summary,
+            .incident-pagination-indicator {
+                font-size: .7rem;
+            }
+            .incident-pagination-button {
+                min-height: 36px;
+                padding: 0 11px;
+                border-radius: 11px;
+                font-size: .72rem;
+            }
             .incident-item {
                 grid-template-columns: 40px minmax(0, 1fr);
                 gap: 10px;
@@ -452,33 +655,50 @@
                 align-items: center;
             }
             .incident-modal-title { font-size: .98rem; }
-            .incident-modal-subtitle { margin-top: 3px; font-size: .72rem; }
             .incident-modal-close {
                 width: 40px;
                 height: 40px;
                 flex: 0 0 40px;
             }
             .incident-modal-body {
-                padding: 12px;
-                gap: 10px;
+                padding: 14px 12px 16px;
+                gap: 12px;
                 max-height: calc(72dvh - 82px);
             }
-            .detail-grid { grid-template-columns: 1fr; gap: 8px; }
-            .detail-card {
-                padding: 10px 11px;
-                border-radius: 13px;
+            .incident-sheet__hero {
+                padding: 15px;
+                border-radius: 18px;
             }
-            .detail-label { font-size: .58rem; margin-bottom: 3px; }
-            .detail-value { font-size: .74rem; line-height: 1.35; }
-            .detail-description {
-                padding: 11px;
-                border-radius: 13px;
+            .incident-sheet__hero-top {
+                align-items: flex-start;
+                flex-direction: column;
             }
-            .detail-description h3 { font-size: .82rem; margin-bottom: 5px; }
-            .detail-description p { font-size: .74rem; line-height: 1.45; }
-            .detail-image {
-                max-height: 150px;
-                border-radius: 13px;
+            .incident-sheet__meta-grid {
+                grid-template-columns: 1fr;
+            }
+            .incident-sheet__meta-item {
+                grid-template-columns: 38px minmax(0, 1fr);
+                gap: 10px;
+                padding: 12px;
+                border-radius: 14px;
+            }
+            .incident-sheet__meta-icon {
+                width: 38px;
+                height: 38px;
+                border-radius: 12px;
+                font-size: .92rem;
+            }
+            .incident-sheet__title {
+                font-size: 1.06rem;
+            }
+            .incident-sheet__summary,
+            .incident-sheet__notes,
+            .incident-sheet__meta-value {
+                font-size: .86rem;
+            }
+            .incident-sheet__footnote {
+                align-items: flex-start;
+                flex-direction: column;
             }
         }
         @media (max-width: 430px) {
@@ -581,7 +801,8 @@
     <script>
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
         const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 30000;
-        const incidentState = { incidents: [], filter: 'all', search: '', sort: 'reported_desc', poller: null, request: null, lastFetchedAt: 0 };
+        const INCIDENT_PAGE_SIZE = 8;
+        const incidentState = { incidents: [], filter: 'all', search: '', sort: 'reported_desc', currentPage: 1, poller: null, request: null, lastFetchedAt: 0 };
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
         const mobileResultsCount = document.getElementById('mobileResultsCount');
@@ -701,6 +922,28 @@
             return filtered;
         }
 
+        function renderIncidentPagination(totalItems, totalPages, currentPage) {
+            const hidden = totalItems <= 0 || totalPages <= 1;
+            return `
+                <div class="incident-list-footer" ${hidden ? 'hidden' : ''}>
+                    <div class="incident-pagination-summary">
+                        Showing ${((currentPage - 1) * INCIDENT_PAGE_SIZE) + 1}-${Math.min(currentPage * INCIDENT_PAGE_SIZE, totalItems)} of ${totalItems} incidents
+                    </div>
+                    <div class="incident-pagination-controls">
+                        <button type="button" class="incident-pagination-button" data-incident-page-action="prev" ${currentPage <= 1 ? 'disabled' : ''}>
+                            <i class="fa-solid fa-chevron-left"></i>
+                            Previous
+                        </button>
+                        <span class="incident-pagination-indicator">Page ${currentPage} of ${totalPages}</span>
+                        <button type="button" class="incident-pagination-button" data-incident-page-action="next" ${currentPage >= totalPages ? 'disabled' : ''}>
+                            Next
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderIncidentList() {
             const incidents = getFilteredIncidents();
             if (!listState) return;
@@ -716,7 +959,12 @@
                 return;
             }
 
-            listState.innerHTML = `<div class="incident-list">${incidents.map((incident) => {
+            const totalPages = Math.max(1, Math.ceil(incidents.length / INCIDENT_PAGE_SIZE));
+            incidentState.currentPage = Math.min(Math.max(1, incidentState.currentPage), totalPages);
+            const startIndex = (incidentState.currentPage - 1) * INCIDENT_PAGE_SIZE;
+            const pagedIncidents = incidents.slice(startIndex, startIndex + INCIDENT_PAGE_SIZE);
+
+            listState.innerHTML = `<div class="incident-list">${pagedIncidents.map((incident) => {
                 const imageUrl = resolveStorageUrl(incident.image_url);
                 const statusBucket = getStatusBucket(incident.incident_status_id);
                 const statusLabel = statusBucket === 'active' ? 'Available / Active' : (statusBucket === 'controlled' ? 'Controlled' : 'Closed');
@@ -724,7 +972,7 @@
                     ? `<a class="action-btn investigation" href="${escapeHtml(incident.investigation_url)}"><i class="fa-solid fa-magnifying-glass"></i> Start Spot Report</a>`
                     : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '');
                 return `
-                    <article class="incident-item">
+                    <article class="incident-item is-clickable" data-incident-row data-incident-id="${incident.incident_id}" role="button" tabindex="0" aria-label="Open incident details for ${escapeHtml(incident.title || `Incident ${incident.incident_id}`)}">
                         <div class="incident-image">
                             ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident Image">` : `<i class="fa-solid ${getIncidentTypeIcon(incident.incident_type_name)}"></i>`}
                         </div>
@@ -732,7 +980,6 @@
                             <div class="incident-topline">
                                 <span class="incident-chip chip-type"><i class="fa-solid ${getIncidentTypeIcon(incident.incident_type_name)}"></i>${escapeHtml(incident.incident_type_name || 'Incident')}</span>
                                 <span class="incident-chip ${getStatusChipClass(incident.incident_status_id)}">${escapeHtml(statusLabel)}</span>
-                                <span class="incident-chip chip-type">#${escapeHtml(incident.incident_id)}</span>
                             </div>
                             <h3 class="incident-title">${escapeHtml(incident.title || `Incident #${incident.incident_id}`)}</h3>
                             <p class="incident-description">${escapeHtml(incident.description || 'No incident description was recorded for this response.')}</p>
@@ -743,13 +990,45 @@
                                 <div class="incident-meta-item incident-meta-item--secondary"><span class="incident-meta-label">Last Updated</span>${escapeHtml(formatDateTime(incident.updated_at))}</div>
                             </div>
                         </div>
-                        <div class="incident-actions">
+                        <div class="incident-actions" data-incident-actions>
                             ${investigationAction}
-                            <button type="button" class="action-btn primary" onclick="openIncidentDetails(${incident.incident_id})"><i class="fa-solid fa-eye"></i> View Details</button>
                             <button type="button" class="action-btn ghost" onclick="copyIncidentId(${incident.incident_id})"><i class="fa-regular fa-copy"></i> Copy ID</button>
                         </div>
                     </article>`;
-            }).join('')}</div>`;
+            }).join('')}</div>${renderIncidentPagination(incidents.length, totalPages, incidentState.currentPage)}`;
+
+            listState.querySelectorAll('[data-incident-row]').forEach((row) => {
+                row.addEventListener('click', (event) => {
+                    if (event.target.closest('[data-incident-actions]')) {
+                        return;
+                    }
+
+                    openIncidentDetails(row.dataset.incidentId);
+                });
+
+                row.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                    }
+
+                    if (event.target.closest('[data-incident-actions]')) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    openIncidentDetails(row.dataset.incidentId);
+                });
+            });
+
+            listState.querySelector('[data-incident-page-action="prev"]')?.addEventListener('click', () => {
+                incidentState.currentPage = Math.max(1, incidentState.currentPage - 1);
+                renderIncidentList();
+            });
+
+            listState.querySelector('[data-incident-page-action="next"]')?.addEventListener('click', () => {
+                incidentState.currentPage = Math.min(totalPages, incidentState.currentPage + 1);
+                renderIncidentList();
+            });
         }
 
         function showToast(message, isError = false) {
@@ -810,6 +1089,99 @@
             const modalSubtitle = document.getElementById('incidentModalSubtitle');
             const imageUrl = resolveStorageUrl(incident.image_url);
 
+            const statusId = Number(incident.incident_status_id);
+            const incidentTypeName = incident.incident_type_name || 'Incident';
+            const incidentTypeIcon = getIncidentTypeIcon(incidentTypeName);
+            const statusText = statusId === 5 ? 'CLOSED' : (statusId === 4 ? 'CONTROLLED' : 'ACTIVE');
+            const statusClass = statusId === 5 ? 'status-badge-closed' : (statusId === 4 ? 'status-badge-resolved' : 'status-badge-responding');
+            const statusIcon = statusId === 5 ? 'fa-folder' : (statusId === 4 ? 'fa-check-circle' : 'fa-bell');
+            const locationHeadline = incident.location || incident.title || `Incident #${incident.incident_id}`;
+            const incidentSubtitle = incident.title && incident.title !== locationHeadline ? incident.title : null;
+            const description = incident.description || 'No incident description was recorded for this incident.';
+            const reportedBy = incident.reporter_name || 'Concerned Citizen';
+            const roleLabel = incident.reporter_role || 'Citizen';
+            const createdAt = formatDateTime(incident.reported_at);
+            const updatedAt = formatDateTime(incident.updated_at);
+            const hasCoordinates = incident.coordinates?.lat !== null && incident.coordinates?.lat !== undefined && incident.coordinates?.lng !== null && incident.coordinates?.lng !== undefined;
+            const overviewItems = [
+                { icon: 'fa-location-dot', label: 'Location', value: escapeHtml(locationHeadline) },
+                { icon: 'fa-user', label: 'Reporter', value: escapeHtml(reportedBy) },
+                { icon: 'fa-user-shield', label: 'Source', value: escapeHtml(roleLabel) },
+                { icon: 'fa-calendar-days', label: 'Reported', value: escapeHtml(createdAt) },
+            ];
+
+            if (incident.team_name) {
+                overviewItems.push({ icon: 'fa-users', label: 'Assigned Team', value: escapeHtml(incident.team_name) });
+            }
+
+            if (incident.response_minutes !== null && incident.response_minutes !== undefined) {
+                overviewItems.push({ icon: 'fa-stopwatch', label: 'Response Duration', value: escapeHtml(formatMinutes(incident.response_minutes)) });
+            }
+
+            if (incident.updated_at) {
+                overviewItems.push({ icon: 'fa-clock', label: 'Last Updated', value: escapeHtml(updatedAt) });
+            }
+
+            const overviewMarkup = overviewItems.map((item) => `
+                <div class="incident-sheet__meta-item">
+                    <span class="incident-sheet__meta-icon"><i class="fa-solid ${item.icon}"></i></span>
+                    <div class="incident-sheet__meta-copy">
+                        <span class="incident-sheet__meta-label">${item.label}</span>
+                        <strong class="incident-sheet__meta-value">${item.value}</strong>
+                    </div>
+                </div>
+            `).join('');
+
+            modalTitle.innerHTML = `<i class="fa-solid fa-file-alt"></i> Incident Details`;
+            modalSubtitle.textContent = '';
+            modalBody.innerHTML = `
+                <div class="incident-sheet">
+                    <section class="incident-sheet__hero">
+                        <div class="incident-sheet__hero-top">
+                            <span class="incident-sheet__status ${statusClass}">
+                                <i class="fa-solid ${statusIcon}"></i>
+                                <span>${statusText}</span>
+                            </span>
+                            <span class="incident-sheet__type">
+                                <i class="fa-solid ${incidentTypeIcon}"></i>
+                                ${escapeHtml(incidentTypeName)}
+                            </span>
+                        </div>
+                        <div class="incident-sheet__hero-body">
+                            <p class="incident-sheet__eyebrow">Response Summary</p>
+                            <h2 class="incident-sheet__title">${escapeHtml(locationHeadline)}</h2>
+                            ${incidentSubtitle ? `<p class="incident-sheet__subtitle">${escapeHtml(incidentSubtitle)}</p>` : ''}
+                            <p class="incident-sheet__summary">${escapeHtml(description)}</p>
+                            ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident Image" class="detail-image">` : ''}
+                        </div>
+                    </section>
+
+                    <section class="incident-sheet__section">
+                        <div class="incident-sheet__section-head">
+                            <h3>Overview</h3>
+                            <span class="incident-sheet__section-note">Operational details only</span>
+                        </div>
+                        <div class="incident-sheet__meta-grid">${overviewMarkup}</div>
+                    </section>
+
+                    <section class="incident-sheet__section">
+                        <div class="incident-sheet__section-head">
+                            <h3>Incident Notes</h3>
+                        </div>
+                        <div class="incident-sheet__notes">${escapeHtml(description)}</div>
+                    </section>
+
+                    ${hasCoordinates ? `
+                    <section class="incident-sheet__footnote">
+                        <span class="incident-sheet__footnote-label"><i class="fa-solid fa-location-crosshairs"></i> Coordinates</span>
+                        <span class="incident-sheet__footnote-value">${escapeHtml(`${incident.coordinates?.lat}, ${incident.coordinates?.lng}`)}</span>
+                    </section>
+                    ` : ''}
+                </div>
+            `;
+            modal.classList.add('active');
+            return;
+
             modalTitle.textContent = incident.title || `Incident #${incident.incident_id}`;
             modalSubtitle.textContent = `${incident.incident_type_name || 'Incident'} · ${incident.incident_status_name || 'Unknown status'} · #${incident.incident_id}`;
             modalBody.innerHTML = `
@@ -852,11 +1224,12 @@
                 const tab = event.target.closest('.filter-tab');
                 if (!tab) return;
                 incidentState.filter = tab.dataset.filter || 'all';
+                incidentState.currentPage = 1;
                 document.querySelectorAll('.filter-tab').forEach(button => button.classList.toggle('active', button === tab));
                 renderIncidentList();
             });
-            searchInput.addEventListener('input', (event) => { incidentState.search = event.target.value || ''; renderIncidentList(); });
-            sortSelect.addEventListener('change', (event) => { incidentState.sort = event.target.value || 'reported_desc'; renderIncidentList(); });
+            searchInput.addEventListener('input', (event) => { incidentState.search = event.target.value || ''; incidentState.currentPage = 1; renderIncidentList(); });
+            sortSelect.addEventListener('change', (event) => { incidentState.sort = event.target.value || 'reported_desc'; incidentState.currentPage = 1; renderIncidentList(); });
             refreshBtn.addEventListener('click', () => fetchIncidentRegistry(true));
             document.getElementById('closeIncidentModal').addEventListener('click', closeIncidentDetails);
             document.getElementById('incidentDetailModal').addEventListener('click', (event) => {

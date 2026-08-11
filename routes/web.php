@@ -486,6 +486,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/assigned/{id}',[FirefighterController::class, 'getAssignedIncidents'])->name('assigned');
         Route::get('/incidents', [FirefighterController::class, 'incidentView'])->name('incidents');
         Route::get('/api/incidents/registry', [FirefighterController::class, 'incidentRegistryData'])->name('incidents.registry');
+        Route::get('/risk-reviews', [RiskAreaReviewController::class, 'firefighterIndex'])->name('risk-reviews.index');
+        Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'firefighterReview'])->name('risk-reviews.review');
 
         
 
@@ -529,6 +531,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/risk-reports', [PublicController::class, 'storeCitizenRiskReport'])->name('risk-reports.store');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');
+        Route::post('/profile/photo', [PublicController::class, 'updateProfilePhoto'])->name('profile.photo.update');
         Route::put('/profile/email', [PublicController::class, 'updateProfileEmail'])->name('profile.email.update');
         Route::put('/profile/password', [PublicController::class, 'updateProfilePassword'])->name('profile.password.update');
         Route::resource('incident', IncidentController::class);

@@ -156,6 +156,13 @@ class IncidentController extends Controller
         });
     }
 
+    private function supportsIncidentStationColumn(): bool
+    {
+        return Cache::rememberForever('schema:incident:station-id', function () {
+            return Schema::hasColumn('incidents', 'station_id');
+        });
+    }
+
     private function serializeIncident(Incident $incident): array
     {
         return [
@@ -549,7 +556,7 @@ class IncidentController extends Controller
 
         $markerId = $validated['marker_id'] ?? null;
 
-        $data = DB::transaction(function () use ($validated, $markerId) {
+        $data = DB::transaction(function () use ($validated, $markerId, $boundaryMatcherService) {
             $createdMarker = null;
 
             if (! $markerId) {
@@ -612,12 +619,30 @@ class IncidentController extends Controller
                 }
             }
 
-            if (empty($validated['station_id'])) {
-                $validated['station_id'] = $this->resolveJurisdictionStationIdOrDefault(
-                    isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
-                    $resolvedLat !== null ? (float) $resolvedLat : null,
-                    $resolvedLng !== null ? (float) $resolvedLng : null
-                );
+            if ($this->supportsIncidentStationColumn()) {
+                if (empty($validated['station_id'])) {
+                    $validated['station_id'] = $this->resolveJurisdictionStationIdOrDefault(
+                        isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
+                        $resolvedLat !== null ? (float) $resolvedLat : null,
+                        $resolvedLng !== null ? (float) $resolvedLng : null
+                    );
+                }
+            } else {
+                if (empty($validated['team_id'])) {
+                    $fallbackStationId = ! empty($validated['station_id'])
+                        ? (int) $validated['station_id']
+                        : 1;
+
+                    $fallbackTeam = $this->findAvailableTeamForStation($fallbackStationId)
+                        ?? $this->findAnyTeamForStation($fallbackStationId)
+                        ?? Team::query()->find(1);
+
+                    if ($fallbackTeam?->team_id) {
+                        $validated['team_id'] = (int) $fallbackTeam->team_id;
+                    }
+                }
+
+                unset($validated['station_id']);
             }
 
             $validated['status'] = empty($validated['status'])

@@ -6,6 +6,7 @@
     $profileName = trim(($profileUser->first_name ?? '') . ' ' . ($profileUser->last_name ?? ''));
     $profileName = $profileName !== '' ? $profileName : ($profileUser->name ?? 'Citizen');
     $profileInitials = strtoupper(substr($profileUser->first_name ?? 'C', 0, 1) . substr($profileUser->last_name ?? ($profileUser->first_name ?? 'P'), 0, 1));
+    $profileImageUrl = \App\Support\MediaPath::url($profileUser->image);
     $selectedCityId = old('city_id', $profileCity?->city_id);
     $barangayOptions = collect();
     $memberSince = $profileUser?->created_at?->format('F j, Y') ?? 'Not available';
@@ -219,25 +220,78 @@
     }
 
     #section-profile .profile-summary-card .profile-avatar {
-        margin-top: -3rem;
+        margin-top: -4.35rem;
         border: 5px solid #fff;
         position: relative;
         z-index: 1;
     }
 
     #section-profile .profile-avatar {
-        width: 6rem;
-        height: 6rem;
-        border-radius: 2rem;
+        width: 8.2rem;
+        height: 8.2rem;
+        border-radius: 999px;
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0 auto 0.9rem;
         color: #fff;
         background: linear-gradient(135deg, var(--profile-red), var(--profile-orange));
-        font-size: 2.2rem;
+        font-size: 2.8rem;
         font-weight: 950;
         box-shadow: 0 18px 36px rgba(198, 61, 38, 0.22);
+        overflow: hidden;
+    }
+
+    #section-profile .profile-avatar-wrap {
+        position: relative;
+        width: fit-content;
+        margin: 0 auto 0.9rem;
+    }
+
+    #section-profile .profile-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        cursor: zoom-in;
+    }
+
+    #section-profile .profile-avatar-fallback {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #section-profile .profile-avatar-camera {
+        position: absolute;
+        right: -0.1rem;
+        bottom: 0.45rem;
+        width: 2.4rem;
+        height: 2.4rem;
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--profile-red), var(--profile-orange));
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 14px 28px rgba(198, 61, 38, 0.22);
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        z-index: 4;
+    }
+
+    #section-profile .profile-avatar-camera:hover,
+    #section-profile .profile-avatar-camera:focus-visible {
+        transform: translateY(-1px) scale(1.04);
+        box-shadow: 0 18px 32px rgba(198, 61, 38, 0.28);
+        outline: none;
+    }
+
+    #section-profile .profile-avatar-camera i {
+        font-size: 0.95rem;
     }
 
     #section-profile .profile-summary-name {
@@ -842,6 +896,288 @@
             display: block;
             height: calc(2.25rem + env(safe-area-inset-bottom, 0px));
         }
+
+        #section-profile .profile-avatar {
+            width: 6.9rem;
+            height: 6.9rem;
+            font-size: 2.2rem;
+        }
+
+        #section-profile .profile-avatar-camera {
+            width: 2.1rem;
+            height: 2.1rem;
+            right: 0;
+            bottom: 0.25rem;
+        }
+    }
+
+    #citizenProfileViewerModal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.78);
+        backdrop-filter: blur(10px);
+        z-index: 128;
+    }
+
+    #citizenProfileViewerModal.is-open {
+        display: flex;
+    }
+
+    #citizenProfileViewerModal .viewer-shell {
+        position: relative;
+        width: min(100%, 30rem);
+        max-height: calc(100vh - 2rem);
+        border-radius: 2rem;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.32);
+        background: #0f172a;
+    }
+
+    #citizenProfileViewerModal .viewer-image {
+        width: 100%;
+        height: auto;
+        max-height: calc(100vh - 2rem);
+        display: block;
+        object-fit: contain;
+        background: linear-gradient(135deg, rgba(198, 61, 38, 0.22), rgba(227, 155, 23, 0.12));
+    }
+
+    #citizenProfileViewerModal .viewer-close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        width: 2.6rem;
+        height: 2.6rem;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #c2410c;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+    }
+
+    #section-profile .profile-photo-input {
+        display: none;
+    }
+
+    #citizenProfileCropModal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.68);
+        backdrop-filter: blur(8px);
+        z-index: 130;
+    }
+
+    #citizenProfileCropModal.is-open {
+        display: flex;
+    }
+
+    #citizenProfileCropModal .crop-shell {
+        width: min(100%, 34rem);
+        border-radius: 1.8rem;
+        background: #fff;
+        box-shadow: 0 28px 80px rgba(15, 23, 42, 0.26);
+        overflow: hidden;
+    }
+
+    #citizenProfileCropModal .crop-head {
+        padding: 1rem 1.15rem;
+        border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    #citizenProfileCropModal .crop-head h3 {
+        margin: 0;
+        color: var(--profile-ink);
+        font-size: 1.05rem;
+        font-weight: 900;
+    }
+
+    #citizenProfileCropModal .crop-head p {
+        margin: 0.18rem 0 0;
+        color: var(--profile-muted);
+        font-size: 0.82rem;
+    }
+
+    #citizenProfileCropModal .crop-close {
+        width: 2.4rem;
+        height: 2.4rem;
+        border: 0;
+        border-radius: 999px;
+        background: #fff7ed;
+        color: #c2410c;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    #citizenProfileCropModal .crop-body {
+        padding: 1.1rem;
+        display: grid;
+        gap: 1rem;
+    }
+
+    #citizenProfileCropViewport {
+        position: relative;
+        width: min(100%, 21rem);
+        aspect-ratio: 1;
+        margin: 0 auto;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        background:
+            linear-gradient(135deg, rgba(198, 61, 38, 0.08), rgba(227, 155, 23, 0.12)),
+            #f8fafc;
+        touch-action: none;
+        cursor: grab;
+    }
+
+    #citizenProfileCropViewport.is-dragging {
+        cursor: grabbing;
+    }
+
+    #citizenProfileCropStage {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+    }
+
+    #citizenProfileCropImage {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        max-width: none;
+        max-height: none;
+        user-select: none;
+        -webkit-user-drag: none;
+        transform-origin: center center;
+        pointer-events: none;
+    }
+
+    #citizenProfileCropViewport::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at center, transparent 0 37%, rgba(15, 23, 42, 0.56) 37.8% 100%);
+        pointer-events: none;
+    }
+
+    #citizenProfileCropViewport::before {
+        content: '';
+        position: absolute;
+        width: 86%;
+        aspect-ratio: 1;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 3px solid rgba(255, 255, 255, 0.95);
+        border-radius: 999px;
+        box-shadow: 0 0 0 999px rgba(15, 23, 42, 0.08);
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    #citizenProfileCropModal .crop-zoom {
+        display: grid;
+        gap: 0.4rem;
+    }
+
+    #citizenProfileCropModal .crop-zoom-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        color: var(--profile-ink);
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    #citizenProfileCropModal .crop-range {
+        width: 100%;
+        accent-color: #c63d26;
+    }
+
+    #citizenProfileCropModal .crop-message {
+        min-height: 1.1rem;
+        color: #b91c1c;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    #citizenProfileCropModal .crop-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        padding-top: 0.35rem;
+    }
+
+    #citizenProfileCropModal .crop-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        padding: 0.8rem 1.1rem;
+        font-size: 0.86rem;
+        font-weight: 800;
+        border: 1px solid #fed7aa;
+        cursor: pointer;
+        min-width: 8.5rem;
+        min-height: 3.25rem;
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    #citizenProfileCropModal .crop-btn--ghost {
+        background: #fff;
+        color: #9a3412;
+    }
+
+    #citizenProfileCropModal .crop-btn--primary {
+        border: 0;
+        color: #fff !important;
+        background: linear-gradient(135deg, var(--profile-red), var(--profile-orange)) !important;
+        box-shadow: 0 16px 34px rgba(198, 61, 38, 0.22);
+    }
+
+    @media (max-width: 640px) {
+        #citizenProfileCropModal {
+            padding: 0.85rem;
+        }
+
+        #citizenProfileCropModal .crop-shell {
+            width: 100%;
+            border-radius: 1.4rem;
+        }
+
+        #citizenProfileCropViewport {
+            width: min(100%, 18.5rem);
+        }
+
+        #citizenProfileCropModal .crop-actions {
+            flex-direction: column-reverse;
+        }
+
+        #citizenProfileCropModal .crop-btn {
+            width: 100%;
+        }
     }
 </style>
 
@@ -876,7 +1212,34 @@
         <div class="profile-layout">
             <aside class="profile-card profile-summary-card">
                 <div class="profile-card-body">
-                    <div id="citizenProfileCardInitials" class="profile-avatar">{{ $profileInitials }}</div>
+                    <div class="profile-avatar-wrap">
+                        <div class="profile-avatar" data-citizen-profile-avatar-frame>
+                            @if ($profileImageUrl)
+                                <img
+                                    id="citizenProfileCardImage"
+                                    class="profile-avatar-image"
+                                    src="{{ $profileImageUrl }}"
+                                    alt="{{ $profileName }}"
+                                    data-citizen-profile-avatar-image
+                                    data-citizen-profile-view-trigger
+                                >
+                            @endif
+                            <div
+                                id="citizenProfileCardInitials"
+                                class="profile-avatar-fallback"
+                                @if ($profileImageUrl) style="display:none;" @endif
+                            >{{ $profileInitials }}</div>
+                        </div>
+                        <button
+                            id="citizenProfilePhotoTrigger"
+                            type="button"
+                            class="profile-avatar-camera"
+                            aria-label="Upload profile photo"
+                            title="Upload profile photo"
+                        >
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+                    </div>
                     <h2 id="citizenProfileCardName" class="profile-summary-name">{{ $profileName }}</h2>
                     <p id="citizenProfileCardEmail" class="profile-summary-email">{{ $profileUser->email }}</p>
                     <div class="profile-badge-row">
@@ -992,10 +1355,11 @@
                     </button>
                 </div>
 
-                <form id="citizenProfileForm" method="POST" action="{{ route('citizen.profile.update') }}">
+                <form id="citizenProfileForm" method="POST" action="{{ route('citizen.profile.update') }}" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
                     <input id="citizen_email" name="email" type="hidden" value="{{ old('email', $profileUser->email) }}">
+                    <input id="citizenProfilePhotoInput" name="profile_image" type="file" class="profile-photo-input" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
 
                     <section class="profile-card">
                         <div class="profile-card-head">
@@ -1208,9 +1572,55 @@
             <svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8" fill="none"></path></svg>
         </span>
         <div>
-            <p class="font-semibold">Saving changes</p>
-            <p class="text-sm text-slate-500">Updating your account...</p>
+            <p id="citizenProfileLoadingTitle" class="font-semibold">Saving changes</p>
+            <p id="citizenProfileLoadingCopy" class="text-sm text-slate-500">Updating your account...</p>
         </div>
+    </div>
+</div>
+
+<div id="citizenProfileCropModal" aria-hidden="true">
+    <div class="crop-shell" role="dialog" aria-modal="true" aria-labelledby="citizenProfileCropTitle">
+        <div class="crop-head">
+            <div>
+                <h3 id="citizenProfileCropTitle">Adjust profile photo</h3>
+                <p>Drag to center your photo inside the circle, then use zoom if needed.</p>
+            </div>
+            <button id="citizenProfileCropClose" type="button" class="crop-close" aria-label="Close photo cropper">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="crop-body">
+            <div id="citizenProfileCropViewport">
+                <div id="citizenProfileCropStage">
+                    <img id="citizenProfileCropImage" alt="Profile crop preview">
+                </div>
+            </div>
+            <div class="crop-zoom">
+                <div class="crop-zoom-label">
+                    <span>Zoom</span>
+                    <span id="citizenProfileZoomValue">100%</span>
+                </div>
+                <input id="citizenProfileZoomRange" type="range" class="crop-range" min="1" max="3" step="0.01" value="1">
+            </div>
+            <p id="citizenProfileCropMessage" class="crop-message"></p>
+            <div class="crop-actions">
+                <button id="citizenProfileCropCancel" type="button" class="crop-btn crop-btn--ghost">Cancel</button>
+                <button id="citizenProfileCropApply" type="button" class="crop-btn crop-btn--primary">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Use this photo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="citizenProfileViewerModal" aria-hidden="true">
+    <div class="viewer-shell" role="dialog" aria-modal="true" aria-labelledby="citizenProfileViewerTitle">
+        <button id="citizenProfileViewerClose" type="button" class="viewer-close" aria-label="Close profile photo preview">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="citizenProfileViewerImage" class="viewer-image" alt="Profile photo preview">
+        <span id="citizenProfileViewerTitle" class="sr-only">Profile photo preview</span>
     </div>
 </div>
 
@@ -1227,13 +1637,51 @@ document.addEventListener('DOMContentLoaded', function () {
     const toast = document.getElementById('toast');
     const infoMessage = document.getElementById('profileInfoMessage');
     const modalTitle = document.getElementById('profileModalTitle');
+    const loadingTitle = document.getElementById('citizenProfileLoadingTitle');
+    const loadingCopy = document.getElementById('citizenProfileLoadingCopy');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const profilePhotoInput = document.getElementById('citizenProfilePhotoInput');
+    const profilePhotoTrigger = document.getElementById('citizenProfilePhotoTrigger');
+    const profileCardFallback = document.getElementById('citizenProfileCardInitials');
+    const cropModal = document.getElementById('citizenProfileCropModal');
+    const cropViewport = document.getElementById('citizenProfileCropViewport');
+    const cropImage = document.getElementById('citizenProfileCropImage');
+    const cropRange = document.getElementById('citizenProfileZoomRange');
+    const cropZoomValue = document.getElementById('citizenProfileZoomValue');
+    const cropMessage = document.getElementById('citizenProfileCropMessage');
+    const cropClose = document.getElementById('citizenProfileCropClose');
+    const cropCancel = document.getElementById('citizenProfileCropCancel');
+    const cropApply = document.getElementById('citizenProfileCropApply');
+    const profilePhotoUploadUrl = @json(route('citizen.profile.photo.update'));
+    const profileViewerModal = document.getElementById('citizenProfileViewerModal');
+    const profileViewerImage = document.getElementById('citizenProfileViewerImage');
+    const profileViewerClose = document.getElementById('citizenProfileViewerClose');
 
     if (!section || !profileForm || !citySelect || !barangaySelect) {
         return;
     }
 
     let originalProfile = {};
+    let pendingProfileImageFile = null;
+    let pendingProfileImageUrl = null;
+    let savedProfileImageUrl = @json($profileImageUrl);
+    let cropObjectUrl = null;
+    let cropImageState = {
+        sourceWidth: 0,
+        sourceHeight: 0,
+        baseScale: 1,
+        scale: 1,
+        minScale: 1,
+        maxScale: 3,
+        offsetX: 0,
+        offsetY: 0,
+    };
+    let dragState = null;
+
+    function setLoadingState(title = 'Saving changes', copy = 'Updating your account...') {
+        if (loadingTitle) loadingTitle.textContent = title;
+        if (loadingCopy) loadingCopy.textContent = copy;
+    }
 
     function getFormSnapshot() {
         return Object.fromEntries(new FormData(profileForm).entries());
@@ -1251,11 +1699,241 @@ document.addEventListener('DOMContentLoaded', function () {
         if (citySelect.value) {
             loadCitizenBarangays(citySelect.value, originalProfile.barangay_id || '');
         }
+        pendingProfileImageFile = null;
+        if (pendingProfileImageUrl) {
+            URL.revokeObjectURL(pendingProfileImageUrl);
+            pendingProfileImageUrl = null;
+        }
+        if (profilePhotoInput) {
+            profilePhotoInput.value = '';
+        }
+        updateAvatarState(savedProfileImageUrl, profileCardFallback?.textContent?.trim() || '');
     }
 
     function hasProfileChanges() {
         const current = getFormSnapshot();
-        return Object.keys(originalProfile).some((key) => String(originalProfile[key] ?? '') !== String(current[key] ?? ''));
+        return pendingProfileImageFile !== null
+            || Object.keys(originalProfile).some((key) => String(originalProfile[key] ?? '') !== String(current[key] ?? ''));
+    }
+
+    function updateAvatarState(imageUrl, initials) {
+        const safeInitials = initials || profileCardFallback?.textContent?.trim() || 'CP';
+
+        document.querySelectorAll('[data-citizen-profile-avatar-frame], [data-citizen-avatar-frame]').forEach((frame) => {
+            let image = frame.querySelector('[data-citizen-profile-avatar-image], [data-citizen-avatar-image]');
+            let fallback = frame.querySelector('.profile-avatar-fallback, [data-citizen-avatar-fallback]');
+
+            if (imageUrl) {
+                if (!image) {
+                    image = document.createElement('img');
+                    image.alt = 'Profile photo';
+
+                    if (frame.hasAttribute('data-citizen-profile-avatar-frame')) {
+                        image.className = 'profile-avatar-image';
+                        image.setAttribute('data-citizen-profile-avatar-image', '');
+                        image.setAttribute('data-citizen-profile-view-trigger', '');
+                    } else {
+                        image.className = 'w-full h-full object-cover';
+                        image.setAttribute('data-citizen-avatar-image', '');
+                    }
+
+                    frame.prepend(image);
+                }
+
+                image.src = imageUrl;
+                image.style.display = '';
+
+                if (fallback) {
+                    fallback.textContent = safeInitials;
+                    fallback.style.display = 'none';
+                }
+            } else {
+                if (image) {
+                    image.remove();
+                }
+
+                if (fallback) {
+                    fallback.textContent = safeInitials;
+                    fallback.style.display = '';
+                }
+            }
+        });
+    }
+
+    function openProfileViewer(src) {
+        if (!profileViewerModal || !profileViewerImage || !src) return;
+
+        profileViewerImage.src = src;
+        profileViewerModal.classList.add('is-open');
+        profileViewerModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeProfileViewer() {
+        if (!profileViewerModal || !profileViewerImage) return;
+
+        profileViewerModal.classList.remove('is-open');
+        profileViewerModal.setAttribute('aria-hidden', 'true');
+        profileViewerImage.removeAttribute('src');
+    }
+
+    function closeCropModal(resetInput = false) {
+        cropModal?.classList.remove('is-open');
+        cropModal?.setAttribute('aria-hidden', 'true');
+        cropViewport?.classList.remove('is-dragging');
+        dragState = null;
+
+        if (cropMessage) {
+            cropMessage.textContent = '';
+        }
+
+        if (resetInput && profilePhotoInput) {
+            profilePhotoInput.value = '';
+        }
+
+        if (cropObjectUrl) {
+            URL.revokeObjectURL(cropObjectUrl);
+            cropObjectUrl = null;
+        }
+    }
+
+    function applyCropTransform() {
+        if (!cropImage || !cropViewport) return;
+
+        cropImage.style.transform = `translate(calc(-50% + ${cropImageState.offsetX}px), calc(-50% + ${cropImageState.offsetY}px)) scale(${cropImageState.scale})`;
+
+        if (cropZoomValue) {
+            cropZoomValue.textContent = `${Math.round((cropImageState.scale / cropImageState.minScale) * 100)}%`;
+        }
+    }
+
+    function clampCropOffsets() {
+        if (!cropViewport) return;
+
+        const viewportSize = cropViewport.clientWidth;
+        const renderedWidth = cropImageState.sourceWidth * cropImageState.scale;
+        const renderedHeight = cropImageState.sourceHeight * cropImageState.scale;
+        const maxOffsetX = Math.max(0, (renderedWidth - viewportSize) / 2);
+        const maxOffsetY = Math.max(0, (renderedHeight - viewportSize) / 2);
+
+        cropImageState.offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, cropImageState.offsetX));
+        cropImageState.offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, cropImageState.offsetY));
+    }
+
+    function updateCropScale(nextScale) {
+        cropImageState.scale = Math.max(cropImageState.minScale, Math.min(cropImageState.maxScale, nextScale));
+        clampCropOffsets();
+        applyCropTransform();
+    }
+
+    function openCropModal(file) {
+        if (!cropModal || !cropImage || !cropRange || !cropViewport) return;
+
+        if (cropObjectUrl) {
+            URL.revokeObjectURL(cropObjectUrl);
+        }
+
+        cropObjectUrl = URL.createObjectURL(file);
+        cropImage.onload = () => {
+            const viewportSize = cropViewport.clientWidth || 320;
+            const sourceWidth = cropImage.naturalWidth || viewportSize;
+            const sourceHeight = cropImage.naturalHeight || viewportSize;
+            const baseScale = Math.max(viewportSize / sourceWidth, viewportSize / sourceHeight);
+
+            cropImageState = {
+                sourceWidth,
+                sourceHeight,
+                baseScale,
+                scale: baseScale,
+                minScale: baseScale,
+                maxScale: baseScale * 3,
+                offsetX: 0,
+                offsetY: 0,
+            };
+
+            cropRange.min = String(baseScale);
+            cropRange.max = String(baseScale * 3);
+            cropRange.step = String(baseScale * 0.01);
+            cropRange.value = String(baseScale);
+            clampCropOffsets();
+            applyCropTransform();
+        };
+
+        cropImage.src = cropObjectUrl;
+        cropModal.classList.add('is-open');
+        cropModal.setAttribute('aria-hidden', 'false');
+
+        if (cropMessage) {
+            cropMessage.textContent = '';
+        }
+    }
+
+    function setPendingPreview(file) {
+        pendingProfileImageFile = file;
+
+        if (pendingProfileImageUrl) {
+            URL.revokeObjectURL(pendingProfileImageUrl);
+        }
+
+        pendingProfileImageUrl = URL.createObjectURL(file);
+        updateAvatarState(pendingProfileImageUrl, profileCardFallback?.textContent?.trim() || '');
+    }
+
+    async function uploadProfilePhoto(file) {
+        if (!file) return;
+
+        clearProfileErrors(profileForm);
+        setMessage(infoMessage);
+
+        setLoadingState('Uploading photo', 'Saving your new profile picture...');
+        loadingOverlay?.classList.remove('hidden');
+        loadingOverlay?.classList.add('flex');
+
+        try {
+            const formData = new FormData();
+            formData.set('profile_image', file, file.name);
+
+            const response = await fetch(profilePhotoUploadUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: formData,
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                if (response.status === 422 && payload.errors) {
+                    applyFieldErrors(payload.errors, profileForm);
+                    setMessage(infoMessage, 'Please check the highlighted fields.', true);
+                    throw new Error(payload.message || 'Unable to upload profile photo.');
+                }
+
+                throw new Error(payload.message || 'Unable to upload profile photo.');
+            }
+
+            updateCitizenProfileUI(payload.user || {});
+            captureOriginalProfile();
+            showProfileToast(payload.message || 'Profile photo updated successfully.');
+        } catch (error) {
+            console.error('Citizen profile photo upload failed:', error);
+            pendingProfileImageFile = null;
+            if (pendingProfileImageUrl) {
+                URL.revokeObjectURL(pendingProfileImageUrl);
+                pendingProfileImageUrl = null;
+            }
+            if (profilePhotoInput) {
+                profilePhotoInput.value = '';
+            }
+            updateAvatarState(savedProfileImageUrl, profileCardFallback?.textContent?.trim() || '');
+            setMessage(infoMessage, error.message || 'Failed to upload profile photo.', true);
+            showProfileToast(error.message || 'Failed to upload profile photo.', true);
+        } finally {
+            loadingOverlay?.classList.add('hidden');
+            loadingOverlay?.classList.remove('flex');
+        }
     }
 
     function showProfileToast(message, isError = false) {
@@ -1364,10 +2042,16 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.entries(map).forEach(([id, value]) => setText(id, value));
 
         document.getElementById('citizen_email').value = user.email || document.getElementById('citizen_email').value;
-
-        document.querySelectorAll('#userDropdownBtn .w-8.h-8, .px-4.py-4.border-b .w-12.h-12').forEach((node) => {
-            node.textContent = user.initials;
-        });
+        savedProfileImageUrl = user.image_url || null;
+        pendingProfileImageFile = null;
+        if (pendingProfileImageUrl) {
+            URL.revokeObjectURL(pendingProfileImageUrl);
+            pendingProfileImageUrl = null;
+        }
+        if (profilePhotoInput) {
+            profilePhotoInput.value = '';
+        }
+        updateAvatarState(savedProfileImageUrl, user.initials);
 
         const topbarName = document.querySelector('#userDropdownBtn span.hidden.md\\:inline');
         if (topbarName) topbarName.textContent = fullName;
@@ -1441,12 +2125,136 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-profile-settings-open]').forEach((button) => button.addEventListener('click', openSettingsMode));
     document.querySelectorAll('[data-profile-modal-close]').forEach((button) => button.addEventListener('click', closeProfileModal));
     cancelBtn?.addEventListener('click', closeEditMode);
+    profilePhotoTrigger?.addEventListener('click', () => {
+        profilePhotoInput?.click();
+    });
     section.querySelector('.profile-layout > main.profile-shell')?.addEventListener('click', (event) => {
         if (event.target === event.currentTarget) closeProfileModal();
+    });
+    cropClose?.addEventListener('click', () => closeCropModal(true));
+    cropCancel?.addEventListener('click', () => closeCropModal(true));
+    cropModal?.addEventListener('click', (event) => {
+        if (event.target === cropModal) {
+            closeCropModal(true);
+        }
+    });
+    profileViewerClose?.addEventListener('click', closeProfileViewer);
+    profileViewerModal?.addEventListener('click', (event) => {
+        if (event.target === profileViewerModal) {
+            closeProfileViewer();
+        }
+    });
+    document.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-citizen-profile-view-trigger]');
+        if (!trigger) return;
+
+        event.preventDefault();
+        const src = trigger.getAttribute('src');
+        if (src) {
+            openProfileViewer(src);
+        }
     });
 
     citySelect.addEventListener('change', function () {
         loadCitizenBarangays(this.value);
+    });
+
+    cropRange?.addEventListener('input', (event) => {
+        updateCropScale(Number(event.target.value || cropImageState.minScale));
+    });
+
+    cropViewport?.addEventListener('pointerdown', (event) => {
+        if (!cropModal?.classList.contains('is-open')) return;
+
+        dragState = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: cropImageState.offsetX,
+            originY: cropImageState.offsetY,
+        };
+
+        cropViewport.classList.add('is-dragging');
+        cropViewport.setPointerCapture(event.pointerId);
+    });
+
+    cropViewport?.addEventListener('pointermove', (event) => {
+        if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+        cropImageState.offsetX = dragState.originX + (event.clientX - dragState.startX);
+        cropImageState.offsetY = dragState.originY + (event.clientY - dragState.startY);
+        clampCropOffsets();
+        applyCropTransform();
+    });
+
+    function releaseDrag(pointerId) {
+        if (cropViewport?.hasPointerCapture(pointerId)) {
+            cropViewport.releasePointerCapture(pointerId);
+        }
+
+        dragState = null;
+        cropViewport?.classList.remove('is-dragging');
+    }
+
+    cropViewport?.addEventListener('pointerup', (event) => releaseDrag(event.pointerId));
+    cropViewport?.addEventListener('pointercancel', (event) => releaseDrag(event.pointerId));
+
+    profilePhotoInput?.addEventListener('change', () => {
+        const file = profilePhotoInput.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            setMessage(infoMessage, 'Profile photo must not exceed 5 MB.', true);
+            profilePhotoInput.value = '';
+            return;
+        }
+
+        if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+            setMessage(infoMessage, 'Profile photo must be a JPG, PNG, or WEBP image.', true);
+            profilePhotoInput.value = '';
+            return;
+        }
+
+        openCropModal(file);
+    });
+
+    cropApply?.addEventListener('click', async () => {
+        if (!cropViewport || !cropImage?.src) return;
+
+        const viewportSize = cropViewport.clientWidth;
+        const outputSize = 640;
+        const canvas = document.createElement('canvas');
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        const context = canvas.getContext('2d');
+
+        if (!context) return;
+
+        const sampleScale = outputSize / viewportSize;
+        const drawWidth = cropImageState.sourceWidth * cropImageState.scale * sampleScale;
+        const drawHeight = cropImageState.sourceHeight * cropImageState.scale * sampleScale;
+        const drawX = (outputSize / 2) - (drawWidth / 2) + (cropImageState.offsetX * sampleScale);
+        const drawY = (outputSize / 2) - (drawHeight / 2) + (cropImageState.offsetY * sampleScale);
+
+        context.clearRect(0, 0, outputSize, outputSize);
+        context.drawImage(cropImage, drawX, drawY, drawWidth, drawHeight);
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                if (cropMessage) cropMessage.textContent = 'Unable to prepare this photo. Please try another image.';
+                return;
+            }
+
+            if (blob.size > 5 * 1024 * 1024) {
+                if (cropMessage) cropMessage.textContent = 'The cropped photo is still larger than 5 MB. Try a smaller image.';
+                return;
+            }
+
+            const croppedFile = new File([blob], `profile-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            setPendingPreview(croppedFile);
+            closeCropModal(true);
+            await uploadProfilePhoto(croppedFile);
+        }, 'image/jpeg', 0.92);
     });
 
     if (citySelect.value) {
@@ -1472,12 +2280,19 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        setLoadingState('Saving changes', 'Updating your account...');
         loadingOverlay?.classList.remove('hidden');
         loadingOverlay?.classList.add('flex');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
 
         try {
+            const formData = new FormData(profileForm);
+
+            if (pendingProfileImageFile) {
+                formData.set('profile_image', pendingProfileImageFile, pendingProfileImageFile.name);
+            }
+
             const response = await fetch(profileForm.action, {
                 method: 'POST',
                 headers: {
@@ -1485,7 +2300,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
                 },
-                body: new FormData(profileForm),
+                body: formData,
             });
 
             const payload = await response.json();

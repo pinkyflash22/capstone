@@ -1195,8 +1195,6 @@
                                 name="password" 
                                 class="form-input" 
                                 placeholder="Enter your password"
-                                pattern="(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9@*.\-]{8,}"
-                                title="Password must include 1 uppercase letter, 1 number, and only use @ - * . as symbols."
                                 oninput="this.value = this.value.replace(/[^A-Za-z0-9@*.\-]/g, '')"
                                 required
                             >
@@ -1367,7 +1365,7 @@
             const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
             const emailRegex = /^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/;
-            const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/;
+            const passwordAllowedCharsRegex = /^[A-Za-z0-9@*.\-]+$/;
 
             if (emailInput && !emailRegex.test(emailInput.value)) {
                 event.preventDefault();
@@ -1375,9 +1373,9 @@
                 return;
             }
 
-            if (passwordInput && !passwordRegex.test(passwordInput.value)) {
+            if (passwordInput && !passwordAllowedCharsRegex.test(passwordInput.value)) {
                 event.preventDefault();
-                alert('Password may only use letters, numbers, and these symbols: @ - * . It must also include 1 uppercase letter and 1 number.');
+                alert('Password may only use letters, numbers, and these symbols: @ - * .');
                 return;
             }
 

@@ -116,7 +116,8 @@
         }
 
         .firefighter-mobile-welcome-toast,
-        .firefighter-mobile-insights-panel {
+        .firefighter-mobile-insights-panel,
+        .firefighter-mobile-assigned-fab {
             display: none;
         }
 
@@ -134,7 +135,7 @@
                 top: calc(env(safe-area-inset-top, 0px) + 14px);
                 left: 14px;
                 right: 14px;
-                z-index: 320;
+                z-index: 1300;
                 display: flex;
                 align-items: center;
                 gap: 12px;
@@ -220,6 +221,9 @@
                 border-radius: 0 !important;
                 box-shadow: none !important;
                 background: transparent !important;
+                position: relative;
+                z-index: 1 !important;
+                isolation: isolate;
             }
 
             .firefighter-map-stage__header,
@@ -355,11 +359,936 @@
                 border-radius: 22px !important;
                 box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08) !important;
             }
+
+            .firefighter-mobile-assigned-fab {
+                position: fixed;
+                right: 16px;
+                bottom: calc(102px + env(safe-area-inset-bottom, 0px));
+                z-index: 1320;
+                display: inline-flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 58px;
+                padding: 0 18px 0 16px;
+                border: none;
+                border-radius: 999px;
+                background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+                color: #fff;
+                box-shadow: 0 18px 34px rgba(198, 61, 38, 0.28);
+            }
+
+            .firefighter-mobile-assigned-fab__icon {
+                width: 34px;
+                height: 34px;
+                border-radius: 999px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(255, 255, 255, 0.18);
+                flex-shrink: 0;
+            }
+
+            .firefighter-mobile-assigned-fab__copy {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                min-width: 0;
+            }
+
+            .firefighter-mobile-assigned-fab__label {
+                font-size: 0.74rem;
+                font-weight: 900;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                line-height: 1.1;
+            }
+
+            .firefighter-mobile-assigned-fab__meta {
+                font-size: 0.78rem;
+                font-weight: 700;
+                line-height: 1.15;
+                opacity: 0.96;
+            }
+
+            .firefighter-mobile-assigned-fab__count {
+                min-width: 24px;
+                height: 24px;
+                padding: 0 7px;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.22);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.74rem;
+                font-weight: 900;
+                line-height: 1;
+                flex-shrink: 0;
+            }
         }
 
     </style>
     --}}
     @include('partials.pwa-head')
+    <style data-ff-dashboard-mobile-assigned-fab>
+        .firefighter-mobile-assigned-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 30px;
+            z-index: 1320;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 52px;
+            padding: 0 15px 0 14px;
+            border: none;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            color: #fff;
+            box-shadow: 0 18px 34px rgba(198, 61, 38, 0.24);
+        }
+
+        .firefighter-mobile-assigned-fab__icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.18);
+            flex-shrink: 0;
+        }
+
+        .firefighter-mobile-assigned-fab__copy {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            min-width: 0;
+        }
+
+        .firefighter-mobile-assigned-fab__label {
+            font-size: 0.7rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .firefighter-mobile-assigned-fab__meta {
+            font-size: 0.74rem;
+            font-weight: 700;
+            line-height: 1.1;
+            opacity: 0.96;
+        }
+
+        .firefighter-mobile-assigned-fab__count {
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.22);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 900;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .firefighter-assigned-queue-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9988;
+            display: none;
+        }
+
+        .firefighter-assigned-queue-modal[aria-hidden="false"] {
+            display: block;
+        }
+
+        .firefighter-assigned-queue-modal__backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.48);
+            backdrop-filter: blur(8px);
+        }
+
+        .firefighter-assigned-queue-modal__dialog {
+            position: absolute;
+            inset: 50% auto auto 50%;
+            transform: translate(-50%, -50%);
+            width: min(1040px, calc(100vw - 40px));
+            max-height: calc(100vh - 56px);
+            background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+            border-radius: 28px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 32px 70px rgba(15, 23, 42, 0.22);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .firefighter-assigned-queue-modal__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+        }
+
+        .firefighter-assigned-queue-modal__header-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .firefighter-assigned-queue-modal__eyebrow {
+            margin: 0 0 4px;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #d18a16;
+        }
+
+        .firefighter-assigned-queue-modal__title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.45rem;
+            line-height: 1.08;
+            font-weight: 900;
+        }
+
+        .firefighter-assigned-queue-modal__refresh,
+        .firefighter-assigned-queue-modal__close {
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #64748b;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .firefighter-assigned-queue-modal__content {
+            padding: 20px 22px 22px;
+            overflow-y: auto;
+        }
+
+        .firefighter-assigned-queue-modal__content [data-ff-insights-source] {
+            display: block !important;
+            margin: 0 !important;
+        }
+
+        .ff-assigned-incidents-inline {
+            display: none;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incidents-inline {
+            display: block !important;
+        }
+
+        .firefighter-assigned-queue-modal__content .assigned-incidents-container.is-in-modal .section-header {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .firefighter-mobile-welcome-toast {
+                z-index: 1300 !important;
+            }
+
+            .firefighter-mobile-assigned-fab {
+                right: 14px;
+                bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+                width: 56px;
+                min-width: 56px;
+                height: 56px;
+                min-height: 56px;
+                padding: 0;
+                gap: 0;
+                justify-content: center;
+                border-radius: 18px;
+                z-index: 1320 !important;
+            }
+
+            .firefighter-mobile-assigned-fab__icon {
+                width: 34px;
+                height: 34px;
+            }
+
+            .firefighter-mobile-assigned-fab__copy {
+                display: none;
+            }
+
+            .firefighter-mobile-assigned-fab__count {
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                min-width: 22px;
+                height: 22px;
+                padding: 0 5px;
+                background: #fff7ed;
+                color: #c2410c;
+                border: 1px solid rgba(251, 146, 60, 0.4);
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+            }
+
+            .firefighter-assigned-queue-modal__dialog {
+                inset: auto 10px calc(10px + env(safe-area-inset-bottom, 0px)) 10px;
+                transform: none;
+                width: auto;
+                max-height: min(76svh, 760px);
+                border-radius: 24px;
+            }
+
+            .firefighter-assigned-queue-modal__header {
+                padding: 16px 16px 14px;
+                gap: 12px;
+            }
+
+            .firefighter-assigned-queue-modal__eyebrow {
+                font-size: 0.64rem;
+                margin-bottom: 3px;
+            }
+
+            .firefighter-assigned-queue-modal__title {
+                font-size: 1.1rem;
+                line-height: 1.08;
+            }
+
+            .firefighter-assigned-queue-modal__close {
+                width: 38px;
+                height: 38px;
+                flex-shrink: 0;
+            }
+
+            .firefighter-assigned-queue-modal__refresh {
+                width: 38px;
+                height: 38px;
+                flex-shrink: 0;
+            }
+
+            .firefighter-assigned-queue-modal__content {
+                padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+            }
+
+            .firefighter-assigned-queue-modal__content .assigned-incidents-container {
+                border-radius: 0 !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+
+            .firefighter-assigned-queue-modal__content .assigned-incidents-container.is-in-modal .section-header {
+                display: none !important;
+            }
+
+            .firefighter-assigned-queue-modal__content .section-header {
+                display: none !important;
+            }
+
+            .firefighter-assigned-queue-modal__content .view-all,
+            .firefighter-assigned-queue-modal__content #refreshAssignedIncidents {
+                min-height: 32px;
+                width: 32px;
+                padding: 0;
+                border-radius: 999px;
+                font-size: 0.74rem;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .firefighter-assigned-queue-modal__content #refreshAssignedIncidents span,
+            .firefighter-assigned-queue-modal__content #refreshAssignedIncidents .ff-refresh-label {
+                display: none;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row {
+                padding: 0.6rem 0;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__main {
+                grid-template-columns: 52px minmax(0, 1fr);
+                gap: 0.6rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__media {
+                width: 46px;
+                height: 46px;
+                min-width: 46px;
+                min-height: 46px;
+                border-radius: 0.8rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__title {
+                font-size: 0.86rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__summary {
+                font-size: 0.64rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__type,
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__status {
+                font-size: 0.58rem;
+                padding: 0.2rem 0.42rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__detail,
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__meta {
+                font-size: 0.65rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__actions {
+                padding-left: 0;
+                justify-content: flex-end;
+                align-self: center;
+                gap: 0.3rem;
+                flex-wrap: nowrap;
+                max-width: 100%;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__action {
+                min-height: 28px;
+                padding: 0 0.58rem;
+                font-size: 0.62rem;
+                flex: 0 0 auto;
+                white-space: nowrap;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-pagination {
+                padding-top: 0.45rem;
+                gap: 0.6rem;
+            }
+
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-pagination__summary,
+            .firefighter-assigned-queue-modal__content .ff-assigned-incident-pagination__indicator {
+                font-size: 0.72rem;
+            }
+        }
+    </style>
+    <style data-ff-dashboard-announcement-stories>
+        #dashboardAnnouncementsList {
+            overflow: visible !important;
+            max-height: none !important;
+        }
+
+        .ff-dashboard-stories {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.9rem;
+            align-items: stretch;
+        }
+
+        .ff-dashboard-story {
+            position: relative;
+            min-height: 220px;
+            overflow: hidden;
+            border-radius: 1.35rem;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.78));
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .ff-dashboard-story:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 22px 40px rgba(15, 23, 42, 0.14);
+        }
+
+        .ff-dashboard-story__media,
+        .ff-dashboard-story__fallback {
+            position: absolute;
+            inset: 0;
+        }
+
+        .ff-dashboard-story__media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .ff-dashboard-story__fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, #c63d26, #d18a16);
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 2.1rem;
+            font-weight: 800;
+        }
+
+        .ff-dashboard-story__overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.24) 36%, rgba(15, 23, 42, 0.92) 100%);
+        }
+
+        .ff-dashboard-story__content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            padding: 0.95rem;
+            color: #fff;
+        }
+
+        .ff-dashboard-story__badge {
+            align-self: flex-end;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.94);
+            color: #c63d26;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+
+        .ff-dashboard-story__meta {
+            display: grid;
+            gap: 0.34rem;
+        }
+
+        .ff-dashboard-story__author {
+            font-size: 0.92rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .ff-dashboard-story__time {
+            font-size: 0.66rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .ff-dashboard-story__caption {
+            font-size: 0.9rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .ff-dashboard-story--more {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, rgba(198, 61, 38, 0.12), rgba(209, 138, 22, 0.18));
+            border: 1px dashed rgba(198, 61, 38, 0.28);
+        }
+
+        .ff-dashboard-story--more .ff-dashboard-story__overlay {
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.04));
+        }
+
+        .ff-dashboard-story--more .ff-dashboard-story__content {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #1f2937;
+            gap: 0.75rem;
+        }
+
+        .ff-dashboard-story__more-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #c63d26, #d18a16);
+            color: #fff;
+            font-size: 1rem;
+            box-shadow: 0 12px 26px rgba(198, 61, 38, 0.18);
+        }
+
+        .ff-dashboard-story__more-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #1f2937;
+        }
+
+        .ff-dashboard-story__more-copy {
+            font-size: 0.82rem;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 1180px) {
+            .ff-dashboard-stories {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 860px) {
+            .ff-dashboard-stories {
+                display: flex;
+                overflow-x: auto;
+                padding-bottom: 0.35rem;
+                scroll-snap-type: x proximity;
+            }
+
+            .ff-dashboard-story {
+                min-width: 180px;
+                flex: 0 0 180px;
+                scroll-snap-align: start;
+            }
+        }
+    </style>
+    <style data-ff-dashboard-assigned-incidents>
+        .ff-assigned-incident-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.78rem 0;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+            background: transparent;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        .ff-assigned-incident-row:first-child {
+            padding-top: 0.1rem;
+        }
+
+        .ff-assigned-incident-row:last-child {
+            border-bottom: 0;
+            padding-bottom: 0.1rem;
+        }
+
+        .ff-assigned-incident-row__main {
+            appearance: none;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 58px minmax(0, 1fr);
+            gap: 0.75rem;
+            align-items: start;
+            text-align: left;
+            cursor: pointer;
+            min-width: 0;
+        }
+
+        .ff-assigned-incident-row__main:focus-visible {
+            outline: 2px solid rgba(59, 130, 246, 0.22);
+            outline-offset: 3px;
+            border-radius: 0.9rem;
+        }
+
+        .ff-assigned-incident-row__media {
+            width: 58px;
+            height: 58px;
+            min-width: 58px;
+            min-height: 58px;
+            border-radius: 0.9rem;
+            overflow: hidden;
+            background: linear-gradient(180deg, #fdf2e8 0%, #fff7ed 100%);
+            border: 1px solid rgba(251, 191, 36, 0.16);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ff-assigned-incident-row__media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .ff-assigned-incident-row__copy {
+            min-width: 0;
+            display: grid;
+            gap: 0.26rem;
+        }
+
+        .ff-assigned-incident-row__badges {
+            display: flex;
+            align-items: center;
+            gap: 0.38rem;
+            flex-wrap: wrap;
+        }
+
+        .ff-assigned-incident-row__type,
+        .ff-assigned-incident-row__status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.22rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.62rem;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+        }
+
+        .ff-assigned-incident-row__type {
+            background: rgba(255, 247, 237, 0.95);
+            color: #c2410c;
+        }
+
+        .ff-assigned-incident-row__title {
+            margin: 0;
+            font-size: 0.96rem;
+            line-height: 1.18;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .ff-assigned-incident-row__detail,
+        .ff-assigned-incident-row__meta {
+            display: flex;
+            align-items: center;
+            gap: 0.34rem;
+            min-width: 0;
+            color: #64748b;
+            font-size: 0.74rem;
+            line-height: 1.3;
+        }
+
+        .ff-assigned-incident-row__detail i {
+            width: 0.8rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            font-size: 0.72rem;
+        }
+
+        .ff-assigned-incident-row__detail span,
+        .ff-assigned-incident-row__meta span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ff-assigned-incident-row__meta {
+            flex-wrap: wrap;
+        }
+
+        .ff-assigned-incident-row__meta-separator {
+            color: #cbd5e1;
+            font-size: 0.76rem;
+            flex-shrink: 0;
+        }
+
+        .ff-assigned-incident-row__summary {
+            margin: 0.08rem 0 0;
+            color: #94a3b8;
+            font-size: 0.72rem;
+            line-height: 1.28;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .ff-assigned-incident-row__actions {
+            display: flex;
+            align-items: center;
+            gap: 0.42rem;
+            flex-wrap: nowrap;
+            justify-content: flex-end;
+            align-self: center;
+            padding-left: 0.4rem;
+            flex-shrink: 0;
+            max-width: 100%;
+        }
+
+        .ff-assigned-incident-row__action {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: #fff;
+            color: #0f172a;
+            min-height: 34px;
+            padding: 0 0.78rem;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.34rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1;
+            cursor: pointer;
+            transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+            flex: 0 0 auto;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .ff-assigned-incident-row__action:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .ff-assigned-incident-row__action:disabled {
+            opacity: 0.62;
+            cursor: not-allowed;
+        }
+
+        .ff-assigned-incident-row__action--primary {
+            background: #10b981;
+            border-color: #10b981;
+            color: #fff;
+        }
+
+        .ff-assigned-incident-row__action--warn {
+            border: 1px solid rgba(248, 113, 113, 0.28);
+            background: linear-gradient(180deg, #fff5f5 0%, #fff 100%);
+            color: #dc2626;
+        }
+
+        .ff-assigned-incident-row__action--muted {
+            background: #f8fafc;
+            color: #64748b;
+        }
+
+        .ff-assigned-incident-pagination {
+            margin-top: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            padding: 0.85rem 0.1rem 0;
+        }
+
+        .ff-assigned-incident-pagination__summary {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .ff-assigned-incident-pagination__controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .ff-assigned-incident-pagination__indicator {
+            color: #334155;
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+
+        .ff-assigned-incident-pagination__button {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: #fff;
+            color: #0f172a;
+            border-radius: 999px;
+            min-height: 40px;
+            padding: 0 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+        }
+
+        .ff-assigned-incident-pagination__button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        .ff-assigned-incident-pagination__button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .incident-media-fallback {
+            display: grid;
+            place-items: center;
+            gap: 0.45rem;
+            text-align: center;
+            color: #c2410c;
+            font-weight: 800;
+            font-size: 0.8rem;
+            padding: 1rem;
+        }
+
+        .incident-media-fallback i {
+            font-size: 1.15rem;
+        }
+
+        @media (max-width: 1200px) {
+            .ff-assigned-incident-row {
+                grid-template-columns: 1fr;
+                gap: 0.55rem;
+            }
+
+            .ff-assigned-incident-row__actions {
+                justify-content: flex-start;
+                padding-left: 66px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .ff-assigned-incident-row {
+                gap: 0.5rem;
+                padding: 0.62rem 0;
+            }
+
+            .ff-assigned-incident-row__main {
+                grid-template-columns: 48px minmax(0, 1fr);
+                gap: 0.58rem;
+            }
+
+            .ff-assigned-incident-row__media {
+                width: 48px;
+                height: 48px;
+                border-radius: 0.72rem;
+            }
+
+            .ff-assigned-incident-row__title {
+                font-size: 0.88rem;
+            }
+
+            .ff-assigned-incident-row__detail,
+            .ff-assigned-incident-row__meta {
+                font-size: 0.68rem;
+            }
+
+            .ff-assigned-incident-row__summary {
+                font-size: 0.66rem;
+                -webkit-line-clamp: 2;
+            }
+
+            .ff-assigned-incident-row__actions {
+                padding-left: 56px;
+                gap: 0.35rem;
+            }
+
+            .ff-assigned-incident-row__action {
+                min-height: 30px;
+                padding: 0 0.62rem;
+                font-size: 0.66rem;
+            }
+
+            .ff-assigned-incident-row__action i {
+                font-size: 0.64rem;
+            }
+        }
+    </style>
 </head>
 <body class="firefighter-portal-shell firefighter-dashboard-page">
     @include('firefighters.partials.shell-sidebar', [
@@ -570,14 +1499,14 @@
             <div id="firefighterMapLegend" class="ff-clean-map-legend firefighter-map-stage__legend"></div>
         </div>
         <!-- ASSIGNED INCIDENTS SECTION - DYNAMIC -->
-        <div class="assigned-incidents-container" data-ff-insights-source>
+        <div class="assigned-incidents-container ff-assigned-incidents-inline" data-ff-insights-source data-ff-insights-section="assigned">
             <div class="section-header">
                 <h2>
                     <i class="fas fa-truck"></i>
-                    My Assigned Incidents
+                    Assigned Incidents
                 </h2>
-                <button id="refreshAssignedIncidents" class="view-all">
-                    <i class="fas fa-sync-alt"></i> Refresh
+                <button id="refreshAssignedIncidents" class="view-all" aria-label="Refresh assigned incidents">
+                    <i class="fas fa-rotate-right"></i><span class="ff-refresh-label">Refresh</span>
                 </button>
             </div>
             <div id="assignedIncidentsList" class="incident-list">
@@ -586,6 +1515,7 @@
                     <p>Loading assigned incidents...</p>
                 </div>
             </div>
+            <div id="assignedIncidentsPagination" class="ff-assigned-incident-pagination" hidden></div>
         </div>
 <div id="routeInfoCard" class="route-info-card" style="display: none;" aria-live="polite">
         <div class="route-info-card__handle" aria-hidden="true"></div>
@@ -780,12 +1710,48 @@
                     </h2>
                     <a href="{{ route('firefighter.announcements') }}" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
                 </div>
-                <div id="dashboardAnnouncementsList" style="max-height: 300px; overflow-y: auto;">
-                    <div class="ff-shell-section-state">
-                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
-                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
-                        <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
-                    </div>
+                <div id="dashboardAnnouncementsList">
+                    @php
+                        $dashboardAnnouncementStories = collect($dashboardAnnouncementStories ?? [])->take(4)->values();
+                    @endphp
+                    @if($dashboardAnnouncementStories->isNotEmpty())
+                        <div class="ff-dashboard-stories">
+                            @foreach($dashboardAnnouncementStories as $post)
+                                <a href="{{ route('firefighter.announcements') }}" class="ff-dashboard-story" aria-label="Open firefighter announcement from {{ $post['author_name'] ?? 'Station Update' }}">
+                                    @if(!empty($post['image_url']))
+                                        <div class="ff-dashboard-story__media">
+                                            <img src="{{ $post['image_url'] }}" alt="{{ $post['author_name'] ?? 'Station Update' }}" loading="lazy">
+                                        </div>
+                                    @else
+                                        <div class="ff-dashboard-story__fallback">{{ $post['author_initials'] ?? 'FF' }}</div>
+                                    @endif
+                                    <div class="ff-dashboard-story__overlay"></div>
+                                    <div class="ff-dashboard-story__content">
+                                        <span class="ff-dashboard-story__badge"><i class="fas fa-bullhorn"></i> Feed</span>
+                                        <div class="ff-dashboard-story__meta">
+                                            <div class="ff-dashboard-story__author">{{ $post['author_name'] ?? 'Station Update' }}</div>
+                                            <div class="ff-dashboard-story__time">{{ $post['time'] ?? 'Just now' }}</div>
+                                            <div class="ff-dashboard-story__caption">{{ \Illuminate\Support\Str::words($post['content'] ?? 'No content', 5, '...') }}</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            @endforeach
+                            <a href="{{ route('firefighter.announcements') }}" class="ff-dashboard-story ff-dashboard-story--more" aria-label="See more firefighter announcements">
+                                <div class="ff-dashboard-story__overlay"></div>
+                                <div class="ff-dashboard-story__content">
+                                    <span class="ff-dashboard-story__more-icon"><i class="fas fa-arrow-right"></i></span>
+                                    <div class="ff-dashboard-story__more-title">See more...</div>
+                                    <div class="ff-dashboard-story__more-copy">Open the full station feed and view every announcement.</div>
+                                </div>
+                            </a>
+                        </div>
+                    @else
+                        <div class="ff-shell-section-state">
+                            <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                            <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                            <div class="ff-shell-skeleton ff-shell-skeleton-list"></div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -877,14 +1843,44 @@
         <div class="firefighter-mobile-insights-panel__sheet">
             <div class="firefighter-mobile-insights-panel__header">
                 <div>
-                    <p class="firefighter-mobile-insights-panel__eyebrow">Responder Hub</p>
-                    <h2 class="firefighter-mobile-insights-panel__title">Cards and Charts</h2>
+                    <p class="firefighter-mobile-insights-panel__eyebrow" id="firefighterMobileInsightsEyebrow">Responder Hub</p>
+                    <h2 class="firefighter-mobile-insights-panel__title" id="firefighterMobileInsightsTitle">Cards and Charts</h2>
                 </div>
                 <button type="button" class="firefighter-mobile-insights-panel__close" data-ff-insights-close aria-label="Close cards and charts">
                     <i class="fas fa-xmark"></i>
                 </button>
             </div>
             <div class="firefighter-mobile-insights-panel__content" id="firefighterMobileInsightsContent"></div>
+        </div>
+    </div>
+
+    <button type="button" class="firefighter-mobile-assigned-fab" id="firefighterMobileAssignedFab" aria-label="Open assigned incidents queue">
+        <span class="firefighter-mobile-assigned-fab__icon" aria-hidden="true"><i class="fas fa-truck-fast"></i></span>
+        <span class="firefighter-mobile-assigned-fab__copy">
+            <span class="firefighter-mobile-assigned-fab__label">Assigned Queue</span>
+            <span class="firefighter-mobile-assigned-fab__meta">Open active incidents</span>
+        </span>
+        <span class="firefighter-mobile-assigned-fab__count" id="firefighterMobileAssignedFabCount">0</span>
+    </button>
+
+    <div class="firefighter-assigned-queue-modal" id="firefighterAssignedQueueModal" aria-hidden="true">
+        <div class="firefighter-assigned-queue-modal__backdrop" data-ff-assigned-queue-close></div>
+        <div class="firefighter-assigned-queue-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="firefighterAssignedQueueTitle">
+            <div class="firefighter-assigned-queue-modal__header">
+                <div>
+                    <p class="firefighter-assigned-queue-modal__eyebrow">Active response queue</p>
+                    <h2 class="firefighter-assigned-queue-modal__title" id="firefighterAssignedQueueTitle">Assigned Incidents</h2>
+                </div>
+                <div class="firefighter-assigned-queue-modal__header-actions">
+                    <button type="button" class="firefighter-assigned-queue-modal__refresh" id="refreshAssignedIncidentsModal" aria-label="Refresh assigned incidents">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
+                    <button type="button" class="firefighter-assigned-queue-modal__close" data-ff-assigned-queue-close aria-label="Close assigned incidents queue">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="firefighter-assigned-queue-modal__content" id="firefighterAssignedQueueModalContent"></div>
         </div>
     </div>
 
@@ -1179,9 +2175,10 @@
     const FF_LOCATION_PULL_INTERVAL_MS = 90000;
     const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 30000;
     const FF_AUTO_ASSIGN_INTERVAL_MS = 300000;
-    const FF_WIDGET_CACHE_KEY = `ff_dashboard_widgets_${window.currentFirefighterId}`;
-    const FF_POSTS_CACHE_KEY = `ff_dashboard_posts_${window.currentFirefighterId}`;
-    const FF_ASSIGNED_CACHE_KEY = `ff_dashboard_assigned_${window.currentFirefighterId}`;
+    const FF_WIDGET_CACHE_KEY = `ff_dashboard_widgets_v2_${window.currentFirefighterId}`;
+    const FF_POSTS_CACHE_KEY = `ff_dashboard_posts_v2_${window.currentFirefighterId}`;
+    const FF_ASSIGNED_CACHE_KEY = `ff_dashboard_assigned_v2_${window.currentFirefighterId}`;
+    const FF_REVERSE_GEOCODE_CACHE_KEY = `ff_dashboard_reverse_geocode_v1_${window.currentFirefighterId || 'guest'}`;
     let ffLocationPushInterval = null;
     let ffLocationPullInterval = null;
     let ffAssignedIncidentsInterval = null;
@@ -1291,7 +2288,7 @@
         try {
             window.localStorage?.setItem(key, JSON.stringify(value));
             window.pyroPwa?.updatePageSnapshot?.({
-                key: 'firefighter-dashboard',
+                key: 'firefighter-dashboard-v2',
                 label: 'Firefighter Dashboard'
             });
         } catch (error) {
@@ -1332,20 +2329,62 @@
             return;
         }
 
-        container.innerHTML = posts.map((post) => `
-            <article class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 mb-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-bold text-slate-800">${escapeHtml(post.author_name || 'Station Update')}</p>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">${escapeHtml(post.time || 'Just now')}</p>
+        const visiblePosts = posts.slice(0, 4);
+        const fullFeedUrl = @json(route('firefighter.announcements'));
+
+        const truncateWords = (value, limit = 5) => {
+            const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+            if (!cleaned) {
+                return 'No update yet.';
+            }
+
+            const words = cleaned.split(' ');
+            if (words.length <= limit) {
+                return cleaned;
+            }
+
+            return `${words.slice(0, limit).join(' ')}...`;
+        };
+
+        const storyCards = visiblePosts.map((post) => {
+            const imageUrl = post.image_url || null;
+            const authorInitials = escapeHtml(post.author_initials || 'FF');
+            const authorName = escapeHtml(post.author_name || 'Station Update');
+            const time = escapeHtml(post.time || 'Just now');
+            const caption = escapeHtml(truncateWords(post.content || 'No content', 5));
+
+            const mediaMarkup = imageUrl
+                ? `<div class="ff-dashboard-story__media"><img src="${escapeHtml(imageUrl)}" alt="${authorName}" loading="lazy" onerror="this.closest('.ff-dashboard-story__media')?.remove();"></div>`
+                : `<div class="ff-dashboard-story__fallback">${authorInitials}</div>`;
+
+            return `
+                <a href="${fullFeedUrl}" class="ff-dashboard-story" aria-label="Open firefighter announcement from ${authorName}">
+                    ${mediaMarkup}
+                    <div class="ff-dashboard-story__overlay"></div>
+                    <div class="ff-dashboard-story__content">
+                        <span class="ff-dashboard-story__badge"><i class="fas fa-bullhorn"></i> Feed</span>
+                        <div class="ff-dashboard-story__meta">
+                            <div class="ff-dashboard-story__author">${authorName}</div>
+                            <div class="ff-dashboard-story__time">${time}</div>
+                            <div class="ff-dashboard-story__caption">${caption}</div>
+                        </div>
                     </div>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-orange-700 border border-orange-100">
-                        <i class="fas fa-bullhorn"></i> Feed
-                    </span>
+                </a>
+            `;
+        });
+
+        storyCards.push(`
+            <a href="${fullFeedUrl}" class="ff-dashboard-story ff-dashboard-story--more" aria-label="See more firefighter announcements">
+                <div class="ff-dashboard-story__overlay"></div>
+                <div class="ff-dashboard-story__content">
+                    <span class="ff-dashboard-story__more-icon"><i class="fas fa-arrow-right"></i></span>
+                    <div class="ff-dashboard-story__more-title">See more...</div>
+                    <div class="ff-dashboard-story__more-copy">Open the full station feed and view every announcement.</div>
                 </div>
-                <p class="mt-3 text-sm leading-6 text-slate-600">${escapeHtml(post.content || 'No content')}</p>
-            </article>
-        `).join('');
+            </a>
+        `);
+
+        container.innerHTML = `<div class="ff-dashboard-stories">${storyCards.join('')}</div>`;
     }
 
     function renderDashboardNearbyStations(stations = []) {
@@ -1642,6 +2681,78 @@
             || (incident?.marker?.category === 'fire' ? 'Fire' : 'Incident');
     }
 
+    function getReverseGeocodeCache() {
+        return readDashboardCache(FF_REVERSE_GEOCODE_CACHE_KEY, {}) || {};
+    }
+
+    function setReverseGeocodeCache(nextCache) {
+        writeDashboardCache(FF_REVERSE_GEOCODE_CACHE_KEY, nextCache && typeof nextCache === 'object' ? nextCache : {});
+    }
+
+    function buildReverseGeocodeKey(lat, lng) {
+        return `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+    }
+
+    async function reverseGeocodeIncidentLocation(lat, lng) {
+        if (lat === null || lat === undefined || lng === null || lng === undefined) {
+            return 'Location not specified';
+        }
+
+        const cacheKey = buildReverseGeocodeKey(lat, lng);
+        const cache = getReverseGeocodeCache();
+        if (cache[cacheKey]?.label) {
+            return cache[cacheKey].label;
+        }
+
+        try {
+            const response = await fetch('/api/reverse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ lat, lon: lng }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Reverse geocode request failed');
+            }
+
+            const payload = await response.json();
+            const formatted = payload?.features?.[0]?.properties?.formatted
+                || payload?.features?.[0]?.properties?.address_line1
+                || payload?.features?.[0]?.properties?.address_line2
+                || `${lat}, ${lng}`;
+
+            cache[cacheKey] = {
+                label: formatted,
+                saved_at: new Date().toISOString(),
+            };
+            setReverseGeocodeCache(cache);
+
+            return formatted;
+        } catch (error) {
+            console.warn('Assigned incident reverse geocode failed:', error);
+            return `${lat}, ${lng}`;
+        }
+    }
+
+    async function hydrateAssignedIncidentLocations(incidents = []) {
+        const tasks = incidents
+            .filter((incident) => incident?.marker?.lat !== null && incident?.marker?.lat !== undefined && incident?.marker?.lng !== null && incident?.marker?.lng !== undefined)
+            .map(async (incident) => {
+                const label = await reverseGeocodeIncidentLocation(incident.marker.lat, incident.marker.lng);
+                const target = document.querySelector(`[data-incident-location="${incident.incident_id}"]`);
+                if (target && label) {
+                    target.textContent = label;
+                    target.setAttribute('title', label);
+                }
+            });
+
+        await Promise.allSettled(tasks);
+    }
+
     function setIncidentActionPendingState(incidentId, options = {}) {
         const card = document.querySelector(`.incident-card [data-incident-id="${incidentId}"]`)?.closest('.incident-card')
             || document.querySelector(`.incident-card .view-incident-details[data-incident-id="${incidentId}"]`)?.closest('.incident-card');
@@ -1722,48 +2833,48 @@
             statusClass = 'status-reported';
             statusText = 'REPORTED';
             actionButton = `
-                <button class="btn btn-success respond-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}">
-                    <i class="fas fa-truck"></i> Respond Now
+                <button type="button" class="respond-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-truck-fast"></i><span>Respond</span>
                 </button>
             `;
         } else if (statusId == 2) {
             statusClass = 'status-responding';
             statusText = 'RESPONDING';
             actionButton = `
-                <button class="btn btn-outline" disabled style="opacity: 0.7; cursor: default;">
-                    <i class="fas fa-truck"></i> En Route
+                <button type="button" class="ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" disabled>
+                    <i class="fas fa-truck-fast"></i><span>En Route</span>
                 </button>
             `;
         } else if (statusId == 3) {
             statusClass = 'status-resolved';
             statusText = 'ON SCENE';
             actionButton = `
-                <button class="btn btn-warning complete-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}" style="background: #f59e0b; color: white;">
-                    <i class="fas fa-check-circle"></i> Complete Incident
+                <button type="button" class="complete-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-check-circle"></i><span>Complete</span>
                 </button>
             `;
         } else if (statusId == 4) {
             statusClass = 'status-resolved';
             statusText = 'CONTROLLED';
             actionButton = `
-                <button class="btn btn-info close-case" data-incident-id="${incident.incident_id}" data-status="${statusId}" style="background: #8b5cf6; color: white;">
-                    <i class="fas fa-folder"></i> Close Case
+                <button type="button" class="close-case ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-folder"></i><span>Close</span>
                 </button>
             `;
         } else if (statusId == 5) {
             statusClass = 'status-closed';
             statusText = 'CLOSED';
             actionButton = `
-                <button class="btn btn-secondary" disabled style="background: #6b7280; color: white; opacity: 0.6; cursor: not-allowed;">
-                    <i class="fas fa-folder"></i> Case Closed
+                <button type="button" class="ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" disabled>
+                    <i class="fas fa-folder"></i><span>Closed</span>
                 </button>
             `;
         }
 
         if ([1, 2].includes(parseInt(statusId))) {
             falseAlarmButton = `
-                <button class="btn btn-danger false-alarm-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}">
-                    <i class="fas fa-exclamation-triangle"></i> False Alarm
+                <button type="button" class="false-alarm-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-triangle-exclamation"></i><span>False Alarm</span>
                 </button>
             `;
         }
@@ -1779,71 +2890,50 @@
         const imageUrl = getIncidentImageUrl(incident);
         const incidentTypeIcon = getIncidentTypeIconClass(incidentType);
         const hasCoordinates = lat !== null && lat !== undefined && lng !== null && lng !== undefined;
-        const locationLabel = hasCoordinates ? `${lat}, ${lng}` : 'Location not specified';
+        const locationLabel = hasCoordinates ? 'Resolving location...' : 'Location not specified';
+        const descriptionSummary = String(description).replace(/\s+/g, ' ').trim();
         const imageMarkup = imageUrl
             ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(incidentTitle)}" onerror="this.remove(); this.parentElement.classList.add('no-image'); this.parentElement.innerHTML = '<div class=&quot;incident-media-fallback&quot;><i class=&quot;fas ${incidentTypeIcon}&quot;></i><span>No Image</span></div>';">`
             : `<div class="incident-media-fallback"><i class="fas ${incidentTypeIcon}"></i><span>No Image</span></div>`;
         
         html += `
-            <div class="incident-card medium">
-                <div class="incident-card-layout">
-                    <div class="incident-media">
+            <article class="incident-card ff-assigned-incident-row" data-incident-card="${incident.incident_id}">
+                <button type="button" class="ff-assigned-incident-row__main view-incident-details" data-incident-id="${incident.incident_id}" aria-label="Open incident details for ${escapeHtml(incidentTitle)}">
+                    <div class="ff-assigned-incident-row__media">
                         ${imageMarkup}
                     </div>
-                    <div class="incident-main">
-                        <div class="incident-topline">
-                            <span class="incident-type">
-                                <i class="fas ${incidentTypeIcon}"></i> ${escapeHtml(incidentType)}
+                    <div class="ff-assigned-incident-row__copy">
+                        <div class="ff-assigned-incident-row__badges">
+                            <span class="ff-assigned-incident-row__type">
+                                <i class="fas ${incidentTypeIcon}"></i>
+                                ${escapeHtml(incidentType)}
                             </span>
-                            <span class="incident-priority priority-medium">Assigned</span>
-                        </div>
-                        <div class="incident-title-wrap">
-                            <h3 class="incident-title">${escapeHtml(incidentTitle)}</h3>
-                            <div class="incident-subtitle">${escapeHtml(description)}</div>
-                        </div>
-                        <div class="incident-detail-grid incident-detail-grid-compact">
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-map-marker-alt"></i> Location</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(locationLabel)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-user-shield"></i> Reported By</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(reporterLabel)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="far fa-calendar-alt"></i> Reported At</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(reportedAt)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="far fa-clock"></i> Assigned At</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(assignedAt)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-hashtag"></i> Incident ID</span>
-                                <span class="incident-detail-value-inline">#${escapeHtml(incident.incident_id)}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-crosshairs"></i> Coordinates</span>
-                                <span class="incident-detail-value-inline">${hasCoordinates ? `${escapeHtml(lat)}, ${escapeHtml(lng)}` : 'Coordinates unavailable'}</span>
-                            </span>
-                            <span class="incident-detail-item">
-                                <span class="incident-detail-label-inline"><i class="fas fa-signal"></i> Status</span>
-                                <span class="incident-detail-value-inline">${escapeHtml(statusText)}</span>
+                            <span class="incident-status-badge ff-assigned-incident-row__status ${statusClass}">
+                                ${escapeHtml(statusText)}
                             </span>
                         </div>
+                        <h3 class="incident-title ff-assigned-incident-row__title">${escapeHtml(incidentTitle)}</h3>
+                        <div class="ff-assigned-incident-row__detail">
+                            <i class="fas fa-location-dot" aria-hidden="true"></i>
+                            <span data-incident-location="${incident.incident_id}">${escapeHtml(locationLabel)}</span>
+                        </div>
+                        <div class="ff-assigned-incident-row__detail">
+                            <i class="fas fa-user" aria-hidden="true"></i>
+                            <span>${escapeHtml(reporterLabel)}</span>
+                        </div>
+                        <div class="ff-assigned-incident-row__meta">
+                            <span>${escapeHtml(reportedAt)}</span>
+                            <span class="ff-assigned-incident-row__meta-separator">&bull;</span>
+                            <span>Assigned ${escapeHtml(assignedAt)}</span>
+                        </div>
+                        <p class="ff-assigned-incident-row__summary">${escapeHtml(descriptionSummary)}</p>
                     </div>
-                    <div class="incident-actions-column">
-                        <div class="incident-status-badge ${statusClass} is-block">
-                            ${statusText}
-                        </div>
-                        <button class="btn btn-outline view-incident-details" data-incident-id="${incident.incident_id}">
-                            <i class="far fa-eye"></i> Details
-                        </button>
-                        ${falseAlarmButton}
-                        ${actionButton}
-                    </div>
+                </button>
+                <div class="ff-assigned-incident-row__actions">
+                    ${actionButton}
+                    ${falseAlarmButton}
                 </div>
-            </div>
+            </article>
         `;
     });
     
@@ -1894,6 +2984,8 @@
             await markIncidentFalseAlarm(incidentId, currentStatus, btn);
         });
     });
+
+    hydrateAssignedIncidentLocations(incidents);
 }
     // Professional Incident Details Modal
     function showProfessionalIncidentModal(incident) {
@@ -3063,7 +4155,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         window.pyroPwa?.registerPageSnapshot?.({
-            key: 'firefighter-dashboard',
+            key: 'firefighter-dashboard-v2',
             label: 'Firefighter Dashboard'
         });
     });

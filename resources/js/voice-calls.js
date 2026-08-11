@@ -5,6 +5,7 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribut
 const role = String(voiceConfig.role || '').toLowerCase();
 const isResponder = ['station admin', 'chief', 'chief station admin'].includes(role);
 const isCitizen = ['citizen', 'anonymous'].includes(role);
+const isMobileHubPage = document.body?.classList.contains('mobile-hub-page');
 
 let incomingPollTimer = null;
 let callerPollTimer = null;
@@ -16,6 +17,7 @@ let localAudioTrack = null;
 let isMuted = false;
 let joinedCallId = null;
 let ringtoneState = null;
+let outgoingRingtoneState = null;
 let knownIncomingIds = new Set();
 let knownCallsById = new Map();
 let incomingPollFailureCount = 0;
@@ -26,6 +28,8 @@ let agoraJoinState = 'idle';
 let incomingPollInFlight = null;
 let voiceSessionBootstrapPromise = null;
 let knownMissedIds = new Set();
+let isSpeakerEnabled = true;
+const remoteAudioTracks = new Map();
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
@@ -369,16 +373,35 @@ function ensureCallerDock() {
     dock.innerHTML = `
         <div class="pyro-voice-caller-dock__header">
             <div>
-                <p class="pyro-voice-caller-dock__eyebrow">Emergency voice</p>
-                <h2 class="pyro-voice-caller-dock__title" data-pyro-voice-caller-title>Calling station</h2>
+                <p class="pyro-voice-caller-dock__eyebrow">Emergency call</p>
+                <h2 class="pyro-voice-caller-dock__title">Fire Bureau Dispatch</h2>
             </div>
             <span class="pyro-voice-badge" data-pyro-voice-caller-status>Calling</span>
         </div>
         <div class="pyro-voice-caller-dock__body">
-            <p class="pyro-voice-status-line" data-pyro-voice-caller-line>Connecting to the station...</p>
+            <div class="pyro-voice-caller-dock__hero">
+                <div class="pyro-voice-caller-dock__avatar" aria-hidden="true">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                </div>
+                <p class="pyro-voice-caller-dock__label">Connecting to</p>
+                <h3 class="pyro-voice-caller-dock__station" data-pyro-voice-caller-title>Calling station</h3>
+                <p class="pyro-voice-status-line" data-pyro-voice-caller-line>Connecting to the station...</p>
+            </div>
             <div class="pyro-voice-controls">
-                <button type="button" class="pyro-voice-btn" data-pyro-voice-mute disabled>Mute</button>
-                <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-end>End</button>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--icon" data-pyro-voice-mute disabled>
+                    <i class="fa-solid fa-microphone"></i>
+                    <span>Mute</span>
+                </button>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--icon" data-pyro-voice-speaker>
+                    <i class="fa-solid fa-volume-high"></i>
+                    <span>Speaker</span>
+                </button>
+            </div>
+            <div class="pyro-voice-caller-dock__footer">
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--danger pyro-voice-btn--endcall" data-pyro-voice-end>
+                    <i class="fa-solid fa-phone-slash"></i>
+                    <span>End Call</span>
+                </button>
             </div>
         </div>
     `;
@@ -712,8 +735,15 @@ function renderCallerDock(call) {
     dock.querySelector('[data-pyro-voice-caller-status]').textContent = status;
     dock.querySelector('[data-pyro-voice-caller-title]').textContent = call.station?.name || 'Calling station';
     dock.querySelector('[data-pyro-voice-caller-line]').textContent = callerStatusText(call);
-    dock.querySelector('[data-pyro-voice-mute]').disabled = call.status !== 'answered' || !localAudioTrack;
-    dock.querySelector('[data-pyro-voice-mute]').textContent = isMuted ? 'Unmute' : 'Mute';
+    const muteButton = dock.querySelector('[data-pyro-voice-mute]');
+    const speakerButton = dock.querySelector('[data-pyro-voice-speaker]');
+    muteButton.disabled = call.status !== 'answered' || !localAudioTrack;
+    muteButton.classList.toggle('is-active', isMuted);
+    muteButton.querySelector('span').textContent = isMuted ? 'Muted' : 'Mute';
+    muteButton.querySelector('i').className = isMuted ? 'fa-solid fa-microphone-slash' : 'fa-solid fa-microphone';
+    speakerButton.classList.toggle('is-active', isSpeakerEnabled);
+    speakerButton.querySelector('span').textContent = isSpeakerEnabled ? 'Speaker' : 'Silent';
+    speakerButton.querySelector('i').className = isSpeakerEnabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
 }
 
 function callerStatusText(call) {
@@ -748,10 +778,20 @@ async function triggerCitizenCall(trigger, event = null) {
         });
         activeCall = payload.call;
         renderCallerDock(activeCall);
+        syncOutgoingRinging(activeCall.status);
         startDurationTicker();
         startCallerPolling(activeCall.id);
+        if (isMobileHubPage) {
+            window.dispatchEvent(new CustomEvent('pyro:mobile-hub-call-started', {
+                detail: {
+                    callId: activeCall?.id || null,
+                    status: activeCall?.status || null,
+                },
+            }));
+        }
     } catch (error) {
         setCallerTriggerState(trigger, 'idle');
+        stopOutgoingRinging();
         toast(error.message || 'Unable to start voice call.', 'error');
     }
 }
@@ -771,6 +811,7 @@ async function pollCaller(callId) {
         const payload = await jsonFetch(routeFor('show', callId));
         activeCall = payload.call;
         renderCallerDock(activeCall);
+        syncOutgoingRinging(activeCall.status);
 
         if (activeCallerTrigger) {
             if (activeCall.status === 'answered') {
@@ -816,6 +857,10 @@ async function handleCallerDockClick(event) {
         await toggleMute();
         if (activeCall) renderCallerDock(activeCall);
     }
+    if (event.target.closest('[data-pyro-voice-speaker]')) {
+        toggleSpeaker();
+        if (activeCall) renderCallerDock(activeCall);
+    }
 }
 
 async function joinAgora(call, agora) {
@@ -826,13 +871,28 @@ async function joinAgora(call, agora) {
     if (joinedCallId === call.id) return;
 
     setAgoraJoinState('connecting');
+    stopOutgoingRinging();
     await leaveAgora();
     agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
     activeAgora = agora;
 
     agoraClient.on('user-published', async (remoteUser, mediaType) => {
         await agoraClient.subscribe(remoteUser, mediaType);
-        if (mediaType === 'audio') remoteUser.audioTrack?.play();
+        if (mediaType === 'audio' && remoteUser.audioTrack) {
+            remoteAudioTracks.set(remoteUser.uid, remoteUser.audioTrack);
+            try {
+                remoteUser.audioTrack.setVolume(isSpeakerEnabled ? 100 : 0);
+            } catch {}
+            remoteUser.audioTrack.play();
+        }
+    });
+    agoraClient.on('user-unpublished', (remoteUser, mediaType) => {
+        if (mediaType === 'audio') {
+            remoteAudioTracks.delete(remoteUser.uid);
+        }
+    });
+    agoraClient.on('user-left', (remoteUser) => {
+        remoteAudioTracks.delete(remoteUser.uid);
     });
     agoraClient.on('connection-state-change', (currentState) => {
         if (currentState === 'RECONNECTING') toast('Voice reconnecting...');
@@ -855,6 +915,8 @@ async function joinAgora(call, agora) {
 
     joinedCallId = call.id;
     isMuted = false;
+    isSpeakerEnabled = true;
+    syncSpeakerState();
     setAgoraJoinState('connected');
     startDurationTicker();
 }
@@ -880,6 +942,74 @@ async function toggleMute() {
     toast(isMuted ? 'Microphone muted.' : 'Microphone active.');
 }
 
+function buildToneLoop(frequency = 880, cadenceMs = 1500, volume = 0.08) {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return null;
+
+        const context = new AudioContext();
+        const gain = context.createGain();
+        gain.gain.value = 0.0001;
+        gain.connect(context.destination);
+
+        const playTone = () => {
+            const oscillator = context.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            oscillator.connect(gain);
+            gain.gain.setValueAtTime(0.0001, context.currentTime);
+            gain.gain.exponentialRampToValueAtTime(volume, context.currentTime + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.46);
+        };
+
+        context.resume().then(playTone).catch(() => {});
+
+        return {
+            context,
+            interval: setInterval(playTone, cadenceMs),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function startOutgoingRinging() {
+    if (outgoingRingtoneState?.interval) return;
+    outgoingRingtoneState = buildToneLoop(740, 1650, 0.055);
+}
+
+function stopOutgoingRinging() {
+    if (!outgoingRingtoneState) return;
+    clearInterval(outgoingRingtoneState.interval);
+    outgoingRingtoneState.context?.close?.().catch(() => {});
+    outgoingRingtoneState = null;
+}
+
+function syncOutgoingRinging(status) {
+    if (!isCitizen) return;
+    if (['ringing', 'queued'].includes(String(status || '').toLowerCase())) {
+        startOutgoingRinging();
+        return;
+    }
+    stopOutgoingRinging();
+}
+
+function syncSpeakerState() {
+    remoteAudioTracks.forEach((track) => {
+        try {
+            track.setVolume(isSpeakerEnabled ? 100 : 0);
+        } catch {}
+    });
+}
+
+function toggleSpeaker() {
+    isSpeakerEnabled = !isSpeakerEnabled;
+    syncSpeakerState();
+    toast(isSpeakerEnabled ? 'Speaker enabled.' : 'Speaker muted.');
+}
+
 async function endCurrentCall(callId) {
     const effectiveCallId = callId || activeCall?.id || joinedCallId;
     if (!effectiveCallId) {
@@ -893,6 +1023,7 @@ async function endCurrentCall(callId) {
     } catch (error) {
         toast(error.message || 'Unable to end call.', 'error');
     } finally {
+        stopOutgoingRinging();
         await leaveAgora();
         clearInterval(callerPollTimer);
         activeCall = null;
@@ -923,6 +1054,8 @@ async function leaveAgora() {
     agoraClient = null;
     joinedCallId = null;
     isMuted = false;
+    isSpeakerEnabled = true;
+    remoteAudioTracks.clear();
     setAgoraJoinState('idle');
 }
 
@@ -935,34 +1068,7 @@ function startDurationTicker() {
 
 function startRinging() {
     if (ringtoneState?.interval) return;
-
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
-
-        const context = new AudioContext();
-        const gain = context.createGain();
-        gain.gain.value = 0.0001;
-        gain.connect(context.destination);
-
-        const playTone = () => {
-            const oscillator = context.createOscillator();
-            oscillator.type = 'sine';
-            oscillator.frequency.value = 880;
-            oscillator.connect(gain);
-            gain.gain.setValueAtTime(0.0001, context.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.04);
-            gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
-            oscillator.start();
-            oscillator.stop(context.currentTime + 0.46);
-        };
-
-        context.resume().then(playTone).catch(() => {});
-        ringtoneState = {
-            context,
-            interval: setInterval(playTone, 1500),
-        };
-    } catch {}
+    ringtoneState = buildToneLoop(880, 1500, 0.08);
 }
 
 function stopRinging() {
@@ -1022,6 +1128,7 @@ function initVoiceCalls() {
 
     window.addEventListener('pagehide', () => {
         stopRinging();
+        stopOutgoingRinging();
         clearIncomingPollTimer();
     });
 }

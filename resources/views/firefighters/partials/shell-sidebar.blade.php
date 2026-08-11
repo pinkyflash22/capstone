@@ -8,6 +8,7 @@
             'items' => [
                 ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'fas fa-tachometer-alt', 'route' => 'firefighter.dashboard', 'active' => ['dashboard']],
                 ['type' => 'link', 'label' => 'Incidents', 'icon' => 'fas fa-fire-extinguisher', 'route' => 'firefighter.incidents', 'active' => ['incidents']],
+                ['type' => 'link', 'label' => 'Risk Reviews', 'icon' => 'fas fa-triangle-exclamation', 'route' => 'firefighter.risk-reviews.index', 'active' => ['risk-reviews']],
                 ['type' => 'link', 'label' => 'My Station', 'icon' => 'fas fa-building', 'route' => 'firefighter.my-station', 'active' => ['station']],
                 ['type' => 'link', 'label' => 'Requests', 'icon' => 'fas fa-clipboard-list', 'route' => 'firefighter.equipments', 'active' => ['equipment', 'fsic']],
             ],
@@ -21,7 +22,7 @@
         ],
     ];
     $firefighterInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1));
-    $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'station', 'equipment', 'fsic'], true);
+    $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'risk-reviews', 'station', 'equipment', 'fsic'], true);
 @endphp
 
 <style>
@@ -782,6 +783,9 @@
             <a href="{{ route('firefighter.incidents') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'incidents' ? 'active' : '' }}" aria-label="Incidents" data-ff-nav-link data-ff-nav-key="incidents">
                 <span class="ff-mobile-icon" aria-hidden="true">local_fire_department</span>
             </a>
+            <a href="{{ route('firefighter.risk-reviews.index') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'risk-reviews' ? 'active' : '' }}" aria-label="Risk Reviews" data-ff-nav-link data-ff-nav-key="risk-reviews">
+                <span class="ff-mobile-icon" aria-hidden="true">fact_check</span>
+            </a>
             <a href="{{ route('firefighter.my-station') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'station' ? 'active' : '' }}" aria-label="My Station" data-ff-nav-link data-ff-nav-key="station">
                 <span class="ff-mobile-icon" aria-hidden="true">apartment</span>
             </a>
@@ -833,6 +837,13 @@
                 <span class="ff-mobile-panel__copy">
                     <strong>Active Incidents</strong>
                     <small>Check incident updates and field assignments.</small>
+                </span>
+            </a>
+            <a href="{{ route('firefighter.risk-reviews.index') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="risk-reviews">
+                <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">fact_check</span></span>
+                <span class="ff-mobile-panel__copy">
+                    <strong>Risk Reviews</strong>
+                    <small>Verify pending hazard and risk submissions for your station.</small>
                 </span>
             </a>
             <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="announcements">
@@ -1073,6 +1084,54 @@
     </div>
 </div>
 
+<div class="ff-route-skeleton" data-ff-route-skeleton="risk-reviews" aria-hidden="true">
+    <div class="ff-route-skeleton__surface">
+        <div class="ff-route-skeleton__content">
+            <div class="ff-route-skeleton__topbar">
+                <div style="display:grid; gap:10px; min-width:0;">
+                    <div class="ff-route-skeleton__line ff-route-skeleton__line--title"></div>
+                    <div class="ff-route-skeleton__line ff-route-skeleton__line--subtitle"></div>
+                    <div class="ff-route-skeleton__line ff-route-skeleton__line--meta"></div>
+                </div>
+                <div class="ff-route-skeleton__topbar-actions">
+                    <div class="ff-route-skeleton__pill"></div>
+                    <div class="ff-route-skeleton__pill"></div>
+                </div>
+            </div>
+            <div class="ff-route-skeleton__summary">
+                <div class="ff-route-skeleton__line ff-route-skeleton__line--title"></div>
+                <div class="ff-route-skeleton__line ff-route-skeleton__line--subtitle" style="width:min(600px, 90%);"></div>
+                <div class="ff-route-skeleton__line ff-route-skeleton__line--subtitle" style="width:min(520px, 82%);"></div>
+                <div class="ff-route-skeleton__pills">
+                    <div class="ff-route-skeleton__pill"></div>
+                    <div class="ff-route-skeleton__pill"></div>
+                </div>
+            </div>
+            <div class="ff-route-skeleton__stats" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
+                <div class="ff-route-skeleton__stat"></div>
+                <div class="ff-route-skeleton__stat"></div>
+                <div class="ff-route-skeleton__stat"></div>
+                <div class="ff-route-skeleton__stat"></div>
+            </div>
+            <div class="ff-route-skeleton__list-card">
+                <div class="ff-route-skeleton__list-header">
+                    <div style="display:grid; gap:10px; min-width:0; width:100%;">
+                        <div class="ff-route-skeleton__line ff-route-skeleton__line--title" style="width:min(280px, 52%);"></div>
+                        <div class="ff-route-skeleton__line ff-route-skeleton__line--subtitle" style="width:min(460px, 84%);"></div>
+                    </div>
+                    <div class="ff-route-skeleton__pill"></div>
+                </div>
+                <div class="ff-route-skeleton__toolbar-card"></div>
+                <div class="ff-route-skeleton__list-items">
+                    <div class="ff-route-skeleton__list-item"></div>
+                    <div class="ff-route-skeleton__list-item"></div>
+                    <div class="ff-route-skeleton__list-item"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="{{ $backdropId }}" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden transition-opacity duration-300"></div>
 
 <script>
@@ -1093,9 +1152,10 @@ document.addEventListener('DOMContentLoaded', function () {
         announcements: document.querySelector('[data-ff-route-skeleton="announcements"]'),
         profile: document.querySelector('[data-ff-route-skeleton="profile"]'),
         schedule: document.querySelector('[data-ff-route-skeleton="schedule"]'),
-        station: document.querySelector('[data-ff-route-skeleton="station"]')
+        station: document.querySelector('[data-ff-route-skeleton="station"]'),
+        'risk-reviews': document.querySelector('[data-ff-route-skeleton="risk-reviews"]')
     };
-    const partialRouteKeys = new Set(['incidents', 'announcements', 'profile', 'schedule', 'station']);
+    const partialRouteKeys = new Set(['incidents', 'announcements', 'profile', 'schedule', 'station', 'risk-reviews']);
     const prefetchedRoutes = new Set();
     const prefetchedPages = new Map();
     const pendingPrefetchTimers = new Map();
@@ -1309,7 +1369,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            ['incidents', 'announcements', 'schedule', 'profile'].forEach(function (key, index) {
+            ['incidents', 'risk-reviews', 'announcements', 'schedule', 'profile'].forEach(function (key, index) {
                 const link = document.querySelector(`a[data-ff-nav-link][data-ff-nav-key="${key}"]`);
                 if (!link) {
                     return;

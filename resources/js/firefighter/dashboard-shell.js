@@ -21,10 +21,12 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     const FF_LOCATION_PUSH_INTERVAL_MS = 60000;
     const FF_LOCATION_PULL_INTERVAL_MS = 90000;
     const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 30000;
+    const FF_ASSIGNED_QUEUE_PAGE_SIZE = 5;
     const FF_AUTO_ASSIGN_INTERVAL_MS = 300000;
-    const FF_WIDGET_CACHE_KEY = `ff_dashboard_widgets_${window.currentFirefighterId}`;
-    const FF_POSTS_CACHE_KEY = `ff_dashboard_posts_${window.currentFirefighterId}`;
-    const FF_ASSIGNED_CACHE_KEY = `ff_dashboard_assigned_${window.currentFirefighterId}`;
+    const FF_WIDGET_CACHE_KEY = `ff_dashboard_widgets_v2_${window.currentFirefighterId}`;
+    const FF_POSTS_CACHE_KEY = `ff_dashboard_posts_v2_${window.currentFirefighterId}`;
+    const FF_ASSIGNED_CACHE_KEY = `ff_dashboard_assigned_v2_${window.currentFirefighterId}`;
+    const FF_REVERSE_GEOCODE_CACHE_KEY = `ff_dashboard_reverse_geocode_v1_${window.currentFirefighterId || 'guest'}`;
     let ffLocationPushInterval = null;
     let ffLocationPullInterval = null;
     let ffAssignedIncidentsInterval = null;
@@ -36,6 +38,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     let ffAssignedIncidentsRequest = null;
     let ffAutoAssignRequest = null;
     let ffAssignedIncidentsLastFetchedAt = 0;
+    let ffAssignedQueuePage = 1;
     function firefighterDashboardIsVisible() {
         return document.visibilityState === 'visible';
     }
@@ -185,20 +188,62 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             return;
         }
 
-        container.innerHTML = posts.map((post) => `
-            <article class="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 mb-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-bold text-slate-800">${escapeHtml(post.author_name || 'Station Update')}</p>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">${escapeHtml(post.time || 'Just now')}</p>
+        const visiblePosts = posts.slice(0, 4);
+        const fullFeedUrl = '/firefighter/announcements';
+
+        const truncateWords = (value, limit = 5) => {
+            const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+            if (!cleaned) {
+                return 'No update yet.';
+            }
+
+            const words = cleaned.split(' ');
+            if (words.length <= limit) {
+                return cleaned;
+            }
+
+            return `${words.slice(0, limit).join(' ')}...`;
+        };
+
+        const storyCards = visiblePosts.map((post) => {
+            const imageUrl = post.image_url || null;
+            const authorInitials = escapeHtml(post.author_initials || 'FF');
+            const authorName = escapeHtml(post.author_name || 'Station Update');
+            const time = escapeHtml(post.time || 'Just now');
+            const caption = escapeHtml(truncateWords(post.content || 'No content', 5));
+
+            const mediaMarkup = imageUrl
+                ? `<div class="ff-dashboard-story__media"><img src="${escapeHtml(imageUrl)}" alt="${authorName}" loading="lazy" onerror="this.closest('.ff-dashboard-story__media')?.remove();"></div>`
+                : `<div class="ff-dashboard-story__fallback">${authorInitials}</div>`;
+
+            return `
+                <a href="${fullFeedUrl}" class="ff-dashboard-story" aria-label="Open firefighter announcement from ${authorName}">
+                    ${mediaMarkup}
+                    <div class="ff-dashboard-story__overlay"></div>
+                    <div class="ff-dashboard-story__content">
+                        <span class="ff-dashboard-story__badge"><i class="fas fa-bullhorn"></i> Feed</span>
+                        <div class="ff-dashboard-story__meta">
+                            <div class="ff-dashboard-story__author">${authorName}</div>
+                            <div class="ff-dashboard-story__time">${time}</div>
+                            <div class="ff-dashboard-story__caption">${caption}</div>
+                        </div>
                     </div>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-orange-700 border border-orange-100">
-                        <i class="fas fa-bullhorn"></i> Feed
-                    </span>
+                </a>
+            `;
+        });
+
+        storyCards.push(`
+            <a href="${fullFeedUrl}" class="ff-dashboard-story ff-dashboard-story--more" aria-label="See more firefighter announcements">
+                <div class="ff-dashboard-story__overlay"></div>
+                <div class="ff-dashboard-story__content">
+                    <span class="ff-dashboard-story__more-icon"><i class="fas fa-arrow-right"></i></span>
+                    <div class="ff-dashboard-story__more-title">See more...</div>
+                    <div class="ff-dashboard-story__more-copy">Open the full station feed and view every announcement.</div>
                 </div>
-                <p class="mt-3 text-sm leading-6 text-slate-600">${escapeHtml(post.content || 'No content')}</p>
-            </article>
-        `).join('');
+            </a>
+        `);
+
+        container.innerHTML = `<div class="ff-dashboard-stories">${storyCards.join('')}</div>`;
     }
 
     function renderDashboardNearbyStations(stations = []) {
@@ -269,12 +314,36 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         if (context.user_team_id !== undefined && context.user_team_id !== null) {
             window.userTeamId = context.user_team_id;
         }
+
+        const nextMarkers = Array.isArray(payload.allMarkers) ? payload.allMarkers : [];
+        const nextStations = Array.isArray(payload.stations) ? payload.stations : [];
+        const nextIncidentCoords = Array.isArray(payload.incidentCoords)
+            ? payload.incidentCoords
+            : (Array.isArray(payload.incidents) ? payload.incidents : []);
+
+        window.allMarkers = nextMarkers;
+        window.mapData = window.mapData || {};
+        window.mapData.marker = nextMarkers;
+        window.stationsData = nextStations;
+        window.stationDatas = nextStations;
+        window.incidentCoords = nextIncidentCoords;
+
         document.getElementById('activeIncidentsCount').textContent = counts.active_incidents ?? '--';
         document.getElementById('equipmentCount').textContent = counts.equipment ?? '--';
         document.getElementById('crewOnlineCount').textContent = counts.crew_online ?? '--';
 
         renderDashboardNearbyStations(payload.stations || []);
         renderDashboardCrew(payload.crew || []);
+
+        if (window.map && typeof window.refreshMapMarkers === 'function') {
+            window.refreshMapMarkers({
+                preferSeeded: true,
+                revalidate: true,
+                force: true,
+            }).catch((error) => {
+                console.warn('Unable to refresh firefighter dashboard markers:', error);
+            });
+        }
     }
 
     async function loadFirefighterDashboardWidgets(force = false) {
@@ -375,11 +444,12 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             writeDashboardCache(FF_ASSIGNED_CACHE_KEY, incidents);
             
             displayAssignedIncidents(incidents);
+            syncFirefighterAssignedFabCount(incidents);
             if (typeof updateChartsWithData === 'function') {
                 updateChartsWithData(incidents);
             }
             
-            document.getElementById('assignedIncidentsCount').textContent = incidents.length;
+            document.getElementById('assignedIncidentsCount').textContent = getAssignedIncidentQueue(incidents).length;
             
             return incidents;
         } catch (error) {
@@ -495,6 +565,144 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             || (incident?.marker?.category === 'fire' ? 'Fire' : 'Incident');
     }
 
+    function getAssignedIncidentQueue(incidents = []) {
+        return (Array.isArray(incidents) ? incidents : [])
+            .filter((incident) => {
+                const statusId = getIncidentStatusId(incident);
+                return [1, 2, 3].includes(statusId);
+            })
+            .sort((left, right) => {
+                const leftTime = Date.parse(left?.created_at || left?.updated_at || '') || 0;
+                const rightTime = Date.parse(right?.created_at || right?.updated_at || '') || 0;
+
+                return leftTime - rightTime;
+            });
+    }
+
+    function renderAssignedIncidentsPagination(totalItems = 0, totalPages = 1, currentPage = 1) {
+        const paginationEl = document.getElementById('assignedIncidentsPagination');
+        if (!paginationEl) {
+            return;
+        }
+
+        if (totalItems <= 0 || totalPages <= 1) {
+            paginationEl.innerHTML = '';
+            paginationEl.hidden = true;
+            return;
+        }
+
+        const startItem = ((currentPage - 1) * FF_ASSIGNED_QUEUE_PAGE_SIZE) + 1;
+        const endItem = Math.min(currentPage * FF_ASSIGNED_QUEUE_PAGE_SIZE, totalItems);
+
+        paginationEl.hidden = false;
+        paginationEl.innerHTML = `
+            <div class="ff-assigned-incident-pagination__summary">
+                Showing ${startItem}-${endItem} of ${totalItems} queued incidents
+            </div>
+            <div class="ff-assigned-incident-pagination__controls">
+                <button type="button" class="ff-assigned-incident-pagination__button" data-assigned-page-action="prev" ${currentPage <= 1 ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                    Previous
+                </button>
+                <span class="ff-assigned-incident-pagination__indicator">Page ${currentPage} of ${totalPages}</span>
+                <button type="button" class="ff-assigned-incident-pagination__button" data-assigned-page-action="next" ${currentPage >= totalPages ? 'disabled' : ''}>
+                    Next
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                </button>
+            </div>
+        `;
+
+        paginationEl.querySelector('[data-assigned-page-action="prev"]')?.addEventListener('click', () => {
+            ffAssignedQueuePage = Math.max(1, ffAssignedQueuePage - 1);
+            displayAssignedIncidents(window.assignedIncidentsData || []);
+        });
+
+        paginationEl.querySelector('[data-assigned-page-action="next"]')?.addEventListener('click', () => {
+            ffAssignedQueuePage = Math.min(totalPages, ffAssignedQueuePage + 1);
+            displayAssignedIncidents(window.assignedIncidentsData || []);
+        });
+    }
+
+    function syncFirefighterAssignedFabCount(incidents = window.assignedIncidentsData || []) {
+        const count = getAssignedIncidentQueue(incidents).length;
+        const badge = document.getElementById('firefighterMobileAssignedFabCount');
+        if (badge) {
+            badge.textContent = String(count);
+        }
+    }
+
+    function getReverseGeocodeCache() {
+        return readDashboardCache(FF_REVERSE_GEOCODE_CACHE_KEY, {}) || {};
+    }
+
+    function setReverseGeocodeCache(nextCache) {
+        writeDashboardCache(FF_REVERSE_GEOCODE_CACHE_KEY, nextCache && typeof nextCache === 'object' ? nextCache : {});
+    }
+
+    function buildReverseGeocodeKey(lat, lng) {
+        return `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+    }
+
+    async function reverseGeocodeIncidentLocation(lat, lng) {
+        if (lat === null || lat === undefined || lng === null || lng === undefined) {
+            return 'Location not specified';
+        }
+
+        const cacheKey = buildReverseGeocodeKey(lat, lng);
+        const cache = getReverseGeocodeCache();
+        if (cache[cacheKey]?.label) {
+            return cache[cacheKey].label;
+        }
+
+        try {
+            const response = await fetch('/api/reverse', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ lat, lon: lng }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Reverse geocode request failed');
+            }
+
+            const payload = await response.json();
+            const formatted = payload?.features?.[0]?.properties?.formatted
+                || payload?.features?.[0]?.properties?.address_line1
+                || payload?.features?.[0]?.properties?.address_line2
+                || `${lat}, ${lng}`;
+
+            cache[cacheKey] = {
+                label: formatted,
+                saved_at: new Date().toISOString(),
+            };
+            setReverseGeocodeCache(cache);
+
+            return formatted;
+        } catch (error) {
+            console.warn('Assigned incident reverse geocode failed:', error);
+            return `${lat}, ${lng}`;
+        }
+    }
+
+    async function hydrateAssignedIncidentLocations(incidents = []) {
+        const tasks = incidents
+            .filter((incident) => incident?.marker?.lat !== null && incident?.marker?.lat !== undefined && incident?.marker?.lng !== null && incident?.marker?.lng !== undefined)
+            .map(async (incident) => {
+                const label = await reverseGeocodeIncidentLocation(incident.marker.lat, incident.marker.lng);
+                const target = document.querySelector(`[data-incident-location="${incident.incident_id}"]`);
+                if (target && label) {
+                    target.textContent = label;
+                    target.setAttribute('title', label);
+                }
+            });
+
+        await Promise.allSettled(tasks);
+    }
+
     function setIncidentActionPendingState(incidentId, options = {}) {
         const card = document.querySelector(`.incident-card [data-incident-id="${incidentId}"]`)?.closest('.incident-card')
             || document.querySelector(`.incident-card .view-incident-details[data-incident-id="${incidentId}"]`)?.closest('.incident-card');
@@ -555,20 +763,28 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
 
     function displayAssignedIncidents(incidents) {
     const container = document.getElementById('assignedIncidentsList');
-    
-    if (!incidents || incidents.length === 0) {
+    const queuedIncidents = getAssignedIncidentQueue(incidents);
+    const totalQueued = queuedIncidents.length;
+    const totalPages = Math.max(1, Math.ceil(totalQueued / FF_ASSIGNED_QUEUE_PAGE_SIZE));
+
+    ffAssignedQueuePage = Math.min(Math.max(1, ffAssignedQueuePage), totalPages);
+
+    if (totalQueued === 0) {
         container.innerHTML = `
             <div class="empty-incidents">
                 <i class="fas fa-truck text-4xl mb-2 opacity-50"></i>
-                <p>No assigned incidents</p>
-                <p class="text-sm">You haven't been assigned to any incidents yet.</p>
+                <p>No active queued incidents</p>
+                <p class="text-sm">Only reported, responding, and on-scene incidents appear here.</p>
             </div>
         `;
+        renderAssignedIncidentsPagination(0, 1, 1);
         return;
     }
-    
+
+    const startIndex = (ffAssignedQueuePage - 1) * FF_ASSIGNED_QUEUE_PAGE_SIZE;
+    const pageIncidents = queuedIncidents.slice(startIndex, startIndex + FF_ASSIGNED_QUEUE_PAGE_SIZE);
     let html = '';
-    incidents.forEach(incident => {
+    pageIncidents.forEach(incident => {
         const statusId = getIncidentStatusId(incident);
         let statusClass = 'status-reported';
         let statusText = 'REPORTED';
@@ -579,48 +795,48 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             statusClass = 'status-reported';
             statusText = 'REPORTED';
             actionButton = `
-                <button class="btn btn-success respond-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}">
-                    <i class="fas fa-truck"></i> Respond Now
+                <button type="button" class="respond-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-truck-fast"></i><span>Respond</span>
                 </button>
             `;
         } else if (statusId == 2) {
             statusClass = 'status-responding';
             statusText = 'RESPONDING';
             actionButton = `
-                <button class="btn btn-outline" disabled style="opacity: 0.7; cursor: default;">
-                    <i class="fas fa-truck"></i> En Route
+                <button type="button" class="ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" disabled>
+                    <i class="fas fa-truck-fast"></i><span>En Route</span>
                 </button>
             `;
         } else if (statusId == 3) {
             statusClass = 'status-resolved';
             statusText = 'ON SCENE';
             actionButton = `
-                <button class="btn btn-warning complete-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}" style="background: #f59e0b; color: white;">
-                    <i class="fas fa-check-circle"></i> Complete Incident
+                <button type="button" class="complete-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-check-circle"></i><span>Complete</span>
                 </button>
             `;
         } else if (statusId == 4) {
             statusClass = 'status-resolved';
             statusText = 'CONTROLLED';
             actionButton = `
-                <button class="btn btn-info close-case" data-incident-id="${incident.incident_id}" data-status="${statusId}" style="background: #8b5cf6; color: white;">
-                    <i class="fas fa-folder"></i> Close Case
+                <button type="button" class="close-case ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-folder"></i><span>Close</span>
                 </button>
             `;
         } else if (statusId == 5) {
             statusClass = 'status-closed';
             statusText = 'CLOSED';
             actionButton = `
-                <button class="btn btn-secondary" disabled style="background: #6b7280; color: white; opacity: 0.6; cursor: not-allowed;">
-                    <i class="fas fa-folder"></i> Case Closed
+                <button type="button" class="ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" disabled>
+                    <i class="fas fa-folder"></i><span>Closed</span>
                 </button>
             `;
         }
 
         if ([1, 2].includes(parseInt(statusId))) {
             falseAlarmButton = `
-                <button class="btn btn-danger false-alarm-incident" data-incident-id="${incident.incident_id}" data-status="${statusId}">
-                    <i class="fas fa-exclamation-triangle"></i> False Alarm
+                <button type="button" class="false-alarm-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-triangle-exclamation"></i><span>False Alarm</span>
                 </button>
             `;
         }
@@ -636,46 +852,48 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         const imageUrl = getIncidentImageUrl(incident);
         const incidentTypeIcon = getIncidentTypeIconClass(incidentType);
         const hasCoordinates = lat !== null && lat !== undefined && lng !== null && lng !== undefined;
-        const locationLabel = hasCoordinates ? `${lat}, ${lng}` : 'Location not specified';
+        const locationLabel = hasCoordinates ? 'Resolving location...' : 'Location not specified';
+        const descriptionSummary = String(description).replace(/\s+/g, ' ').trim();
         const imageMarkup = imageUrl
             ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(incidentTitle)}" onerror="this.remove(); this.parentElement.classList.add('no-image'); this.parentElement.innerHTML = '<div class=&quot;incident-media-fallback&quot;><i class=&quot;fas ${incidentTypeIcon}&quot;></i><span>No Image</span></div>';">`
             : `<div class="incident-media-fallback"><i class="fas ${incidentTypeIcon}"></i><span>No Image</span></div>`;
         
         html += `
-            <article class="incident-card medium ff-response-panel">
-                <div class="ff-response-panel__media">
-                    ${imageMarkup}
-                </div>
-                <div class="ff-response-panel__body">
-                    <div class="ff-response-panel__header">
-                        <span class="ff-response-panel__type">
-                            <i class="fas ${incidentTypeIcon}"></i>
-                            ${escapeHtml(incidentType)}
-                        </span>
-                        <span class="ff-response-panel__status ${statusClass}">
-                            ${escapeHtml(statusText)}
-                        </span>
+            <article class="incident-card ff-assigned-incident-row" data-incident-card="${incident.incident_id}">
+                <button type="button" class="ff-assigned-incident-row__main view-incident-details" data-incident-id="${incident.incident_id}" aria-label="Open incident details for ${escapeHtml(incidentTitle)}">
+                    <div class="ff-assigned-incident-row__media">
+                        ${imageMarkup}
                     </div>
-                    <div class="ff-response-panel__title-row">
-                        <div>
-                            <h3 class="incident-title ff-response-panel__title">${escapeHtml(incidentTitle)}</h3>
-                            <p class="ff-response-panel__summary">${escapeHtml(description)}</p>
+                    <div class="ff-assigned-incident-row__copy">
+                        <div class="ff-assigned-incident-row__badges">
+                            <span class="ff-assigned-incident-row__type">
+                                <i class="fas ${incidentTypeIcon}"></i>
+                                ${escapeHtml(incidentType)}
+                            </span>
+                            <span class="incident-status-badge ff-assigned-incident-row__status ${statusClass}">
+                                ${escapeHtml(statusText)}
+                            </span>
                         </div>
-                        <span class="ff-response-panel__id">#${escapeHtml(incident.incident_id)}</span>
+                        <h3 class="incident-title ff-assigned-incident-row__title">${escapeHtml(incidentTitle)}</h3>
+                        <div class="ff-assigned-incident-row__detail">
+                            <i class="fas fa-location-dot" aria-hidden="true"></i>
+                            <span data-incident-location="${incident.incident_id}">${escapeHtml(locationLabel)}</span>
+                        </div>
+                        <div class="ff-assigned-incident-row__detail">
+                            <i class="fas fa-user" aria-hidden="true"></i>
+                            <span>${escapeHtml(reporterLabel)}</span>
+                        </div>
+                        <div class="ff-assigned-incident-row__meta">
+                            <span>${escapeHtml(reportedAt)}</span>
+                            <span class="ff-assigned-incident-row__meta-separator">&bull;</span>
+                            <span>Assigned ${escapeHtml(assignedAt)}</span>
+                        </div>
+                        <p class="ff-assigned-incident-row__summary">${escapeHtml(descriptionSummary)}</p>
                     </div>
-                    <div class="ff-response-panel__meta">
-                        <span><i class="fas fa-map-marker-alt"></i>${escapeHtml(locationLabel)}</span>
-                        <span><i class="fas fa-user-shield"></i>${escapeHtml(reporterLabel)}</span>
-                        <span><i class="far fa-calendar-alt"></i>${escapeHtml(reportedAt)}</span>
-                        <span><i class="far fa-clock"></i>Assigned ${escapeHtml(assignedAt)}</span>
-                    </div>
-                </div>
-                <div class="incident-actions-column ff-response-panel__actions">
-                    <button class="btn btn-outline view-incident-details" data-incident-id="${incident.incident_id}">
-                        <i class="far fa-eye"></i> Details
-                    </button>
-                    ${falseAlarmButton}
+                </button>
+                <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
+                    ${falseAlarmButton}
                 </div>
             </article>
         `;
@@ -687,7 +905,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     document.querySelectorAll('.view-incident-details').forEach(btn => {
         btn.addEventListener('click', () => {
             const incidentId = btn.dataset.incidentId;
-            const incident = incidents.find(i => i.incident_id == incidentId);
+            const incident = pageIncidents.find(i => i.incident_id == incidentId) || queuedIncidents.find(i => i.incident_id == incidentId);
             if (incident) {
                 showProfessionalIncidentModal(incident);
             }
@@ -728,6 +946,9 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             await markIncidentFalseAlarm(incidentId, currentStatus, btn);
         });
     });
+
+    hydrateAssignedIncidentLocations(pageIncidents);
+    renderAssignedIncidentsPagination(totalQueued, totalPages, ffAssignedQueuePage);
 }
     // Professional Incident Details Modal
     function showProfessionalIncidentModal(incident) {
@@ -743,7 +964,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                     <div class="professional-modal-header">
                         <div class="professional-modal-title">
                             <i class="fas fa-file-alt"></i>
-                            Incident Report
+                            Incident Details
                         </div>
                         <button class="professional-modal-close">&times;</button>
                     </div>
@@ -800,86 +1021,115 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         const lng = incident.marker?.lng;
         const description = incident.marker?.description || 'No description provided';
         const teamId = incident.team?.team_id;
-        const reportedBy = incident.reported_by || 'Dispatch';
+        const reportedBy = formatReporterLabel(incident);
         const createdAt = incident.created_at ? new Date(incident.created_at).toLocaleString() : 'Unknown';
+        const updatedAt = incident.updated_at ? new Date(incident.updated_at).toLocaleString() : null;
+        const incidentTypeIcon = getIncidentTypeIconClass(incidentType);
+        const locationHeadline = incident.marker?.address
+            || incident.marker?.location_name
+            || incident.marker?.landmark
+            || incidentTitle;
+        const roleLabel = String(incident?.reporter?.role?.role || 'Citizen').trim() || 'Citizen';
+        const hasCoordinates = lat !== null && lat !== undefined && lng !== null && lng !== undefined;
+        const incidentSubtitle = incidentTitle && incidentTitle !== locationHeadline ? incidentTitle : null;
+        const overviewItems = [
+            {
+                icon: 'fa-location-dot',
+                label: 'Location',
+                value: escapeHtml(locationHeadline),
+            },
+            {
+                icon: 'fa-user',
+                label: 'Reporter',
+                value: escapeHtml(reportedBy),
+            },
+            {
+                icon: 'fa-user-shield',
+                label: 'Source',
+                value: escapeHtml(roleLabel),
+            },
+            {
+                icon: 'fa-calendar-days',
+                label: 'Reported',
+                value: escapeHtml(createdAt),
+            },
+        ];
+
+        if (teamId) {
+            overviewItems.push({
+                icon: 'fa-users',
+                label: 'Assigned Team',
+                value: `Team #${escapeHtml(String(teamId))}`,
+            });
+        }
+
+        if (updatedAt) {
+            overviewItems.push({
+                icon: 'fa-clock',
+                label: 'Last Updated',
+                value: escapeHtml(updatedAt),
+            });
+        }
+
+        const overviewMarkup = overviewItems.map((item) => `
+            <div class="incident-sheet__meta-item">
+                <span class="incident-sheet__meta-icon"><i class="fas ${item.icon}"></i></span>
+                <div class="incident-sheet__meta-copy">
+                    <span class="incident-sheet__meta-label">${item.label}</span>
+                    <strong class="incident-sheet__meta-value">${item.value}</strong>
+                </div>
+            </div>
+        `).join('');
         
         content.innerHTML = `
-            <div class="professional-incident-details">
-                <!-- Header Status Bar -->
-                <div class="details-status-header ${statusBadgeClass}">
-                    <i class="${statusIcon}"></i>
-                    <span>${statusText}</span>
-                </div>
-                
-                <!-- Incident ID & Type Row -->
-                <div class="details-info-row">
-                    <div class="details-info-item">
-                        <label>INCIDENT ID</label>
-                        <div class="details-info-value">#${incident.incident_id}</div>
+            <div class="incident-sheet">
+                <section class="incident-sheet__hero">
+                    <div class="incident-sheet__hero-top">
+                        <span class="incident-sheet__status details-status-header ${statusBadgeClass}">
+                            <i class="${statusIcon}"></i>
+                            <span>${statusText}</span>
+                        </span>
+                        <span class="incident-sheet__type details-type-pill">
+                            <i class="fas ${incidentTypeIcon}"></i>
+                            ${escapeHtml(incidentType)}
+                        </span>
                     </div>
-                    <div class="details-info-item">
-                        <label>INCIDENT TYPE</label>
-                        <div class="details-info-value">
-                            <i class="fas fa-fire" style="color: #ef4444;"></i> ${escapeHtml(incidentType)}
-                        </div>
+                    <div class="incident-sheet__hero-body">
+                        <p class="incident-sheet__eyebrow">Response Summary</p>
+                        <h2 class="incident-sheet__title">${escapeHtml(locationHeadline)}</h2>
+                        ${incidentSubtitle ? `<p class="incident-sheet__subtitle">${escapeHtml(incidentSubtitle)}</p>` : ''}
+                        <p class="incident-sheet__summary">${escapeHtml(description)}</p>
                     </div>
-                </div>
-                
-                <!-- Title Section -->
-                <div class="details-title-section">
-                    <label>TITLE / LOCATION</label>
-                    <div class="details-title">${escapeHtml(incidentTitle)}</div>
-                </div>
-                
-                <!-- Coordinates Section -->
-                ${lat && lng ? `
-                <div class="details-coordinates">
-                    <div class="coord-box">
-                        <label>LATITUDE</label>
-                        <div class="coord-value">${lat}</div>
+                </section>
+
+                <section class="incident-sheet__section">
+                    <div class="incident-sheet__section-head">
+                        <h3>Overview</h3>
+                        <span class="incident-sheet__section-note">Operational details only</span>
                     </div>
-                    <div class="coord-box">
-                        <label>LONGITUDE</label>
-                        <div class="coord-value">${lng}</div>
+                    <div class="incident-sheet__meta-grid">
+                        ${overviewMarkup}
                     </div>
-                </div>
-                ` : '<div class="details-info-item"><label>COORDINATES</label><div class="details-info-value">Not available</div></div>'}
-                
-                <!-- Description Section -->
-                <div class="details-description">
-                    <label><i class="fas fa-align-left"></i> INCIDENT DESCRIPTION</label>
-                    <div class="description-text">${escapeHtml(description)}</div>
-                </div>
-                
-                <!-- Report Information Grid -->
-                <div class="details-grid-2">
-                    <div class="details-info-item">
-                        <label><i class="far fa-user"></i> REPORTED BY</label>
-                        <div class="details-info-value">${escapeHtml(reportedBy)}</div>
+                </section>
+
+                <section class="incident-sheet__section">
+                    <div class="incident-sheet__section-head">
+                        <h3>Incident Notes</h3>
                     </div>
-                    <div class="details-info-item">
-                        <label><i class="far fa-calendar"></i> REPORTED AT</label>
-                        <div class="details-info-value">${createdAt}</div>
+                    <div class="incident-sheet__notes">
+                        ${escapeHtml(description)}
                     </div>
-                </div>
-                
-                <!-- Team Information -->
-                ${teamId ? `
-                <div class="details-team-info">
-                    <label><i class="fas fa-users"></i> ASSIGNED TEAM</label>
-                    <div class="team-badge">Team #${teamId}</div>
-                </div>
-                ` : ''}
-                
-                <!-- Last Updated -->
-                ${incident.updated_at ? `
-                <div class="details-last-updated">
-                    <i class="far fa-clock"></i> Last updated: ${new Date(incident.updated_at).toLocaleString()}
-                </div>
+                </section>
+
+                ${hasCoordinates ? `
+                <section class="incident-sheet__footnote">
+                    <span class="incident-sheet__footnote-label"><i class="fas fa-location-crosshairs"></i> Coordinates</span>
+                    <span class="incident-sheet__footnote-value">${escapeHtml(String(lat))}, ${escapeHtml(String(lng))}</span>
+                </section>
                 ` : ''}
             </div>
         `;
-        
+
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
     }
@@ -1205,7 +1455,8 @@ function showFalseAlarmConfirmationToast() {
         if (Array.isArray(cachedAssigned) && cachedAssigned.length > 0) {
             window.assignedIncidentsData = cachedAssigned;
             displayAssignedIncidents(cachedAssigned);
-            document.getElementById('assignedIncidentsCount').textContent = cachedAssigned.length;
+            syncFirefighterAssignedFabCount(cachedAssigned);
+            document.getElementById('assignedIncidentsCount').textContent = getAssignedIncidentQueue(cachedAssigned).length;
             if (typeof updateChartsWithData === 'function') {
                 updateChartsWithData(cachedAssigned);
             }
@@ -1255,6 +1506,9 @@ function showFalseAlarmConfirmationToast() {
                 initializeFirefighterGeolocation();
                 await Promise.allSettled([
                     typeof fetchAllFirefighterLocations === 'function' ? fetchAllFirefighterLocations() : Promise.resolve(),
+                    typeof window.refreshMapMarkers === 'function'
+                        ? window.refreshMapMarkers({ preferSeeded: true, revalidate: true, force: true })
+                        : Promise.resolve(),
                     typeof loadShapes === 'function' ? loadShapes() : Promise.resolve(),
                 ]);
             } finally {
@@ -1271,7 +1525,7 @@ function showFalseAlarmConfirmationToast() {
         startDeferredMapHydration();
 
         await fetchAssignedIncidents(true);
-        loadFirefighterDashboardWidgets();
+        await loadFirefighterDashboardWidgets(true);
         window.setTimeout(() => {
             loadFirefighterDashboardPosts();
         }, 320);
@@ -1910,71 +2164,90 @@ document.addEventListener('DOMContentLoaded', function () {
     syncFirefighterMobileLayerButtonBadge();
 });
 document.addEventListener('DOMContentLoaded', function () {
-    const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
-    const insightsContent = document.getElementById('firefighterMobileInsightsContent');
-    const insightsCloseButtons = document.querySelectorAll('[data-ff-insights-close]');
+    const assignedFab = document.getElementById('firefighterMobileAssignedFab');
     const welcomeToast = document.getElementById('firefighterMobileWelcomeToast');
-    const insightSections = Array.from(document.querySelectorAll('[data-ff-insights-source]'));
-    const insightPlaceholders = new Map();
+    const assignedQueueModal = document.getElementById('firefighterAssignedQueueModal');
+    const assignedQueueModalContent = document.getElementById('firefighterAssignedQueueModalContent');
+    const assignedQueueModalRefresh = document.getElementById('refreshAssignedIncidentsModal');
+    const assignedQueueCloseButtons = document.querySelectorAll('[data-ff-assigned-queue-close]');
+    const assignedQueueSection = document.querySelector('.assigned-incidents-container[data-ff-insights-section="assigned"]');
+    let assignedQueuePlaceholder = null;
 
-    function moveInsightsIntoPanel() {
-        if (!insightsContent) {
+    function moveAssignedQueueIntoModal() {
+        if (!assignedQueueSection || !assignedQueueModalContent) {
             return;
         }
 
-        insightSections.forEach(function (section, index) {
-            if (!insightPlaceholders.has(section)) {
-                const placeholder = document.createElement('div');
-                placeholder.dataset.ffInsightsPlaceholder = String(index);
-                section.parentNode?.insertBefore(placeholder, section);
-                insightPlaceholders.set(section, placeholder);
-            }
+        if (!assignedQueuePlaceholder) {
+            assignedQueuePlaceholder = document.createElement('div');
+            assignedQueuePlaceholder.dataset.ffAssignedQueuePlaceholder = 'true';
+            assignedQueueSection.parentNode?.insertBefore(assignedQueuePlaceholder, assignedQueueSection);
+        }
 
-            insightsContent.appendChild(section);
-        });
+        assignedQueueSection.classList.add('is-in-modal');
+        assignedQueueModalContent.appendChild(assignedQueueSection);
     }
 
-    function restoreInsightsFromPanel() {
-        insightSections.forEach(function (section) {
-            const placeholder = insightPlaceholders.get(section);
-            if (placeholder && placeholder.parentNode) {
-                placeholder.parentNode.insertBefore(section, placeholder);
-                placeholder.remove();
-            }
-            insightPlaceholders.delete(section);
-        });
-    }
-
-    function openFirefighterInsightsPanel() {
-        if (!insightsPanel || window.innerWidth > 768) {
+    function restoreAssignedQueueFromModal() {
+        if (!assignedQueueSection || !assignedQueuePlaceholder?.parentNode) {
             return;
         }
 
-        closeFirefighterInsightsPanel();
+        assignedQueuePlaceholder.parentNode.insertBefore(assignedQueueSection, assignedQueuePlaceholder);
+        assignedQueueSection.classList.remove('is-in-modal');
+        assignedQueuePlaceholder.remove();
+        assignedQueuePlaceholder = null;
     }
 
-    function closeFirefighterInsightsPanel() {
-        if (!insightsPanel) {
+    function openAssignedQueueModal() {
+        if (!assignedQueueModal) {
             return;
         }
 
-        restoreInsightsFromPanel();
-        insightsPanel.setAttribute('aria-hidden', 'true');
+        if (typeof window.closeFirefighterMapLayersPanel === 'function') {
+            window.closeFirefighterMapLayersPanel();
+        }
+        if (typeof window.closeFirefighterInsightsPanel === 'function') {
+            window.closeFirefighterInsightsPanel();
+        }
+
+        moveAssignedQueueIntoModal();
+        assignedQueueModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('menu-open');
+    }
+
+    function closeAssignedQueueModal() {
+        if (!assignedQueueModal) {
+            return;
+        }
+
+        restoreAssignedQueueFromModal();
+        assignedQueueModal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('menu-open');
     }
 
-    window.openFirefighterInsightsPanel = openFirefighterInsightsPanel;
-    window.closeFirefighterInsightsPanel = closeFirefighterInsightsPanel;
+    window.openFirefighterAssignedQueueModal = openAssignedQueueModal;
+    window.closeFirefighterAssignedQueueModal = closeAssignedQueueModal;
 
-    insightsCloseButtons.forEach(function (button) {
-        button.addEventListener('click', closeFirefighterInsightsPanel);
+    assignedQueueCloseButtons.forEach(function (button) {
+        button.addEventListener('click', closeAssignedQueueModal);
     });
 
-    window.addEventListener('resize', function () {
-        if (window.innerWidth > 768) {
-            closeFirefighterInsightsPanel();
+    assignedFab?.addEventListener('click', function () {
+        openAssignedQueueModal();
+    });
+
+    assignedQueueModalRefresh?.addEventListener('click', function () {
+        fetchAssignedIncidents(true);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && assignedQueueModal?.getAttribute('aria-hidden') === 'false') {
+            closeAssignedQueueModal();
         }
     });
+
+    syncFirefighterAssignedFabCount(window.assignedIncidentsData || []);
 
     if (welcomeToast) {
         window.setTimeout(function () {

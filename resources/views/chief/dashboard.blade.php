@@ -1567,6 +1567,18 @@
     let icons = [];
 
     document.addEventListener('DOMContentLoaded', function() {
+        window.setTimeout(() => {
+            if (typeof window.refreshMapMarkers === 'function') {
+                window.refreshMapMarkers({
+                    preferSeeded: true,
+                    revalidate: true,
+                    force: true
+                }).catch((error) => {
+                    console.warn('Unable to refresh chief dashboard markers:', error);
+                });
+            }
+        }, 220);
+
         window.addEventListener('pyro:voice-caller-location', function(event) {
             const latLng = Array.isArray(event?.detail?.latLng) ? event.detail.latLng : null;
             if (!latLng || latLng.length < 2) {

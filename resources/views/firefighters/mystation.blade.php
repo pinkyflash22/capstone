@@ -34,13 +34,14 @@
 <body class="firefighter-portal-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'station'])
 
+    <div data-ff-page-root="station">
     <main class="main-content">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'My Station',
             'subtitle' => 'Station resources and reports'
         ])
 
-        <div data-ff-page-root="station" class="station-shell-page">
+        <div class="station-shell-page">
             <div class="station-shell">
                 <section class="station-identity-card" aria-labelledby="stationIdentityTitle">
                     <div class="station-identity-main">
@@ -168,6 +169,7 @@
             </script>
         </div>
     </main>
+    </div>
 
     <div class="report-modal" id="spotReportModal" role="dialog" aria-modal="true" aria-labelledby="spotReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
