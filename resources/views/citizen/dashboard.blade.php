@@ -2004,70 +2004,6 @@
                 </div>
             </div>
 
-            <!-- ANALYTICS SECTION - SEPARATE FROM NAVIGATION -->
-            <div class="px-4 py-4 border-b border-gray-200">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-line"></i> YOUR ANALYTICS
-             
-                </p>
-                <div class="space-y-3">
-                    <!-- Safety Score -->
-                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-medium text-gray-600">Safety Score</span>
-                            {{-- lagay tayo logic dito para mag calculate minors naman na ito --}}
-                            <span class="text-xs font-bold text-green-600">85%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-1.5">
-                            <div class="bg-green-600 h-1.5 rounded-full" style="width: 85%"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Quick Stats -->
-                    <div class="grid grid-cols-2 gap-2">
-                        <div class="bg-blue-50 p-2 rounded-lg text-center">
-                            <p class="text-xs text-gray-500">Alerts</p>
-                            <p id="citizenSidebarAlertsValue" class="text-lg font-bold text-blue-600">{{ $totalAlerts ?? 12 }}</p>
-                        </div>
-                        <div class="bg-orange-50 p-2 rounded-lg text-center">
-                            <p class="text-xs text-gray-500">Reports</p>
-                            <p id="citizenSidebarReportsValue" class="text-lg font-bold text-orange-600">{{ $overviewReportCount ?? $countReport ?? 0 }}</p>
-                            {{-- <p class="text-lg font-bold text-orange-600">{{ $incidents ?? 0 }}</p> --}}
-
-                        </div>
-                        <div class="bg-purple-50 p-2 rounded-lg text-center">
-                            <p class="text-xs text-gray-500">Drills</p>
-                            <p id="citizenSidebarDrillsValue" class="text-lg font-bold text-orange-600">{{ $drillsAttended ?? 5 }}</p>
-                        </div>
-                        <div class="bg-amber-50 p-2 rounded-lg text-center">
-                            <p class="text-xs text-gray-500">Badges</p>
-                            <p id="citizenSidebarBadgesValue" class="text-lg font-bold text-amber-600">{{ $badges ?? 2 }}</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Weekly Activity -->
-                    <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs font-medium text-gray-600">Weekly Activity</span>
-                            <span id="citizenWeeklyActivityChange" class="text-xs text-gray-500">0 this week</span>
-                        </div>
-                        <div id="citizenWeeklyActivityBars" class="flex gap-1 h-12 items-end" aria-label="Weekly activity chart">
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
-                        </div>
-                        <div id="citizenWeeklyActivityLabels" class="flex justify-between mt-1 text-[8px] text-gray-400">
-                            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-                        </div>
-                        <p id="citizenWeeklyActivityPeriod" class="mt-2 text-[10px] text-gray-400">Current week</p>
-                    </div>
-                </div>
-            </div>
-
             <!-- Dynamic Navigation Menu -->
             <nav class="py-4 px-3">
                 <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">MAIN MENU</p>
@@ -2094,6 +2030,16 @@
                         </a>
                     </li>
                     <li>
+                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="safety" data-citizen-switch-section="safety">
+                            <i class="fa-solid fa-book-open w-5 text-gray-400 group-hover:text-orange-600"></i>
+                            <span class="flex-1">Safety Guide</span>
+                        </a>
+                    </li> --}}
+                </ul>
+
+                <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-6 mb-2">COMMUNITY</p>
+                <ul class="space-y-1">
+                    <li>
                         <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="contacts" data-citizen-switch-section="contacts">
                             <i class="fa-solid fa-phone-volume w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Emergency Contacts</span>
@@ -2105,16 +2051,6 @@
                             <span class="flex-1">Announcements</span>
                         </a>
                     </li>
-                    {{-- <li>
-                        <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="safety" data-citizen-switch-section="safety">
-                            <i class="fa-solid fa-book-open w-5 text-gray-400 group-hover:text-orange-600"></i>
-                            <span class="flex-1">Safety Guide</span>
-                        </a>
-                    </li> --}}
-                </ul>
-
-                <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-6 mb-2">COMMUNITY</p>
-                <ul class="space-y-1">
                     {{-- <li>
                         <a class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="neighborhood" data-citizen-switch-section="neighborhood">
                             <i class="fa-solid fa-people-group w-5 text-gray-400 group-hover:text-orange-600"></i>
@@ -2136,7 +2072,63 @@
                     </li> --}}
                 </ul>
 
+            </nav>
 
+            <!-- ANALYTICS SECTION - SEPARATE FROM NAVIGATION -->
+            <div class="px-4 py-4 border-t border-gray-200">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line"></i> YOUR ANALYTICS
+                </p>
+                <div class="space-y-3">
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-medium text-gray-600">Safety Score</span>
+                            <span class="text-xs font-bold text-green-600">85%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-green-600 h-1.5 rounded-full" style="width: 85%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-blue-50 p-2 rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Alerts</p>
+                            <p id="citizenSidebarAlertsValue" class="text-lg font-bold text-blue-600">{{ $totalAlerts ?? 12 }}</p>
+                        </div>
+                        <div class="bg-orange-50 p-2 rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Reports</p>
+                            <p id="citizenSidebarReportsValue" class="text-lg font-bold text-orange-600">{{ $overviewReportCount ?? $countReport ?? 0 }}</p>
+                        </div>
+                        <div class="bg-purple-50 p-2 rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Drills</p>
+                            <p id="citizenSidebarDrillsValue" class="text-lg font-bold text-orange-600">{{ $drillsAttended ?? 5 }}</p>
+                        </div>
+                        <div class="bg-amber-50 p-2 rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Badges</p>
+                            <p id="citizenSidebarBadgesValue" class="text-lg font-bold text-amber-600">{{ $badges ?? 2 }}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-medium text-gray-600">Weekly Activity</span>
+                            <span id="citizenWeeklyActivityChange" class="text-xs text-gray-500">0 this week</span>
+                        </div>
+                        <div id="citizenWeeklyActivityBars" class="flex gap-1 h-12 items-end" aria-label="Weekly activity chart">
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                            <div class="flex-1 bg-orange-100 rounded-t" style="height: 8%"></div>
+                        </div>
+                        <div id="citizenWeeklyActivityLabels" class="flex justify-between mt-1 text-[8px] text-gray-400">
+                            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                        </div>
+                        <p id="citizenWeeklyActivityPeriod" class="mt-2 text-[10px] text-gray-400">Current week</p>
+                    </div>
+                </div>
             </div>
         </div>
     </aside>
@@ -2620,7 +2612,6 @@
                             <div id="citizenSosMenu" class="hidden absolute right-0 top-full mt-3 w-64 rounded-2xl border border-orange-100 bg-white p-3 shadow-2xl z-[120]" role="menu" aria-label="Emergency actions">
                                 <div class="mb-2 px-1">
                                     <p class="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Emergency Actions</p>
-                                    <p class="mt-1 text-xs text-slate-500">Use the same quick emergency actions from the mobile hub.</p>
                                 </div>
                                 <div class="grid gap-2">
                                     <button type="button" class="w-full rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-left text-amber-900 hover:bg-amber-100 transition" data-pyro-voice-call role="menuitem">
@@ -2630,7 +2621,6 @@
                                             </span>
                                             <span class="mobile-hub-btn__copy">
                                                 <strong class="block text-sm font-bold">Call BFP</strong>
-                                                <small class="block text-xs text-amber-700/80">Agora voice call with your existing fallback flow</small>
                                             </span>
                                         </span>
                                     </button>
@@ -2641,7 +2631,6 @@
                                             </span>
                                             <span>
                                                 <strong class="block text-sm font-bold">Call 911</strong>
-                                                <small class="block text-xs text-rose-700/80">Open your phone dialer immediately</small>
                                             </span>
                                         </span>
                                     </a>

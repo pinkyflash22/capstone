@@ -1068,7 +1068,11 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="first_name" name="first_name" class="form-input" 
                                         placeholder="Enter your first name"
-                                        value="{{ old('first_name') }}" required autofocus>
+                                        value="{{ old('first_name') }}"
+                                        pattern="[A-Za-z]+"
+                                        title="First name must contain letters only."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
+                                        required autofocus>
                                 </div>
                             </div>
 
@@ -1082,7 +1086,10 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="middle_name" name="middle_name" class="form-input" 
                                         placeholder="Enter your middle name (optional)"
-                                        value="{{ old('middle_name') }}">
+                                        value="{{ old('middle_name') }}"
+                                        pattern="[A-Za-z]+"
+                                        title="Middle name must contain letters only."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')">
                                 </div>
                             </div>
 
@@ -1096,7 +1103,11 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="last_name" name="last_name" class="form-input" 
                                         placeholder="Enter your last name"
-                                        value="{{ old('last_name') }}" required>
+                                        value="{{ old('last_name') }}"
+                                        pattern="[A-Za-z]+"
+                                        title="Last name must contain letters only."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
+                                        required>
                                 </div>
                             </div>
 
@@ -1130,7 +1141,11 @@
                                     <i class="fa-solid fa-envelope input-icon"></i>
                                     <input type="email" id="email" name="email" class="form-input" 
                                         placeholder="john.doe@example.com"
-                                        value="{{ old('email') }}" required>
+                                        value="{{ old('email') }}"
+                                        pattern="[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}"
+                                        title="Email may only use letters, numbers, @, and dots."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z0-9@.]/g, '')"
+                                        required>
                                 </div>
                             </div>
 
@@ -1143,14 +1158,18 @@
                                 <div class="input-wrapper">
                                     <i class="fa-solid fa-lock input-icon"></i>
                                     <input type="password" id="password" name="password" class="form-input" 
-                                        placeholder="Create a strong password" required>
+                                        placeholder="Create a strong password"
+                                        pattern="(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9@*.\-]{8,}"
+                                        title="Password must be at least 8 characters, include 1 uppercase letter, 1 number, and only use @ - * . as symbols."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z0-9@*.\-]/g, '')"
+                                        required>
                                     <button type="button" class="password-toggle" onclick="togglePassword('password', 'toggleIcon1')">
                                         <i class="fa-solid fa-eye" id="toggleIcon1"></i>
                                     </button>
                                 </div>
                                 <div class="form-hint">
                                     <i class="fa-solid fa-info-circle"></i>
-                                    Minimum 8 characters with at least one number and one uppercase letter
+                                    Minimum 8 characters with at least one number, one uppercase letter, and only these symbols: @ - * .
                                 </div>
                             </div>
 
@@ -1163,7 +1182,11 @@
                                 <div class="input-wrapper">
                                     <i class="fa-solid fa-lock input-icon"></i>
                                     <input type="password" id="password_confirmation" name="password_confirmation" 
-                                        class="form-input" placeholder="Re-enter your password" required>
+                                        class="form-input" placeholder="Re-enter your password"
+                                        pattern="(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9@*.\-]{8,}"
+                                        title="Password confirmation must match the same password format."
+                                        oninput="this.value = this.value.replace(/[^A-Za-z0-9@*.\-]/g, '')"
+                                        required>
                                     <button type="button" class="password-toggle" onclick="togglePassword('password_confirmation', 'toggleIcon2')">
                                         <i class="fa-solid fa-eye" id="toggleIcon2"></i>
                                     </button>
@@ -1387,12 +1410,12 @@
             
             <div style="margin-bottom: 1.5rem;">
                 <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
-                    <input type="text" maxlength="1" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
+                    <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" class="otp-input" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid var(--gray-200); border-radius: 12px; text-align: center;">
                 </div>
                 <div id="otpError" style="color: var(--primary); font-size: 0.875rem; margin-top: 0.5rem; display: none;"></div>
             </div>
@@ -1524,18 +1547,50 @@ document.getElementById('acceptPoliciesBtn').addEventListener('click', () => {
 // Modified form submission - Step 1: Send OTP
 document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    if (!this.checkValidity()) {
+        this.reportValidity();
+        return;
+    }
     
     // Validate form first
+    const firstName = document.getElementById('first_name').value;
+    const middleName = document.getElementById('middle_name').value;
+    const lastName = document.getElementById('last_name').value;
+    const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('password_confirmation').value;
+    const nameRegex = /^[A-Za-z]+$/;
+    const emailRegex = /^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/;
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]{8,}$/;
+
+    if (!nameRegex.test(firstName)) {
+        alert('First name must contain letters only.');
+        return;
+    }
+
+    if (middleName && !nameRegex.test(middleName)) {
+        alert('Middle name must contain letters only.');
+        return;
+    }
+
+    if (!nameRegex.test(lastName)) {
+        alert('Last name must contain letters only.');
+        return;
+    }
+
+    if (!emailRegex.test(email)) {
+        alert('Email may only use letters, numbers, @, and dots.');
+        return;
+    }
     
     if (password !== confirmPassword) {
         alert('Passwords do not match!');
         return;
     }
     
-    if (password.length < 8) {
-        alert('Password must be at least 8 characters long!');
+    if (!passwordRegex.test(password)) {
+        alert('Password must be at least 8 characters, include 1 uppercase letter, 1 number, and only use @ - * . as symbols.');
         return;
     }
     
@@ -1551,7 +1606,6 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     
     // Get form data
     const formData = new FormData(this);
-    const email = document.getElementById('email').value;
     
     // Show loading
     const submitBtn = document.getElementById('submitBtn');
@@ -1622,6 +1676,8 @@ function setupOtpInputs() {
     inputs.forEach((input, index) => {
         input.value = '';
         input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 1);
+
             if (e.target.value.length === 1 && index < inputs.length - 1) {
                 inputs[index + 1].focus();
             }

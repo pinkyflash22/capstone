@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class CommunityActivityRequest extends Model
 {
@@ -34,6 +35,11 @@ class CommunityActivityRequest extends Model
         'preferred_date' => 'date',
         'reviewed_at' => 'datetime',
     ];
+
+    public static function isAvailable(): bool
+    {
+        return Schema::hasTable('community_activity_requests');
+    }
 
     public function requester()
     {

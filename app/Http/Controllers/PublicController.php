@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
@@ -606,12 +607,14 @@ class PublicController extends Controller
         $overviewReportCount = $dashboardData['summary']['total_reports'];
         $citizenCombinedReports = $dashboardData['user_reports'];
         $riskMapReports = $dashboardData['risk_map_reports'];
-        $citizenCommunityActivityRequests = CommunityActivityRequest::query()
-            ->with(['station:station_id,station_name', 'barangay:barangay_id,barangay_name', 'convertedEvent:event_id,event,event_date,schedule'])
-            ->where('requester_user_id', $accountId)
-            ->latest()
-            ->limit(6)
-            ->get();
+        $citizenCommunityActivityRequests = CommunityActivityRequest::isAvailable()
+            ? CommunityActivityRequest::query()
+                ->with(['station:station_id,station_name', 'barangay:barangay_id,barangay_name', 'convertedEvent:event_id,event,event_date,schedule'])
+                ->where('requester_user_id', $accountId)
+                ->latest()
+                ->limit(6)
+                ->get()
+            : collect();
 
 
         //request
@@ -921,11 +924,11 @@ class PublicController extends Controller
         $user = User::with('address')->findOrFail(Auth::id());
 
         $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+(?:\s[A-Za-z]+)*$/'],
+            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z]+(?:\s[A-Za-z]+)*$/'],
+            'last_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+(?:\s[A-Za-z]+)*$/'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
-            'contact_number' => ['nullable', 'string', 'max:50'],
+            'contact_number' => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'city_id' => ['required', 'exists:cities,city_id'],
             'barangay_id' => [
                 'required',
@@ -933,7 +936,13 @@ class PublicController extends Controller
                     $query->where('city_id', $request->city_id);
                 }),
             ],
-            'street' => ['required', 'string', 'max:255'],
+            'street' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9\s,\.-]+$/'],
+        ], [
+            'first_name.regex' => 'First name must contain letters only.',
+            'middle_name.regex' => 'Middle name must contain letters only.',
+            'last_name.regex' => 'Last name must contain letters only.',
+            'contact_number.regex' => 'Phone number must be 11 digits and start with 09.',
+            'street.regex' => 'Street address may only contain letters, numbers, spaces, commas, periods, and hyphens.',
         ]);
 
         $user->first_name = $validated['first_name'];
@@ -949,11 +958,16 @@ class PublicController extends Controller
             $address->barangay_id = $validated['barangay_id'];
             $address->save();
         } else {
-            $address = FullAddress::create([
+            $addressPayload = [
                 'street' => $validated['street'],
                 'barangay_id' => $validated['barangay_id'],
-                'postal_id' => null,
-            ]);
+            ];
+
+            if (Schema::hasColumn('full_addresses', 'postal_id')) {
+                $addressPayload['postal_id'] = null;
+            }
+
+            $address = FullAddress::create($addressPayload);
 
             $user->address_id = $address->address_id;
         }

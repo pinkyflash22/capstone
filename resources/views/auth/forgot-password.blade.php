@@ -209,6 +209,67 @@
             font-size: 0.9rem;
         }
 
+        .identity-card {
+            padding: 1rem;
+            border-radius: 18px;
+            background: #fffaf2;
+            border: 1px solid rgba(198, 61, 38, 0.12);
+            margin-bottom: 1rem;
+        }
+
+        .channel-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.95rem 1rem;
+            border: 1px solid rgba(198, 61, 38, 0.12);
+            border-radius: 16px;
+            background: #fff;
+            margin-bottom: 0.8rem;
+        }
+
+        .channel-option input[type="radio"] {
+            margin-top: 0.2rem;
+            accent-color: var(--primary);
+        }
+
+        .channel-option strong {
+            display: block;
+            color: var(--gray-900);
+            margin-bottom: 0.15rem;
+        }
+
+        .channel-option span {
+            color: var(--gray-600);
+            font-size: 0.92rem;
+        }
+
+        .search-mode-group {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-mode-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.95rem 1rem;
+            border: 1px solid rgba(198, 61, 38, 0.12);
+            border-radius: 16px;
+            background: #fff;
+        }
+
+        .search-mode-option input[type="radio"] {
+            margin-top: 0.2rem;
+            accent-color: var(--primary);
+        }
+
+        .search-mode-option strong {
+            color: var(--gray-900);
+        }
+
         @media (max-width: 480px) {
             .recovery-card {
                 padding: 1.1rem;
@@ -217,6 +278,10 @@
 
             h1 {
                 font-size: 1.42rem;
+            }
+
+            .search-mode-group {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -236,7 +301,12 @@
             <h1>{{ ! empty($resetMode) ? 'Enter reset code' : 'Find your account' }}</h1>
             <p class="lead">
                 @if (! empty($resetMode))
-                    We sent a 6-digit reset code to {{ $maskedEmail ?? 'your email' }}. Enter it below with your new password.
+                    We sent a 6-digit reset code to {{ $maskedDestination ?? $maskedEmail ?? 'your recovery destination' }}. Enter it below with your new password.
+                    @if (! empty($channelLabel))
+                        This code was sent through your {{ strtolower($channelLabel) }}.
+                    @endif
+                @elseif (! empty($recoveryLookup))
+                    We found a matching account. Confirm where you want us to send the recovery code.
                 @else
                     Enter the email address or contact number connected to your PyroSense account.
                 @endif
@@ -261,21 +331,21 @@
                         <label for="otp_code">Reset code</label>
                         <div class="input-wrap">
                             <i class="fa-solid fa-shield-halved"></i>
-                            <input id="otp_code" class="input" type="text" name="otp_code" inputmode="numeric" maxlength="6" placeholder="6-digit code" required autofocus>
+                            <input id="otp_code" class="input" type="text" name="otp_code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6)" placeholder="6-digit code" required autofocus>
                         </div>
                     </div>
                     <div class="field">
                         <label for="password">New password</label>
                         <div class="input-wrap">
                             <i class="fa-solid fa-lock"></i>
-                            <input id="password" class="input" type="password" name="password" placeholder="At least 8 characters" required>
+                            <input id="password" class="input" type="password" name="password" placeholder="At least 8 characters" pattern="(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9@*.\-]{8,}" title="Password must be at least 8 characters, include 1 uppercase letter, 1 number, and only use @ - * . as symbols." oninput="this.value = this.value.replace(/[^A-Za-z0-9@*.\-]/g, '')" required>
                         </div>
                     </div>
                     <div class="field">
                         <label for="password_confirmation">Confirm password</label>
                         <div class="input-wrap">
                             <i class="fa-solid fa-lock"></i>
-                            <input id="password_confirmation" class="input" type="password" name="password_confirmation" placeholder="Repeat new password" required>
+                            <input id="password_confirmation" class="input" type="password" name="password_confirmation" placeholder="Repeat new password" pattern="(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9@*.\-]{8,}" title="Password confirmation must match the same password format." oninput="this.value = this.value.replace(/[^A-Za-z0-9@*.\-]/g, '')" required>
                         </div>
                     </div>
                     <button type="submit" class="btn">
@@ -283,19 +353,91 @@
                         Reset password
                     </button>
                 </form>
-            @else
+            @elseif (! empty($recoveryLookup))
+                <div class="identity-card">
+                    <strong style="display:block;margin-bottom:0.35rem;color:var(--gray-900);">Is this you?</strong>
+                    <span style="color:var(--gray-600);font-size:0.92rem;">Choose a recovery destination for the one-time verification code.</span>
+                </div>
+
                 <form method="POST" action="{{ route('password.email') }}">
                     @csrf
+                    @foreach (($recoveryLookup['channels'] ?? []) as $index => $channel)
+                        <label class="channel-option" for="delivery_channel_{{ $channel['type'] }}">
+                            <input
+                                id="delivery_channel_{{ $channel['type'] }}"
+                                type="radio"
+                                name="delivery_channel"
+                                value="{{ $channel['type'] }}"
+                                {{ old('delivery_channel', $index === 0 ? $channel['type'] : null) === $channel['type'] ? 'checked' : '' }}
+                                required
+                            >
+                            <span>
+                                <strong>{{ $channel['label'] }}</strong>
+                                <span>{{ $channel['masked'] }}</span>
+                            </span>
+                        </label>
+                    @endforeach
+
+                    <button type="submit" class="btn">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        Confirm and send code
+                    </button>
+                </form>
+
+                <a href="{{ route('password.request', ['clear_lookup' => 1]) }}" class="back-link" style="margin-top:0.85rem;">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Search a different account
+                </a>
+            @else
+                <form method="POST" action="{{ route('password.lookup') }}">
+                    @csrf
                     <div class="field">
-                        <label for="account_identifier">Email or contact number</label>
+                        <div class="search-mode-group">
+                            <label class="search-mode-option" for="search_mode_identity">
+                                <input
+                                    id="search_mode_identity"
+                                    type="radio"
+                                    name="search_mode"
+                                    value="identity"
+                                    {{ old('search_mode', 'identity') === 'identity' ? 'checked' : '' }}
+                                    required
+                                >
+                                <strong>Name or email</strong>
+                            </label>
+
+                            <label class="search-mode-option" for="search_mode_mobile">
+                                <input
+                                    id="search_mode_mobile"
+                                    type="radio"
+                                    name="search_mode"
+                                    value="mobile"
+                                    {{ old('search_mode') === 'mobile' ? 'checked' : '' }}
+                                    required
+                                >
+                                <strong>Mobile number</strong>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="account_identifier" id="accountIdentifierLabel">Name or email</label>
                         <div class="input-wrap">
                             <i class="fa-solid fa-user-magnifying-glass"></i>
-                            <input id="account_identifier" class="input" type="text" name="account_identifier" value="{{ old('account_identifier') }}" placeholder="email@example.com or 09XXXXXXXXX" required autofocus>
+                            <input
+                                id="account_identifier"
+                                class="input"
+                                type="text"
+                                name="account_identifier"
+                                value="{{ old('account_identifier') }}"
+                                placeholder="Juan Dela Cruz or email@example.com"
+                                required
+                                autofocus
+                            >
                         </div>
                     </div>
                     <button type="submit" class="btn">
-                        <i class="fa-solid fa-paper-plane"></i>
-                        Search and send code
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        Search account
                     </button>
                 </form>
             @endif
@@ -306,5 +448,45 @@
             </a>
         </section>
     </main>
+
+    <script>
+        (function () {
+            const identityRadio = document.getElementById('search_mode_identity');
+            const mobileRadio = document.getElementById('search_mode_mobile');
+            const input = document.getElementById('account_identifier');
+            const label = document.getElementById('accountIdentifierLabel');
+            if (!identityRadio || !mobileRadio || !input || !label) {
+                return;
+            }
+
+            const applySearchMode = () => {
+                if (mobileRadio.checked) {
+                    label.textContent = 'Mobile number';
+                    input.placeholder = '09XXXXXXXXX';
+                    input.inputMode = 'numeric';
+                    input.maxLength = 11;
+                    input.pattern = '09[0-9]{9}';
+                    input.title = 'Mobile number must be 11 digits and start with 09.';
+                    input.oninput = function () {
+                        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+                    };
+                } else {
+                    label.textContent = 'Name or email';
+                    input.placeholder = 'Juan Dela Cruz or email@example.com';
+                    input.inputMode = 'text';
+                    input.maxLength = 255;
+                    input.removeAttribute('pattern');
+                    input.title = 'Enter your full name using letters and spaces, or a valid email address.';
+                    input.oninput = function () {
+                        this.value = this.value.replace(/[^A-Za-z0-9@. ]/g, '');
+                    };
+                }
+            };
+
+            identityRadio.addEventListener('change', applySearchMode);
+            mobileRadio.addEventListener('change', applySearchMode);
+            applySearchMode();
+        })();
+    </script>
 </body>
 </html>

@@ -476,6 +476,73 @@
         display: none;
     }
 
+    #citizenReportsHistoryModal {
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+    }
+
+    #citizenReportsHistoryModal .reports-history-panel {
+        width: min(100%, 58rem);
+        max-width: 58rem;
+        max-height: min(78vh, 46rem);
+        margin: 0 auto;
+        border-radius: 1.75rem;
+        box-shadow: 0 24px 56px rgba(15, 23, 42, 0.2);
+    }
+
+    #citizenReportsHistoryModal .reports-history-body {
+        max-height: calc(min(78vh, 46rem) - 10.5rem);
+    }
+
+    body.citizen-history-standalone {
+        background: #fffdfa;
+    }
+
+    body.citizen-history-standalone #sidebar,
+    body.citizen-history-standalone #sidebarBackdrop,
+    body.citizen-history-standalone .citizen-mobile-dock,
+    body.citizen-history-standalone [data-citizen-settings-panel],
+    body.citizen-history-standalone [data-citizen-map-layers-panel] {
+        display: none !important;
+    }
+
+    body.citizen-history-standalone #section-alerts {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    body.citizen-history-standalone #section-alerts .aoc-shell > *:not(#citizenReportsHistoryModal) {
+        display: none !important;
+    }
+
+    body.citizen-history-standalone #citizenReportsHistoryModal {
+        padding: 0;
+        align-items: stretch;
+        justify-content: stretch;
+        background: rgba(255, 253, 250, 0.98);
+        backdrop-filter: none;
+    }
+
+    body.citizen-history-standalone #citizenReportsHistoryModal .reports-history-panel {
+        width: 100%;
+        max-width: none;
+        min-height: 100vh;
+        max-height: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    body.citizen-history-standalone #citizenReportsHistoryModal .reports-history-header,
+    body.citizen-history-standalone #citizenReportsHistoryModal .reports-history-toolbar,
+    body.citizen-history-standalone #citizenReportsHistoryModal .reports-history-body {
+        padding-left: clamp(1rem, 4vw, 1.5rem);
+        padding-right: clamp(1rem, 4vw, 1.5rem);
+    }
+
     @media (min-width: 760px) {
         #section-alerts .aoc-hero-grid,
         #section-alerts .aoc-panel-head-row,
@@ -811,6 +878,18 @@
         #section-alerts .reports-history-mobile-list {
             display: grid;
             gap: 0.7rem;
+        }
+
+        body.citizen-history-standalone #citizenReportsHistoryModal {
+            padding: 0;
+            align-items: stretch;
+        }
+
+        body.citizen-history-standalone #citizenReportsHistoryModal .reports-history-panel {
+            max-width: none;
+            max-height: none;
+            min-height: 100vh;
+            border-radius: 0;
         }
 
         #section-alerts .reports-history-card {
@@ -1165,6 +1244,8 @@
 
 <script>
 (() => {
+    const pageParams = new URLSearchParams(window.location.search);
+    const reportsHistoryStandalone = pageParams.get('reports') === 'history' && pageParams.get('standalone') === '1';
     const initialAlerts = @json($nearbyAlertCollection->values());
     const initialReports = @json($combinedReportCollection->values());
     const initialRiskMapReports = @json($riskMapCollection->values());
@@ -1623,6 +1704,9 @@
 
     function openReportsHistoryModal() {
         if (!reportHistoryModal) return;
+        if (reportsHistoryStandalone) {
+            document.body.classList.add('citizen-history-standalone');
+        }
         reportHistoryModal.classList.remove('hidden');
         reportHistoryModal.classList.add('flex');
         document.body.style.overflow = 'hidden';
@@ -1634,6 +1718,9 @@
         reportHistoryModal.classList.add('hidden');
         reportHistoryModal.classList.remove('flex');
         document.body.style.overflow = '';
+        if (reportsHistoryStandalone) {
+            document.body.classList.remove('citizen-history-standalone');
+        }
     }
 
     function openConcernDetailsModal(record) {
@@ -1835,13 +1922,15 @@
     renderReportsHistoryTable();
     ensureConcernMap();
 
-    if (new URLSearchParams(window.location.search).get('reports') === 'history') {
+    if (pageParams.get('reports') === 'history') {
         window.setTimeout(() => {
             window.switchSection?.('alerts', { updateHistory: false });
             openReportsHistoryModal();
 
             const nextUrl = new URL(window.location.href);
             nextUrl.searchParams.delete('reports');
+            nextUrl.searchParams.delete('standalone');
+            nextUrl.searchParams.delete('source');
             window.history.replaceState(window.history.state, '', nextUrl.toString());
         }, 250);
     }

@@ -1238,7 +1238,7 @@ class StationAdminController extends Controller
         $pendingCommunityActivityRequests = collect();
         $reviewedCommunityActivityRequests = collect();
 
-        if ($stationId) {
+        if ($stationId && CommunityActivityRequest::isAvailable()) {
             $pendingCommunityActivityRequests = CommunityActivityRequest::query()
                 ->with([
                     'requester:user_id,first_name,middle_name,last_name,contact_number',

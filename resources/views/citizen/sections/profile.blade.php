@@ -160,6 +160,10 @@
         margin-inline: auto;
     }
 
+    #section-profile .profile-layout > :not(main.profile-shell) {
+        transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+    }
+
     #section-profile .profile-card {
         overflow: hidden;
         border-radius: 1.6rem;
@@ -502,7 +506,9 @@
         align-content: start;
         justify-items: center;
         gap: 0.85rem;
-        background: rgba(15, 23, 42, 0.48);
+        background: rgba(15, 23, 42, 0.28);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
         padding: clamp(1rem, 3vw, 2rem);
         padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
     }
@@ -510,6 +516,15 @@
     #section-profile.is-editing .profile-layout > main.profile-shell,
     #section-profile.is-account-settings .profile-layout > main.profile-shell {
         display: grid;
+    }
+
+    #section-profile.is-editing .profile-layout > :not(main.profile-shell),
+    #section-profile.is-account-settings .profile-layout > :not(main.profile-shell) {
+        opacity: 0.55;
+        filter: blur(1.5px);
+        transform: scale(0.992);
+        pointer-events: none;
+        user-select: none;
     }
 
     #section-profile .profile-layout > main.profile-shell > * {
@@ -581,6 +596,25 @@
     #section-profile .profile-settings-list {
         display: grid;
         gap: 0.75rem;
+    }
+
+    #section-profile.is-account-settings .profile-layout > main.profile-shell {
+        align-content: start;
+    }
+
+    #section-profile.is-account-settings .profile-layout > main.profile-shell > section.profile-card {
+        display: flex;
+        flex-direction: column;
+        max-height: min(84vh, 760px);
+        overflow: hidden;
+    }
+
+    #section-profile.is-account-settings .profile-card-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-bottom: 1.25rem;
     }
 
     #section-profile .profile-setting-row {
@@ -997,19 +1031,19 @@
                                 <div class="profile-form-grid">
                                     <div>
                                         <label for="citizen_first_name" class="profile-form-label">First Name</label>
-                                        <input id="citizen_first_name" name="first_name" type="text" required value="{{ old('first_name', $profileUser->first_name) }}" class="profile-input">
+                                        <input id="citizen_first_name" name="first_name" type="text" required value="{{ old('first_name', $profileUser->first_name) }}" class="profile-input" autocomplete="given-name" inputmode="text" maxlength="255" pattern="[A-Za-z]+(?:\s[A-Za-z]+)*">
                                     </div>
                                     <div>
                                         <label for="citizen_middle_name" class="profile-form-label">Middle Name</label>
-                                        <input id="citizen_middle_name" name="middle_name" type="text" value="{{ old('middle_name', $profileUser->middle_name) }}" class="profile-input">
+                                        <input id="citizen_middle_name" name="middle_name" type="text" value="{{ old('middle_name', $profileUser->middle_name) }}" class="profile-input" autocomplete="additional-name" inputmode="text" maxlength="255" pattern="[A-Za-z]+(?:\s[A-Za-z]+)*">
                                     </div>
                                     <div>
                                         <label for="citizen_last_name" class="profile-form-label">Last Name</label>
-                                        <input id="citizen_last_name" name="last_name" type="text" required value="{{ old('last_name', $profileUser->last_name) }}" class="profile-input">
+                                        <input id="citizen_last_name" name="last_name" type="text" required value="{{ old('last_name', $profileUser->last_name) }}" class="profile-input" autocomplete="family-name" inputmode="text" maxlength="255" pattern="[A-Za-z]+(?:\s[A-Za-z]+)*">
                                     </div>
                                     <div>
                                         <label for="citizen_contact_number" class="profile-form-label">Phone Number</label>
-                                        <input id="citizen_contact_number" name="contact_number" type="text" value="{{ old('contact_number', $profileUser->contact_number) }}" class="profile-input">
+                                        <input id="citizen_contact_number" name="contact_number" type="text" value="{{ old('contact_number', $profileUser->contact_number) }}" class="profile-input" autocomplete="tel" inputmode="numeric" maxlength="11" pattern="09\d{9}">
                                     </div>
                                 </div>
                             </div>
@@ -1068,13 +1102,13 @@
                                     </div>
                                     <div class="profile-field--wide">
                                         <label for="citizen_street" class="profile-form-label">Street Address</label>
-                                        <input id="citizen_street" name="street" type="text" required value="{{ old('street', $profileStreet) }}" class="profile-input" placeholder="Enter street address">
+                                        <input id="citizen_street" name="street" type="text" required value="{{ old('street', $profileStreet) }}" class="profile-input" placeholder="Enter street address" autocomplete="street-address" inputmode="text" maxlength="255" pattern="[A-Za-z0-9\s,.\-]+">
                                     </div>
                                 </div>
                                 <div id="profileInfoMessage" class="profile-message"></div>
                                 <div class="profile-form-actions">
-                                    <button id="citizenProfileCancelBtn" type="button" class="profile-secondary-btn">Cancel</button>
                                     <button id="citizenProfileSaveBtn" type="submit" class="profile-primary-btn">Save Changes</button>
+                                    <button id="citizenProfileCancelBtn" type="button" class="profile-secondary-btn">Cancel</button>
                                 </div>
                             </div>
                         </div>
@@ -1114,8 +1148,8 @@
                                 </div>
                                 <div id="profileEmailMessage" class="profile-message"></div>
                                 <div class="profile-form-actions">
-                                    <button type="button" class="profile-secondary-btn" data-account-cancel="email">Cancel</button>
                                     <button type="submit" class="profile-primary-btn">Save Email</button>
+                                    <button type="button" class="profile-secondary-btn" data-account-cancel="email">Cancel</button>
                                 </div>
                             </form>
 
@@ -1154,8 +1188,8 @@
                                 </div>
                                 <div id="profilePasswordMessage" class="profile-message"></div>
                                 <div class="profile-form-actions">
-                                    <button type="button" class="profile-secondary-btn" data-account-cancel="password">Cancel</button>
                                     <button type="submit" class="profile-primary-btn">Save Password</button>
+                                    <button type="button" class="profile-secondary-btn" data-account-cancel="password">Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1264,6 +1298,41 @@ document.addEventListener('DOMContentLoaded', function () {
             error.textContent = Array.isArray(messages) ? messages[0] : messages;
             input.closest('.profile-password-wrap')?.insertAdjacentElement('afterend', error) || input.insertAdjacentElement('afterend', error);
         });
+    }
+
+    function validateProfileForm() {
+        const errors = {};
+        const firstName = document.getElementById('citizen_first_name')?.value.trim() || '';
+        const middleName = document.getElementById('citizen_middle_name')?.value.trim() || '';
+        const lastName = document.getElementById('citizen_last_name')?.value.trim() || '';
+        const contactNumber = document.getElementById('citizen_contact_number')?.value.trim() || '';
+        const street = document.getElementById('citizen_street')?.value.trim() || '';
+
+        const namePattern = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+        const phonePattern = /^09\d{9}$/;
+        const streetPattern = /^[A-Za-z0-9\s,.-]+$/;
+
+        if (!namePattern.test(firstName)) {
+            errors.first_name = ['First name must contain letters only.'];
+        }
+
+        if (middleName !== '' && !namePattern.test(middleName)) {
+            errors.middle_name = ['Middle name must contain letters only.'];
+        }
+
+        if (!namePattern.test(lastName)) {
+            errors.last_name = ['Last name must contain letters only.'];
+        }
+
+        if (contactNumber !== '' && !phonePattern.test(contactNumber)) {
+            errors.contact_number = ['Phone number must be 11 digits and start with 09.'];
+        }
+
+        if (!streetPattern.test(street)) {
+            errors.street = ['Street address may only contain letters, numbers, spaces, commas, periods, and hyphens.'];
+        }
+
+        return errors;
     }
 
     function setText(id, value) {
@@ -1391,6 +1460,13 @@ document.addEventListener('DOMContentLoaded', function () {
         clearProfileErrors(profileForm);
         setMessage(infoMessage);
 
+        const clientErrors = validateProfileForm();
+        if (Object.keys(clientErrors).length > 0) {
+            applyFieldErrors(clientErrors, profileForm);
+            setMessage(infoMessage, 'Please check the highlighted fields.', true);
+            return;
+        }
+
         if (!hasProfileChanges()) {
             setMessage(infoMessage, 'No changes were made.', true);
             return;
@@ -1453,6 +1529,24 @@ document.addEventListener('DOMContentLoaded', function () {
             clearProfileErrors(form);
             setMessage(form?.querySelector('.profile-message'));
         });
+    });
+
+    [
+        document.getElementById('citizen_first_name'),
+        document.getElementById('citizen_middle_name'),
+        document.getElementById('citizen_last_name'),
+    ].forEach((input) => {
+        input?.addEventListener('input', () => {
+            input.value = input.value.replace(/[^A-Za-z\s]/g, '').replace(/\s{2,}/g, ' ');
+        });
+    });
+
+    document.getElementById('citizen_contact_number')?.addEventListener('input', (event) => {
+        event.target.value = event.target.value.replace(/\D/g, '').slice(0, 11);
+    });
+
+    document.getElementById('citizen_street')?.addEventListener('input', (event) => {
+        event.target.value = event.target.value.replace(/[^A-Za-z0-9\s,.-]/g, '');
     });
 
     document.querySelectorAll('[data-password-toggle]').forEach((button) => {

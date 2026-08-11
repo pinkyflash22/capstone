@@ -22,6 +22,12 @@ class CommunityActivityRequestController extends Controller
         $user = Auth::user();
         abort_unless($user, 403);
 
+        if (! CommunityActivityRequest::isAvailable()) {
+            return redirect()
+                ->route('citizen.dashboard', ['section' => 'announcements'])
+                ->with('error', 'Community activity requests are not available on this server yet.');
+        }
+
         $barangay = $user->address?->barangay;
         $this->createRequest($request, $user, $barangay, 'citizen');
 
@@ -36,6 +42,12 @@ class CommunityActivityRequestController extends Controller
     {
         $user = Auth::user();
         abort_unless($user, 403);
+
+        if (! CommunityActivityRequest::isAvailable()) {
+            return redirect()
+                ->route('barangay.awareness')
+                ->with('error', 'Community activity requests are not available on this server yet.');
+        }
 
         $barangay = $this->resolveBarangayForBarangayUser($user);
 
@@ -58,6 +70,12 @@ class CommunityActivityRequestController extends Controller
     {
         $user = Auth::user();
         abort_unless($user, 403);
+
+        if (! CommunityActivityRequest::isAvailable()) {
+            return redirect()
+                ->route('station-admin.schedule')
+                ->with('error', 'Community activity requests are not available on this server yet.');
+        }
 
         $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
         $stationId = $stationOfficer?->station_id;
@@ -145,6 +163,12 @@ class CommunityActivityRequestController extends Controller
     {
         $user = Auth::user();
         abort_unless($user, 403);
+
+        if (! CommunityActivityRequest::isAvailable()) {
+            return redirect()
+                ->route('station-admin.schedule')
+                ->with('error', 'Community activity requests are not available on this server yet.');
+        }
 
         $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
         $stationId = $stationOfficer?->station_id;

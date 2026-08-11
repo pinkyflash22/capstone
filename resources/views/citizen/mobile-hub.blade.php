@@ -552,7 +552,7 @@
                     </button>
                 </div>
 
-                <a href="{{ rtrim(route('citizen.dashboard'), '/') }}/alerts?reports=history" class="mobile-hub-btn mobile-hub-btn--dashboard" data-mobile-hub-nav="history">
+                <a href="{{ rtrim(route('citizen.dashboard'), '/') }}/alerts?reports=history&standalone=1&source=mobile-hub" class="mobile-hub-btn mobile-hub-btn--dashboard" data-mobile-hub-nav="history">
                     <span class="mobile-hub-btn__icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
                     <span class="mobile-hub-btn__copy">
                         <strong>History</strong>

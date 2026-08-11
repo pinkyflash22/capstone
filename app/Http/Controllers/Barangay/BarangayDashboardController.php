@@ -550,12 +550,14 @@ class BarangayDashboardController extends Controller
                 ->limit(18)
                 ->get();
 
-            $communityActivityRequests = CommunityActivityRequest::query()
-                ->with(['station:station_id,station_name', 'convertedEvent:event_id,event,event_date,schedule'])
-                ->where('barangay_id', $barangay->barangay_id)
-                ->latest()
-                ->limit(6)
-                ->get();
+            $communityActivityRequests = CommunityActivityRequest::isAvailable()
+                ? CommunityActivityRequest::query()
+                    ->with(['station:station_id,station_name', 'convertedEvent:event_id,event,event_date,schedule'])
+                    ->where('barangay_id', $barangay->barangay_id)
+                    ->latest()
+                    ->limit(6)
+                    ->get()
+                : collect();
 
         }
 

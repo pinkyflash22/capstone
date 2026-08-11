@@ -95,16 +95,16 @@ class RegisterController extends Controller
         }
 
         $validated = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'last_name' => 'required|string|max:255',
+            'first_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'last_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
             'contact_number' => 'required|string|regex:/^[0-9]{11}$/|unique:users,contact_number',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email' => ['required', 'email', 'max:255', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/', 'unique:users,email'],
             'role_id' => 'required|exists:roles,role_id',
             'rank' => ['nullable', 'string', 'max:50', Rule::in($this->stationOfficerRanks)],
             'barangay_officer_position' => ['nullable', 'string', Rule::in(array_keys($this->barangayOfficerPositions))],
             'barangay_officer_status' => 'nullable|in:active,inactive',
-            'password' => 'nullable|string|min:8|confirmed',
+            'password' => ['nullable', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/'],
             'province_id' => 'nullable|exists:provinces,province_id',
             'city_id' => 'nullable|exists:cities,city_id',
             'barangay_id' => 'nullable|exists:barangays,barangay_id',
@@ -147,27 +147,37 @@ class RegisterController extends Controller
             $addressId = null;
 
             if (!empty($validated['street']) && !empty($validated['barangay_id'])) {
+                $supportsPostalId = Schema::hasColumn('full_addresses', 'postal_id');
                 $postalId = null;
 
-                if (!empty($validated['city_id'])) {
+                if ($supportsPostalId && !empty($validated['city_id'])) {
                     $postalId = PostalCode::where('city_id', $validated['city_id'])
                         ->orderBy('postal_code')
                         ->value('postal_id');
                 }
 
-                $existingAddress = FullAddress::where('street', $validated['street'])
-                    ->where('barangay_id', $validated['barangay_id'])
-                    ->where('postal_id', $postalId)
-                    ->first();
+                $existingAddressQuery = FullAddress::where('street', $validated['street'])
+                    ->where('barangay_id', $validated['barangay_id']);
+
+                if ($supportsPostalId) {
+                    $existingAddressQuery->where('postal_id', $postalId);
+                }
+
+                $existingAddress = $existingAddressQuery->first();
 
                 if ($existingAddress) {
                     $addressId = $existingAddress->address_id;
                 } else {
-                    $address = FullAddress::create([
+                    $addressPayload = [
                         'street' => $validated['street'],
                         'barangay_id' => $validated['barangay_id'],
-                        'postal_id' => $postalId,
-                    ]);
+                    ];
+
+                    if ($supportsPostalId) {
+                        $addressPayload['postal_id'] = $postalId;
+                    }
+
+                    $address = FullAddress::create($addressPayload);
                     $addressId = $address->address_id;
                 }
             }
@@ -675,7 +685,7 @@ public function verifyOTPAndRegister(Request $request)
     try {
         $request->validate([
             'otp_request_id' => 'required|exists:otp_requests,id',
-            'otp_code' => 'required|string|size:6',
+            'otp_code' => ['required', 'string', 'size:6', 'regex:/^\d{6}$/'],
         ]);
 
         $otpRequest = OtpRequest::find($request->otp_request_id);
@@ -742,19 +752,29 @@ public function verifyOTPAndRegister(Request $request)
             $addressId = null;
             
             if (!empty($formData['street']) && !empty($formData['barangay_id'])) {
-                $existingAddress = FullAddress::where('street', $formData['street'])
-                    ->where('barangay_id', $formData['barangay_id'])
-                    ->where('postal_id', $formData['postal_id'] ?? null)
-                    ->first();
-                
+                $supportsPostalId = Schema::hasColumn('full_addresses', 'postal_id');
+                $existingAddressQuery = FullAddress::where('street', $formData['street'])
+                    ->where('barangay_id', $formData['barangay_id']);
+
+                if ($supportsPostalId) {
+                    $existingAddressQuery->where('postal_id', $formData['postal_id'] ?? null);
+                }
+
+                $existingAddress = $existingAddressQuery->first();
+
                 if ($existingAddress) {
                     $addressId = $existingAddress->address_id;
                 } else {
-                    $address = FullAddress::create([
+                    $addressPayload = [
                         'street' => $formData['street'],
                         'barangay_id' => $formData['barangay_id'],
-                        'postal_id' => $formData['postal_id'] ?? null,
-                    ]);
+                    ];
+
+                    if ($supportsPostalId) {
+                        $addressPayload['postal_id'] = $formData['postal_id'] ?? null;
+                    }
+
+                    $address = FullAddress::create($addressPayload);
                     $addressId = $address->address_id;
                 }
             }
@@ -907,13 +927,13 @@ public function resendOTP(Request $request)
     private function otpRegistrationRules(): array
     {
         return [
-            'first_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'last_name' => 'required|string|max:255',
+            'first_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'last_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
             'contact_number' => 'required|string|regex:/^[0-9]{11}$/|unique:users,contact_number',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email' => ['required', 'email', 'max:255', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/', 'unique:users,email'],
             'role_id' => 'required|exists:roles,role_id',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/'],
             'province_id' => 'nullable|exists:provinces,province_id',
             'city_id' => 'nullable|exists:cities,city_id',
             'barangay_id' => 'nullable|exists:barangays,barangay_id',

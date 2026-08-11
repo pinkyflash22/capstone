@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -81,8 +82,8 @@ class LoginController extends Controller
 
         // Validate credentials
         $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
+            'email' => ['required', 'email', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/'],
+            'password' => ['required', 'string', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/'],
         ]);
         $postLoginAction = $request->input('post_login_action');
 
@@ -145,87 +146,237 @@ class LoginController extends Controller
         ]);
     }
 
-    public function showForgotPasswordForm()
+    public function showForgotPasswordForm(Request $request)
     {
+        if ($request->boolean('clear_lookup')) {
+            $request->session()->forget('password_recovery_lookup');
+        }
+
         return response()
-            ->view('auth.forgot-password')
+            ->view('auth.forgot-password', [
+                'recoveryLookup' => $request->session()->get('password_recovery_lookup'),
+            ])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
             ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
     }
 
-    public function sendPasswordResetOtp(Request $request): RedirectResponse
+    public function searchPasswordRecoveryAccount(Request $request): RedirectResponse
     {
         $validated = $request->validate([
+            'search_mode' => ['required', 'in:identity,mobile'],
             'account_identifier' => ['required', 'string', 'max:255'],
         ], [
-            'account_identifier.required' => 'Enter your email address or contact number.',
+            'search_mode.required' => 'Select how you want to search for your account.',
+            'account_identifier.required' => 'Enter your account details.',
         ]);
 
+        $searchMode = $validated['search_mode'];
         $identifier = trim($validated['account_identifier']);
-        $digits = preg_replace('/\D+/', '', $identifier);
 
-        $user = User::query()
-            ->where('email', $identifier)
-            ->when($digits !== '', function ($query) use ($digits, $identifier) {
-                $query->orWhere('contact_number', $digits)
-                    ->orWhere('contact_number', $identifier);
-            })
-            ->first();
+        if ($searchMode === 'mobile') {
+            if (! preg_match('/^09\d{9}$/', $identifier)) {
+                throw ValidationException::withMessages([
+                    'account_identifier' => 'Mobile number must be 11 digits and start with 09.',
+                ]);
+            }
+        } else {
+            $isEmail = str_contains($identifier, '@');
+
+            if ($isEmail) {
+                if (! preg_match('/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/', $identifier)) {
+                    throw ValidationException::withMessages([
+                        'account_identifier' => 'Enter a valid email address using letters, numbers, @, and dots only.',
+                    ]);
+                }
+            } else {
+                if (! preg_match('/^[A-Za-z ]+$/', $identifier)) {
+                    throw ValidationException::withMessages([
+                        'account_identifier' => 'Name search only allows letters and spaces.',
+                    ]);
+                }
+            }
+        }
+
+        $user = $this->findRecoveryUserByIdentifier($identifier, $searchMode);
 
         if (! $user) {
             throw ValidationException::withMessages([
-                'account_identifier' => 'No PyroSense account matched that email address or contact number.',
+                'account_identifier' => $searchMode === 'mobile'
+                    ? 'No PyroSense account matched that mobile number.'
+                    : 'No PyroSense account matched that name or email address.',
             ]);
         }
 
-        if (! $user->email) {
+        $channels = $this->buildRecoveryChannels($user);
+
+        if (empty($channels)) {
             throw ValidationException::withMessages([
-                'account_identifier' => 'This account does not have an email address for password recovery.',
+                'account_identifier' => 'This account does not have a supported recovery destination yet.',
             ]);
         }
 
-        $recentRequests = OtpRequest::where('email', $user->email)
-            ->where('created_at', '>=', now()->subMinute())
-            ->count();
-
-        if ($recentRequests >= 3) {
-            throw ValidationException::withMessages([
-                'account_identifier' => 'Too many recovery requests. Please wait a minute before trying again.',
-            ]);
-        }
-
-        $otpCode = $this->generateOtpCode();
-        $requestId = 'password-reset-otp-' . uniqid();
-
-        Mail::raw(
-            "Your PyroSense password reset code is {$otpCode}. This code will expire in 10 minutes. If you did not request this, you can ignore this email.",
-            function ($message) use ($user) {
-                $message->to($user->email)
-                    ->subject('PyroSense Password Reset Code');
-            }
-        );
-
-        $otp = OtpRequest::create([
+        $request->session()->put('password_recovery_lookup', [
             'user_id' => $user->user_id,
-            'phone' => (string) ($user->contact_number ?? 'N/A'),
-            'email' => $user->email,
-            'request_id' => $requestId,
-            'otp_code' => $otpCode,
-            'expires_at' => now()->addMinutes(10),
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+            'account_identifier' => $identifier,
+            'search_mode' => $searchMode,
+            'channels' => $channels,
         ]);
+
+        return redirect()
+            ->route('password.request')
+            ->with('success', 'We found a matching PyroSense account. Confirm where you want the reset code sent.');
+    }
+
+    public function sendPasswordResetOtp(Request $request): RedirectResponse
+    {
+        $lookup = $request->session()->get('password_recovery_lookup');
+
+        if (! $lookup) {
+            return redirect()
+                ->route('password.request')
+                ->withErrors([
+                    'account_identifier' => 'Search for your account first before sending a reset code.',
+                ]);
+        }
+
+        $validated = $request->validate([
+            'delivery_channel' => ['required', 'in:email,phone'],
+        ], [
+            'delivery_channel.required' => 'Select where you want to receive the reset code.',
+        ]);
+
+        $user = User::find($lookup['user_id'] ?? null);
+
+        if (! $user) {
+            $request->session()->forget('password_recovery_lookup');
+
+            return redirect()
+                ->route('password.request')
+                ->withErrors([
+                    'account_identifier' => 'The selected account is no longer available. Please search again.',
+                ]);
+        }
+
+        $channels = collect($this->buildRecoveryChannels($user))->keyBy('type');
+        $selectedChannel = $channels->get($validated['delivery_channel']);
+
+        if (! $selectedChannel) {
+            throw ValidationException::withMessages([
+                'delivery_channel' => 'The selected recovery destination is not available for this account.',
+            ]);
+        }
+
+        $maskedDestination = $selectedChannel['masked'];
+        $channelType = $selectedChannel['type'];
+
+        if ($channelType === 'email') {
+            $recentRequests = OtpRequest::where('email', $user->email)
+                ->where('created_at', '>=', now()->subMinute())
+                ->count();
+
+            if ($recentRequests >= 3) {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'Too many recovery requests. Please wait a minute before trying again.',
+                ]);
+            }
+
+            $otpCode = $this->generateOtpCode();
+            $requestId = 'password-reset-otp-' . uniqid();
+
+            Mail::raw(
+                "Your PyroSense password reset code is {$otpCode}. This code will expire in 10 minutes. If you did not request this, you can ignore this email.",
+                function ($message) use ($user) {
+                    $message->to($user->email)
+                        ->subject('PyroSense Password Reset Code');
+                }
+            );
+
+            $otp = OtpRequest::create([
+                'user_id' => $user->user_id,
+                'phone' => (string) ($user->contact_number ?? 'N/A'),
+                'email' => $user->email,
+                'request_id' => $requestId,
+                'otp_code' => $otpCode,
+                'expires_at' => now()->addMinutes(10),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        } else {
+            $phone = preg_replace('/\D+/', '', (string) $user->contact_number);
+
+            if ($phone === '') {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'This account does not have a valid mobile number for OTP delivery.',
+                ]);
+            }
+
+            $recentRequests = OtpRequest::where('phone', $phone)
+                ->where('created_at', '>=', now()->subMinute())
+                ->count();
+
+            if ($recentRequests >= 3) {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'Too many recovery requests. Please wait a minute before trying again.',
+                ]);
+            }
+
+            $apiKey = env('MOVIDER_API_KEY');
+            $apiSecret = env('MOVIDER_API_SECRET');
+
+            if (! $apiKey || ! $apiSecret) {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'Mobile OTP delivery is not configured on this server right now.',
+                ]);
+            }
+
+            $response = Http::asForm()->post('https://api.movider.co/v1/verify', [
+                'to' => $phone,
+                'api_key' => $apiKey,
+                'api_secret' => $apiSecret,
+            ]);
+
+            if (! $response->successful()) {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'Unable to send the reset code to your mobile number right now. Please try again.',
+                ]);
+            }
+
+            $responseData = $response->json();
+            $requestId = $responseData['request_id'] ?? null;
+
+            if (! $requestId) {
+                throw ValidationException::withMessages([
+                    'delivery_channel' => 'The mobile OTP provider returned an invalid response. Please try again.',
+                ]);
+            }
+
+            $otp = OtpRequest::create([
+                'user_id' => $user->user_id,
+                'phone' => $phone,
+                'email' => $user->email,
+                'request_id' => $requestId,
+                'otp_code' => null,
+                'expires_at' => now()->addMinutes(5),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        }
 
         $request->session()->put('pending_password_reset', [
             'user_id' => $user->user_id,
             'otp_request_id' => $otp->id,
             'email' => $user->email,
+            'channel' => $channelType,
+            'masked_destination' => $maskedDestination,
+            'channel_label' => $selectedChannel['label'],
         ]);
+
+        $request->session()->forget('password_recovery_lookup');
 
         return redirect()
             ->route('password.reset.form')
-            ->with('success', 'We found your account and sent a reset code to ' . $this->maskEmail($user->email) . '.');
+            ->with('success', 'We sent a reset code to ' . $maskedDestination . '.');
     }
 
     public function showResetPasswordForm(Request $request)
@@ -238,6 +389,8 @@ class LoginController extends Controller
             ->view('auth.forgot-password', [
                 'resetMode' => true,
                 'maskedEmail' => $this->maskEmail((string) $request->session()->get('pending_password_reset.email')),
+                'maskedDestination' => $request->session()->get('pending_password_reset.masked_destination'),
+                'channelLabel' => $request->session()->get('pending_password_reset.channel_label'),
             ])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
@@ -253,8 +406,8 @@ class LoginController extends Controller
         }
 
         $validated = $request->validate([
-            'otp_code' => ['required', 'string', 'size:6'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'otp_code' => ['required', 'string', 'size:6', 'regex:/^\d{6}$/'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]+$/'],
         ]);
 
         $otpRequest = OtpRequest::find($pending['otp_request_id'] ?? null);
@@ -280,7 +433,33 @@ class LoginController extends Controller
             ]);
         }
 
-        if (! hash_equals((string) $otpRequest->otp_code, (string) $validated['otp_code'])) {
+        $channel = $pending['channel'] ?? 'email';
+
+        if ($channel === 'phone') {
+            $apiKey = env('MOVIDER_API_KEY');
+            $apiSecret = env('MOVIDER_API_SECRET');
+
+            if (! $apiKey || ! $apiSecret) {
+                throw ValidationException::withMessages([
+                    'otp_code' => 'Mobile OTP verification is not configured on this server right now.',
+                ]);
+            }
+
+            $response = Http::asForm()->post('https://api.movider.co/v1/verify/acknowledge', [
+                'request_id' => $otpRequest->request_id,
+                'code' => $validated['otp_code'],
+                'api_key' => $apiKey,
+                'api_secret' => $apiSecret,
+            ]);
+
+            $responseData = $response->json();
+
+            if (! $response->successful() || ! isset($responseData['request_id'])) {
+                throw ValidationException::withMessages([
+                    'otp_code' => 'Invalid reset code.',
+                ]);
+            }
+        } elseif (! hash_equals((string) $otpRequest->otp_code, (string) $validated['otp_code'])) {
             throw ValidationException::withMessages([
                 'otp_code' => 'Invalid reset code.',
             ]);
@@ -366,34 +545,21 @@ class LoginController extends Controller
                 'contact_number' => $this->generatePlaceholderContactNumber(),
                 'email' => $email,
                 'google_id' => $googleUser->getId(),
-                'email_verified_at' => null,
-                'is_verified' => false,
+                'email_verified_at' => now(),
+                'is_verified' => true,
                 'password' => Hash::make($this->generateRandomPassword()),
                 'image' => $googleUser->getAvatar(),
             ]);
         } else {
             $user->forceFill([
                 'google_id' => $user->google_id ?: $googleUser->getId(),
+                'email_verified_at' => $user->email_verified_at ?: now(),
+                'is_verified' => true,
                 'image' => $googleUser->getAvatar() ?: $user->image,
             ])->save();
         }
 
-        if (! $user->is_verified) {
-            try {
-                $this->sendGoogleVerificationOtp($user, $request);
-            } catch (ValidationException $e) {
-                return redirect()->route('auth.login')->withErrors($e->errors());
-            } catch (\Throwable $e) {
-                report($e);
-
-                return redirect()->route('auth.login')->withErrors([
-                    'email' => 'Unable to send a verification code right now. Please try again.',
-                ]);
-            }
-
-            return redirect()->route('auth.google.verify')
-                ->with('success', 'Verification code sent to your email. Please complete verification to continue.');
-        }
+        $request->session()->forget('pending_google_verification');
 
         Auth::login($user, true);
         $request->session()->regenerate();
@@ -425,7 +591,7 @@ class LoginController extends Controller
     public function verifyGoogleOtp(Request $request)
     {
         $validated = $request->validate([
-            'otp_code' => 'required|string|size:6',
+            'otp_code' => ['required', 'string', 'size:6', 'regex:/^\d{6}$/'],
         ]);
 
         $pending = $request->session()->get('pending_google_verification');
@@ -934,6 +1100,62 @@ class LoginController extends Controller
         return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
+    private function findRecoveryUserByIdentifier(string $identifier, string $searchMode = 'identity'): ?User
+    {
+        if ($searchMode === 'mobile') {
+            $digits = preg_replace('/\D+/', '', $identifier);
+
+            return User::query()
+                ->where('contact_number', $digits)
+                ->orWhere('contact_number', $identifier)
+                ->first();
+        }
+
+        $normalized = preg_replace('/\s+/', ' ', trim(mb_strtolower($identifier)));
+
+        if (str_contains($normalized, '@')) {
+            return User::query()
+                ->whereRaw('LOWER(email) = ?', [$normalized])
+                ->first();
+        }
+
+        return User::query()
+            ->whereRaw('LOWER(first_name) = ?', [$normalized])
+            ->orWhereRaw('LOWER(last_name) = ?', [$normalized])
+            ->orWhereRaw(
+                "LOWER(TRIM(CONCAT_WS(' ', COALESCE(first_name, ''), COALESCE(last_name, '')))) = ?",
+                [$normalized]
+            )
+            ->orWhereRaw(
+                "LOWER(TRIM(CONCAT_WS(' ', COALESCE(first_name, ''), COALESCE(middle_name, ''), COALESCE(last_name, '')))) = ?",
+                [$normalized]
+            )
+            ->first();
+    }
+
+    private function buildRecoveryChannels(User $user): array
+    {
+        $channels = [];
+
+        if ($user->contact_number) {
+            $channels[] = [
+                'type' => 'phone',
+                'label' => 'Mobile number',
+                'masked' => $this->maskPhone((string) $user->contact_number),
+            ];
+        }
+
+        if ($user->email) {
+            $channels[] = [
+                'type' => 'email',
+                'label' => $user->google_id ? 'Google account' : 'Email account',
+                'masked' => $this->maskRecoveryEmail((string) $user->email),
+            ];
+        }
+
+        return $channels;
+    }
+
     private function maskEmail(string $email): string
     {
         if (! str_contains($email, '@')) {
@@ -944,5 +1166,34 @@ class LoginController extends Controller
         $visible = mb_substr($name, 0, 2);
 
         return $visible . str_repeat('*', max(2, mb_strlen($name) - 2)) . '@' . $domain;
+    }
+
+    private function maskRecoveryEmail(string $email): string
+    {
+        if (! str_contains($email, '@')) {
+            return $email;
+        }
+
+        [$name] = explode('@', $email, 2);
+        $nameLength = mb_strlen($name);
+
+        if ($nameLength <= 2) {
+            return mb_substr($name, 0, 1) . str_repeat('*', max(1, $nameLength - 1));
+        }
+
+        return mb_substr($name, 0, 1)
+            . str_repeat('*', max(6, $nameLength - 2))
+            . mb_substr($name, -1);
+    }
+
+    private function maskPhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        if ($digits === '') {
+            return $phone;
+        }
+
+        return substr($digits, 0, 3) . str_repeat('*', max(3, strlen($digits) - 3));
     }
 }
