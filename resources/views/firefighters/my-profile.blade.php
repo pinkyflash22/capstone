@@ -51,6 +51,7 @@
 
         $fullName = trim(collect([$user->first_name, $user->middle_name, $user->last_name])->filter()->join(' '));
         $initials = strtoupper(substr($user->first_name ?? 'F', 0, 1) . substr($user->last_name ?? 'R', 0, 1));
+        $profileImageUrl = \App\Support\MediaPath::url($user->image);
         $roleName = $user->role->role ?? 'Firefighter';
         $rank = $stationOfficer->rank ?? 'No rank assigned';
         $status = $stationOfficer->status ?? 'available';
@@ -217,6 +218,61 @@
             font-weight: 800;
             box-shadow: 0 16px 34px rgba(198, 61, 38, 0.24);
             margin: 0;
+        }
+
+        .profile-avatar-wrap {
+            position: relative;
+            width: fit-content;
+        }
+
+        .profile-avatar-image {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            cursor: zoom-in;
+        }
+
+        .profile-avatar-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .profile-avatar-camera {
+            position: absolute;
+            right: 4px;
+            bottom: 2px;
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 14px 28px rgba(198, 61, 38, 0.24);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            z-index: 5;
+        }
+
+        .profile-avatar-camera:hover,
+        .profile-avatar-camera:focus-visible {
+            transform: translateY(-1px) scale(1.04);
+            box-shadow: 0 18px 32px rgba(198, 61, 38, 0.28);
+            outline: none;
+        }
+
+        .profile-avatar-camera i {
+            font-size: 0.92rem;
+        }
+
+        .profile-photo-input {
+            display: none;
         }
 
         .profile-name {
@@ -856,6 +912,216 @@
             cursor: pointer;
         }
 
+        .profile-photo-viewer {
+            position: fixed;
+            inset: 0;
+            z-index: 11010;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(10px);
+        }
+
+        .profile-photo-viewer.active {
+            display: flex;
+        }
+
+        .profile-photo-viewer img {
+            max-width: min(92vw, 720px);
+            max-height: 82vh;
+            border-radius: 28px;
+            object-fit: contain;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+            background: #fff;
+        }
+
+        .profile-photo-viewer-close {
+            position: absolute;
+            top: 28px;
+            right: 28px;
+            width: 48px;
+            height: 48px;
+            border: 0;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #c63d26;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
+        }
+
+        #firefighterProfileCropModal {
+            position: fixed;
+            inset: 0;
+            z-index: 11000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, 0.52);
+            backdrop-filter: blur(10px);
+        }
+
+        #firefighterProfileCropModal.active {
+            display: flex;
+        }
+
+        #firefighterProfileCropModal .crop-shell {
+            width: min(100%, 680px);
+            max-height: min(92vh, 880px);
+            overflow: hidden;
+            border-radius: 34px;
+            background: #fff;
+            border: 1px solid rgba(226, 232, 240, 0.92);
+            box-shadow: 0 28px 60px rgba(15, 23, 42, 0.2);
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+
+        #firefighterProfileCropModal .crop-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 22px 22px 18px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+        }
+
+        #firefighterProfileCropModal .crop-head h3 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #172033;
+        }
+
+        #firefighterProfileCropModal .crop-head p {
+            margin: 8px 0 0;
+            color: #475569;
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }
+
+        #firefighterProfileCropModal .crop-close {
+            width: 48px;
+            height: 48px;
+            border: 0;
+            border-radius: 999px;
+            background: #fff7f3;
+            color: #c63d26;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #firefighterProfileCropModal .crop-body {
+            display: grid;
+            gap: 18px;
+            padding: 22px;
+            overflow-y: auto;
+        }
+
+        #firefighterProfileCropViewport {
+            position: relative;
+            width: min(100%, 420px);
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            border-radius: 28px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
+            touch-action: none;
+        }
+
+        #firefighterProfileCropViewport::after {
+            content: '';
+            position: absolute;
+            inset: 15%;
+            border-radius: 999px;
+            box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.34);
+            border: 4px solid rgba(255, 255, 255, 0.96);
+            pointer-events: none;
+        }
+
+        #firefighterProfileCropStage {
+            position: absolute;
+            inset: 0;
+            cursor: grab;
+        }
+
+        #firefighterProfileCropStage.is-dragging {
+            cursor: grabbing;
+        }
+
+        #firefighterProfileCropImage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            user-select: none;
+            -webkit-user-drag: none;
+            max-width: none;
+        }
+
+        #firefighterProfileCropModal .crop-zoom-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #172033;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        #firefighterProfileCropModal .crop-range {
+            width: 100%;
+            accent-color: #c63d26;
+        }
+
+        #firefighterProfileCropModal .crop-message {
+            min-height: 1.2rem;
+            margin: 0;
+            color: #be123c;
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        #firefighterProfileCropModal .crop-actions {
+            display: flex;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        #firefighterProfileCropModal .crop-btn {
+            min-width: 132px;
+            min-height: 48px;
+            border-radius: 999px;
+            border: 0;
+            padding: 0.88rem 1.2rem;
+            font-size: 0.92rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            cursor: pointer;
+        }
+
+        #firefighterProfileCropModal .crop-btn--ghost {
+            border: 1px solid rgba(198, 61, 38, 0.2);
+            background: #fff;
+            color: #a9311d;
+        }
+
+        #firefighterProfileCropModal .crop-btn--primary {
+            color: #fff;
+            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+            box-shadow: 0 16px 32px rgba(198, 61, 38, 0.2);
+        }
+
         .profile-modal-body {
             flex: 1 1 auto;
             min-height: 0;
@@ -1040,6 +1306,13 @@
                 border-width: 4px;
             }
 
+            .profile-avatar-camera {
+                width: 30px;
+                height: 30px;
+                right: -1px;
+                bottom: -1px;
+            }
+
             .profile-name {
                 font-size: 1.28rem;
                 line-height: 1.08;
@@ -1195,6 +1468,40 @@
                 flex: 0 0 44px;
             }
 
+            #firefighterProfileCropModal {
+                padding: 14px;
+                align-items: flex-end;
+            }
+
+            #firefighterProfileCropModal .crop-shell {
+                width: 100%;
+                max-height: min(92vh, 860px);
+                border-radius: 26px 26px 0 0;
+            }
+
+            #firefighterProfileCropViewport {
+                width: min(100%, 360px);
+            }
+
+            #firefighterProfileCropModal .crop-actions {
+                flex-direction: column-reverse;
+            }
+
+            #firefighterProfileCropModal .crop-btn {
+                width: 100%;
+            }
+
+            .profile-photo-viewer {
+                padding: 18px;
+            }
+
+            .profile-photo-viewer-close {
+                top: 18px;
+                right: 18px;
+                width: 42px;
+                height: 42px;
+            }
+
             body.profile-modal-open .profile-toast {
                 bottom: 12px;
             }
@@ -1228,10 +1535,46 @@
             'subtitle' => 'Personal information and responder account details'
         ])
 
+        <input
+            id="firefighterProfilePhotoInput"
+            name="profile_image"
+            type="file"
+            class="profile-photo-input"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        >
+
         <div class="profile-shell">
             <section class="profile-summary" aria-labelledby="profileSummaryTitle">
                 <div class="profile-summary-main">
-                    <div class="profile-avatar" aria-hidden="true">{{ $initials }}</div>
+                    <div class="profile-avatar-wrap">
+                        <div class="profile-avatar" data-firefighter-avatar-frame>
+                            @if ($profileImageUrl)
+                                <img
+                                    id="firefighterProfileCardImage"
+                                    class="profile-avatar-image"
+                                    src="{{ $profileImageUrl }}"
+                                    alt="{{ $fullName ?: 'Firefighter' }}"
+                                    data-firefighter-avatar-image
+                                    data-firefighter-profile-view-trigger
+                                >
+                            @endif
+                            <div
+                                id="firefighterProfileCardInitials"
+                                class="profile-avatar-fallback"
+                                @if ($profileImageUrl) style="display:none;" @endif
+                                data-firefighter-avatar-fallback
+                            >{{ $initials }}</div>
+                        </div>
+                        <button
+                            id="firefighterProfilePhotoTrigger"
+                            type="button"
+                            class="profile-avatar-camera"
+                            aria-label="Upload profile photo"
+                            title="Upload profile photo"
+                        >
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+                    </div>
                     <div class="profile-summary-copy">
                         <h1 class="profile-name" id="profileSummaryTitle">{{ $fullName ?: 'Unnamed Firefighter' }}</h1>
                         <div class="profile-meta-line">{{ $rank }} &middot; {{ $roleName }}</div>
@@ -1616,6 +1959,49 @@
         </div>
     </div>
 
+    <div id="firefighterProfileCropModal" aria-hidden="true">
+        <div class="crop-shell" role="dialog" aria-modal="true" aria-labelledby="firefighterProfileCropTitle">
+            <div class="crop-head">
+                <div>
+                    <h3 id="firefighterProfileCropTitle">Adjust profile photo</h3>
+                    <p>Drag to center your photo inside the circle, then use zoom if needed.</p>
+                </div>
+                <button id="firefighterProfileCropClose" type="button" class="crop-close" aria-label="Close photo cropper">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="crop-body">
+                <div id="firefighterProfileCropViewport">
+                    <div id="firefighterProfileCropStage">
+                        <img id="firefighterProfileCropImage" alt="Profile crop preview">
+                    </div>
+                </div>
+                <div class="crop-zoom">
+                    <div class="crop-zoom-label">
+                        <span>Zoom</span>
+                        <span id="firefighterProfileZoomValue">100%</span>
+                    </div>
+                    <input id="firefighterProfileZoomRange" type="range" class="crop-range" min="1" max="3" step="0.01" value="1">
+                </div>
+                <p id="firefighterProfileCropMessage" class="crop-message"></p>
+                <div class="crop-actions">
+                    <button id="firefighterProfileCropCancel" type="button" class="crop-btn crop-btn--ghost">Cancel</button>
+                    <button id="firefighterProfileCropApply" type="button" class="crop-btn crop-btn--primary">
+                        <i class="fa-solid fa-circle-check"></i>
+                        Use this photo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-photo-viewer" id="firefighterProfileViewerModal" aria-hidden="true">
+        <button id="firefighterProfileViewerClose" type="button" class="profile-photo-viewer-close" aria-label="Close profile photo preview">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="firefighterProfileViewerImage" alt="Profile photo preview">
+    </div>
+
     <div class="profile-toast" id="profileToast" role="status" aria-live="polite"></div>
 
     <script>
@@ -1630,6 +2016,276 @@
             let activeModal = null;
             let pendingCloseModal = null;
             let lastTrigger = null;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const profilePhotoInput = document.getElementById('firefighterProfilePhotoInput');
+            const profilePhotoTrigger = document.getElementById('firefighterProfilePhotoTrigger');
+            const profileCardFallback = document.getElementById('firefighterProfileCardInitials');
+            const cropModal = document.getElementById('firefighterProfileCropModal');
+            const cropViewport = document.getElementById('firefighterProfileCropViewport');
+            const cropStage = document.getElementById('firefighterProfileCropStage');
+            const cropImage = document.getElementById('firefighterProfileCropImage');
+            const cropRange = document.getElementById('firefighterProfileZoomRange');
+            const cropZoomValue = document.getElementById('firefighterProfileZoomValue');
+            const cropMessage = document.getElementById('firefighterProfileCropMessage');
+            const cropClose = document.getElementById('firefighterProfileCropClose');
+            const cropCancel = document.getElementById('firefighterProfileCropCancel');
+            const cropApply = document.getElementById('firefighterProfileCropApply');
+            const profilePhotoUploadUrl = @json(route('firefighter.my-profile.photo.update'));
+            const profileViewerModal = document.getElementById('firefighterProfileViewerModal');
+            const profileViewerImage = document.getElementById('firefighterProfileViewerImage');
+            const profileViewerClose = document.getElementById('firefighterProfileViewerClose');
+            let savedProfileImageUrl = @json($profileImageUrl);
+            let cropObjectUrl = null;
+            let uploadInFlight = false;
+            let cropImageState = {
+                sourceWidth: 0,
+                sourceHeight: 0,
+                baseScale: 1,
+                scale: 1,
+                minScale: 1,
+                maxScale: 3,
+                offsetX: 0,
+                offsetY: 0,
+            };
+            let dragState = null;
+
+            function updateAvatarState(imageUrl, initials) {
+                const safeInitials = initials || profileCardFallback?.textContent?.trim() || 'FR';
+
+                document.querySelectorAll('[data-firefighter-avatar-frame]').forEach((frame) => {
+                    let image = frame.querySelector('[data-firefighter-avatar-image]');
+                    let fallback = frame.querySelector('[data-firefighter-avatar-fallback], .profile-avatar-fallback');
+
+                    if (imageUrl) {
+                        if (!image) {
+                            image = document.createElement('img');
+                            image.className = 'profile-avatar-image h-full w-full object-cover';
+                            image.alt = 'Firefighter profile';
+                            image.setAttribute('data-firefighter-avatar-image', '');
+                            if (frame.classList.contains('profile-avatar')) {
+                                image.setAttribute('data-firefighter-profile-view-trigger', '');
+                                image.addEventListener('click', () => {
+                                    if (savedProfileImageUrl) {
+                                        openProfileViewer(savedProfileImageUrl);
+                                    }
+                                });
+                            }
+                            frame.insertBefore(image, fallback || null);
+                        }
+                        image.src = imageUrl;
+                        image.style.display = '';
+                        if (fallback) fallback.style.display = 'none';
+                    } else {
+                        if (image) {
+                            image.removeAttribute('src');
+                            image.style.display = 'none';
+                        }
+                        if (fallback) {
+                            fallback.textContent = safeInitials;
+                            fallback.style.display = '';
+                        }
+                    }
+                });
+            }
+
+            function revokeCropObjectUrl() {
+                if (cropObjectUrl) {
+                    URL.revokeObjectURL(cropObjectUrl);
+                    cropObjectUrl = null;
+                }
+            }
+
+            function openProfileViewer(src) {
+                if (!profileViewerModal || !profileViewerImage || !src) return;
+                profileViewerImage.src = src;
+                profileViewerModal.classList.add('active');
+                profileViewerModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('profile-modal-open');
+            }
+
+            function closeProfileViewer() {
+                if (!profileViewerModal || !profileViewerImage) return;
+                profileViewerModal.classList.remove('active');
+                profileViewerModal.setAttribute('aria-hidden', 'true');
+                profileViewerImage.removeAttribute('src');
+                if (!document.querySelector('.profile-modal.active') && !cropModal?.classList.contains('active')) {
+                    document.body.classList.remove('profile-modal-open');
+                }
+            }
+
+            function setCropMessage(message = '') {
+                if (cropMessage) {
+                    cropMessage.textContent = message;
+                }
+            }
+
+            function updateCropImageTransform() {
+                if (!cropImage || !cropViewport) return;
+                cropImage.style.transform = `translate(${cropImageState.offsetX}px, ${cropImageState.offsetY}px) scale(${cropImageState.scale})`;
+                if (cropZoomValue) {
+                    cropZoomValue.textContent = `${Math.round(cropImageState.scale * 100)}%`;
+                }
+            }
+
+            function clampCropOffsets() {
+                if (!cropViewport) return;
+                const viewportRect = cropViewport.getBoundingClientRect();
+                const displayedWidth = cropImageState.sourceWidth * cropImageState.baseScale * cropImageState.scale;
+                const displayedHeight = cropImageState.sourceHeight * cropImageState.baseScale * cropImageState.scale;
+                const minX = viewportRect.width - displayedWidth;
+                const minY = viewportRect.height - displayedHeight;
+                cropImageState.offsetX = Math.min(0, Math.max(minX, cropImageState.offsetX));
+                cropImageState.offsetY = Math.min(0, Math.max(minY, cropImageState.offsetY));
+            }
+
+            function resetCropState() {
+                cropImageState = {
+                    sourceWidth: 0,
+                    sourceHeight: 0,
+                    baseScale: 1,
+                    scale: 1,
+                    minScale: 1,
+                    maxScale: 3,
+                    offsetX: 0,
+                    offsetY: 0,
+                };
+                dragState = null;
+                cropStage?.classList.remove('is-dragging');
+                if (cropRange) cropRange.value = '1';
+                if (cropZoomValue) cropZoomValue.textContent = '100%';
+                setCropMessage('');
+            }
+
+            function openCropModalWithFile(file) {
+                if (!cropModal || !cropImage || !cropViewport) return;
+                revokeCropObjectUrl();
+                resetCropState();
+                cropObjectUrl = URL.createObjectURL(file);
+                cropImage.onload = function () {
+                    const viewportRect = cropViewport.getBoundingClientRect();
+                    const sourceWidth = cropImage.naturalWidth || 1;
+                    const sourceHeight = cropImage.naturalHeight || 1;
+                    const baseScale = Math.max(viewportRect.width / sourceWidth, viewportRect.height / sourceHeight);
+                    cropImageState.sourceWidth = sourceWidth;
+                    cropImageState.sourceHeight = sourceHeight;
+                    cropImageState.baseScale = baseScale;
+                    cropImageState.scale = 1;
+                    cropImageState.minScale = 1;
+                    cropImageState.maxScale = 3;
+                    cropImageState.offsetX = (viewportRect.width - (sourceWidth * baseScale)) / 2;
+                    cropImageState.offsetY = (viewportRect.height - (sourceHeight * baseScale)) / 2;
+                    clampCropOffsets();
+                    updateCropImageTransform();
+                };
+                cropImage.src = cropObjectUrl;
+                cropModal.classList.add('active');
+                cropModal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('profile-modal-open');
+            }
+
+            function closeCropModal() {
+                if (!cropModal) return;
+                cropModal.classList.remove('active');
+                cropModal.setAttribute('aria-hidden', 'true');
+                if (profilePhotoInput) {
+                    profilePhotoInput.value = '';
+                }
+                revokeCropObjectUrl();
+                if (cropImage) {
+                    cropImage.removeAttribute('src');
+                }
+                resetCropState();
+                if (!document.querySelector('.profile-modal.active') && !profileViewerModal?.classList.contains('active')) {
+                    document.body.classList.remove('profile-modal-open');
+                }
+            }
+
+            async function cropCurrentImageToBlob() {
+                const viewportRect = cropViewport?.getBoundingClientRect();
+                if (!viewportRect || !cropImageState.sourceWidth || !cropImageState.sourceHeight) {
+                    throw new Error('Profile crop is not ready yet.');
+                }
+
+                const outputSize = 720;
+                const canvas = document.createElement('canvas');
+                canvas.width = outputSize;
+                canvas.height = outputSize;
+                const context = canvas.getContext('2d');
+                if (!context) {
+                    throw new Error('Unable to prepare the image crop.');
+                }
+
+                const scale = cropImageState.baseScale * cropImageState.scale;
+                const sourceX = Math.max(0, (-cropImageState.offsetX) / scale);
+                const sourceY = Math.max(0, (-cropImageState.offsetY) / scale);
+                const sourceWidth = Math.min(cropImageState.sourceWidth, viewportRect.width / scale);
+                const sourceHeight = Math.min(cropImageState.sourceHeight, viewportRect.height / scale);
+
+                context.drawImage(
+                    cropImage,
+                    sourceX,
+                    sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    0,
+                    0,
+                    outputSize,
+                    outputSize
+                );
+
+                return await new Promise((resolve, reject) => {
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error('Unable to export the cropped image.'));
+                            return;
+                        }
+                        resolve(blob);
+                    }, 'image/jpeg', 0.92);
+                });
+            }
+
+            async function uploadProfilePhoto(blob) {
+                if (uploadInFlight) return;
+                uploadInFlight = true;
+                cropApply.disabled = true;
+                cropApply.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+                setCropMessage('');
+
+                try {
+                    const formData = new FormData();
+                    formData.append('profile_image', blob, 'firefighter-profile.jpg');
+
+                    const response = await fetch(profilePhotoUploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                        credentials: 'same-origin',
+                    });
+
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        const message = payload?.message
+                            || payload?.errors?.profile_image?.[0]
+                            || 'Unable to upload the profile photo right now.';
+                        throw new Error(message);
+                    }
+
+                    const user = payload.user || {};
+                    savedProfileImageUrl = user.image_url || null;
+                    updateAvatarState(savedProfileImageUrl, user.initials || profileCardFallback?.textContent?.trim() || 'FR');
+                    closeCropModal();
+                    showProfileToast(payload.message || 'Profile photo updated.');
+                } catch (error) {
+                    setCropMessage(error.message || 'Unable to upload the profile photo.');
+                } finally {
+                    uploadInFlight = false;
+                    cropApply.disabled = false;
+                    cropApply.innerHTML = '<i class="fa-solid fa-circle-check"></i> Use this photo';
+                }
+            }
 
             function showProfileToast(message, tone = 'success') {
                 if (!toast || !message) return;
@@ -1806,8 +2462,107 @@
                 });
             });
 
+            profilePhotoTrigger?.addEventListener('click', (event) => {
+                event.preventDefault();
+                profilePhotoInput?.click();
+            });
+
+            profilePhotoInput?.addEventListener('change', (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    showProfileToast('Use a JPG, PNG, or WEBP image only.', 'error');
+                    profilePhotoInput.value = '';
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    showProfileToast('Profile photo must be 5 MB or smaller.', 'error');
+                    profilePhotoInput.value = '';
+                    return;
+                }
+
+                openCropModalWithFile(file);
+            });
+
+            cropRange?.addEventListener('input', () => {
+                const nextScale = Number(cropRange.value || 1);
+                cropImageState.scale = Number.isFinite(nextScale) ? nextScale : 1;
+                clampCropOffsets();
+                updateCropImageTransform();
+            });
+
+            cropStage?.addEventListener('pointerdown', (event) => {
+                if (!cropModal?.classList.contains('active')) return;
+                dragState = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    originX: cropImageState.offsetX,
+                    originY: cropImageState.offsetY,
+                };
+                cropStage.classList.add('is-dragging');
+                cropStage.setPointerCapture?.(event.pointerId);
+            });
+
+            cropStage?.addEventListener('pointermove', (event) => {
+                if (!dragState) return;
+                cropImageState.offsetX = dragState.originX + (event.clientX - dragState.startX);
+                cropImageState.offsetY = dragState.originY + (event.clientY - dragState.startY);
+                clampCropOffsets();
+                updateCropImageTransform();
+            });
+
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+                cropStage?.addEventListener(eventName, () => {
+                    dragState = null;
+                    cropStage.classList.remove('is-dragging');
+                });
+            });
+
+            cropClose?.addEventListener('click', closeCropModal);
+            cropCancel?.addEventListener('click', closeCropModal);
+            cropModal?.addEventListener('click', (event) => {
+                if (event.target === cropModal) {
+                    closeCropModal();
+                }
+            });
+
+            cropApply?.addEventListener('click', async () => {
+                try {
+                    const blob = await cropCurrentImageToBlob();
+                    await uploadProfilePhoto(blob);
+                } catch (error) {
+                    setCropMessage(error.message || 'Unable to prepare the selected image.');
+                }
+            });
+
+            document.querySelectorAll('[data-firefighter-profile-view-trigger]').forEach((trigger) => {
+                trigger.addEventListener('click', () => {
+                    if (savedProfileImageUrl) {
+                        openProfileViewer(savedProfileImageUrl);
+                    }
+                });
+            });
+
+            profileViewerClose?.addEventListener('click', closeProfileViewer);
+            profileViewerModal?.addEventListener('click', (event) => {
+                if (event.target === profileViewerModal) {
+                    closeProfileViewer();
+                }
+            });
+
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
+                    if (profileViewerModal?.classList.contains('active')) {
+                        closeProfileViewer();
+                        return;
+                    }
+                    if (cropModal?.classList.contains('active')) {
+                        closeCropModal();
+                        return;
+                    }
                     if (discardConfirm?.classList.contains('active')) {
                         hideDiscardConfirm();
                         activeModal?.querySelector('[data-profile-modal-close]')?.focus({ preventScroll: true });
@@ -1839,6 +2594,8 @@
                 openModal(modalToReopen);
                 showProfileToast(firstErrorMessage, 'error');
             }
+
+            updateAvatarState(savedProfileImageUrl, profileCardFallback?.textContent?.trim() || 'FR');
         });
     </script>
     </div>

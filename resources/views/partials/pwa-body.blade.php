@@ -331,8 +331,12 @@
         .pyrosense-connection-pill {
             left: 12px;
             right: 12px;
-            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(var(--mobile-bottom-nav-h, var(--ff-mobile-dock-h, 0px)) + 10px + env(safe-area-inset-bottom, 0px));
             max-width: none;
+            padding: 10px 12px;
+            gap: 8px;
+            border-radius: 15px;
+            font-size: 12px;
         }
     }
 </style>
@@ -402,8 +406,10 @@
         .pyrosense-page-snapshot-badge {
             left: 12px;
             right: 12px;
-            bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(var(--mobile-bottom-nav-h, var(--ff-mobile-dock-h, 0px)) + 58px + env(safe-area-inset-bottom, 0px));
             max-width: none;
+            padding: 10px 12px;
+            border-radius: 15px;
         }
     }
 </style>
@@ -425,8 +431,11 @@
         const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue`;
         const STATUS_KEY = `${STORAGE_PREFIX}:status`;
         const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots`;
+        const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
         const AUTH_URL = @json(url('/auth'));
+        const OFFLINE_PILL_AUTO_HIDE_MS = 2600;
+        const SNAPSHOT_BADGE_AUTO_HIDE_MS = 2600;
         const pill = document.getElementById('pyrosenseConnectionPill');
         const pillIcon = document.getElementById('pyrosenseConnectionPillIcon');
         const pillTitle = document.getElementById('pyrosenseConnectionPillTitle');
@@ -571,6 +580,34 @@
             safeWriteJson(PAGE_SNAPSHOT_KEY, nextSnapshots && typeof nextSnapshots === 'object' ? nextSnapshots : {});
         }
 
+        function rememberOfflineReturnRoute() {
+            try {
+                const url = new URL(window.location.href);
+                const path = url.pathname || '/';
+
+                if (/^\/(?:auth|login|logout)(?:\/.*)?$/i.test(path)) {
+                    return;
+                }
+
+                const fullRoute = `${path}${url.search}`;
+                const roleMeta = document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '';
+                const inferredRole = roleMeta
+                    || (path.startsWith('/citizen/') ? 'citizen' : (path.startsWith('/firefighter/') ? 'firefighter' : (path.startsWith('/chief/') ? 'chief' : (path.startsWith('/barangay/') ? 'barangay' : 'guest'))));
+                const mobileHubRoute = inferredRole === 'citizen' ? '/citizen/mobile-hub' : null;
+
+                safeWriteJson(OFFLINE_RETURN_KEY, {
+                    role: inferredRole,
+                    last_route: fullRoute,
+                    preferred_route: mobileHubRoute || fullRoute,
+                    mobile_hub_route: mobileHubRoute,
+                    label: document.title || 'Cached page',
+                    saved_at: new Date().toISOString(),
+                });
+            } catch (error) {
+                console.warn('[PyroSense PWA] Failed to remember offline return route:', error);
+            }
+        }
+
         function formatSnapshotTimestamp(savedAt) {
             if (!savedAt) {
                 return null;
@@ -597,6 +634,7 @@
 
             if (!snapshot || (!options.forceVisible && window.navigator.onLine)) {
                 pageSnapshotBadge.classList.remove('is-visible');
+                window.clearTimeout(renderPageSnapshotBadge.timer);
                 return;
             }
 
@@ -606,6 +644,13 @@
                 ? `Showing the last loaded data saved on ${savedLabel}.`
                 : 'Showing the last loaded data saved on this device.';
             pageSnapshotBadge.classList.add('is-visible');
+            window.clearTimeout(renderPageSnapshotBadge.timer);
+
+            if (options.autoHideMs !== 0) {
+                renderPageSnapshotBadge.timer = window.setTimeout(() => {
+                    pageSnapshotBadge.classList.remove('is-visible');
+                }, options.autoHideMs || SNAPSHOT_BADGE_AUTO_HIDE_MS);
+            }
         }
 
         function updatePageSnapshot(config = {}) {
@@ -635,6 +680,7 @@
         function registerPageSnapshot(config = {}) {
             const key = config.key || window.location.pathname;
             const snapshot = readPageSnapshot(key);
+            rememberOfflineReturnRoute();
 
             if (window.navigator.onLine) {
                 renderPageSnapshotBadge(snapshot, { forceVisible: false });
@@ -647,7 +693,8 @@
 
             renderPageSnapshotBadge(snapshot, {
                 forceVisible: true,
-                title: config.offlineTitle || `${config.label || document.title || 'Page'} offline snapshot`
+                title: config.offlineTitle || `${config.label || document.title || 'Page'} offline snapshot`,
+                autoHideMs: SNAPSHOT_BADGE_AUTO_HIDE_MS
             });
 
             return snapshot;
@@ -662,6 +709,7 @@
             pillText.textContent = message;
             pillIcon.textContent = icon;
             pill.classList.add('is-visible');
+            window.clearTimeout(showConnectionState.timer);
         }
 
         function hideConnectionState() {
@@ -670,6 +718,7 @@
             }
 
             pill.classList.remove('is-visible');
+            window.clearTimeout(showConnectionState.timer);
         }
 
         function updateConnectionState(forceVisible = false) {
@@ -684,6 +733,7 @@
                         : 'Cached pages and your last saved dashboard data are still available.',
                     '!'
                 );
+                showConnectionState.timer = window.setTimeout(hideConnectionState, OFFLINE_PILL_AUTO_HIDE_MS);
                 return;
             }
 
@@ -696,7 +746,7 @@
                     pendingCount > 0 ? '...' : 'OK'
                 );
                 if (!pendingCount) {
-                    window.setTimeout(hideConnectionState, 2200);
+                    showConnectionState.timer = window.setTimeout(hideConnectionState, 2200);
                 }
                 return;
             }
@@ -892,6 +942,7 @@
         });
 
         document.addEventListener('DOMContentLoaded', function () {
+            rememberOfflineReturnRoute();
             ensureServiceWorker();
             updateConnectionState(false);
             if (window.navigator.onLine && getQueue().length) {

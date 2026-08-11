@@ -1,3 +1,9 @@
+@php
+    $ffTopbarUser = auth()->user();
+    $ffTopbarInitials = strtoupper(substr($ffTopbarUser->first_name ?? 'F', 0, 1) . substr($ffTopbarUser->last_name ?? 'R', 0, 1));
+    $ffTopbarImageUrl = \App\Support\MediaPath::url($ffTopbarUser->image ?? null);
+@endphp
+
 <nav class="ff-topbar-shell">
     <div class="flex items-center gap-4">
         <button id="ffOpenSidebar" class="lg:hidden text-slate-600">
@@ -16,11 +22,14 @@
 
         <div class="user-dropdown">
             <button id="ffUserDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="ffUserDropdownMenu">
-                <div class="ff-topbar-profile-avatar">
-                    {{ substr(auth()->user()->first_name ?? 'F', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'R', 0, 1) }}
+                <div class="ff-topbar-profile-avatar" data-firefighter-avatar-frame>
+                    @if ($ffTopbarImageUrl)
+                        <img src="{{ $ffTopbarImageUrl }}" alt="{{ $ffTopbarUser->first_name ?? 'Firefighter' }}" class="h-full w-full object-cover rounded-full" data-firefighter-avatar-image>
+                    @endif
+                    <span @if ($ffTopbarImageUrl) style="display:none;" @endif data-firefighter-avatar-fallback>{{ $ffTopbarInitials }}</span>
                 </div>
                 <span class="ff-topbar-profile-copy hidden sm:flex">
-                    <span class="ff-topbar-profile-name">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</span>
+                    <span class="ff-topbar-profile-name">{{ $ffTopbarUser->first_name ?? $ffTopbarUser->name ?? 'Firefighter' }}</span>
                     <span class="ff-topbar-profile-role">Firefighter</span>
                 </span>
                 <i class="fas fa-chevron-down text-[10px] text-slate-400"></i>

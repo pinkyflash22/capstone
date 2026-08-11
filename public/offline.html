@@ -150,6 +150,10 @@
             color: var(--primary);
             border: 1px solid rgba(198, 61, 38, 0.14);
         }
+
+        .offline-btn[hidden] {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -169,9 +173,51 @@
         </section>
 
         <div class="offline-actions">
+            <a id="offlineReturnAppButton" class="offline-btn offline-btn--primary" href="/pwa/start">Open Cached App</a>
+            <a id="offlineMobileHubButton" class="offline-btn offline-btn--secondary" href="/citizen/mobile-hub" hidden>Open Mobile Hub</a>
             <a class="offline-btn offline-btn--primary" href="/">Open Cached Landing Page</a>
             <button class="offline-btn offline-btn--secondary" type="button" onclick="window.location.reload()">Try Again</button>
         </div>
     </main>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = 'pyrosense-pwa:offline-return';
+            const returnBtn = document.getElementById('offlineReturnAppButton');
+            const mobileHubBtn = document.getElementById('offlineMobileHubButton');
+
+            if (!returnBtn) {
+                return;
+            }
+
+            try {
+                const raw = window.localStorage.getItem(STORAGE_KEY);
+                const state = raw ? JSON.parse(raw) : null;
+
+                if (!state || typeof state !== 'object') {
+                    return;
+                }
+
+                if (typeof state.last_route === 'string' && state.last_route.trim() !== '') {
+                    returnBtn.href = state.last_route;
+                } else if (typeof state.preferred_route === 'string' && state.preferred_route.trim() !== '') {
+                    returnBtn.href = state.preferred_route;
+                }
+
+                if (state.role === 'citizen') {
+                    returnBtn.textContent = 'Return to Cached Citizen Page';
+                } else if (typeof state.label === 'string' && state.label.trim() !== '') {
+                    returnBtn.textContent = `Open ${state.label}`;
+                }
+
+                if (mobileHubBtn && state.role === 'citizen' && typeof state.mobile_hub_route === 'string' && state.mobile_hub_route.trim() !== '') {
+                    mobileHubBtn.href = state.mobile_hub_route;
+                    mobileHubBtn.hidden = false;
+                }
+            } catch (error) {
+                console.warn('[PyroSense Offline] Failed to restore cached route:', error);
+            }
+        })();
+    </script>
 </body>
 </html>

@@ -1546,6 +1546,39 @@ public function updateMyProfile(Request $request)
         ->with('success', 'Profile updated.');
 }
 
+public function updateMyProfilePhoto(Request $request)
+{
+    $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();
+
+    $validated = $request->validate([
+        'profile_image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+    ]);
+
+    if (filled($user->image) && !str_starts_with((string) $user->image, 'http')) {
+        MediaPath::delete($user->image);
+    }
+
+    $path = $validated['profile_image']->store('profile', 'supabase');
+
+    $user->update([
+        'image' => $path,
+    ]);
+
+    UserActivityLogger::log('updated firefighter profile photo', Auth::user()?->user_id, $request);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Profile photo updated successfully.',
+        'user' => [
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'name' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Firefighter',
+            'initials' => strtoupper(substr($user->first_name ?? 'F', 0, 1) . substr($user->last_name ?? 'R', 0, 1)),
+            'image_url' => MediaPath::url($path),
+        ],
+    ]);
+}
+
 public function updateMyProfileEmail(Request $request)
 {
     $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();

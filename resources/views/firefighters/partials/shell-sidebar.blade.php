@@ -22,6 +22,7 @@
         ],
     ];
     $firefighterInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1));
+    $firefighterImageUrl = \App\Support\MediaPath::url(auth()->user()->image ?? null);
     $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'risk-reviews', 'station', 'equipment', 'fsic'], true);
 @endphp
 
@@ -765,8 +766,11 @@
     <div class="p-4 border-t border-slate-100">
         <div class="bg-red-50/50 rounded-2xl p-4 border border-red-100/50">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold border border-red-200">
-                    {{ $firefighterInitials }}
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold border border-red-200 overflow-hidden" data-firefighter-avatar-frame>
+                    @if ($firefighterImageUrl)
+                        <img src="{{ $firefighterImageUrl }}" alt="{{ auth()->user()->first_name ?? 'Firefighter' }}" class="h-full w-full object-cover" data-firefighter-avatar-image>
+                    @endif
+                    <span @if ($firefighterImageUrl) style="display:none;" @endif data-firefighter-avatar-fallback>{{ $firefighterInitials }}</span>
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-bold text-slate-800 truncate">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</p>

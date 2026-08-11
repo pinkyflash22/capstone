@@ -7,6 +7,8 @@ const OFFLINE_URL = '/offline.html';
 const LANDING_URL = '/';
 const PWA_START_URL = '/pwa/start';
 const PWA_QUICK_REPORT_URL = '/pwa/quick-report';
+const CITIZEN_MOBILE_HUB_URL = '/citizen/mobile-hub';
+const CITIZEN_DASHBOARD_URL = '/citizen/dashboard';
 
 const NO_CACHE_HTML_PATTERNS = [
     /^\/auth(?:\/.*)?$/i,
@@ -277,12 +279,23 @@ async function handleNavigationRequest(request) {
             || requestUrl.pathname === PWA_QUICK_REPORT_URL
             || (requestUrl.pathname === LANDING_URL && requestUrl.searchParams.get('source') === 'installed')
         ) {
-            const cachedStartPage = await caches.match(PWA_START_URL, { ignoreSearch: true })
+            const cachedStartPage = await caches.match(CITIZEN_MOBILE_HUB_URL, { ignoreSearch: true })
+                || await caches.match(CITIZEN_DASHBOARD_URL, { ignoreSearch: true })
+                || await caches.match(PWA_START_URL, { ignoreSearch: true })
                 || await caches.match(PWA_QUICK_REPORT_URL, { ignoreSearch: true })
                 || await caches.match(LANDING_URL, { ignoreSearch: true });
 
             if (cachedStartPage) {
                 return cachedStartPage;
+            }
+        }
+
+        if (requestUrl.pathname.startsWith('/citizen/')) {
+            const cachedCitizenPage = await caches.match(CITIZEN_MOBILE_HUB_URL, { ignoreSearch: true })
+                || await caches.match(CITIZEN_DASHBOARD_URL, { ignoreSearch: true });
+
+            if (cachedCitizenPage) {
+                return cachedCitizenPage;
             }
         }
 
