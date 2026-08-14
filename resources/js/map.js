@@ -11234,7 +11234,6 @@ function initAfterMapReady() {
         ensureManagedMapClickHandler();
     }
     
-    setTimeout(() => showNotification('Welcome to PyroSense Dashboard', 'info', 'System Ready'), 1000);
 }
 
 // ============================================================================
