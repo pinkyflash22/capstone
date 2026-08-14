@@ -5261,6 +5261,9 @@ function showNotification(message, type = 'info', title = 'Notification') {
     return id;
 }
 
+// Allow page-specific shells to use the shared themed notification surface.
+window.showPyroNotification = showNotification;
+
 // ============================================================================
 // DETAILS PANEL (keeping your existing functions)
 // ============================================================================
@@ -6202,8 +6205,11 @@ async function fetchCoordinate(options = {}) {
             showNotification('Failed to load markers: Invalid response format', 'error');
             return;
         }
-        if (!coordinates || coordinates.length === 0) return;
-        await updateCoordinate(coordinates, { fetchSupplemental: true });
+        if (!coordinates) return;
+        await updateCoordinate(coordinates, {
+            fetchSupplemental: true,
+            forceIncidents: Boolean(options.forceIncidents)
+        });
         lastMarkersFetchAt = Date.now();
         writeStaticMapCache('markers', coordinates);
     } catch (error) {
@@ -6219,6 +6225,7 @@ window.refreshMapMarkers = function(options = {}) {
         preferSeeded: false,
         revalidate: true,
         force: true,
+        forceIncidents: true,
         ...options
     });
 };
@@ -6530,7 +6537,11 @@ async function getLatestIncidentsData(options = {}) {
 }
 
 async function updateCoordinate(data, options = {}) {
-    const { fetchSupplemental = true, incidents: preloadedIncidents = null } = options;
+    const {
+        fetchSupplemental = true,
+        incidents: preloadedIncidents = null,
+        forceIncidents = false
+    } = options;
 
     try {
         let incidents = Array.isArray(preloadedIncidents) ? preloadedIncidents : [];
@@ -6543,7 +6554,7 @@ async function updateCoordinate(data, options = {}) {
 
         if (fetchSupplemental) {
             const [incidentResponseResult, markerReferencesResult] = await Promise.allSettled([
-                getLatestIncidentsData(),
+                getLatestIncidentsData({ force: forceIncidents }),
                 getMarkerReferenceData()
             ]);
 
@@ -6575,6 +6586,8 @@ async function updateCoordinate(data, options = {}) {
         
         const coordinates = normalizeCoordinatePayload(data);
         if (coordinates.length === 0) {
+            // A successful empty feed means prior incident layers must not remain on screen.
+            clearAllMarkers();
             return;
         }
         

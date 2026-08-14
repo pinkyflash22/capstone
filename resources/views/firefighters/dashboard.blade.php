@@ -2023,8 +2023,6 @@
         </div>
     </div>
 
-    <!-- Toast Container -->
-    <div id="toast" class="toast"></div>
     <script>
         window.firefighterDashboardConfig = {
             csrfToken: @json(csrf_token()),

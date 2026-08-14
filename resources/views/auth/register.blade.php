@@ -248,6 +248,40 @@
             line-height: 1.6;
         }
 
+        .google-prefill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            width: fit-content;
+            margin-top: 0.25rem;
+            padding: 0.72rem 1rem;
+            color: var(--gray-700);
+            background: #fff;
+            border: 1px solid rgba(198, 61, 38, 0.16);
+            border-radius: 12px;
+            box-shadow: 0 8px 18px rgba(198, 61, 38, 0.08);
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .google-prefill:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: 0 12px 22px rgba(198, 61, 38, 0.14);
+        }
+
+        .google-prefill i { color: #4285f4; font-size: 1rem; }
+
+        .google-prefill-note {
+            margin-top: 0.6rem;
+            color: var(--gray-500);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
         /* Form Section */
         .card-body {
             padding: 2.5rem;
@@ -1040,6 +1074,11 @@
                         </span>
                         <h1>Create your account</h1>
                         <p>Set up your PyroSense citizen access with your contact details, password, and optional address information.</p>
+                        <a class="google-prefill" href="{{ route('auth.google.redirect', ['registration_prefill' => 1]) }}">
+                            <i class="fa-brands fa-google" aria-hidden="true"></i>
+                            Continue with Google to prefill
+                        </a>
+                        <p class="google-prefill-note">Choose a Google account to add its name and email only. You will still complete and verify this registration.</p>
                     </div>
 
                     @if ($errors->any())
@@ -1053,6 +1092,7 @@
                         </div>
                     @endif
 
+                    @php($googlePrefill = session('google_registration_prefill', []))
                     <form method="POST" action="{{ route('register.store') }}" id="registerForm">
                         @csrf
                         <input type="hidden" id="role_id" name="role_id" value="{{ old('role_id', $citizenRoleId) }}">
@@ -1068,7 +1108,7 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="first_name" name="first_name" class="form-input" 
                                         placeholder="Enter your first name"
-                                        value="{{ old('first_name') }}"
+                                        value="{{ old('first_name', $googlePrefill['first_name'] ?? '') }}"
                                         pattern="[A-Za-z]+"
                                         title="First name must contain letters only."
                                         oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
@@ -1086,7 +1126,7 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="middle_name" name="middle_name" class="form-input" 
                                         placeholder="Enter your middle name (optional)"
-                                        value="{{ old('middle_name') }}"
+                                        value="{{ old('middle_name', $googlePrefill['middle_name'] ?? '') }}"
                                         pattern="[A-Za-z]+"
                                         title="Middle name must contain letters only."
                                         oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')">
@@ -1103,7 +1143,7 @@
                                     <i class="fa-solid fa-user input-icon"></i>
                                     <input type="text" id="last_name" name="last_name" class="form-input" 
                                         placeholder="Enter your last name"
-                                        value="{{ old('last_name') }}"
+                                        value="{{ old('last_name', $googlePrefill['last_name'] ?? '') }}"
                                         pattern="[A-Za-z]+"
                                         title="Last name must contain letters only."
                                         oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
@@ -1141,7 +1181,7 @@
                                     <i class="fa-solid fa-envelope input-icon"></i>
                                     <input type="email" id="email" name="email" class="form-input" 
                                         placeholder="john.doe@example.com"
-                                        value="{{ old('email') }}"
+                                        value="{{ old('email', $googlePrefill['email'] ?? '') }}"
                                         pattern="[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}"
                                         title="Email may only use letters, numbers, @, and dots."
                                         oninput="this.value = this.value.replace(/[^A-Za-z0-9@.]/g, '')"

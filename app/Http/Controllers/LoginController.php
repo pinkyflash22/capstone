@@ -485,13 +485,19 @@ class LoginController extends Controller
     public function redirectToGoogle(Request $request)
     {
         $postLoginAction = $request->input('post_login_action');
+        $registrationPrefill = $request->boolean('registration_prefill');
 
         if ($request->filled('post_login_action')) {
             $request->session()->put('post_login_action', $postLoginAction);
         }
 
+        if ($registrationPrefill) {
+            $request->session()->put('google_registration_prefill_active', true);
+        }
+
         return Socialite::driver('google')
             ->scopes(['openid', 'profile', 'email'])
+            ->with(['prompt' => 'select_account'])
             ->redirect()
             ->cookie($this->makePostLoginActionCookie($postLoginAction));
     }
@@ -501,12 +507,16 @@ class LoginController extends Controller
      */
     public function handleGoogleCallback(Request $request)
     {
+        $registrationPrefill = (bool) $request->session()->get('google_registration_prefill_active');
+
         try {
             $googleUser = Socialite::driver('google')->user();
         } catch (\Throwable $e) {
             report($e);
 
-            return redirect()->route('auth.login')->withErrors([
+            $request->session()->forget('google_registration_prefill_active');
+
+            return redirect()->route($registrationPrefill ? 'register' : 'auth.login')->withErrors([
                 'email' => 'Google sign-in failed. Please try again.',
             ]);
         }
@@ -514,9 +524,32 @@ class LoginController extends Controller
         $email = $googleUser->getEmail();
 
         if (! $email) {
-            return redirect()->route('auth.login')->withErrors([
+            $request->session()->forget('google_registration_prefill_active');
+
+            return redirect()->route($registrationPrefill ? 'register' : 'auth.login')->withErrors([
                 'email' => 'Google did not return an email address for this account.',
             ]);
+        }
+
+        if ($registrationPrefill) {
+            $request->session()->forget('google_registration_prefill_active');
+
+            if (User::where('email', $email)->exists()) {
+                return redirect()->route('register')->withErrors([
+                    'email' => 'This Google email already has a PyroSense account. Please sign in instead.',
+                ]);
+            }
+
+            [$firstName, $middleName, $lastName] = $this->splitDisplayName(
+                $googleUser->getName() ?: $email
+            );
+
+            return redirect()->route('register')->with('google_registration_prefill', [
+                'first_name' => $firstName,
+                'middle_name' => $middleName,
+                'last_name' => $lastName,
+                'email' => $email,
+            ])->with('success', 'Google profile details were added. Please complete the remaining registration fields.');
         }
 
         $user = User::where('google_id', $googleUser->getId())

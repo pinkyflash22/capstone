@@ -4,6 +4,60 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
+.ff-app-notice {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 10100;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: min(390px, calc(100vw - 48px));
+    padding: 13px 14px;
+    color: #28364b;
+    background: rgba(255, 253, 249, 0.98);
+    border: 1px solid rgba(198, 61, 38, 0.15);
+    border-radius: 18px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(14px);
+    transform: translateY(-14px);
+    opacity: 0;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.ff-app-notice.is-visible { transform: translateY(0); opacity: 1; }
+.ff-app-notice__icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #c94b2a, #db9218); }
+.ff-app-notice__message { min-width: 0; font-size: 0.86rem; font-weight: 800; line-height: 1.35; }
+.ff-app-notice__close { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; color: #718096; background: transparent; border: 0; border-radius: 10px; cursor: pointer; }
+.ff-app-notice__close:hover { color: #9f2f1c; background: #fff1e8; }
+.ff-app-notice--error { border-color: rgba(185, 28, 28, 0.22); }
+.ff-app-notice--error .ff-app-notice__icon { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+.ff-app-notice--warning .ff-app-notice__icon { background: linear-gradient(135deg, #c77013, #e5a32c); }
+.ff-app-notice--info .ff-app-notice__icon { background: linear-gradient(135deg, #124e5d, #247287); }
+
+.ff-false-alarm-confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 10110;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(5px);
+}
+
+.ff-false-alarm-confirm__card { width: min(390px, calc(100vw - 32px)); padding: 20px; background: linear-gradient(145deg, #fffaf5, #ffffff); border: 1px solid rgba(201, 75, 42, 0.2); border-radius: 22px; box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28); }
+.ff-false-alarm-confirm__body { display: flex; align-items: flex-start; gap: 13px; }
+.ff-false-alarm-confirm__icon { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; color: #fff; background: linear-gradient(135deg, #c94b2a, #db9218); border-radius: 14px; box-shadow: 0 10px 20px rgba(201, 75, 42, 0.22); }
+.ff-false-alarm-confirm__title { color: #2a3548; font-size: 1rem; font-weight: 900; }
+.ff-false-alarm-confirm__copy { margin-top: 5px; color: #64748b; font-size: 0.84rem; line-height: 1.5; }
+.ff-false-alarm-confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 19px; }
+.ff-false-alarm-confirm__button { min-height: 44px; padding: 9px 12px; border-radius: 13px; font-size: 0.8rem; font-weight: 900; cursor: pointer; }
+.ff-false-alarm-confirm__button--cancel { color: #9f2f1c; background: #fff; border: 1px solid rgba(201, 75, 42, 0.2); }
+.ff-false-alarm-confirm__button--confirm { color: #fff; background: linear-gradient(135deg, #c94b2a, #db9218); border: 0; box-shadow: 0 12px 24px rgba(201, 75, 42, 0.22); }
+
 @media (max-width: 768px) {
     :root {
         --ff-mobile-dock-h: calc(92px + env(safe-area-inset-bottom, 0px));
@@ -142,6 +196,21 @@
     body.firefighter-dashboard-page .firefighter-mobile-assigned-fab {
         z-index: 1320 !important;
     }
+
+    body.firefighter-dashboard-page .ff-app-notice {
+        top: auto;
+        right: 14px;
+        bottom: calc(var(--ff-mobile-dock-h, 92px) + 14px);
+        left: 14px;
+        width: auto;
+        z-index: 10050;
+        border-radius: 16px;
+        transform: translateY(14px);
+    }
+
+    body.firefighter-dashboard-page .ff-app-notice.is-visible { transform: translateY(0); }
+
+    body.firefighter-dashboard-page .ff-false-alarm-confirm { z-index: 10110; }
 
     body.firefighter-dashboard-page .firefighter-mobile-insights-panel,
     body.firefighter-dashboard-page .firefighter-assigned-queue-modal {

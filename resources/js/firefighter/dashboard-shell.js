@@ -1161,7 +1161,10 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         
         if (result.success) {
             showToast(result.message || 'You are now responding to this incident!', 'success');
-            await fetchAssignedIncidents(true);
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                refreshFirefighterLiveMap()
+            ]);
             if (typeof window.calculateRouteToIncident === 'function') {
                 await window.calculateRouteToIncident(incidentId);
             }
@@ -1203,7 +1206,10 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
         
         if (result.success) {
             showToast(result.message || 'Incident completed and marked as controlled!', 'success');
-            fetchAssignedIncidents(true); // Refresh the list
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                refreshFirefighterLiveMap()
+            ]);
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to update incident', 'error');
@@ -1242,7 +1248,10 @@ async function closeCase(incidentId, currentStatusId, triggerButton = null) {
         
         if (result.success) {
             showToast(result.message || 'Case closed successfully!', 'success');
-            fetchAssignedIncidents(true); // Refresh the list
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                refreshFirefighterLiveMap()
+            ]);
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to close case', 'error');
@@ -1281,7 +1290,10 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
 
         if (result.success) {
             showToast(result.message || 'Incident tagged as false alarm', 'success');
-            fetchAssignedIncidents(true);
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                refreshFirefighterLiveMap()
+            ]);
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to tag false alarm', 'error');
@@ -1293,6 +1305,22 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     }
 }
 
+async function refreshFirefighterLiveMap() {
+    if (typeof window.refreshMapMarkers !== 'function') {
+        return;
+    }
+
+    try {
+        await window.refreshMapMarkers({
+            force: true,
+            forceIncidents: true
+        });
+    } catch (error) {
+        // The status change succeeded; background map synchronization can retry on its normal poll.
+        console.warn('Unable to refresh the live map after an incident update:', error);
+    }
+}
+
 function showFalseAlarmConfirmationToast() {
     return new Promise((resolve) => {
         const existing = document.getElementById('falseAlarmConfirmToast');
@@ -1300,39 +1328,30 @@ function showFalseAlarmConfirmationToast() {
             existing.remove();
         }
 
+        const previouslyFocused = document.activeElement;
+
         const toast = document.createElement('div');
         toast.id = 'falseAlarmConfirmToast';
-        toast.style.cssText = `
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 18px;
-            background: rgba(15, 23, 42, 0.22);
-            backdrop-filter: blur(4px);
-            z-index: 5000;
-            color: #7c2d12;
-        `;
+        toast.className = 'ff-false-alarm-confirm';
 
         toast.innerHTML = `
-            <div role="dialog" aria-modal="true" aria-labelledby="falseAlarmConfirmTitle" style="width:min(360px, calc(100vw - 32px)); background:linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); border:1px solid rgba(251, 146, 60, 0.26); border-radius:20px; box-shadow:0 24px 54px rgba(15, 23, 42, 0.18); padding:18px;">
-                <div style="display:flex; align-items:flex-start; gap:12px;">
-                    <div style="width:42px; height:42px; border-radius:999px; background:#fb923c; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 10px 20px rgba(251, 146, 60, 0.22);">
+            <div class="ff-false-alarm-confirm__card" role="dialog" aria-modal="true" aria-labelledby="falseAlarmConfirmTitle">
+                <div class="ff-false-alarm-confirm__body">
+                    <div class="ff-false-alarm-confirm__icon" aria-hidden="true">
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
-                    <div style="flex:1;">
-                        <div id="falseAlarmConfirmTitle" style="font-size:15px; font-weight:800; margin-bottom:4px; color:#7c2d12;">Flag as False Alarm?</div>
-                        <div style="font-size:13px; line-height:1.45; color:#9a3412;">
+                    <div>
+                        <div id="falseAlarmConfirmTitle" class="ff-false-alarm-confirm__title">Flag as false alarm?</div>
+                        <div class="ff-false-alarm-confirm__copy">
                             This will remove the incident from active response handling.
                         </div>
                     </div>
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;">
-                    <button type="button" id="falseAlarmCancelBtn" style="min-height:42px; padding:9px 12px; border-radius:12px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:800; cursor:pointer;">
+                <div class="ff-false-alarm-confirm__actions">
+                    <button type="button" id="falseAlarmCancelBtn" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--cancel">
                         Cancel
                     </button>
-                    <button type="button" id="falseAlarmConfirmBtn" style="min-height:42px; padding:9px 12px; border-radius:12px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 12px 24px rgba(234, 88, 12, 0.22);">
+                    <button type="button" id="falseAlarmConfirmBtn" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--confirm">
                         Confirm
                     </button>
                 </div>
@@ -1343,6 +1362,7 @@ function showFalseAlarmConfirmationToast() {
             if (toast.parentNode) {
                 toast.remove();
             }
+            previouslyFocused?.focus?.();
             resolve(value);
         };
 
@@ -1350,6 +1370,7 @@ function showFalseAlarmConfirmationToast() {
 
         toast.querySelector('#falseAlarmCancelBtn')?.addEventListener('click', () => cleanup(false));
         toast.querySelector('#falseAlarmConfirmBtn')?.addEventListener('click', () => cleanup(true));
+        toast.querySelector('#falseAlarmConfirmBtn')?.focus();
         toast.addEventListener('click', (event) => {
             if (event.target === toast) {
                 cleanup(false);
@@ -1364,18 +1385,45 @@ function showFalseAlarmConfirmationToast() {
     });
 }
     
-    // Show toast notification
+    // Firefighter actions use one concise themed notification on every screen size.
     function showToast(message, type = 'info') {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        
-        toast.textContent = message;
-        toast.className = `toast toast-${type}`;
-        toast.style.display = 'block';
-        
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 3000);
+        const existing = document.getElementById('firefighterAppNotice');
+        if (existing) {
+            existing.remove();
+        }
+
+        const normalized = String(message || '').toLowerCase();
+        const conciseMessage = type === 'success'
+            ? (normalized.includes('false alarm') ? 'False alarm recorded.'
+                : normalized.includes('respond') ? 'Response started.'
+                : normalized.includes('controlled') ? 'Incident marked controlled.'
+                : normalized.includes('closed') ? 'Case closed.'
+                : 'Update saved.')
+            : (type === 'error' ? 'Could not update this incident. Please try again.' : String(message || 'Update in progress.'));
+
+        const icons = {
+            success: 'fa-check',
+            error: 'fa-triangle-exclamation',
+            warning: 'fa-triangle-exclamation',
+            info: 'fa-bolt'
+        };
+        const notice = document.createElement('div');
+        notice.id = 'firefighterAppNotice';
+        notice.className = `ff-app-notice ff-app-notice--${type}`;
+        notice.setAttribute('role', 'status');
+        notice.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        notice.innerHTML = `<span class="ff-app-notice__icon" aria-hidden="true"><i class="fas ${icons[type] || icons.info}"></i></span><span class="ff-app-notice__message"></span><button type="button" class="ff-app-notice__close" aria-label="Dismiss notification"><i class="fas fa-xmark" aria-hidden="true"></i></button>`;
+        notice.querySelector('.ff-app-notice__message').textContent = conciseMessage;
+        document.body.appendChild(notice);
+
+        requestAnimationFrame(() => notice.classList.add('is-visible'));
+        const dismiss = () => {
+            notice.classList.remove('is-visible');
+            window.setTimeout(() => notice.remove(), 180);
+        };
+
+        notice.querySelector('.ff-app-notice__close')?.addEventListener('click', dismiss);
+        window.setTimeout(dismiss, type === 'error' ? 5200 : 3600);
     }
     
     function paintCurrentUserLocation(lat, lng) {
