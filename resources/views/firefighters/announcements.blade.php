@@ -13,6 +13,7 @@
     @php
         $authName = trim((auth()->user()->first_name ?? '') . ' ' . (auth()->user()->last_name ?? '')) ?: 'Firefighter';
         $authInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'F', 0, 1));
+        $authProfileImageUrl = \App\Support\MediaPath::url(auth()->user()?->image);
     @endphp
 
     <style data-ff-page-style="announcements">
@@ -40,6 +41,17 @@
         .post-author-avatar,
         .comment-avatar {
             background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+        }
+        .composer-avatar img,
+        .post-author-avatar img,
+        .comment-avatar img,
+        .media-drawer-avatar img,
+        .media-drawer-comment-avatar img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: inherit;
+            object-fit: cover;
         }
         .composer-meta {
             display: grid;
@@ -1195,7 +1207,13 @@
             <div class="create-post-card composer-card">
                 <div class="composer-header">
                     <div class="composer-header-main">
-                        <div class="post-avatar composer-avatar">{{ $authInitials }}</div>
+                        <div class="post-avatar composer-avatar">
+                            @if ($authProfileImageUrl)
+                                <img src="{{ $authProfileImageUrl }}" alt="{{ $authName }}">
+                            @else
+                                {{ $authInitials }}
+                            @endif
+                        </div>
                         <div class="composer-meta">
                             <div class="composer-name">{{ $authName }}</div>
                             <div class="composer-role">Firefighter · Station feed</div>

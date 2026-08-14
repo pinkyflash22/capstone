@@ -1,4 +1,7 @@
 {{-- resources/views/firefighter/dashboard.blade.php --}}
+@php
+    $dashboardProfileImageUrl = \App\Support\MediaPath::url(auth()->user()?->image);
+@endphp
 
 <!DOCTYPE html>
 <html lang="en">
@@ -1391,7 +1394,11 @@
                 <div class="user-dropdown">
                     <button id="userDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="userDropdownMenu">
                         <div class="ff-topbar-profile-avatar">
-                            {{ substr(auth()->user()->first_name ?? 'F', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'R', 0, 1) }}
+                            @if ($dashboardProfileImageUrl)
+                                <img src="{{ $dashboardProfileImageUrl }}" alt="{{ auth()->user()->first_name ?? 'Firefighter' }}">
+                            @else
+                                {{ substr(auth()->user()->first_name ?? 'F', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'R', 0, 1) }}
+                            @endif
                         </div>
                         <span class="ff-topbar-profile-copy hidden sm:flex">
                             <span class="ff-topbar-profile-name">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Firefighter' }}</span>

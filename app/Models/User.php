@@ -27,6 +27,7 @@ use App\Models\BarangayHall;
 use App\Models\BarangayOfficer;
 use App\Models\BarangayFireRecord;
 use App\Models\BarangayPredictionChecklist;
+use App\Support\MediaPath;
 
 
 
@@ -67,6 +68,10 @@ protected $primaryKey = 'user_id';
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    protected $appends = [
+        'profile_image_url',
     ];
 
     /**
@@ -200,10 +205,15 @@ protected $primaryKey = 'user_id';
     }
 
     // Accessor for full name
-       public function getFullNameAttribute()
+    public function getFullNameAttribute()
     {
         $middle = $this->middle_name ? ' ' . $this->middle_name . ' ' : ' ';
         return trim($this->first_name . $middle . $this->last_name);
+    }
+
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        return MediaPath::url($this->image);
     }
     public function stations()
 {

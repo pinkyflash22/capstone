@@ -585,7 +585,6 @@ class AnnouncementSystem {
 
     createPostElement(post) {
         const authorName = this.getFullName(post.user);
-        const authorAvatar = this.getInitials(post.user);
         const authorRole = post.user?.role?.role ? this.capitalize(post.user.role.role) : 'Personnel';
         const timeAgo = post.time_ago || this.getTimeAgo(new Date(post.created_at));
         const canManage = Boolean(post.can_manage);
@@ -598,7 +597,7 @@ class AnnouncementSystem {
         const pollHtml = this.renderPoll(post.poll_data);
         const commentsHtml = (post.comments || []).map((comment) => `
             <div class="comment">
-                <div class="comment-avatar">${this.escapeHtml(this.getInitials(comment.user))}</div>
+                ${this.renderUserAvatar(comment.user, 'comment-avatar')}
                 <div class="comment-content">
                     <div class="comment-author">${this.escapeHtml(this.getFullName(comment.user) || 'User')}</div>
                     <div class="comment-text">${this.escapeHtml(comment.content)}</div>
@@ -611,7 +610,7 @@ class AnnouncementSystem {
             <article class="post-card" data-post-id="${post.id}">
                 <div class="post-header">
                     <div class="post-header-main">
-                        <div class="post-author-avatar">${this.escapeHtml(authorAvatar)}</div>
+                        ${this.renderUserAvatar(post.user, 'post-author-avatar')}
                         <div class="post-author-info">
                             <div class="post-author-meta">
                                 <div>
@@ -664,7 +663,7 @@ class AnnouncementSystem {
 
                 <div class="comment-section" id="comment-section-${post.id}" style="display:none;">
                     <div class="comment-input">
-                        <div class="comment-avatar">${this.escapeHtml(this.getInitials(post.user))}</div>
+                        ${this.renderUserAvatar(post.user, 'comment-avatar')}
                         <div class="comment-field">
                             <input type="text" placeholder="Write a comment..." id="comment-input-${post.id}" maxlength="1000">
                             <button type="button" onclick="window.announcementSystem.addComment(${post.id})">
@@ -713,7 +712,7 @@ class AnnouncementSystem {
 
         head.innerHTML = `
             <div class="media-drawer-author">
-                <div class="media-drawer-avatar">${this.escapeHtml(this.getInitials(post.user))}</div>
+                ${this.renderUserAvatar(post.user, 'media-drawer-avatar')}
                 <div>
                     <div class="media-drawer-name">${this.escapeHtml(this.getFullName(post.user))}</div>
                     <div class="media-drawer-meta">${this.escapeHtml(post.user?.role?.role ? this.capitalize(post.user.role.role) : 'Personnel')} | ${this.escapeHtml(post.time_ago || this.getTimeAgo(new Date(post.created_at)))}</div>
@@ -727,7 +726,7 @@ class AnnouncementSystem {
                 <div class="media-drawer-comments">
                     ${(post.comments || []).map((comment) => `
                         <div class="media-drawer-comment">
-                            <div class="media-drawer-comment-avatar">${this.escapeHtml(this.getInitials(comment.user))}</div>
+                            ${this.renderUserAvatar(comment.user, 'media-drawer-comment-avatar')}
                             <div class="media-drawer-comment-body">
                                 <div class="media-drawer-comment-author">${this.escapeHtml(this.getFullName(comment.user))}</div>
                                 <div class="media-drawer-comment-text">${this.escapeHtml(comment.content)}</div>
@@ -1161,6 +1160,17 @@ class AnnouncementSystem {
         const last = (user.last_name || '').trim().charAt(0);
         const fallback = (user.name || 'US').trim().slice(0, 2);
         return (first + last).toUpperCase() || fallback.toUpperCase();
+    }
+
+    renderUserAvatar(user, className) {
+        const initials = this.escapeHtml(this.getInitials(user));
+        const imageUrl = this.normalizeMediaUrl(user?.profile_image_url || '');
+
+        if (!imageUrl) {
+            return `<div class="${className}">${initials}</div>`;
+        }
+
+        return `<div class="${className}"><img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(this.getFullName(user))}"></div>`;
     }
 
     capitalize(value) {
