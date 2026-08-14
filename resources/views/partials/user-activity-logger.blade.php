@@ -23,11 +23,15 @@
         return compactText(action).slice(0, 50);
     }
 
+    function isReadOnlyAction(action) {
+        return /^(?:view(?:ed|ing)?|open(?:ed|ing)?|load(?:ed|ing)?|access(?:ed|ing)?|read(?:ing)?|visit(?:ed|ing)?|navigate(?:d|ing)?)(?:\s|$)/i.test(action);
+    }
+
     function send(action) {
         const normalized = toAction(action);
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-        if (!normalized || !csrfToken) {
+        if (!normalized || isReadOnlyAction(normalized) || !csrfToken) {
             return;
         }
 

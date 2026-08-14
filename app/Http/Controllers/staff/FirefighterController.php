@@ -1558,7 +1558,8 @@ public function updateMyProfilePhoto(Request $request)
         MediaPath::delete($user->image);
     }
 
-    $path = $validated['profile_image']->store('profile', 'supabase');
+    $storedPath = $validated['profile_image']->store('profile', 'supabase');
+    $path = MediaPath::storeForDisk($storedPath, 'supabase');
 
     $user->update([
         'image' => $path,

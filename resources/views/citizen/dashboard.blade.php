@@ -3017,7 +3017,9 @@
             }
 
             window.logCitizenUserAction = async function(action) {
-                if (!action) {
+                const normalizedAction = String(action || '').trim();
+
+                if (!normalizedAction || /^(?:view(?:ed|ing)?|open(?:ed|ing)?|load(?:ed|ing)?|access(?:ed|ing)?|read(?:ing)?|visit(?:ed|ing)?|navigate(?:d|ing)?)(?:\s|$)/i.test(normalizedAction)) {
                     return;
                 }
 
@@ -3032,7 +3034,7 @@
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRF-TOKEN': csrfToken
                         },
-                        body: JSON.stringify({ action })
+                        body: JSON.stringify({ action: normalizedAction })
                     });
                 } catch (error) {
                     console.warn('Citizen action log failed:', error);

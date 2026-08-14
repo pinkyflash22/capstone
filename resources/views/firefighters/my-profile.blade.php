@@ -1049,6 +1049,7 @@
             position: absolute;
             inset: 0;
             cursor: grab;
+            touch-action: none;
         }
 
         #firefighterProfileCropStage.is-dragging {
@@ -1063,6 +1064,7 @@
             user-select: none;
             -webkit-user-drag: none;
             max-width: none;
+            pointer-events: none;
         }
 
         #firefighterProfileCropModal .crop-zoom-label {
@@ -2121,7 +2123,8 @@
 
             function updateCropImageTransform() {
                 if (!cropImage || !cropViewport) return;
-                cropImage.style.transform = `translate(${cropImageState.offsetX}px, ${cropImageState.offsetY}px) scale(${cropImageState.scale})`;
+                const displayedScale = cropImageState.baseScale * cropImageState.scale;
+                cropImage.style.transform = `translate(${cropImageState.offsetX}px, ${cropImageState.offsetY}px) scale(${displayedScale})`;
                 if (cropZoomValue) {
                     cropZoomValue.textContent = `${Math.round(cropImageState.scale * 100)}%`;
                 }
@@ -2165,7 +2168,8 @@
                     const viewportRect = cropViewport.getBoundingClientRect();
                     const sourceWidth = cropImage.naturalWidth || 1;
                     const sourceHeight = cropImage.naturalHeight || 1;
-                    const baseScale = Math.max(viewportRect.width / sourceWidth, viewportRect.height / sourceHeight);
+                    // Leave a little movement room on both axes even at 100% zoom.
+                    const baseScale = Math.max(viewportRect.width / sourceWidth, viewportRect.height / sourceHeight) * 1.08;
                     cropImageState.sourceWidth = sourceWidth;
                     cropImageState.sourceHeight = sourceHeight;
                     cropImageState.baseScale = baseScale;
@@ -2495,7 +2499,8 @@
             });
 
             cropStage?.addEventListener('pointerdown', (event) => {
-                if (!cropModal?.classList.contains('active')) return;
+                if (!cropModal?.classList.contains('active') || !event.isPrimary) return;
+                event.preventDefault();
                 dragState = {
                     startX: event.clientX,
                     startY: event.clientY,
@@ -2507,14 +2512,15 @@
             });
 
             cropStage?.addEventListener('pointermove', (event) => {
-                if (!dragState) return;
+                if (!dragState || !event.isPrimary) return;
+                event.preventDefault();
                 cropImageState.offsetX = dragState.originX + (event.clientX - dragState.startX);
                 cropImageState.offsetY = dragState.originY + (event.clientY - dragState.startY);
                 clampCropOffsets();
                 updateCropImageTransform();
             });
 
-            ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+            ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((eventName) => {
                 cropStage?.addEventListener(eventName, () => {
                     dragState = null;
                     cropStage.classList.remove('is-dragging');

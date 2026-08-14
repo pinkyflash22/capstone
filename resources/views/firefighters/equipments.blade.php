@@ -1382,7 +1382,6 @@
 
             try {
                 const request = await fetchFsicRequest(id);
-                window.logUserInteraction?.('viewed fsic request details');
                 body.innerHTML = `
                     <div class="fsic-detail-grid">
                         ${createDetailCard('Request Code', request.request_code)}

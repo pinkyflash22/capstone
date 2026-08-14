@@ -229,7 +229,7 @@
         }
         .incident-modal.active { display: flex; }
         .incident-modal-panel {
-            width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: hidden;
+            width: min(560px, 100%); max-height: min(78dvh, 720px); overflow: hidden;
             border-radius: 24px; background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
             border: 1px solid rgba(226,232,240,.95); box-shadow: 0 30px 70px rgba(15,23,42,.28);
         }
@@ -315,6 +315,13 @@
             color: #334155;
             font-size: .94rem;
             line-height: 1.6;
+        }
+        .incident-sheet .detail-image {
+            width: 100%;
+            max-height: 220px;
+            object-fit: cover;
+            border-radius: 16px;
+            border: 1px solid rgba(226,232,240,.92);
         }
         .incident-sheet__section { display: grid; gap: 12px; }
         .incident-sheet__section-head {
@@ -646,7 +653,7 @@
             .incident-modal { padding: 0 10px calc(90px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
             .incident-modal-panel {
                 width: 100%;
-                max-height: min(72dvh, 620px);
+                max-height: min(58dvh, 520px);
                 border-radius: 24px 24px 18px 18px;
                 box-shadow: 0 -10px 28px rgba(15,23,42,.18);
             }
@@ -663,7 +670,7 @@
             .incident-modal-body {
                 padding: 14px 12px 16px;
                 gap: 12px;
-                max-height: calc(72dvh - 82px);
+                max-height: calc(58dvh - 82px);
             }
             .incident-sheet__hero {
                 padding: 15px;
@@ -800,8 +807,8 @@
 
     <script>
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
-        const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 30000;
-        const INCIDENT_PAGE_SIZE = 8;
+        const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 15000;
+        const INCIDENT_PAGE_SIZE = 6;
         const incidentState = { incidents: [], filter: 'all', search: '', sort: 'reported_desc', currentPage: 1, poller: null, request: null, lastFetchedAt: 0 };
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
@@ -1064,6 +1071,7 @@
                 incidentState.lastFetchedAt = Date.now();
                 updateStats(result.data?.stats || {});
                 renderIncidentList();
+                syncOpenIncidentDetails();
             } catch (error) {
                 console.error('Incident registry fetch failed:', error);
                 if (listState) {
@@ -1074,14 +1082,28 @@
             }
         }
 
-        function openIncidentDetails(incidentId) {
+        function syncOpenIncidentDetails() {
+            const modal = document.getElementById('incidentDetailModal');
+            const incidentId = modal?.dataset.incidentId;
+
+            if (!modal?.classList.contains('active') || !incidentId) {
+                return;
+            }
+
+            if (!incidentState.incidents.some((incident) => Number(incident.incident_id) === Number(incidentId))) {
+                closeIncidentDetails();
+                return;
+            }
+
+            openIncidentDetails(incidentId, { silent: true });
+        }
+
+        function openIncidentDetails(incidentId, options = {}) {
             const incident = incidentState.incidents.find(item => Number(item.incident_id) === Number(incidentId));
             if (!incident) {
                 showToast('Incident details not found.', true);
                 return;
             }
-
-            window.logUserInteraction?.('viewed incident details');
 
             const modal = document.getElementById('incidentDetailModal');
             const modalBody = document.getElementById('incidentModalBody');
@@ -1179,6 +1201,7 @@
                     ` : ''}
                 </div>
             `;
+            modal.dataset.incidentId = String(incident.incident_id);
             modal.classList.add('active');
             return;
 
@@ -1207,7 +1230,9 @@
         }
 
         function closeIncidentDetails() {
-            document.getElementById('incidentDetailModal').classList.remove('active');
+            const modal = document.getElementById('incidentDetailModal');
+            modal.classList.remove('active');
+            delete modal.dataset.incidentId;
         }
 
         async function copyIncidentId(incidentId) {

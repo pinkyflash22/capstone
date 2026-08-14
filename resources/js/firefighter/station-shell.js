@@ -111,6 +111,8 @@ function bootFirefighterMyStationPage() {
     const mobilePickerMedia = window.matchMedia('(max-width: 767px)');
     let activeReportPicker = null;
     const mobilePickerListeners = [];
+    let lastPickerControl = null;
+    let lastPickerOpenedAt = 0;
 
     function isMobileReportPicker() {
         return mobilePickerMedia.matches;
@@ -381,16 +383,20 @@ function bootFirefighterMyStationPage() {
     function bindMobileReportPickers() {
         if (mobilePickerListeners.length) return;
 
-        const interceptPickerControl = (event) => {
-            if (!isMobileReportPicker()) return;
-            if (event.target.closest('.report-control-picker')) return;
+        const getMobilePickerControl = (target) => {
+            if (!isMobileReportPicker() || target?.closest?.('.report-control-picker')) {
+                return null;
+            }
 
-            const control = event.target.closest('.report-modal.active select.form-select, .report-modal.active input[type="date"].form-input, .report-modal.active input[type="datetime-local"].form-input');
-            if (!control) return;
+            return target?.closest?.('.report-modal.active select.form-select, .report-modal.active input[type="date"].form-input, .report-modal.active input[type="datetime-local"].form-input') || null;
+        };
 
+        const openPickerForControl = (control, event) => {
             event.preventDefault();
-            event.stopPropagation();
+            event.stopImmediatePropagation();
             control.blur();
+            lastPickerControl = control;
+            lastPickerOpenedAt = Date.now();
 
             if (control.matches('select')) {
                 openMobileSelectPicker(control);
@@ -400,10 +406,45 @@ function bootFirefighterMyStationPage() {
             openMobileDatePicker(control);
         };
 
-        ['pointerdown', 'mousedown', 'click', 'focusin'].forEach((eventName) => {
-            document.addEventListener(eventName, interceptPickerControl, true);
-            mobilePickerListeners.push([eventName, interceptPickerControl]);
-        });
+        const interceptPickerPointerDown = (event) => {
+            if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) {
+                return;
+            }
+
+            const control = getMobilePickerControl(event.target);
+            if (!control) return;
+            openPickerForControl(control, event);
+        };
+
+        const suppressNativeControlClick = (event) => {
+            const control = getMobilePickerControl(event.target);
+            if (!control) return;
+
+            // The click following a handled touch must not reopen the native picker.
+            if (control === lastPickerControl && (Date.now() - lastPickerOpenedAt) < 900) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }
+        };
+
+        const interceptPickerKeyboard = (event) => {
+            if (!['Enter', ' '].includes(event.key)) return;
+            const control = getMobilePickerControl(event.target);
+            if (!control) return;
+            openPickerForControl(control, event);
+        };
+
+        document.addEventListener('pointerdown', interceptPickerPointerDown, true);
+        document.addEventListener('click', suppressNativeControlClick, true);
+        document.addEventListener('keydown', interceptPickerKeyboard, true);
+
+        mobilePickerListeners.push(
+            ['pointerdown', interceptPickerPointerDown],
+            ['click', suppressNativeControlClick],
+            ['keydown', interceptPickerKeyboard]
+        );
+
+        // One touch interception prevents the native select and app sheet from competing.
     }
 
     function unbindMobileReportPickers() {

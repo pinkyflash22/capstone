@@ -287,8 +287,6 @@ public function store(Request $request)
                 ];
             }
 
-            UserActivityLogger::log('viewed fsic request', Auth::id(), request());
-            
             return response()->json([
                 'success' => true,
                 'id' => $fsicRequest->id,

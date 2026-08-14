@@ -751,7 +751,6 @@ window.selectIncident = function(incidentId) {
     
     console.log('Found incident:', incident);
     window.currentSelectedIncident = incident;
-    window.logCitizenUserAction?.('viewed incident details');
     
     // Highlight selected incident in list
     document.querySelectorAll('.incident-item').forEach(item => {

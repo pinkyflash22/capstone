@@ -44,6 +44,10 @@ class UserLogController extends Controller
             'action' => 'required|string|max:50',
         ]);
 
+        if (!UserActivityLogger::shouldLog($validated['action'])) {
+            return response()->noContent();
+        }
+
         UserActivityLogger::log($validated['action'], auth()->id(), $request);
 
         return response()->json([

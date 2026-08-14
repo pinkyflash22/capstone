@@ -2987,7 +2987,6 @@
 }
     // Professional Incident Details Modal
     function showProfessionalIncidentModal(incident) {
-        window.logUserInteraction?.('viewed incident details');
         let modal = document.getElementById('professionalIncidentModal');
         if (!modal) {
             modal = document.createElement('div');
