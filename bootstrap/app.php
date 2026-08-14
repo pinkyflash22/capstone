@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 // use App\Http\Middleware\RoleMiddleware;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -34,5 +35,27 @@ return Application::configure(basePath: dirname(__DIR__))
             return redirect()
                 ->route('auth.login')
                 ->with('error', 'Your session expired. Please sign in again.');
+        });
+
+        // Keep browser and API responses safe: diagnostic details stay in server logs.
+        $exceptions->render(function (\Throwable $exception, $request) {
+            $status = $exception instanceof HttpExceptionInterface
+                ? $exception->getStatusCode()
+                : 500;
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => $status >= 500
+                        ? 'The service is temporarily unavailable. Please try again shortly.'
+                        : 'The requested resource is unavailable.',
+                ], $status);
+            }
+
+            // Retain the real HTTP code while selecting one of the safe visual fallbacks.
+            $viewStatus = in_array($status, [400, 404, 500, 503], true)
+                ? $status
+                : ($status >= 500 ? 500 : 400);
+
+            return response()->view("errors.{$viewStatus}", [], $status);
         });
     })->create();

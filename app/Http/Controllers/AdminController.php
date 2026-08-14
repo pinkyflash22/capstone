@@ -72,8 +72,27 @@ class AdminController extends Controller
 
                 return $analysis;
             });
+        $dashboardStatsSeed = [
+            'incident_total' => $incidents->count(),
+            'stations_covered' => $stations->count(),
+            'personnel_tracked' => $stationperson->count(),
+            'provinces_configured' => $provinces->count(),
+        ];
 
-        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'posts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes', 'recentAnalyses'));
+        return view('admin.dashboard', compact('categories', 'mapmarker', 'incidents', 'alerts', 'posts', 'stations', 'chiefs', 'provinces','stationperson','hydrantTypes', 'recentAnalyses', 'dashboardStatsSeed'));
+    }
+
+    public function dashboardStats()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'incident_total' => Incident::query()->count(),
+                'stations_covered' => Station::query()->count(),
+                'personnel_tracked' => StationOfficer::query()->count(),
+                'provinces_configured' => Province::query()->count(),
+            ],
+        ]);
     }
 
     //for reports

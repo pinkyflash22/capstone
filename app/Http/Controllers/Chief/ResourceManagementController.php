@@ -21,11 +21,56 @@ use Illuminate\Support\Facades\Schema;
 
 class ResourceManagementController extends Controller
 {
+    protected function currentRole(): string
+    {
+        return strtolower(trim((string) (Auth::user()?->role?->role ?? '')));
+    }
+
+    protected function isProvincialAdmin(): bool
+    {
+        return $this->currentRole() === 'provincial admin';
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        if ($this->isProvincialAdmin()) {
+            $equipments = Equipment::all();
+            $stationOfficers = StationOfficer::with('user.role', 'station')->get();
+            $activeStations = Station::with(['marker', 'address.barangay.city.province'])->get();
+            $currentStation = null;
+            $chiefCityId = null;
+            $chiefProvinceId = null;
+            $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
+            $stationUserIds = StationOfficer::query()->pluck('user_id');
+
+            $allTeam = Team::with(['commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio'])->get();
+            $users = User::where('role_id', '!=', $citizenRoleId)->with('role', 'address')->get();
+            $allusers = User::with('role', 'address')->get();
+            $citizens = User::where('role_id', $citizenRoleId)->with('role', 'address')->get();
+            $roles = Role::all();
+            $provinces = Province::orderBy('province_name')->get();
+            $boundaryBarangays = $this->buildBoundaryBarangayList(null, null);
+
+            return view('chief.resource-management', compact(
+                'citizens',
+                'allusers',
+                'provinces',
+                'roles',
+                'equipments',
+                'activeStations',
+                'users',
+                'stationOfficers',
+                'allTeam',
+                'currentStation',
+                'boundaryBarangays',
+                'chiefCityId',
+                'chiefProvinceId'
+            ));
+        }
+
         $loggedInChief = Auth::user()?->loadMissing('address.barangay.city.province');
         $thisUser = $loggedInChief?->user_id;
         //direct to station officer
@@ -100,6 +145,44 @@ class ResourceManagementController extends Controller
 
     protected function buildBoundaryBarangayList(?int $stationId, ?int $chiefCityId = null)
     {
+        if ($this->isProvincialAdmin()) {
+            $supportsBarangayBoundaries = Schema::hasColumn('boundary_location', 'barangay_id')
+                && Schema::hasColumn('boundary_location', 'boundary_type');
+
+            return Barangay::query()
+                ->with($supportsBarangayBoundaries ? ['city', 'boundaryLocations'] : ['city'])
+                ->orderBy('barangay_name')
+                ->get()
+                ->map(function (Barangay $barangay) {
+                    $boundary = null;
+
+                    if (isset($barangay->boundaryLocations)) {
+                        $boundary = $barangay->boundaryLocations
+                            ->where('boundary_type', 'barangay')
+                            ->sortByDesc('updated_at')
+                            ->first();
+                    }
+
+                    $boundaryState = $this->buildBoundaryState($barangay, $boundary);
+
+                    return [
+                        'barangay_id' => $barangay->barangay_id,
+                        'barangay_name' => $barangay->barangay_name,
+                        'city_name' => $barangay->city?->city_name,
+                        'has_boundary' => $boundaryState['has_boundary'],
+                        'boundary_is_valid' => $boundaryState['is_valid'],
+                        'boundary_status' => $boundaryState['status'],
+                        'boundary_status_label' => $boundaryState['label'],
+                        'boundary_status_icon' => $boundaryState['icon'],
+                        'boundary_source' => $boundary?->source,
+                        'boundary_updated_at' => $boundary?->updated_at,
+                        'boundary_updated_at_human' => $boundary?->updated_at?->diffForHumans(),
+                        'boundary_name' => $boundary?->name,
+                        'external_place_id' => $boundary?->external_place_id,
+                    ];
+                });
+        }
+
         $supportsBarangayBoundaries = Schema::hasColumn('boundary_location', 'barangay_id')
             && Schema::hasColumn('boundary_location', 'boundary_type');
 

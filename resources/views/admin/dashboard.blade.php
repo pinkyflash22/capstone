@@ -1519,7 +1519,7 @@
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
                 <div class="hidden lg:block">
-                    <h1 class="text-xl font-bold text-slate-800">Commander's Dashboard</h1>
+                    <h1 class="text-xl font-bold text-slate-800">Provincial Admin Dashboard</h1>
                     <p class="text-xs text-slate-500 font-medium">Monitoring Command Center • {{ now()->format('l, F j') }}</p>
                 </div>
             </div>
@@ -1581,14 +1581,14 @@
                 </div>
                 <div class="dashboard-welcome-toast__copy">
                     <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                    <span>Command overview is ready. Recent analytics are loaded below.</span>
+                    <span>Your provincial command overview is ready with live station and incident visibility.</span>
                 </div>
             </div>
 
             <div class="chief-dashboard-welcome bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-8 mb-8 flex items-start justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-amber-900 mb-2">Welcome back, {{ auth()->user()->first_name }}!</h1>
-                    <p class="text-amber-700 font-medium">System Command Overview. {{ now()->format('l, F j, Y') }}</p>
+                    <h1 class="text-2xl font-bold text-amber-900 mb-2">Welcome back, Provincial Admin {{ auth()->user()->first_name }}!</h1>
+                    <p class="text-amber-700 font-medium">Province-wide operational command overview. {{ now()->format('l, F j, Y') }}</p>
                 </div>
                 <div class="hidden md:flex items-center gap-4 bg-white/50 p-2 rounded-xl border border-amber-100">
                     <div class="text-right">
@@ -1636,7 +1636,7 @@
             </div>
             <!-- page title + date -->
             <div id="dashboard" class="page-header scroll-mt-24">
-                <h1>Operations Dashboard</h1>
+                <h1>Provincial Operations Dashboard</h1>
                 <div class="page-date">
                     <i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs
                 </div>
@@ -1648,8 +1648,8 @@
                     <i class="fa-solid fa-triangle-exclamation text-xl"></i>
                 </div>
                 <div class="flex-1">
-                    <h4 class="text-amber-900 font-bold text-lg mb-1">Operational Alert</h4>
-                    <p class="text-amber-700 leading-relaxed font-medium">Red flag warning active in Sector 4. All primary response units in Sector 4 are on heightened readiness. Crews are advised to monitor weather patterns in real-time.</p>
+                    <h4 class="text-amber-900 font-bold text-lg mb-1">Provincial Command Priority</h4>
+                    <p class="text-amber-700 leading-relaxed font-medium">This dashboard serves as the province-wide live view for incidents, resources, hydrants, barangay markers, and all station activity across the system.</p>
                 </div>
             </div>
 
@@ -1661,37 +1661,37 @@
                     </div>
                     <div class="kpi-info">
                         <h3>Active Incidents</h3>
-                        <p>{{ $incidents->count() }}</p>
+                        <p id="adminIncidentTotal">{{ $dashboardStatsSeed['incident_total'] ?? $incidents->count() }}</p>
                     </div>
                 </div>
 
                 <div class="lector-card kpi-card">
                     <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
-                        <i class="fa-solid fa-truck"></i>
+                        <i class="fa-solid fa-building-shield"></i>
                     </div>
                     <div class="kpi-info">
-                        <h3>Units Deployed</h3>
-                        <p>12</p>
+                        <h3>Stations Covered</h3>
+                        <p id="adminStationsCovered">{{ $dashboardStatsSeed['stations_covered'] ?? $stations->count() }}</p>
                     </div>
                 </div>
 
                 <div class="lector-card kpi-card">
                     <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
-                        <i class="fa-solid fa-water"></i>
+                        <i class="fa-solid fa-users-viewfinder"></i>
                     </div>
                     <div class="kpi-info">
-                        <h3>Weather Status</h3>
-                        <p id="weather-result" class="capitalize">Rainy</p>
+                        <h3>Personnel Tracked</h3>
+                        <p id="adminPersonnelTracked">{{ $dashboardStatsSeed['personnel_tracked'] ?? $stationperson->count() }}</p>
                     </div>
                 </div>
 
                 <div class="lector-card kpi-card">
                     <div class="kpi-icon" style="background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);">
-                        <i class="fa-solid fa-clock"></i>
+                        <i class="fa-solid fa-map"></i>
                     </div>
                     <div class="kpi-info">
-                        <h3>Avg. Response</h3>
-                        <p>3.2min</p>
+                        <h3>Provinces Configured</h3>
+                        <p id="adminProvincesConfigured">{{ $dashboardStatsSeed['provinces_configured'] ?? $provinces->count() }}</p>
                     </div>
                 </div>
             </div>
@@ -1720,11 +1720,18 @@
                             <i class="fa-solid fa-map-location-dot"></i>
                         </div>
                         <div>
-                            <h2 class="text-lg font-bold text-slate-800">Operational Map</h2>
-                            <p class="text-xs text-slate-500 font-medium">Real-time incident & resources tracking</p>
+                            <h2 class="text-lg font-bold text-slate-800">Provincial Live Map</h2>
+                            <p class="text-xs text-slate-500 font-medium">Real-time cross-station incident and resource tracking</p>
                         </div>
                     </div>
-                    <span class="px-3 py-1 bg-blue-100 text-blue-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-200">System Ready</span>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-600 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-200">Province Live Feed</span>
+                </div>
+
+                <div class="mb-5 rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm text-blue-900">
+                    <div class="font-semibold">Provincial command map</div>
+                    <div class="mt-1 text-blue-800">
+                        Live operational view for all stations, incidents, hydrants, barangay assets, and reviewed risk markers across your coverage area.
+                    </div>
                 </div>
    
                 <div id="map"></div>
@@ -2487,9 +2494,257 @@
     window.stationDatas = {
         stations: @json($stations) || []
     };
+    window.adminDashboardStatsSeed = @json($dashboardStatsSeed ?? []);
 
     let multimediaData = [];
     let icons = [];
+
+    const ADMIN_DASHBOARD_FETCH_TIMEOUT_MS = 10000;
+    const ADMIN_DASHBOARD_STATS_CACHE_KEY = 'pyrosense:admin-dashboard:stats';
+    let adminLatestIncidentRequest = null;
+    let adminStatsRequest = null;
+
+    function createAdminDashboardRequest(url, options = {}) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_DASHBOARD_FETCH_TIMEOUT_MS);
+        const promise = fetch(url, {
+            cache: 'no-store',
+            ...options,
+            signal: controller.signal
+        }).finally(() => {
+            window.clearTimeout(timeoutId);
+        });
+
+        return { controller, promise };
+    }
+
+    function getAdminDashboardPollingRuntime() {
+        if (!window.__adminDashboardPollingRuntime) {
+            window.__adminDashboardPollingRuntime = {
+                initialized: false,
+                pollingStarted: false,
+                listenersBound: false,
+                listeners: {}
+            };
+        }
+
+        return window.__adminDashboardPollingRuntime;
+    }
+
+    function abortAdminDashboardRequest(request) {
+        try {
+            request?.controller?.abort();
+        } catch (error) {
+            console.warn('Unable to abort provincial admin dashboard request cleanly:', error);
+        }
+    }
+
+    function applyAdminDashboardStats(stats = {}) {
+        const incidentTotal = document.getElementById('adminIncidentTotal');
+        const stationsCovered = document.getElementById('adminStationsCovered');
+        const personnelTracked = document.getElementById('adminPersonnelTracked');
+        const provincesConfigured = document.getElementById('adminProvincesConfigured');
+
+        if (incidentTotal) incidentTotal.textContent = stats.incident_total ?? '0';
+        if (stationsCovered) stationsCovered.textContent = stats.stations_covered ?? '0';
+        if (personnelTracked) personnelTracked.textContent = stats.personnel_tracked ?? '0';
+        if (provincesConfigured) provincesConfigured.textContent = stats.provinces_configured ?? '0';
+    }
+
+    function readAdminDashboardStatsCache() {
+        try {
+            const raw = window.sessionStorage?.getItem(ADMIN_DASHBOARD_STATS_CACHE_KEY);
+            if (!raw) return null;
+
+            const parsed = JSON.parse(raw);
+            if (!parsed?.stats || typeof parsed.stats !== 'object') return null;
+            if ((Date.now() - Number(parsed.saved_at || 0)) > 120000) return null;
+
+            return parsed.stats;
+        } catch (error) {
+            console.warn('Unable to read provincial admin dashboard stats cache:', error);
+            return null;
+        }
+    }
+
+    function writeAdminDashboardStatsCache(stats = {}) {
+        try {
+            window.sessionStorage?.setItem(ADMIN_DASHBOARD_STATS_CACHE_KEY, JSON.stringify({
+                stats,
+                saved_at: Date.now()
+            }));
+        } catch (error) {
+            console.warn('Unable to write provincial admin dashboard stats cache:', error);
+        }
+    }
+
+    async function refreshAdminDashboardStats() {
+        if (adminStatsRequest) {
+            return;
+        }
+
+        try {
+            adminStatsRequest = createAdminDashboardRequest('/admin/api/dashboard-stats', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                }
+            });
+            const response = await adminStatsRequest.promise;
+
+            if (!response.ok) {
+                throw new Error(`Failed to load provincial dashboard stats (${response.status})`);
+            }
+
+            const payload = await response.json();
+            const stats = payload?.data || {};
+            applyAdminDashboardStats(stats);
+            writeAdminDashboardStatsCache(stats);
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
+            console.error('Error refreshing provincial admin dashboard stats:', error);
+        } finally {
+            adminStatsRequest = null;
+        }
+    }
+
+    window.refreshAdminIncidentNotifications = async function() {
+        if (adminLatestIncidentRequest) {
+            return;
+        }
+
+        try {
+            adminLatestIncidentRequest = createAdminDashboardRequest('/api/incident/latest', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                }
+            });
+            const response = await adminLatestIncidentRequest.promise;
+
+            if (!response.ok) {
+                throw new Error(`Failed to refresh provincial incident notifications (${response.status})`);
+            }
+
+            const payload = await response.json();
+            const incidents = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+            window.incidentsData = incidents;
+
+            if (typeof window.syncIncidentAlertFeed === 'function') {
+                window.syncIncidentAlertFeed('map-provincial-admin-incidents', incidents, {
+                    titlePrefix: 'Provincial Command Alert'
+                });
+            }
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
+            console.error('Provincial admin incident notification refresh failed:', error);
+        } finally {
+            adminLatestIncidentRequest = null;
+        }
+    };
+
+    window.ADMIN_STATS_INTERVAL_MS = 30000;
+    window.ADMIN_NOTIFICATION_INTERVAL_MS = 15000;
+    window.adminStatsInterval = null;
+    window.adminNotificationInterval = null;
+    window.adminDashboardIsVisible = function() {
+        return document.visibilityState === 'visible';
+    };
+    window.clearAdminDashboardIntervals = function() {
+        const runtime = window.__adminDashboardPollingRuntime || null;
+
+        if (window.adminStatsInterval) {
+            clearInterval(window.adminStatsInterval);
+            window.adminStatsInterval = null;
+        }
+        if (window.adminNotificationInterval) {
+            clearInterval(window.adminNotificationInterval);
+            window.adminNotificationInterval = null;
+        }
+
+        abortAdminDashboardRequest(adminStatsRequest);
+        abortAdminDashboardRequest(adminLatestIncidentRequest);
+
+        if (runtime) {
+            runtime.pollingStarted = false;
+        }
+    };
+    window.startAdminDashboardIntervals = function() {
+        const runtime = window.__adminDashboardPollingRuntime || { pollingStarted: false };
+
+        if (!window.adminDashboardIsVisible() || runtime.pollingStarted) {
+            return;
+        }
+
+        window.clearAdminDashboardIntervals();
+        runtime.pollingStarted = true;
+
+        window.adminStatsInterval = window.setInterval(() => {
+            if (!window.adminDashboardIsVisible()) return;
+            refreshAdminDashboardStats();
+        }, window.ADMIN_STATS_INTERVAL_MS);
+
+        window.adminNotificationInterval = window.setInterval(() => {
+            if (!window.adminDashboardIsVisible()) return;
+            window.refreshAdminIncidentNotifications();
+        }, window.ADMIN_NOTIFICATION_INTERVAL_MS);
+    };
+
+    function handleAdminDashboardVisibilityChange() {
+        const runtime = getAdminDashboardPollingRuntime();
+
+        if (!window.adminDashboardIsVisible()) {
+            window.clearAdminDashboardIntervals();
+            runtime.pollingStarted = false;
+            return;
+        }
+
+        refreshAdminDashboardStats();
+        window.refreshAdminIncidentNotifications();
+        window.startAdminDashboardIntervals();
+    }
+
+    function teardownAdminDashboardPolling() {
+        const runtime = getAdminDashboardPollingRuntime();
+
+        window.clearAdminDashboardIntervals();
+
+        if (runtime.listenersBound) {
+            const { visibilitychange, pagehide, beforeunload } = runtime.listeners;
+            if (visibilitychange) document.removeEventListener('visibilitychange', visibilitychange);
+            if (pagehide) window.removeEventListener('pagehide', pagehide);
+            if (beforeunload) window.removeEventListener('beforeunload', beforeunload);
+            runtime.listenersBound = false;
+        }
+
+        runtime.listeners = {};
+        runtime.initialized = false;
+    }
+
+    function initializeAdminDashboardPolling() {
+        const runtime = getAdminDashboardPollingRuntime();
+        if (runtime.initialized) {
+            return runtime;
+        }
+
+        runtime.initialized = true;
+        if (!runtime.listenersBound) {
+            runtime.listeners.visibilitychange = handleAdminDashboardVisibilityChange;
+            runtime.listeners.pagehide = teardownAdminDashboardPolling;
+            runtime.listeners.beforeunload = teardownAdminDashboardPolling;
+
+            document.addEventListener('visibilitychange', runtime.listeners.visibilitychange);
+            window.addEventListener('pagehide', runtime.listeners.pagehide);
+            window.addEventListener('beforeunload', runtime.listeners.beforeunload);
+            runtime.listenersBound = true;
+        }
+
+        return runtime;
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
         const welcomeToast = document.getElementById('adminDashboardWelcomeToast');
@@ -2520,6 +2775,19 @@
                 welcomeToast.classList.remove('is-visible');
             }, 3200);
         }
+
+        initializeAdminDashboardPolling();
+
+        const cachedStats = readAdminDashboardStatsCache();
+        if (cachedStats) {
+            applyAdminDashboardStats(cachedStats);
+        } else if (window.adminDashboardStatsSeed) {
+            applyAdminDashboardStats(window.adminDashboardStatsSeed);
+        }
+
+        refreshAdminDashboardStats();
+        window.refreshAdminIncidentNotifications();
+        window.startAdminDashboardIntervals();
         
         // Debug: Log available categories (remove this in production)
         console.log('Available categories:');

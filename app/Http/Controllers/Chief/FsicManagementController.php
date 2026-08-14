@@ -20,6 +20,16 @@ use App\Support\UserActivityLogger;
 
 class FsicManagementController extends Controller
 {
+    protected function currentRole(): string
+    {
+        return strtolower(trim((string) (Auth::user()?->role?->role ?? '')));
+    }
+
+    protected function isProvincialAdmin(): bool
+    {
+        return $this->currentRole() === 'provincial admin';
+    }
+
     protected function getAuthenticatedStationOfficer(): ?StationOfficer
     {
         return StationOfficer::where('user_id', Auth::user()->user_id)->first();
@@ -60,7 +70,14 @@ class FsicManagementController extends Controller
         $chiefStationOfficer = $this->getAuthenticatedStationOfficer();
         $availableInspectors = collect();
 
-        if ($chiefStationOfficer?->station_id) {
+        if ($this->isProvincialAdmin()) {
+            $availableInspectors = StationOfficer::with('user', 'station')
+                ->where('status', 'available')
+                ->orderBy('station_id')
+                ->orderBy('rank')
+                ->orderBy('station_officer_id')
+                ->get();
+        } elseif ($chiefStationOfficer?->station_id) {
             $availableInspectors = StationOfficer::with('user')
                 ->where('station_id', $chiefStationOfficer->station_id)
                 ->where('status', 'available')

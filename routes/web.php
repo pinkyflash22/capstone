@@ -84,7 +84,7 @@ Route::post('/register/verify-otp', [RegisterController::class, 'verifyOTPAndReg
 Route::post('/register/resend-otp', [RegisterController::class, 'resendOTP'])->name('register.resend-otp');
 Route::get('/api/recent-incidents',[IncidentController::class,'getRecentIncident']);
 
-Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-api-key', function() {
+Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/test-api-key', function() {
     $apiKey = env('OPENROUTER_API_KEY');
     
     // Test with a simple models list request (this endpoint exists)
@@ -148,11 +148,11 @@ Route::middleware('auth')->post('/citizen/marker', [MarkerController::class, 'st
 Route::post('/multimedia/store', [MultimediaController::class, 'store'])
     ->name('multimedia.store');
 Route::get('/multimedia', [MultimediaController::class, 'index'])->name('multimedia.index');
-Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/weather', function(){
+Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/weather', function(){
     return view('admin.weather');
 });
 
-Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/debug-incidents', function() {
+Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/debug-incidents', function() {
     // Check stations and their marker_ids
     $stations = DB::table('stations')->select('station_id', 'station_name', 'marker_id')->get();
     
@@ -180,7 +180,7 @@ Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/debug-i
 });
 
 
-Route::middleware(['auth', 'prevent.back.history', 'role:admin'])->get('/test-db', function() {
+Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/test-db', function() {
     try {
         $incidents = DB::table('incidents')->count();
         $markers = DB::table('markers')->count();
@@ -246,18 +246,30 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     // Route::post('/api/predictive-analysis', [AnalyticsController::class, 'runAnalysis'])->name('api.analytics');
     // Route::get('/api/historical-analyses', [AnalyticsController::class, 'getHistoricalAnalyses'])->name('api.historical');
 
-     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+     Route::middleware(['role:provincial admin'])->prefix('admin')->name('admin.')->group(function () {
 
         Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+        Route::get('/api/dashboard-stats', [AdminController::class, 'dashboardStats'])->name('dashboard-stats');
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
+        Route::get('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'mitigations'])->name('mitigations');
+        Route::post('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
+        Route::post('/mitigations/generated-drafts/{checklistId}/approve', [App\Http\Controllers\Chief\StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
+        Route::post('/mitigations/generated-drafts/{checklistId}/reject', [App\Http\Controllers\Chief\StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
+        Route::put('/mitigations/{mitigationActionId}', [App\Http\Controllers\Chief\StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
+        Route::delete('/mitigations/{mitigationActionId}', [App\Http\Controllers\Chief\StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/schedule', [AdminController::class, 'schedule'])->name('schedule');
+        Route::post('/schedule/events', [App\Http\Controllers\Chief\StationAdminController::class, 'storeScheduleEvent'])->name('schedule.events.store');
+        Route::put('/schedule/events/{eventActivity}', [App\Http\Controllers\Chief\StationAdminController::class, 'updateScheduleEvent'])->name('schedule.events.update');
+        Route::delete('/schedule/events/{eventActivity}', [App\Http\Controllers\Chief\StationAdminController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'adminIndex'])->name('risk-reviews.index');
         Route::post('/risk-reviews', [RiskAreaReviewController::class, 'adminStore'])->name('risk-reviews.store');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'adminReview'])->name('risk-reviews.review');
         Route::patch('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminUpdateActive'])->name('risk-reviews.active.update');
         Route::delete('/risk-reviews/{riskAreaId}/active', [RiskAreaReviewController::class, 'adminDeleteActive'])->name('risk-reviews.active.delete');
+        Route::post('/community-activity-requests/{requestId}/approve', [App\Http\Controllers\CommunityActivityRequestController::class, 'approve'])->name('community-activity-requests.approve');
+        Route::post('/community-activity-requests/{requestId}/reject', [App\Http\Controllers\CommunityActivityRequestController::class, 'reject'])->name('community-activity-requests.reject');
          
 
             
@@ -267,11 +279,21 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         //         return view('admin.analytics');
         //     })->name('analytics');
 
-        Route::get('/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('analytics');
-        Route::get('/api/stations-for-analytics', [App\Http\Controllers\AnalyticsController::class, 'getStationsForAnalytics']);
-        Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\AnalyticsController::class, 'runAIPredictiveAnalysis']);
-        Route::get('/api/analyses/history', [App\Http\Controllers\AnalyticsController::class, 'getHistoricalAnalyses']);
-        Route::get('/api/analyses/{id}', [App\Http\Controllers\AnalyticsController::class, 'getAnalysis']);
+        Route::post('/api/explore-recommendation', [App\Http\Controllers\Chief\AnalyticController::class, 'exploreRecommendation']);
+        Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
+        Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
+        Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
+        Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
+        Route::get('/api/historical-weather-preview', [App\Http\Controllers\Chief\AnalyticController::class, 'previewHistoricalWeatherArchive']);
+        Route::post('/api/historical-weather-save', [App\Http\Controllers\Chief\AnalyticController::class, 'saveHistoricalWeatherArchive']);
+        Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
+        Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
+        Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
+        Route::get('/api/analyses/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysis']);
+        Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);
+        Route::patch('/api/action-plan-checklists/{id}/confirm', [App\Http\Controllers\Chief\AnalyticController::class, 'confirmActionPlanChecklist']);
+        Route::patch('/api/action-plan-checklists/{id}/items', [App\Http\Controllers\Chief\AnalyticController::class, 'updateChecklistItemReview']);
+        Route::get('/api/recommendation-suggestions', [App\Http\Controllers\Chief\AnalyticController::class, 'getRecommendationSuggestions']);
     
         // });
         // Route::post('/markers', [AdminController::class, 'store'])->name('admin.markers.store');
@@ -283,8 +305,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/posts/{post}/like', [PostController::class, 'like'])->name('posts.like');
         Route::post('/posts/{post}/comment', [PostController::class, 'comment'])->name('posts.comment');
         Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
-        Route::resource('management', ManagementController::class);
-        Route::get('/management', [ManagementController::class,'index']) ->name('management');
+        Route::resource('management', App\Http\Controllers\Chief\ManagementController::class);
+        Route::get('/management', [App\Http\Controllers\Chief\ManagementController::class,'index']) ->name('management');
 
         //delete officer on a station
         Route::post('/station-officers', [StationOfficerController::class, 'store'])->name('station-officers.store');
@@ -308,8 +330,21 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
 
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
-        Route::resource('resource-management', ResourceManagementController::class);
+        Route::resource('resource-management', App\Http\Controllers\Chief\ResourceManagementController::class);
+        Route::post('/resource-management/assign-equipment', [App\Http\Controllers\Chief\ResourceManagementController::class, 'assignEquipmentToStation'])->name('resource-management.assign-equipment');
+        Route::get('/fsic', [App\Http\Controllers\Chief\FsicManagementController::class, 'index'])->name('fsic');
+        Route::post('/api/create-applicant', [App\Http\Controllers\Chief\FsicManagementController::class, 'createApplicant']);
+        Route::post('/api/fsic', [App\Http\Controllers\Chief\FsicManagementController::class, 'store']);
+        Route::get('/api/fsic/{id}', [App\Http\Controllers\Chief\FsicManagementController::class, 'show']);
+        Route::post('/api/fsic/{id}/review', [App\Http\Controllers\Chief\FsicManagementController::class, 'review']);
+        Route::post('/api/fsic/{id}/inspect', [App\Http\Controllers\Chief\FsicManagementController::class, 'inspect']);
+        Route::post('/api/fsic/{id}/approve', [App\Http\Controllers\Chief\FsicManagementController::class, 'approve']);
+        Route::get('/barangays', [BarangayController::class, 'index'])->name('barangays.index');
+        Route::get('/barangays/create', [BarangayController::class, 'create'])->name('barangays.create');
+        Route::post('/barangays', [BarangayController::class, 'store'])->name('barangays.store');
         Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
+        Route::put('/barangays/{barangay}', [BarangayController::class, 'update'])->name('barangays.update');
+        Route::delete('/barangays/{barangay}', [BarangayController::class, 'destroy'])->name('barangays.destroy');
         Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])
             ->name('barangay-boundaries.sync');
     

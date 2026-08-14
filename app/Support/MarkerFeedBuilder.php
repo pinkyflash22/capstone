@@ -153,7 +153,7 @@ class MarkerFeedBuilder
     {
         $role = strtolower(trim((string) ($viewer?->role?->role ?? '')));
 
-        return in_array($role, ['admin', 'chief', 'station admin', 'firefighter'], true);
+        return in_array($role, ['admin', 'provincial admin', 'chief', 'station admin', 'firefighter'], true);
     }
 
     protected static function viewerIsCitizen(?User $viewer = null): bool

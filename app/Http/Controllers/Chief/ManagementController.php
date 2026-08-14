@@ -56,11 +56,95 @@ class ManagementController extends Controller
 
         return StationOfficer::where('user_id', $userId)->first();
     }
+
+    protected function currentRole(): string
+    {
+        return strtolower(trim((string) (Auth::user()?->role?->role ?? '')));
+    }
+
+    protected function isProvincialAdmin(): bool
+    {
+        return $this->currentRole() === 'provincial admin';
+    }
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        if ($this->isProvincialAdmin()) {
+            $mapmarker = Marker::with('stations')->get();
+            $stations = Station::with(['marker', 'profileMedia', 'galleryMedia'])->get();
+            $stationOfficers = StationOfficer::with(['user.role', 'station'])->get();
+            $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter();
+            $stationOfficerUserIds = $stationOfficers->pluck('user_id')->filter();
+            $stationTeamIds = Team::query()->pluck('team_id')->all();
+
+            $incidents = Incident::with(['marker', 'reporter', 'team', 'historicalRecords.barangay'])->get();
+            $alerts = Incident::with('marker')->get();
+            $provinces = Province::orderBy('province_name')->get();
+
+            $chiefRole = Role::where('role', 'chief')->first();
+            $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
+
+            $personnel = $stationOfficers->map(function ($officer) {
+                return [
+                    'user_id' => $officer->user?->user_id,
+                    'station_officer_id' => $officer->station_officer_id,
+                    'first_name' => $officer->user?->first_name,
+                    'last_name' => $officer->user?->last_name,
+                    'email' => $officer->user?->email,
+                    'account_code' => $officer->user?->account_code,
+                    'contact_number' => $officer->user?->contact_number,
+                    'status' => $officer->status,
+                    'rank' => $officer->rank,
+                    'station_id' => $officer->station_id,
+                    'role' => $officer->user?->role ? [
+                        'role_id' => $officer->user->role->role_id,
+                        'role' => $officer->user->role->role,
+                    ] : null,
+                ];
+            })->values();
+
+            $equipment = EquipmentToStation::with(['equipment', 'station'])
+                ->get()
+                ->map(function ($assignment) {
+                    return [
+                        'equipment_station_id' => $assignment->equipment_station_id,
+                        'equipment_id' => $assignment->equipment_id,
+                        'station_id' => $assignment->station_id,
+                        'equipment_name' => $assignment->equipment?->equipment_name,
+                        'type' => $assignment->equipment?->type,
+                        'serial_number' => $assignment->equipment?->serial_number,
+                        'model' => $assignment->equipment?->model,
+                        'category' => $assignment->equipment?->category,
+                        'available_quantity' => (int) ($assignment->available_quantity ?? 0),
+                        'damaged_quantity' => (int) ($assignment->damaged_quantity ?? 0),
+                        'maintenance_quantity' => (int) ($assignment->maintenance_quantity ?? 0),
+                        'status' => $this->deriveEquipmentAvailabilityStatus($assignment),
+                    ];
+                })->values();
+
+            $reports = $this->buildStationReports($stationOfficerIds->all());
+            $roles = Role::where('role', '!=', 'anonymous')->orderBy('role')->get();
+            $managedBarangays = Barangay::with('city')->orderBy('barangay_name')->get();
+            $totalIncidents = $incidents;
+
+            return view('chief.management', compact(
+                'totalIncidents',
+                'mapmarker',
+                'incidents',
+                'reports',
+                'alerts',
+                'stations',
+                'provinces',
+                'chiefs',
+                'personnel',
+                'equipment',
+                'roles',
+                'managedBarangays'
+            ));
+        }
+
         $thisUser = $this->currentUserId();
         $thisStation = $this->currentStationOfficer();
         $stationExact = $thisStation?->station_id;
@@ -156,14 +240,13 @@ class ManagementController extends Controller
 
     public function updateStation(Request $request, Station $station)
     {
-        $currentUserId = $this->currentUserId();
         $stationOfficer = $this->currentStationOfficer();
 
-        if (!$stationOfficer || (int) $stationOfficer->station_id !== (int) $station->station_id) {
+        if (! $this->isProvincialAdmin() && (!$stationOfficer || (int) $stationOfficer->station_id !== (int) $station->station_id)) {
             abort(403, 'You are not allowed to update this station.');
         }
 
-        if (strtolower(Auth::user()->role->role ?? '') !== 'chief') {
+        if (! in_array($this->currentRole(), ['chief', 'provincial admin'], true)) {
             abort(403, 'Only chiefs can update station information.');
         }
 
@@ -286,6 +369,69 @@ class ManagementController extends Controller
 // }
 public function getIncidents(Request $request)
 {
+    if ($this->isProvincialAdmin()) {
+        $query = Incident::query()
+            ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay']);
+
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('incident_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('reporter', function ($reporterQuery) use ($search) {
+                      $reporterQuery->where('first_name', 'LIKE', "%{$search}%")
+                          ->orWhere('last_name', 'LIKE', "%{$search}%");
+                  })
+                  ->orWhereHas('historicalRecords', function ($historicalQuery) use ($search) {
+                      $historicalQuery->where('source_name', 'LIKE', "%{$search}%")
+                          ->orWhere('incident_location', 'LIKE', "%{$search}%")
+                          ->orWhere('fire_cause', 'LIKE', "%{$search}%");
+                  })
+                  ->orWhereHas('marker', function($sub) use ($search) {
+                      $sub->where('title', 'LIKE', "%{$search}%")
+                          ->orWhere('description', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->has('status') && $request->status) {
+            $statusMap = [
+                '1' => ['Reported', 'reported'],
+                '2' => ['Responding', 'responding'],
+                '3' => ['Active', 'active', 'Controlled', 'controlled', 'On Scene', 'on scene'],
+                '4' => ['Resolved', 'resolved', 'Closed', 'closed'],
+            ];
+            $statusAliases = $statusMap[(string) $request->status] ?? [$request->status];
+            $query->where(function ($statusQuery) use ($request, $statusAliases) {
+                $statusQuery->where('incident_status_id', $request->status)
+                    ->orWhereIn('status', $statusAliases);
+            });
+        }
+
+        if ($request->has('date_filter') && $request->date_filter) {
+            switch($request->date_filter) {
+                case 'today':
+                    $query->whereDate('created_at', Carbon::today());
+                    break;
+                case 'week':
+                    $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
+                    break;
+                case 'month':
+                    $query->whereMonth('created_at', Carbon::now()->month);
+                    break;
+            }
+        }
+
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
+
+        return response()->json([
+            'success' => true,
+            'data' => $query->get(),
+            'user_team_ids' => Team::query()->pluck('team_id')->all(),
+        ]);
+    }
+
     $stationOfficer = $this->currentStationOfficer();
 
     if (! $stationOfficer?->station_id) {
@@ -815,7 +961,7 @@ protected function storeHistoricalFireIncident(Request $request)
     {
         $stationOfficer = $this->currentStationOfficer();
 
-        if (! $stationOfficer?->station_id) {
+        if (! $this->isProvincialAdmin() && ! $stationOfficer?->station_id) {
             return response()->json([
                 'success' => true,
                 'data' => [],
@@ -824,7 +970,7 @@ protected function storeHistoricalFireIncident(Request $request)
         }
 
         $query = StationOfficer::with(['user.role'])
-            ->where('station_id', $stationOfficer?->station_id);
+            ->when(! $this->isProvincialAdmin(), fn ($builder) => $builder->where('station_id', $stationOfficer?->station_id));
         
         // Apply search filter
         if ($request->has('search') && $request->search) {
@@ -890,7 +1036,7 @@ protected function storeHistoricalFireIncident(Request $request)
     {
         $stationOfficer = $this->currentStationOfficer();
 
-        if (! $stationOfficer?->station_id) {
+        if (! $this->isProvincialAdmin() && ! $stationOfficer?->station_id) {
             return response()->json([
                 'success' => true,
                 'data' => [],
@@ -899,7 +1045,7 @@ protected function storeHistoricalFireIncident(Request $request)
         }
 
         $query = EquipmentToStation::with(['equipment.category', 'station'])
-            ->where('station_id', $stationOfficer?->station_id);
+            ->when(! $this->isProvincialAdmin(), fn ($builder) => $builder->where('station_id', $stationOfficer?->station_id));
         
         // Apply search filter
         if ($request->has('search') && $request->search) {
