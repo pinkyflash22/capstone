@@ -31,7 +31,9 @@ class ForecastModelService
         $this->trainingScriptPath = $this->resolvePath((string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py'));
         $this->evaluationScriptPath = $this->resolvePath((string) config('services.ai_prediction.evaluation_script', 'capstone-ai/evaluate_model.py'));
         $this->evaluationCachePath = $this->resolvePath((string) config('services.ai_prediction.evaluation_cache_path', 'capstone-ai/fire_model_evaluation.json'));
-        $this->pythonBinary = (string) config('services.ai_prediction.python_binary', 'python');
+        $this->pythonBinary = $this->resolvePythonBinary(
+            (string) config('services.ai_prediction.python_binary', 'python')
+        );
     }
 
     public function ensureReady(): bool
@@ -48,6 +50,36 @@ class ForecastModelService
         }
 
         return $this->retrain(exportDataset: true)['success'] === true;
+    }
+
+    private function resolvePythonBinary(string $configuredBinary): string
+    {
+        if (PHP_OS_FAMILY === 'Windows' && strtolower(trim($configuredBinary)) === 'python') {
+            $bundledPython = 'C:/Program Files/Python314/python.exe';
+
+            if (File::exists($bundledPython)) {
+                return $bundledPython;
+            }
+        }
+
+        return $configuredBinary;
+    }
+
+    private function pythonEnvironment(): array
+    {
+        $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
+        $environment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
+                $value = getenv($name);
+                if (is_string($value) && $value !== '') {
+                    $environment[$name] = $value;
+                }
+            }
+        }
+
+        return $environment;
     }
 
     public function retrain(bool $exportDataset = true): array
@@ -291,7 +323,9 @@ class ForecastModelService
         }
 
         try {
+            File::ensureDirectoryExists(dirname($this->evaluationCachePath));
             $process = Process::path(base_path())
+                ->env($this->pythonEnvironment())
                 ->timeout(60)
                 ->run([
                     $this->pythonBinary,

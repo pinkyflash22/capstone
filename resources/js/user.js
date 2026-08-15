@@ -1891,7 +1891,7 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
     }
 
     try {
-        const latestResponse = await fetchCitizenLiveResponseOnce('citizen-markers-latest', '/api/markers/latest', {
+        const latestResponse = await fetchCitizenLiveResponseOnce('citizen-markers-latest', '/map/markers/latest', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -1911,7 +1911,7 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
             return false;
         }
 
-        const markersResponse = await fetchCitizenLiveResponseOnce('citizen-markers', '/api/markers', {
+        const markersResponse = await fetchCitizenLiveResponseOnce('citizen-markers', '/map/markers/feed', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken

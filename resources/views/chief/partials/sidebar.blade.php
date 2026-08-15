@@ -78,7 +78,7 @@
             };
 
             const prefetchDashboard = () => {
-                if (dashboardPrefetched) {
+                if (dashboardPrefetched || document.visibilityState !== 'visible') {
                     return;
                 }
 
@@ -90,12 +90,6 @@
                 });
                 dashboardApiUrls.forEach((apiUrl) => appendPrefetchLink(apiUrl, 'fetch'));
             };
-
-            if (typeof window.requestIdleCallback === 'function') {
-                window.requestIdleCallback(prefetchDashboard, { timeout: 1500 });
-            } else {
-                window.setTimeout(prefetchDashboard, 900);
-            }
 
             document
                 .querySelectorAll('a[href="' + dashboardUrl + '"]')

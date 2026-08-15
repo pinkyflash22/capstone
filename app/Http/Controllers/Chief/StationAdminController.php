@@ -185,6 +185,60 @@ class StationAdminController extends Controller
         ];
     }
 
+    protected function buildDashboardMlTrendSeries($recentAnalyses, ?int $stationId, $teamIds)
+    {
+        $teamIds = collect($teamIds)->filter()->map(fn ($id) => (int) $id)->values();
+        $completedIncidents = Incident::query()
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+            ->when($stationId, function ($query) use ($stationId, $teamIds) {
+                $query->where(function ($stationQuery) use ($stationId, $teamIds) {
+                    $stationQuery->where('station_id', $stationId);
+                    if ($teamIds->isNotEmpty()) {
+                        $stationQuery->orWhereIn('team_id', $teamIds->all());
+                    }
+                });
+            })
+            ->when(! $stationId && $teamIds->isNotEmpty(), fn ($query) => $query->whereIn('team_id', $teamIds->all()))
+            ->get(['created_at', 'occurred_at']);
+
+        $dailyAnalysisPoints = collect($recentAnalyses)
+            ->sortBy('created_at')
+            ->values()
+            ->map(function ($analysis) {
+                $analysisData = is_array($analysis->analysis_data ?? null)
+                    ? $analysis->analysis_data
+                    : (json_decode((string) ($analysis->analysis_data ?? '{}'), true) ?: []);
+                $predictions = is_array($analysis->predictions ?? null)
+                    ? $analysis->predictions
+                    : (json_decode((string) ($analysis->predictions ?? '[]'), true) ?: []);
+                $rawData = data_get($analysisData, 'raw_data', []);
+                return [
+                    'date' => Carbon::parse($analysis->created_at)->toDateString(),
+                    'predicted_fire_incidents' => (int) (data_get($predictions, 'predicted_fire_incidents') ?? 0),
+                    'confidence' => is_numeric($analysis->confidence_data ?? null) ? (int) $analysis->confidence_data : 0,
+                    'risk_level' => (string) ($analysis->risk_level ?? 'Unknown'),
+                ];
+            })
+            ->keyBy('date');
+
+        return collect(range(7, 0))
+            ->map(function (int $daysAgo) use ($completedIncidents, $dailyAnalysisPoints) {
+                $date = Carbon::today()->subDays($daysAgo);
+                $analysisPoint = $dailyAnalysisPoints->get($date->toDateString());
+
+                return [
+                    'label' => $date->format('M d'),
+                    'incident_count' => $completedIncidents
+                        ->filter(fn ($incident) => optional($incident->occurred_at ?: $incident->created_at)?->isSameDay($date))
+                        ->count(),
+                    'predicted_fire_incidents' => $analysisPoint['predicted_fire_incidents'] ?? null,
+                    'confidence' => $analysisPoint['confidence'] ?? null,
+                    'risk_level' => $analysisPoint['risk_level'] ?? 'No saved forecast',
+                ];
+            })
+            ->values();
+    }
+
     protected function buildStationReadinessData()
     {
         $eligibleRoles = ['firefighter', 'chief', 'station admin'];
@@ -333,6 +387,21 @@ class StationAdminController extends Controller
             ->where('risk_areas.station_id', $stationId)
             ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
             ->get();
+
+        $inferredCityIds = $cityIds
+            ->merge($riskAreaBarangays->pluck('city_id')->filter())
+            ->unique()
+            ->values();
+
+        if ($inferredCityIds->isNotEmpty()) {
+            $barangays = $barangays->merge(
+                DB::table('barangays')
+                    ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+                    ->whereIn('barangays.city_id', $inferredCityIds)
+                    ->select('barangays.barangay_id', 'barangays.barangay_name', 'barangays.city_id', 'cities.city_name')
+                    ->get()
+            );
+        }
 
         return $barangays
             ->merge($riskAreaBarangays)
@@ -1547,19 +1616,8 @@ class StationAdminController extends Controller
                     return $analysis;
                 })
             : collect();
-        $analysisTrendSeries = collect($recentAnalyses)
-            ->sortBy('created_at')
-            ->values()
-            ->map(function ($analysis) {
-                return [
-                    'label' => optional(\Carbon\Carbon::parse($analysis->created_at))->format('M d'),
-                    'incident_count' => (int) ($analysis->incident_count ?? 0),
-                    'predicted_fire_incidents' => (int) (data_get($analysis->predictions ?? [], 'predicted_fire_incidents') ?? 0),
-                    'confidence' => (int) ($analysis->confidence_score ?? 0),
-                    'risk_level' => (string) ($analysis->risk_level ?? 'Unknown'),
-                ];
-            })
-            ->values();
+        $analysisTrendSeries = $this->buildDashboardMlTrendSeries($recentAnalyses, $stationId, $teamIds);
+        $analysisTrendRunCount = $recentAnalyses->count();
         $dashboardStatsSeed = [
             'incident_total' => $teamIds->isNotEmpty()
                 ? $incidents->whereIn('team_id', $teamIds->all())->count()
@@ -1591,6 +1649,7 @@ class StationAdminController extends Controller
             'stationReadiness',
             'recentAnalyses',
             'analysisTrendSeries',
+            'analysisTrendRunCount',
             'dashboardStatsSeed'
         ));
     }
@@ -1646,6 +1705,7 @@ class StationAdminController extends Controller
                 'status' => request()->string('status')->toString() ?: null,
                 'responsible_team_id' => request()->integer('responsible_team_id') ?: null,
                 'source_type' => request()->string('source_type')->toString() ?: null,
+                'revision_review' => request()->boolean('revision_review'),
                 'mitigation_action_id' => request()->integer('mitigation_action_id') ?: null,
                 'search' => trim(request()->string('search')->toString()) ?: null,
             ];
@@ -1688,6 +1748,9 @@ class StationAdminController extends Controller
                     'approved_at',
                     'reviewed_by',
                     'reviewed_at',
+                    'analysis_revision',
+                    'requires_revision_review',
+                    'is_manually_edited',
                     'created_at',
                 ])
                 ->with([
@@ -1698,7 +1761,7 @@ class StationAdminController extends Controller
                     'riskArea.marker:marker_id,title',
                     'checklist:barangay_prediction_checklist_id,title',
                     'aiActionPlanChecklist:ai_action_plan_checklist_id,analysis_id,plan_title,plan_description,priority_level,source_title,source_description,risk_area_id,ai_payload',
-                    'aiActionPlanChecklist.analysis:analysis_id,station_id,barangay_scope,scope_level,risk_level,confidence_score,predictions,contributing_factors,recommendations,created_at',
+                    'aiActionPlanChecklist.analysis:analysis_id,station_id,risk_level,confidence_data,analysis_data,predictions,recommendations,created_at',
                     'aiActionPlanChecklist.suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description,steps,resources_needed,estimated_timeline',
                     'aiActionPlanChecklist.items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order',
                     'creator:user_id,first_name,middle_name,last_name',
@@ -1734,6 +1797,7 @@ class StationAdminController extends Controller
                 })
                 ->when($filters['priority_level'], fn ($query, $value) => $query->where('priority_level', $value))
                 ->when($filters['status'], fn ($query, $value) => $query->where('status', $value))
+                ->when($filters['revision_review'], fn ($query) => $query->where('requires_revision_review', true))
                 ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
                 ->when($filters['source_type'], function ($query, $value) {
                     match ($value) {
@@ -1854,7 +1918,7 @@ class StationAdminController extends Controller
 
             $aiActionPlanOptions = AiActionPlanChecklist::query()
                 ->with([
-                    'analysis:analysis_id,barangay_scope,scope_level,risk_level,created_at',
+                    'analysis:analysis_id,station_id,risk_level,confidence_data,analysis_data,created_at',
                     'suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description',
                     'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order',
                 ])
@@ -1881,7 +1945,7 @@ class StationAdminController extends Controller
                     'barangay:barangay_id,barangay_name',
                     'riskArea:risk_area_id,marker_id',
                     'riskArea.marker:marker_id,title',
-                    'analysis:analysis_id,risk_level,barangay_scope,created_at',
+                    'analysis:analysis_id,station_id,risk_level,confidence_data,analysis_data,created_at',
                     'suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description',
                     'mitigationActions:mitigation_action_id,ai_action_plan_checklist_id,status',
                 ])
@@ -2017,6 +2081,7 @@ class StationAdminController extends Controller
             'status' => $request->string('status')->toString() ?: null,
             'responsible_team_id' => $request->integer('responsible_team_id') ?: null,
             'source_type' => $request->string('source_type')->toString() ?: null,
+            'revision_review' => $request->boolean('revision_review'),
             'mitigation_action_id' => $request->integer('mitigation_action_id') ?: null,
             'search' => trim($request->string('search')->toString()) ?: null,
         ];
@@ -2037,9 +2102,10 @@ class StationAdminController extends Controller
             ->when($filters['category'], fn ($query, $value) => $query->whereIn('category', $this->mitigationCategoryFilterAliases($value)))
             ->when($filters['priority_level'], fn ($query, $value) => $query->where('priority_level', $value))
             ->when($filters['status'], fn ($query, $value) => $query->where('status', $value))
+            ->when($filters['revision_review'], fn ($query) => $query->where('requires_revision_review', true))
             ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
             ->when($filters['source_type'], fn ($query, $value) => $query->where('source_type', $value))
-            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderByDesc('created_at')
             ->paginate(10);
 
@@ -2056,6 +2122,8 @@ class StationAdminController extends Controller
                 'target_date' => optional($action->target_date)->format('M d, Y'),
                 'source' => $this->resolveMitigationSourceType($action->toArray()),
                 'responsible' => $action->responsibleUser?->full_name,
+                'requires_revision_review' => (bool) $action->requires_revision_review,
+                'analysis_revision' => $action->analysis_revision,
             ])->items(),
             'meta' => ['current_page' => $actions->currentPage(), 'last_page' => $actions->lastPage(), 'total' => $actions->total()],
         ]);
@@ -2234,6 +2302,8 @@ class StationAdminController extends Controller
                 'approved_at' => $approvalTriggered ? now() : $action->approved_at,
                 'reviewed_by' => Auth::user()?->user_id,
                 'reviewed_at' => now(),
+                'is_manually_edited' => true,
+                'requires_revision_review' => false,
             ]);
 
             $this->storeMitigationAttachments($action, $request);

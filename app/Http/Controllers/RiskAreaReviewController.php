@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 class RiskAreaReviewController extends Controller
 {
-    public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version';
+    public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version:v2';
     protected const REVIEW_TEXT_REGEX = "/^[\\pL\\pN\\s\\.,:\\-\\(\\)]*$/u";
 
     public function adminIndex(Request $request): View
@@ -844,7 +844,7 @@ class RiskAreaReviewController extends Controller
     protected function riskReviewRelationships(): array
     {
         return [
-            'marker:marker_id,title,description,status,category',
+            'marker:marker_id,title,description,lat,lng,status,category',
             'photos:risk_area_photo_id,risk_area_id,photo_path,photo_name',
             'reporter:user_id,first_name,last_name',
             'barangayHall:barangay_hall_id,barangay_id',

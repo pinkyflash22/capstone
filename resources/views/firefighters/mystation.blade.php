@@ -219,8 +219,9 @@
                             <input type="text" name="memorandum_for" class="form-input" placeholder="Head of office receiving the report">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Fire Started</label>
+                            <label class="form-label">Fire Occurred At</label>
                             <input type="datetime-local" name="fire_started" class="form-input">
+                            <small class="table-muted">Confirm or correct the actual start time. Saving this verifies the occurrence time used by forecasting.</small>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Fire Out</label>

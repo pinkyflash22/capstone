@@ -303,6 +303,10 @@
             cursor: wait;
         }
 
+        .boundary-action-group { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+        .boundary-action-group form { margin:0; }
+        .boundary-visit-btn { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 12px; border:1px solid #cbd5e1; border-radius:10px; color:#334155; background:#fff; text-decoration:none; font-size:.78rem; font-weight:800; }
+
         .search-box {
             display: flex;
             align-items: center;
@@ -842,10 +846,18 @@
                                     <td>{{ $boundaryBarangay['boundary_source'] ? strtoupper($boundaryBarangay['boundary_source']) : 'NONE' }}</td>
                                     <td>{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
                                     <td>
-                                        <a href="{{ route('admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-sync-btn" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-                                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                            Visit
-                                        </a>
+                                        <div class="boundary-action-group">
+                                            <form class="boundary-sync-form" method="POST" action="{{ route('admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route('admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
+                                                @csrf
+                                                <button type="submit" class="boundary-sync-btn" title="Fetch the latest barangay polygon from Geoapify">
+                                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                                    {{ $boundaryBarangay['boundary_status'] === 'synced' ? 'Refresh' : 'Sync' }}
+                                                </button>
+                                            </form>
+                                            <a href="{{ route('admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-visit-btn" title="Open barangay boundary details">
+                                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Details
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

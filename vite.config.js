@@ -3,6 +3,11 @@ import laravel from 'laravel-vite-plugin';
 // import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+    build: {
+        // Keep prior hashed assets so already-open tabs do not receive a 404
+        // immediately after a new production bundle is generated.
+        emptyOutDir: false,
+    },
     plugins: [
         laravel({
             input: [

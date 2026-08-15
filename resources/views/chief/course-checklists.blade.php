@@ -4,1244 +4,180 @@
     @include('partials.pyrosense-favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-
-    <title>PyroSense · Chief Course Checklists</title>
-
+    <title>PyroSense · Action Plan Checklists</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
-
     <style>
-        body {
-            margin: 0;
-            background: #f8fafc;
-            color: #0f172a;
-            font-family: Inter, system-ui, sans-serif;
-        }
-
-        .chief-checklist-shell {
-            min-height: 100vh;
-            display: flex;
-            background: linear-gradient(180deg, #fff7ed 0%, #f8fafc 22%);
-        }
-
-        .chief-checklist-main {
-            flex: 1;
-            min-width: 0;
-            padding: 28px;
-            width: 100%;
-        }
-
-        .chief-checklist-wrap {
-            max-width: 1380px;
-            margin: 0 auto;
-        }
-
-        .lector-top-bar {
-            background: rgba(255, 255, 255, 0.82);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            height: 72px;
-            padding: 0 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 16px;
-            z-index: 40;
-            margin-bottom: 24px;
-            border-radius: 24px;
-            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
-        }
-
-        .station-badge {
-            color: #6b7280;
-            font-size: 13px;
-            background: #f8fafc;
-            padding: 8px 12px;
-            border-radius: 999px;
-            border: 1px solid #e2e8f0;
-            white-space: nowrap;
-        }
-
-        .user-dropdown {
-            position: relative;
-        }
-
-        .user-dropdown-toggle {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            border-radius: 999px;
-            background: #fffbeb;
-            border: 1px solid #fef3c7;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .user-dropdown-toggle:hover {
-            background: #fef3c7;
-        }
-
-        .user-dropdown-menu {
-            position: absolute;
-            top: calc(100% + 12px);
-            right: 0;
-            width: 260px;
-            background: white;
-            border-radius: 18px;
-            box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
-            border: 1px solid rgba(226, 232, 240, 0.95);
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(10px);
-            transition: all 0.2s ease;
-            overflow: hidden;
-        }
-
-        .user-dropdown-menu.show {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .user-dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 18px;
-            color: #1e293b;
-            text-decoration: none;
-            font-size: 14px;
-            transition: background 0.2s ease;
-        }
-
-        .user-dropdown-item:hover {
-            background: #fff7ed;
-            color: #c2410c;
-        }
-
-        .chief-checklist-topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 18px;
-            padding: 24px 28px;
-            border-radius: 24px;
-            background:
-                radial-gradient(circle at top right, rgba(251, 191, 36, 0.15), transparent 28%),
-                linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 237, 0.9));
-            border: 1px solid rgba(251, 191, 36, 0.18);
-            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.05);
-        }
-
-        .chief-checklist-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: #fff7ed;
-            border: 1px solid #fdba74;
-            color: #9a3412;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-
-        .chief-checklist-title {
-            margin: 12px 0 8px;
-            font-size: 1.85rem;
-            line-height: 1.05;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-        }
-
-        .chief-checklist-copy {
-            margin: 0;
-            color: #475569;
-            max-width: 700px;
-            line-height: 1.55;
-            font-size: 14px;
-        }
-
-        .chief-checklist-badge {
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: white;
-            border: 1px solid #e2e8f0;
-            color: #475569;
-            font-size: 13px;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .chief-checklist-summary {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 14px;
-            margin-bottom: 20px;
-        }
-
-        .chief-summary-card,
-        .chief-filter-card,
-        .chief-checklist-card {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            border-radius: 20px;
-            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
-        }
-
-        .chief-summary-card {
-            padding: 18px 20px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chief-summary-card::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(180deg, #f97316, #dc2626);
-            opacity: 0.9;
-        }
-
-        .chief-summary-label {
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-
-        .chief-summary-value {
-            margin-top: 10px;
-            font-size: 2rem;
-            font-weight: 800;
-            color: #0f172a;
-        }
-
-        .chief-filter-card {
-            padding: 18px 20px;
-            margin-bottom: 20px;
-        }
-
-        .chief-filter-grid {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr 1fr 1.2fr auto;
-            gap: 12px;
-            align-items: end;
-        }
-
-        .chief-field label {
-            display: block;
-            margin-bottom: 6px;
-            color: #475569;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-        }
-
-        .chief-field input,
-        .chief-field select,
-        .chief-row-notes {
-            width: 100%;
-            border: 1px solid #dbe4f0;
-            border-radius: 14px;
-            padding: 12px 14px;
-            font: inherit;
-            color: #0f172a;
-            background: #fff;
-            box-sizing: border-box;
-        }
-
-        .chief-filter-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .chief-btn {
-            border: none;
-            border-radius: 12px;
-            padding: 11px 15px;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
-            transition: .2s ease;
-        }
-
-        .chief-btn:hover {
-            transform: translateY(-1px);
-        }
-
-        .chief-btn-primary {
-            background: linear-gradient(135deg, #dc2626, #ea580c);
-            color: white;
-        }
-
-        .chief-btn-soft {
-            background: #f8fafc;
-            color: #334155;
-            border: 1px solid #dbe4f0;
-        }
-
-        .chief-checklist-stack {
-            display: grid;
-            gap: 16px;
-        }
-
-        .chief-checklist-card {
-            padding: 20px;
-        }
-
-        .chief-checklist-head {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            align-items: flex-start;
-            margin-bottom: 16px;
-        }
-
-        .chief-checklist-title-row {
-            margin: 0 0 8px;
-            font-size: 1.08rem;
-            font-weight: 800;
-        }
-
-        .chief-checklist-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .chief-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 11px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .chief-chip--barangay {
-            background: #eff6ff;
-            color: #1d4ed8;
-        }
-
-        .chief-chip--priority-critical,
-        .chief-chip--status-rejected {
-            background: #fef2f2;
-            color: #b91c1c;
-        }
-
-        .chief-chip--priority-high,
-        .chief-chip--status-submitted {
-            background: #fff7ed;
-            color: #c2410c;
-        }
-
-        .chief-chip--priority-medium,
-        .chief-chip--status-in_progress {
-            background: #eff6ff;
-            color: #1d4ed8;
-        }
-
-        .chief-chip--priority-low,
-        .chief-chip--status-pending {
-            background: #f8fafc;
-            color: #475569;
-        }
-
-        .chief-chip--status-confirmed {
-            background: #ecfdf5;
-            color: #15803d;
-        }
-
-        .chief-checklist-description,
-        .chief-checklist-success {
-            margin: 0 0 12px;
-            color: #475569;
-            line-height: 1.6;
-        }
-
-        .chief-checklist-grid {
-            display: grid;
-            grid-template-columns: 1.4fr .95fr;
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .chief-checklist-panel {
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 16px;
-            background: linear-gradient(180deg, #ffffff, #fbfdff);
-        }
-
-        .chief-panel-title {
-            margin: 0 0 12px;
-            font-size: 13px;
-            font-weight: 800;
-            color: #0f172a;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-
-        .chief-checklist-items {
-            display: grid;
-            gap: 10px;
-        }
-
-        .chief-checklist-item {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 12px;
-            align-items: flex-start;
-            padding: 12px 14px;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            background: #fff;
-        }
-
-        .chief-checklist-item.is-followed {
-            background: #ecfdf5;
-            border-color: #86efac;
-        }
-
-        .chief-checklist-item.is-not-followed {
-            background: #fef2f2;
-            border-color: #fca5a5;
-        }
-
-        .chief-checklist-item-copy {
-            color: #334155;
-            line-height: 1.55;
-            font-size: 14px;
-        }
-
-        .chief-checklist-item.is-followed .chief-checklist-item-copy {
-            color: #166534;
-        }
-
-        .chief-checklist-item.is-not-followed .chief-checklist-item-copy {
-            color: #991b1b;
-        }
-
-        .chief-checklist-item-meta {
-            display: grid;
-            gap: 8px;
-            justify-items: end;
-        }
-
-        .chief-checklist-item-state {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            white-space: nowrap;
-            color: #64748b;
-        }
-
-        .chief-step-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .chief-step-btn {
-            border: 1px solid transparent;
-            border-radius: 999px;
-            padding: 8px 10px;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .03em;
-            cursor: pointer;
-        }
-
-        .chief-step-btn--followed {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .chief-step-btn--not-followed {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-
-        .chief-step-btn--reset {
-            background: #e2e8f0;
-            color: #334155;
-        }
-
-        .chief-progress-card {
-            display: grid;
-            gap: 8px;
-            margin-bottom: 14px;
-            padding: 12px 14px;
-            border-radius: 14px;
-            background: #fff7ed;
-            border: 1px solid #fed7aa;
-        }
-
-        .chief-progress-bar {
-            height: 10px;
-            background: #fde7cf;
-            border-radius: 999px;
-            overflow: hidden;
-        }
-
-        .chief-progress-bar > span {
-            display: block;
-            height: 100%;
-            background: linear-gradient(135deg, #f97316, #16a34a);
-            border-radius: inherit;
-        }
-
-        .chief-row-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .chief-btn-status {
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 12px;
-        }
-
-        .chief-btn-progress {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .chief-btn-submitted {
-            background: #ffedd5;
-            color: #c2410c;
-        }
-
-        .chief-btn-confirm {
-            background: #dcfce7;
-            color: #15803d;
-        }
-
-        .chief-btn-reject {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-
-        .chief-suggestion-history {
-            display: grid;
-            gap: 10px;
-        }
-
-        .chief-suggestion-card {
-            border-radius: 12px;
-            padding: 12px 14px;
-            background: linear-gradient(180deg, #f8fafc, #ffffff);
-            border: 1px solid #e2e8f0;
-        }
-
-        .chief-suggestion-date {
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .chief-empty {
-            padding: 42px 24px;
-            text-align: center;
-            color: #64748b;
-            background: rgba(255,255,255,.88);
-            border: 1px dashed #cbd5e1;
-            border-radius: 24px;
-        }
-
-        .chief-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.52);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            z-index: 4000;
-        }
-
-        .chief-modal.is-open {
-            display: flex;
-        }
-
-        .chief-modal__card {
-            width: min(760px, 100%);
-            max-height: 85vh;
-            overflow: auto;
-            border-radius: 24px;
-            background: white;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 24px 56px rgba(15, 23, 42, 0.16);
-        }
-
-        .chief-modal__header,
-        .chief-modal__footer {
-            padding: 18px 22px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .chief-modal__footer {
-            border-bottom: none;
-            border-top: 1px solid #e2e8f0;
-            justify-content: flex-end;
-        }
-
-        .chief-modal__body {
-            padding: 22px;
-        }
-
-        .chief-close-btn {
-            border: none;
-            background: #f8fafc;
-            color: #475569;
-            width: 40px;
-            height: 40px;
-            border-radius: 999px;
-            cursor: pointer;
-        }
-
-        @media (max-width: 1180px) {
-            .chief-checklist-summary,
-            .chief-filter-grid,
-            .chief-checklist-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .chief-checklist-main {
-                margin-left: 280px;
-                width: calc(100% - 280px);
-            }
-        }
-
-        @media (max-width: 768px) {
-            .lector-top-bar {
-                height: auto;
-                min-height: 64px;
-                padding: 12px 16px;
-                margin-bottom: 18px;
-            }
-
-            .chief-checklist-main {
-                width: min(100%, 760px);
-                padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 96px);
-                margin-left: 0;
-            }
-
-            .chief-checklist-topbar,
-            .chief-checklist-summary,
-            .chief-filter-grid,
-            .chief-checklist-grid {
-                grid-template-columns: 1fr;
-                display: grid;
-            }
-
-            .chief-filter-actions {
-                flex-direction: column;
-            }
-
-            .chief-checklist-topbar,
-            .chief-summary-card,
-            .chief-filter-card,
-            .chief-checklist-card {
-                border-radius: 0;
-                box-shadow: none;
-                margin-inline: -14px;
-            }
-
-            .chief-filter-actions .chief-btn,
-            .chief-modal__footer .chief-btn {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .chief-modal {
-                align-items: flex-end;
-                padding: 10px;
-            }
-
-            .chief-modal__card {
-                width: 100%;
-                max-width: 100%;
-                max-height: min(84dvh, 760px);
-                border-radius: 24px 24px 18px 18px;
-            }
-
-            .chief-modal__card::before {
-                content: "";
-                display: block;
-                width: 52px;
-                height: 5px;
-                border-radius: 999px;
-                background: #cbd5e1;
-                margin: 14px auto 0;
-            }
-        }
+        :root{--ink:#152238;--muted:#65748b;--line:#e7dfd5;--paper:#fffdfa;--soft:#fff7ed;--orange:#d86616;--red:#c63820;--gold:#e99a14;--green:#15966f;--blue:#3173d9}
+        *{box-sizing:border-box}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+        body{margin:0;background:linear-gradient(180deg,#fff7ed 0,#f7f8fa 340px);color:var(--ink);font-family:Inter,system-ui,sans-serif}.checklist-shell{display:flex;min-height:100vh}.checklist-main{flex:1;min-width:0;padding:26px}.checklist-container{max-width:1400px;margin:auto}
+        .checklist-topbar{position:sticky;top:14px;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 20px;margin-bottom:16px;background:rgba(255,255,255,.93);border:1px solid rgba(231,223,213,.9);border-radius:24px;box-shadow:0 15px 38px rgba(39,46,59,.08);backdrop-filter:blur(14px)}.checklist-topbar__title{display:flex;align-items:center;gap:13px}.checklist-topbar__icon{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#fff1e7;color:var(--red)}.checklist-topbar h1{font-size:19px;line-height:1.15;margin:0}.checklist-topbar p{font-size:12px;color:var(--muted);margin:4px 0 0}.mobile-menu,.profile-pill{border:0;cursor:pointer}.mobile-menu{display:none;background:#f6f7f9;width:40px;height:40px;border-radius:13px;color:var(--ink)}.profile-pill{display:flex;align-items:center;gap:9px;padding:7px 13px 7px 7px;border:1px solid #f3d8b8;border-radius:999px;background:#fffaf0;color:var(--ink);font-weight:750}.profile-pill span:first-child{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#e54a10);color:#fff;font-size:11px}
+        .forecast-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:26px 30px;margin-bottom:16px;border:1px solid #f0d9c1;border-radius:28px;background:radial-gradient(circle at 90% 12%,rgba(245,158,11,.18),transparent 30%),linear-gradient(135deg,#fff,#fff8f0);box-shadow:0 18px 46px rgba(107,66,25,.07)}.forecast-hero__eyebrow,.checklist-eyebrow{display:inline-flex;align-items:center;gap:8px;color:#a43b1a;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.1em}.forecast-hero h2{font-size:clamp(25px,3vw,38px);letter-spacing:-.04em;margin:8px 0}.forecast-hero p{max-width:730px;margin:0;color:var(--muted);font-size:14px;line-height:1.6}.workflow-nav{display:flex;gap:8px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:17px}.workflow-nav a{display:flex;align-items:center;gap:7px;padding:10px 12px;border-radius:12px;text-decoration:none;color:#6d7481;font-size:12px;font-weight:800}.workflow-nav a.active{background:linear-gradient(135deg,#cf3f24,#e88313);color:#fff;box-shadow:0 8px 20px rgba(207,63,36,.2)}
+        .checklist-workspace{display:grid;gap:16px}.checklist-workspace[aria-busy=true]{opacity:.58;pointer-events:none}.checklist-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.checklist-metric{display:flex;align-items:center;gap:12px;min-height:82px;padding:15px 17px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.94);box-shadow:0 10px 28px rgba(39,46,59,.045)}.checklist-metric__icon{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#fff3e8;color:var(--orange)}.checklist-metric small,.checklist-metric strong{display:block}.checklist-metric small{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8590a2;font-weight:800}.checklist-metric strong{font-size:23px;margin-top:3px}.checklist-metric--amber .checklist-metric__icon{background:#fff7d9;color:#c57b00}.checklist-metric--blue .checklist-metric__icon{background:#eaf2ff;color:var(--blue)}.checklist-metric--green .checklist-metric__icon{background:#e6f8f1;color:var(--green)}
+        .checklist-register{border:1px solid var(--line);border-radius:26px;background:var(--paper);box-shadow:0 18px 44px rgba(39,46,59,.07);overflow:hidden}.checklist-register__head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px 15px}.checklist-register__head h2{font-size:20px;margin:7px 0 3px}.checklist-register__head p{margin:0;color:var(--muted);font-size:13px}.checklist-result-count{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;background:var(--soft);border:1px solid #f6d4b1;border-radius:999px;color:#a43b1a;font-size:11px;font-weight:800;white-space:nowrap}
+        .checklist-filters{display:grid;grid-template-columns:minmax(230px,1fr) repeat(3,minmax(135px,180px)) 40px 40px;gap:9px;padding:0 24px 17px}.checklist-filters input,.checklist-filters select{width:100%;height:40px;border:1px solid #ddd8d2;border-radius:12px;background:#fff;padding:0 12px;color:#344055;font:inherit;font-size:12px;outline:0}.checklist-filters input:focus,.checklist-filters select:focus,.modal-review textarea:focus{border-color:#e67d35;box-shadow:0 0 0 3px rgba(230,125,53,.12)}.checklist-search{position:relative}.checklist-search i{position:absolute;left:13px;top:13px;color:#9aa3b1;font-size:12px}.checklist-search input{padding-left:35px}.icon-button{display:inline-grid;place-items:center;width:36px;height:36px;border:1px solid #ddd8d2;border-radius:11px;background:#fff;color:#667085;text-decoration:none;cursor:pointer;transition:.18s}.checklist-filters>.icon-button{width:40px;height:40px}.icon-button:hover{transform:translateY(-1px);border-color:#e99a5a;color:#bd481f}.icon-button--primary{border-color:transparent;background:linear-gradient(135deg,#cf3f24,#e88313);color:#fff;box-shadow:0 7px 16px rgba(207,63,36,.18)}
+        .checklist-table-wrap{overflow-x:auto;border-top:1px solid #eee8e1}.checklist-table{width:100%;border-collapse:collapse;min-width:960px}.checklist-table th{padding:11px 15px;background:#fbf8f4;color:#8992a0;font-size:10px;text-align:left;text-transform:uppercase;letter-spacing:.08em}.checklist-table td{padding:12px 15px;border-top:1px solid #f0ebe5;font-size:12px;vertical-align:middle}.checklist-table tbody tr{transition:.15s}.checklist-table tbody tr:hover{background:#fffaf4}.plan-cell{display:flex;align-items:center;gap:10px;max-width:320px}.plan-cell__icon{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:11px;background:#fff0e6;color:#c44824}.plan-cell strong,.plan-cell small{display:block}.plan-cell strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}.plan-cell small{margin-top:3px;color:#9099a6;font-size:10px}.table-location,.target-date{display:inline-flex;align-items:center;gap:6px;color:#637086;white-space:nowrap}.table-location i{color:#dc5a2a}.priority-pill,.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap}.priority-pill--critical{background:#fee8e5;color:#b92e21}.priority-pill--high{background:#fff0e0;color:#b8580a}.priority-pill--medium{background:#fff7d7;color:#956800}.priority-pill--low{background:#e8f7f1;color:#137759}.status-pill{background:#f0f2f5;color:#5f6876}.status-pill i{font-size:6px}.status-pill--in_progress{background:#eaf2ff;color:#2864bd}.status-pill--submitted{background:#edeafe;color:#6754bb}.status-pill--confirmed{background:#e5f8ef;color:#147653}.status-pill--rejected{background:#fee9e7;color:#b6372a}.table-progress{width:112px}.table-progress>span{display:block;height:5px;border-radius:999px;background:#eee9e3;overflow:hidden}.table-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#dc4a27,#ef9d18)}.table-progress small{display:block;margin-top:5px;color:#737f91;font-size:10px}.table-actions{display:flex;justify-content:flex-end;gap:6px}.checklist-empty{display:flex;flex-direction:column;align-items:center;gap:7px;padding:46px 20px;color:#788497}.checklist-empty i{font-size:25px;color:#dc7c43}.checklist-empty strong{color:var(--ink)}.checklist-pagination{padding:14px 20px;border-top:1px solid #eee8e1}.checklist-pagination nav>div:first-child{display:none}.checklist-pagination nav>div:last-child{display:flex;align-items:center;justify-content:space-between;gap:12px}.checklist-pagination p{font-size:11px;color:#778295}.checklist-pagination a,.checklist-pagination span[aria-current]>span{border-radius:9px!important;font-size:11px!important}
+        .checklist-modal[hidden]{display:none}.checklist-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(18,27,41,.58);backdrop-filter:blur(5px)}.checklist-modal__card{width:min(850px,100%);max-height:min(90vh,900px);display:flex;flex-direction:column;border:1px solid #eadfd3;border-radius:26px;background:#fffdfb;box-shadow:0 30px 80px rgba(17,24,39,.28);overflow:hidden}.checklist-modal__head{display:flex;align-items:center;justify-content:space-between;padding:16px 19px;border-bottom:1px solid #eee7df;background:#fff}.checklist-modal__head strong{display:block;font-size:15px}.checklist-modal__head small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.checklist-modal__body{padding:20px;overflow:auto}.checklist-modal__foot{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1px solid #eee7df;background:#fff}.close-button{border:0;background:#f5f2ee;color:#657085;border-radius:11px;width:36px;height:36px;cursor:pointer}.modal-plan-summary{display:grid;grid-template-columns:48px 1fr;gap:14px}.modal-plan-summary__icon{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#fff0e5,#ffe8cf);color:#c34321;font-size:18px}.modal-plan-summary h3{margin:9px 0 5px;font-size:20px}.modal-plan-summary p{margin:0;color:#657186;line-height:1.55;font-size:12px}.modal-success{display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:8px 10px;border-radius:11px;background:#f3f8f5;color:#4c685c;font-size:10px;line-height:1.45}.modal-success i{color:#15966f;margin-top:2px}.modal-badges{display:flex;gap:6px;flex-wrap:wrap}.modal-progress-card{margin:17px 0;padding:13px 15px;border:1px solid #f2d2b7;border-radius:16px;background:#fff8f1}.modal-progress-card>div:first-child{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#9b4a20;font-weight:800}.modal-progress-card__bar{height:7px;margin-top:10px;border-radius:999px;background:#f1e4d8;overflow:hidden}.modal-progress-card__bar span{display:block;height:100%;background:linear-gradient(90deg,#cf3e24,#ed9a15);border-radius:inherit}.modal-section{margin-top:14px;padding:15px;border:1px solid #e9e4de;border-radius:18px;background:#fff}.modal-section__head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.modal-section__head h4{margin:0;font-size:13px}.modal-section__head h4 i{color:#cf4b25;margin-right:7px}.modal-section__head>span{font-size:10px;color:#8791a0}.modal-steps{display:grid;gap:8px}.modal-step{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;padding:10px;border:1px solid #ece8e2;border-radius:13px;background:#fcfbf9}.modal-step--followed{border-color:#bee8d8;background:#f3fcf8}.modal-step--not_followed{border-color:#f4c8c3;background:#fff7f6}.modal-step__number{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#b94422;font-size:11px;font-weight:900}.modal-step__copy strong,.modal-step__copy small{display:block}.modal-step__copy strong{font-size:12px;line-height:1.4}.modal-step__copy small{margin-top:4px;color:#7d8796;font-size:9.5px}.modal-step__actions{display:flex;gap:5px}.step-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #dedbd6;border-radius:9px;background:#fff;color:#737c8b;cursor:pointer}.step-icon--done{color:#148160;border-color:#bae4d5}.step-icon--missed{color:#bd3c2e;border-color:#f0c4bf}.modal-review label{display:block;margin-bottom:6px;color:#6b7688;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}.modal-review textarea{width:100%;resize:vertical;border:1px solid #ddd8d2;border-radius:12px;padding:10px 12px;font:inherit;font-size:12px;outline:0}.modal-review__actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.action-button{display:inline-flex;align-items:center;gap:7px;min-height:35px;padding:0 11px;border:1px solid transparent;border-radius:10px;font-size:10px;font-weight:850;cursor:pointer}.action-button--progress{background:#eaf2ff;color:#2864bd}.action-button--submitted{background:#eeebff;color:#6754bb}.action-button--confirmed{background:#e5f8ef;color:#147653}.action-button--rejected{background:#fee9e7;color:#b6372a}.modal-links{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.modal-links a{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:11px 13px;border:1px solid #e8e2db;border-radius:13px;color:#3e4a5e;text-decoration:none;font-size:11px;font-weight:800}.modal-links a:hover{border-color:#efa76c;background:#fff8f1;color:#aa431f}.modal-empty{display:flex;align-items:center;gap:9px;color:#778295;font-size:11px;padding:12px}.toast-stack{position:fixed;right:20px;bottom:20px;z-index:120;display:grid;gap:8px}.toast{display:flex;align-items:center;gap:9px;min-width:250px;max-width:360px;padding:12px 14px;border-radius:13px;background:#172235;color:#fff;box-shadow:0 14px 35px rgba(15,23,42,.2);font-size:11px;font-weight:700}.toast--error{background:#a83227}.is-loading i{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+        @media(max-width:1050px){.checklist-metrics{grid-template-columns:repeat(2,1fr)}.checklist-filters{grid-template-columns:1fr 1fr 1fr}.checklist-search{grid-column:span 2}.forecast-hero{grid-template-columns:1fr}.workflow-nav{width:max-content}}
+        @media(max-width:767px){.checklist-main{padding:10px}.checklist-topbar{top:8px;border-radius:18px;padding:10px 12px}.mobile-menu{display:grid;place-items:center}.checklist-topbar__icon{display:none}.profile-pill b{display:none}.forecast-hero{padding:20px;border-radius:21px}.workflow-nav{width:100%;overflow:auto}.workflow-nav a{flex:1;justify-content:center}.checklist-metrics{grid-template-columns:1fr 1fr;gap:8px}.checklist-metric{min-height:68px;padding:11px}.checklist-metric__icon{width:35px;height:35px}.checklist-metric strong{font-size:19px}.checklist-register{border-radius:21px}.checklist-register__head{padding:17px;align-items:center}.checklist-register__head p{display:none}.checklist-filters{grid-template-columns:1fr 1fr;padding:0 15px 14px}.checklist-search{grid-column:1/-1}.checklist-filters select[name=barangay_id]{grid-column:1/-1}.checklist-table{min-width:0}.checklist-table thead{display:none}.checklist-table,.checklist-table tbody,.checklist-table tr,.checklist-table td{display:block;width:100%}.checklist-table tr{position:relative;padding:13px 56px 13px 14px;border-top:1px solid #eee8e1}.checklist-table td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border:0}.checklist-table td:before{content:attr(data-label);font-size:9px;color:#929aa7;text-transform:uppercase;letter-spacing:.07em;font-weight:800}.checklist-table td:first-child:before,.checklist-table td:last-child:before{display:none}.checklist-table td:first-child{display:block}.checklist-table td:last-child{position:absolute;right:12px;top:13px}.plan-cell strong{white-space:normal}.table-actions{flex-direction:column}.checklist-modal{padding:8px;align-items:end}.checklist-modal__card{max-height:92dvh;border-radius:23px 23px 15px 15px}.checklist-modal__body{padding:15px}.modal-step{grid-template-columns:28px 1fr}.modal-step__actions{grid-column:2;justify-content:flex-end}.modal-progress-card>div:first-child{display:block}.modal-progress-card strong{display:block;margin-top:4px}.modal-links{grid-template-columns:1fr}}
     </style>
 </head>
 <body class="chief-legacy-layout">
-    <div class="chief-checklist-shell">
-        @include('chief.partials.sidebar', ['active' => 'course-checklists'])
-
-        <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
-
-        <main class="chief-checklist-main">
-            <div class="chief-checklist-wrap">
-            <nav class="lector-top-bar">
-                <div class="flex items-center gap-4">
-                    <button id="openSidebar" class="lg:hidden text-slate-600">
-                        <i class="fa-solid fa-bars text-xl"></i>
-                    </button>
-                    <div>
-                        <h1 class="text-xl font-bold text-slate-800">Action Plans</h1>
-                        <p class="text-xs text-slate-500 font-medium">Barangay compliance review · {{ now()->format('l, F j') }}</p>
-                    </div>
+<div class="checklist-shell">
+    @include('chief.partials.sidebar', ['active' => 'course-checklists'])
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
+    <main class="checklist-main">
+        <div class="checklist-container">
+            <header class="checklist-topbar">
+                <div class="checklist-topbar__title">
+                    <button id="openSidebar" class="mobile-menu" aria-label="Open navigation"><i class="fa-solid fa-bars"></i></button>
+                    <span class="checklist-topbar__icon"><i class="fa-solid fa-clipboard-check"></i></span>
+                    <div><h1>Action Plan Checklists</h1><p>Forecast response and compliance tracking · {{ now()->format('l, F j') }}</p></div>
                 </div>
+                <a href="{{ route('station-admin.profile') }}" class="profile-pill" style="text-decoration:none"><span>{{ substr(auth()->user()->first_name ?? 'C',0,1) }}{{ substr(auth()->user()->last_name ?? 'A',0,1) }}</span><b>{{ auth()->user()->first_name ?? 'Chief' }}</b><i class="fa-solid fa-chevron-right" style="font-size:9px"></i></a>
+            </header>
 
-                <div class="flex items-center gap-4">
-                    <span class="station-badge hidden sm:inline-flex">Station Command</span>
-
-                    <div class="user-dropdown">
-                        <button id="userDropdownBtn" class="user-dropdown-toggle">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm shadow-amber-200">
-                                {{ substr(auth()->user()->first_name ?? 'C', 0, 1) }}{{ substr(auth()->user()->last_name ?? 'A', 0, 1) }}
-                            </div>
-                            <span class="text-sm font-bold text-slate-700 hidden sm:block">{{ auth()->user()->first_name }}</span>
-                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
-                        </button>
-
-                        <div id="userDropdownMenu" class="user-dropdown-menu">
-                            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
-                                <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p>
-                                <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
-                            </div>
-                            <div class="p-2">
-                                <a href="{{ route('station-admin.profile') }}" class="user-dropdown-item">
-                                    <i class="fa-regular fa-user"></i>
-                                    <span>Commander Profile</span>
-                                </a>
-                                <a href="#" class="user-dropdown-item chief-open-logs">
-                                    <i class="fa-solid fa-clock-rotate-left"></i>
-                                    <span>My Logs</span>
-                                </a>
-                                <div class="h-px bg-slate-100 my-2"></div>
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
-                                        <i class="fa-solid fa-sign-out-alt"></i>
-                                        <span>Logout</span>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            <section class="chief-theme-hero">
-                <div>
-                    <span class="chief-theme-hero__eyebrow">
-                        <i class="fa-solid fa-list-check"></i>
-                        Compliance Review
-                    </span>
-                    <h1 class="chief-theme-hero__title">Course Checklists</h1>
-                    <p class="chief-theme-hero__copy">Review submitted action plans, verify field compliance, and record the result per step using the same visual language as Activity Schedule.</p>
-                    <div class="chief-theme-badges">
-                        <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('l, F j') }}</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-user-shield"></i> {{ auth()->user()->first_name ?? 'Chief' }} · Chief</span>
-                    </div>
-                </div>
-                <div class="chief-theme-summary-grid">
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Plans</div>
-                        <div class="chief-theme-summary-value">{{ $summary['total'] }}</div>
-                    </article>
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Open</div>
-                        <div class="chief-theme-summary-value">{{ $summary['open'] }}</div>
-                    </article>
-                    <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Submitted</div>
-                        <div class="chief-theme-summary-value">{{ $summary['submitted'] }}</div>
-                    </article>
-                </div>
+            <section class="forecast-hero">
+                <div><span class="forecast-hero__eyebrow"><i class="fa-solid fa-fire-flame-curved"></i> Forecast response workflow</span><h2>From forecast insight to field action.</h2><p>Scan the register, open only the plan you need, then verify its steps and send approved work into Mitigation Control.</p></div>
+                <nav class="workflow-nav" aria-label="Forecast workflow">
+                    <a href="{{ route('station-admin.analytics') }}"><i class="fa-solid fa-chart-line"></i><span>Forecast</span></a>
+                    <a href="{{ route('station-admin.course-checklists') }}" class="active"><i class="fa-solid fa-list-check"></i><span>Checklists</span></a>
+                    <a href="{{ route('station-admin.mitigations') }}"><i class="fa-solid fa-shield-halved"></i><span>Mitigation</span></a>
+                </nav>
             </section>
 
-            <section class="chief-checklist-summary">
-                <article class="chief-summary-card">
-                    <div class="chief-summary-label">Plans</div>
-                    <div class="chief-summary-value">{{ $summary['total'] }}</div>
-                </article>
-                <article class="chief-summary-card">
-                    <div class="chief-summary-label">Open</div>
-                    <div class="chief-summary-value">{{ $summary['open'] }}</div>
-                </article>
-                <article class="chief-summary-card">
-                    <div class="chief-summary-label">Submitted</div>
-                    <div class="chief-summary-value">{{ $summary['submitted'] }}</div>
-                </article>
-                <article class="chief-summary-card">
-                    <div class="chief-summary-label">Confirmed</div>
-                    <div class="chief-summary-value">{{ $summary['confirmed'] }}</div>
-                </article>
-                <article class="chief-summary-card">
-                    <div class="chief-summary-label">Rejected</div>
-                    <div class="chief-summary-value">{{ $summary['rejected'] }}</div>
-                </article>
-            </section>
-
-            <section class="chief-filter-card">
-                <form method="GET" action="{{ route('station-admin.course-checklists') }}" class="chief-filter-grid">
-                    <div class="chief-field">
-                        <label for="barangay_id">Barangay</label>
-                        <select name="barangay_id" id="barangay_id">
-                            <option value="">All barangays</option>
-                            @foreach ($barangays as $barangay)
-                                <option value="{{ $barangay->barangay_id }}" @selected((string) $filters['barangay_id'] === (string) $barangay->barangay_id)>
-                                    {{ $barangay->barangay_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="chief-field">
-                        <label for="status">Status</label>
-                        <select name="status" id="status">
-                            <option value="">All statuses</option>
-                            @foreach (['pending', 'in_progress', 'submitted', 'confirmed', 'rejected'] as $status)
-                                <option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst(str_replace('_', ' ', $status)) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="chief-field">
-                        <label for="priority">Priority</label>
-                        <select name="priority" id="priority">
-                            <option value="">All priorities</option>
-                            @foreach (['critical', 'high', 'medium', 'low'] as $priority)
-                                <option value="{{ $priority }}" @selected($filters['priority'] === $priority)>{{ ucfirst($priority) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="chief-field">
-                        <label for="q">Search Plan</label>
-                        <input type="text" id="q" name="q" value="{{ $filters['q'] }}" placeholder="Title or source">
-                    </div>
-                    <div class="chief-filter-actions">
-                        <button type="submit" class="chief-btn chief-btn-primary">Apply</button>
-                        <a href="{{ route('station-admin.course-checklists') }}" class="chief-btn chief-btn-soft" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Reset</a>
-                    </div>
-                </form>
-            </section>
-
-            @if ($checklists->isEmpty())
-                <div class="chief-empty">
-                    <h3 style="margin:0 0 10px; font-size:1.1rem; color:#0f172a;">No records found</h3>
-                    <p style="margin:0;">Try clearing a filter or run a new analysis first.</p>
-                </div>
-            @else
-                <section class="chief-checklist-stack">
-                    @foreach ($checklists as $checklist)
-                        @php
-                            $priorityClass = 'chief-chip--priority-' . strtolower($checklist->priority_level ?? 'medium');
-                            $statusClass = 'chief-chip--status-' . strtolower($checklist->status ?? 'pending');
-                        @endphp
-                        <article class="chief-checklist-card">
-                            <div class="chief-checklist-head">
-                                <div>
-                                    <h2 class="chief-checklist-title-row">{{ $checklist->plan_title }}</h2>
-                                    <div class="chief-checklist-meta">
-                                        <span class="chief-chip chief-chip--barangay">
-                                            <i class="fa-solid fa-location-dot"></i>
-                                            {{ $checklist->barangay->barangay_name ?? 'No barangay linked' }}
-                                        </span>
-                                        <span class="chief-chip {{ $priorityClass }}">{{ strtoupper($checklist->priority_level) }} PRIORITY</span>
-                                        <span class="chief-chip {{ $statusClass }}">{{ strtoupper(str_replace('_', ' ', $checklist->status)) }}</span>
-                                        @if ($checklist->target_date)
-                                            <span class="chief-chip chief-chip--priority-low">
-                                                <i class="fa-regular fa-calendar"></i>
-                                                Target {{ $checklist->target_date->format('M d, Y') }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                    @if ($checklist->plan_description)
-                                        <p class="chief-checklist-description">{{ \Illuminate\Support\Str::limit($checklist->plan_description, 180) }}</p>
-                                    @endif
-                                    @if ($checklist->success_indicator)
-                                        <p class="chief-checklist-success"><strong>Completion check:</strong> {{ $checklist->success_indicator }}</p>
-                                    @endif
-                                </div>
-                                <a href="{{ route('station-admin.analytics') }}" class="chief-btn chief-btn-soft" style="text-decoration:none;">
-                                    Source
-                                </a>
-                            </div>
-
-                            <div class="chief-checklist-grid">
-                                <div class="chief-checklist-panel">
-                                    <h3 class="chief-panel-title">Checklist Steps</h3>
-                                    @php
-                                        $progress = $checklist->checklist_progress;
-                                        $progressPercent = $progress['percent'];
-                                    @endphp
-                                    <div class="chief-progress-card">
-                                        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-                                            <div style="font-size:13px; font-weight:800; color:#9a3412;">Step Progress</div>
-                                            <div style="font-size:13px; font-weight:800; color:#0f172a;">{{ $progress['followed'] }}/{{ max(1, $progress['total']) }} followed</div>
-                                        </div>
-                                        <div class="chief-progress-bar">
-                                            <span style="width: {{ $progressPercent }}%;"></span>
-                                        </div>
-                                    </div>
-                                    <div class="chief-checklist-items">
-                                        @foreach ($checklist->items as $item)
-                                            <div class="chief-checklist-item {{ $item->status === 'followed' ? 'is-followed' : ($item->status === 'not_followed' ? 'is-not-followed' : '') }}">
-                                                <div class="chief-checklist-item-copy">
-                                                    <strong style="display:block; margin-bottom:4px; color:#0f172a;">Step {{ $item->item_order }}</strong>
-                                                    {{ $item->item_text }}
-                                                </div>
-                                                <div class="chief-checklist-item-meta">
-                                                    <div class="chief-checklist-item-state">{{ strtoupper(str_replace('_', ' ', $item->status)) }}</div>
-                                                    <div class="chief-step-actions">
-                                                        <button type="button" class="chief-step-btn chief-step-btn--followed" onclick="updateChecklistItemStatus({{ $checklist->ai_action_plan_checklist_id }}, {{ $item->ai_action_plan_checklist_item_id }}, 'followed')">Followed</button>
-                                                        <button type="button" class="chief-step-btn chief-step-btn--not-followed" onclick="updateChecklistItemStatus({{ $checklist->ai_action_plan_checklist_id }}, {{ $item->ai_action_plan_checklist_item_id }}, 'not_followed')">Not Followed</button>
-                                                        <button type="button" class="chief-step-btn chief-step-btn--reset" onclick="updateChecklistItemStatus({{ $checklist->ai_action_plan_checklist_id }}, {{ $item->ai_action_plan_checklist_item_id }}, 'pending')">Reset</button>
-                                                    </div>
-                                                    @if ($item->reviewer)
-                                                        <div style="font-size:11px; color:#64748b;">{{ trim(($item->reviewer->first_name ?? '') . ' ' . ($item->reviewer->last_name ?? '')) }}</div>
-                                                    @endif
-                                                    @if ($item->reviewed_at)
-                                                        <div style="font-size:11px; color:#94a3b8;">{{ $item->reviewed_at->format('M d, Y g:i A') }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-
-                                <div class="chief-checklist-panel">
-                                    <h3 class="chief-panel-title">Review</h3>
-                                    <div style="font-size:13px; color:#64748b; margin-bottom:10px;">
-                                        Source: <strong style="color:#0f172a;">{{ $checklist->source_title }}</strong>
-                                    </div>
-                                    <textarea
-                                        id="notes-{{ $checklist->ai_action_plan_checklist_id }}"
-                                        class="chief-row-notes"
-                                        rows="4"
-                                        placeholder="Inspection notes"
-                                    >{{ $checklist->confirmation_notes }}</textarea>
-
-                                    <div class="chief-row-actions">
-                                        <button type="button" class="chief-btn chief-btn-status chief-btn-progress" onclick="updateChecklistStatus({{ $checklist->ai_action_plan_checklist_id }}, 'in_progress')">In Progress</button>
-                                        <button type="button" class="chief-btn chief-btn-status chief-btn-submitted" onclick="updateChecklistStatus({{ $checklist->ai_action_plan_checklist_id }}, 'submitted')">Submitted</button>
-                                        <button type="button" class="chief-btn chief-btn-status chief-btn-confirm" onclick="updateChecklistStatus({{ $checklist->ai_action_plan_checklist_id }}, 'confirmed')">Confirm</button>
-                                        <button type="button" class="chief-btn chief-btn-status chief-btn-reject" onclick="updateChecklistStatus({{ $checklist->ai_action_plan_checklist_id }}, 'rejected')">Reject</button>
-                                        <button type="button" class="chief-btn chief-btn-soft" onclick="openExploreModal({{ $checklist->ai_action_plan_checklist_id }})">Details</button>
-                                    </div>
-
-                                    @if ($checklist->confirmer)
-                                        <div style="margin-top:12px; color:#64748b; font-size:12px;">
-                                            Last reviewed by <strong style="color:#0f172a;">{{ trim(($checklist->confirmer->first_name ?? '') . ' ' . ($checklist->confirmer->last_name ?? '')) }}</strong>
-                                            @if ($checklist->confirmed_at)
-                                                on {{ $checklist->confirmed_at->format('M d, Y g:i A') }}
-                                            @endif
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-
-                            @if ($checklist->suggestions->isNotEmpty())
-                                <div class="chief-checklist-panel" style="margin-top:16px;">
-                                    <h3 class="chief-panel-title">Notes History</h3>
-                                    <div class="chief-suggestion-history">
-                                        @foreach ($checklist->suggestions as $suggestion)
-                                            <div class="chief-suggestion-card">
-                                                <div class="chief-suggestion-date">{{ optional($suggestion->created_at)->format('M d, Y g:i A') }}</div>
-                                                <div style="margin-top:6px; font-weight:700;">{{ $suggestion->recommendation_title }}</div>
-                                                @if (!empty($suggestion->estimated_timeline))
-                                                    <div style="margin-top:6px; color:#475569; font-size:13px;">Timeline: {{ $suggestion->estimated_timeline }}</div>
-                                                @endif
-                                                @if (!empty($suggestion->steps))
-                                                    <div style="margin-top:8px; color:#334155; font-size:13px;">
-                                                        {{ \Illuminate\Support\Str::limit(implode(' ', $suggestion->steps), 220) }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-                        </article>
-                    @endforeach
-                </section>
-            @endif
-        </main>
-    </div>
-
-    <div class="chief-modal" id="exploreModal">
-        <div class="chief-modal__card">
-            <div class="chief-modal__header">
-                <div>
-                    <div class="chief-panel-title" style="margin:0;">Action Details</div>
-                    <div style="color:#64748b; font-size:13px;">Reference notes for this plan.</div>
-                </div>
-                <button type="button" class="chief-close-btn" onclick="closeExploreModal()">
-                    <i class="fa-solid fa-times"></i>
-                </button>
-            </div>
-            <div class="chief-modal__body" id="exploreModalBody">
-                <div class="chief-empty" style="padding:30px 18px;">
-                    Details will appear here.
-                </div>
-            </div>
-            <div class="chief-modal__footer">
-                <button type="button" class="chief-btn chief-btn-soft" onclick="closeExploreModal()">Close</button>
-            </div>
+            @include('chief.partials.course-checklist-workspace')
         </div>
+    </main>
+</div>
+
+<div id="checklistModal" class="checklist-modal" role="dialog" aria-modal="true" aria-labelledby="checklistModalTitle" hidden>
+    <div class="checklist-modal__card">
+        <header class="checklist-modal__head"><div><strong id="checklistModalTitle">Checklist review</strong><small>Verify steps and record operational progress.</small></div><button id="closeChecklistModal" type="button" class="close-button" aria-label="Close checklist"><i class="fa-solid fa-xmark"></i></button></header>
+        <div id="checklistModalBody" class="checklist-modal__body"></div>
+        <footer class="checklist-modal__foot"><button type="button" class="action-button" data-close-checklist><i class="fa-solid fa-arrow-left"></i><span>Back to register</span></button></footer>
     </div>
+</div>
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
 
-    @php
-        $checklistMap = $checklists->mapWithKeys(function ($item) {
-            return [
-                $item->ai_action_plan_checklist_id => [
-                    'id' => $item->ai_action_plan_checklist_id,
-                    'analysis_id' => $item->analysis_id,
-                    'title' => $item->source_title ?: $item->plan_title,
-                    'description' => $item->source_description ?: $item->plan_description,
-                    'priority' => ucfirst($item->priority_level ?? 'medium'),
-                ],
-            ];
-        });
-    @endphp
+<script>
+    const checklistCsrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const checklistPageUrl = @json(route('station-admin.course-checklists'));
+    let checklistTrigger = null;
+    let checklistSearchTimer = null;
 
-    <script>
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const checklistMap = @json($checklistMap);
+    function showChecklistToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'toast--error' : ''}`;
+        toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i><span></span>`;
+        toast.querySelector('span').textContent = message;
+        document.getElementById('toastStack').appendChild(toast);
+        window.setTimeout(() => toast.remove(), 3200);
+    }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const sidebar = document.getElementById('sidebar');
-            const openBtn = document.getElementById('openSidebar');
-            const backdrop = document.getElementById('sidebarBackdrop');
-            const userDropdownBtn = document.getElementById('userDropdownBtn');
-            const userDropdownMenu = document.getElementById('userDropdownMenu');
+    function openChecklistModal(id, trigger = null) {
+        const template = document.getElementById(`checklistDetail-${id}`);
+        const modal = document.getElementById('checklistModal');
+        if (!template || !modal) return;
+        checklistTrigger = trigger || document.querySelector(`[data-open-checklist="${id}"]`) || null;
+        document.getElementById('checklistModalBody').replaceChildren(template.content.cloneNode(true));
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        document.getElementById('closeChecklistModal').focus();
+    }
 
-            if (openBtn && sidebar && backdrop) {
-                openBtn.addEventListener('click', () => {
-                    sidebar.classList.add('open');
-                    backdrop.classList.remove('hidden');
-                });
+    function closeChecklistModal() {
+        const modal = document.getElementById('checklistModal');
+        if (modal.hidden) return;
+        modal.hidden = true;
+        document.getElementById('checklistModalBody').replaceChildren();
+        document.body.style.overflow = '';
+        checklistTrigger?.focus?.();
+    }
 
-                backdrop.addEventListener('click', () => {
-                    sidebar.classList.remove('open');
-                    backdrop.classList.add('hidden');
-                });
-            }
-
-            if (userDropdownBtn && userDropdownMenu) {
-                userDropdownBtn.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    userDropdownMenu.classList.toggle('show');
-                });
-
-                document.addEventListener('click', (event) => {
-                    if (!userDropdownBtn.contains(event.target) && !userDropdownMenu.contains(event.target)) {
-                        userDropdownMenu.classList.remove('show');
-                    }
-                });
-            }
-
-            document.querySelectorAll('.chief-open-logs').forEach((button) => {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    userDropdownMenu?.classList.remove('show');
-
-                    if (typeof window.openChiefLogsModal === 'function') {
-                        window.openChiefLogsModal();
-                    }
-                });
-            });
-        });
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+    async function loadChecklistWorkspace(targetUrl, { push = true, reopen = null } = {}) {
+        const visibleUrl = new URL(targetUrl || window.location.href, window.location.origin);
+        visibleUrl.searchParams.delete('partial');
+        const requestUrl = new URL(visibleUrl);
+        requestUrl.searchParams.set('partial', '1');
+        const workspace = document.getElementById('checklistWorkspace');
+        workspace?.setAttribute('aria-busy', 'true');
+        try {
+            const response = await fetch(requestUrl, { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!response.ok) throw new Error('Could not load checklist records.');
+            const incoming = new DOMParser().parseFromString(await response.text(), 'text/html').getElementById('checklistWorkspace');
+            if (!incoming) throw new Error('Checklist response was incomplete.');
+            workspace.replaceWith(incoming);
+            if (push) window.history.pushState({}, '', visibleUrl);
+            if (reopen && document.getElementById(`checklistDetail-${reopen}`)) openChecklistModal(reopen);
+        } catch (error) {
+            workspace?.removeAttribute('aria-busy');
+            showChecklistToast(error.message || 'Could not load checklist records.', 'error');
         }
+    }
 
-        async function updateChecklistStatus(id, status) {
-            const notes = document.getElementById(`notes-${id}`)?.value || '';
-
-            try {
-                const response = await fetch(`/station-admin/api/action-plan-checklists/${id}/confirm`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                    },
-                    body: JSON.stringify({
-                        status,
-                        confirmation_notes: notes,
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                window.location.reload();
-            } catch (error) {
-                alert(`Failed to update checklist row: ${error.message}`);
-            }
+    async function patchChecklist(url, payload, button, checklistId) {
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.classList.add('is-loading');
+        button.innerHTML = '<i class="fa-solid fa-spinner"></i>';
+        try {
+            const response = await fetch(url, { method:'PATCH', headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':checklistCsrf}, body:JSON.stringify(payload) });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) throw new Error(result.message || 'The checklist update failed.');
+            closeChecklistModal();
+            await loadChecklistWorkspace(window.location.href, { push:false, reopen:checklistId });
+            showChecklistToast('Checklist progress updated.');
+        } catch (error) {
+            button.disabled = false;
+            button.classList.remove('is-loading');
+            button.innerHTML = original;
+            showChecklistToast(error.message || 'The checklist update failed.', 'error');
         }
+    }
 
-        async function updateChecklistItemStatus(id, itemId, status) {
-            try {
-                const response = await fetch(`/station-admin/api/action-plan-checklists/${id}/items`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                    },
-                    body: JSON.stringify({
-                        item_id: itemId,
-                        status: status,
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                window.location.reload();
-            } catch (error) {
-                alert(`Failed to update checklist item: ${error.message}`);
-                window.location.reload();
-            }
+    document.addEventListener('click', (event) => {
+        const open = event.target.closest('[data-open-checklist]');
+        if (open) { openChecklistModal(open.dataset.openChecklist, open); return; }
+        if (event.target.closest('#closeChecklistModal,[data-close-checklist]') || event.target.id === 'checklistModal') { closeChecklistModal(); return; }
+        const reset = event.target.closest('[data-checklist-reset]');
+        if (reset) { loadChecklistWorkspace(checklistPageUrl); return; }
+        const pageLink = event.target.closest('.checklist-pagination a');
+        if (pageLink) { event.preventDefault(); loadChecklistWorkspace(pageLink.href); return; }
+        const step = event.target.closest('[data-step-status]');
+        if (step) { patchChecklist(`/station-admin/api/action-plan-checklists/${step.dataset.checklistId}/items`, {item_id:Number(step.dataset.itemId),status:step.dataset.status}, step, step.dataset.checklistId); return; }
+        const status = event.target.closest('[data-checklist-status]');
+        if (status) {
+            const notes = document.getElementById(`notes-${status.dataset.checklistId}`)?.value || '';
+            patchChecklist(`/station-admin/api/action-plan-checklists/${status.dataset.checklistId}/confirm`, {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
         }
+    });
 
-        function closeExploreModal() {
-            document.getElementById('exploreModal').classList.remove('is-open');
-        }
+    document.addEventListener('submit', (event) => {
+        if (event.target.id !== 'checklistFilters') return;
+        event.preventDefault();
+        const url = new URL(event.target.action);
+        new FormData(event.target).forEach((value,key) => { if (String(value).trim()) url.searchParams.set(key,String(value).trim()); });
+        loadChecklistWorkspace(url);
+    });
 
-        async function openExploreModal(checklistId) {
-            const checklist = checklistMap[String(checklistId)] || checklistMap[checklistId];
-            const modal = document.getElementById('exploreModal');
-            const body = document.getElementById('exploreModalBody');
-
-            if (!checklist) {
-                alert('Checklist context not found.');
-                return;
-            }
-
-            modal.classList.add('is-open');
-            body.innerHTML = `
-                <div class="chief-empty" style="padding:30px 18px;">
-                    Loading details for <strong>${escapeHtml(checklist.title)}</strong>...
-                </div>
-            `;
-
-            try {
-                const response = await fetch('/station-admin/api/explore-recommendation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                    },
-                    body: JSON.stringify({
-                        recommendation_title: checklist.title,
-                        recommendation_description: checklist.description,
-                        priority: checklist.priority,
-                        analysis_id: checklist.analysis_id,
-                        action_plan_checklist_id: checklist.id,
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.message || 'Unknown error');
-                }
-
-                const data = result.data || {};
-                let html = `
-                    <div style="margin-bottom:16px; padding:14px; border-radius:16px; background:#fff7ed; border:1px solid #fdba74;">
-                        <div style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#9a3412;">Original Checklist Focus</div>
-                        <div style="margin-top:6px; font-size:16px; font-weight:800; color:#0f172a;">${escapeHtml(checklist.title)}</div>
-                        <div style="margin-top:6px; color:#475569; line-height:1.6;">${escapeHtml(checklist.description || '')}</div>
-                    </div>
-                `;
-
-                if (Array.isArray(data.steps) && data.steps.length) {
-                    html += `<div class="chief-checklist-panel"><h3 class="chief-panel-title">Implementation Steps</h3><ol class="chief-checklist-items">`;
-                    data.steps.forEach((step) => {
-                        html += `<li>${escapeHtml(step)}</li>`;
-                    });
-                    html += `</ol></div>`;
-                }
-
-                if (Array.isArray(data.resources_needed) && data.resources_needed.length) {
-                    html += `<div class="chief-checklist-panel" style="margin-top:14px;"><h3 class="chief-panel-title">Resources Needed</h3><ul class="chief-checklist-items">`;
-                    data.resources_needed.forEach((resource) => {
-                        html += `<li>${escapeHtml(resource)}</li>`;
-                    });
-                    html += `</ul></div>`;
-                }
-
-                if (data.estimated_timeline) {
-                    html += `
-                        <div class="chief-checklist-panel" style="margin-top:14px;">
-                            <h3 class="chief-panel-title">Estimated Timeline</h3>
-                            <div style="color:#334155; line-height:1.6;">${escapeHtml(data.estimated_timeline)}</div>
-                        </div>
-                    `;
-                }
-
-                if (!html.trim()) {
-                    html = `<div class="chief-empty" style="padding:30px 18px;">No detailed suggestions were returned.</div>`;
-                }
-
-                body.innerHTML = html;
-            } catch (error) {
-                body.innerHTML = `
-                    <div class="chief-empty" style="padding:30px 18px; color:#b91c1c;">
-                        Failed to load suggestions.<br>
-                        <small>${escapeHtml(error.message)}</small>
-                    </div>
-                `;
-            }
-        }
-    </script>
-
-    @include('chief.partials.logs-modal')
-    @include('chief.partials.logs-script')
-    @include('chief.partials.logout-confirmation')
+    document.addEventListener('change', (event) => {
+        if (!event.target.closest('#checklistFilters select')) return;
+        event.target.form?.requestSubmit();
+    });
+    document.addEventListener('input', (event) => {
+        if (!event.target.matches('#checklistFilters input[name=q]')) return;
+        clearTimeout(checklistSearchTimer);
+        checklistSearchTimer = setTimeout(() => event.target.form?.requestSubmit(), 350);
+    });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeChecklistModal(); });
+    window.addEventListener('popstate', () => loadChecklistWorkspace(window.location.href, {push:false}));
+    document.getElementById('openSidebar')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.add('open'); document.getElementById('sidebarBackdrop')?.classList.remove('hidden'); });
+    document.getElementById('sidebarBackdrop')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarBackdrop')?.classList.add('hidden'); });
+</script>
+@include('chief.partials.logs-modal')
+@include('chief.partials.logs-script')
+@include('chief.partials.logout-confirmation')
 </body>
 </html>

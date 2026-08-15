@@ -9,6 +9,7 @@ class ManagementPage {
         this.filters = {};
         this.sortBy = 'created_at';
         this.sortOrder = 'desc';
+        this.pagination = { current_page: 1, last_page: 1, per_page: 10, total: 0, from: 0, to: 0 };
         this.currentEditId = null;
         this.currentDeleteId = null;
         this.currentItem = null;
@@ -66,7 +67,7 @@ class ManagementPage {
             searchInput.addEventListener('input', debounce((e) => {
                 this.searchTerm = e.target.value;
                 this.currentPage = 1;
-                this.renderTable();
+                this.loadCurrentTab();
             }, 300));
         }
 
@@ -76,7 +77,7 @@ class ManagementPage {
             filterSelect.addEventListener('change', (e) => {
                 this.filters.status = e.target.value;
                 this.currentPage = 1;
-                this.renderTable();
+                this.loadCurrentTab();
             });
         }
 
@@ -86,7 +87,7 @@ class ManagementPage {
             dateFilter.addEventListener('change', (e) => {
                 this.filters.date = e.target.value;
                 this.currentPage = 1;
-                this.renderTable();
+                this.loadCurrentTab();
             });
         }
 
@@ -280,23 +281,34 @@ class ManagementPage {
     }
 
     async loadData() {
+        return this.loadCurrentTab();
+    }
+
+    async loadCurrentTab() {
         this.showLoading(true);
-        
+
         try {
-            const [incidents, reports, personnel, equipment] = await Promise.all([
-                this.fetchData(`/api/managements/incidents`),
-                this.fetchData(`/api/managements/reports`),
-                this.fetchData(`/api/managements/personnel`),
-                this.fetchData(`/api/managements/equipment`)
-            ]);
+            const params = new URLSearchParams({
+                page: String(this.currentPage),
+                per_page: String(this.perPage),
+                sort_by: this.sortBy,
+                sort_order: this.sortOrder
+            });
+            if (this.searchTerm.trim()) params.set('search', this.searchTerm.trim());
+            if (this.filters.status) params.set('status', this.filters.status);
+            if (this.filters.date && this.currentTab === 'incidents') params.set('date_filter', this.filters.date);
 
-            this.data = {
-                incidents: incidents.length ? incidents : (window.incidentDb || []),
-                reports: reports.length ? reports : (window.reportDb || []),
-                personnel: personnel.length ? personnel : (window.personnelDb || []),
-                equipment: equipment.length ? equipment : (window.equipmentDb || [])
+            const payload = await this.fetchData(`/api/managements/${this.currentTab}?${params.toString()}`);
+            this.data[this.currentTab] = Array.isArray(payload.data) ? payload.data : [];
+            this.pagination = payload.pagination || {
+                current_page: 1,
+                last_page: 1,
+                per_page: this.perPage,
+                total: this.data[this.currentTab].length,
+                from: this.data[this.currentTab].length ? 1 : 0,
+                to: this.data[this.currentTab].length
             };
-
+            this.currentPage = this.pagination.current_page || 1;
             this.updateStats();
             this.renderTable();
             
@@ -319,24 +331,24 @@ class ManagementPage {
             });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
-            return data.data || data;
+            return data;
         } catch (error) {
             console.error(`Error fetching ${url}:`, error);
-            return [];
+            throw error;
         }
     }
 
     updateStats() {
         const stats = {
-            totalIncidents: this.data.incidents.length,
+            totalIncidents: this.currentTab === 'incidents' ? this.pagination.total : this.data.incidents.length,
             activeIncidents: this.data.incidents.filter((incident) => {
                 const status = this.getIncidentStatusMeta(incident).value;
                 return ['reported', 'responding', 'active'].includes(status);
             }).length,
-            totalReports: this.data.reports.length,
+            totalReports: this.currentTab === 'reports' ? this.pagination.total : this.data.reports.length,
             pendingReports: this.data.reports.filter(r => ['filed', 'conducting'].includes(r.status)).length,
-            totalPersonnel: this.data.personnel.length,
-            totalEquipment: this.data.equipment.length
+            totalPersonnel: this.currentTab === 'personnel' ? this.pagination.total : this.data.personnel.length,
+            totalEquipment: this.currentTab === 'equipment' ? this.pagination.total : this.data.equipment.length
         };
 
         document.getElementById('totalIncidents') && (document.getElementById('totalIncidents').textContent = stats.totalIncidents);
@@ -368,7 +380,7 @@ class ManagementPage {
         }
 
         this.updateFilterOptions();
-        this.renderTable();
+        this.loadCurrentTab();
     }
 
     getDefaultSortField() {
@@ -468,13 +480,10 @@ class ManagementPage {
     }
 
     renderTable() {
-        const data = this.getFilteredData();
-        const sortedData = this.sortData(data);
-        const paginatedData = this.paginateData(sortedData);
-        
+        const data = this.data[this.currentTab] || [];
         this.renderTableHeader();
-        this.renderTableBody(paginatedData);
-        this.renderPagination(sortedData.length);
+        this.renderTableBody(data);
+        this.renderPagination(this.pagination.total || 0);
     }
 
     sortData(data) {
@@ -669,7 +678,8 @@ class ManagementPage {
                         this.sortBy = field;
                         this.sortOrder = 'asc';
                     }
-                    this.renderTable();
+                    this.currentPage = 1;
+                    this.loadCurrentTab();
                 }
             });
             // Add sort icon
@@ -843,7 +853,7 @@ class ManagementPage {
             <tr data-id="${person.user_id}">
                 <td data-label="Name">
                     <div class="avatar-group">
-                        <span class="avatar-sm">${name.substring(0, 2).toUpperCase()}</span>
+                        <span class="avatar-sm">${this.escapeHtml(name.substring(0, 2).toUpperCase())}</span>
                         <strong>${this.escapeHtml(name)}</strong>
                     </div>
                 </td>
@@ -877,9 +887,9 @@ class ManagementPage {
                     ${equipment.category_name ? `<br><small>${this.escapeHtml(equipment.category_name)}</small>` : ''}
                 </td>
                 <td data-label="Type">${this.escapeHtml(equipment.type || 'General')}</td>
-                <td data-label="Available">${equipment.available_quantity ?? 0}</td>
-                <td data-label="Maintenance">${equipment.maintenance_quantity ?? 0}</td>
-                <td data-label="Damaged">${equipment.damaged_quantity ?? 0}</td>
+                <td data-label="Available">${Number(equipment.available_quantity || 0)}</td>
+                <td data-label="Maintenance">${Number(equipment.maintenance_quantity || 0)}</td>
+                <td data-label="Damaged">${Number(equipment.damaged_quantity || 0)}</td>
                 <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
@@ -923,7 +933,7 @@ class ManagementPage {
     }
 
     renderPagination(totalItems) {
-        const totalPages = Math.ceil(totalItems / this.perPage);
+        const totalPages = Math.max(1, this.pagination.last_page || Math.ceil(totalItems / this.perPage));
         const pagination = document.getElementById('pagination');
         if (!pagination) return;
 
@@ -974,8 +984,9 @@ class ManagementPage {
     }
 
     changePage(page) {
+        if (page < 1 || page > (this.pagination.last_page || 1)) return;
         this.currentPage = page;
-        this.renderTable();
+        this.loadCurrentTab();
     }
 
     async refreshData() {

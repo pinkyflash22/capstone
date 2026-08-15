@@ -16,6 +16,8 @@ use App\Services\BarangayPredictionService;
 use App\Services\ForecastModelService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Support\BarangayNotificationService;
+use App\Support\ForecastIncidentCalibration;
+use App\Support\PeakHourEstimator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
@@ -31,6 +33,7 @@ class AnalyticController extends Controller
   
     private $apiKey;
     private ?string $lastAiModelUsed = null;
+    private array $unavailableAiModels = [];
     private BarangayPredictionService $barangayPredictionService;
     private ForecastModelService $forecastModelService;
     private PredictionFeedbackSignalService $predictionFeedbackSignalService;
@@ -62,25 +65,42 @@ class AnalyticController extends Controller
     {
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
         $stationId = $stationOfficer?->station_id;
+        $isProvincialAdmin = strtolower(trim((string) (Auth::user()?->role?->role ?? ''))) === 'provincial admin';
 
-        $query = AiActionPlanChecklist::query()
-            ->with(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer'])
-            ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId));
+        $baseQuery = AiActionPlanChecklist::query()
+            ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
+            ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'));
+
+        $summary = [
+            'total' => (clone $baseQuery)->count(),
+            'open' => (clone $baseQuery)->whereIn('status', ['pending', 'in_progress'])->count(),
+            'submitted' => (clone $baseQuery)->where('status', 'submitted')->count(),
+            'confirmed' => (clone $baseQuery)->where('status', 'confirmed')->count(),
+            'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
+        ];
+
+        $query = (clone $baseQuery)
+            ->with(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer', 'mitigationActions'])
+            ->withCount('mitigationActions');
 
         if ($request->filled('barangay_id')) {
             $query->where('barangay_id', $request->integer('barangay_id'));
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+        $status = in_array($request->input('status'), ['pending', 'in_progress', 'submitted', 'confirmed', 'rejected'], true)
+            ? $request->input('status') : null;
+        if ($status) {
+            $query->where('status', $status);
         }
 
-        if ($request->filled('priority')) {
-            $query->where('priority_level', $request->input('priority'));
+        $priority = in_array($request->input('priority'), ['critical', 'high', 'medium', 'low'], true)
+            ? $request->input('priority') : null;
+        if ($priority) {
+            $query->where('priority_level', $priority);
         }
 
         if ($request->filled('q')) {
-            $search = trim((string) $request->input('q'));
+            $search = mb_substr(trim((string) $request->input('q')), 0, 100);
             $query->where(function ($builder) use ($search) {
                 $builder->where('plan_title', 'like', "%{$search}%")
                     ->orWhere('plan_description', 'like', "%{$search}%")
@@ -98,11 +118,13 @@ class AnalyticController extends Controller
                 END
             ")
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(max(5, min(25, $request->integer('per_page', 10))))
+            ->withQueryString();
 
         $barangays = AiActionPlanChecklist::query()
             ->with('barangay')
             ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
+            ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'))
             ->whereNotNull('barangay_id')
             ->get()
             ->pluck('barangay')
@@ -111,25 +133,23 @@ class AnalyticController extends Controller
             ->sortBy('barangay_name')
             ->values();
 
-        $summary = [
-            'total' => $checklists->count(),
-            'open' => $checklists->whereIn('status', ['pending', 'in_progress'])->count(),
-            'submitted' => $checklists->where('status', 'submitted')->count(),
-            'confirmed' => $checklists->where('status', 'confirmed')->count(),
-            'rejected' => $checklists->where('status', 'rejected')->count(),
-        ];
-
-        return view('chief.course-checklists', [
+        $viewData = [
             'checklists' => $checklists,
             'barangays' => $barangays,
             'summary' => $summary,
             'filters' => [
                 'barangay_id' => $request->input('barangay_id'),
-                'status' => $request->input('status'),
-                'priority' => $request->input('priority'),
-                'q' => $request->input('q'),
+                'status' => $status,
+                'priority' => $priority,
+                'q' => mb_substr((string) $request->input('q'), 0, 100),
             ],
-        ]);
+        ];
+
+        if ($request->boolean('partial')) {
+            return view('chief.partials.course-checklist-workspace', $viewData);
+        }
+
+        return view('chief.course-checklists', $viewData);
     }
     
     /**
@@ -226,8 +246,8 @@ class AnalyticController extends Controller
     public function runAIPredictiveAnalysis(Request $request)
     {
         try {
-            @set_time_limit(180);
-            @ini_set('max_execution_time', '180');
+            @set_time_limit(300);
+            @ini_set('max_execution_time', '300');
 
             Log::info('AI Analysis request received', $request->all());
             
@@ -236,9 +256,12 @@ class AnalyticController extends Controller
             $days = (int)$request->input('days', 30);
             $predictionScope = $request->input('prediction_scope', 'current_month');
             $historicalWindow = $request->input('historical_window', '3');
+            $analysisKind = $request->input('analysis_kind', $predictionScope === 'next_month' ? 'forecast' : 'actual_analysis');
             
             // Fetch REAL data from database
             $analysisData = $this->fetchRealTimeData($locationId, $days, $predictionScope, $selectedBarangayId, $historicalWindow);
+            $analysisData['analysis_kind'] = $analysisKind;
+            $analysisData['replace_existing'] = $request->boolean('replace_existing');
             
         $predictionAiResponse = null;
         $recommendationAiResponse = null;
@@ -283,6 +306,8 @@ class AnalyticController extends Controller
                 ];
             }
 
+            $structuredAnalysis = $this->applyStructuredIncidentCountSemantics($structuredAnalysis, $analysisData);
+
             $structuredAnalysis['model_metadata'] = $this->buildScopedModelMetadataContext(
                 (int) ($analysisData['station_id'] ?? $locationId),
                 $selectedBarangayId
@@ -320,6 +345,10 @@ class AnalyticController extends Controller
                 $analysisId = $this->storeAnalysis($locationId, $days, $structuredAnalysis, $analysisData);
                 if ($analysisId) {
                     $structuredAnalysis['analysis_id'] = $analysisId;
+                    $structuredAnalysis['analysis_revision'] = max(
+                        1,
+                        (int) (Analysis::query()->whereKey($analysisId)->value('revision_number') ?? 1)
+                    );
                     $structuredAnalysis['checklist_debug']['attempted'] = true;
                     $structuredAnalysis['checklist_debug']['analysis_id'] = $analysisId;
 
@@ -387,6 +416,19 @@ class AnalyticController extends Controller
                     ]
                 );
                 $structuredAnalysis['warnings'][] = 'Action-plan checklist could not be fully stored. Check checklist_debug for details.';
+            }
+
+            if (! $analysisId) {
+                Log::error('Analysis completed but was not saved.', [
+                    'station_id' => $analysisData['station_id'] ?? null,
+                    'barangay_id' => $selectedBarangayId,
+                    'prediction_scope' => $predictionScope,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Analysis completed but could not be saved. Please retry after resolving the server error.',
+                ], 500);
             }
             
             return response()->json([
@@ -635,7 +677,7 @@ class AnalyticController extends Controller
     /**
  * Fetch REAL data from your database tables
  */
-private function fetchRealTimeData($locationId, $days, $predictionScope = 'current_month', ?int $selectedBarangayId = null, $historicalWindow = '3')
+private function fetchRealTimeData($locationId, $days, $predictionScope = 'current_month', ?int $selectedBarangayId = null, $historicalWindow = '3', bool $generatePredictions = true)
 {
     $startDate = Carbon::now()->subDays($days);
     
@@ -659,29 +701,51 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     $locationName = $station ? $station->station_name : 'My Station';
     $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName) ?? [];
     
-    // Get all personnel in this station
+    // Resolve teams through the station link first, then through assigned officers for legacy rows.
     $allPersons = StationOfficer::where('station_id', $stationId)->get();
-    $userIds = $allPersons->pluck('user_id')->toArray();
-    
-    // Get team IDs for this station using the same station -> officers -> team leader flow used elsewhere.
-    $teamIds = !empty($userIds)
-        ? Team::whereIn('team_leader', $userIds)->pluck('team_id')->toArray()
-        : [];
+    $officerIds = $allPersons->pluck('station_officer_id')->filter()->all();
+    $userIds = $allPersons->pluck('user_id')->filter()->all();
+    $teamOfficerColumns = [
+        'commander_driver', 'pumper', 'team_leader',
+        'firefighter_officer_1', 'firefighter_officer_2', 'firefighter_officer_3', 'rescue_radio',
+    ];
+    $teamIds = Team::query()
+        ->where('station_id', $stationId)
+        ->orWhere(function ($query) use ($teamOfficerColumns, $officerIds, $userIds) {
+            foreach ($teamOfficerColumns as $column) {
+                if (! empty($officerIds)) {
+                    $query->orWhereIn($column, $officerIds);
+                }
+                if (! empty($userIds)) {
+                    $query->orWhereIn($column, $userIds);
+                }
+            }
+        })
+        ->pluck('team_id')
+        ->unique()
+        ->values()
+        ->all();
     
     Log::info('Team IDs found: ' . json_encode($teamIds));
     
-    // Get incidents only for this station's teams.
-    $incidents = collect();
-    
-    if (!empty($teamIds)) {
-        try {
-            $incidents = Incident::whereIn('team_id', $teamIds)
-                ->where('created_at', '>=', $startDate)
-                ->get();
-        } catch (\Exception $e) {
-            Log::warning('Error fetching station-scoped incidents: ' . $e->getMessage());
-            $incidents = collect();
-        }
+    // Include incidents directly assigned to the station as well as legacy team-assigned incidents.
+    try {
+        $incidentDateExpression = Schema::hasColumn('incidents', 'occurred_at')
+            ? 'COALESCE(occurred_at, created_at)'
+            : 'created_at';
+        $incidents = Incident::query()
+            ->whereRaw("{$incidentDateExpression} >= ?", [$startDate])
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+            ->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId);
+                if (! empty($teamIds)) {
+                    $query->orWhereIn('team_id', $teamIds);
+                }
+            })
+            ->get();
+    } catch (\Exception $e) {
+        Log::warning('Error fetching station-scoped incidents: ' . $e->getMessage());
+        $incidents = collect();
     }
 
     if ($selectedBarangayId) {
@@ -699,11 +763,11 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     $incidentsByType = [];
     $fireIncidents = 0;
     
+    $hasIncidentTypeColumn = Schema::hasColumn('incidents', 'incident_type_id');
     foreach ($incidents as $incident) {
-        $type = $incident->incident_type_id ?? '0';
+        $type = $hasIncidentTypeColumn ? ($incident->incident_type_id ?? '0') : 'fire';
         $incidentsByType[$type] = ($incidentsByType[$type] ?? 0) + 1;
-        // if (strtolower($type) === 'fire' || strpos(strtolower($type), 'fire') !== false) {
-        if ($type == '1'){
+        if (! $hasIncidentTypeColumn || $type == '1') {
 
             $fireIncidents++;
         }
@@ -714,7 +778,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     $dailyData = array_fill(0, 7, 0);
     
     foreach ($incidents as $incident) {
-        $incidentDate = $incident->created_at ?? null;
+        $incidentDate = $incident->occurred_at ?: ($incident->created_at ?? null);
         if ($incidentDate) {
             try {
                 $date = Carbon::parse($incidentDate);
@@ -776,10 +840,16 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $availableEquipment = 0;
     }
     
-    $predictionContext = $this->buildPredictionContext($teamIds, $predictionScope);
-    $barangayPredictions = $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext);
-    $barangayPredictions = $this->attachBarangayHistoricalBaselines($stationId, $barangayPredictions, $predictionContext);
-    $modelPrediction = $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions);
+    $predictionContext = $this->buildPredictionContext($stationId, $teamIds, $predictionScope);
+    $barangayPredictions = $generatePredictions
+        ? $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext)
+        : [];
+    $barangayPredictions = $generatePredictions
+        ? $this->attachBarangayHistoricalBaselines($stationId, $barangayPredictions, $predictionContext)
+        : [];
+    $modelPrediction = $generatePredictions
+        ? $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions)
+        : null;
     $selectedBarangayPrediction = null;
 
     if ($selectedBarangayId) {
@@ -990,6 +1060,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         return [
             'prediction_scope' => (string) ($rawData['prediction_scope'] ?? 'current_month'),
+            'analysis_kind' => (string) ($rawData['analysis_kind'] ?? (($rawData['prediction_scope'] ?? 'current_month') === 'next_month' ? 'forecast' : 'actual_analysis')),
             'barangay_id' => $this->scopeBarangayIdFromRawData($rawData),
             'target_month_label' => (string) ($predictionContext['target_month_label'] ?? ''),
         ];
@@ -1021,6 +1092,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $candidate = $this->scopeSignatureFromRawData($candidateRaw);
 
         return $candidate['prediction_scope'] === $expected['prediction_scope']
+            && $candidate['analysis_kind'] === $expected['analysis_kind']
             && $candidate['barangay_id'] === $expected['barangay_id']
             && $candidate['target_month_label'] === $expected['target_month_label'];
     }
@@ -1299,6 +1371,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $predictedIncidentCount = (int) round(collect($barangayPredictions)->sum(function ($item) {
                 return (float) ($item['predicted_incident_count'] ?? 0);
             }));
+            $incidentCalibration = $this->calibrateStationIncidentForecast(
+                (int) $stationId,
+                $predictionContext,
+                $predictedIncidentCount
+            );
+            $calibratedIncidentCount = (int) $incidentCalibration['calibrated_midpoint'];
             $predictedDamage = round((float) collect($barangayPredictions)->sum(function ($item) {
                 return (float) ($item['predicted_estimated_damage'] ?? 0);
             }), 2);
@@ -1306,11 +1384,14 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $maxProbability = (float) ($probabilities->max() ?? 0);
             $averageProbability = (float) ($probabilities->avg() ?? 0);
             $stationProbability = round(($maxProbability * 0.55) + ($averageProbability * 0.45), 2);
+            $riskIncidentCount = ($predictionContext['scope'] ?? 'current_month') === 'current_month'
+                ? max($calibratedIncidentCount, (int) ($predictionContext['current_month_fire_incidents'] ?? 0))
+                : $calibratedIncidentCount;
 
             $riskLevel = 'low';
-            if ($stationProbability >= 65 || $predictedIncidentCount >= 6 || $predictedDamage >= 500000) {
+            if ($stationProbability >= 65 || $riskIncidentCount >= 6 || $predictedDamage >= 500000) {
                 $riskLevel = 'high';
-            } elseif ($stationProbability >= 35 || $predictedIncidentCount >= 3 || $predictedDamage >= 150000) {
+            } elseif ($stationProbability >= 35 || $riskIncidentCount >= 3 || $predictedDamage >= 150000) {
                 $riskLevel = 'moderate';
             }
 
@@ -1353,11 +1434,27 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 'risk_level' => $riskLevel,
                 'confidence_band' => $confidenceBand,
                 'target' => 'station_monthly_fire_pressure',
-                'predicted_incident_count' => $predictedIncidentCount,
+                'raw_model_predicted_incident_count' => $predictedIncidentCount,
+                'calibrated_predicted_incident_count' => $calibratedIncidentCount,
+                'predicted_incident_count' => $calibratedIncidentCount,
+                'incident_count_range' => $incidentCalibration['range'],
+                'forecast_calibration' => $incidentCalibration,
                 'predicted_estimated_damage' => $predictedDamage,
-                'drivers' => array_map(fn ($summary) => ['summary' => $summary], $driverSummaries),
+                'drivers' => array_merge(
+                    array_map(fn ($summary) => ['summary' => $summary], $driverSummaries),
+                    [[
+                        'summary' => "Incident count calibrated from a raw barangay sum of {$predictedIncidentCount} to {$calibratedIncidentCount}, using observed pace and a "
+                            . number_format((float) $incidentCalibration['historical_same_month_average'], 2)
+                            . ' same-month historical average.',
+                    ]]
+                ),
                 'watch_items' => $watchItems,
             ];
+            $decoded = $this->applyForecastIncidentCountSemantics(
+                $decoded,
+                (int) ($predictionContext['current_month_fire_incidents'] ?? 0),
+                ($predictionContext['scope'] ?? 'current_month') === 'current_month'
+            );
 
             return [
                 'input' => [
@@ -1375,23 +1472,118 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         }
     }
 
+    private function calibrateStationIncidentForecast(int $stationId, array $predictionContext, int $rawModelTotal): array
+    {
+        try {
+            $targetMonth = Carbon::createFromFormat(
+                'F Y',
+                (string) ($predictionContext['target_month_label'] ?? Carbon::now()->format('F Y'))
+            )->startOfMonth();
+        } catch (\Throwable) {
+            $targetMonth = Carbon::now()->startOfMonth();
+        }
+
+        $comparisonYears = collect(range($targetMonth->year - 3, $targetMonth->year - 1));
+        $barangayIds = $this->resolveStationBarangays($stationId)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $totalsByYear = collect();
+
+        if (! empty($barangayIds)) {
+            $totalsByYear = DB::table('historical_fire_incidents')
+                ->whereIn('barangay_id', $barangayIds)
+                ->whereMonth('incident_date', $targetMonth->month)
+                ->whereIn(DB::raw('EXTRACT(YEAR FROM incident_date)::int'), $comparisonYears->all())
+                ->get(['incident_date', 'incident_count'])
+                ->groupBy(fn ($row) => (int) Carbon::parse($row->incident_date)->year)
+                ->map(fn ($rows) => (int) $rows->sum(fn ($row) => max(0, (int) ($row->incident_count ?? 1))));
+        }
+
+        $historicalTotals = $comparisonYears
+            ->map(fn ($year) => (int) ($totalsByYear->get($year, 0)))
+            ->all();
+        $observedCurrentMonth = (int) ($predictionContext['current_month_fire_incidents'] ?? 0);
+        $paceMonth = Carbon::now();
+
+        return ForecastIncidentCalibration::calibrate(
+            $rawModelTotal,
+            $observedCurrentMonth,
+            ($predictionContext['scope'] ?? 'current_month') === 'current_month',
+            $paceMonth->daysInMonth,
+            $paceMonth->day,
+            $historicalTotals
+        );
+    }
+
+    private function applyStructuredIncidentCountSemantics(array $analysis, array $rawData): array
+    {
+        $prediction = is_array($analysis['predictions'] ?? null) ? $analysis['predictions'] : [];
+        $modelOutput = data_get($rawData, 'model_prediction.output', []);
+        $isCurrentMonth = ($rawData['prediction_scope'] ?? 'current_month') === 'current_month';
+        $selectedBarangay = $rawData['selected_barangay_prediction'] ?? null;
+        $observedToDate = is_array($selectedBarangay)
+            ? (int) data_get($selectedBarangay, 'input.current_month_fire_incidents', 0)
+            : (int) data_get($rawData, 'prediction_context.current_month_fire_incidents', 0);
+
+        $authoritativeForecast = is_array($selectedBarangay) && ! empty($selectedBarangay)
+            ? $selectedBarangay
+            : (is_array($modelOutput) && ! empty($modelOutput) ? $modelOutput : $prediction);
+        $normalized = $this->applyForecastIncidentCountSemantics(
+            $authoritativeForecast,
+            $observedToDate,
+            $isCurrentMonth
+        );
+
+        $prediction = array_merge($prediction, [
+            'raw_model_predicted_incident_count' => $normalized['raw_model_predicted_incident_count'],
+            'calibrated_predicted_incident_count' => $normalized['calibrated_predicted_incident_count'],
+            'observed_fire_incidents_to_date' => $normalized['observed_fire_incidents_to_date'],
+            'predicted_additional_fire_incidents' => $normalized['predicted_additional_fire_incidents'],
+            'expected_month_total_fire_incidents' => $normalized['expected_month_total_fire_incidents'],
+            'incident_count_range' => $normalized['incident_count_range'],
+            'predicted_additional_incident_range' => $normalized['predicted_additional_incident_range'],
+            'forecast_calibration' => $normalized['forecast_calibration'] ?? null,
+            'predicted_fire_incidents' => $normalized['expected_month_total_fire_incidents'],
+            'forecast_count_basis' => $normalized['forecast_count_basis'],
+        ]);
+
+        $targetLabel = (string) data_get($rawData, 'prediction_context.target_month_label', 'the forecast month');
+        $outlook = (string) ($prediction['outlook'] ?? $analysis['risk_level'] ?? 'Unknown');
+        $prediction['ai_narrative_original'] = $prediction['summary'] ?? null;
+        $range = $normalized['incident_count_range'];
+        $rangeLabel = $range['lower'] === $range['upper']
+            ? (string) $range['lower']
+            : "{$range['lower']}-{$range['upper']}";
+        $prediction['incident_count_summary'] = $isCurrentMonth
+            ? "{$normalized['observed_fire_incidents_to_date']} fire incident(s) have already been observed in {$targetLabel}. The calibrated planning range is {$rangeLabel} total incident(s), with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate."
+            : "The calibrated planning range is {$rangeLabel} fire incident(s) for {$targetLabel}, with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate. The forecast month has not started, so there are no observed incidents in that window yet.";
+        $prediction['summary'] = $prediction['incident_count_summary'] . " Risk outlook: {$outlook}. Review probability, confidence, and the listed drivers together before operational decisions.";
+
+        $analysis['predictions'] = $prediction;
+        return $analysis;
+    }
+
     private function buildBarangayPredictionData(int $stationId, array $predictionContext, array $weatherContext = []): array
     {
         try {
-            $this->forecastModelService->ensureReady();
+            $modelReady = $this->forecastModelService->ensureReady();
 
             $targetMonth = !empty($predictionContext['target_month_label'])
                 ? Carbon::createFromFormat('F Y', $predictionContext['target_month_label'])->startOfMonth()
                 : Carbon::now()->startOfMonth();
 
             $stationHistoricalRow = $this->buildStationHistoricalProfile($stationId, $targetMonth);
+            $recentFireSignals = $this->buildRecentFireMomentumByBarangay($stationId);
 
             $barangays = $this->resolveStationBarangays($stationId);
             if ($barangays->isEmpty()) {
                 return [];
             }
 
-            $forecasts = [];
+            $requests = [];
 
             foreach ($barangays as $barangay) {
                 $payload = $this->buildBarangayPredictionPayload(
@@ -1399,22 +1591,56 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     $barangay,
                     $stationHistoricalRow,
                     $targetMonth,
-                    $weatherContext
+                    $weatherContext,
+                    $recentFireSignals[(int) $barangay->barangay_id] ?? [],
+                    $recentFireSignals[0] ?? [],
+                    max(1, $barangays->count())
                 );
 
                 if (!$payload) {
                     continue;
                 }
 
-                $decoded = $this->barangayPredictionService->predict($payload);
+                $requests[] = [
+                    'payload' => $payload,
+                    'barangay' => $barangay,
+                ];
+            }
+
+            $modelResults = [];
+            if ($modelReady && ! empty($requests)) {
+                try {
+                    $modelResults = $this->barangayPredictionService->predictMany(array_column($requests, 'payload'));
+                } catch (\Throwable $e) {
+                    // A bulk model/runtime failure must not erase the barangay
+                    // ranking. Each request below will use the deterministic,
+                    // evidence-based fallback instead.
+                    Log::warning('Bulk barangay prediction failed; using per-barangay fallback.', [
+                        'station_id' => $stationId,
+                        'barangay_count' => count($requests),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            $forecasts = [];
+
+            foreach ($requests as $index => $requestData) {
+                $payload = $requestData['payload'];
+                $barangay = $requestData['barangay'];
+                $decoded = $modelResults[$index] ?? null;
 
                 if (! is_array($decoded)) {
-                    Log::warning('Skipping barangay prediction because the Python response was invalid.', [
-                        'station_id' => $stationId,
-                        'barangay_id' => $barangay->barangay_id ?? null,
-                    ]);
-                    continue;
+                    $decoded = $this->buildBarangayPredictionFallback($payload);
+                    $decoded['prediction_source'] = 'deterministic_fallback';
+                } else {
+                    $decoded['prediction_source'] = 'trained_model';
                 }
+
+                $decoded = $this->applyForecastIncidentCountSemantics(
+                    $decoded,
+                    (int) ($payload['current_month_fire_incidents'] ?? 0),
+                    $targetMonth->isSameMonth(Carbon::now())
+                );
 
                 $forecasts[] = array_merge($decoded, [
                     'station_id' => $stationId,
@@ -1434,6 +1660,94 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             Log::warning('Unable to build barangay prediction data: ' . $e->getMessage());
             return [];
         }
+    }
+
+    private function buildBarangayPredictionFallback(array $payload): array
+    {
+        $incidentCount = max(0, (int) ($payload['incident_count'] ?? 0));
+        $temperature = (float) ($payload['average_temperature'] ?? 27);
+        $humidity = (float) ($payload['average_humidity'] ?? 70);
+        $wind = (float) ($payload['average_wind_speed'] ?? 5);
+        $riskPressure = (float) ($payload['risk_area_pressure_signal'] ?? 0);
+        $recentFireMomentum = (float) ($payload['recent_fire_momentum_signal'] ?? 0);
+        $stationFireMomentum = (float) ($payload['station_recent_fire_momentum_signal'] ?? 0);
+        $mitigationReadiness = (float) ($payload['mitigation_readiness_signal'] ?? 0);
+        $completionRatio = (float) ($payload['mitigation_completion_ratio'] ?? 0);
+
+        $score = 12
+            + ($incidentCount * 7)
+            + max(0, $temperature - 27) * 1.8
+            + max(0, 65 - $humidity) * 0.35
+            + ($wind * 0.45)
+            + ($riskPressure * 2.4)
+            + ($recentFireMomentum * 2.2)
+            + ($stationFireMomentum * 0.55)
+            - ($mitigationReadiness * 3)
+            - ($completionRatio * 12);
+        $probability = round(max(5, min(95, $score)), 2);
+        $riskLevel = $probability >= 65 ? 'high' : ($probability >= 35 ? 'moderate' : 'low');
+        $predictedIncidents = max(0, (int) round($incidentCount * (0.65 + ($probability / 100))));
+
+        return [
+            'prediction' => $riskLevel === 'high' ? 1 : 0,
+            'probability' => round($probability / 100, 4),
+            'probability_percent' => $probability,
+            'risk_level' => $riskLevel,
+            'confidence_band' => 'fallback',
+            'target' => 'high_risk_barangay_month',
+            'predicted_incident_count' => $predictedIncidents,
+            'predicted_fire_incidents' => $predictedIncidents,
+            'drivers' => [
+                ['summary' => "{$incidentCount} historical incident(s) contribute to the barangay baseline."],
+                ['summary' => (int) ($payload['current_month_fire_incidents'] ?? 0) . ' completed fire incident(s) this month contribute to recent fire momentum.'],
+                ['summary' => (int) ($payload['station_current_month_fire_incidents'] ?? 0) . ' station-wide completed fire incident(s) influence the common monthly baseline.'],
+                ['summary' => 'Verified risk-area pressure and current weather signals were included.'],
+                ['summary' => 'Completed mitigation and checklist readiness reduce the fallback score.'],
+            ],
+            'watch_items' => ['incident activity', 'risk-area conditions', 'mitigation readiness'],
+        ];
+    }
+
+    private function applyForecastIncidentCountSemantics(array $forecast, int $observedToDate, bool $isCurrentMonth): array
+    {
+        $rawModelCount = max(0, (int) round((float) (
+            $forecast['raw_model_predicted_incident_count']
+                ?? $forecast['predicted_incident_count']
+                ?? $forecast['predicted_fire_incidents']
+                ?? 0
+        )));
+        $calibratedCount = max(0, (int) round((float) (
+            $forecast['calibrated_predicted_incident_count']
+                ?? $forecast['predicted_incident_count']
+                ?? $rawModelCount
+        )));
+        $observed = $isCurrentMonth ? max(0, $observedToDate) : 0;
+        $expectedTotal = $isCurrentMonth ? max($observed, $calibratedCount) : $calibratedCount;
+        $predictedAdditional = $isCurrentMonth
+            ? max(0, $expectedTotal - $observed)
+            : $expectedTotal;
+        $providedRange = is_array($forecast['incident_count_range'] ?? null)
+            ? $forecast['incident_count_range']
+            : [];
+        $rangeLower = max($isCurrentMonth ? $observed : 0, (int) ($providedRange['lower'] ?? $expectedTotal));
+        $rangeUpper = max($rangeLower, (int) ($providedRange['upper'] ?? $expectedTotal));
+
+        return array_merge($forecast, [
+            'raw_model_predicted_incident_count' => $rawModelCount,
+            'calibrated_predicted_incident_count' => $expectedTotal,
+            'observed_fire_incidents_to_date' => $observed,
+            'predicted_additional_fire_incidents' => $predictedAdditional,
+            'predicted_additional_incident_range' => [
+                'lower' => $isCurrentMonth ? max(0, $rangeLower - $observed) : $rangeLower,
+                'upper' => $isCurrentMonth ? max(0, $rangeUpper - $observed) : $rangeUpper,
+            ],
+            'incident_count_range' => ['lower' => $rangeLower, 'upper' => $rangeUpper],
+            'expected_month_total_fire_incidents' => $expectedTotal,
+            // Keep the legacy field as the expected total so existing charts cannot fall below actuals.
+            'predicted_incident_count' => $expectedTotal,
+            'predicted_fire_incidents' => $expectedTotal,
+            'forecast_count_basis' => $isCurrentMonth ? 'current_month_observed_plus_remaining' : 'next_month_forecast',
+        ]);
     }
 
     private function resolveStationBarangays(int $stationId)
@@ -1491,6 +1805,20 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             ->get();
 
         $barangays = $barangays->merge($riskAreaBarangays);
+        $inferredCityIds = $cityIds
+            ->merge($riskAreaBarangays->pluck('city_id')->filter())
+            ->unique()
+            ->values();
+
+        if ($inferredCityIds->isNotEmpty()) {
+            $barangays = $barangays->merge(
+                DB::table('barangays')
+                    ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+                    ->whereIn('barangays.city_id', $inferredCityIds)
+                    ->select('barangays.barangay_id', 'barangays.barangay_name', 'cities.city_name', 'cities.city_id')
+                    ->get()
+            );
+        }
 
         if ($barangays->isEmpty()) {
             $urbiztondoBarangays = DB::table('barangays')
@@ -1572,7 +1900,16 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         ];
     }
 
-    private function buildBarangayPredictionPayload(int $stationId, object $barangay, object $stationHistoricalRow, Carbon $targetMonth, array $weatherContext = []): ?array
+    private function buildBarangayPredictionPayload(
+        int $stationId,
+        object $barangay,
+        object $stationHistoricalRow,
+        Carbon $targetMonth,
+        array $weatherContext = [],
+        array $recentFireSignal = [],
+        array $stationRecentFireSignal = [],
+        int $coveredBarangayCount = 1
+    ): ?array
     {
         $barangayIncidents = DB::table('historical_fire_incidents')
             ->where('barangay_id', $barangay->barangay_id)
@@ -1727,6 +2064,9 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $targetMonth->copy()->endOfMonth()
         );
 
+        $rawStationMomentum = (float) ($stationRecentFireSignal['recent_fire_momentum_signal'] ?? 0);
+        $allocatedStationMomentum = round($rawStationMomentum / max(1, $coveredBarangayCount), 3);
+
         return array_merge([
             'station_id' => $stationId,
             'barangay_id' => (int) $barangay->barangay_id,
@@ -1734,6 +2074,19 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'month' => $targetMonth->format('F'),
             'year' => (int) $targetMonth->year,
             'incident_count' => $incidentCount,
+            'current_month_fire_incidents' => (int) ($recentFireSignal['current_month_fire_incidents'] ?? 0),
+            'previous_month_fire_incidents' => (int) ($recentFireSignal['previous_month_fire_incidents'] ?? 0),
+            'recent_7_day_fire_incidents' => (int) ($recentFireSignal['recent_7_day_fire_incidents'] ?? 0),
+            'recent_30_day_fire_incidents' => (int) ($recentFireSignal['recent_30_day_fire_incidents'] ?? 0),
+            'recent_fire_momentum_signal' => (float) ($recentFireSignal['recent_fire_momentum_signal'] ?? 0),
+            'station_current_month_fire_incidents' => (int) ($stationRecentFireSignal['current_month_fire_incidents'] ?? 0),
+            'station_previous_month_fire_incidents' => (int) ($stationRecentFireSignal['previous_month_fire_incidents'] ?? 0),
+            'station_recent_7_day_fire_incidents' => (int) ($stationRecentFireSignal['recent_7_day_fire_incidents'] ?? 0),
+            // Station momentum is shared context, so allocate it across coverage instead
+            // of adding the full signal to every barangay forecast.
+            'station_recent_fire_momentum_signal' => $allocatedStationMomentum,
+            'station_recent_fire_momentum_signal_raw' => $rawStationMomentum,
+            'station_momentum_coverage_count' => max(1, $coveredBarangayCount),
             'risk_level' => $historicalRiskLevel,
             'average_temperature' => (float) $averageTemperature,
             'average_humidity' => $averageHumidity !== null ? (float) $averageHumidity : null,
@@ -1769,6 +2122,83 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'type_incident' => $typeIncident,
             'occupancy' => $occupancy,
         ], $feedbackSignals);
+    }
+
+    private function buildRecentFireMomentumByBarangay(int $stationId): array
+    {
+        $teamIds = Team::query()
+            ->where('station_id', $stationId)
+            ->pluck('team_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $now = Carbon::now();
+        $windowStart = $now->copy()->subDays(60)->startOfDay();
+
+        $incidentDateExpression = Schema::hasColumn('incidents', 'occurred_at')
+            ? 'COALESCE(occurred_at, created_at)'
+            : 'created_at';
+        $incidentsQuery = Incident::query()
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+            ->whereRaw("{$incidentDateExpression} >= ?", [$windowStart])
+            ->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId);
+                if (! empty($teamIds)) {
+                    $query->orWhereIn('team_id', $teamIds);
+                }
+            });
+
+        if (Schema::hasColumn('incidents', 'incident_type_id')) {
+            $incidentsQuery->where('incident_type_id', 1);
+        }
+
+        $incidentColumns = ['barangay_id', 'created_at'];
+        if (Schema::hasColumn('incidents', 'occurred_at')) {
+            $incidentColumns[] = 'occurred_at';
+        }
+        $incidents = $incidentsQuery->get($incidentColumns);
+
+        $signals = $incidents
+            ->filter(fn ($incident) => ! empty($incident->barangay_id))
+            ->groupBy(fn ($incident) => (int) $incident->barangay_id)
+            ->map(fn ($rows) => $this->summarizeRecentFireRows($rows, $now))
+            ->all();
+
+        // Key 0 is the station-wide signal. It lets records without a resolved barangay
+        // affect every barangay's common baseline without pretending they occurred locally.
+        $signals[0] = $this->summarizeRecentFireRows($incidents, $now);
+
+        return $signals;
+    }
+
+    private function summarizeRecentFireRows($rows, Carbon $now): array
+    {
+        $currentMonthStart = $now->copy()->startOfMonth();
+        $previousMonthStart = $now->copy()->subMonthNoOverflow()->startOfMonth();
+        $previousMonthEnd = $now->copy()->subMonthNoOverflow()->endOfMonth();
+        $lastSevenStart = $now->copy()->subDays(6)->startOfDay();
+        $lastThirtyStart = $now->copy()->subDays(29)->startOfDay();
+        $countBetween = fn (Carbon $start, Carbon $end) => $rows->filter(
+            fn ($incident) => optional($incident->occurred_at ?: $incident->created_at)?->betweenIncluded($start, $end)
+        )->count();
+        $currentMonth = $countBetween($currentMonthStart, $now->copy()->endOfDay());
+        $previousMonth = $countBetween($previousMonthStart, $previousMonthEnd);
+        $lastSeven = $countBetween($lastSevenStart, $now->copy()->endOfDay());
+        $lastThirty = $countBetween($lastThirtyStart, $now->copy()->endOfDay());
+
+        return [
+            'current_month_fire_incidents' => $currentMonth,
+            'previous_month_fire_incidents' => $previousMonth,
+            'recent_7_day_fire_incidents' => $lastSeven,
+            'recent_30_day_fire_incidents' => $lastThirty,
+            'recent_fire_momentum_signal' => round(
+                ($lastSeven * 2.0)
+                + (max(0, $lastThirty - $lastSeven) * 0.65)
+                + ($currentMonth * 0.8)
+                - ($previousMonth * 0.35),
+                3
+            ),
+        ];
     }
 
     private function deriveBarangayPeakHours($barangayIncidents, string $fallback): string
@@ -1963,18 +2393,29 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         }
 
         if (!empty($data['selected_barangay_prediction'])) {
+            $selectedInput = $data['selected_barangay_prediction']['input'] ?? [];
             $prompt .= "SELECTED BARANGAY FOCUS:\n";
             $prompt .= "- Barangay: " . ($data['selected_barangay_prediction']['barangay_name'] ?? 'Selected barangay') . "\n";
             $prompt .= "- Barangay risk probability: " . ($data['selected_barangay_prediction']['probability_percent'] ?? 0) . "%\n";
-            $prompt .= "- Barangay risk level: " . strtoupper($data['selected_barangay_prediction']['risk_level'] ?? 'unknown') . "\n\n";
+            $prompt .= "- Barangay risk level: " . strtoupper($data['selected_barangay_prediction']['risk_level'] ?? 'unknown') . "\n";
+            $prompt .= "- Completed fires this month: " . ($selectedInput['current_month_fire_incidents'] ?? 0) . "\n";
+            $prompt .= "- Completed fires in the previous month: " . ($selectedInput['previous_month_fire_incidents'] ?? 0) . "\n";
+            $prompt .= "- Completed fires in the latest 7 days: " . ($selectedInput['recent_7_day_fire_incidents'] ?? 0) . "\n";
+            $prompt .= "- Recent fire momentum signal: " . ($selectedInput['recent_fire_momentum_signal'] ?? 0) . "\n\n";
+            $prompt .= "- Station-wide completed fires this month: " . ($selectedInput['station_current_month_fire_incidents'] ?? 0) . "\n";
+            $prompt .= "- Station-wide recent fire momentum: " . ($selectedInput['station_recent_fire_momentum_signal'] ?? 0) . "\n\n";
         }
 
         if (!empty($data['barangay_predictions'])) {
             $prompt .= "BARANGAY-LEVEL HOTSPOT FORECASTS:\n";
             foreach (array_slice($data['barangay_predictions'], 0, 5) as $barangayForecast) {
+                $barangayInput = $barangayForecast['input'] ?? [];
                 $prompt .= "- " . ($barangayForecast['barangay_name'] ?? 'Unknown barangay')
                     . ': ' . strtoupper($barangayForecast['risk_level'] ?? 'unknown')
-                    . ' risk at ' . ($barangayForecast['probability_percent'] ?? 0) . "% probability";
+                    . ' risk at ' . ($barangayForecast['probability_percent'] ?? 0) . "% probability"
+                    . ' | Current-month completed fires: ' . ($barangayInput['current_month_fire_incidents'] ?? 0)
+                    . ' | 7-day local fires: ' . ($barangayInput['recent_7_day_fire_incidents'] ?? 0)
+                    . ' | Station fires this month: ' . ($barangayInput['station_current_month_fire_incidents'] ?? 0);
 
                 if (!empty($barangayForecast['drivers'][0]['summary'])) {
                     $prompt .= " | Driver: " . $barangayForecast['drivers'][0]['summary'];
@@ -1992,7 +2433,9 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $prompt .= "- Probability: " . (($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'] . "%" : 'N/A') . "\n";
             $prompt .= "- Risk Level: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
             $prompt .= "- Confidence Band: " . strtoupper($modelPrediction['confidence_band'] ?? 'unknown') . "\n";
-            $prompt .= "- Predicted Incident Count: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
+            $prompt .= "- Observed Incidents To Date: " . ($modelPrediction['observed_fire_incidents_to_date'] ?? 0) . "\n";
+            $prompt .= "- Predicted Additional Incidents: " . ($modelPrediction['predicted_additional_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
+            $prompt .= "- Expected Month-End Total: " . ($modelPrediction['expected_month_total_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
             $prompt .= "- Predicted Damage Exposure: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
             $prompt .= "- Watch Items: " . implode(', ', $modelPrediction['watch_items'] ?? ['None']) . "\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
@@ -2000,7 +2443,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     $prompt .= "- Driver: {$driver['summary']}\n";
                 }
             }
-            $prompt .= "\nUse these model signals as grounded evidence. Do not ignore them when forming the prediction.\n\n";
+            $prompt .= "\nUse these model signals as grounded evidence. For a current-month analysis, never describe the forecast as fewer than incidents already observed. Clearly distinguish observed-to-date, predicted additional, and expected month-end total.\n\n";
         }
         
         $prompt .= "Only provide prediction content. Do not give action recommendations.\n";
@@ -2172,7 +2615,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
         throw new \Exception('No API key configured');
     }
     
-    Log::info('Calling OpenRouter API with key: ' . substr($this->apiKey, 0, 15) . '...');
+    Log::info('Calling OpenRouter API.');
 
     $errors = [];
     $connectTimeout = max(3, (int) config('services.openrouter.connect_timeout', 8));
@@ -2181,6 +2624,10 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
     $prompt = $this->trimAiPrompt($prompt);
 
     foreach ($this->getOpenRouterModelCandidates() as $model) {
+        if (isset($this->unavailableAiModels[$model])) {
+            continue;
+        }
+
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->apiKey,
@@ -2197,6 +2644,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
                 'max_tokens' => $maxTokens
             ]);
         } catch (\Throwable $e) {
+            $this->unavailableAiModels[$model] = true;
             $errors[] = "{$model}: {$e->getMessage()}";
             Log::warning('OpenRouter API request threw an exception for model ' . $model, [
                 'message' => $e->getMessage(),
@@ -2207,6 +2655,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
         }
 
         if (!$response->successful()) {
+            $this->unavailableAiModels[$model] = true;
             $errorBody = $response->body();
             $errors[] = "{$model}: HTTP {$response->status()}";
             Log::warning('OpenRouter API call failed for model ' . $model . ': ' . $response->status() . ' - ' . $errorBody);
@@ -2217,6 +2666,7 @@ private function callAIApi($prompt, $systemPrompt = 'You are a fire safety exper
         $content = $json['choices'][0]['message']['content'] ?? '';
 
         if (empty($content)) {
+            $this->unavailableAiModels[$model] = true;
             $errors[] = "{$model}: empty response";
             Log::warning('OpenRouter API returned empty content for model ' . $model);
             continue;
@@ -2307,10 +2757,24 @@ private function trimAiPrompt(string $prompt): string
         $usedFallbackGeneration = empty($plans);
         $plans = $this->normalizeActionPlanCount($plans, $recommendations, $rawData);
 
-        AiActionPlanChecklist::query()->where('analysis_id', $analysisId)->delete();
+        $targetBarangayIds = $this->resolveChecklistTargetBarangayIds($rawData);
+        if (count($targetBarangayIds) > 1) {
+            // Station-wide runs still cover every barangay, but use the highest-priority
+            // recommendation once per barangay instead of creating a full duplicate set.
+            $plans = array_slice($plans, 0, 1);
+            $recommendations = array_slice($recommendations, 0, 1);
+        }
+
+        $analysisRevision = max(1, (int) (Analysis::query()->find($analysisId)?->revision_number ?? 1));
+        $existingPlans = AiActionPlanChecklist::withoutGlobalScope('current_revision')
+            ->where('analysis_id', $analysisId)
+            ->where('is_superseded', false)
+            ->with(['items', 'mitigationActions'])
+            ->get();
+        $reconciledExistingIds = [];
 
         $savedPlans = [];
-        $targetBarangayIds = $this->resolveChecklistTargetBarangayIds($rawData);
+        $newPlansByBarangay = [];
 
         foreach ($plans as $index => $plan) {
             $sourceRecommendation = $recommendations[$index] ?? $recommendations[0];
@@ -2331,15 +2795,23 @@ private function trimAiPrompt(string $prompt): string
                     ],
                 ]);
 
-                $saved = AiActionPlanChecklist::create([
+                $sourceTitle = $plan['source_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan');
+                $planTitle = $plan['plan_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan');
+                $sourceSignature = $this->buildActionPlanRevisionSignature(
+                    (int) ($rawData['station_id'] ?? 0),
+                    (int) $targetBarangayId,
+                    $riskAreaId ? (int) $riskAreaId : null,
+                    (string) $sourceTitle
+                );
+                $checklistAttributes = [
                     'analysis_id' => $analysisId,
                     'station_id' => $rawData['station_id'] ?? null,
                     'barangay_id' => $targetBarangayId,
                     'risk_area_id' => $riskAreaId,
                     'source_type' => 'action_plan',
-                    'source_title' => $plan['source_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan'),
+                    'source_title' => $sourceTitle,
                     'source_description' => $sourceRecommendation['description'] ?? null,
-                    'plan_title' => $plan['plan_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan'),
+                    'plan_title' => $planTitle,
                     'plan_description' => $this->decoratePlanDescriptionForBarangay(
                         $plan['plan_description'] ?? ($sourceRecommendation['description'] ?? null),
                         $targetBarangayId,
@@ -2353,14 +2825,65 @@ private function trimAiPrompt(string $prompt): string
                     'target_date' => isset($plan['target_days']) ? now()->addDays((int) $plan['target_days'])->toDateString() : null,
                     'ai_payload' => $planPayload,
                     'is_ai_generated' => $aiGenerated,
-                ]);
+                    'source_signature' => $sourceSignature,
+                    'analysis_revision' => $analysisRevision,
+                    'is_superseded' => false,
+                    'requires_revision_review' => false,
+                    'superseded_at' => null,
+                ];
 
-                $this->syncChecklistItems($saved, array_values(array_filter($plan['checklist_items'] ?? [])));
-                BarangayNotificationService::notifyActionPlanChecklistPublished($saved);
+                $matchingPlan = $existingPlans->first(function (AiActionPlanChecklist $existing) use ($sourceSignature, $targetBarangayId, $riskAreaId, $sourceTitle) {
+                    if (filled($existing->source_signature)) {
+                        return hash_equals((string) $existing->source_signature, $sourceSignature);
+                    }
 
-                $savedPlans[] = $saved->fresh();
+                    return (int) $existing->barangay_id === (int) $targetBarangayId
+                        && (int) ($existing->risk_area_id ?? 0) === (int) ($riskAreaId ?? 0)
+                        && Str::lower(trim((string) $existing->source_title)) === Str::lower(trim((string) $sourceTitle));
+                });
+
+                $checklistItems = array_values(array_filter($plan['checklist_items'] ?? []));
+                $itemsChanged = true;
+                $wasCreated = false;
+
+                if ($matchingPlan && ! $this->isActionPlanRevisionProtected($matchingPlan)) {
+                    $itemsChanged = array_values($matchingPlan->checklist_items ?? []) !== $checklistItems;
+                    $matchingPlan->update($checklistAttributes);
+                    $saved = $matchingPlan;
+                    $reconciledExistingIds[] = (int) $matchingPlan->ai_action_plan_checklist_id;
+                } else {
+                    if ($matchingPlan) {
+                        $this->markActionPlanForRevisionReview($matchingPlan);
+                    }
+                    $saved = AiActionPlanChecklist::create($checklistAttributes);
+                    $wasCreated = true;
+                }
+
+                if ($itemsChanged) {
+                    $this->syncChecklistItems($saved, $checklistItems);
+                }
+
+                if ($wasCreated && ! isset($newPlansByBarangay[$targetBarangayId])) {
+                    $newPlansByBarangay[$targetBarangayId] = $saved;
+                }
+
+                $savedPlans[] = $saved;
             }
         }
+
+        foreach ($newPlansByBarangay as $newPlan) {
+            BarangayNotificationService::notifyActionPlanChecklistPublished($newPlan);
+        }
+
+        $existingPlans
+            ->reject(fn (AiActionPlanChecklist $existing) => in_array((int) $existing->ai_action_plan_checklist_id, $reconciledExistingIds, true))
+            ->each(function (AiActionPlanChecklist $existing) {
+                if ($this->isActionPlanRevisionProtected($existing)) {
+                    $this->markActionPlanForRevisionReview($existing);
+                } else {
+                    $this->supersedeActionPlanRevision($existing);
+                }
+            });
 
         $persistedChecklistRows = AiActionPlanChecklist::query()
             ->where('analysis_id', $analysisId)
@@ -2390,6 +2913,77 @@ private function trimAiPrompt(string $prompt): string
         ];
     }
 
+    private function buildActionPlanRevisionSignature(int $stationId, int $barangayId, ?int $riskAreaId, string $sourceTitle): string
+    {
+        return hash('sha256', implode('|', [
+            $stationId,
+            $barangayId,
+            $riskAreaId ?: 0,
+            Str::lower(preg_replace('/\s+/', ' ', trim($sourceTitle)) ?: 'ai action plan'),
+        ]));
+    }
+
+    private function isActionPlanRevisionProtected(AiActionPlanChecklist $checklist): bool
+    {
+        $checklist->loadMissing(['items', 'mitigationActions']);
+
+        if (strtolower((string) $checklist->status) !== 'pending'
+            || filled($checklist->assigned_to)
+            || filled($checklist->confirmed_by)
+            || filled($checklist->confirmed_at)
+            || $checklist->items->contains(fn ($item) => strtolower((string) $item->status) !== 'pending')) {
+            return true;
+        }
+
+        return $checklist->mitigationActions->contains(function (MitigationAction $action) {
+            return strtolower((string) $action->status) !== 'draft'
+                || $action->is_manually_edited
+                || filled($action->responsible_team_id)
+                || filled($action->responsible_user_id)
+                || filled($action->reviewed_at)
+                || filled($action->approved_at)
+                || filled($action->implementation_notes)
+                || filled($action->completion_notes)
+                || filled($action->outcome_result);
+        });
+    }
+
+    private function markActionPlanForRevisionReview(AiActionPlanChecklist $checklist): void
+    {
+        $checklist->update(['requires_revision_review' => true]);
+
+        MitigationAction::withoutGlobalScope('current_revision')
+            ->where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)
+            ->where('is_superseded', false)
+            ->update(['requires_revision_review' => true]);
+    }
+
+    private function supersedeActionPlanRevision(AiActionPlanChecklist $checklist): void
+    {
+        $checklist->update([
+            'is_superseded' => true,
+            'superseded_at' => now(),
+            'requires_revision_review' => false,
+        ]);
+
+        $actions = MitigationAction::withoutGlobalScope('current_revision')
+            ->where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)
+            ->where('is_superseded', false)
+            ->get();
+
+        foreach ($actions as $action) {
+            if (strtolower((string) $action->status) === 'draft' && ! $action->is_manually_edited) {
+                $action->update([
+                    'is_superseded' => true,
+                    'superseded_at' => now(),
+                    'requires_revision_review' => false,
+                ]);
+            } else {
+                $action->update(['requires_revision_review' => true]);
+            }
+        }
+    }
+
     private function resolveChecklistTargetBarangayIds(array $rawData): array
     {
         $selectedBarangayId = $this->normalizeSelectedBarangayId(
@@ -2416,7 +3010,17 @@ private function trimAiPrompt(string $prompt): string
 
         $fallbackBarangayId = $this->normalizeSelectedBarangayId(data_get($rawData, 'barangay_predictions.0.barangay_id'));
 
-        return $fallbackBarangayId ? [$fallbackBarangayId] : [];
+        if ($fallbackBarangayId) {
+            return [$fallbackBarangayId];
+        }
+
+        return $this->resolveStationBarangays((int) ($rawData['station_id'] ?? 0))
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function decoratePlanDescriptionForBarangay(
@@ -2621,19 +3225,16 @@ private function trimAiPrompt(string $prompt): string
                 ->first();
 
             if ($existingAction) {
-                if (in_array($existingAction->status, ['draft', 'planned'], true) && $this->resolveMitigationSourceTypeForAnalysis($existingAction->toArray()) === 'ai_action_plan') {
-                    $hasManualEdits = filled($existingAction->responsible_team_id)
+                if ($existingAction->status === 'draft' && $this->resolveMitigationSourceTypeForAnalysis($existingAction->toArray()) === 'ai_action_plan') {
+                    $hasManualEdits = (bool) $existingAction->is_manually_edited
+                        || filled($existingAction->responsible_team_id)
                         || filled($existingAction->responsible_user_id)
                         || filled($existingAction->implementation_notes)
                         || filled($existingAction->completion_notes)
                         || filled($existingAction->outcome_result)
                         || filled($existingAction->follow_up_notes)
-                        || trim((string) ($existingAction->remarks ?? '')) !== trim((string) ($payload['remarks'] ?? ''))
-                        || trim((string) ($existingAction->description ?? '')) !== trim((string) ($payload['description'] ?? ''))
-                        || trim((string) ($existingAction->title ?? '')) !== trim((string) ($payload['title'] ?? ''))
-                        || strtolower((string) ($existingAction->category ?? '')) !== strtolower((string) ($payload['category'] ?? ''))
-                        || strtolower((string) ($existingAction->priority_level ?? '')) !== strtolower((string) ($payload['priority_level'] ?? ''))
-                        || (string) optional($existingAction->target_date)->format('Y-m-d') !== (string) ($payload['target_date'] ?? null);
+                        || filled($existingAction->reviewed_at)
+                        || filled($existingAction->approved_at);
 
                     if ($hasManualEdits) {
                         $skipped++;
@@ -2646,6 +3247,7 @@ private function trimAiPrompt(string $prompt): string
                         $updated++;
                     }
                 } else {
+                    $existingAction->update(['requires_revision_review' => true]);
                     $skipped++;
                 }
 
@@ -2719,6 +3321,11 @@ private function trimAiPrompt(string $prompt): string
             'approved_at' => null,
             'reviewed_by' => null,
             'reviewed_at' => null,
+            'analysis_revision' => (int) ($checklist->analysis_revision ?? 1),
+            'is_superseded' => false,
+            'requires_revision_review' => false,
+            'is_manually_edited' => false,
+            'superseded_at' => null,
         ];
     }
 
@@ -2909,6 +3516,7 @@ private function trimAiPrompt(string $prompt): string
             'raw_data' => [
                 'hourly_data' => $rawData['hourly_data'] ?? [],
                 'daily_data' => $rawData['daily_data'] ?? [],
+                'days_analyzed' => max(1, (int) ($rawData['days_analyzed'] ?? 30)),
                 'peak_hour' => $rawData['peak_hour'] ?? null,
                 'avg_response_time' => $rawData['avg_response_time'] ?? null,
                 'total_personnel' => $rawData['total_personnel'] ?? 0,
@@ -2927,6 +3535,7 @@ private function trimAiPrompt(string $prompt): string
                 'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
                 'prediction_context' => $rawData['prediction_context'] ?? null,
                 'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                'analysis_kind' => $rawData['analysis_kind'] ?? (($rawData['prediction_scope'] ?? null) === 'next_month' ? 'forecast' : 'actual_analysis'),
                 'historical_window' => $rawData['historical_window'] ?? '3',
                 'chart_context' => $rawData['chart_context'] ?? null,
                 'checklist_debug' => $analysis['checklist_debug'] ?? null,
@@ -2941,7 +3550,7 @@ private function trimAiPrompt(string $prompt): string
             'recommendations' => $this->buildPersistableRecommendations($analysis['recommendations'] ?? []),
             'predictions' => $analysis['predictions'] ?? null,
             'sector' => $rawData['location_name'] ?? $analysisRow->sector,
-            'period' => "Last {$rawData['days_analyzed']} days",
+            'period' => 'Last ' . max(1, (int) ($rawData['days_analyzed'] ?? 30)) . ' days',
             'risk_level' => $analysis['risk_level'] ?? $analysisRow->risk_level,
             'confidence_data' => isset($analysis['confidence_score']) ? (string) $analysis['confidence_score'] : $analysisRow->confidence_data,
             'incident_count' => (int) ($rawData['total_incidents'] ?? $analysisRow->incident_count ?? 0),
@@ -2980,6 +3589,7 @@ private function trimAiPrompt(string $prompt): string
         $recommendations = [];
         $lines = explode("\n", $aiContent);
         $predictions = $this->extractPredictionData($aiContent, $data);
+        $confidenceContext = $this->calculateAnalysisConfidence($data, true);
         
         // Parse AI response for recommendations
         foreach ($lines as $line) {
@@ -3025,7 +3635,8 @@ private function trimAiPrompt(string $prompt): string
         return [
             'risk_score' => $data['risk_score'],
             'risk_level' => $data['risk_level'],
-            'confidence_score' => 85,
+            'confidence_score' => $confidenceContext['score'],
+            'confidence_context' => $confidenceContext,
             'risk_factors' => $data['risk_factors'],
             'total_incidents' => $data['total_incidents'],
             'fire_incidents' => $data['fire_incidents'],
@@ -3261,6 +3872,7 @@ private function trimAiPrompt(string $prompt): string
     {
         $recommendations = $this->generateDataDrivenRecommendations($data);
         $predictions = $this->generateDataDrivenPrediction($data);
+        $confidenceContext = $this->calculateAnalysisConfidence($data, false);
         
         $explanation = "Based on {$data['total_incidents']} incidents over {$data['days_analyzed']} days, " .
                       "risk level is {$data['risk_level']} with {$data['fire_incidents']} fire incidents. " .
@@ -3269,7 +3881,8 @@ private function trimAiPrompt(string $prompt): string
         return [
             'risk_score' => $data['risk_score'],
             'risk_level' => $data['risk_level'],
-            'confidence_score' => 80,
+            'confidence_score' => $confidenceContext['score'],
+            'confidence_context' => $confidenceContext,
             'risk_factors' => $data['risk_factors'],
             'total_incidents' => $data['total_incidents'],
             'fire_incidents' => $data['fire_incidents'],
@@ -3301,6 +3914,7 @@ private function trimAiPrompt(string $prompt): string
     {
         $recommendations = $this->extractRecommendationsFromAi($recommendationAiContent, $data);
         $predictions = $this->extractPredictionData($predictionAiContent, $data);
+        $confidenceContext = $this->calculateAnalysisConfidence($data, true);
 
         usort($recommendations, function($a, $b) {
             $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
@@ -3322,7 +3936,8 @@ private function trimAiPrompt(string $prompt): string
         return [
             'risk_score' => $data['risk_score'],
             'risk_level' => $data['risk_level'],
-            'confidence_score' => 85,
+            'confidence_score' => $confidenceContext['score'],
+            'confidence_context' => $confidenceContext,
             'risk_factors' => $data['risk_factors'],
             'total_incidents' => $data['total_incidents'],
             'fire_incidents' => $data['fire_incidents'],
@@ -3346,6 +3961,82 @@ private function trimAiPrompt(string $prompt): string
             'predictions' => $predictions,
             'recommendations' => array_slice($recommendations, 0, 6),
             'ai_explanation' => substr($predictionAiContent, 0, 300) . "\n\n" . substr($recommendationAiContent, 0, 300)
+        ];
+    }
+
+    private function calculateAnalysisConfidence(array $data, bool $aiResponseAvailable): array
+    {
+        $score = 20;
+        $factors = [];
+        $historicalYears = (int) data_get($data, 'chart_context.historical_window_meta.year_count', 0);
+        if ($historicalYears > 0) {
+            $points = min(15, $historicalYears * 5);
+            $score += $points;
+            $factors[] = "{$historicalYears} historical comparison year(s) (+{$points})";
+        } else {
+            $factors[] = 'No historical comparison years (+0)';
+        }
+
+        $incidentCount = (int) ($data['total_incidents'] ?? 0);
+        $incidentPoints = $incidentCount >= 10 ? 10 : ($incidentCount >= 3 ? 7 : ($incidentCount >= 1 ? 4 : 0));
+        $score += $incidentPoints;
+        $factors[] = "{$incidentCount} scoped actual incident record(s) (+{$incidentPoints})";
+
+        $predictions = collect($data['barangay_predictions'] ?? []);
+        $selectedBarangayId = $this->scopeBarangayIdFromRawData($data);
+        $expectedBarangays = $selectedBarangayId
+            ? 1
+            : max(1, $this->resolveStationBarangays((int) ($data['station_id'] ?? 0))->count());
+        $coverageRatio = min(1, $predictions->count() / $expectedBarangays);
+        $coveragePoints = (int) round($coverageRatio * 12);
+        $score += $coveragePoints;
+        $factors[] = $predictions->count() . "/{$expectedBarangays} barangay forecast(s) available (+{$coveragePoints})";
+
+        $trainedPredictionCount = $predictions->where('prediction_source', 'trained_model')->count();
+        if ($trainedPredictionCount > 0) {
+            $score += 8;
+            $factors[] = "{$trainedPredictionCount} trained-model barangay forecast(s) (+8)";
+        } elseif ($predictions->isNotEmpty()) {
+            $factors[] = 'Barangay forecasts use deterministic fallback (+0 model points)';
+        }
+
+        if (! empty($data['weather_context'])) {
+            $score += 6;
+            $factors[] = 'Weather context available (+6)';
+        }
+
+        $riskFindingCount = count(data_get($data, 'recommendation_context.focus_findings', []));
+        if ($riskFindingCount > 0) {
+            $points = min(6, $riskFindingCount * 2);
+            $score += $points;
+            $factors[] = "{$riskFindingCount} verified risk finding(s) (+{$points})";
+        }
+
+        $currentFireCount = (int) data_get($data, 'prediction_context.current_month_fire_incidents', 0);
+        $previousFireCount = (int) data_get($data, 'prediction_context.previous_month_fire_incidents', 0);
+        if (($currentFireCount + $previousFireCount) > 0) {
+            $score += 5;
+            $factors[] = "Current/previous fire trend evidence {$currentFireCount}/{$previousFireCount} (+5)";
+        }
+
+        if ($aiResponseAvailable) {
+            $score += 3;
+            $factors[] = 'AI prediction and recommendation responses parsed (+3)';
+        }
+
+        $score = max(30, min(95, $score));
+
+        return [
+            'score' => $score,
+            'method' => 'evidence_coverage_v1',
+            'meaning' => 'Confidence measures evidence coverage and model availability; it is separate from fire-risk probability.',
+            'factors' => $factors,
+            'historical_year_count' => $historicalYears,
+            'scoped_incident_count' => $incidentCount,
+            'barangay_coverage_ratio' => round($coverageRatio, 3),
+            'trained_prediction_count' => $trainedPredictionCount,
+            'current_month_fire_incidents' => $currentFireCount,
+            'previous_month_fire_incidents' => $previousFireCount,
         ];
     }
 
@@ -3430,6 +4121,7 @@ private function trimAiPrompt(string $prompt): string
                 'raw_data' => [
                     'hourly_data' => $rawData['hourly_data'],
                     'daily_data' => $rawData['daily_data'],
+                    'days_analyzed' => max(1, (int) ($rawData['days_analyzed'] ?? $days)),
                     'peak_hour' => $rawData['peak_hour'],
                     'avg_response_time' => $rawData['avg_response_time'],
                     'total_personnel' => $rawData['total_personnel'],
@@ -3448,6 +4140,7 @@ private function trimAiPrompt(string $prompt): string
                     'selected_barangay_prediction' => $rawData['selected_barangay_prediction'] ?? null,
                     'prediction_context' => $rawData['prediction_context'] ?? null,
                     'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                    'analysis_kind' => $rawData['analysis_kind'] ?? 'actual_analysis',
                     'historical_window' => $rawData['historical_window'] ?? '3',
                     'chart_context' => $rawData['chart_context'] ?? null,
                     'checklist_debug' => $analysis['checklist_debug'] ?? null,
@@ -3465,6 +4158,10 @@ private function trimAiPrompt(string $prompt): string
             $predictionsJson = json_encode($analysis['predictions'] ?? null);
 
             $existingAnalysis = $this->findExistingScopedAnalysis((int) $stationId, $rawData);
+            $currentRevision = $existingAnalysis
+                ? max(1, (int) ($existingAnalysis->revision_number ?? 1))
+                : 0;
+            $nextRevision = $currentRevision + 1;
             $payload = [
                 'sector' => $sectorName,
                 'period' => "Last {$days} days",
@@ -3475,10 +4172,42 @@ private function trimAiPrompt(string $prompt): string
                 'predictions' => $predictionsJson,
                 'incident_count' => $incidentCount,
                 'station_id' => $stationId,
+                'revision_number' => $nextRevision,
                 'updated_at' => now(),
             ];
 
+            if ($existingAnalysis && ! ($rawData['replace_existing'] ?? false)) {
+                throw new \RuntimeException('A saved result already exists for this station, barangay scope, month, and run type. Confirm replacement before running again.');
+            }
+
             if ($existingAnalysis) {
+                DB::table('analysis_revision_snapshots')->updateOrInsert(
+                    [
+                        'analysis_id' => $existingAnalysis->analysis_id,
+                        'revision_number' => $currentRevision,
+                    ],
+                    [
+                        'snapshot_data' => json_encode([
+                            'sector' => $existingAnalysis->sector,
+                            'period' => $existingAnalysis->period,
+                            'risk_level' => $existingAnalysis->risk_level,
+                            'confidence_data' => $existingAnalysis->confidence_data,
+                            'analysis_data' => $existingAnalysis->analysis_data,
+                            'recommendations' => $existingAnalysis->recommendations,
+                            'predictions' => $existingAnalysis->predictions,
+                            'incident_count' => $existingAnalysis->incident_count,
+                            'probability' => $existingAnalysis->probability,
+                            'station_id' => $existingAnalysis->station_id,
+                            'created_at' => optional($existingAnalysis->created_at)?->toISOString(),
+                            'updated_at' => optional($existingAnalysis->updated_at)?->toISOString(),
+                        ]),
+                        'replaced_by' => Auth::user()?->user_id,
+                        'replaced_at' => now(),
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+
                 DB::table('analysis')
                     ->where('analysis_id', $existingAnalysis->analysis_id)
                     ->update($payload);
@@ -3496,6 +4225,7 @@ private function trimAiPrompt(string $prompt): string
                 'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
                 'barangay_id' => $normalizedBarangayId,
                 'overwrote_existing_scope' => (bool) $existingAnalysis,
+                'revision_number' => $nextRevision,
             ]);
             
             return $analysisId;
@@ -3546,6 +4276,7 @@ private function trimAiPrompt(string $prompt): string
 
                     return (object) [
                         'analysis_id' => $analysis->analysis_id,
+                        'analysis_revision' => max(1, (int) ($analysis->revision_number ?? 1)),
                         'sector' => $analysis->sector,
                         'period' => $analysis->period,
                         'risk_level' => $analysis->risk_level,
@@ -3554,6 +4285,7 @@ private function trimAiPrompt(string $prompt): string
                         'station_id' => $analysis->station_id,
                         'created_at' => optional($analysis->created_at)?->toISOString(),
                         'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+                        'analysis_kind' => $rawData['analysis_kind'] ?? (($rawData['prediction_scope'] ?? null) === 'next_month' ? 'forecast' : 'actual_analysis'),
                         'barangay_id' => $this->scopeBarangayIdFromRawData($rawData),
                         'selected_barangay_name' => data_get($rawData, 'selected_barangay_prediction.barangay_name'),
                         'target_month_label' => data_get($rawData, 'prediction_context.target_month_label'),
@@ -3614,18 +4346,6 @@ private function trimAiPrompt(string $prompt): string
                         && $candidate['target_month_label'] === $requestedScope['target_month_label'];
                 });
 
-            if (! $latestAnalysis && $requestedScope['barangay_id']) {
-                $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($requestedScope, $stationOfficer) {
-                    $candidateData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
-                    $candidateRaw = $candidateData['raw_data'] ?? [];
-                    $candidate = $this->scopeSignatureFromRawData($candidateRaw);
-
-                    return (int) ($analysis->station_id ?? 0) === (int) $stationOfficer->station_id
-                        && $candidate['prediction_scope'] === $requestedScope['prediction_scope']
-                        && $candidate['target_month_label'] === $requestedScope['target_month_label'];
-                });
-            }
-
             if (!$latestAnalysis) {
                 return response()->json([
                     'success' => true,
@@ -3674,7 +4394,8 @@ private function trimAiPrompt(string $prompt): string
                 $daysAnalyzed,
                 $requestedScope['prediction_scope'],
                 $selectedBarangayId,
-                $historicalWindow
+                $historicalWindow,
+                false
             );
             $liveChartContext = $this->mergeLiveChartContext(
                 (int) $stationOfficer->station_id,
@@ -3703,6 +4424,7 @@ private function trimAiPrompt(string $prompt): string
 
             $payload = array_merge($analysisSummary, [
                 'analysis_id' => $latestAnalysis->analysis_id,
+                'analysis_revision' => max(1, (int) ($latestAnalysis->revision_number ?? 1)),
                 'location_name' => $locationName,
                 'hourly_data' => $liveScopedRawData['hourly_data'] ?? ($rawData['hourly_data'] ?? []),
                 'daily_data' => $liveScopedRawData['daily_data'] ?? ($rawData['daily_data'] ?? []),
@@ -3759,6 +4481,205 @@ private function trimAiPrompt(string $prompt): string
         }
     }
 
+    public function getAnalysisRevisions(int $id)
+    {
+        try {
+            $analysis = $this->resolveStationAnalysis($id);
+            $current = $this->formatAnalysisRevisionEntry(
+                $this->snapshotPayloadFromAnalysis($analysis),
+                (int) ($analysis->revision_number ?? 1),
+                true,
+                optional($analysis->updated_at)?->toISOString()
+            );
+
+            $history = DB::table('analysis_revision_snapshots')
+                ->where('analysis_id', $analysis->analysis_id)
+                ->orderByDesc('revision_number')
+                ->get()
+                ->map(function ($snapshot) {
+                    return $this->formatAnalysisRevisionEntry(
+                        json_decode((string) $snapshot->snapshot_data, true) ?: [],
+                        (int) $snapshot->revision_number,
+                        false,
+                        Carbon::parse($snapshot->replaced_at)->toISOString(),
+                        (int) $snapshot->analysis_revision_snapshot_id
+                    );
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => collect([$current])->concat($history)->values(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Unable to load analysis revision history: ' . $e->getMessage());
+
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 404);
+        }
+    }
+
+    public function rollbackAnalysisRevision(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'revision_number' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $analysis = $this->resolveStationAnalysis($id);
+            $target = DB::table('analysis_revision_snapshots')
+                ->where('analysis_id', $analysis->analysis_id)
+                ->where('revision_number', $validated['revision_number'])
+                ->first();
+
+            if (! $target) {
+                return response()->json(['success' => false, 'message' => 'The selected revision is unavailable.'], 404);
+            }
+
+            $targetPayload = json_decode((string) $target->snapshot_data, true) ?: [];
+            $currentRevision = max(1, (int) ($analysis->revision_number ?? 1));
+            $nextRevision = $currentRevision + 1;
+
+            DB::transaction(function () use ($analysis, $targetPayload, $currentRevision, $nextRevision) {
+                DB::table('analysis_revision_snapshots')->updateOrInsert(
+                    ['analysis_id' => $analysis->analysis_id, 'revision_number' => $currentRevision],
+                    [
+                        'snapshot_data' => json_encode($this->snapshotPayloadFromAnalysis($analysis)),
+                        'replaced_by' => Auth::user()?->user_id,
+                        'replaced_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+
+                DB::table('analysis')->where('analysis_id', $analysis->analysis_id)->update([
+                    'sector' => $targetPayload['sector'] ?? $analysis->sector,
+                    'period' => $targetPayload['period'] ?? $analysis->period,
+                    'risk_level' => $targetPayload['risk_level'] ?? $analysis->risk_level,
+                    'confidence_data' => $targetPayload['confidence_data'] ?? $analysis->confidence_data,
+                    'analysis_data' => $this->normalizeStoredJsonValue($targetPayload['analysis_data'] ?? []),
+                    'recommendations' => $this->normalizeStoredJsonValue($targetPayload['recommendations'] ?? []),
+                    'predictions' => $this->normalizeStoredJsonValue($targetPayload['predictions'] ?? null),
+                    'incident_count' => (int) ($targetPayload['incident_count'] ?? 0),
+                    'probability' => $targetPayload['probability'] ?? null,
+                    'revision_number' => $nextRevision,
+                    'updated_at' => now(),
+                ]);
+            });
+
+            $restored = Analysis::query()->findOrFail($analysis->analysis_id);
+            $storedData = is_array($restored->analysis_data) ? $restored->analysis_data : [];
+            $rawData = is_array($storedData['raw_data'] ?? null) ? $storedData['raw_data'] : [];
+            $structured = is_array($storedData['analysis_summary'] ?? null) ? $storedData['analysis_summary'] : [];
+            $structured['risk_level'] = $restored->risk_level;
+            $structured['confidence_score'] = $restored->confidence_data;
+            $structured['recommendations'] = is_array($restored->recommendations) ? $restored->recommendations : [];
+            $structured['predictions'] = is_array($restored->predictions) ? $restored->predictions : null;
+            $structured['analysis_id'] = $restored->analysis_id;
+            $structured['analysis_revision'] = $nextRevision;
+
+            $checklistGeneration = $this->generateAndStoreActionPlanChecklists($restored->analysis_id, $structured, $rawData);
+            $structured['action_plan_checklists'] = $checklistGeneration['plans'];
+            $structured['recommendations'] = $this->attachChecklistIdsToRecommendations(
+                $structured['recommendations'],
+                $structured['action_plan_checklists']
+            );
+            $suggestionGeneration = $this->generateAndStoreRecommendationSuggestions(
+                $restored->analysis_id,
+                $structured['recommendations'],
+                $structured['action_plan_checklists']
+            );
+            $structured['recommendation_suggestions'] = $suggestionGeneration['suggestions'];
+            $this->syncMitigationDraftActionsForAnalysis($structured['action_plan_checklists']);
+            $this->updateStoredAnalysisArtifacts($restored->analysis_id, $structured, $rawData);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Revision {$validated['revision_number']} was restored as revision {$nextRevision}.",
+                'data' => ['analysis_id' => $restored->analysis_id, 'analysis_revision' => $nextRevision],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Analysis revision rollback failed: ' . $e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['success' => false, 'message' => 'Revision rollback failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function resolveStationAnalysis(int $analysisId): Analysis
+    {
+        $stationId = StationOfficer::query()
+            ->where('user_id', Auth::user()?->user_id)
+            ->value('station_id');
+
+        abort_unless($stationId, 403, 'No station assignment was found for this account.');
+
+        return Analysis::query()->where('station_id', $stationId)->findOrFail($analysisId);
+    }
+
+    private function snapshotPayloadFromAnalysis(Analysis $analysis): array
+    {
+        return [
+            'sector' => $analysis->sector,
+            'period' => $analysis->period,
+            'risk_level' => $analysis->risk_level,
+            'confidence_data' => $analysis->confidence_data,
+            'analysis_data' => $analysis->analysis_data,
+            'recommendations' => $analysis->recommendations,
+            'predictions' => $analysis->predictions,
+            'incident_count' => $analysis->incident_count,
+            'probability' => $analysis->probability,
+            'station_id' => $analysis->station_id,
+            'created_at' => optional($analysis->created_at)?->toISOString(),
+            'updated_at' => optional($analysis->updated_at)?->toISOString(),
+        ];
+    }
+
+    private function normalizeStoredJsonValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $value;
+            }
+        }
+
+        return json_encode($value);
+    }
+
+    private function formatAnalysisRevisionEntry(
+        array $payload,
+        int $revisionNumber,
+        bool $isCurrent,
+        ?string $recordedAt,
+        ?int $snapshotId = null
+    ): array {
+        $analysisData = $payload['analysis_data'] ?? [];
+        if (is_string($analysisData)) {
+            $analysisData = json_decode($analysisData, true) ?: [];
+        }
+        $predictions = $payload['predictions'] ?? [];
+        if (is_string($predictions)) {
+            $predictions = json_decode($predictions, true) ?: [];
+        }
+        $rawData = is_array($analysisData['raw_data'] ?? null) ? $analysisData['raw_data'] : [];
+
+        return [
+            'snapshot_id' => $snapshotId,
+            'revision_number' => $revisionNumber,
+            'is_current' => $isCurrent,
+            'recorded_at' => $recordedAt,
+            'risk_level' => $payload['risk_level'] ?? null,
+            'confidence' => $payload['confidence_data'] ?? null,
+            'incident_count' => (int) ($payload['incident_count'] ?? 0),
+            'prediction_scope' => $rawData['prediction_scope'] ?? 'current_month',
+            'analysis_kind' => $rawData['analysis_kind'] ?? (($rawData['prediction_scope'] ?? null) === 'next_month' ? 'forecast' : 'actual_analysis'),
+            'barangay_id' => $this->scopeBarangayIdFromRawData($rawData),
+            'barangay_name' => data_get($rawData, 'selected_barangay_prediction.barangay_name'),
+            'target_month_label' => data_get($rawData, 'prediction_context.target_month_label'),
+            'predicted_fire_incidents' => data_get($predictions, 'predicted_fire_incidents')
+                ?? data_get($predictions, 'predicted_incident_count')
+                ?? data_get($rawData, 'model_prediction.output.predicted_incident_count'),
+        ];
+    }
+
     public function getActionPlanChecklists(Request $request)
     {
         try {
@@ -3804,10 +4725,12 @@ private function trimAiPrompt(string $prompt): string
                             'mitigation_action_id' => $payload['linked_mitigation_id'],
                         ]) . '#mitigation-row-' . $payload['linked_mitigation_id']
                         : null;
-                    $payload['mitigation_draft_url'] = route('station-admin.mitigations', [
-                        'draft_ai_action_plan_checklist_id' => $item->ai_action_plan_checklist_id,
-                        'analysis_id' => $item->analysis_id,
-                    ]);
+                    $payload['mitigation_draft_url'] = $payload['linked_mitigation_id']
+                        ? null
+                        : route('station-admin.mitigations', [
+                            'draft_ai_action_plan_checklist_id' => $item->ai_action_plan_checklist_id,
+                            'analysis_id' => $item->analysis_id,
+                        ]);
                     $payload['workflow_labels'] = [
                         'prediction' => 'Prediction',
                         'recommendation' => 'Recommendation',
@@ -4616,7 +5539,10 @@ private function trimAiPrompt(string $prompt): string
         $predictedDamage = null;
 
         $likelyPeakHours = $predictionContext['likely_peak_hours'] ?? [];
-        if (empty($likelyPeakHours) && isset($data['peak_hour']) && $data['peak_hour'] !== null) {
+        if (empty($likelyPeakHours)
+            && ! isset($predictionContext['peak_hour_evidence'])
+            && isset($data['peak_hour'])
+            && $data['peak_hour'] !== null) {
             $likelyPeakHours = [str_pad((string) $data['peak_hour'], 2, '0', STR_PAD_LEFT) . ':00'];
         }
 
@@ -4655,6 +5581,9 @@ private function trimAiPrompt(string $prompt): string
             'predicted_fire_incidents' => $predictedFireCount,
             'predicted_damage' => $predictedDamage,
             'likely_peak_hours' => $likelyPeakHours,
+            'likely_peak_hours_label' => $predictionContext['peak_hour_evidence']['label']
+                ?? (empty($likelyPeakHours) ? 'No clear peak yet' : implode(', ', $likelyPeakHours)),
+            'peak_hour_evidence' => $predictionContext['peak_hour_evidence'] ?? null,
             'drivers' => array_values(array_unique(array_filter($drivers))),
             'weather_context' => $weather ?: null,
             'model_prediction' => $modelPrediction,
@@ -4664,7 +5593,7 @@ private function trimAiPrompt(string $prompt): string
         ];
     }
 
-    private function buildPredictionContext(array $teamIds, string $predictionScope): array
+    private function buildPredictionContext(int $stationId, array $teamIds, string $predictionScope): array
     {
         $now = Carbon::now();
         $currentMonthStart = $now->copy()->startOfMonth();
@@ -4678,14 +5607,14 @@ private function trimAiPrompt(string $prompt): string
             ? $now->copy()->addMonthNoOverflow()->endOfMonth()
             : $currentMonthEnd->copy();
 
-        $currentMonthIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $currentMonthStart, $now->copy()->endOfDay());
-        $previousMonthIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $previousMonthStart, $previousMonthEnd);
+        $currentMonthIncidents = $this->fetchIncidentsForPredictionWindow($stationId, $teamIds, $currentMonthStart, $now->copy()->endOfDay());
+        $previousMonthIncidents = $this->fetchIncidentsForPredictionWindow($stationId, $teamIds, $previousMonthStart, $previousMonthEnd);
         $currentMonthHourlyData = array_fill(0, 24, 0);
         $previousMonthHourlyData = array_fill(0, 24, 0);
 
         foreach ($currentMonthIncidents as $incident) {
             try {
-                $hour = (int) Carbon::parse($incident->created_at)->format('H');
+                $hour = (int) Carbon::parse($incident->occurred_at ?: $incident->created_at)->format('H');
                 $currentMonthHourlyData[$hour]++;
             } catch (\Throwable $e) {
             }
@@ -4693,18 +5622,19 @@ private function trimAiPrompt(string $prompt): string
 
         foreach ($previousMonthIncidents as $incident) {
             try {
-                $hour = (int) Carbon::parse($incident->created_at)->format('H');
+                $hour = (int) Carbon::parse($incident->occurred_at ?: $incident->created_at)->format('H');
                 $previousMonthHourlyData[$hour]++;
             } catch (\Throwable $e) {
             }
         }
 
-        arsort($currentMonthHourlyData);
-        $topHours = array_keys(array_filter($currentMonthHourlyData));
-        $likelyPeakHours = collect(array_slice($topHours, 0, 3))
-            ->map(fn($hour) => str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':00')
-            ->values()
-            ->all();
+        $peakHourEvidence = $this->estimateStationPeakHours(
+            $stationId,
+            $currentMonthIncidents,
+            $previousMonthIncidents,
+            $targetMonthStart
+        );
+        $likelyPeakHours = $peakHourEvidence['hours'];
 
         return [
             'scope' => $predictionScope,
@@ -4712,13 +5642,87 @@ private function trimAiPrompt(string $prompt): string
             'target_month_label' => $targetMonthStart->format('F Y'),
             'target_period_label' => $targetMonthStart->format('M j') . ' - ' . $targetMonthEnd->format('M j, Y'),
             'current_month_total_incidents' => $currentMonthIncidents->count(),
-            'current_month_fire_incidents' => $currentMonthIncidents->where('incident_type_id', 1)->count(),
+            'current_month_fire_incidents' => $this->countFireIncidents($currentMonthIncidents),
             'previous_month_total_incidents' => $previousMonthIncidents->count(),
-            'previous_month_fire_incidents' => $previousMonthIncidents->where('incident_type_id', 1)->count(),
+            'previous_month_fire_incidents' => $this->countFireIncidents($previousMonthIncidents),
             'current_month_hourly_data' => array_values($currentMonthHourlyData),
             'previous_month_hourly_data' => array_values($previousMonthHourlyData),
             'likely_peak_hours' => $likelyPeakHours,
+            'peak_hour_evidence' => $peakHourEvidence,
         ];
+    }
+
+    private function estimateStationPeakHours(
+        int $stationId,
+        $currentMonthIncidents,
+        $previousMonthIncidents,
+        Carbon $targetMonth
+    ): array {
+        $observations = [];
+
+        $appendLiveIncidents = function ($incidents, float $verifiedWeight, float $fallbackWeight) use (&$observations) {
+            foreach ($incidents as $incident) {
+                try {
+                    $occurredAt = $incident->occurred_at ?: $incident->created_at;
+                    if (! $occurredAt) {
+                        continue;
+                    }
+                    $observations[] = [
+                        'hour' => (int) Carbon::parse($occurredAt)->format('H'),
+                        'weight' => $incident->occurred_at_verified_at ? $verifiedWeight : $fallbackWeight,
+                    ];
+                } catch (\Throwable $e) {
+                }
+            }
+        };
+
+        // Verified operational timestamps carry more weight than report-time fallbacks.
+        $appendLiveIncidents($currentMonthIncidents, 3.0, 0.75);
+        $appendLiveIncidents($previousMonthIncidents, 2.0, 0.5);
+
+        $barangayIds = $this->resolveStationBarangays($stationId)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $liveIncidentIds = $currentMonthIncidents->concat($previousMonthIncidents)
+            ->pluck('incident_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        if (! empty($barangayIds) && Schema::hasTable('historical_fire_incidents')) {
+            $historicalQuery = DB::table('historical_fire_incidents')
+                ->whereIn('barangay_id', $barangayIds)
+                ->whereNotNull('incident_time')
+                ->whereDate('incident_date', '>=', $targetMonth->copy()->subYears(3)->startOfYear());
+
+            if (! empty($liveIncidentIds)) {
+                $historicalQuery->where(function ($query) use ($liveIncidentIds) {
+                    $query->whereNull('incident_id')->orWhereNotIn('incident_id', $liveIncidentIds);
+                });
+            }
+
+            foreach ($historicalQuery->get(['incident_date', 'incident_time', 'incident_count', 'is_verified']) as $row) {
+                try {
+                    $hour = (int) Carbon::parse($row->incident_time)->format('H');
+                    $isTargetMonth = Carbon::parse($row->incident_date)->month === $targetMonth->month;
+                    $weight = $isTargetMonth ? 1.5 : 0.5;
+                    if ((bool) $row->is_verified) {
+                        $weight *= 1.25;
+                    }
+                    foreach (range(1, min(5, max(1, (int) ($row->incident_count ?? 1)))) as $_) {
+                        $observations[] = ['hour' => $hour, 'weight' => $weight];
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
+        return PeakHourEstimator::estimate($observations);
     }
 
     private function buildAnalyticsChartContext(
@@ -4737,8 +5741,8 @@ private function trimAiPrompt(string $prompt): string
         $previousStart = $currentStart->copy()->subDays(7)->startOfDay();
         $previousEnd = $currentStart->copy()->subDay()->endOfDay();
 
-        $currentIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $currentStart, $currentEnd);
-        $previousIncidents = $this->fetchIncidentsForPredictionWindow($teamIds, $previousStart, $previousEnd);
+        $currentIncidents = $this->fetchIncidentsForPredictionWindow($stationId, $teamIds, $currentStart, $currentEnd);
+        $previousIncidents = $this->fetchIncidentsForPredictionWindow($stationId, $teamIds, $previousStart, $previousEnd);
 
         $dailyLabels = [];
         $currentDailySeries = [];
@@ -4857,6 +5861,7 @@ private function trimAiPrompt(string $prompt): string
             'historical_trend' => $patternContext['historical_trend'],
             'seasonal_pattern' => $patternContext['seasonal_pattern'],
             'monthly_pattern' => $patternContext['monthly_pattern'],
+            'ml_trend_analysis' => $patternContext['ml_trend_analysis'],
             'day_of_week_pattern' => $patternContext['day_of_week_pattern'],
             'time_of_day_pattern' => $patternContext['time_of_day_pattern'],
             'weather_pattern' => $patternContext['weather_pattern'],
@@ -5856,7 +6861,8 @@ private function trimAiPrompt(string $prompt): string
         $query = Incident::query()
             ->whereIn('team_id', $teamIds)
             ->whereBetween('created_at', [$start, $end])
-            ->select(['incident_id', 'barangay_id', 'created_at']);
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+            ->select(['incident_id', 'barangay_id', 'created_at', 'occurred_at']);
 
         if ($selectedBarangayId) {
             $query->where('barangay_id', $selectedBarangayId);
@@ -5881,8 +6887,8 @@ private function trimAiPrompt(string $prompt): string
             ]);
 
             return (object) [
-                'incident_date' => optional($incident->created_at)?->toDateString(),
-                'incident_time' => optional($incident->created_at)?->format('H:i:s'),
+                'incident_date' => optional($incident->occurred_at ?: $incident->created_at)?->toDateString(),
+                'incident_time' => optional($incident->occurred_at ?: $incident->created_at)?->format('H:i:s'),
                 'incident_count' => 1,
                 'temperature' => $context?->temperature,
                 'temperature_2m' => $context?->temperature_2m,
@@ -6221,21 +7227,114 @@ private function trimAiPrompt(string $prompt): string
             ->limit(12)
             ->get();
 
-        $series = $recentAnalyses
+        $savedPoints = $recentAnalyses
             ->sortBy('created_at')
             ->values()
-            ->map(fn (Analysis $analysis) => $this->buildScopedMlTrendPoint($analysis, $selectedBarangayId))
+            ->map(function (Analysis $analysis) use ($selectedBarangayId) {
+                $point = $this->buildScopedMlTrendPoint($analysis, $selectedBarangayId);
+                if (! $point) return null;
+                $point['date'] = optional($analysis->created_at)?->toDateString();
+                return $point;
+            })
             ->filter()
+            ->keyBy('date');
+
+        $officerIds = StationOfficer::query()->where('station_id', $stationId)->pluck('station_officer_id')->all();
+        $teamIds = Team::query()->where(function ($query) use ($officerIds) {
+            $query->whereIn('commander_driver', $officerIds)->orWhereIn('pumper', $officerIds)->orWhereIn('team_leader', $officerIds)
+                ->orWhereIn('firefighter_officer_1', $officerIds)->orWhereIn('firefighter_officer_2', $officerIds)
+                ->orWhereIn('firefighter_officer_3', $officerIds)->orWhereIn('rescue_radio', $officerIds);
+        })->pluck('team_id')->all();
+        $actuals = Incident::query()->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+            ->where(function ($query) use ($stationId, $teamIds) { $query->where('station_id', $stationId)->orWhereIn('team_id', $teamIds); })
+            ->when($selectedBarangayId, fn ($query) => $query->where('barangay_id', $selectedBarangayId))
+            ->get(['created_at', 'occurred_at']);
+        $latestSavedPoint = $savedPoints->sortBy('date')->last();
+
+        $monthStart = Carbon::today()->startOfMonth();
+        $daysFromMonthStart = $monthStart->diffInDays(Carbon::today());
+        $series = collect(range(0, $daysFromMonthStart))->map(function (int $dayOffset) use ($actuals, $savedPoints, $latestSavedPoint, $monthStart, $daysFromMonthStart) {
+            $date = $monthStart->copy()->addDays($dayOffset);
+            $saved = $savedPoints->get($date->toDateString());
+            $displayPoint = $saved ?: ($dayOffset === $daysFromMonthStart ? $latestSavedPoint : null);
+            return [
+                'label' => $date->format('M d'),
+                'incident_count' => $actuals->filter(fn ($incident) => optional($incident->occurred_at ?: $incident->created_at)?->isSameDay($date))->count(),
+                'predicted_fire_incidents' => $displayPoint['predicted_fire_incidents'] ?? null,
+                'confidence' => $displayPoint['confidence'] ?? null,
+                'risk_level' => $displayPoint['risk_level'] ?? 'No saved forecast',
+            ];
+        })->values()->all();
+
+        return [
+            'series' => $series,
+            'month_over_month' => $this->buildMlMonthOverMonthComparison(
+                $recentAnalyses,
+                $actuals,
+                $selectedBarangayId
+            ),
+            'latest_risk' => !empty($series) ? ($series[count($series) - 1]['risk_level'] ?? 'No data') : 'No data',
+            'latest_confidence' => !empty($series) ? (int) ($series[count($series) - 1]['confidence'] ?? 0) : 0,
+            'run_count' => $savedPoints->count(),
+            'missing' => [
+                'series' => empty($series),
+            ],
+        ];
+    }
+
+    private function buildMlMonthOverMonthComparison($analyses, $actuals, ?int $selectedBarangayId = null): array
+    {
+        $currentMonth = Carbon::today()->startOfMonth();
+        $lastMonth = $currentMonth->copy()->subMonth();
+
+        $forecastByMonth = collect($analyses)
+            ->sortBy('created_at')
+            ->map(function (Analysis $analysis) use ($selectedBarangayId) {
+                $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+                $rawData = $analysisData['raw_data'] ?? [];
+                $targetLabel = (string) data_get($rawData, 'prediction_context.target_month_label', '');
+
+                try {
+                    $targetMonth = $targetLabel !== ''
+                        ? Carbon::createFromFormat('F Y', $targetLabel)->startOfMonth()
+                        : null;
+                } catch (\Throwable $e) {
+                    $targetMonth = null;
+                }
+
+                $point = $this->buildScopedMlTrendPoint($analysis, $selectedBarangayId);
+
+                return $targetMonth && $point
+                    ? ['month' => $targetMonth->format('Y-m'), 'point' => $point]
+                    : null;
+            })
+            ->filter()
+            ->keyBy('month');
+
+        $series = collect([$lastMonth, $currentMonth])
+            ->map(function (Carbon $month) use ($actuals, $forecastByMonth) {
+                $forecast = data_get($forecastByMonth->get($month->format('Y-m')), 'point', []);
+
+                return [
+                    'label' => $month->format('F Y'),
+                    'actual_incidents' => $actuals
+                        ->filter(fn ($incident) => optional($incident->occurred_at ?: $incident->created_at)?->isSameMonth($month))
+                        ->count(),
+                    'predicted_fire_incidents' => array_key_exists('predicted_fire_incidents', $forecast)
+                        ? $forecast['predicted_fire_incidents']
+                        : null,
+                    'confidence' => array_key_exists('confidence', $forecast) ? $forecast['confidence'] : null,
+                    'risk_level' => $forecast['risk_level'] ?? 'No saved forecast',
+                ];
+            })
             ->values()
             ->all();
 
         return [
             'series' => $series,
-            'latest_risk' => !empty($series) ? ($series[count($series) - 1]['risk_level'] ?? 'No data') : 'No data',
-            'latest_confidence' => !empty($series) ? (int) ($series[count($series) - 1]['confidence'] ?? 0) : 0,
-            'run_count' => count($series),
             'missing' => [
-                'series' => empty($series),
+                'forecast' => collect($series)->every(fn ($item) => $item['predicted_fire_incidents'] === null),
+                'actual_incidents' => collect($series)->sum('actual_incidents') === 0,
             ],
         ];
     }
@@ -6276,7 +7375,7 @@ private function trimAiPrompt(string $prompt): string
 
         return [
             'label' => $label,
-            'incident_count' => (int) ($this->resolveScopedActualIncidentCountForAnalysis($analysis, $selectedBarangayId, $scopedPrediction) ?? 0),
+            'incident_count' => $this->resolveScopedActualIncidentCountForAnalysis($analysis, $selectedBarangayId, $scopedPrediction),
             'predicted_fire_incidents' => $predictedIncidentCount !== null ? (int) round((float) $predictedIncidentCount) : 0,
             'confidence' => $confidence,
             'risk_level' => (string) $riskLevel,
@@ -6310,18 +7409,8 @@ private function trimAiPrompt(string $prompt): string
         ?int $selectedBarangayId = null,
         ?array $scopedPrediction = null
     ): ?int {
-        if (! $selectedBarangayId) {
-            return isset($analysis->incident_count) ? (int) $analysis->incident_count : null;
-        }
-
         $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
         $rawData = $analysisData['raw_data'] ?? [];
-        $analysisBarangayId = $this->scopeBarangayIdFromRawData($rawData);
-
-        if ($analysisBarangayId && $analysisBarangayId === (int) $selectedBarangayId) {
-            return isset($analysis->incident_count) ? (int) $analysis->incident_count : null;
-        }
-
         $predictionContext = is_array($rawData['prediction_context'] ?? null) ? $rawData['prediction_context'] : [];
         $targetMonthLabel = (string) ($predictionContext['target_month_label'] ?? '');
         if ($targetMonthLabel === '') {
@@ -6338,45 +7427,40 @@ private function trimAiPrompt(string $prompt): string
             return null;
         }
 
-        $historicalTotal = (int) DB::table('historical_fire_incidents')
-            ->where('barangay_id', $selectedBarangayId)
-            ->whereYear('incident_date', $targetMonth->year)
-            ->whereMonth('incident_date', $targetMonth->month)
-            ->sum('incident_count');
-
-        if ($historicalTotal > 0) {
-            return $historicalTotal;
-        }
-
         $stationId = (int) ($analysis->station_id ?? 0);
-        if ($stationId <= 0) {
-            return null;
-        }
+        $teamIds = $stationId > 0
+            ? Team::query()->where('station_id', $stationId)->pluck('team_id')->filter()->map(fn ($id) => (int) $id)->all()
+            : [];
 
-        $teamIds = Team::query()
-            ->where('station_id', $stationId)
-            ->pluck('team_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-
-        if (empty($teamIds)) {
-            return null;
-        }
-
-        $incidentQuery = Incident::query()
-            ->whereIn('team_id', $teamIds)
+        $actualQuery = Incident::query()
             ->whereBetween('created_at', [$targetMonth->copy()->startOfMonth(), $targetMonth->copy()->endOfMonth()])
-            ->where('incident_type_id', 1);
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed']);
 
-        if (Schema::hasColumn('incidents', 'barangay_id')) {
-            $incidentQuery->where('barangay_id', $selectedBarangayId);
-        } else {
-            return null;
+        if (Schema::hasColumn('incidents', 'incident_type_id')) {
+            $actualQuery->where('incident_type_id', 1);
         }
 
-        return (int) $incidentQuery->count();
+        if ($stationId > 0 && Schema::hasColumn('incidents', 'station_id')) {
+            $actualQuery->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId);
+                if (! empty($teamIds)) {
+                    $query->orWhereIn('team_id', $teamIds);
+                }
+            });
+        } elseif (! empty($teamIds)) {
+            $actualQuery->whereIn('team_id', $teamIds);
+        } else {
+            return $selectedBarangayId ? null : (isset($analysis->incident_count) ? (int) $analysis->incident_count : null);
+        }
+
+        if ($selectedBarangayId) {
+            if (! Schema::hasColumn('incidents', 'barangay_id')) {
+                return null;
+            }
+            $actualQuery->where('barangay_id', $selectedBarangayId);
+        }
+
+        return (int) $actualQuery->count();
     }
 
     private function buildOperationalPredictionEvaluationSeries(int $stationId, ?int $selectedBarangayId = null): ?array
@@ -6662,15 +7746,37 @@ private function trimAiPrompt(string $prompt): string
         return "{$limit}-year window";
     }
 
-    private function fetchIncidentsForPredictionWindow(array $teamIds, Carbon $start, Carbon $end)
+    private function countFireIncidents($incidents): int
     {
-        if (empty($teamIds)) {
+        if (! Schema::hasColumn('incidents', 'incident_type_id')) {
+            return $incidents->count();
+        }
+
+        return $incidents->where('incident_type_id', 1)->count();
+    }
+
+    private function fetchIncidentsForPredictionWindow(int $stationId, array $teamIds, Carbon $start, Carbon $end)
+    {
+        if ($stationId <= 0 && empty($teamIds)) {
             return collect();
         }
 
+        $incidentDateExpression = Schema::hasColumn('incidents', 'occurred_at')
+            ? 'COALESCE(occurred_at, created_at)'
+            : 'created_at';
+
         return Incident::query()
-            ->whereIn('team_id', $teamIds)
-            ->whereBetween('created_at', [$start, $end])
+            ->where(function ($query) use ($stationId, $teamIds) {
+                if ($stationId > 0 && Schema::hasColumn('incidents', 'station_id')) {
+                    $query->where('station_id', $stationId);
+                }
+                if (! empty($teamIds)) {
+                    $method = $stationId > 0 && Schema::hasColumn('incidents', 'station_id') ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('team_id', $teamIds);
+                }
+            })
+            ->whereRaw("{$incidentDateExpression} BETWEEN ? AND ?", [$start, $end])
+            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
             ->get();
     }
 // public function exploreRecommendation(Request $request)

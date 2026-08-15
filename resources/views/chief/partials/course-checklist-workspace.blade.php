@@ -1,0 +1,174 @@
+<div id="checklistWorkspace" class="checklist-workspace">
+    <section class="checklist-metrics" aria-label="Checklist summary">
+        @foreach ([
+            ['icon' => 'fa-list-check', 'label' => 'All Plans', 'value' => $summary['total'], 'tone' => 'orange'],
+            ['icon' => 'fa-spinner', 'label' => 'Open', 'value' => $summary['open'], 'tone' => 'amber'],
+            ['icon' => 'fa-paper-plane', 'label' => 'Submitted', 'value' => $summary['submitted'], 'tone' => 'blue'],
+            ['icon' => 'fa-circle-check', 'label' => 'Confirmed', 'value' => $summary['confirmed'], 'tone' => 'green'],
+        ] as $metric)
+            <article class="checklist-metric checklist-metric--{{ $metric['tone'] }}">
+                <span class="checklist-metric__icon"><i class="fa-solid {{ $metric['icon'] }}"></i></span>
+                <span><small>{{ $metric['label'] }}</small><strong>{{ $metric['value'] }}</strong></span>
+            </article>
+        @endforeach
+    </section>
+
+    <section class="checklist-register">
+        <div class="checklist-register__head">
+            <div>
+                <span class="checklist-eyebrow"><i class="fa-solid fa-table-list"></i> Action register</span>
+                <h2>AI Action Plan Checklists</h2>
+                <p>Open a row to review its steps and record field progress.</p>
+            </div>
+            <span class="checklist-result-count"><i class="fa-solid fa-layer-group"></i> {{ $checklists->total() }} result(s)</span>
+        </div>
+
+        <form id="checklistFilters" method="GET" action="{{ route('station-admin.course-checklists') }}" class="checklist-filters">
+            <label class="checklist-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" name="q" value="{{ $filters['q'] }}" placeholder="Search plan or source" aria-label="Search checklists">
+            </label>
+            <select name="barangay_id" aria-label="Filter by barangay">
+                <option value="">All barangays</option>
+                @foreach ($barangays as $barangay)
+                    <option value="{{ $barangay->barangay_id }}" @selected((string) $filters['barangay_id'] === (string) $barangay->barangay_id)>{{ $barangay->barangay_name }}</option>
+                @endforeach
+            </select>
+            <select name="status" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                @foreach (['pending', 'in_progress', 'submitted', 'confirmed', 'rejected'] as $status)
+                    <option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst(str_replace('_', ' ', $status)) }}</option>
+                @endforeach
+            </select>
+            <select name="priority" aria-label="Filter by priority">
+                <option value="">All priorities</option>
+                @foreach (['critical', 'high', 'medium', 'low'] as $priority)
+                    <option value="{{ $priority }}" @selected($filters['priority'] === $priority)>{{ ucfirst($priority) }}</option>
+                @endforeach
+            </select>
+            <button type="submit" class="icon-button icon-button--primary" title="Apply filters" aria-label="Apply filters"><i class="fa-solid fa-filter"></i></button>
+            <button type="button" class="icon-button" data-checklist-reset title="Clear filters" aria-label="Clear filters"><i class="fa-solid fa-rotate-left"></i></button>
+        </form>
+
+        <div class="checklist-table-wrap">
+            <table class="checklist-table">
+                <thead>
+                    <tr>
+                        <th>Action plan</th>
+                        <th>Area</th>
+                        <th>Priority</th>
+                        <th>Progress</th>
+                        <th>Status</th>
+                        <th>Target</th>
+                        <th><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($checklists as $checklist)
+                        @php
+                            $progress = $checklist->checklist_progress;
+                            $status = strtolower($checklist->status ?? 'pending');
+                            $priority = strtolower($checklist->priority_level ?? 'medium');
+                            $mitigation = $checklist->mitigationActions->sortByDesc('mitigation_action_id')->first();
+                            $mitigationUrl = $mitigation
+                                ? route('station-admin.mitigations', ['mitigation_action_id' => $mitigation->mitigation_action_id]) . '#mitigation-row-' . $mitigation->mitigation_action_id
+                                : route('station-admin.mitigations', [
+                                    'draft_ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                                    'analysis_id' => $checklist->analysis_id,
+                                ]);
+                        @endphp
+                        <tr data-checklist-row="{{ $checklist->ai_action_plan_checklist_id }}">
+                            <td data-label="Action plan">
+                                <div class="plan-cell">
+                                    <span class="plan-cell__icon"><i class="fa-solid fa-clipboard-check"></i></span>
+                                    <span><strong>{{ $checklist->plan_title ?: $checklist->source_title ?: 'Untitled action plan' }}</strong><small>#{{ $checklist->ai_action_plan_checklist_id }} · {{ optional($checklist->created_at)->format('M d, Y') }}</small></span>
+                                </div>
+                            </td>
+                            <td data-label="Area"><span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span></td>
+                            <td data-label="Priority"><span class="priority-pill priority-pill--{{ $priority }}"><i class="fa-solid fa-flag"></i> {{ ucfirst($priority) }}</span></td>
+                            <td data-label="Progress">
+                                <div class="table-progress"><span><i style="width:{{ $progress['percent'] }}%"></i></span><small>{{ $progress['followed'] }}/{{ $progress['total'] }} · {{ $progress['percent'] }}%</small></div>
+                            </td>
+                            <td data-label="Status"><span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span></td>
+                            <td data-label="Target"><span class="target-date"><i class="fa-regular fa-calendar"></i> {{ $checklist->target_date?->format('M d') ?? 'None' }}</span></td>
+                            <td data-label="Actions">
+                                <div class="table-actions">
+                                    <button type="button" class="icon-button icon-button--primary" data-open-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Review checklist" aria-label="Review {{ $checklist->plan_title }}"><i class="fa-solid fa-eye"></i></button>
+                                    <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create mitigation draft' }}" aria-label="Open mitigation"><i class="fa-solid fa-shield-halved"></i></a>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <template id="checklistDetail-{{ $checklist->ai_action_plan_checklist_id }}">
+                            <div class="modal-plan-summary">
+                                <div class="modal-plan-summary__icon"><i class="fa-solid fa-list-check"></i></div>
+                                <div>
+                                    <div class="modal-badges">
+                                        <span class="priority-pill priority-pill--{{ $priority }}"><i class="fa-solid fa-flag"></i> {{ ucfirst($priority) }}</span>
+                                        <span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span>
+                                        <span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span>
+                                    </div>
+                                    <h3>{{ $checklist->plan_title ?: 'Action Plan Checklist' }}</h3>
+                                    <p>{{ $checklist->plan_description ?: $checklist->source_description ?: 'No additional plan description was provided.' }}</p>
+                                    @if ($checklist->success_indicator)
+                                        <div class="modal-success"><i class="fa-solid fa-bullseye"></i><span><strong>Completion indicator:</strong> {{ $checklist->success_indicator }}</span></div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="modal-progress-card">
+                                <div><span>Field progress</span><strong>{{ $progress['followed'] }} of {{ $progress['total'] }} steps followed</strong></div>
+                                <div class="modal-progress-card__bar"><span style="width:{{ $progress['percent'] }}%"></span></div>
+                            </div>
+
+                            <section class="modal-section">
+                                <div class="modal-section__head"><h4><i class="fa-solid fa-shoe-prints"></i> Checklist steps</h4><span>{{ $progress['pending'] }} pending</span></div>
+                                <div class="modal-steps">
+                                    @forelse ($checklist->items as $item)
+                                        <article class="modal-step modal-step--{{ $item->status }}">
+                                            <span class="modal-step__number">{{ $item->item_order }}</span>
+                                            <div class="modal-step__copy">
+                                                <strong>{{ $item->item_text }}</strong>
+                                                <small><i class="fa-solid fa-circle-info"></i> {{ ucfirst(str_replace('_', ' ', $item->status)) }}@if($item->reviewer) · {{ trim(($item->reviewer->first_name ?? '') . ' ' . ($item->reviewer->last_name ?? '')) }}@endif</small>
+                                            </div>
+                                            <div class="modal-step__actions">
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="followed" class="step-icon step-icon--done" title="Mark followed" aria-label="Mark step {{ $item->item_order }} followed"><i class="fa-solid fa-check"></i></button>
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="not_followed" class="step-icon step-icon--missed" title="Mark not followed" aria-label="Mark step {{ $item->item_order }} not followed"><i class="fa-solid fa-xmark"></i></button>
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="pending" class="step-icon" title="Reset step" aria-label="Reset step {{ $item->item_order }}"><i class="fa-solid fa-rotate-left"></i></button>
+                                            </div>
+                                        </article>
+                                    @empty
+                                        <div class="modal-empty"><i class="fa-regular fa-square-check"></i><span>No individual steps were saved for this plan.</span></div>
+                                    @endforelse
+                                </div>
+                            </section>
+
+                            <section class="modal-section modal-review">
+                                <div class="modal-section__head"><h4><i class="fa-solid fa-pen-to-square"></i> Chief review</h4><span>{{ $checklist->source_title ?: 'AI recommendation' }}</span></div>
+                                <label for="notes-{{ $checklist->ai_action_plan_checklist_id }}">Review notes</label>
+                                <textarea id="notes-{{ $checklist->ai_action_plan_checklist_id }}" rows="3" placeholder="Add concise verification notes...">{{ $checklist->confirmation_notes }}</textarea>
+                                <div class="modal-review__actions">
+                                    <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="in_progress" class="action-button action-button--progress"><i class="fa-solid fa-spinner"></i><span>In progress</span></button>
+                                    <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="submitted" class="action-button action-button--submitted"><i class="fa-solid fa-paper-plane"></i><span>Submitted</span></button>
+                                    <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="confirmed" class="action-button action-button--confirmed"><i class="fa-solid fa-circle-check"></i><span>Confirm</span></button>
+                                    <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="rejected" class="action-button action-button--rejected"><i class="fa-solid fa-ban"></i><span>Reject</span></button>
+                                </div>
+                            </section>
+
+                            <div class="modal-links">
+                                <a href="{{ route('station-admin.analytics') }}"><i class="fa-solid fa-chart-line"></i><span>Forecast source</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                <a href="{{ $mitigationUrl }}"><i class="fa-solid fa-shield-halved"></i><span>{{ $mitigation ? 'Linked mitigation (' . $checklist->mitigation_actions_count . ')' : 'Create mitigation draft' }}</span><i class="fa-solid fa-arrow-right"></i></a>
+                            </div>
+                        </template>
+                    @empty
+                        <tr><td colspan="7"><div class="checklist-empty"><i class="fa-regular fa-folder-open"></i><strong>No checklist records found</strong><span>Clear the filters or run a forecast analysis to generate action plans.</span></div></td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if ($checklists->hasPages())
+            <div class="checklist-pagination">{{ $checklists->onEachSide(1)->links() }}</div>
+        @endif
+    </section>
+</div>

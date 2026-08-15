@@ -15,6 +15,7 @@ use App\Models\Team;
 
 use App\Models\User;
 use App\Support\IncidentContextDispatcher;
+use App\Support\IncidentOccurrenceSynchronizer;
 use App\Models\Role;
 use App\Models\Province;
 use App\Models\SpotInvestigationReport;
@@ -25,6 +26,8 @@ use App\Models\Barangay;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Pagination\LengthAwarePaginator;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
 
@@ -124,7 +127,7 @@ class ManagementController extends Controller
                     ];
                 })->values();
 
-            $reports = $this->buildStationReports($stationOfficerIds->all());
+            $reports = $this->buildStationReports(null, $stationOfficerIds->all(), $stationTeamIds, $stationOfficerUserIds->all());
             $roles = Role::where('role', '!=', 'anonymous')->orderBy('role')->get();
             $managedBarangays = Barangay::with('city')->orderBy('barangay_name')->get();
             $totalIncidents = $incidents;
@@ -158,9 +161,9 @@ class ManagementController extends Controller
             ->get();
         $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter();
         $stationOfficerUserIds = $stationOfficers->pluck('user_id')->filter();
-        $stationTeamIds = Team::whereIn('team_leader', $stationOfficerUserIds)->pluck('team_id')->all();
+        $stationTeamIds = $this->stationTeamIds((int) $stationExact, $stationOfficerIds->all());
 
-        $incidents = $this->buildStationIncidentQuery($stationTeamIds, $stationOfficerUserIds->all())
+        $incidents = $this->buildStationIncidentQuery((int) $stationExact, $stationTeamIds, $stationOfficerUserIds->all())
             ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay'])
             ->get();
 
@@ -213,7 +216,7 @@ class ManagementController extends Controller
                 ];
             })->values();
 
-        $reports = $this->buildStationReports($stationOfficerIds->all());
+        $reports = $this->buildStationReports((int) $stationExact, $stationOfficerIds->all(), $stationTeamIds, $stationOfficerUserIds->all());
   
         $roles = Role::where('role', '!=', 'anonymous')
             ->orderBy('role')
@@ -374,9 +377,9 @@ public function getIncidents(Request $request)
             ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay']);
 
         if ($request->has('search') && $request->search) {
-            $search = $request->search;
+            $search = mb_substr(trim((string) $request->search), 0, 100);
             $query->where(function($q) use ($search) {
-                $q->where('incident_id', 'LIKE', "%{$search}%")
+                $q->whereRaw('CAST(incident_id AS TEXT) ILIKE ?', ["%{$search}%"])
                   ->orWhereHas('reporter', function ($reporterQuery) use ($search) {
                       $reporterQuery->where('first_name', 'LIKE', "%{$search}%")
                           ->orWhere('last_name', 'LIKE', "%{$search}%");
@@ -416,18 +419,22 @@ public function getIncidents(Request $request)
                     $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
                     break;
                 case 'month':
-                    $query->whereMonth('created_at', Carbon::now()->month);
+                    $query->whereYear('created_at', Carbon::now()->year)
+                        ->whereMonth('created_at', Carbon::now()->month);
                     break;
             }
         }
 
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $sortBy = in_array($request->get('sort_by'), ['created_at', 'incident_id', 'incident_status_id'], true)
+            ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
+        $incidents = $query->paginate($this->perPage($request));
 
         return response()->json([
             'success' => true,
-            'data' => $query->get(),
+            'data' => $incidents->items(),
+            'pagination' => $this->paginationMeta($incidents),
             'user_team_ids' => Team::query()->pluck('team_id')->all(),
         ]);
     }
@@ -442,22 +449,20 @@ public function getIncidents(Request $request)
         ]);
     }
 
-    $stationUserIds = StationOfficer::where('station_id', $stationOfficer?->station_id)
-        ->pluck('user_id')
-        ->filter()
-        ->toArray();
-    $stationTeamIds = Team::whereIn('team_leader', $stationUserIds)
-        ->pluck('team_id')
-        ->toArray();
+    $stationOfficers = StationOfficer::where('station_id', $stationOfficer->station_id)
+        ->get(['station_officer_id', 'user_id']);
+    $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter()->all();
+    $stationUserIds = $stationOfficers->pluck('user_id')->filter()->all();
+    $stationTeamIds = $this->stationTeamIds((int) $stationOfficer->station_id, $stationOfficerIds);
 
-    $query = $this->buildStationIncidentQuery($stationTeamIds, $stationUserIds)
-        ->with(['marker', 'reporter', 'historicalRecords.barangay']);
+    $query = $this->buildStationIncidentQuery((int) $stationOfficer->station_id, $stationTeamIds, $stationUserIds)
+        ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay']);
     
     // Apply search filter
     if ($request->has('search') && $request->search) {
-        $search = $request->search;
+        $search = mb_substr(trim((string) $request->search), 0, 100);
         $query->where(function($q) use ($search) {
-            $q->where('incident_id', 'LIKE', "%{$search}%")
+            $q->whereRaw('CAST(incident_id AS TEXT) ILIKE ?', ["%{$search}%"])
               ->orWhereHas('reporter', function ($reporterQuery) use ($search) {
                   $reporterQuery->where('first_name', 'LIKE', "%{$search}%")
                       ->orWhere('last_name', 'LIKE', "%{$search}%");
@@ -500,21 +505,23 @@ public function getIncidents(Request $request)
                 $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
                 break;
             case 'month':
-                $query->whereMonth('created_at', Carbon::now()->month);
+                $query->whereYear('created_at', Carbon::now()->year)
+                    ->whereMonth('created_at', Carbon::now()->month);
                 break;
         }
     }
     
     // Apply sorting
-    $sortBy = $request->get('sort_by', 'created_at');
-    $sortOrder = $request->get('sort_order', 'desc');
+    $sortBy = in_array($request->get('sort_by'), ['created_at', 'incident_id', 'incident_status_id'], true)
+        ? $request->get('sort_by') : 'created_at';
+    $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
     $query->orderBy($sortBy, $sortOrder);
-    
-    $incidents = $query->get();
+    $incidents = $query->paginate($this->perPage($request));
     
     return response()->json([
         'success' => true,
-        'data' => $incidents,
+        'data' => $incidents->items(),
+        'pagination' => $this->paginationMeta($incidents),
         'user_team_ids' => $stationTeamIds
     ]);
 }
@@ -812,23 +819,42 @@ public function storeIncident(Request $request)
     }
 }
 
-protected function buildStationIncidentQuery(array $stationTeamIds, array $stationUserIds)
+protected function buildStationIncidentQuery(int $stationId, array $stationTeamIds, array $stationUserIds)
 {
-    return Incident::query()->where(function ($query) use ($stationTeamIds, $stationUserIds) {
-        if (empty($stationTeamIds) && empty($stationUserIds)) {
-            $query->whereRaw('1 = 0');
-            return;
-        }
+    $barangayIds = $this->getManagedBarangays($stationId)->pluck('barangay_id')->all();
 
-        if (! empty($stationTeamIds)) {
-            $query->whereIn('team_id', $stationTeamIds);
-        }
-
-        if (! empty($stationUserIds)) {
-            $method = empty($stationTeamIds) ? 'whereIn' : 'orWhereIn';
-            $query->{$method}('reported_by', $stationUserIds);
-        }
+    return Incident::query()->where(function ($query) use ($stationId, $stationTeamIds, $stationUserIds, $barangayIds) {
+        $query->where('station_id', $stationId)
+            ->orWhere(function ($legacy) use ($stationTeamIds, $stationUserIds, $barangayIds) {
+                $legacy->whereNull('station_id')->where(function ($fallback) use ($stationTeamIds, $stationUserIds, $barangayIds) {
+                    $hasFallback = false;
+                    foreach ([['team_id', $stationTeamIds], ['reported_by', $stationUserIds], ['barangay_id', $barangayIds]] as [$column, $ids]) {
+                        if (! empty($ids)) {
+                            $hasFallback ? $fallback->orWhereIn($column, $ids) : $fallback->whereIn($column, $ids);
+                            $hasFallback = true;
+                        }
+                    }
+                    if (! $hasFallback) $fallback->whereRaw('1 = 0');
+                });
+            });
     });
+}
+
+protected function stationTeamIds(int $stationId, array $stationOfficerIds): array
+{
+    return Team::query()
+        ->where(function ($query) use ($stationId, $stationOfficerIds) {
+            $query->where('station_id', $stationId);
+
+            foreach (['team_leader', 'commander_driver', 'pumper', 'firefighter_officer_1', 'firefighter_officer_2', 'firefighter_officer_3', 'rescue_radio'] as $column) {
+                if (! empty($stationOfficerIds)) {
+                    $query->orWhereIn($column, $stationOfficerIds);
+                }
+            }
+        })
+        ->pluck('team_id')
+        ->map(fn ($id) => (int) $id)
+        ->all();
 }
 
 protected function getManagedBarangays(?int $stationId)
@@ -916,7 +942,12 @@ protected function storeHistoricalFireIncident(Request $request)
             'reported_by' => $stationOfficer->user_id,
             'barangay_id' => (int) $validated['barangay_id'],
         ]);
-        $incident->created_at = Carbon::parse($incidentTimestamp);
+        IncidentOccurrenceSynchronizer::verify(
+            $incident,
+            Carbon::parse($incidentTimestamp),
+            'historical_bfp_record',
+            Auth::user()?->user_id
+        );
         $incident->incident_status_id = 4;
         $incident->save();
 
@@ -986,20 +1017,19 @@ protected function storeHistoricalFireIncident(Request $request)
         }
         
         // Apply status filter (active/inactive based on status_id)
-        if ($request->has('status') && $request->status) {
-            $statusMap = [
-                'active' => 1,
-                'inactive' => 0
-            ];
-            $statusId = $statusMap[$request->status] ?? null;
-            if ($statusId !== null) {
+        if ($request->filled('status')) {
+            if (in_array($request->status, ['active', 'inactive'], true)) {
+                $statusId = $request->status === 'active' ? 1 : 0;
                 $query->whereHas('user', function ($userQuery) use ($statusId) {
                     $userQuery->where('status_id', $statusId);
                 });
+            } else {
+                $query->where('status', mb_substr(trim((string) $request->status), 0, 30));
             }
         }
 
-        $personnel = $query->get()->map(function ($officer) {
+        $paginator = $query->orderBy('station_officer_id')->paginate($this->perPage($request));
+        $personnel = collect($paginator->items())->map(function ($officer) {
             $resolvedStatus = (int) ($officer->user?->status_id ?? 0) === 1 ? 'active' : 'inactive';
 
             return [
@@ -1011,21 +1041,19 @@ protected function storeHistoricalFireIncident(Request $request)
                 'account_code' => $officer->user?->account_code,
                 'contact_number' => $officer->user?->contact_number,
                 'status_id' => $officer->user?->status_id,
-                'status' => $resolvedStatus,
+                'status' => strtolower((string) ($officer->status ?: $resolvedStatus)),
                 'rank' => $officer->rank,
                 'role' => $officer->user?->role ? [
                     'role_id' => $officer->user->role->role_id,
                     'role' => $officer->user->role->role,
                 ] : null,
             ];
-        })->sortBy([
-            ['first_name', 'asc'],
-            ['last_name', 'asc'],
-        ])->values();
+        })->values();
 
         return response()->json([
             'success' => true,
-            'data' => $personnel
+            'data' => $personnel,
+            'pagination' => $this->paginationMeta($paginator),
         ]);
     }
 
@@ -1077,7 +1105,8 @@ protected function storeHistoricalFireIncident(Request $request)
             });
         }
 
-        $equipment = $query->get()->map(function ($assignment) {
+        $paginator = $query->orderBy('equipment_station_id')->paginate($this->perPage($request));
+        $equipment = collect($paginator->items())->map(function ($assignment) {
             return [
                 'equipment_station_id' => $assignment->equipment_station_id,
                 'equipment_id' => $assignment->equipment_id,
@@ -1094,11 +1123,12 @@ protected function storeHistoricalFireIncident(Request $request)
                 'maintenance_quantity' => (int) ($assignment->maintenance_quantity ?? 0),
                 'status' => $this->deriveEquipmentAvailabilityStatus($assignment),
             ];
-        })->sortBy('equipment_name')->values();
+        })->values();
 
         return response()->json([
             'success' => true,
-            'data' => $equipment
+            'data' => $equipment,
+            'pagination' => $this->paginationMeta($paginator),
         ]);
     }
 
@@ -1106,7 +1136,7 @@ protected function storeHistoricalFireIncident(Request $request)
     {
         $stationOfficer = $this->currentStationOfficer();
 
-        if (! $stationOfficer?->station_id) {
+        if (! $this->isProvincialAdmin() && ! $stationOfficer?->station_id) {
             return response()->json([
                 'success' => true,
                 'data' => [],
@@ -1114,12 +1144,18 @@ protected function storeHistoricalFireIncident(Request $request)
             ]);
         }
 
-        $stationOfficerIds = StationOfficer::where('station_id', $stationOfficer?->station_id)
-            ->pluck('station_officer_id')
-            ->filter()
-            ->all();
+        $stationId = $this->isProvincialAdmin() ? null : (int) $stationOfficer->station_id;
+        $officers = StationOfficer::query()
+            ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+            ->get(['station_officer_id', 'user_id']);
+        $stationOfficerIds = $officers->pluck('station_officer_id')->filter()->all();
+        $stationUserIds = $officers->pluck('user_id')->filter()->all();
+        $stationTeamIds = $stationId ? $this->stationTeamIds($stationId, $stationOfficerIds) : Team::pluck('team_id')->all();
 
-        $reports = collect($this->buildStationReports($stationOfficerIds));
+        $cacheKey = 'management:reports:' . ($stationId ?: 'all');
+        $reports = Cache::remember($cacheKey, now()->addSeconds(30), fn () =>
+            $this->buildStationReports($stationId, $stationOfficerIds, $stationTeamIds, $stationUserIds)
+        );
 
         if ($request->filled('search')) {
             $search = strtolower($request->search);
@@ -1132,16 +1168,45 @@ protected function storeHistoricalFireIncident(Request $request)
             $reports = $reports->where('report_kind', $request->status);
         }
 
+        $reports = $reports->values();
+        $paginator = new LengthAwarePaginator(
+            $reports->forPage(max(1, $request->integer('page', 1)), $this->perPage($request))->values(),
+            $reports->count(),
+            $this->perPage($request),
+            max(1, $request->integer('page', 1))
+        );
+
         return response()->json([
             'success' => true,
-            'data' => $reports->values(),
+            'data' => $paginator->items(),
+            'pagination' => $this->paginationMeta($paginator),
         ]);
     }
 
-    private function buildStationReports(array $stationOfficerIds)
+    private function buildStationReports(?int $stationId, array $stationOfficerIds, array $stationTeamIds = [], array $stationUserIds = [])
     {
+        $barangayIds = $stationId ? $this->getManagedBarangays($stationId)->pluck('barangay_id')->all() : [];
+        $scopeIncident = function ($query) use ($stationId, $stationTeamIds, $stationUserIds, $barangayIds) {
+            $query->where('station_id', $stationId)
+                ->orWhere(function ($legacy) use ($stationTeamIds, $stationUserIds, $barangayIds) {
+                    $legacy->whereNull('station_id')->where(function ($fallback) use ($stationTeamIds, $stationUserIds, $barangayIds) {
+                        $hasFallback = false;
+                        foreach ([['team_id', $stationTeamIds], ['reported_by', $stationUserIds], ['barangay_id', $barangayIds]] as [$column, $ids]) {
+                            if ($ids) {
+                                $hasFallback ? $fallback->orWhereIn($column, $ids) : $fallback->whereIn($column, $ids);
+                                $hasFallback = true;
+                            }
+                        }
+                        if (! $hasFallback) $fallback->whereRaw('1 = 0');
+                    });
+                });
+        };
+
         $spotReports = SpotInvestigationReport::with(['incident.marker', 'incident.reporter', 'investigator.user', 'progressInvestigation.finalInvestigation'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
+                $scope->whereIn('station_officer_id', $stationOfficerIds)
+                    ->orWhereHas('incident', $scopeIncident);
+            }))
             ->get()
             ->map(function ($report) {
                 return [
@@ -1161,7 +1226,10 @@ protected function storeHistoricalFireIncident(Request $request)
             });
 
         $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'fireOrigin', 'finalInvestigation'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
+                $scope->whereIn('station_officer_id', $stationOfficerIds)
+                    ->orWhereHas('spotInvestigation.incident', $scopeIncident);
+            }))
             ->get()
             ->map(function ($report) {
                 return [
@@ -1181,7 +1249,10 @@ protected function storeHistoricalFireIncident(Request $request)
             });
 
         $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.investigator.user'])
-            ->whereIn('station_officer_id', $stationOfficerIds)
+            ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
+                $scope->whereIn('station_officer_id', $stationOfficerIds)
+                    ->orWhereHas('progressInvestigation.spotInvestigation.incident', $scopeIncident);
+            }))
             ->get()
             ->map(function ($report) {
                 $investigator = $report->progressInvestigation?->investigator?->user;
@@ -1223,6 +1294,23 @@ protected function storeHistoricalFireIncident(Request $request)
         }
 
         return 'in-use';
+    }
+
+    private function perPage(Request $request): int
+    {
+        return max(5, min(50, $request->integer('per_page', 10)));
+    }
+
+    private function paginationMeta(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => max(1, $paginator->lastPage()),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'from' => $paginator->firstItem(),
+            'to' => $paginator->lastItem(),
+        ];
     }
 
     /**
@@ -1433,8 +1521,13 @@ protected function storeHistoricalFireIncident(Request $request)
                 $incidentDate = $validated['incident_date'] ?? optional($historical->incident_date)->toDateString() ?? optional($incident->created_at)->toDateString();
                 $incidentTime = array_key_exists('incident_time', $validated)
                     ? ($validated['incident_time'] ?: '00:00')
-                    : (optional($historical->incident_time)->format('H:i') ?: optional($incident->created_at)->format('H:i') ?: '00:00');
-                $incident->created_at = Carbon::parse(trim($incidentDate . ' ' . $incidentTime));
+                    : (optional($historical->incident_time)->format('H:i') ?: optional($incident->occurred_at)->format('H:i') ?: '00:00');
+                IncidentOccurrenceSynchronizer::verify(
+                    $incident,
+                    Carbon::parse(trim($incidentDate . ' ' . $incidentTime)),
+                    'historical_bfp_record',
+                    Auth::user()?->user_id
+                );
             }
 
             $incident->status = 'Resolved';

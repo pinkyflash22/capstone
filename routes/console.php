@@ -2,13 +2,104 @@
 
 use App\Models\HistoricalFireIncident;
 use App\Models\Incident;
+use App\Jobs\SyncBarangayBoundaryJob;
 use App\Services\PredictionFeedbackSignalService;
+use App\Services\StationBarangayCoverageService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Schedule;
+
+Artisan::command('coverage:sync-stations {--station=}', function (StationBarangayCoverageService $service) {
+    $stationId = $this->option('station');
+    $summary = $service->syncAll($stationId !== null && $stationId !== '' ? (int) $stationId : null);
+
+    $this->info("Synchronized {$summary['barangays']} barangay coverage row(s) for {$summary['stations']} station(s).");
+    foreach ($summary['unresolved'] as $item) {
+        $this->warn("Station {$item['station_id']} ({$item['station_name']}): {$item['reason']}");
+    }
+
+    return empty($summary['unresolved']) ? 0 : 1;
+})->purpose('Populate and refresh explicit station-to-barangay coverage from station locality.');
+
+Artisan::command('boundaries:sync-covered {--station=} {--limit=} {--force}', function () {
+    $stationId = $this->option('station');
+    $limit = max(1, (int) ($this->option('limit') ?: config('services.geoapify.boundary_sync_limit', 20)));
+    $force = (bool) $this->option('force');
+    $geometry = (string) config('services.geoapify.boundary_geometry', 'geometry_1000');
+
+    $candidates = DB::table('station_barangay_coverage')
+        ->join('barangay_halls', 'station_barangay_coverage.barangay_id', '=', 'barangay_halls.barangay_id')
+        ->join('markers', 'barangay_halls.marker_id', '=', 'markers.marker_id')
+        ->leftJoin('boundary_location', function ($join) {
+            $join->on('station_barangay_coverage.barangay_id', '=', 'boundary_location.barangay_id')
+                ->where('boundary_location.boundary_type', '=', 'barangay');
+        })
+        ->where('station_barangay_coverage.is_active', true)
+        ->whereNotNull('markers.lat')
+        ->whereNotNull('markers.lng')
+        ->when($stationId !== null && $stationId !== '', fn ($query) => $query->where('station_barangay_coverage.station_id', (int) $stationId))
+        ->when(! $force, fn ($query) => $query->whereNull('boundary_location.id'))
+        ->when(! $force, function ($query) {
+            $query->where(function ($retryQuery) {
+                $retryQuery->whereNull('station_barangay_coverage.boundary_sync_attempted_at')
+                    ->orWhere('station_barangay_coverage.boundary_sync_attempted_at', '<=', now()->subDays(7));
+            });
+        })
+        ->orderBy('station_barangay_coverage.station_id')
+        ->orderBy('station_barangay_coverage.barangay_id')
+        ->limit($limit)
+        ->get([
+            'station_barangay_coverage.station_id',
+            'station_barangay_coverage.barangay_id',
+        ])
+        ->unique('barangay_id')
+        ->values();
+
+    if ($candidates->isEmpty()) {
+        $this->info('No covered barangay boundaries need synchronization.');
+        return 0;
+    }
+
+    $queued = 0;
+    $failed = 0;
+    foreach ($candidates as $candidate) {
+        try {
+            $job = new SyncBarangayBoundaryJob(
+                (int) $candidate->barangay_id,
+                (int) $candidate->station_id,
+                $geometry,
+                $force,
+            );
+
+            if (config('queue.default') === 'sync') {
+                dispatch_sync($job);
+            } else {
+                dispatch($job);
+            }
+            $queued++;
+        } catch (\Throwable $exception) {
+            $failed++;
+            report($exception);
+            $this->warn("Barangay {$candidate->barangay_id} failed: {$exception->getMessage()}");
+        }
+    }
+
+    $verb = config('queue.default') === 'sync' ? 'processed' : 'queued';
+    $this->info(ucfirst($verb) . " {$queued} barangay boundary job(s); {$failed} failed.");
+    return $failed === 0 ? 0 : 1;
+})->purpose('Queue Geoapify polygon synchronization for covered barangays that lack boundaries.');
+
+Schedule::command('coverage:sync-stations')
+    ->dailyAt('01:30')
+    ->withoutOverlapping();
+
+Schedule::command('boundaries:sync-covered')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -660,8 +751,17 @@ Artisan::command('ai:train-forecast-model {--dataset=capstone-ai/station_baranga
 
     $this->info("Training forecast model using {$datasetPath}...");
     $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
+    $pythonEnvironment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
+    if (PHP_OS_FAMILY === 'Windows') {
+        foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
+            $value = getenv($name);
+            if (is_string($value) && $value !== '') $pythonEnvironment[$name] = $value;
+        }
+    }
     $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
     $trainProcess = Process::path(base_path())
+        ->env($pythonEnvironment)
         ->run([$pythonBinary, $trainingScript, $datasetPath]);
 
     if ($trainProcess->failed()) {
@@ -700,7 +800,16 @@ Artisan::command('ai:predict-barangay-risk {payload?} {--file=capstone-ai/sample
         : 'Running barangay risk prediction...');
 
     $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
+    $pythonEnvironment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
+    if (PHP_OS_FAMILY === 'Windows') {
+        foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
+            $value = getenv($name);
+            if (is_string($value) && $value !== '') $pythonEnvironment[$name] = $value;
+        }
+    }
     $predictProcess = Process::path(base_path())
+        ->env($pythonEnvironment)
         ->run([$pythonBinary, $script, $inputArgument]);
 
     if ($predictProcess->failed()) {

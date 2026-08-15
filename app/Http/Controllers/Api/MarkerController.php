@@ -14,11 +14,11 @@ class MarkerController extends Controller
     // GET markers
     public function index()
     {
-        $markers = Cache::remember('map:markers:index:v3_public', now()->addSeconds(20), function () {
-            return MarkerFeedBuilder::buildForViewer(null)->values()->all();
-        });
+        // Map status is operational state. Always read it from the database so a
+        // refresh cannot replay a stale status from Laravel's response cache.
+        $markers = MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all();
 
-        return response()->json($markers);
+        return response()->json($markers)->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     // SAVE marker
@@ -91,6 +91,22 @@ class MarkerController extends Controller
             'updated_at' => optional($latestMarker?->updated_at)->toISOString(),
             'count' => \App\Models\Marker::count(),
         ]);
+    }
+
+    public function latestForViewer()
+    {
+        $markers = MarkerFeedBuilder::buildForViewer(Auth::user());
+        $latestMarker = $markers
+            ->sortByDesc(fn (array $marker) => optional($marker['updated_at'] ?? null)->timestamp ?? 0)
+            ->first();
+
+        return response()->json([
+            'marker_id' => $latestMarker['marker_id'] ?? null,
+            'updated_at' => isset($latestMarker['updated_at'])
+                ? $latestMarker['updated_at']->toISOString()
+                : null,
+            'count' => $markers->count(),
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     //  public function image()

@@ -20,6 +20,7 @@ class Team extends Model
         'firefighter_officer_2',
         'firefighter_officer_3',
         'rescue_radio',
+        'station_id',
         'status'
     ];
 
@@ -60,14 +61,7 @@ class Team extends Model
 
     public function station()
     {
-        return $this->hasOneThrough(
-            Station::class,
-            StationOfficer::class,
-            'station_officer_id',
-            'station_id',
-            'team_leader',
-            'station_id'
-        );
+        return $this->belongsTo(Station::class, 'station_id', 'station_id');
     }
 
     public function getTeamNameAttribute()

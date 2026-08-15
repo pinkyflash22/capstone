@@ -1058,7 +1058,7 @@
             }).addTo(map);
 
             const [markersResponse, incidentsResponse] = await Promise.allSettled([
-                fetch('/api/markers', { headers: { Accept: 'application/json' } }),
+                fetch('/map/markers/feed', { headers: { Accept: 'application/json' } }),
                 fetch('/api/recent-incidents', { headers: { Accept: 'application/json' } }),
             ]);
 

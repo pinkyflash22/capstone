@@ -4,10 +4,8 @@
   "dataset_kind": "station_barangay_monthly",
   "target_column": "target_high_risk_barangay_month",
   "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
-  "records_used": 432,
+  "records_used": 960,
   "feature_columns": [
-    "station_id",
-    "barangay_id",
     "year",
     "average_temperature",
     "average_humidity",
@@ -47,7 +45,6 @@
     "humidity_signal",
     "wind_signal",
     "barangay_pressure_signal",
-    "barangay_name",
     "weather_condition",
     "season",
     "hazard_category",
@@ -65,49 +62,47 @@
   ],
   "global_feature_importance": [
     {
-      "feature": "materials",
-      "importance": 0.1487
-    },
-    {
-      "feature": "type_incident",
-      "importance": 0.1271
-    },
-    {
-      "feature": "occupancy",
-      "importance": 0.0984
-    },
-    {
-      "feature": "density",
-      "importance": 0.0888
-    },
-    {
-      "feature": "peak_hours",
-      "importance": 0.0776
-    },
-    {
-      "feature": "accesibility",
-      "importance": 0.074
-    },
-    {
       "feature": "barangay_pressure_signal",
-      "importance": 0.0734
+      "importance": 0.1334
     },
     {
-      "feature": "barangay_id",
-      "importance": 0.051
+      "feature": "condition_label",
+      "importance": 0.0935
     },
     {
-      "feature": "barangay_name",
-      "importance": 0.0391
+      "feature": "high_assessment_count",
+      "importance": 0.066
     },
     {
-      "feature": "temperature_signal",
-      "importance": 0.0389
+      "feature": "hazard_category_electrical_hazard",
+      "importance": 0.0641
+    },
+    {
+      "feature": "risk_area_pressure_signal",
+      "importance": 0.0562
+    },
+    {
+      "feature": "average_humidity",
+      "importance": 0.0509
+    },
+    {
+      "feature": "weather_condition",
+      "importance": 0.0498
+    },
+    {
+      "feature": "verified_hazard_count",
+      "importance": 0.049
+    },
+    {
+      "feature": "wind_signal",
+      "importance": 0.0461
+    },
+    {
+      "feature": "verified_risk_area_count",
+      "importance": 0.0426
     }
   ],
   "reference_profile": {
-    "station_id": 1.0,
-    "barangay_id": 257.0,
     "year": 2024.5,
     "average_temperature": 30.0,
     "average_humidity": 0.0,
@@ -147,7 +142,6 @@
     "humidity_signal": 0.0,
     "wind_signal": 0.0,
     "barangay_pressure_signal": 10.5,
-    "barangay_name": "Poblacion",
     "weather_condition": "unknown",
     "season": "dry",
     "hazard_category": "unknown",
@@ -164,69 +158,111 @@
     "occupancy": "mixed-use"
   },
   "metrics": {
-    "train_rows": 324,
-    "test_rows": 108,
-    "accuracy": 0.9722,
-    "roc_auc": 0.8889,
-    "precision": 0.0,
-    "recall": 0.0,
-    "f1_score": 0.0,
-    "brier_score": 0.024,
-    "cross_val_roc_auc_mean": 0.9369,
+    "train_rows": 720,
+    "test_rows": 240,
+    "accuracy": 0.9792,
+    "roc_auc": 0.9974,
+    "precision": 1.0,
+    "recall": 0.7826,
+    "f1_score": 0.878,
+    "brier_score": 0.0141,
+    "cross_val_roc_auc_mean": 0.9919,
     "cross_val_roc_auc_scores": [
-      0.881,
-      0.9683,
-      0.9583,
-      0.881,
-      0.996
+      0.9891,
+      1.0,
+      1.0,
+      0.9948,
+      0.9757
     ],
     "classification_report": {
       "0": {
-        "precision": 0.9722222222222222,
+        "precision": 0.9774774774774775,
         "recall": 1.0,
-        "f1-score": 0.9859154929577465,
-        "support": 105.0
+        "f1-score": 0.9886104783599089,
+        "support": 217.0
       },
       "1": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
-        "support": 3.0
+        "precision": 1.0,
+        "recall": 0.782608695652174,
+        "f1-score": 0.8780487804878049,
+        "support": 23.0
       },
-      "accuracy": 0.9722222222222222,
+      "accuracy": 0.9791666666666666,
       "macro avg": {
-        "precision": 0.4861111111111111,
-        "recall": 0.5,
-        "f1-score": 0.49295774647887325,
-        "support": 108.0
+        "precision": 0.9887387387387387,
+        "recall": 0.8913043478260869,
+        "f1-score": 0.9333296294238569,
+        "support": 240.0
       },
       "weighted avg": {
-        "precision": 0.945216049382716,
-        "recall": 0.9722222222222222,
-        "f1-score": 0.9585289514866979,
-        "support": 108.0
+        "precision": 0.9796358858858859,
+        "recall": 0.9791666666666666,
+        "f1-score": 0.9780149823138322,
+        "support": 240.0
       }
     },
     "regression_metrics": {
       "predicted_incident_count": {
         "target_column": "incident_count",
-        "train_rows": 324,
-        "test_rows": 108,
-        "mae": 0.0174,
-        "rmse": 0.0551,
-        "r2_score": 0.669
+        "train_rows": 720,
+        "test_rows": 240,
+        "mae": 0.0088,
+        "rmse": 0.0646,
+        "r2_score": 0.8704
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
-        "train_rows": 324,
-        "test_rows": 108,
-        "mae": 2393.5108,
-        "rmse": 22197.732,
-        "r2_score": 0.0
+        "train_rows": 720,
+        "test_rows": 240,
+        "mae": 1157.6528,
+        "rmse": 15947.1444,
+        "r2_score": -411.9666
       }
     }
   },
-  "trained_at": "2026-08-08T06:49:40.764507+00:00",
+  "calibration": {
+    "method": "sigmoid_cv",
+    "expected_calibration_error": 0.0211,
+    "mean_predicted_probability": 0.0941,
+    "observed_positive_rate": 0.0958,
+    "bins": [
+      {
+        "range": "(-0.001, 0.1]",
+        "count": 219,
+        "mean_probability": 0.0197,
+        "observed_rate": 0.0091
+      },
+      {
+        "range": "(0.2, 0.3]",
+        "count": 1,
+        "mean_probability": 0.2881,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "(0.3, 0.4]",
+        "count": 2,
+        "mean_probability": 0.3093,
+        "observed_rate": 1.0
+      },
+      {
+        "range": "(0.9, 1.0]",
+        "count": 18,
+        "mean_probability": 0.9636,
+        "observed_rate": 1.0
+      }
+    ]
+  },
+  "target_policy": {
+    "risk_level": "high, or medium with corroborating evidence",
+    "incident_count_threshold": 3,
+    "estimated_damage_threshold": 150000.0,
+    "identity_features_excluded": [
+      "station_id",
+      "barangay_id",
+      "barangay_name"
+    ]
+  },
+  "trained_at": "2026-08-15T12:52:55.814025+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

@@ -145,7 +145,7 @@ Route::prefix('/management')->group(function () {
     Route::put('/equipment/{id}', [ManagementController::class, 'updateEquipment']);
     Route::delete('/{type}/{id}', [ManagementController::class, 'destroy']);
 });
-Route::prefix('/managements')->group(function () {
+Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->prefix('/managements')->group(function () {
     Route::get('/incidents', [App\Http\Controllers\Chief\ManagementController::class, 'getIncidents']);
     Route::get('/reports', [App\Http\Controllers\Chief\ManagementController::class, 'getReports']);
     Route::get('/personnel', [App\Http\Controllers\Chief\ManagementController::class, 'getPersonnel']);

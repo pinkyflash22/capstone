@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\BoundaryUnavailableException;
 use App\Models\Barangay;
 use App\Models\BoundaryLocation;
 use App\Models\City;
@@ -179,47 +180,20 @@ class BoundaryLocationController extends Controller
             'geometry' => ['nullable', Rule::in(['geometry_1000', 'geometry_5000', 'geometry_10000'])],
         ]);
 
-        $barangay = Barangay::query()
-            ->with(['hall.marker', 'city'])
-            ->findOrFail($barangayId);
-
-        $marker = $barangay->hall?->marker;
-
-        if (! $marker || $marker->lat === null || $marker->lng === null) {
+        try {
+            $boundary = $geoapifyBoundaryService->syncBarangayBoundary(
+                $barangayId,
+                null,
+                Auth::id(),
+                (string) $request->input('geometry', config('services.geoapify.boundary_geometry', 'geometry_1000')),
+                true,
+            );
+        } catch (BoundaryUnavailableException $exception) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected barangay does not have a hall marker with coordinates yet.',
+                'message' => $exception->getMessage(),
             ], 422);
         }
-
-        $boundaryPayload = $geoapifyBoundaryService->importBarangayBoundary(
-            $barangay,
-            (float) $marker->lat,
-            (float) $marker->lng,
-            (string) $request->input('geometry', 'geometry_1000')
-        );
-
-        $feature = $boundaryPayload['feature'];
-        $properties = (array) ($feature['properties'] ?? []);
-
-        $boundary = BoundaryLocation::query()->updateOrCreate(
-            [
-                'barangay_id' => $barangay->barangay_id,
-                'boundary_type' => 'barangay',
-            ],
-            [
-                'name' => $barangay->barangay_name,
-                'station_id' => null,
-                'geojson' => $boundaryPayload['feature_collection'],
-                'source' => 'geoapify',
-                'external_place_id' => $properties['place_id'] ?? $properties['id'] ?? null,
-                'properties' => [
-                    'geoapify_feature' => $properties,
-                    'imported_at' => now()->toISOString(),
-                    'imported_by' => Auth::id(),
-                ],
-            ]
-        );
 
         return response()->json([
             'success' => true,

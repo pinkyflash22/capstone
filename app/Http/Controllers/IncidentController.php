@@ -549,6 +549,7 @@ class IncidentController extends Controller
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string|max:1000',
             'status' => 'nullable|in:reported,en-route,on-scene,controlled,closed,completed,Reported,Responding,On Scene,Controlled,Closed',
+            'occurred_at' => 'nullable|date',
             'station_id' => 'nullable|exists:stations,station_id',
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
@@ -600,22 +601,28 @@ class IncidentController extends Controller
                 $resolvedLng = $existingMarker?->lng;
             }
 
-            if ($this->supportsBarangayResolution() && $resolvedLat !== null && $resolvedLng !== null) {
-                $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
-                    (float) $resolvedLat,
-                    (float) $resolvedLng
-                );
+            if ($this->supportsBarangayResolution()) {
+                $validated['barangay_id'] = null;
+                $validated['barangay_resolution_status'] = 'pending';
+                $validated['barangay_resolution_source'] = null;
+                $validated['barangay_resolved_at'] = null;
 
-                if ($matchedBoundary?->barangay_id) {
-                    $validated['barangay_id'] = (int) $matchedBoundary->barangay_id;
-                    $validated['barangay_resolution_status'] = 'matched';
-                    $validated['barangay_resolution_source'] = $matchedBoundary->source ?: 'boundary-location';
-                    $validated['barangay_resolved_at'] = now();
-                } else {
-                    $validated['barangay_id'] = null;
-                    $validated['barangay_resolution_status'] = 'unmatched';
-                    $validated['barangay_resolution_source'] = 'boundary-location';
-                    $validated['barangay_resolved_at'] = now();
+                if ($resolvedLat !== null && $resolvedLng !== null) {
+                    $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
+                        (float) $resolvedLat,
+                        (float) $resolvedLng
+                    );
+
+                    if ($matchedBoundary?->barangay_id) {
+                        $validated['barangay_id'] = (int) $matchedBoundary->barangay_id;
+                        $validated['barangay_resolution_status'] = 'matched';
+                        $validated['barangay_resolution_source'] = $matchedBoundary->source ?: 'boundary-location';
+                        $validated['barangay_resolved_at'] = now();
+                    } else {
+                        $validated['barangay_resolution_status'] = 'unmatched';
+                        $validated['barangay_resolution_source'] = 'boundary-location';
+                        $validated['barangay_resolved_at'] = now();
+                    }
                 }
             }
 
@@ -648,12 +655,6 @@ class IncidentController extends Controller
             $validated['status'] = empty($validated['status'])
                 ? self::STATUS_DB_REPORTED
                 : $this->resolveDatabaseStatusName($validated['status']);
-
-            if ($this->supportsBarangayResolution()) {
-                $validated['barangay_resolution_status'] = 'pending';
-                $validated['barangay_resolution_source'] = null;
-                $validated['barangay_resolved_at'] = null;
-            }
 
             $incident = Incident::create($validated);
 

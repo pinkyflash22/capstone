@@ -26,6 +26,11 @@ class Incident extends Model
     protected $fillable = [
         'marker_id',
         'status',
+        'occurred_at',
+        'occurred_at_source',
+        'occurred_at_verified_at',
+        'occurred_at_verified_by',
+        'incident_completed_at',
         'station_id',
         'team_id',
         'reported_by',
@@ -37,7 +42,25 @@ class Incident extends Model
 
     protected $casts = [
         'barangay_resolved_at' => 'datetime',
+        'occurred_at' => 'datetime',
+        'occurred_at_verified_at' => 'datetime',
+        'incident_completed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $incident) {
+            if (! $incident->occurred_at) {
+                $incident->occurred_at = $incident->created_at ?: now();
+                $incident->occurred_at_source = $incident->occurred_at_source ?: 'report_time_fallback';
+            }
+
+            if (in_array(strtolower((string) $incident->status), ['closed', 'completed'], true)
+                && ! $incident->incident_completed_at) {
+                $incident->incident_completed_at = now();
+            }
+        });
+    }
 
     public function marker()
     {

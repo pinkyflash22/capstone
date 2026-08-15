@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class AiActionPlanChecklist extends Model
 {
@@ -34,6 +35,10 @@ class AiActionPlanChecklist extends Model
         'confirmation_notes',
         'ai_payload',
         'is_ai_generated',
+        'analysis_revision',
+        'is_superseded',
+        'requires_revision_review',
+        'superseded_at',
     ];
 
     protected function casts(): array
@@ -44,7 +49,18 @@ class AiActionPlanChecklist extends Model
             'target_date' => 'date',
             'confirmed_at' => 'datetime',
             'is_ai_generated' => 'boolean',
+            'analysis_revision' => 'integer',
+            'is_superseded' => 'boolean',
+            'requires_revision_review' => 'boolean',
+            'superseded_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('current_revision', function (Builder $builder) {
+            $builder->where($builder->getModel()->qualifyColumn('is_superseded'), false);
+        });
     }
 
     public function analysis()

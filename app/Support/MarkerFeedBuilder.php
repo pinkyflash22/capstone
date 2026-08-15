@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\Marker;
+use App\Models\StationBarangayCoverage;
+use App\Models\StationOfficer;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -10,6 +12,7 @@ class MarkerFeedBuilder
 {
     public static function buildForViewer(?User $viewer = null): Collection
     {
+        $visibility = static::visibilityContext($viewer);
         $markers = Marker::with([
             'stations.address.barangay.city',
             'stations.stationOfficers.user.role',
@@ -22,16 +25,16 @@ class MarkerFeedBuilder
         ])->get();
 
         return $markers
-            ->map(fn (Marker $marker) => static::serializeMarker($marker, $viewer))
+            ->map(fn (Marker $marker) => static::serializeMarker($marker, $viewer, $visibility))
             ->filter()
             ->values();
     }
 
-    protected static function serializeMarker(Marker $marker, ?User $viewer = null): ?array
+    protected static function serializeMarker(Marker $marker, ?User $viewer = null, array $visibility = []): ?array
     {
         $riskArea = static::resolveCurrentRiskArea($marker);
 
-        if (! static::markerIsVisible($marker, $riskArea, $viewer)) {
+        if (! static::markerIsVisible($marker, $riskArea, $viewer, $visibility)) {
             return null;
         }
 
@@ -97,7 +100,10 @@ class MarkerFeedBuilder
                     ->all(),
             ] : null,
             'created_at' => $marker->created_at,
-            'updated_at' => $marker->updated_at,
+            'updated_at' => collect([$marker->updated_at, $riskArea?->updated_at])
+                ->filter()
+                ->sortByDesc(fn ($date) => $date->timestamp)
+                ->first(),
         ];
     }
 
@@ -114,7 +120,7 @@ class MarkerFeedBuilder
             ->first();
     }
 
-    protected static function markerIsVisible(Marker $marker, $riskArea, ?User $viewer = null): bool
+    protected static function markerIsVisible(Marker $marker, $riskArea, ?User $viewer = null, array $visibility = []): bool
     {
         $category = strtolower(trim((string) ($marker->category ?? '')));
 
@@ -137,28 +143,89 @@ class MarkerFeedBuilder
             return false;
         }
 
-        if (static::viewerCanReviewPendingRiskAreas($viewer)) {
+        if ($reviewStatus === 'approved') {
             return true;
         }
 
-        if (static::viewerIsCitizen($viewer)) {
-            return $reviewStatus === 'approved'
-                || ((int) ($viewer?->user_id ?? 0) > 0 && (int) ($viewer?->user_id ?? 0) === (int) ($riskArea->reported_by ?? 0));
+        $viewerId = (int) ($visibility['viewer_id'] ?? $viewer?->user_id ?? 0);
+        if ($viewerId > 0 && $viewerId === (int) ($riskArea->reported_by ?? 0)) {
+            return true;
         }
 
-        return $reviewStatus === 'approved';
+        $role = (string) ($visibility['role'] ?? '');
+        if (in_array($role, ['admin', 'provincial admin'], true)) {
+            return true;
+        }
+
+        $riskStationId = (int) ($riskArea->station_id ?? 0);
+        $riskBarangayId = (int) ($riskArea->barangayHall?->barangay_id ?? 0);
+
+        if (in_array($role, ['chief', 'station admin', 'firefighter'], true)) {
+            return ($riskStationId > 0 && in_array($riskStationId, $visibility['station_ids'] ?? [], true))
+                || ($riskBarangayId > 0 && in_array($riskBarangayId, $visibility['covered_barangay_ids'] ?? [], true));
+        }
+
+        if (in_array($role, ['barangay', 'barangay captain', 'barangay officer'], true)) {
+            return $riskBarangayId > 0
+                && in_array($riskBarangayId, $visibility['barangay_ids'] ?? [], true);
+        }
+
+        return false;
     }
 
-    protected static function viewerCanReviewPendingRiskAreas(?User $viewer = null): bool
+    protected static function visibilityContext(?User $viewer): array
     {
-        $role = strtolower(trim((string) ($viewer?->role?->role ?? '')));
+        if (! $viewer) {
+            return [
+                'viewer_id' => 0,
+                'role' => '',
+                'station_ids' => [],
+                'covered_barangay_ids' => [],
+                'barangay_ids' => [],
+            ];
+        }
 
-        return in_array($role, ['admin', 'provincial admin', 'chief', 'station admin', 'firefighter'], true);
-    }
+        $viewer->loadMissing([
+            'role',
+            'address.barangay',
+            'barangayOfficer.barangay',
+            'captainedBarangayHall.barangay',
+        ]);
 
-    protected static function viewerIsCitizen(?User $viewer = null): bool
-    {
-        return strtolower(trim((string) ($viewer?->role?->role ?? ''))) === 'citizen';
+        $stationIds = StationOfficer::query()
+            ->where('user_id', $viewer->user_id)
+            ->pluck('station_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $coveredBarangayIds = $stationIds->isEmpty()
+            ? collect()
+            : StationBarangayCoverage::query()
+                ->whereIn('station_id', $stationIds->all())
+                ->where('is_active', true)
+                ->pluck('barangay_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+        $barangayIds = collect([
+            $viewer->address?->barangay_id,
+            $viewer->barangayOfficer?->barangay_id,
+            $viewer->captainedBarangayHall?->barangay_id,
+        ])
+            ->filter(fn ($id) => (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        return [
+            'viewer_id' => (int) $viewer->user_id,
+            'role' => strtolower(trim((string) ($viewer->role?->role ?? ''))),
+            'station_ids' => $stationIds->all(),
+            'covered_barangay_ids' => $coveredBarangayIds->all(),
+            'barangay_ids' => $barangayIds->all(),
+        ];
     }
 
     protected static function riskAreaPrimaryPhotoUrl($riskArea): ?string

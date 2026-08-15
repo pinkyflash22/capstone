@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Exceptions\BoundaryUnavailableException;
 use App\Models\Barangay;
+use App\Models\BoundaryLocation;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -10,6 +12,59 @@ use RuntimeException;
 
 class GeoapifyBoundaryService
 {
+    public function syncBarangayBoundary(
+        int $barangayId,
+        ?int $coverageStationId = null,
+        ?int $importedBy = null,
+        string $geometry = 'geometry_1000',
+        bool $force = false,
+    ): BoundaryLocation {
+        $existing = BoundaryLocation::query()
+            ->where('barangay_id', $barangayId)
+            ->where('boundary_type', 'barangay')
+            ->first();
+
+        if ($existing && ! $force && $existing->source === 'geoapify' && ! empty($existing->geojson)) {
+            return $existing;
+        }
+
+        $barangay = Barangay::query()
+            ->with(['hall.marker', 'city.province'])
+            ->findOrFail($barangayId);
+        $marker = $barangay->hall?->marker;
+        if (! $marker || $marker->lat === null || $marker->lng === null) {
+            throw new BoundaryUnavailableException('The barangay does not have a hall marker with coordinates.');
+        }
+
+        $payload = $this->importBarangayBoundary(
+            $barangay,
+            (float) $marker->lat,
+            (float) $marker->lng,
+            $geometry,
+        );
+        $feature = (array) ($payload['feature'] ?? []);
+        $properties = (array) ($feature['properties'] ?? []);
+
+        return BoundaryLocation::query()->updateOrCreate(
+            ['barangay_id' => $barangayId, 'boundary_type' => 'barangay'],
+            [
+                'name' => $barangay->barangay_name,
+                // Barangay boundaries are reusable across all stations that cover them.
+                'station_id' => null,
+                'geojson' => $payload['feature_collection'],
+                'source' => 'geoapify',
+                'external_place_id' => $properties['place_id'] ?? $properties['id'] ?? null,
+                'properties' => [
+                    'geoapify_feature' => $properties,
+                    'query' => $this->boundaryQueryComponents($barangay),
+                    'coverage_station_id' => $coverageStationId,
+                    'imported_at' => now()->toISOString(),
+                    'imported_by' => $importedBy,
+                ],
+            ]
+        );
+    }
+
     public function importBarangayBoundary(Barangay $barangay, float $lat, float $lng, string $geometry = 'geometry_1000'): array
     {
         $barangay->loadMissing('city.province');
@@ -106,7 +161,7 @@ class GeoapifyBoundaryService
         }
 
         $textQuery = $this->buildBarangaySearchText($barangay);
-        $textPlaceId = $this->searchPlaceIdByText($textQuery, $apiKey, $attemptSummaries);
+        $textPlaceId = $this->searchPlaceIdByText($textQuery, $apiKey, $attemptSummaries, $lat, $lng);
 
         if ($textPlaceId) {
             foreach ($geometryFallbacks as $geometryMode) {
@@ -186,7 +241,7 @@ class GeoapifyBoundaryService
             'attempts' => $attemptSummaries,
         ]);
 
-        throw new RuntimeException(
+        throw new BoundaryUnavailableException(
             'Geoapify did not return a barangay-level boundary for ' . $barangay->barangay_name . '. ' .
             'Only higher-level boundaries were available, so please draw or edit this barangay manually.'
         );
@@ -194,7 +249,7 @@ class GeoapifyBoundaryService
 
     protected function fetchBoundaryPayload(float $lat, float $lng, string $geometry, string $apiKey): array
     {
-        $response = Http::timeout(20)->retry(1, 250)->get(
+        return $this->geoapifyGet(
             'https://api.geoapify.com/v1/boundaries/part-of',
             [
                 'lat' => $lat,
@@ -202,33 +257,23 @@ class GeoapifyBoundaryService
                 'boundaries' => 'administrative',
                 'geometry' => $geometry,
                 'apiKey' => $apiKey,
-            ]
+            ],
+            'Geoapify boundary request'
         );
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Geoapify boundary request failed with status ' . $response->status() . '.');
-        }
-
-        return (array) $response->json();
     }
 
     protected function fetchBoundaryPayloadByPlaceId(string $placeId, string $geometry, string $apiKey): array
     {
-        $response = Http::timeout(20)->retry(1, 250)->get(
+        return $this->geoapifyGet(
             'https://api.geoapify.com/v1/boundaries/part-of',
             [
                 'id' => $placeId,
                 'boundaries' => 'administrative',
                 'geometry' => $geometry,
                 'apiKey' => $apiKey,
-            ]
+            ],
+            'Geoapify boundary place-id request'
         );
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Geoapify boundary place-id request failed with status ' . $response->status() . '.');
-        }
-
-        return (array) $response->json();
     }
 
     protected function fetchContainsPayload(string $placeId, string $geometry, string $apiKey, ?int $sublevel = null): array
@@ -244,16 +289,11 @@ class GeoapifyBoundaryService
             $query['sublevel'] = $sublevel;
         }
 
-        $response = Http::timeout(20)->retry(1, 250)->get(
+        return $this->geoapifyGet(
             'https://api.geoapify.com/v1/boundaries/consists-of',
-            $query
+            $query,
+            'Geoapify consists-of request'
         );
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Geoapify consists-of request failed with status ' . $response->status() . '.');
-        }
-
-        return (array) $response->json();
     }
 
     protected function selectBestBarangayFeature(Barangay $barangay, array $features): ?array
@@ -389,23 +429,33 @@ class GeoapifyBoundaryService
             ->all();
     }
 
-    protected function searchPlaceIdByText(string $textQuery, string $apiKey, array &$attemptSummaries): ?string
+    protected function searchPlaceIdByText(
+        string $textQuery,
+        string $apiKey,
+        array &$attemptSummaries,
+        ?float $lat = null,
+        ?float $lng = null,
+    ): ?string
     {
-        $response = Http::timeout(20)->retry(1, 250)->get(
-            'https://api.geoapify.com/v1/geocode/search',
-            [
-                'text' => $textQuery,
-                'format' => 'json',
-                'limit' => 5,
-                'apiKey' => $apiKey,
-            ]
-        );
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Geoapify text search request failed with status ' . $response->status() . '.');
+        $countryCode = strtolower(trim((string) config('services.geoapify.country_code', 'ph')));
+        $query = [
+            'text' => $textQuery,
+            'format' => 'json',
+            'limit' => 5,
+            'filter' => 'countrycode:' . ($countryCode ?: 'ph'),
+            'apiKey' => $apiKey,
+        ];
+        if ($lat !== null && $lng !== null) {
+            $query['bias'] = "proximity:{$lng},{$lat}";
         }
 
-        $results = collect((array) ($response->json()['results'] ?? []));
+        $payload = $this->geoapifyGet(
+            'https://api.geoapify.com/v1/geocode/search',
+            $query,
+            'Geoapify text search request'
+        );
+
+        $results = collect((array) ($payload['results'] ?? []));
 
         $attemptSummaries[] = [
             'mode' => 'text-search',
@@ -451,14 +501,37 @@ class GeoapifyBoundaryService
         return is_string($placeId) && $placeId !== '' ? $placeId : null;
     }
 
+    protected function geoapifyGet(string $url, array $query, string $operation): array
+    {
+        try {
+            $response = Http::timeout(20)->retry(1, 250)->get($url, $query);
+        } catch (\Throwable) {
+            throw new RuntimeException("{$operation} could not connect to Geoapify.");
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException("{$operation} failed with status {$response->status()}.");
+        }
+
+        return (array) $response->json();
+    }
+
     protected function buildBarangaySearchText(Barangay $barangay): string
     {
-        return collect([
-            $barangay->barangay_name,
-            $barangay->city?->city_name,
-            $barangay->city?->province?->province_name,
-            'Philippines',
-        ])->filter(fn (?string $value) => filled($value))->implode(', ');
+        return collect($this->boundaryQueryComponents($barangay))
+            ->filter(fn (?string $value) => filled($value))
+            ->implode(', ');
+    }
+
+    protected function boundaryQueryComponents(Barangay $barangay): array
+    {
+        return [
+            'barangay' => $barangay->barangay_name,
+            'city' => $barangay->city?->city_name,
+            'province' => $barangay->city?->province?->province_name,
+            'region' => (string) config('services.geoapify.region', 'Ilocos Region'),
+            'country' => (string) config('services.geoapify.country', 'Philippines'),
+        ];
     }
 
     protected function extractMunicipalityPlaceId(array $features, string $cityNeedle): ?string

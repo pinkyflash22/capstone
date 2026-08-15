@@ -24,6 +24,15 @@ RISK_LABEL_THRESHOLDS = {
 }
 
 
+def select_feature_columns(df: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
+    """Keep prediction input tolerant of older or partially populated request payloads."""
+    for column in feature_columns:
+        if column not in df.columns:
+            df[column] = pd.NA
+
+    return df[feature_columns]
+
+
 def prepare_historical_request_frame(payload: dict, feature_columns: list[str]) -> pd.DataFrame:
     df = pd.DataFrame([payload]).copy()
 
@@ -44,7 +53,7 @@ def prepare_historical_request_frame(payload: dict, feature_columns: list[str]) 
     df["is_dry_season"] = 1 if season == "dry" else 0
     df["high_density_flag"] = 1 if density == "high" else 0
 
-    return df[feature_columns]
+    return select_feature_columns(df, feature_columns)
 
 
 def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[str]) -> pd.DataFrame:
@@ -55,6 +64,15 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         "barangay_id",
         "year",
         "incident_count",
+        "current_month_fire_incidents",
+        "previous_month_fire_incidents",
+        "recent_7_day_fire_incidents",
+        "recent_30_day_fire_incidents",
+        "recent_fire_momentum_signal",
+        "station_current_month_fire_incidents",
+        "station_previous_month_fire_incidents",
+        "station_recent_7_day_fire_incidents",
+        "station_recent_fire_momentum_signal",
         "average_temperature",
         "average_humidity",
         "average_wind_speed",
@@ -121,6 +139,15 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         "poor_access_count",
         "affected_households",
         "risk_area_pressure_signal",
+        "current_month_fire_incidents",
+        "previous_month_fire_incidents",
+        "recent_7_day_fire_incidents",
+        "recent_30_day_fire_incidents",
+        "recent_fire_momentum_signal",
+        "station_current_month_fire_incidents",
+        "station_previous_month_fire_incidents",
+        "station_recent_7_day_fire_incidents",
+        "station_recent_fire_momentum_signal",
         "ai_checklist_total",
         "ai_checklist_confirmed_count",
         "ai_checklist_active_count",
@@ -144,6 +171,8 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
         + df["average_wind_speed"].fillna(0) * 0.15
         - df["average_humidity"].fillna(0) * 0.03
         + df["risk_area_pressure_signal"] * 0.9
+        + df["recent_fire_momentum_signal"] * 1.35
+        + df["station_recent_fire_momentum_signal"] * 0.35
         + df["high_assessment_count"] * 1.1
         + df["blocked_hydrant_count"] * 0.8
         - df["mitigation_readiness_signal"] * 0.6
@@ -152,7 +181,7 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
     )
     df["weather_condition"] = weather_condition
 
-    return df[feature_columns]
+    return select_feature_columns(df, feature_columns)
 
 
 def normalize_weather_context(value) -> dict:
@@ -228,7 +257,7 @@ def prepare_merged_request_frame(payload: dict, feature_columns: list[str]) -> p
     ]:
         df[column] = str(df.at[0, column] if column in df.columns else "unknown").strip() or "unknown"
 
-    return df[feature_columns]
+    return select_feature_columns(df, feature_columns)
 
 
 def prepare_legacy_request_frame(payload: dict, feature_columns: list[str]) -> pd.DataFrame:
@@ -244,7 +273,7 @@ def prepare_legacy_request_frame(payload: dict, feature_columns: list[str]) -> p
     df["dryness_signal"] = (df["avg_temp"] * 1.4) - (df["rainfall_mm"] * 0.9) - (df["humidity"] * 0.35)
     df["recent_activity_signal"] = df["past_7_day_incidents"] * 1.2 + df["past_30_day_incidents"] * 0.4
 
-    return df[feature_columns]
+    return select_feature_columns(df, feature_columns)
 
 
 def get_risk_level(probability: float, dataset_kind: str) -> str:
@@ -265,11 +294,12 @@ def get_confidence_band(probability: float) -> str:
     return "low"
 
 
-def build_local_drivers(model, request_frame: pd.DataFrame, reference_profile: dict, feature_columns: list[str]) -> list[dict]:
+def build_local_drivers(model, request_frame: pd.DataFrame, reference_profile: dict, feature_columns: list[str], candidate_features: list[str] | None = None) -> list[dict]:
     base_probability = float(model.predict_proba(request_frame)[0][1])
     drivers = []
 
-    for feature in feature_columns:
+    features_to_check = candidate_features or feature_columns
+    for feature in features_to_check:
         if feature not in request_frame.columns or feature not in reference_profile:
             continue
 
@@ -344,12 +374,23 @@ def apply_reference_defaults(request_frame: pd.DataFrame, feature_columns: list[
     return normalized[feature_columns]
 
 
-def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind: str, target: str, reference_profile: dict, global_feature_importance: list[dict], feature_columns: list[str]) -> dict:
+def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind: str, target: str, reference_profile: dict, global_feature_importance: list[dict], feature_columns: list[str], calibration: dict | None = None) -> dict:
     probability = float(model.predict_proba(request_frame)[0][1])
-    prediction = int(model.predict(request_frame)[0])
+    high_threshold, _ = RISK_LABEL_THRESHOLDS.get(dataset_kind, (0.65, 0.35))
+    prediction = int(probability >= high_threshold)
     risk_level = get_risk_level(probability, dataset_kind)
     confidence_band = get_confidence_band(probability)
-    local_drivers = build_local_drivers(model, request_frame, reference_profile, feature_columns)
+    top_features = [
+        item.get("feature") for item in global_feature_importance[:5]
+        if isinstance(item, dict) and item.get("feature")
+    ]
+    local_drivers = build_local_drivers(
+        model,
+        request_frame,
+        reference_profile,
+        feature_columns,
+        top_features or feature_columns,
+    )
     ai_context = build_ai_context(dataset_kind, target, probability, risk_level, confidence_band, local_drivers, global_feature_importance)
 
     return {
@@ -363,6 +404,10 @@ def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind:
         "global_feature_importance": global_feature_importance[:8],
         "watch_items": build_watch_items(local_drivers),
         "ai_context": ai_context,
+        "calibration": {
+            "method": (calibration or {}).get("method", "unknown"),
+            "expected_calibration_error": (calibration or {}).get("expected_calibration_error"),
+        },
     }
 
 
@@ -385,13 +430,14 @@ def append_regression_outputs(bundle: dict, request_frame: pd.DataFrame, respons
     return response
 
 
-def predict(payload: dict) -> dict:
-    bundle = joblib.load(MODEL_PATH)
+def predict(payload: dict, bundle: dict | None = None) -> dict:
+    bundle = bundle or joblib.load(MODEL_PATH)
     model = bundle["model"]
     feature_columns = bundle["feature_columns"]
     dataset_kind = bundle.get("dataset_kind", "legacy_fire_data")
     reference_profile = bundle.get("reference_profile", {})
     global_feature_importance = bundle.get("global_feature_importance", [])
+    calibration = bundle.get("calibration", {})
 
     if dataset_kind == "historical_data":
         request_frame = apply_reference_defaults(
@@ -407,6 +453,7 @@ def predict(payload: dict) -> dict:
             reference_profile,
             global_feature_importance,
             feature_columns,
+            calibration,
         )
         return append_regression_outputs(bundle, request_frame, response)
 
@@ -424,6 +471,7 @@ def predict(payload: dict) -> dict:
             reference_profile,
             global_feature_importance,
             feature_columns,
+            calibration,
         )
         return append_regression_outputs(bundle, request_frame, response)
 
@@ -441,6 +489,7 @@ def predict(payload: dict) -> dict:
             reference_profile,
             global_feature_importance,
             feature_columns,
+            calibration,
         )
         return append_regression_outputs(bundle, request_frame, response)
 
@@ -457,6 +506,7 @@ def predict(payload: dict) -> dict:
         reference_profile,
         global_feature_importance,
         feature_columns,
+        calibration,
     )
     return append_regression_outputs(bundle, request_frame, response)
 
@@ -470,4 +520,10 @@ if __name__ == "__main__":
     else:
         payload = json.loads(raw_input)
 
-    print(json.dumps(predict(payload), indent=2))
+    if isinstance(payload, list):
+        shared_bundle = joblib.load(MODEL_PATH)
+        result = [predict(item, shared_bundle) for item in payload]
+    else:
+        result = predict(payload)
+
+    print(json.dumps(result, indent=2))

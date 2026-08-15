@@ -2750,12 +2750,42 @@
                         <article class="prediction-card">
                             <div class="prediction-card__head">
                                 <div>
-                                    <div class="prediction-card__label">Predicted Incident Count</div>
+                                    <div class="prediction-card__label">Observed to Date</div>
+                                    <div id="summaryObservedCount" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #b91c1c, #ef4444);"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Completed or closed fire incidents already recorded in the current month.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Predicted Additional</div>
+                                    <div id="summaryAdditionalCount" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #ea580c, #f59e0b);"><i class="fa-solid fa-forward"></i></div>
+                            </div>
+                            <div class="prediction-card__copy">Possible additional incidents remaining in the forecast window.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Planning Midpoint</div>
                                     <div id="summaryIncidentCount" class="prediction-card__value">--</div>
                                 </div>
-                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #ef4444, #f97316);"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #c2410c, #f97316);"><i class="fa-solid fa-calendar-check"></i></div>
                             </div>
-                            <div class="prediction-card__copy">Projected possible fire incidents in the active forecast period.</div>
+                            <div class="prediction-card__copy">Calibrated midpoint—not a guaranteed incident count.</div>
+                        </article>
+                        <article class="prediction-card">
+                            <div class="prediction-card__head">
+                                <div>
+                                    <div class="prediction-card__label">Expected Incident Range</div>
+                                    <div id="summaryIncidentRange" class="prediction-card__value">--</div>
+                                </div>
+                                <div class="prediction-card__icon" style="background: linear-gradient(135deg, #7c3aed, #a855f7);"><i class="fa-solid fa-arrows-left-right"></i></div>
+                            </div>
+                            <div id="summaryIncidentRangeCopy" class="prediction-card__copy">Planning interval based on model output, observed pace, and same-month history.</div>
                         </article>
                         <article class="prediction-card">
                             <div class="prediction-card__head">
@@ -2775,7 +2805,7 @@
                                 </div>
                                 <div class="prediction-card__icon" style="background: linear-gradient(135deg, #2563eb, #38bdf8);"><i class="fa-solid fa-crosshairs"></i></div>
                             </div>
-                            <div class="prediction-card__copy">Confidence reported by the current analysis response and model context.</div>
+                            <div id="confidenceScoreCopy" class="prediction-card__copy">Evidence coverage across incidents, history, barangay forecasts, risk findings, weather, and model availability.</div>
                         </article>
                         <article class="prediction-card prediction-card--wide">
                             <div class="prediction-card__head">
@@ -2911,7 +2941,13 @@
                                     <div class="analytics-section__title"><i class="fa-solid fa-brain"></i> ML Trend Analysis</div>
                                     <p class="analytics-section__copy">Reuses the dashboard trend-analysis pattern to compare saved analysis runs, their actual incident counts, predicted fire incidents, and confidence trend over time.</p>
                                 </div>
-                                <span id="mlTrendRunCount" class="analytics-empty-pill">0 saved model run(s)</span>
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <span id="analysisRevisionBadge" class="analytics-empty-pill">Revision --</span>
+                                    <span id="mlTrendRunCount" class="analytics-empty-pill">0 saved model run(s)</span>
+                                    <button type="button" id="revisionHistoryBtn" class="analytics-empty-pill" onclick="openRevisionHistoryModal()" disabled style="cursor:pointer; border:1px solid #fed7aa; background:#fff7ed;">
+                                        <i class="fa-solid fa-clock-rotate-left"></i> History
+                                    </button>
+                                </div>
                             </div>
                             <div class="analytics-chart-wrap">
                                 <div class="analytics-chart-canvas">
@@ -2934,6 +2970,22 @@
                             </div>
                             <div id="mlTrendInsights" class="analytics-insight-list">
                                 <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Saved-run ML trend analysis will appear after the first analysis response is loaded.</span></div>
+                            </div>
+                        </div>
+                        <div class="analytics-shell-card analytics-section">
+                            <div class="analytics-section__head">
+                                <div>
+                                    <div class="analytics-section__title"><i class="fa-solid fa-calendar-days"></i> Month-over-Month Comparison</div>
+                                    <p class="analytics-section__copy">Compares last month’s completed incidents with this month’s incidents to date, alongside the saved forecast for each month.</p>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-wrap">
+                                <div class="analytics-chart-canvas">
+                                    <canvas id="mlMonthComparisonChart"></canvas>
+                                </div>
+                            </div>
+                            <div id="mlMonthComparisonInsights" class="analytics-insight-list">
+                                <div class="analytics-insight"><i class="fa-solid fa-circle-info"></i><span>Month-over-month comparison will appear after an analysis response is loaded.</span></div>
                             </div>
                         </div>
                     </section>
@@ -3341,6 +3393,21 @@
         </div>
     </div>
 
+    <div id="revisionHistoryModal" class="modal">
+        <div class="modal-content analytics-forecast-modal analytics-barangay-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-code-compare" style="color:#dc2626;"></i> Forecast Revision History</h3>
+                <button class="modal-close" onclick="closeRevisionHistoryModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="revisionHistoryModalBody">
+                <div class="text-center py-8 text-gray-500">Select a saved analysis to view its revisions.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeRevisionHistoryModal()" style="padding:8px 20px; background:#f1f5f9; border:none; border-radius:10px; cursor:pointer; font-weight:500;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="historicalWeatherPreviewModal" class="modal">
         <div class="modal-content analytics-forecast-modal analytics-barangay-modal">
             <div class="modal-header">
@@ -3415,10 +3482,11 @@
     </div>
 
     <script>
-        let hourlyChart, dailyChart, historicalTrendChart, seasonalPatternChart, monthlyPatternChart, weatherPatternChart, forecastCompareChart, mlTrendAnalysisChart, dayOfWeekPatternChart;
+        let hourlyChart, dailyChart, historicalTrendChart, seasonalPatternChart, monthlyPatternChart, weatherPatternChart, forecastCompareChart, mlTrendAnalysisChart, mlMonthComparisonChart, dayOfWeekPatternChart;
         let featureImportanceChart, crossValidationChart, actualVsPredictedChart, residualPatternChart;
         let currentRecommendations = [];
         let currentAnalysisId = null;
+        let currentAnalysisRevision = null;
         let analyticsStations = [];
         let currentBarangayPredictions = [];
         let currentPredictionDetails = null;
@@ -3441,6 +3509,7 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
+        let analyticsConfirmOpener = null;
         const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
         let analyticsScopeLoadingDepth = 0;
 
@@ -3693,6 +3762,9 @@
             cancel.textContent = options.cancelText || 'Cancel';
             accept.textContent = options.acceptText || 'Continue';
 
+            analyticsConfirmOpener = document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
             modal.hidden = false;
             modal.setAttribute('aria-hidden', 'false');
             accept.focus({ preventScroll: true });
@@ -3705,9 +3777,15 @@
         function closeAnalyticsConfirm(value) {
             const modal = document.getElementById('analyticsConfirmModal');
             if (modal) {
+                if (modal.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
                 modal.setAttribute('aria-hidden', 'true');
                 modal.hidden = true;
             }
+
+            analyticsConfirmOpener?.focus({ preventScroll: true });
+            analyticsConfirmOpener = null;
 
             if (analyticsConfirmResolver) {
                 analyticsConfirmResolver(value);
@@ -3854,7 +3932,7 @@
                         const rank = startRank + index;
                         const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
                         const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
-                        const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
+                        const incidents = prediction.expected_month_total_fire_incidents ?? prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
                         const historicalBaseline = prediction.historical_baseline_incidents ?? null;
                         const targetLabel = prediction.prediction_target_label || prediction.prediction_context?.target_period_label || '';
                         const updatedAt = prediction.analysis_created_at
@@ -3882,7 +3960,7 @@
                                             <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${probability !== null ? `${escapeHtml(String(probability))}%` : 'N/A'}</div>
                                         </div>
                                         <div class="barangay-ranking-card__stat">
-                                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Possible Incidents</div>
+                                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Expected Month Total</div>
                                             <div style="font-size:17px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
                                         </div>
                                         <div class="barangay-ranking-card__stat">
@@ -3930,7 +4008,7 @@
                         ${currentSortedBarangayPredictions.map((prediction, index) => {
                             const riskLevel = prediction.risk_level || prediction.assessment_level || 'Unknown';
                             const probability = prediction.probability_percent ?? prediction.risk_score ?? null;
-                            const incidents = prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
+                            const incidents = prediction.expected_month_total_fire_incidents ?? prediction.predicted_fire_incidents ?? prediction.predicted_incident_count ?? null;
                             const historicalBaseline = prediction.historical_baseline_incidents ?? null;
                             const targetLabel = prediction.prediction_target_label || prediction.prediction_context?.target_period_label || '';
                             return `
@@ -3952,7 +4030,7 @@
                                                 <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${probability !== null ? `${escapeHtml(String(probability))}%` : 'N/A'}</div>
                                             </div>
                                             <div class="barangay-ranking-card__stat">
-                                                <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Incidents</div>
+                                                <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Expected Total</div>
                                                 <div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">${incidents !== null ? escapeHtml(String(incidents)) : 'N/A'}</div>
                                             </div>
                                             <div class="barangay-ranking-card__stat">
@@ -3974,6 +4052,95 @@
 
         function closeBarangayRankingModal() {
             document.getElementById('barangayRankingModal')?.classList.remove('show');
+        }
+
+        async function openRevisionHistoryModal() {
+            const modal = document.getElementById('revisionHistoryModal');
+            const body = document.getElementById('revisionHistoryModalBody');
+            if (!modal || !body) return;
+
+            modal.classList.add('show');
+            if (!currentAnalysisId) {
+                body.innerHTML = '<div class="text-center py-8 text-gray-500">No saved analysis is selected.</div>';
+                return;
+            }
+
+            body.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> Loading revisions...</div>';
+            try {
+                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(currentAnalysisId)}/revisions`, {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Revision history could not be loaded.');
+                }
+
+                const revisions = Array.isArray(result.data) ? result.data : [];
+                const current = revisions.find((revision) => revision.is_current) || revisions[0] || {};
+                body.innerHTML = revisions.length ? `
+                    <div style="display:grid; gap:12px;">
+                        ${revisions.map((revision) => {
+                            const incidentDelta = Number(revision.incident_count || 0) - Number(current.incident_count || 0);
+                            const predictedDelta = Number(revision.predicted_fire_incidents || 0) - Number(current.predicted_fire_incidents || 0);
+                            return `
+                                <article style="padding:16px; border:1px solid ${revision.is_current ? '#fdba74' : '#e2e8f0'}; border-radius:16px; background:${revision.is_current ? '#fff7ed' : '#fff'};">
+                                    <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                                        <div>
+                                            <div style="font-size:14px; font-weight:900; color:#0f172a;">Revision ${escapeHtml(String(revision.revision_number))}${revision.is_current ? ' · Current' : ''}</div>
+                                            <div style="font-size:12px; color:#64748b; margin-top:4px;">${escapeHtml(revision.target_month_label || 'Target month unavailable')} · ${escapeHtml(revision.barangay_name || 'All barangays')}</div>
+                                        </div>
+                                        <span style="padding:6px 10px; border-radius:999px; background:#fef3c7; color:#92400e; font-size:11px; font-weight:800; text-transform:uppercase;">${escapeHtml(revision.risk_level || 'Unknown')}</span>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px;">
+                                        <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Actual</small><div style="font-weight:900;">${escapeHtml(String(revision.incident_count ?? 0))}</div></div>
+                                        <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Predicted</small><div style="font-weight:900;">${revision.predicted_fire_incidents ?? 'N/A'}</div></div>
+                                        <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Confidence</small><div style="font-weight:900;">${escapeHtml(String(revision.confidence ?? 0))}%</div></div>
+                                    </div>
+                                    ${!revision.is_current ? `<div style="font-size:11px; color:#64748b; margin-top:10px;">Compared with current: actual ${incidentDelta >= 0 ? '+' : ''}${incidentDelta}, predicted ${predictedDelta >= 0 ? '+' : ''}${predictedDelta}.</div>` : ''}
+                                    <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:12px;">
+                                        <span style="font-size:11px; color:#64748b;">${revision.recorded_at ? escapeHtml(new Date(revision.recorded_at).toLocaleString()) : ''}</span>
+                                        ${!revision.is_current ? `<button type="button" onclick="rollbackAnalysisRevision(${Number(revision.revision_number)})" style="border:none; border-radius:999px; padding:8px 12px; background:#0f172a; color:#fff; font-size:11px; font-weight:800; cursor:pointer;"><i class="fa-solid fa-rotate-left"></i> Restore</button>` : ''}
+                                    </div>
+                                </article>
+                            `;
+                        }).join('')}
+                    </div>
+                ` : '<div class="text-center py-8 text-gray-500">No revision history is available yet.</div>';
+            } catch (error) {
+                body.innerHTML = `<div class="text-center py-8 text-red-500">${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function closeRevisionHistoryModal() {
+            document.getElementById('revisionHistoryModal')?.classList.remove('show');
+        }
+
+        async function rollbackAnalysisRevision(revisionNumber) {
+            const confirmed = await showAnalyticsConfirm({
+                eyebrow: 'Restore revision',
+                title: `Restore revision ${revisionNumber}?`,
+                message: 'The current result will be archived. AI drafts will be reconciled, while confirmed or edited checklist and mitigation records remain protected for review.',
+                cancelText: 'Cancel',
+                acceptText: 'Restore revision',
+            });
+            if (!confirmed || !currentAnalysisId) return;
+
+            try {
+                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(currentAnalysisId)}/rollback`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                    body: JSON.stringify({ revision_number: revisionNumber }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Revision restore failed.');
+                }
+                closeRevisionHistoryModal();
+                showAnalyticsToast(result.message || 'Revision restored.', 'success');
+                await loadLatestAnalysisSnapshot(currentPredictionDetails?.prediction_scope || 'current_month');
+            } catch (error) {
+                showAnalyticsToast(error.message || 'Revision restore failed.', 'error');
+            }
         }
 
         function closeHistoricalWeatherPreviewModal() {
@@ -5552,17 +5719,62 @@
                     ? [...analysisData.barangay_predictions].sort((a, b) => Number(b.probability_percent || 0) - Number(a.probability_percent || 0))[0]
                     : null);
 
-            const probability = hotspot?.probability_percent ?? prediction?.model_prediction?.probability_percent ?? null;
-            const predictedCount = prediction?.predicted_fire_incidents ?? hotspot?.predicted_fire_incidents ?? prediction?.model_prediction?.predicted_incident_count ?? null;
+            const probability = prediction?.model_prediction?.probability_percent ?? hotspot?.probability_percent ?? null;
+            const expectedCount = prediction?.expected_month_total_fire_incidents
+                ?? prediction?.predicted_fire_incidents
+                ?? hotspot?.expected_month_total_fire_incidents
+                ?? hotspot?.predicted_fire_incidents
+                ?? prediction?.model_prediction?.predicted_incident_count
+                ?? null;
+            const scope = analysisData.prediction_scope || prediction?.prediction_scope || 'current_month';
+            const observedCount = prediction?.observed_fire_incidents_to_date
+                ?? (scope === 'current_month' ? analysisData.prediction_context?.current_month_fire_incidents : 0)
+                ?? 0;
+            const additionalCount = prediction?.predicted_additional_fire_incidents
+                ?? (expectedCount !== null ? Math.max(0, Number(expectedCount) - Number(observedCount || 0)) : null);
+            const incidentRange = prediction?.incident_count_range
+                ?? prediction?.model_prediction?.incident_count_range
+                ?? hotspot?.incident_count_range
+                ?? null;
+            const calibration = prediction?.forecast_calibration
+                ?? prediction?.model_prediction?.forecast_calibration
+                ?? null;
             const confidenceScore = analysisData.confidence_score ?? prediction?.model_prediction?.confidence_band ?? null;
             const drivers = Array.isArray(prediction?.drivers) ? prediction.drivers : [];
 
             document.getElementById('summaryProbability').textContent = probability !== null ? `${Number(probability).toFixed(1)}%` : 'Unavailable';
-            document.getElementById('summaryIncidentCount').textContent = predictedCount !== null ? String(predictedCount) : 'Unavailable';
+            document.getElementById('summaryObservedCount').textContent = scope === 'current_month' ? String(observedCount) : 'Not started';
+            document.getElementById('summaryAdditionalCount').textContent = additionalCount !== null ? String(additionalCount) : 'Unavailable';
+            document.getElementById('summaryIncidentCount').textContent = expectedCount !== null ? String(expectedCount) : 'Unavailable';
+            const rangeElement = document.getElementById('summaryIncidentRange');
+            const rangeCopy = document.getElementById('summaryIncidentRangeCopy');
+            if (rangeElement) {
+                const lower = Number(incidentRange?.lower);
+                const upper = Number(incidentRange?.upper);
+                rangeElement.textContent = Number.isFinite(lower) && Number.isFinite(upper)
+                    ? (lower === upper ? String(lower) : `${lower}–${upper}`)
+                    : 'Unavailable';
+            }
+            if (rangeCopy && calibration) {
+                rangeCopy.textContent = `Raw model sum ${Number(calibration.raw_model_total || 0)} · observed-pace projection ${Number(calibration.pace_projection || 0).toFixed(1)} · historical average ${Number(calibration.historical_same_month_average || 0).toFixed(1)}.`;
+            } else if (rangeCopy) {
+                rangeCopy.textContent = 'Planning interval based on model output, observed pace, and same-month history.';
+            }
             document.getElementById('riskLabel').textContent = analysisData.risk_level || prediction?.outlook || 'Unavailable';
             document.getElementById('confidenceScore').textContent = confidenceScore !== null
                 ? (typeof confidenceScore === 'number' ? `${confidenceScore}%` : String(confidenceScore))
                 : 'Unavailable';
+            const confidenceCopy = document.getElementById('confidenceScoreCopy');
+            const confidenceContext = analysisData.confidence_context || {};
+            if (confidenceCopy) {
+                const factors = Array.isArray(confidenceContext.factors) ? confidenceContext.factors.slice(0, 3) : [];
+                confidenceCopy.textContent = factors.length
+                    ? `Evidence score: ${factors.join(' · ')}`
+                    : 'Evidence coverage across incidents, history, barangay forecasts, risk findings, weather, and model availability.';
+                confidenceCopy.title = Array.isArray(confidenceContext.factors)
+                    ? confidenceContext.factors.join('\n')
+                    : '';
+            }
 
             const trendDirection = document.getElementById('summaryTrendDirection');
             const trendCopy = document.getElementById('summaryTrendCopy');
@@ -5639,6 +5851,7 @@
             if (weatherPatternChart) weatherPatternChart.destroy();
             if (forecastCompareChart) forecastCompareChart.destroy();
             if (mlTrendAnalysisChart) mlTrendAnalysisChart.destroy();
+            if (mlMonthComparisonChart) mlMonthComparisonChart.destroy();
             if (dayOfWeekPatternChart) dayOfWeekPatternChart.destroy();
 
             const historicalTrendCtx = document.getElementById('historicalTrendChart').getContext('2d');
@@ -5902,7 +6115,7 @@
                             fill: false
                         },
                         {
-                            label: 'Predicted Fire Incidents',
+                            label: 'Expected / Forecast Incidents',
                             data: mlTrendSeries.map((item) => item.predicted_fire_incidents),
                             borderColor: '#2563eb',
                             backgroundColor: 'rgba(37, 99, 235, 0.08)',
@@ -5966,6 +6179,44 @@
             if (mlTrendLatestRisk) mlTrendLatestRisk.textContent = mlTrendAnalysis.latest_risk || 'No data';
             if (mlTrendLatestConfidence) mlTrendLatestConfidence.textContent = `${Number(mlTrendAnalysis.latest_confidence || 0)}%`;
             if (mlTrendForecastRuns) mlTrendForecastRuns.textContent = String(Number(mlTrendAnalysis.run_count || 0));
+
+            const mlMonthComparison = mlTrendAnalysis.month_over_month || {};
+            const mlMonthComparisonSeries = Array.isArray(mlMonthComparison.series) ? mlMonthComparison.series : [];
+            const mlMonthComparisonCtx = document.getElementById('mlMonthComparisonChart').getContext('2d');
+            mlMonthComparisonChart = new Chart(mlMonthComparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: mlMonthComparisonSeries.map((item) => item.label),
+                    datasets: [
+                        {
+                            label: 'Completed Incidents',
+                            data: mlMonthComparisonSeries.map((item) => item.actual_incidents),
+                            backgroundColor: '#c63d26',
+                            borderRadius: 7,
+                        },
+                        {
+                            label: 'Saved Forecast',
+                            data: mlMonthComparisonSeries.map((item) => item.predicted_fire_incidents),
+                            backgroundColor: '#2563eb',
+                            borderRadius: 7,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: chartLegend },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e5e7eb' },
+                            ticks: { ...chartTicks, precision: 0 },
+                            title: { display: !compactChart, text: 'Incident count' },
+                        },
+                        x: { grid: { display: false }, ticks: chartTicks },
+                    },
+                },
+            });
 
             const dailyCtx = document.getElementById('dailyChart').getContext('2d');
             dailyChart = new Chart(dailyCtx, {
@@ -6251,6 +6502,15 @@
                     mlTrendSeries.length > 1 ? `This panel compares ${mlTrendSeries.length} saved analysis run(s) so you can track how incident counts, predicted incidents, and confidence have been moving over time.` : null,
                 ].filter(Boolean),
                 'ML trend analysis is unavailable for the current dataset.'
+            );
+            setInsightList(
+                'mlMonthComparisonInsights',
+                [
+                    mlMonthComparison?.missing?.forecast ? 'No saved forecast was found for either comparison month.' : null,
+                    !mlMonthComparison?.missing?.forecast ? 'Completed incidents are compared with the latest saved forecast targeting each month.' : null,
+                    mlMonthComparison?.missing?.actual_incidents ? 'No completed incidents were recorded for these months in the current scope.' : null,
+                ].filter(Boolean),
+                'Month-over-month comparison is unavailable for the current dataset.'
             );
             setInsightList(
                 'weatherPatternInsights',
@@ -6548,16 +6808,19 @@
             setAnalyticsActionButtonsBusy(true, predictionScope);
             setScopedForecastLoading(true, precheckLabel);
 
+            let shouldReplaceExisting = false;
+
             try {
                 const existingSnapshot = await fetchScopedAnalysisSnapshot(predictionScope);
                 if (existingSnapshot?.success && existingSnapshot?.data?.analysis_id) {
+                    shouldReplaceExisting = true;
                     const scopeLabel = scopeMeta.barangayId !== 'all'
                         ? `${scopeMeta.barangayName} under ${scopeMeta.stationName}`
                         : `${scopeMeta.stationName} station-wide`;
                     const confirmed = await showAnalyticsConfirm({
                         eyebrow: 'Replace saved forecast',
                         title: 'Overwrite existing saved analysis?',
-                        message: `A saved ${predictionScope === 'next_month' ? 'next-month' : 'current-month'} forecast already exists for ${scopeLabel}. Running this again will replace that saved result for the same scope.`,
+                        message: `A saved ${predictionScope === 'next_month' ? 'next-month prediction' : 'current-month analysis'} already exists for ${scopeLabel}. Only this exact station, month, run type, and barangay scope will be revised. Untouched AI drafts will refresh; confirmed or edited checklists and mitigations will be preserved for revision review.`,
                         cancelText: 'Keep existing',
                         acceptText: 'Replace forecast',
                     });
@@ -6587,6 +6850,8 @@
                         barangay_id: document.getElementById('barangaySelect')?.value || 'all',
                         days: parseInt(periodDays),
                         prediction_scope: predictionScope,
+                        analysis_kind: predictionScope === 'next_month' ? 'forecast' : 'actual_analysis',
+                        replace_existing: shouldReplaceExisting,
                         historical_window: document.getElementById('historicalWindowSelect')?.value || '3'
                     })
                 });
@@ -7071,6 +7336,7 @@
             const weatherSummary = prediction?.weather_context?.summary || currentPredictionDetails.weather_context?.summary || null;
             const drivers = Array.isArray(prediction?.drivers) ? prediction.drivers : [];
             const likelyPeakHours = Array.isArray(prediction?.likely_peak_hours) ? prediction.likely_peak_hours : [];
+            const peakHoursLabel = prediction?.likely_peak_hours_label || (likelyPeakHours.length ? likelyPeakHours.join(', ') : 'No clear peak yet');
             const focusLabel = currentPredictionDetails.prediction_context?.target_period_label || prediction?.prediction_context?.target_period_label || prediction?.forecast_window || 'Forecast window';
             const modelMetadata = currentPredictionDetails.model_metadata || null;
             const workflowContext = currentPredictionDetails.workflow_context || null;
@@ -7109,8 +7375,16 @@
 
                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
                         <div style="padding:14px; border-radius:14px; background:#fff7ed; border:1px solid #fed7aa;">
-                            <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase;">Possible Incidents</div>
-                            <div style="font-size:28px; font-weight:900; color:#7c2d12; margin-top:6px;">${prediction?.predicted_fire_incidents ?? 'N/A'}</div>
+                            <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase;">Observed to Date</div>
+                            <div style="font-size:28px; font-weight:900; color:#7c2d12; margin-top:6px;">${prediction?.forecast_count_basis === 'next_month_forecast' ? 'Not started' : (prediction?.observed_fire_incidents_to_date ?? 'N/A')}</div>
+                        </div>
+                        <div style="padding:14px; border-radius:14px; background:#fffbeb; border:1px solid #fde68a;">
+                            <div style="font-size:11px; font-weight:800; color:#b45309; text-transform:uppercase;">Predicted Additional</div>
+                            <div style="font-size:28px; font-weight:900; color:#92400e; margin-top:6px;">${prediction?.predicted_additional_fire_incidents ?? 'N/A'}</div>
+                        </div>
+                        <div style="padding:14px; border-radius:14px; background:#fff7ed; border:1px solid #fed7aa;">
+                            <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase;">Expected Month Total</div>
+                            <div style="font-size:28px; font-weight:900; color:#7c2d12; margin-top:6px;">${prediction?.expected_month_total_fire_incidents ?? prediction?.predicted_fire_incidents ?? 'N/A'}</div>
                         </div>
                         <div style="padding:14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe;">
                             <div style="font-size:11px; font-weight:800; color:#1d4ed8; text-transform:uppercase;">Estimated Damage</div>
@@ -7118,7 +7392,7 @@
                         </div>
                         <div style="padding:14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
                             <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase;">Peak Hours</div>
-                            <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:6px;">${likelyPeakHours.length ? escapeHtml(likelyPeakHours.join(', ')) : 'N/A'}</div>
+                            <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:6px;">${escapeHtml(peakHoursLabel)}</div>
                         </div>
                     </div>
 
@@ -7230,6 +7504,7 @@
                                 <div>
                                     <div style="font-size: 15px; font-weight: 800; color:#0f172a;">${escapeHtml(item.plan_title || item.source_title || 'Action Plan')}</div>
                                     <div style="font-size: 12px; color:#64748b; margin-top:4px;">${escapeHtml(item.source_title || 'Recommendation')}</div>
+                                    ${item.requires_revision_review ? '<div style="display:inline-flex; align-items:center; gap:6px; margin-top:7px; padding:5px 9px; border-radius:999px; background:#fee2e2; color:#991b1b; font-size:10px; font-weight:900; text-transform:uppercase;"><i class="fa-solid fa-triangle-exclamation"></i> Revision review required</div>' : ''}
                                 </div>
                                 <span style="padding: 6px 12px; border-radius: 999px; background: ${status === 'confirmed' ? '#dcfce7' : '#fef3c7'}; color: ${status === 'confirmed' ? '#166534' : '#92400e'}; font-size: 12px; font-weight: 700; text-transform: uppercase;">
                                     ${escapeHtml(status)}
@@ -7269,10 +7544,12 @@
                                         <span>View Linked Mitigation</span>
                                     </a>
                                 ` : ''}
-                                <a href="${escapeHtml(item.mitigation_draft_url || '#')}" style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:linear-gradient(135deg, #dc2626, #f59e0b); color:#fff; font-size:12px; font-weight:800; text-decoration:none;">
-                                    <i class="fa-solid fa-shield-halved"></i>
-                                    <span>Create Mitigation Draft</span>
-                                </a>
+                                ${item.mitigation_draft_url ? `
+                                    <a href="${escapeHtml(item.mitigation_draft_url)}" style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:linear-gradient(135deg, #dc2626, #f59e0b); color:#fff; font-size:12px; font-weight:800; text-decoration:none;">
+                                        <i class="fa-solid fa-shield-halved"></i>
+                                        <span>Prepare Mitigation</span>
+                                    </a>
+                                ` : ''}
                                 <span style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; color:#475569; font-size:12px; font-weight:700;">
                                     <i class="fa-solid fa-arrows-spin"></i>
                                     ${escapeHtml(item.effectiveness_hint || 'Ready for workflow handoff.')}
@@ -7296,6 +7573,11 @@
             
             // Store recommendations for explore functionality
             currentAnalysisId = analysisData.analysis_id || null;
+            currentAnalysisRevision = analysisData.analysis_revision || null;
+            const revisionBadge = document.getElementById('analysisRevisionBadge');
+            const revisionButton = document.getElementById('revisionHistoryBtn');
+            if (revisionBadge) revisionBadge.textContent = currentAnalysisRevision ? `Revision ${currentAnalysisRevision}` : 'Revision --';
+            if (revisionButton) revisionButton.disabled = !currentAnalysisId;
             currentRecommendations = analysisData.recommendations || [];
             currentBarangayPredictions = Array.isArray(analysisData.barangay_predictions) ? analysisData.barangay_predictions : [];
             currentPredictionDetails = analysisData;

@@ -22,17 +22,26 @@ class FireRiskAreaOverlayController extends Controller
             'station_id' => ['nullable', 'exists:stations,station_id'],
         ]);
 
-        $levels = collect(explode(',', (string) ($validated['levels'] ?? 'medium,high')))
+        $levels = collect(explode(',', (string) ($validated['levels'] ?? 'low,medium,high')))
             ->map(fn ($level) => strtolower(trim($level)))
-            ->filter(fn ($level) => in_array($level, ['medium', 'high'], true))
+            ->filter(fn ($level) => in_array($level, ['low', 'medium', 'high'], true))
             ->values();
 
         if ($levels->isEmpty()) {
-            $levels = collect(['medium', 'high']);
+            $levels = collect(['low', 'medium', 'high']);
         }
 
-        $areas = $this->predictedRiskAreaService
-            ->buildPredictedAreas($validated['station_id'] ?? null, self::DEFAULT_PROXIMITY_METERS)
+        $stationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
+        $evidenceAreas = $this->predictedRiskAreaService
+            ->buildPredictedAreas($stationId, self::DEFAULT_PROXIMITY_METERS)
+            ->map(function (array $area) {
+                $area['overlay_type'] = 'verified_evidence';
+                $area['geometry_precision'] = 'localized_evidence_cluster';
+                return $area;
+            });
+        $forecastAreas = $this->predictedRiskAreaService->buildForecastAreas($stationId);
+        $areas = $evidenceAreas
+            ->concat($forecastAreas)
             ->filter(fn (array $area) => $levels->contains($area['risk_level']))
             ->values()
             ->all();
@@ -42,9 +51,11 @@ class FireRiskAreaOverlayController extends Controller
             'meta' => [
                 'levels' => $levels->all(),
                 'count' => count($areas),
-                'source' => 'predicted_clustered_evidence',
+                'source' => 'verified_evidence_and_saved_barangay_forecasts',
                 'cluster_proximity_meters' => self::DEFAULT_PROXIMITY_METERS,
+                'forecast_count' => $forecastAreas->count(),
+                'evidence_count' => $evidenceAreas->count(),
             ],
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 }

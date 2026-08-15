@@ -55,6 +55,10 @@ use App\Http\Controllers\OTPController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 //note kailangan ko pang import ung controller para magamit ko yung mga functions nila sa routes
+Route::get('/build/assets/map-{hash}.js', function () {
+    return redirect(\Illuminate\Support\Facades\Vite::asset('resources/js/map.js'));
+})->where('hash', '[A-Za-z0-9_-]+');
+
     Route::middleware('redirect.if.authenticated')->group(function () {
         Route::get('/', [PublicController::class, 'homepage'])->name('home');
         Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
@@ -216,6 +220,7 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
 // });
 Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     Route::get('/map/markers/feed', [MarkerController::class, 'index'])->name('map.markers.feed');
+    Route::get('/map/markers/latest', [MarkerController::class, 'latestForViewer'])->name('map.markers.latest');
 
     Route::prefix('voice-calls')->name('voice-calls.')->group(function () {
         Route::post('/', [VoiceCallController::class, 'store'])->name('store');
@@ -289,6 +294,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
+        Route::get('/api/analyses/{id}/revisions', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysisRevisions']);
+        Route::post('/api/analyses/{id}/rollback', [App\Http\Controllers\Chief\AnalyticController::class, 'rollbackAnalysisRevision']);
         Route::get('/api/analyses/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysis']);
         Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);
         Route::patch('/api/action-plan-checklists/{id}/confirm', [App\Http\Controllers\Chief\AnalyticController::class, 'confirmActionPlanChecklist']);
@@ -322,6 +329,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
+        Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
+        Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
         // Route::get('/resource', function(){
         //     return view('admin.resource-management');
         // });
@@ -413,6 +422,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
+        Route::get('/api/analyses/{id}/revisions', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysisRevisions']);
+        Route::post('/api/analyses/{id}/rollback', [App\Http\Controllers\Chief\AnalyticController::class, 'rollbackAnalysisRevision']);
         Route::get('/api/analyses/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysis']);
         Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);
         Route::patch('/api/action-plan-checklists/{id}/confirm', [App\Http\Controllers\Chief\AnalyticController::class, 'confirmActionPlanChecklist']);
@@ -446,6 +457,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/station-media/{stationMedia}', [StationMediaController::class, 'destroy'])->name('station-media.destroy');
         
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
+        Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
+        Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
         // Route::get('/resource', function(){
         //     return view('admin.resource-management');
         // });

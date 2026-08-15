@@ -460,6 +460,10 @@
             cursor: wait;
         }
 
+        .boundary-action-group { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+        .boundary-action-group form { margin:0; }
+        .boundary-visit-btn { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 12px; border:1px solid #fed7aa; border-radius:12px; color:#9a3412; background:#fff7ed; text-decoration:none; font-size:.78rem; font-weight:800; }
+
         .search-box {
             display: flex;
             align-items: center;
@@ -1794,7 +1798,7 @@
                 $missingBoundaryCount = $boundaryBarangays->where('boundary_status', 'missing')->count();
             @endphp
 
-            <section class="boundary-control-card">
+            <section class="boundary-control-card" id="boundaryResourceSection">
                 <div class="boundary-control-header">
                     <div>
                         <h3><i class="fa-solid fa-draw-polygon"></i> Barangay Boundary Control</h3>
@@ -1821,7 +1825,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($boundaryBarangays as $boundaryBarangay)
+                            @forelse ($boundaryPage as $boundaryBarangay)
                                 <tr>
                                     <td><strong>{{ $boundaryBarangay['barangay_name'] }}</strong></td>
                                     <td>{{ $boundaryBarangay['city_name'] ?? 'No city linked' }}</td>
@@ -1834,10 +1838,18 @@
                                     <td>{{ $boundaryBarangay['boundary_source'] ? strtoupper($boundaryBarangay['boundary_source']) : 'NONE' }}</td>
                                     <td>{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
                                     <td>
-                                        <a href="{{ route('station-admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-sync-btn" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-                                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                            Visit
-                                        </a>
+                                        <div class="boundary-action-group">
+                                            <form class="boundary-sync-form" method="POST" action="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
+                                                @csrf
+                                                <button type="submit" class="boundary-sync-btn" title="Fetch the latest barangay polygon from Geoapify">
+                                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                                    {{ $boundaryBarangay['boundary_status'] === 'synced' ? 'Refresh' : 'Sync' }}
+                                                </button>
+                                            </form>
+                                            <a href="{{ route('station-admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-visit-btn" title="Open barangay boundary details">
+                                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Details
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -1848,6 +1860,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $boundaryPage->onEachSide(1)->links() }}</div>
             </section>
 
             <div class="stats-grid">
@@ -1904,7 +1917,7 @@
             </div>
 
             <!-- Personnel Table -->
-            <div class="station-grid">
+            <div class="station-grid" id="personnelResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-user"></i> Personnel Management</h3>
                     <span class="stat-badge" id="personnelCount">{{ $stationOfficers->count() }} total</span>
@@ -1922,7 +1935,7 @@
                             </tr>
                         </thead>
                         <tbody id="personnelTableBody">
-                            @foreach ($stationOfficers as $officer)
+                            @foreach ($personnelPage as $officer)
                             @php
                                 $statusClass = strtolower($officer->status ?? 'unknown');
                                 $bgColor = '#6b728020';
@@ -1968,10 +1981,11 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $personnelPage->onEachSide(1)->links() }}</div>
             </div>
 
             <!-- Teams Table -->
-            <div class="station-grid">
+            <div class="station-grid" id="teamsResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-people-group"></i> Team Management</h3>
                     <span class="stat-badge" id="teamsCount">{{ $allTeam->count() }} teams</span>
@@ -1993,7 +2007,7 @@
                             </tr>
                         </thead>
                         <tbody id="teamsTableBody">
-                            @foreach ($allTeam as $team)
+                            @foreach ($teamsPage as $team)
                             @php
                                 $teamStatusClass = strtolower($team->status ?? 'unknown');
                                 $teamBgColor = '#6b728020';
@@ -2006,15 +2020,15 @@
                                 elseif ($teamStatusClass == 'off') { $teamBgColor = '#6b728020'; $teamTextColor = '#374151'; }
                                 elseif ($teamStatusClass == 'training') { $teamBgColor = '#14b8a620'; $teamTextColor = '#0f766e'; }
                             @endphp
-                            <tr class="team-row" data-team-id="{{ $team->team_id }}" data-status="{{ $teamStatusClass }}" data-station-id="{{ $team->station_id ?? '' }}">
+                            <tr class="team-row" data-team-id="{{ $team->team_id }}" data-status="{{ $teamStatusClass }}" data-station-id="{{ $team->station_id ?? $team->teamLeader?->station_id ?? '' }}">
                                 <td class="plain-sight-hidden" aria-hidden="true"><strong>{{ $team->team_id ?? 'N/A' }}</strong></td>
-                                <td data-label="Team Leader">{{ $team->teamLeader?->first_name ?? '' }} {{ $team->teamLeader?->last_name ?? '' }}<br><small>({{ $team->teamLeader?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Driver">{{ $team->commander?->first_name ?? '' }} {{ $team->commander?->last_name ?? '' }}<br><small>({{ $team->commander?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Pumper">{{ $team->pumpers?->first_name ?? '' }} {{ $team->pumpers?->last_name ?? '' }}<br><small>({{ $team->pumpers?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Officer 1">{{ $team->officer1?->first_name ?? '' }} {{ $team->officer1?->last_name ?? '' }}<br><small>({{ $team->officer1?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Officer 2">{{ $team->officer2?->first_name ?? '' }} {{ $team->officer2?->last_name ?? '' }}<br><small>({{ $team->officer2?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Officer 3">{{ $team->officer3?->first_name ?? '' }} {{ $team->officer3?->last_name ?? '' }}<br><small>({{ $team->officer3?->account_code ?? 'N/A' }})</small></td>
-                                <td data-label="Rescue/Radio">{{ $team->rescueRadio?->first_name ?? '' }} {{ $team->rescueRadio?->last_name ?? '' }}<br><small>({{ $team->rescueRadio?->account_code ?? 'N/A' }})</small></td>
+                                <td data-label="Team Leader"><strong>{{ trim(($team->teamLeader?->user?->first_name ?? '').' '.($team->teamLeader?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->teamLeader?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Driver"><strong>{{ trim(($team->commander?->user?->first_name ?? '').' '.($team->commander?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->commander?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Pumper"><strong>{{ trim(($team->pumpers?->user?->first_name ?? '').' '.($team->pumpers?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->pumpers?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Officer 1"><strong>{{ trim(($team->officer1?->user?->first_name ?? '').' '.($team->officer1?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer1?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Officer 2"><strong>{{ trim(($team->officer2?->user?->first_name ?? '').' '.($team->officer2?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer2?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Officer 3"><strong>{{ trim(($team->officer3?->user?->first_name ?? '').' '.($team->officer3?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer3?->user?->account_code ?? 'No account' }}</small></td>
+                                <td data-label="Rescue/Radio"><strong>{{ trim(($team->rescueRadio?->user?->first_name ?? '').' '.($team->rescueRadio?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->rescueRadio?->user?->account_code ?? 'No account' }}</small></td>
                                 <td data-label="Status">
                                     <select class="status-select" data-team-id="{{ $team->team_id }}" style="background: {{ $teamBgColor }}; color: {{ $teamTextColor }}; border-color: {{ $teamTextColor }}40;">
                                         <option value="available" {{ $team->status == 'available' ? 'selected' : '' }}>Available</option>
@@ -2034,19 +2048,13 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $teamsPage->onEachSide(1)->links() }}</div>
             </div>
 
            
 
-            @php
-                $systemUsers = collect($allusers)
-                    ->concat($citizens ?? collect())
-                    ->unique('user_id')
-                    ->values();
-            @endphp
-
             <!-- All System Users Table with Enhanced Filtering and Edit Functionality -->
-            <div class="station-grid">
+            <div class="station-grid" id="usersResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-users"></i> All System Users</h3>
                     <div class="filter-controls">
@@ -2086,7 +2094,7 @@
                             </tr>
                         </thead>
                         <tbody id="usersTableBody">
-                            @foreach ($systemUsers as $user)
+                            @foreach ($usersPage as $user)
                             <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
                                 <td data-label="Account Code"><strong>{{ $user->account_code ?? 'N/A' }}</strong></td>
@@ -2123,10 +2131,11 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $usersPage->onEachSide(1)->links() }}</div>
             </div>
 
              <!-- Equipment Inventory Table -->
-            <div class="station-grid">
+            <div class="station-grid" id="equipmentResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-kit-medical"></i> Equipment Items</h3>
                     <span class="stat-badge" id="equipmentCount">{{ $equipments->count() }} items</span>
@@ -2144,52 +2153,23 @@
                             </tr>
                         </thead>
                         <tbody id="equipmentTableBody">
-                            @php
-                                $stationEquipment = [];
-                                foreach ($equipments as $equip) {
-                                    $stationId = $equip->station_id ?? 'unassigned';
-                                    if (!isset($stationEquipment[$stationId])) {
-                                        $stationEquipment[$stationId] = [];
-                                    }
-                                    $found = false;
-                                    foreach ($stationEquipment[$stationId] as &$item) {
-                                        if ($item['equipment_id'] == $equip->equipment_id) {
-                                            $item['quantity']++;
-                                            $found = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!$found) {
-                                        $stationEquipment[$stationId][] = [
-                                            'equipment_id' => $equip->equipment_id,
-                                            'name' => $equip->equipment_name,
-                                            'category' => $equip->category ?? 'Uncategorized',
-                                            'type' => $equip->type ?? 'Unspecified',
-                                            'quantity' => 1,
-                                            'station_id' => $stationId,
-                                            'station_name' => $equip->station->station_name ?? 'Unassigned'
-                                        ];
-                                    }
-                                }
-                            @endphp
-                            @foreach ($stationEquipment as $items)
-                                @foreach ($items as $item)
-                                <tr class="equipment-row" data-equipment-id="{{ $item['equipment_id'] }}" data-station-id="{{ $item['station_id'] }}" data-category="{{ $item['category'] }}" data-type="{{ $item['type'] }}">
-                                    <td data-label="Equipment Name"><strong>{{ $item['name'] }}</strong></td>
-                                    <td data-label="Category">{{ $item['category'] }}</td>
+                            @foreach ($equipmentPage as $item)
+                                <tr class="equipment-row" data-equipment-id="{{ $item->equipment_id }}" data-category="{{ $item->category ?? 'Uncategorized' }}" data-type="{{ $item->type ?? 'Unspecified' }}">
+                                    <td data-label="Equipment Name"><strong>{{ $item->equipment_name }}</strong></td>
+                                    <td data-label="Category">{{ $item->category ?? 'Uncategorized' }}</td>
                                     {{-- <td class="equipment-station">{{ $item['station_name'] }}</td> --}}
                                     {{-- <td><span class="status-badge" style="background: #10b98120; color: #065f46; padding: 4px 10px; border-radius: 20px; font-weight: 600;">{{ $item['quantity'] }}</span></td> --}}
                                     {{-- <td><span class="status operational">Available</span></td> --}}
                                     <td class="actions" data-label="Actions">
-                                        <button class="action-btn edit-resource" onclick="editEquipment({{ $item['equipment_id'] }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-                                        <button class="action-btn delete-resource" onclick="deleteEquipment({{ $item['equipment_id'] }})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                        <button class="action-btn edit-resource" onclick="editEquipment({{ $item->equipment_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                        <button class="action-btn delete-resource" onclick="deleteEquipment({{ $item->equipment_id }})" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                     </td>
                                 </tr>
-                                @endforeach
                             @endforeach
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $equipmentPage->onEachSide(1)->links() }}</div>
             </div>
 
 
@@ -2591,13 +2571,13 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-truck-fast"></i> Driver <span style="color: #dc2626;">*</span></label>
-                        <select class="form-select" name="commander_driver" id="driverSelect" disabled >
+                        <select class="form-select" name="commander_driver" id="driverSelect" disabled required>
                             <option value="">Select Driver</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-water"></i> Pumper <span style="color: #dc2626;">*</span></label>
-                        <select class="form-select" name="pumper" id="pumperSelect" disabled >
+                        <select class="form-select" name="pumper" id="pumperSelect" disabled required>
                             <option value="">Select Pumper</option>
                         </select>
                     </div>
@@ -3230,11 +3210,12 @@
     <script>
         window.resourcesData = {
             stationOfficers: @json($stationOfficers),
-            allTeam: @json($allTeam),
+            allTeam: @json($teamData),
             equipments: @json($equipments),
             activeStations: @json($activeStations),
             users: @json($users),
-            allUsers: @json($systemUsers)
+            allUsers: @json($systemUsers),
+            teamBaseUrl: @json(url(request()->is('admin/*') ? '/admin/teams' : '/station-admin/teams'))
         };
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
@@ -3854,7 +3835,8 @@ if (officerForm) {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ status: newStatus })
                 })
@@ -3883,7 +3865,7 @@ if (officerForm) {
                 const teamId = this.dataset.teamId;
                 const newStatus = this.value;
                 
-                fetch(`/admin/teams/${teamId}/status`, {
+                fetch(`${window.resourcesData.teamBaseUrl}/${teamId}/status`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4002,16 +3984,27 @@ if (officerForm) {
         //     document.getElementById('editTeamModal').style.display = 'flex';
         //     document.getElementById('editTeamModal').classList.add('active');
         // }
-        function resolveTeamMemberUser(team, relationKey, fieldKey) {
+function normalizeTeamMember(officer) {
+    if (!officer || typeof officer !== 'object') return null;
+    const user = officer.user && typeof officer.user === 'object' ? officer.user : officer;
+    return {
+        ...user,
+        station_officer_id: officer.station_officer_id || user.station_officer_id || null,
+        rank: officer.rank || user.rank || '',
+        status: officer.status || user.status || ''
+    };
+}
+
+function resolveTeamMemberUser(team, relationKey, fieldKey) {
     const relationValue = team?.[relationKey];
     if (relationValue && typeof relationValue === 'object' && !Array.isArray(relationValue)) {
-        return relationValue;
+        return normalizeTeamMember(relationValue);
     }
 
     const serializedRelationKey = relationKey.replace(/([A-Z])/g, '_$1').toLowerCase();
     const serializedRelationValue = team?.[serializedRelationKey];
     if (serializedRelationValue && typeof serializedRelationValue === 'object' && !Array.isArray(serializedRelationValue)) {
-        return serializedRelationValue;
+        return normalizeTeamMember(serializedRelationValue);
     }
 
     const fallbackUserId = team?.[fieldKey];
@@ -4019,17 +4012,27 @@ if (officerForm) {
         return null;
     }
 
-    const allUsers = window.resourcesData.allUsers || [];
-    return allUsers.find(user => String(user.user_id) === String(fallbackUserId)) || null;
+    const stationOfficers = window.resourcesData.stationOfficers || [];
+    const officer = stationOfficers.find(item => String(item.station_officer_id) === String(fallbackUserId));
+    return normalizeTeamMember(officer);
+}
+
+function escapeResourceHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 }
 
 function formatTeamMemberLabel(user, emptyLabel = 'Unassigned') {
     if (!user) {
-        return emptyLabel;
+        return escapeResourceHtml(emptyLabel);
     }
 
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.replace(/\s+/g, ' ').trim();
-    return `${fullName || emptyLabel} (${user.account_code || 'N/A'})`;
+    return `${escapeResourceHtml(fullName || emptyLabel)} (${escapeResourceHtml(user.account_code || 'N/A')})`;
 }
 
 function buildEditTeamOptionLabel(user) {
@@ -4038,7 +4041,7 @@ function buildEditTeamOptionLabel(user) {
 
 function getTeamMemberSelectionValue(team, relationKey, fieldKey) {
     const resolvedUser = resolveTeamMemberUser(team, relationKey, fieldKey);
-    return resolvedUser?.user_id || team?.[fieldKey] || '';
+    return resolvedUser?.station_officer_id || team?.[fieldKey] || '';
 }
 
 function getEligibleEditTeamUsers(defaultSelections = {}, fallbackSelectedUsers = []) {
@@ -4049,19 +4052,20 @@ function getEligibleEditTeamUsers(defaultSelections = {}, fallbackSelectedUsers 
             .map(value => String(value))
     );
 
-    return stationOfficers
+    const eligibleUsers = stationOfficers
         .filter(officer => {
             const user = officer.user || {};
             const roleName = String(user.role?.role || '').toLowerCase();
-            const userId = String(officer.user_id || user.user_id || '');
-            const isCurrentSelection = selectedIds.has(userId);
-            const isFirefighter = roleName === 'firefighter';
+            const officerId = String(officer.station_officer_id || '');
+            const isCurrentSelection = selectedIds.has(officerId);
+            const isEligibleRole = !['admin', 'chief', 'station admin', 'provincial admin'].includes(roleName);
             const isAvailable = String(officer.status || '').toLowerCase() === 'available';
 
-            return Boolean(userId) && isFirefighter && (isAvailable || isCurrentSelection);
+            return Boolean(officerId) && isEligibleRole && (isAvailable || isCurrentSelection);
         })
         .map(officer => ({
-            user_id: officer.user_id || officer.user?.user_id,
+            user_id: officer.station_officer_id,
+            station_officer_id: officer.station_officer_id,
             first_name: officer.user?.first_name || '',
             middle_name: officer.user?.middle_name || '',
             last_name: officer.user?.last_name || '',
@@ -4072,13 +4076,14 @@ function getEligibleEditTeamUsers(defaultSelections = {}, fallbackSelectedUsers 
         }));
 
     fallbackSelectedUsers.forEach(user => {
-        if (!user?.user_id) return;
+        if (!user?.station_officer_id) return;
 
-        const userId = String(user.user_id);
+        const userId = String(user.station_officer_id);
         const alreadyIncluded = eligibleUsers.some(existingUser => String(existingUser.user_id) === userId);
         if (selectedIds.has(userId) && !alreadyIncluded) {
             eligibleUsers.push({
-                user_id: user.user_id,
+                user_id: user.station_officer_id,
+                station_officer_id: user.station_officer_id,
                 first_name: user.first_name || '',
                 middle_name: user.middle_name || '',
                 last_name: user.last_name || '',
@@ -4187,7 +4192,7 @@ function attachEditTeamSelectSync() {
                     <div class="resource-profile-avatar">${teamInitials}</div>
                     <div class="resource-profile-heading">
                         <div class="resource-profile-name">Edit Team #${team.team_id}</div>
-                        <div class="resource-profile-meta">${teamLeaderName} | ${team.status || 'Unknown'} status</div>
+                        <div class="resource-profile-meta">${escapeResourceHtml(teamLeaderName)} | ${escapeResourceHtml(team.status || 'Unknown')} status</div>
                     </div>
                 </div>
                 <div class="resource-detail-section">
@@ -4381,11 +4386,12 @@ function submitTeamUpdate() {
         return;
     }
     
-    fetch(`/admin/teams/${currentTeamId}`, {
+    fetch(`${window.resourcesData.teamBaseUrl}/${currentTeamId}`, {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': csrfToken,
-            'X-HTTP-Method-Override': 'PUT'
+            'X-HTTP-Method-Override': 'PUT',
+            'Accept': 'application/json'
         },
         body: formData
     })
@@ -4546,13 +4552,13 @@ function validateTeamMembers(formData) {
                             <div class="resource-profile-avatar">${teamInitials}</div>
                             <div class="resource-profile-heading">
                                 <div class="resource-profile-name">Team #${team.team_id}</div>
-                                <div class="resource-profile-meta">${teamLeaderName} | ${team.status || 'Unknown'} status</div>
+                                <div class="resource-profile-meta">${escapeResourceHtml(teamLeaderName)} | ${escapeResourceHtml(team.status || 'Unknown')} status</div>
                             </div>
                         </div>
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Team Overview</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${team.status?.toLowerCase()}">${team.status || 'Unknown'}</span></div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${escapeResourceHtml(team.status?.toLowerCase())}">${escapeResourceHtml(team.status || 'Unknown')}</span></div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Team Leader</div><div class="detail-value">${formatTeamMemberLabel(teamLeader, 'Unassigned Leader')}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Driver</div><div class="detail-value">${formatTeamMemberLabel(commander, 'Unassigned Driver')}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Pumper</div><div class="detail-value">${formatTeamMemberLabel(pumper, 'Unassigned Pumper')}</div></div>
@@ -5254,13 +5260,96 @@ function validateTeamMembers(formData) {
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
             
-            if (search) search.addEventListener('input', filterAll);
-            if (status) status.addEventListener('change', filterAll);
+            let resourceFilterTimer = null;
+            const resourceSectionIds = [
+                'boundaryResourceSection',
+                'personnelResourceSection',
+                'teamsResourceSection',
+                'usersResourceSection',
+                'equipmentResourceSection'
+            ];
+
+            const bindDynamicStatusControls = () => {
+                document.querySelectorAll('.status-select[data-officer-id]').forEach((select) => {
+                    if (select.dataset.dynamicBound === 'true') return;
+                    select.dataset.dynamicBound = 'true';
+                    select.addEventListener('change', function () {
+                        const officerId = this.dataset.officerId;
+                        fetch(`/station-admin/station-officers/${officerId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                            body: JSON.stringify({ status: this.value })
+                        }).then((response) => response.json()).then((data) => {
+                            if (!data.success) throw new Error(data.message || 'Unable to update status.');
+                            updateSelectStyle(this, this.value);
+                            showToast('Status updated successfully');
+                        }).catch((error) => showToast(error.message || 'Unable to update status.', 'error'));
+                    });
+                });
+
+                document.querySelectorAll('.status-select[data-team-id]').forEach((select) => {
+                    if (select.dataset.dynamicBound === 'true') return;
+                    select.dataset.dynamicBound = 'true';
+                    select.addEventListener('change', function () {
+                        fetch(`${window.resourcesData.teamBaseUrl}/${this.dataset.teamId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                            body: JSON.stringify({ status: this.value })
+                        }).then((response) => response.json()).then((data) => {
+                            if (!data.success) throw new Error(data.message || 'Unable to update team status.');
+                            updateSelectStyle(this, this.value);
+                            showToast('Team status updated successfully');
+                        }).catch((error) => showToast(error.message || 'Unable to update team status.', 'error'));
+                    });
+                });
+            };
+
+            const loadResourceTables = async (targetUrl = window.location.href, resetPages = false) => {
+                const url = new URL(targetUrl, window.location.origin);
+                url.searchParams.set('resource_search', search?.value.trim() || '');
+                url.searchParams.set('resource_status', status?.value || '');
+                url.searchParams.set('user_role', roleFilter?.value || '');
+                url.searchParams.set('user_sort', sortFilter?.value || 'name_asc');
+                if (resetPages) {
+                    ['personnel_page', 'teams_page', 'users_page', 'equipment_page', 'boundaries_page'].forEach((key) => url.searchParams.delete(key));
+                }
+
+                resourceSectionIds.forEach((id) => document.getElementById(id)?.setAttribute('aria-busy', 'true'));
+                try {
+                    const response = await fetch(url.toString(), { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!response.ok) throw new Error('Unable to load resource records.');
+                    const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    resourceSectionIds.forEach((id) => {
+                        const current = document.getElementById(id);
+                        const replacement = documentCopy.getElementById(id);
+                        if (current && replacement) current.innerHTML = replacement.innerHTML;
+                    });
+                    window.history.replaceState({}, '', url.toString());
+                    bindDynamicStatusControls();
+                } catch (error) {
+                    showToast(error.message || 'Unable to load resource records.', 'error');
+                } finally {
+                    resourceSectionIds.forEach((id) => document.getElementById(id)?.removeAttribute('aria-busy'));
+                }
+            };
+
+            if (search) search.addEventListener('input', () => {
+                clearTimeout(resourceFilterTimer);
+                resourceFilterTimer = setTimeout(() => loadResourceTables(window.location.href, true), 300);
+            });
+            if (status) status.addEventListener('change', () => loadResourceTables(window.location.href, true));
             if (station) station.addEventListener('change', filterAll);
-            if (roleFilter) roleFilter.addEventListener('change', filterUsers);
-            if (sortFilter) sortFilter.addEventListener('change', sortUsers);
+            if (roleFilter) roleFilter.addEventListener('change', () => loadResourceTables(window.location.href, true));
+            if (sortFilter) sortFilter.addEventListener('change', () => loadResourceTables(window.location.href, true));
             if (registerUserRole) registerUserRole.addEventListener('change', toggleRegisterUserRankField);
-            if (refresh) refresh.addEventListener('click', () => location.reload());
+            if (refresh) refresh.addEventListener('click', () => loadResourceTables(window.location.href));
+
+            document.addEventListener('click', (event) => {
+                const paginationLink = event.target.closest('.resource-pagination a');
+                if (!paginationLink) return;
+                event.preventDefault();
+                loadResourceTables(paginationLink.href);
+            });
 
             toggleRegisterUserRankField();
 
@@ -5529,21 +5618,26 @@ function loadOfficersData() {
         }
         
         const userData = officer.user || {};
-        const userId = officer.user_id || userData.user_id;
+        const officerId = officer.station_officer_id;
         const roleName = String(userData.role?.role || '').toLowerCase();
         const excludedRoles = new Set(['admin', 'chief', 'station admin']);
 
         if (excludedRoles.has(roleName)) {
             return;
         }
+
+        if (String(officer.status || '').toLowerCase() !== 'available') {
+            return;
+        }
         
         // Skip officers already in a team
-        if (officersInTeams.has(parseInt(userId))) {
+        if (officersInTeams.has(parseInt(officerId))) {
             return;
         }
         
         const officerData = {
-            user_id: userId,
+            user_id: officerId,
+            station_officer_id: officerId,
             first_name: userData.first_name || '',
             middle_name: userData.middle_name || '',
             last_name: userData.last_name || '',
@@ -6099,21 +6193,16 @@ document.getElementById('createTeamForm')?.addEventListener('submit', function(e
     
     // Submit form
     const formData = new FormData(this);
-    formData.delete('station_id'); // Remove station_id - it's NOT in your teams table
-    
-    console.log('Sending form data (without station_id):', [...formData.entries()]);
-    console.log('form:',formData);
-    console.log('Before delete:', [...formData.entries()]);
     const submitBtn = document.getElementById('createTeamSubmitBtn');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
     submitBtn.disabled = true;
     
-    fetch('/admin/teams', {
+    fetch(window.resourcesData.teamBaseUrl, {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': csrfToken,
-
+            'Accept': 'application/json'
         },
         body: formData
     })

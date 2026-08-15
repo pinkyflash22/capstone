@@ -1,5 +1,12 @@
 <?php
 
+$configuredAiPythonBinary = (string) env('AI_PYTHON_BINARY', 'python');
+$aiPythonBinary = PHP_OS_FAMILY === 'Windows'
+    && strtolower(trim($configuredAiPythonBinary)) === 'python'
+    && is_file('C:/Program Files/Python314/python.exe')
+        ? 'C:/Program Files/Python314/python.exe'
+        : $configuredAiPythonBinary;
+
 return [
 
     /*
@@ -43,6 +50,11 @@ return [
 
     'geoapify' => [
         'key' => env('GEOAPIFY_KEY'),
+        'country_code' => env('GEOAPIFY_COUNTRY_CODE', 'ph'),
+        'country' => env('GEOAPIFY_COUNTRY', 'Philippines'),
+        'region' => env('GEOAPIFY_REGION', 'Ilocos Region'),
+        'boundary_geometry' => env('GEOAPIFY_BOUNDARY_GEOMETRY', 'geometry_1000'),
+        'boundary_sync_limit' => (int) env('GEOAPIFY_BOUNDARY_SYNC_LIMIT', 20),
     ],
 
     'openrouter' => [
@@ -77,14 +89,15 @@ return [
     ],
 
     'ai_prediction' => [
-        'python_binary' => env('AI_PYTHON_BINARY', 'python'),
+        'python_binary' => $aiPythonBinary,
+        'python_path' => env('AI_PYTHONPATH', ''),
         'prediction_script' => env('AI_PREDICTION_SCRIPT', 'capstone-ai/predict_event.py'),
         'training_script' => env('AI_TRAINING_SCRIPT', 'capstone-ai/train_model.py'),
         'evaluation_script' => env('AI_EVALUATION_SCRIPT', 'capstone-ai/evaluate_model.py'),
         'dataset_path' => env('AI_DATASET_PATH', 'capstone-ai/station_barangay_monthly_db.json'),
         'model_path' => env('AI_MODEL_PATH', 'capstone-ai/fire_model.pkl'),
         'metadata_path' => env('AI_MODEL_METADATA_PATH', 'capstone-ai/fire_model_metadata.json'),
-        'evaluation_cache_path' => env('AI_MODEL_EVALUATION_CACHE_PATH', 'capstone-ai/fire_model_evaluation.json'),
+        'evaluation_cache_path' => env('AI_MODEL_EVALUATION_CACHE_PATH', 'storage/app/ai/fire_model_evaluation.json'),
     ],
 
 ];

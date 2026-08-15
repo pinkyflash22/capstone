@@ -34,7 +34,7 @@ class HistoricalFireIncidentSynchronizer
         $progressReport = $spotReport?->progressInvestigation;
         $finalReport = $progressReport?->finalInvestigation;
         $context = $incident->context;
-        $createdAt = $incident->created_at ?? now();
+        $occurredAt = $incident->occurred_at ?? $incident->created_at ?? now();
 
         $historical = HistoricalFireIncident::firstOrNew([
             'incident_id' => $incident->incident_id,
@@ -44,13 +44,15 @@ class HistoricalFireIncidentSynchronizer
             'barangay_id' => $barangayFireRecord?->barangayHall?->barangay_id
                 ?? $incident->reporter?->address?->barangay_id
                 ?? $historical->barangay_id,
-            'incident_date' => $spotReport?->fire_started?->toDateString()
+            'incident_date' => $incident->occurred_at?->toDateString()
+                ?? $spotReport?->fire_started?->toDateString()
                 ?? $barangayFireRecord?->incident_date?->toDateString()
                 ?? $historical->incident_date
-                ?? $createdAt->toDateString(),
-            'incident_time' => $spotReport?->fire_started?->format('H:i:s')
+                ?? $occurredAt->toDateString(),
+            'incident_time' => $incident->occurred_at?->format('H:i:s')
+                ?? $spotReport?->fire_started?->format('H:i:s')
                 ?? $historical->incident_time
-                ?? $createdAt->format('H:i:s'),
+                ?? $occurredAt->format('H:i:s'),
             'source_name' => $historical->source_name ?: 'System Fire Incident Report',
             'source_type' => 'system_incident',
             'source_reference' => $historical->source_reference ?: 'incident:' . $incident->incident_id,

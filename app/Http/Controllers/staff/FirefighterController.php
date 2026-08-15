@@ -820,6 +820,8 @@ class FirefighterController extends Controller
                 'id' => $incident->incident_id,
                 'label' => $label,
                 'updated_at' => optional($incident->updated_at)->format('Y-m-d\TH:i'),
+                'occurred_at' => optional($incident->occurred_at)->format('Y-m-d\TH:i'),
+                'occurred_at_verified' => (bool) $incident->occurred_at_verified_at,
             ];
         })->values()->all();
     }

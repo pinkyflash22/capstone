@@ -7,6 +7,106 @@ use Illuminate\Support\Facades\DB;
 
 class PredictedRiskAreaService
 {
+    public function buildForecastAreas(?int $stationId): Collection
+    {
+        $analyses = DB::table('analysis')
+            ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+            ->orderByDesc('created_at')
+            ->orderByDesc('analysis_id')
+            ->limit(100)
+            ->get([
+                'analysis_id',
+                'station_id',
+                'risk_level',
+                'confidence_data',
+                'analysis_data',
+                'revision_number',
+                'created_at',
+            ]);
+
+        $locations = $this->forecastBarangayLocations($stationId);
+        $areas = collect();
+        $seen = [];
+
+        foreach ($analyses as $analysis) {
+            $analysisData = $this->decodeJsonArray($analysis->analysis_data);
+            $rawData = is_array($analysisData['raw_data'] ?? null) ? $analysisData['raw_data'] : $analysisData;
+            $scope = strtolower((string) ($rawData['prediction_scope'] ?? 'current_month'));
+            $overlayType = $scope === 'next_month' ? 'next_month_forecast' : 'current_analysis';
+            $predictions = collect($rawData['barangay_predictions'] ?? [])
+                ->filter(fn ($item) => is_array($item) && (int) ($item['barangay_id'] ?? 0) > 0);
+
+            foreach ($predictions as $prediction) {
+                $barangayId = (int) $prediction['barangay_id'];
+                $dedupeKey = $overlayType . ':' . $barangayId;
+                if (isset($seen[$dedupeKey])) {
+                    continue;
+                }
+
+                $location = $locations->get($barangayId);
+                if (! $location) {
+                    continue;
+                }
+
+                $riskLevel = $this->normalizeForecastRiskLevel(
+                    $prediction['risk_level'] ?? $analysis->risk_level ?? 'low'
+                );
+                $probability = $prediction['probability_percent']
+                    ?? (isset($prediction['probability']) ? ((float) $prediction['probability'] * 100) : null);
+                $drivers = collect($prediction['drivers'] ?? [])
+                    ->map(fn ($driver) => is_array($driver) ? ($driver['summary'] ?? $driver['feature'] ?? null) : $driver)
+                    ->filter()
+                    ->map(fn ($driver) => (string) $driver)
+                    ->values()
+                    ->all();
+                $targetLabel = data_get($rawData, 'prediction_context.target_month_label')
+                    ?? data_get($rawData, 'prediction_context.target_period_label');
+
+                $area = [
+                    'id' => "{$overlayType}-{$analysis->analysis_id}-{$barangayId}",
+                    'overlay_type' => $overlayType,
+                    'source_type' => 'saved_ai_forecast',
+                    'name' => ($prediction['barangay_name'] ?? $location->barangay_name) . ' fire-risk forecast',
+                    'barangay_id' => $barangayId,
+                    'barangay_names' => [$prediction['barangay_name'] ?? $location->barangay_name],
+                    'city_name' => $prediction['city_name'] ?? $location->city_name,
+                    'risk_level' => $riskLevel,
+                    'risk_score' => $probability !== null ? round((float) $probability, 2) : null,
+                    'probability_percent' => $probability !== null ? round((float) $probability, 2) : null,
+                    'confidence_percent' => is_numeric($analysis->confidence_data) ? (int) $analysis->confidence_data : null,
+                    'predicted_fire_incidents' => (int) ($prediction['expected_month_total_fire_incidents']
+                        ?? $prediction['predicted_fire_incidents']
+                        ?? $prediction['predicted_incident_count']
+                        ?? 0),
+                    'target_label' => $targetLabel,
+                    'analysis_id' => (int) $analysis->analysis_id,
+                    'revision_number' => (int) ($analysis->revision_number ?? 1),
+                    'drivers' => $drivers,
+                    'metrics' => [],
+                ];
+
+                if (! empty($location->geojson)) {
+                    $area['geometry_type'] = 'geojson';
+                    $area['geometry_precision'] = 'barangay_boundary';
+                    $area['geojson'] = $location->geojson;
+                } elseif (is_numeric($location->lat) && is_numeric($location->lng)) {
+                    // A barangay hall is only a reference point. Do not imply that a
+                    // fixed geographic radius around the hall is the predicted zone.
+                    $area['geometry_type'] = 'point';
+                    $area['geometry_precision'] = 'barangay_hall_reference';
+                    $area['center'] = ['lat' => (float) $location->lat, 'lng' => (float) $location->lng];
+                } else {
+                    continue;
+                }
+
+                $seen[$dedupeKey] = true;
+                $areas->push($area);
+            }
+        }
+
+        return $areas->values();
+    }
+
     public function buildPredictedAreas(?int $stationId, int $proximityMeters = 100): Collection
     {
         $evidence = $this->riskEvidencePoints($stationId)
@@ -125,7 +225,12 @@ class PredictedRiskAreaService
                 $query->whereNull('historical_fire_incidents.is_verified')
                     ->orWhere('historical_fire_incidents.is_verified', true);
             })
-            ->when($stationId, fn ($query) => $query->where('teams.station_id', $stationId))
+            ->when($stationId, function ($query) use ($stationId) {
+                $query->where(function ($stationQuery) use ($stationId) {
+                    $stationQuery->where('incidents.station_id', $stationId)
+                        ->orWhere('teams.station_id', $stationId);
+                });
+            })
             ->select([
                 'historical_fire_incidents.historical_fire_incident_id',
                 'historical_fire_incidents.barangay_id',
@@ -156,6 +261,70 @@ class PredictedRiskAreaService
                     'estimated_damage' => $row->estimated_damage !== null ? (float) $row->estimated_damage : 0.0,
                 ];
             });
+    }
+
+    protected function forecastBarangayLocations(?int $stationId): Collection
+    {
+        $rows = DB::table('barangays')
+            ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
+            ->leftJoin('barangay_halls', 'barangays.barangay_id', '=', 'barangay_halls.barangay_id')
+            ->leftJoin('markers', 'barangay_halls.marker_id', '=', 'markers.marker_id')
+            ->leftJoin('boundary_location', function ($join) use ($stationId) {
+                $join->on('barangays.barangay_id', '=', 'boundary_location.barangay_id')
+                    ->where('boundary_location.boundary_type', '=', 'barangay');
+                if ($stationId) {
+                    $join->where(function ($query) use ($stationId) {
+                        $query->where('boundary_location.station_id', $stationId)
+                            ->orWhereNull('boundary_location.station_id');
+                    });
+                }
+            })
+            ->select([
+                'barangays.barangay_id',
+                'barangays.barangay_name',
+                'cities.city_name',
+                'markers.lat',
+                'markers.lng',
+                'boundary_location.geojson',
+                'boundary_location.station_id as boundary_station_id',
+                'boundary_location.updated_at as boundary_updated_at',
+            ])
+            ->get()
+            ->map(function ($row) {
+                $row->geojson = $this->decodeJsonArray($row->geojson);
+                return $row;
+            })
+            ->sortByDesc(fn ($row) => [
+                ! empty($row->geojson) ? 1 : 0,
+                $row->boundary_station_id !== null ? 1 : 0,
+                (string) ($row->boundary_updated_at ?? ''),
+            ]);
+
+        return $rows->unique('barangay_id')->keyBy(fn ($row) => (int) $row->barangay_id);
+    }
+
+    protected function decodeJsonArray(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    protected function normalizeForecastRiskLevel(mixed $level): string
+    {
+        $normalized = strtolower(trim((string) $level));
+        if (in_array($normalized, ['moderate', 'medium'], true)) {
+            return 'medium';
+        }
+
+        return in_array($normalized, ['high', 'low'], true) ? $normalized : 'low';
     }
 
     protected function clusterEvidencePoints(Collection $points, int $proximityMeters): Collection

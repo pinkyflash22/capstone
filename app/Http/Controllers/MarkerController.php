@@ -151,7 +151,7 @@ class MarkerController extends Controller
         return response()->json([
             'success' => true,
             'data' => MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all(),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
    

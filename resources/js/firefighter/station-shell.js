@@ -729,8 +729,19 @@ function bootFirefighterMyStationPage() {
         const officerSelects = spotForm?.querySelectorAll('select[data-station-ref="officers"]');
         if (!incidentSelect || !officerSelects) return;
 
-        incidentSelect.innerHTML = `<option value="">Select incident</option>${createOptions(data.incidents || [], '', (item) => `data-updated-at="${escapeHtml(item.updated_at || '')}" data-location="${escapeHtml(item.label || '')}"` )}`;
+        incidentSelect.innerHTML = `<option value="">Select incident</option>${createOptions(data.incidents || [], '', (item) => `data-updated-at="${escapeHtml(item.updated_at || '')}" data-occurred-at="${escapeHtml(item.occurred_at || '')}" data-occurred-at-verified="${item.occurred_at_verified ? '1' : '0'}" data-location="${escapeHtml(item.label || '')}"` )}`;
         officerSelects.forEach((select) => populateOfficerSelect(select));
+
+        if (incidentSelect.dataset.occurrenceBound !== 'true') {
+            incidentSelect.dataset.occurrenceBound = 'true';
+            incidentSelect.addEventListener('change', () => {
+                const selected = incidentSelect.options[incidentSelect.selectedIndex];
+                const occurredAtInput = spotForm?.querySelector('input[name="fire_started"]');
+                if (occurredAtInput && selected?.dataset?.occurredAt) {
+                    occurredAtInput.value = selected.dataset.occurredAt.slice(0, 16);
+                }
+            });
+        }
     }
 
     function populateProgressModal(data) {
@@ -1057,7 +1068,7 @@ function bootFirefighterMyStationPage() {
                     <div class="form-group full"><label class="form-label">Owner</label><input class="form-input" type="text" name="owner" value="${escapeHtml(report.owner || '')}"></div>
                     <div class="form-group"><label class="form-label">Report Completed</label><input class="form-input" type="datetime-local" name="report_completed_at" value="${escapeHtml((report.report_completed_at || '').slice(0, 16))}"></div>
                     <div class="form-group"><label class="form-label">Memorandum For</label><input class="form-input" type="text" name="memorandum_for" value="${escapeHtml(report.memorandum_for || '')}"></div>
-                    <div class="form-group"><label class="form-label">Fire Started</label><input class="form-input" type="datetime-local" name="fire_started" value="${escapeHtml((report.fire_started || '').slice(0, 16))}"></div>
+                    <div class="form-group"><label class="form-label">Fire Occurred At</label><input class="form-input" type="datetime-local" name="fire_started" value="${escapeHtml((report.fire_started || '').slice(0, 16))}"><small class="table-muted">Correcting this updates the verified incident occurrence time and its audit history.</small></div>
                     <div class="form-group"><label class="form-label">Fire Out</label><input class="form-input" type="datetime-local" name="fire_out" value="${escapeHtml((report.fire_out || '').slice(0, 16))}"></div>
                     <div class="form-group full"><label class="form-label">Place of Occurrence</label><input class="form-input" type="text" name="place_of_occurrence" value="${escapeHtml(report.place_of_occurrence || '')}"></div>
                     <div class="form-group"><label class="form-label">Estimated Damage</label><input class="form-input" type="number" min="0" step="0.01" name="estimated_damage" value="${escapeHtml(report.estimated_damage || 0)}"></div>

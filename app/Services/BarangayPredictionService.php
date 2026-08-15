@@ -25,7 +25,9 @@ class BarangayPredictionService
             );
         }
 
-        $versionCheck = Process::path(base_path())->run([$this->pythonBinary(), '--version']);
+        $versionCheck = Process::path(base_path())
+            ->env($this->pythonEnvironment())
+            ->run([$this->pythonBinary(), '--version']);
 
         if ($versionCheck->failed()) {
             throw new RuntimeException(
@@ -36,22 +38,34 @@ class BarangayPredictionService
 
     public function predict(array $payload): ?array
     {
+        $results = $this->predictMany([$payload]);
+
+        return $results[0] ?? null;
+    }
+
+    public function predictMany(array $payloads): array
+    {
+        if ($payloads === []) {
+            return [];
+        }
+
         $scriptPath = $this->relativeScriptPath();
 
         $process = Process::path(base_path())
-            ->input(json_encode($payload))
+            ->env($this->pythonEnvironment())
+            ->input(json_encode(array_values($payloads)))
             ->run([$this->pythonBinary(), $scriptPath]);
 
         if ($process->failed()) {
             Log::warning('Python barangay prediction process failed', [
                 'error' => $process->errorOutput(),
                 'output' => $process->output(),
-                'payload' => $payload,
+                'payload_count' => count($payloads),
                 'python_binary' => $this->pythonBinary(),
                 'script_path' => $scriptPath,
             ]);
 
-            return null;
+            return [];
         }
 
         $decoded = json_decode($process->output(), true);
@@ -59,18 +73,45 @@ class BarangayPredictionService
         if (! is_array($decoded)) {
             Log::warning('Python barangay prediction output was not valid JSON', [
                 'output' => $process->output(),
-                'payload' => $payload,
+                'payload_count' => count($payloads),
             ]);
 
-            return null;
+            return [];
         }
 
-        return $decoded;
+        return array_is_list($decoded) ? $decoded : [$decoded];
     }
 
     private function pythonBinary(): string
     {
-        return (string) config('services.ai_prediction.python_binary', 'python');
+        $configuredBinary = (string) config('services.ai_prediction.python_binary', 'python');
+
+        if (PHP_OS_FAMILY === 'Windows' && strtolower(trim($configuredBinary)) === 'python') {
+            $bundledPython = 'C:/Program Files/Python314/python.exe';
+
+            if (File::exists($bundledPython)) {
+                return $bundledPython;
+            }
+        }
+
+        return $configuredBinary;
+    }
+
+    private function pythonEnvironment(): array
+    {
+        $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
+        $environment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
+                $value = getenv($name);
+                if (is_string($value) && $value !== '') {
+                    $environment[$name] = $value;
+                }
+            }
+        }
+
+        return $environment;
     }
 
     private function relativeScriptPath(): string

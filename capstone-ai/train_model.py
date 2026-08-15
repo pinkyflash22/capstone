@@ -446,15 +446,36 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         - df["ai_checklist_item_followed_ratio"] * 1.0
     )
 
+    nonzero_incidents = df.loc[df["incident_count"] > 0, "incident_count"]
+    incident_threshold = max(
+        3,
+        int(math.ceil(nonzero_incidents.quantile(0.75))) if not nonzero_incidents.empty else 3,
+    )
+    positive_damage = df.loc[df["estimated_damage"].fillna(0) > 0, "estimated_damage"]
+    damage_threshold = max(
+        150000.0,
+        float(positive_damage.quantile(0.75)) if not positive_damage.empty else 150000.0,
+    )
+
+    moderate_with_evidence = (
+        (df["risk_level"].str.lower() == "medium")
+        & (
+            (df["incident_count"] >= 1)
+            | (df["risk_area_pressure_signal"] >= 1)
+            | (df["estimated_damage"].fillna(0) >= 50000)
+        )
+    )
+
+    # Medium is a watch level and only becomes a positive training outcome when
+    # it is corroborated by incidents, verified field pressure, or damage.
     df["target_high_risk_barangay_month"] = (
-        (df["risk_level"].str.lower().isin(["medium", "high"])) |
-        (df["incident_count"] >= 1) |
-        (df["estimated_damage"].fillna(0) >= 50000)
+        (df["risk_level"].str.lower() == "high") |
+        moderate_with_evidence |
+        (df["incident_count"] >= incident_threshold) |
+        (df["estimated_damage"].fillna(0) >= damage_threshold)
     ).astype(int)
 
     feature_columns = [
-        "station_id",
-        "barangay_id",
         "year",
         "average_temperature",
         "average_humidity",
@@ -494,7 +515,6 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "humidity_signal",
         "wind_signal",
         "barangay_pressure_signal",
-        "barangay_name",
         "weather_condition",
         "season",
         "hazard_category",
@@ -516,7 +536,6 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "target_column": "target_high_risk_barangay_month",
         "raw_feature_columns": STATION_BARANGAY_MONTHLY_COLUMNS,
         "categorical_features": [
-            "barangay_name",
             "weather_condition",
             "season",
             "hazard_category",
@@ -533,8 +552,6 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "occupancy",
         ],
         "numeric_features": [
-            "station_id",
-            "barangay_id",
             "year",
             "average_temperature",
             "average_humidity",
@@ -578,6 +595,12 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "barangay_pressure_signal",
         ],
         "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
+        "target_policy": {
+            "risk_level": "high, or medium with corroborating evidence",
+            "incident_count_threshold": incident_threshold,
+            "estimated_damage_threshold": round(damage_threshold, 2),
+            "identity_features_excluded": ["station_id", "barangay_id", "barangay_name"],
+        },
         "regression_targets": {
             "predicted_incident_count": "incident_count",
             "predicted_estimated_damage": "estimated_damage",
@@ -905,6 +928,38 @@ def build_example_profiles(X: pd.DataFrame, y: pd.Series) -> dict:
     }
 
 
+def build_calibration_summary(y_true: pd.Series, probabilities) -> dict:
+    frame = pd.DataFrame({"actual": list(y_true), "probability": list(probabilities)})
+    frame["bin"] = pd.cut(
+        frame["probability"],
+        bins=[0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1],
+        include_lowest=True,
+    )
+    bins = []
+    expected_calibration_error = 0.0
+
+    for interval, group in frame.groupby("bin", observed=True):
+        if group.empty:
+            continue
+        mean_probability = float(group["probability"].mean())
+        observed_rate = float(group["actual"].mean())
+        expected_calibration_error += abs(mean_probability - observed_rate) * (len(group) / max(1, len(frame)))
+        bins.append({
+            "range": str(interval),
+            "count": int(len(group)),
+            "mean_probability": round(mean_probability, 4),
+            "observed_rate": round(observed_rate, 4),
+        })
+
+    return {
+        "method": "sigmoid_cv",
+        "expected_calibration_error": round(expected_calibration_error, 4),
+        "mean_predicted_probability": round(float(frame["probability"].mean()), 4),
+        "observed_positive_rate": round(float(frame["actual"].mean()), 4),
+        "bins": bins,
+    }
+
+
 def train(data_path: Path = DEFAULT_DATA_PATH):
     print(f"1. Loading JSON dataset from {data_path.name}...")
     records = load_json_records(data_path)
@@ -1000,6 +1055,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
         "regression_metrics": regression_metrics,
     }
+    calibration = build_calibration_summary(y_test, y_prob)
 
     model_bundle = {
         "model": model,
@@ -1014,6 +1070,8 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "reference_profile": reference_profile,
         "example_profiles": example_profiles,
         "regression_targets": regression_targets,
+        "calibration": calibration,
+        "target_policy": metadata.get("target_policy", {}),
     }
     joblib.dump(model_bundle, MODEL_PATH)
 
@@ -1028,6 +1086,8 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "global_feature_importance": global_feature_importance[:10],
         "reference_profile": reference_profile,
         "metrics": metrics,
+        "calibration": calibration,
+        "target_policy": metadata.get("target_policy", {}),
         "trained_at": pd.Timestamp.utcnow().isoformat(),
         "notes": [
             "This is a JSON-first baseline designed for later API integration.",

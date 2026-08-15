@@ -712,7 +712,7 @@
                             </span>
                             <h3>ML Trend Analysis</h3>
                         </div>
-                        <span class="chart-total-pill">{{ $analysisTrendSeries->count() }} saved model run(s)</span>
+                        <span class="chart-total-pill">{{ $analysisTrendRunCount }} saved model run(s)</span>
                     </div>
                     <div class="chart-container">
                         <canvas id="analysisTrendChart"></canvas>
@@ -898,6 +898,7 @@
                             $predictionOutlook = $prediction['outlook'] ?? 'Unknown';
                             $predictedFireIncidents = $prediction['predicted_fire_incidents'] ?? null;
                             $likelyPeakHours = collect($prediction['likely_peak_hours'] ?? [])->filter()->values();
+                            $peakHoursLabel = $prediction['likely_peak_hours_label'] ?? ($likelyPeakHours->isNotEmpty() ? $likelyPeakHours->join(', ') : 'No clear peak yet');
                             $predictionWindow = $prediction['prediction_context']['target_period_label'] ?? ($prediction['forecast_window'] ?? null);
                             $predictionDrivers = collect($prediction['drivers'] ?? [])->filter()->take(2)->values();
                         @endphp
@@ -950,12 +951,12 @@
                                     {{ $predictionSummary ?: 'No prediction summary available for this analysis.' }}
                                 </p>
 
-                                @if($likelyPeakHours->isNotEmpty() || $predictionDrivers->isNotEmpty())
+                                @if($peakHoursLabel || $predictionDrivers->isNotEmpty())
                                     <div class="mt-4 grid gap-3 md:grid-cols-2">
-                                        @if($likelyPeakHours->isNotEmpty())
+                                        @if($peakHoursLabel)
                                             <div class="rounded-xl bg-white p-4 border border-slate-200">
                                                 <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Likely Peak Hours</div>
-                                                <div class="mt-2 text-sm font-semibold text-slate-700">{{ $likelyPeakHours->join(', ') }}</div>
+                                                <div class="mt-2 text-sm font-semibold text-slate-700">{{ $peakHoursLabel }}</div>
                                             </div>
                                         @endif
                                         @if($predictionDrivers->isNotEmpty())
@@ -2355,6 +2356,7 @@
         const analysisData = analysis.analysis_data || {};
         const predictionDrivers = Array.isArray(prediction.drivers) ? prediction.drivers : [];
         const likelyPeakHours = Array.isArray(prediction.likely_peak_hours) ? prediction.likely_peak_hours : [];
+        const peakHoursLabel = prediction.likely_peak_hours_label || (likelyPeakHours.length ? likelyPeakHours.join(', ') : 'No clear peak yet');
         const riskFactors = Array.isArray(analysisData.risk_factors) ? analysisData.risk_factors : [];
         const savedAt = analysis.created_at ? new Date(analysis.created_at).toLocaleString('en-US', {
             year: 'numeric',
@@ -2409,12 +2411,12 @@
                         ` : ''}
                     </div>
                     <p class="mt-4 text-sm leading-6 text-slate-600">${escapeHtml(prediction.summary || 'No saved prediction summary available.')}</p>
-                    ${(likelyPeakHours.length || predictionDrivers.length) ? `
+                    ${(peakHoursLabel || predictionDrivers.length) ? `
                         <div class="mt-4 grid gap-3 md:grid-cols-2">
-                            ${likelyPeakHours.length ? `
+                            ${peakHoursLabel ? `
                                 <div class="rounded-xl bg-white p-4 border border-slate-200">
                                     <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Likely Peak Hours</div>
-                                    <div class="mt-2 text-sm font-semibold text-slate-700">${escapeHtml(likelyPeakHours.join(', '))}</div>
+                                    <div class="mt-2 text-sm font-semibold text-slate-700">${escapeHtml(peakHoursLabel)}</div>
                                 </div>
                             ` : ''}
                             ${predictionDrivers.length ? `

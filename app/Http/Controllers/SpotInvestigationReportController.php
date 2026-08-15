@@ -8,6 +8,7 @@ use App\Models\Weather;
 use App\Models\StationOfficer;
 use App\Services\SpotNarrativeDraftService;
 use App\Support\HistoricalFireIncidentSynchronizer;
+use App\Support\IncidentOccurrenceSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
@@ -113,7 +114,18 @@ class SpotInvestigationReportController extends Controller
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
         ]);
 
-       $response = SpotInvestigationReport::create($validated);
+        $response = SpotInvestigationReport::create($validated);
+        if ($response->fire_started) {
+            $incident = Incident::find($response->incident_id);
+            if ($incident) {
+                IncidentOccurrenceSynchronizer::verify(
+                    $incident,
+                    $response->fire_started,
+                    'spot_investigation',
+                    auth()->user()?->user_id
+                );
+            }
+        }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $response->incident_id);
         UserActivityLogger::log('created spot report', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true, 'data'=>$response]);
@@ -141,14 +153,14 @@ class SpotInvestigationReportController extends Controller
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
         }
         $validated = $request->validate([
-            'dead' => 'required|numeric|min:0',
-            'injured' => 'required|numeric|min:0',
+            'dead' => 'sometimes|required|numeric|min:0',
+            'injured' => 'sometimes|required|numeric|min:0',
             'owner' => 'nullable|string|max:255',
             'fire_started' => 'nullable|date',
             'fire_out' => 'nullable|date|after_or_equal:fire_started',
-            'estimated_damage' => 'required|numeric|min:0',
-            'occupancy' => 'required|in:residential,commercial,industrial',
-            'estimated_area' => 'required|numeric|min:0',
+            'estimated_damage' => 'sometimes|required|numeric|min:0',
+            'occupancy' => 'sometimes|required|in:residential,commercial,industrial',
+            'estimated_area' => 'sometimes|required|numeric|min:0',
             'report_completed_at' => 'nullable|date',
             'memorandum_for' => 'nullable|string|max:255',
             'place_of_occurrence' => 'nullable|string|max:255',
@@ -165,7 +177,18 @@ class SpotInvestigationReportController extends Controller
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
         ]);
 
-          $spot->update($validated);
+        $spot->update($validated);
+        if (array_key_exists('fire_started', $validated) && $spot->fire_started) {
+            $incident = Incident::find($spot->incident_id);
+            if ($incident) {
+                IncidentOccurrenceSynchronizer::verify(
+                    $incident,
+                    $spot->fire_started,
+                    'spot_investigation',
+                    auth()->user()?->user_id
+                );
+            }
+        }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $spot->incident_id);
         UserActivityLogger::log('updated spot report', auth()->user()?->user_id, $request);
         return response()->json(['success'=>true]);

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class MitigationAction extends Model
 {
@@ -38,6 +39,11 @@ class MitigationAction extends Model
         'approved_by',
         'approved_at',
         'reviewed_at',
+        'analysis_revision',
+        'is_superseded',
+        'requires_revision_review',
+        'is_manually_edited',
+        'superseded_at',
     ];
 
     protected function casts(): array
@@ -48,7 +54,19 @@ class MitigationAction extends Model
             'approved_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'follow_up_required' => 'boolean',
+            'analysis_revision' => 'integer',
+            'is_superseded' => 'boolean',
+            'requires_revision_review' => 'boolean',
+            'is_manually_edited' => 'boolean',
+            'superseded_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('current_revision', function (Builder $builder) {
+            $builder->where($builder->getModel()->qualifyColumn('is_superseded'), false);
+        });
     }
 
     public function barangay()

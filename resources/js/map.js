@@ -90,6 +90,8 @@ let manageShapesMode = false;
 let selectedShapeForEdit = null;
 let shapeFeatureGroup = null;
 let fireRiskAreaLayerGroup = null;
+let currentRiskAnalysisLayerGroup = null;
+let nextMonthForecastLayerGroup = null;
 let boundaryEditorContext = null;
 
 // Notification system
@@ -6193,7 +6195,7 @@ async function fetchCoordinate(options = {}) {
             return;
         }
 
-        const response = await fetch(getMarkerFeedEndpoint());
+        const response = await fetch(getMarkerFeedEndpoint(), { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         let coordinates;
@@ -6294,6 +6296,7 @@ async function pollMarkerStateChanges() {
     try {
         const [markersResponse, incidentsResponse] = await Promise.all([
             fetchLiveResponseOnce('markers-poll', getMarkerFeedEndpoint(), {
+                cache: 'no-store',
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': csrfToken
@@ -10264,14 +10267,33 @@ function normalizeFireRiskAreaGeojson(rawGeojson) {
 
 function getFireRiskAreaStyle(area = {}) {
     const level = String(area.risk_level || '').toLowerCase();
+    const overlayType = String(area.overlay_type || 'verified_evidence').toLowerCase();
+    const timelineStyle = overlayType === 'next_month_forecast'
+        ? { dashArray: '8 7', fillOpacity: 0.14, weight: 3 }
+        : overlayType === 'current_analysis'
+            ? { dashArray: null, fillOpacity: 0.22, weight: 3 }
+            : { dashArray: '3 4', fillOpacity: 0.26, weight: 2.5 };
 
     if (level === 'high') {
         return {
             color: '#b91c1c',
             fillColor: '#ef4444',
-            fillOpacity: 0.28,
+            fillOpacity: timelineStyle.fillOpacity,
             opacity: 0.94,
-            weight: 3,
+            weight: timelineStyle.weight,
+            dashArray: timelineStyle.dashArray,
+            pane: 'overlayPane'
+        };
+    }
+
+    if (level === 'low') {
+        return {
+            color: '#15803d',
+            fillColor: '#22c55e',
+            fillOpacity: timelineStyle.fillOpacity,
+            opacity: 0.88,
+            weight: timelineStyle.weight,
+            dashArray: timelineStyle.dashArray,
             pane: 'overlayPane'
         };
     }
@@ -10279,42 +10301,85 @@ function getFireRiskAreaStyle(area = {}) {
     return {
         color: '#d97706',
         fillColor: '#f59e0b',
-        fillOpacity: 0.24,
+        fillOpacity: timelineStyle.fillOpacity,
         opacity: 0.9,
-        weight: 2.5,
+        weight: timelineStyle.weight,
+        dashArray: timelineStyle.dashArray,
         pane: 'overlayPane'
     };
 }
 
 function buildFireRiskAreaPopup(area = {}) {
     const metrics = area.metrics || {};
+    const isForecast = area.source_type === 'saved_ai_forecast';
     const drivers = Array.isArray(area.drivers) && area.drivers.length
         ? area.drivers.map((driver) => `<li>${escapeHtml(String(driver))}</li>`).join('')
-        : '<li>Verified field data matched the medium/high risk threshold.</li>';
+        : '<li>No detailed driver summary was saved for this area.</li>';
     const level = String(area.risk_level || 'medium').toUpperCase();
     const score = area.risk_score !== null && area.risk_score !== undefined
         ? Number(area.risk_score).toFixed(2)
         : 'N/A';
     const radiusMeters = Number(metrics.cluster_radius_meters || area.radius_meters || 0);
-    const subtitle = area.geometry_type === 'circle'
-        ? `${escapeHtml(area.city_name || 'Clustered nearby evidence')} · ${radiusMeters > 0 ? `${Math.round(radiusMeters)}m prediction radius` : 'Predicted risk zone'}`
+    const precisionLabel = area.geometry_precision === 'barangay_hall_reference'
+        ? 'Barangay hall reference only; no geographic risk footprint is implied'
+        : area.geometry_precision === 'barangay_boundary'
+            ? 'Synced barangay boundary'
+            : 'Localized verified-evidence cluster';
+    const scopeLabel = area.overlay_type === 'next_month_forecast'
+        ? 'Next-month forecast'
+        : area.overlay_type === 'current_analysis'
+            ? 'Current-month analysis'
+            : 'Verified risk evidence';
+    const subtitle = area.geometry_type === 'point'
+        ? escapeHtml(area.city_name || 'Barangay reference location')
+        : area.geometry_type === 'circle'
+        ? `${escapeHtml(area.city_name || 'Clustered nearby evidence')} · ${radiusMeters > 0 ? `${Math.round(radiusMeters)}m display radius` : 'Risk zone'}`
         : escapeHtml(area.city_name || 'Mapped barangay boundary');
+    const riskColors = area.risk_level === 'high'
+        ? ['#fee2e2', '#991b1b']
+        : area.risk_level === 'low' ? ['#dcfce7', '#166534'] : ['#fef3c7', '#92400e'];
+    const metricGrid = isForecast ? `
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;font-size:12px;color:#334155;">
+            <span><strong>${area.probability_percent ?? 'N/A'}%</strong><br>probability</span>
+            <span><strong>${area.confidence_percent ?? 'N/A'}%</strong><br>confidence</span>
+            <span><strong>${Number(area.predicted_fire_incidents || 0)}</strong><br>expected fires</span>
+        </div>` : `
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;font-size:12px;color:#334155;">
+            <span><strong>${Number(metrics.verified_records || 0)}</strong><br>verified records</span>
+            <span><strong>${Number(metrics.historical_incidents || 0)}</strong><br>historical incidents</span>
+            <span><strong>${Number(metrics.support_points || 0)}</strong><br>support points</span>
+            <span><strong>${Number(metrics.affected_households || 0)}</strong><br>households</span>
+        </div>`;
+    const evidencePoints = !isForecast && Array.isArray(area.evidence_points)
+        ? area.evidence_points
+        : [];
+    const evidenceList = evidencePoints.length ? `
+        <div style="margin-top:12px;font-size:12px;color:#334155;">
+            <strong>Contributing map points</strong>
+            <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45;">
+                ${evidencePoints.map((point) => {
+                    const isIncident = point.source_type === 'historical_incident';
+                    const typeLabel = isIncident
+                        ? 'Historical fire'
+                        : (point.entry_type === 'hazard' ? 'Verified hazard' : 'Verified risk');
+                    const name = point.marker_title || point.barangay_name || 'Mapped evidence';
+                    const date = isIncident && point.incident_date ? ` · ${point.incident_date}` : '';
+                    return `<li><strong>${escapeHtml(typeLabel)}</strong> · ${escapeHtml(name)}${escapeHtml(date)}</li>`;
+                }).join('')}
+            </ul>
+        </div>` : '';
 
     return `
         <div class="fire-risk-area-popup">
             <div style="font-weight:800;color:#0f172a;font-size:15px;">${escapeHtml(area.name || 'Fire-risk area')}</div>
-            <div style="margin-top:4px;font-size:12px;color:#64748b;">${subtitle}</div>
-            <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:${area.risk_level === 'high' ? '#fee2e2' : '#fef3c7'};color:${area.risk_level === 'high' ? '#991b1b' : '#92400e'};font-weight:800;font-size:12px;">
+            <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(scopeLabel)}${area.target_label ? ` · ${escapeHtml(area.target_label)}` : ''}</div>
+            <div style="margin-top:3px;font-size:12px;color:#64748b;">${subtitle}</div>
+            <div style="margin-top:3px;font-size:11px;color:#7c2d12;">${escapeHtml(precisionLabel)}</div>
+            <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:${riskColors[0]};color:${riskColors[1]};font-weight:800;font-size:12px;">
                 ${level} FIRE RISK · ${score}
             </div>
-            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;font-size:12px;color:#334155;">
-                <span><strong>${Number(metrics.verified_records || 0)}</strong><br>verified records</span>
-                <span><strong>${Number(metrics.hazards || 0)}</strong><br>hazards</span>
-                <span><strong>${Number(metrics.risks || 0)}</strong><br>risks</span>
-                <span><strong>${Number(metrics.historical_incidents || 0)}</strong><br>historical incidents</span>
-                <span><strong>${Number(metrics.support_points || 0)}</strong><br>support points</span>
-                <span><strong>${Number(metrics.affected_households || 0)}</strong><br>households</span>
-            </div>
+            ${metricGrid}
+            ${evidenceList}
             <div style="margin-top:12px;font-size:12px;color:#334155;">
                 <strong>Why highlighted</strong>
                 <ul style="margin:6px 0 0 18px;padding:0;line-height:1.45;">${drivers}</ul>
@@ -10324,6 +10389,25 @@ function buildFireRiskAreaPopup(area = {}) {
 }
 
 function createFireRiskAreaLayer(area = {}) {
+    if (String(area.geometry_type || '').toLowerCase() === 'point') {
+        const centerLat = Number(area?.center?.lat);
+        const centerLng = Number(area?.center?.lng);
+
+        if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
+            return null;
+        }
+
+        return L.circleMarker([centerLat, centerLng], {
+            ...getFireRiskAreaStyle(area),
+            radius: 9,
+            fillOpacity: 0.08,
+            weight: 3,
+            dashArray: '3 3',
+            interactive: true,
+            pane: 'overlayPane'
+        });
+    }
+
     if (String(area.geometry_type || '').toLowerCase() === 'circle') {
         const centerLat = Number(area?.center?.lat);
         const centerLng = Number(area?.center?.lng);
@@ -10353,13 +10437,49 @@ function createFireRiskAreaLayer(area = {}) {
     });
 }
 
+function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
+    if (area.overlay_type !== 'verified_evidence' || !targetGroup) {
+        return;
+    }
+
+    const points = Array.isArray(area.evidence_points) ? area.evidence_points : [];
+    points.forEach((point) => {
+        const lat = Number(point.lat);
+        const lng = Number(point.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return;
+        }
+
+        const isIncident = point.source_type === 'historical_incident';
+        const label = isIncident
+            ? `Historical fire incident${point.incident_date ? ` · ${point.incident_date}` : ''}`
+            : `${point.entry_type === 'hazard' ? 'Verified hazard' : 'Verified risk'}${point.marker_title ? ` · ${point.marker_title}` : ''}`;
+        L.circleMarker([lat, lng], {
+            radius: 5,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: isIncident ? '#dc2626' : '#f59e0b',
+            fillOpacity: 1,
+            interactive: true,
+            pane: 'overlayPane'
+        })
+            .bindTooltip(escapeHtml(label), { direction: 'top', sticky: true })
+            .addTo(targetGroup);
+    });
+}
+
 async function loadFireRiskAreas() {
     if (!window.map || !fireRiskAreaLayerGroup) {
         return;
     }
 
     try {
-        const response = await fetch('/api/fire-risk-areas?levels=medium,high', {
+        const query = new URLSearchParams({ levels: 'low,medium,high' });
+        if (currentStationMetaId) {
+            query.set('station_id', currentStationMetaId);
+        }
+        const response = await fetch(`/api/fire-risk-areas?${query.toString()}`, {
+            cache: 'no-store',
             headers: {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -10373,6 +10493,8 @@ async function loadFireRiskAreas() {
         const payload = await response.json();
         const areas = Array.isArray(payload?.data) ? payload.data : [];
         fireRiskAreaLayerGroup.clearLayers();
+        currentRiskAnalysisLayerGroup?.clearLayers();
+        nextMonthForecastLayerGroup?.clearLayers();
 
         areas.forEach((area) => {
             try {
@@ -10391,7 +10513,13 @@ async function loadFireRiskAreas() {
                     maxWidth: 320,
                     className: 'fire-risk-area-popup-shell'
                 });
-                layer.addTo(fireRiskAreaLayerGroup);
+                const targetGroup = area.overlay_type === 'next_month_forecast'
+                    ? nextMonthForecastLayerGroup
+                    : area.overlay_type === 'current_analysis'
+                        ? currentRiskAnalysisLayerGroup
+                        : fireRiskAreaLayerGroup;
+                layer.addTo(targetGroup || fireRiskAreaLayerGroup);
+                addFireRiskEvidencePoints(area, targetGroup || fireRiskAreaLayerGroup);
             } catch (error) {
                 console.warn('Unable to render fire-risk area overlay:', { area, error });
             }
@@ -10943,6 +11071,8 @@ function initAfterMapReady() {
     window.map.addLayer(drawnItems);
     shapeFeatureGroup = L.featureGroup().addTo(window.map);
     fireRiskAreaLayerGroup = L.featureGroup().addTo(window.map);
+    currentRiskAnalysisLayerGroup = L.featureGroup().addTo(window.map);
+    nextMonthForecastLayerGroup = L.featureGroup().addTo(window.map);
     
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
@@ -10994,7 +11124,9 @@ function initAfterMapReady() {
             "Fire Hydrants": hydrantFeatureGroup,
             "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
-            "Fire Risk Areas": fireRiskAreaLayerGroup,
+            "Verified Risk Evidence": fireRiskAreaLayerGroup,
+            "Current Risk Analysis": currentRiskAnalysisLayerGroup,
+            "Next-Month Forecast": nextMonthForecastLayerGroup,
             "Water Reference": waterReference
         }
         : isCitizenDashboardMap
@@ -11013,7 +11145,9 @@ function initAfterMapReady() {
                 "Fire Hydrants": hydrantFeatureGroup,
                 "Risk & Hazard Reports": riskHazardFeatureGroup,
                 "Other Markers": otherFeatureGroup,
-                "Fire Risk Areas": fireRiskAreaLayerGroup,
+                "Verified Risk Evidence": fireRiskAreaLayerGroup,
+                "Current Risk Analysis": currentRiskAnalysisLayerGroup,
+                "Next-Month Forecast": nextMonthForecastLayerGroup,
                 "Water Reference": waterReference,
                 "Shapes": shapeFeatureGroup
             }
@@ -11023,7 +11157,9 @@ function initAfterMapReady() {
             "Hydrants": hydrantFeatureGroup,
             "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
-            "Fire Risk Areas": fireRiskAreaLayerGroup,
+            "Verified Risk Evidence": fireRiskAreaLayerGroup,
+            "Current Risk Analysis": currentRiskAnalysisLayerGroup,
+            "Next-Month Forecast": nextMonthForecastLayerGroup,
             "Shapes": shapeFeatureGroup
         };
     routeOverlayControl = L.control.layers(routeBaseMaps, routeOverlays, { collapsed: true, position: 'topright' });

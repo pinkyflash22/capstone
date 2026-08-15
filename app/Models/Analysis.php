@@ -22,6 +22,7 @@ class Analysis extends Model
         'incident_count',
         'probability',
         'station_id',
+        'revision_number',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Analysis extends Model
         'predictions' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'revision_number' => 'integer',
     ];
 
     public function station(){

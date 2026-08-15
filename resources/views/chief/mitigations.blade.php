@@ -11,24 +11,32 @@
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
     <style>
         html, body, body.chief-dashboard-page { min-height: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
-        body { margin: 0; background: #f8fafc; color: #0f172a; font-family: Inter, system-ui, sans-serif; }
-        .mitigation-shell { min-height: 100vh; background: linear-gradient(180deg, #fff7ed 0%, #f8fafc 22%); }
+        body { margin: 0; background: #f3f4f6; color: #0f172a; font-family: Inter, system-ui, sans-serif; }
+        .mitigation-shell { min-height: 100vh; background: radial-gradient(circle at 92% 2%, rgba(251,191,36,.12), transparent 28%), linear-gradient(180deg, #fffaf5 0, #f3f4f6 310px); }
         .mitigation-main { min-width: 0; width: 100%; overflow: visible; }
         .mitigation-wrap { width: 100%; max-width: 1480px; margin: 0 auto; }
         .dashboard-container { padding: 28px; overflow: visible; }
-        .top-bar { background: rgba(255,255,255,.82); backdrop-filter: blur(12px); border: 1px solid rgba(226,232,240,.9); min-height: 72px; padding: 0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:16px; z-index:40; margin-bottom:24px; border-radius:24px; box-shadow:0 16px 36px rgba(15,23,42,.06); }
-        .card, .panel { background: rgba(255,255,255,.97); border:1px solid rgba(226,232,240,.92); border-radius:28px; box-shadow:0 18px 36px rgba(15,23,42,.05); }
-        .card { padding:22px; }
-        .panel { padding:24px; }
-        .mitigation-banner { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:32px; margin-bottom:24px; border-radius:24px; border-left:4px solid #f59e0b; background: linear-gradient(135deg, rgba(255,247,237,.98), rgba(255,251,235,.95)); box-shadow: 0 18px 36px rgba(15,23,42,.05); }
-        .mitigation-banner__title { margin:0; color:#78350f; font-size:1.9rem; font-weight:900; letter-spacing:-0.04em; }
-        .mitigation-banner__copy { margin:8px 0 0; color:#b45309; font-size:.96rem; line-height:1.65; max-width:72ch; }
+        .top-bar { background: rgba(255,255,255,.9); backdrop-filter: blur(14px); border: 1px solid rgba(226,232,240,.92); min-height: 72px; padding: 0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:16px; z-index:40; margin-bottom:16px; border-radius:24px; box-shadow:0 16px 36px rgba(15,23,42,.06); }
+        .workflow-nav { display:flex; align-items:center; gap:8px; margin:0 0 20px; padding:8px; width:max-content; max-width:100%; border:1px solid rgba(226,232,240,.94); border-radius:999px; background:rgba(255,255,255,.9); box-shadow:0 10px 28px rgba(15,23,42,.04); overflow-x:auto; }
+        .workflow-nav__step { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px; border-radius:999px; color:#64748b; text-decoration:none; font-size:.76rem; font-weight:800; white-space:nowrap; }
+        .workflow-nav__step i { color:#f97316; }
+        .workflow-nav__step:hover { color:#9a3412; background:#fff7ed; }
+        .workflow-nav__step.is-active { color:#fff; background:linear-gradient(135deg, #f97316, #dc2626); box-shadow:0 10px 22px rgba(234,88,12,.2); }
+        .workflow-nav__step.is-active i { color:#fff; }
+        .workflow-nav__arrow { color:#cbd5e1; font-size:.68rem; }
+        .card, .panel { position:relative; overflow:hidden; background: rgba(255,255,255,.97); border:1px solid rgba(226,232,240,.92); border-radius:24px; box-shadow:0 18px 36px rgba(15,23,42,.05); }
+        .panel::before { content:""; position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg, #dc2626, #f59e0b); }
+        .card { padding:18px; }
+        .panel { padding:20px; }
+        .mitigation-banner { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:30px; margin-bottom:22px; border-radius:26px; border:1px solid rgba(251,146,60,.24); background: linear-gradient(135deg, rgba(255,247,237,.99), rgba(255,255,255,.98) 62%, rgba(254,242,242,.96)); box-shadow: 0 18px 36px rgba(15,23,42,.05); }
+        .mitigation-banner__title { margin:0; color:#1e293b; font-size:1.75rem; font-weight:900; letter-spacing:-0.04em; }
+        .mitigation-banner__copy { margin:8px 0 0; color:#64748b; font-size:.92rem; line-height:1.6; max-width:68ch; }
         .mitigation-banner__meta { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; min-width:320px; }
         .mitigation-banner__meta-card { padding:14px 16px; border-radius:18px; background:rgba(255,255,255,.7); border:1px solid rgba(251,191,36,.25); }
         .mitigation-banner__meta-label, .card-label, .section-label, th { color:#64748b; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
         .mitigation-banner__meta-value { margin-top:6px; color:#1f2937; font-size:.92rem; font-weight:800; }
         .mitigation-stack { display:flex; flex-direction:column; gap:22px; }
-        .summary-grid { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:16px; }
+        .summary-grid { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:12px; }
         .card-value { margin-top:14px; color:#0f172a; font-size:clamp(1.6rem,2vw,2.2rem); font-weight:900; line-height:1; }
         .card-copy { margin-top:10px; color:#64748b; font-size:.86rem; line-height:1.55; }
         .panel-head { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:18px; }
@@ -55,15 +63,15 @@
         .tag.incident_review { background:#ecfeff; color:#0f766e; }
         .tag.manual { background:#f8fafc; color:#475569; }
         .hero-btn, .row-btn, .submit-btn, .cancel-btn, .filter-btn { border:none; border-radius:999px; font-weight:800; display:inline-flex; align-items:center; gap:8px; text-decoration:none; }
-        .hero-btn, .submit-btn, .filter-btn.primary { min-height:44px; padding:0 18px; background:linear-gradient(135deg, #f97316, #ef4444); color:#fff; box-shadow:0 16px 30px rgba(239,68,68,.16); }
-        .filter-btn.secondary, .cancel-btn { min-height:44px; padding:0 18px; border:1px solid rgba(203,213,225,.96); background:#fff; color:#475569; }
-        .row-btn { width:40px; justify-content:center; min-height:40px; padding:0; font-size:.86rem; white-space:nowrap; border:1px solid transparent; }
+        .hero-btn, .submit-btn, .filter-btn.primary { min-height:38px; padding:0 14px; background:linear-gradient(135deg, #f97316, #ef4444); color:#fff; box-shadow:0 10px 22px rgba(239,68,68,.14); font-size:.78rem; }
+        .filter-btn.secondary, .cancel-btn { min-height:38px; padding:0 14px; border:1px solid rgba(203,213,225,.96); background:#fff; color:#475569; font-size:.78rem; }
+        .row-btn { width:34px; justify-content:center; min-height:34px; padding:0; font-size:.76rem; white-space:nowrap; border:1px solid transparent; }
         .row-btn.view { background:#eef2ff; color:#4338ca; }
         .row-btn.edit { background:#eff6ff; color:#1d4ed8; }
         .row-btn.delete { background:#fef2f2; color:#b91c1c; }
-        .table-wrap { overflow:auto; border:1px solid rgba(226,232,240,.92); border-radius:24px; background:linear-gradient(180deg, rgba(248,250,252,.75), rgba(255,255,255,.96)); max-height:72vh; }
-        table { width:100%; min-width:1320px; border-collapse:separate; border-spacing:0; table-layout:fixed; }
-        th, td { padding:16px 14px; text-align:left; vertical-align:top; border-bottom:1px solid rgba(241,245,249,1); }
+        .table-wrap { overflow:auto; border:1px solid rgba(226,232,240,.92); border-radius:18px; background:#fff; max-height:68vh; }
+        table { width:100%; min-width:860px; border-collapse:separate; border-spacing:0; table-layout:fixed; }
+        th, td { padding:12px 10px; text-align:left; vertical-align:middle; border-bottom:1px solid rgba(241,245,249,1); }
         th { position:sticky; top:0; z-index:2; background:rgba(248,250,252,.96); backdrop-filter:blur(8px); }
         td { color:#334155; font-size:.88rem; background:rgba(255,255,255,.72); }
         tbody tr:hover td { background:rgba(255,247,237,.68); }
@@ -122,6 +130,36 @@
         .user-dropdown-item { display:flex; align-items:center; gap:12px; padding:12px 18px; color:#1e293b; text-decoration:none; font-size:14px; width:100%; border:none; background:none; text-align:left; }
         .user-dropdown-item:hover { background:#fff0e8; color:#c63d26; }
         .mobile-page-head { display:none; }
+        .mitigation-register { order:1; }
+        .mitigation-summary { order:2; }
+        .mitigation-draft-ready { order:0; }
+        .mitigation-ai-saved { order:3; }
+        .mitigation-ai-recommendations { order:4; }
+        .compact-draft-list { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+        .compact-draft-card { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:14px; padding:14px 16px; border:1px solid rgba(226,232,240,.92); border-radius:18px; background:#fff; }
+        .compact-draft-card__body { min-width:0; }
+        .compact-draft-card__title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .compact-draft-card__meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:7px; color:#64748b; font-size:.72rem; }
+        .compact-draft-card__actions { display:flex; align-items:center; gap:6px; }
+        .compact-action { width:34px; min-height:34px; padding:0; justify-content:center; border-radius:11px; box-shadow:none; }
+        .compact-action span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+        .filter-disclosure { margin-bottom:14px; border:1px solid rgba(226,232,240,.92); border-radius:16px; background:#f8fafc; }
+        .filter-disclosure > summary { display:flex; align-items:center; gap:8px; padding:11px 14px; cursor:pointer; color:#475569; font-size:.78rem; font-weight:800; list-style:none; }
+        .filter-disclosure > summary::-webkit-details-marker { display:none; }
+        .filter-disclosure[open] > summary { border-bottom:1px solid #e2e8f0; }
+        .filter-disclosure .panel { border:0; border-radius:0 0 16px 16px; margin:0 !important; background:#fff; }
+        .mitigation-ai-saved > div:last-child, .mitigation-ai-recommendations > div:last-child { display:grid !important; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px !important; }
+        .mitigation-ai-saved article.card, .mitigation-ai-recommendations article.card { padding:13px !important; border-radius:16px; box-shadow:none; }
+        .mitigation-ai-saved article.card > div, .mitigation-ai-recommendations article.card > div { display:grid !important; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px !important; }
+        .mitigation-ai-saved article.card .note, .mitigation-ai-recommendations article.card .note { display:none; }
+        .mitigation-ai-saved article.card .chip-row, .mitigation-ai-recommendations article.card .chip-row { margin:0 0 7px !important; }
+        .mitigation-ai-saved article.card > div > div:last-child, .mitigation-ai-recommendations article.card > div > div:last-child { min-width:0 !important; display:flex !important; flex-direction:row !important; gap:6px !important; }
+        .mitigation-ai-saved article.card > div > div:last-child .hero-btn,
+        .mitigation-ai-saved article.card > div > div:last-child .filter-btn,
+        .mitigation-ai-recommendations article.card > div > div:last-child .hero-btn,
+        .mitigation-ai-recommendations article.card > div > div:last-child .filter-btn { width:34px !important; min-height:34px; padding:0; justify-content:center; border-radius:11px; box-shadow:none; }
+        .mitigation-ai-saved article.card > div > div:last-child span,
+        .mitigation-ai-recommendations article.card > div > div:last-child span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
 
         @media (min-width: 768px) {
             .mitigation-main { margin-left: 348px; width: calc(100% - 348px); }
@@ -137,6 +175,7 @@
             .mitigation-banner__meta { width:100%; min-width:0; }
             .summary-grid, .filters-grid, .form-grid, .details-grid, .details-grid.two-col { grid-template-columns:repeat(2, minmax(0,1fr)); }
             .filter-actions { grid-column:1 / -1; justify-content:flex-start; }
+            .compact-draft-list { grid-template-columns:1fr; }
         }
 
         @media (max-width: 768px) {
@@ -144,6 +183,8 @@
             .mitigation-main { margin-left: 0; width: 100%; }
             .dashboard-container { width: min(100%, 760px); padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 92px); }
             .top-bar { display:none; }
+            .workflow-nav { width:100%; margin-bottom:8px; border-radius:16px; padding:5px; }
+            .workflow-nav__step { min-height:32px; padding:0 10px; font-size:.62rem; }
             .mobile-page-head { display:block; margin-bottom:6px; padding:1px 2px 0; }
             .mobile-page-head__eyebrow { color:#c2410c; font-size:.56rem; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
             .mobile-page-head h1 { margin:2px 0 0; color:#0f172a; font-size:.94rem; font-weight:900; line-height:1.2; }
@@ -184,6 +225,10 @@
             .mitigation-dialog__card::before { content:""; display:block; width:52px; height:5px; border-radius:999px; background:#cbd5e1; margin:4px auto 10px; }
             .form-actions { flex-direction:column; align-items:stretch; }
             .hero-btn, .submit-btn, .cancel-btn, .filter-btn { width:100%; justify-content:center; min-height:38px; padding:0 12px; font-size:.72rem; }
+            .compact-draft-card { grid-template-columns:1fr; gap:9px; padding:11px; }
+            .compact-draft-card__actions { justify-content:flex-end; }
+            .compact-action { width:34px !important; min-height:34px; padding:0; }
+            .mitigation-ai-saved > div:last-child, .mitigation-ai-recommendations > div:last-child { grid-template-columns:1fr; }
         }
     </style>
 </head>
@@ -192,6 +237,7 @@
     @php
         $summary = $mitigationSummaryCounts ?? ['total' => 0, 'awaiting_approval' => 0, 'in_progress' => 0, 'overdue' => 0, 'high_priority' => 0, 'completed' => 0];
         $filters = $filters ?? [];
+        $hasActiveFilters = collect($filters)->filter(fn ($value) => filled($value) && $value !== false)->isNotEmpty();
     @endphp
     <div class="mitigation-shell">
         <main class="mitigation-main">
@@ -228,14 +274,28 @@
                         <h1>Mitigation Control</h1>
                     </section>
 
+                    <nav class="workflow-nav" aria-label="Fire risk workflow">
+                        <a class="workflow-nav__step" href="{{ route('station-admin.analytics') }}">
+                            <i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span>
+                        </a>
+                        <i class="fa-solid fa-chevron-right workflow-nav__arrow" aria-hidden="true"></i>
+                        <a class="workflow-nav__step" href="{{ route('station-admin.course-checklists') }}">
+                            <i class="fa-solid fa-list-check"></i><span>AI Checklists</span>
+                        </a>
+                        <i class="fa-solid fa-chevron-right workflow-nav__arrow" aria-hidden="true"></i>
+                        <span class="workflow-nav__step is-active" aria-current="page">
+                            <i class="fa-solid fa-shield-halved"></i><span>Mitigation Control</span>
+                        </span>
+                    </nav>
+
                     <section class="mitigation-banner chief-theme-hero">
                         <div>
                             <span class="chief-theme-hero__eyebrow">
                                 <i class="fa-solid fa-shield-halved"></i>
                                 Mitigation Control
                             </span>
-                            <h2 class="mitigation-banner__title chief-theme-hero__title">Manage the full mitigation lifecycle.</h2>
-                            <p class="mitigation-banner__copy chief-theme-hero__copy">Plan, approve, implement, monitor, complete, and evaluate mitigation work without breaking the current AI checklist handoff.</p>
+                            <h2 class="mitigation-banner__title chief-theme-hero__title">Turn forecasts into preventive action.</h2>
+                            <p class="mitigation-banner__copy chief-theme-hero__copy">Review AI drafts, assign responsibility, track implementation, and evaluate results.</p>
                         </div>
                         <div class="mitigation-banner__meta chief-theme-summary-grid">
                             <div class="mitigation-banner__meta-card">
@@ -259,7 +319,7 @@
 
                     <div class="mitigation-stack">
                         @if(!empty($mitigationDraft))
-                            <section class="panel" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
+                            <section class="panel mitigation-draft-ready" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
                                 <div class="panel-head">
                                     <div>
                                         <h3>Draft Ready</h3>
@@ -270,11 +330,11 @@
                             </section>
                         @endif
 
-                        <section class="panel" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
+                        <section class="panel mitigation-ai-saved" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
                             <div class="panel-head">
                                 <div>
-                                    <h3>New AI Drafts Awaiting Review</h3>
-                                    <p>These are auto-created mitigation draft records generated after recent analysis runs. Review them first before moving them into planning or approval.</p>
+                                    <h3>AI Mitigation Drafts</h3>
+                                    <p>Saved plans ready for assignment and review.</p>
                                 </div>
                             </div>
                             @if(($newAiDraftMitigations ?? collect())->isEmpty())
@@ -401,11 +461,11 @@
                             @endif
                         </section>
 
-                        <section class="panel">
+                        <section class="panel mitigation-ai-recommendations">
                             <div class="panel-head">
                                 <div>
-                                    <h3>System Draft Recommendations</h3>
-                                    <p>AI-generated or system-assisted drafts still require human review before they become official mitigation plans.</p>
+                                    <h3>Checklist Suggestions</h3>
+                                    <p>AI suggestions not yet added to the register.</p>
                                 </div>
                             </div>
                             @if(($generatedMitigationDrafts ?? collect())->isEmpty())
@@ -467,7 +527,7 @@
                             @endif
                         </section>
 
-                        <section class="summary-grid">
+                        <section class="summary-grid mitigation-summary">
                             <article class="card"><div class="card-label">Total Mitigations</div><div class="card-value">{{ $summary['total'] }}</div><div class="card-copy">All official mitigation plans.</div></article>
                             <article class="card"><div class="card-label">Awaiting Approval</div><div class="card-value">{{ $summary['awaiting_approval'] }}</div><div class="card-copy">Draft and planned items.</div></article>
                             <article class="card"><div class="card-label">In Progress</div><div class="card-value">{{ $summary['in_progress'] }}</div><div class="card-copy">Approved and active work.</div></article>
@@ -476,16 +536,21 @@
                             <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $summary['completed'] }}</div><div class="card-copy">Finished and logged.</div></article>
                         </section>
 
-                        <section class="panel">
+                        <section class="panel mitigation-register">
                             <div class="panel-head">
                                 <div>
                                     <h3>Mitigation Register</h3>
                                     <p>Track, assign, and review prevention actions.</p>
                                 </div>
-                                <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
+                                <div class="chip-row">
+                                    <span class="chip"><i class="fa-solid fa-file-lines"></i> 10 per page</span>
+                                    <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
+                                </div>
                             </div>
 
-                            <form id="mitigationFilters" method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:16px; margin-bottom:18px; box-shadow:none;">
+                            <details class="filter-disclosure" @if($hasActiveFilters) open @endif>
+                                <summary><i class="fa-solid fa-sliders"></i> Filters @if($hasActiveFilters)<span class="chip">Active</span>@endif</summary>
+                            <form id="mitigationFilters" method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:14px; box-shadow:none;">
                                 <div class="filters-grid">
                                     <div class="mitigation-field mitigation-field--full">
                                         <label for="filterSearch">Search</label>
@@ -545,12 +610,20 @@
                                             @endforeach
                                         </select>
                                     </div>
+                                    <div class="mitigation-field">
+                                        <label for="filterRevisionReview">Revision Review</label>
+                                        <select id="filterRevisionReview" name="revision_review">
+                                            <option value="0">All records</option>
+                                            <option value="1" @selected(!empty($filters['revision_review']))>Needs review</option>
+                                        </select>
+                                    </div>
                                     <div class="filter-actions mitigation-field mitigation-field--full">
                                         <button type="submit" class="filter-btn primary"><i class="fa-solid fa-filter"></i><span>Apply Filters</span></button>
                                         <a href="{{ route('station-admin.mitigations') }}" class="filter-btn secondary"><i class="fa-solid fa-rotate-left"></i><span>Reset</span></a>
                                     </div>
                                 </div>
                             </form>
+                            </details>
 
                             <div id="mitigationTableData" aria-live="polite">
                             @if($mitigationActions->isEmpty())
@@ -560,14 +633,10 @@
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>Title</th>
-                                                <th>Barangay / Location</th>
-                                                <th>Category</th>
-                                                <th>Priority</th>
-                                                <th>Stage</th>
-                                                <th>Progress</th>
-                                                <th>Responsible</th>
-                                                <th>Target Date</th>
+                                                <th>Plan</th>
+                                                <th>Location</th>
+                                                <th>Priority / Stage</th>
+                                                <th>Owner / Target</th>
                                                 <th>Source</th>
                                                 <th>Actions</th>
                                             </tr>
@@ -670,45 +739,32 @@
                                                         'attachments' => $attachments,
                                                         'approval_label' => $action->approver?->full_name,
                                                         'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
+                                                        'requires_revision_review' => (bool) $action->requires_revision_review,
+                                                        'analysis_revision' => $action->analysis_revision,
                                                     ];
                                                     $isOverdue = $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true);
                                                 @endphp
                                                 <tr id="mitigation-row-{{ $action->mitigation_action_id }}">
-                                                    <td data-label="Title">
+                                                    <td data-label="Plan">
                                                         <div class="title">{{ $action->title }}</div>
-                                                        <div class="note note--clamp">{{ $action->description }}</div>
-                                                        <div class="chip-row" style="margin-top:10px;">
+                                                        <div class="chip-row" style="margin-top:7px;">
+                                                            <span class="chip">{{ $categoryLabel }}</span>
                                                             @if($isOverdue)
                                                                 <span class="chip overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>
                                                             @endif
-                                                            @if($action->effectiveness)
-                                                                <span class="chip"><i class="fa-solid fa-chart-line"></i> {{ $mitigationEffectivenessOptions[$action->effectiveness] ?? ucfirst(str_replace('_', ' ', $action->effectiveness)) }}</span>
+                                                            @if($action->requires_revision_review)
+                                                                <span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Review revision {{ $action->analysis_revision }}</span>
                                                             @endif
                                                         </div>
                                                     </td>
-                                                    <td data-label="Barangay / Location">
+                                                    <td data-label="Location">
                                                         <div class="title" style="font-size:.86rem;">{{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</div>
                                                         <div class="note">{{ $action->riskArea?->marker?->title ?? 'No linked location marker' }}</div>
                                                     </td>
-                                                    <td data-label="Category"><span class="chip">{{ $categoryLabel }}</span></td>
-                                                    <td data-label="Priority"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span></td>
-                                                    <td data-label="Stage"><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span></td>
-                                                    <td data-label="Progress">
-                                                        <div class="progress-wrap">
-                                                            <div class="progress-meta">
-                                                                <span>{{ $progressPercent }}%</span>
-                                                                <span>{{ $completedTasks }}/{{ $totalTasks ?: 0 }} tasks</span>
-                                                            </div>
-                                                            <div class="progress-bar"><span style="width: {{ $progressPercent }}%;"></span></div>
-                                                        </div>
-                                                    </td>
-                                                    <td data-label="Responsible">
+                                                    <td data-label="Priority / Stage"><div class="chip-row"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span></div></td>
+                                                    <td data-label="Owner / Target">
                                                         <div class="title" style="font-size:.82rem;">{{ $action->responsibleUser?->full_name ?? 'Unassigned person' }}</div>
-                                                        <div class="note">{{ $action->responsibleTeam?->team_name ?? 'No team assigned' }}</div>
-                                                    </td>
-                                                    <td data-label="Target Date">
-                                                        <div class="title" style="font-size:.82rem;">{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div>
-                                                        <div class="note">{{ $action->completed_at ? 'Completed ' . $action->completed_at->format('M d, Y') : 'Open timeline' }}</div>
+                                                        <div class="note"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div>
                                                     </td>
                                                     <td data-label="Source">
                                                         <div class="chip-row">
@@ -1101,11 +1157,19 @@
                 });
             });
 
-            document.querySelectorAll('#mitigationTableData [data-open-details-modal]').forEach((button) => {
+            document.querySelectorAll('[data-open-details-modal]').forEach((button) => {
                 button.addEventListener('click', () => {
-                    const payload = JSON.parse(button.getAttribute('data-payload') || '{}');
-                    renderDetails(payload);
-                    openModal(detailsModal);
+                    try {
+                        const payload = JSON.parse(button.getAttribute('data-payload') || '{}');
+                        renderDetails(payload);
+                        openModal(detailsModal);
+                    } catch (error) {
+                        console.error('Unable to open mitigation draft details.', error);
+                        detailsTitle.textContent = 'Draft unavailable';
+                        detailsSubtitle.textContent = 'The saved draft data could not be read.';
+                        detailsContent.innerHTML = '<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i> Refresh the page and try reviewing this draft again.</div>';
+                        openModal(detailsModal);
+                    }
                 });
             });
             };
@@ -1126,10 +1190,12 @@
                     const pageUrl = new URL(url, window.location.origin);
                     const pageLink = (page) => { const link = new URL(pageUrl); link.searchParams.set('page', page); return link.href; };
                     table.innerHTML = rows.length ? `
-                        <div class="table-wrap"><table><thead><tr><th>Title</th><th>Barangay / Location</th><th>Category</th><th>Priority</th><th>Stage</th><th>Responsible</th><th>Target</th><th>Source</th><th></th></tr></thead><tbody>
-                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Title"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="note note--clamp">${escapeHtml(item.description || '')}</div></td><td data-label="Location"><div class="title" style="font-size:.86rem;">${escapeHtml(item.barangay || '—')}</div><div class="note">${escapeHtml(item.location || 'No linked location')}</div></td><td data-label="Category"><span class="chip">${escapeHtml(item.category || 'other')}</span></td><td data-label="Priority"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span></td><td data-label="Stage"><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></td><td data-label="Responsible">${escapeHtml(item.responsible || 'Unassigned')}</td><td data-label="Target">${escapeHtml(item.target_date || '—')}</td><td data-label="Source"><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
+                        <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Location</th><th>Priority / Stage</th><th>Owner / Target</th><th>Source</th><th>Open</th></tr></thead><tbody>
+                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Location"><div class="title" style="font-size:.86rem;">${escapeHtml(item.barangay || 'Unknown barangay')}</div><div class="note">${escapeHtml(item.location || 'No linked location')}</div></td><td data-label="Priority / Stage"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="title" style="font-size:.82rem;">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="note"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></td><td data-label="Source"><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
                         </tbody></table></div>
                         <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
+                    table.style.opacity = '1';
+                    table.setAttribute('aria-busy', 'false');
                     window.history.replaceState({}, '', url);
                 } catch (error) {
                     console.error(error);
