@@ -16,7 +16,7 @@
         <option value="">Select barangay</option>
         @foreach($managedBarangays as $barangayOption)
             <option value="{{ $barangayOption->barangay_id }}" @selected((string) old('barangay_id', $draft['barangay_id'] ?? '') === (string) $barangayOption->barangay_id)>
-                {{ $barangayOption->barangay_name }}{{ $barangayOption->city ? ', ' . $barangayOption->city->city_name : '' }}
+                {{ $barangayOption->barangay_name }}{{ !empty($barangayOption->city_name) ? ', ' . $barangayOption->city_name : '' }}
             </option>
         @endforeach
     </select>
