@@ -78,6 +78,14 @@
         .mitigation-field--full, .details-card--full { grid-column:1 / -1; }
         .mitigation-field label { color:#334155; font-size:.78rem; font-weight:800; }
         .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; min-height:44px; border:1px solid rgba(203,213,225,.96); border-radius:14px; padding:10px 12px; font-size:.84rem; color:#0f172a; background:#fff; }
+        .mitigation-field input:focus, .mitigation-field select:focus, .mitigation-field textarea:focus { outline:none; border-color:#f97316; box-shadow:0 0 0 4px rgba(249,115,22,.12); }
+        .mitigation-field label::before { font-family:"Font Awesome 6 Free"; font-weight:900; color:#f97316; margin-right:7px; content:"\f058"; }
+        .mitigation-form-section { grid-column:1 / -1; display:flex; align-items:center; gap:10px; margin-top:8px; padding:12px 14px; border-radius:14px; background:#fff7ed; color:#9a3412; font-size:.82rem; font-weight:900; }
+        .mitigation-form-section small { color:#b45309; font-size:.73rem; font-weight:600; }
+        .table-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 4px 0; color:#64748b; font-size:.82rem; }
+        .table-pagination nav { display:flex; gap:6px; flex-wrap:wrap; }
+        .table-pagination a, .table-pagination span { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 10px; border:1px solid #e2e8f0; border-radius:10px; color:#475569; text-decoration:none; font-weight:800; background:#fff; }
+        .table-pagination .active span { color:#fff; background:#f97316; border-color:#f97316; }
         .mitigation-field textarea { min-height:96px; resize:vertical; }
         .filter-actions { display:flex; gap:10px; align-items:flex-end; justify-content:flex-end; }
         .attachments { display:flex; flex-direction:column; gap:8px; }
@@ -472,13 +480,17 @@
                             <div class="panel-head">
                                 <div>
                                     <h3>Mitigation Register</h3>
-                                    <p>Official mitigation plans with lifecycle tracking, ownership, traceability, and outcome evaluation.</p>
+                                    <p>Track, assign, and review prevention actions.</p>
                                 </div>
                                 <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
                             </div>
 
-                            <form method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:16px; margin-bottom:18px; box-shadow:none;">
+                            <form id="mitigationFilters" method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:16px; margin-bottom:18px; box-shadow:none;">
                                 <div class="filters-grid">
+                                    <div class="mitigation-field mitigation-field--full">
+                                        <label for="filterSearch">Search</label>
+                                        <input id="filterSearch" name="search" type="search" value="{{ $filters['search'] ?? '' }}" placeholder="Search title, plan, or risk location">
+                                    </div>
                                     <div class="mitigation-field">
                                         <label for="filterBarangay">Barangay</label>
                                         <select id="filterBarangay" name="barangay_id">
@@ -540,8 +552,9 @@
                                 </div>
                             </form>
 
+                            <div id="mitigationTableData" aria-live="polite">
                             @if($mitigationActions->isEmpty())
-                                <div class="empty">No mitigation plans match the current filters.</div>
+                                <div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>
                             @else
                                 <div class="table-wrap">
                                     <table>
@@ -717,7 +730,12 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <div class="table-pagination">
+                                    <span>Showing {{ $mitigationActions->firstItem() }}–{{ $mitigationActions->lastItem() }} of {{ $mitigationActions->total() }}</span>
+                                    {{ $mitigationActions->onEachSide(1)->links() }}
+                                </div>
                             @endif
+                            </div>
                         </section>
                     </div>
                 </div>
@@ -1034,7 +1052,8 @@
                 if (event.target === modal) closeModal(modal);
             }));
 
-            document.querySelectorAll('[data-open-edit-modal]').forEach((button) => {
+            const bindMitigationTableActions = () => {
+            document.querySelectorAll('#mitigationTableData [data-open-edit-modal]').forEach((button) => {
                 button.addEventListener('click', () => {
                     const payload = JSON.parse(button.getAttribute('data-payload') || '{}');
                     if (!editForm || !payload.id) return;
@@ -1071,7 +1090,7 @@
                 });
             });
 
-            document.querySelectorAll('[data-open-delete-modal]').forEach((button) => {
+            document.querySelectorAll('#mitigationTableData [data-open-delete-modal]').forEach((button) => {
                 button.addEventListener('click', () => {
                     const id = button.getAttribute('data-id');
                     const title = button.getAttribute('data-title') || 'this mitigation plan';
@@ -1082,13 +1101,61 @@
                 });
             });
 
-            document.querySelectorAll('[data-open-details-modal]').forEach((button) => {
+            document.querySelectorAll('#mitigationTableData [data-open-details-modal]').forEach((button) => {
                 button.addEventListener('click', () => {
                     const payload = JSON.parse(button.getAttribute('data-payload') || '{}');
                     renderDetails(payload);
                     openModal(detailsModal);
                 });
             });
+            };
+
+            const loadMitigationTable = async (url) => {
+                const table = document.getElementById('mitigationTableData');
+                if (!table) return;
+                table.setAttribute('aria-busy', 'true');
+                table.style.opacity = '.55';
+                try {
+                    const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!response.ok) throw new Error('Unable to load mitigation records.');
+                    const html = await response.text();
+                    const nextTable = new DOMParser().parseFromString(html, 'text/html').getElementById('mitigationTableData');
+                    if (!nextTable) throw new Error('Mitigation table was not found.');
+                    table.replaceWith(nextTable);
+                    window.history.replaceState({}, '', url);
+                    bindMitigationTableActions();
+                } catch (error) {
+                    console.error(error);
+                    table.style.opacity = '1';
+                    table.setAttribute('aria-busy', 'false');
+                }
+            };
+
+            const mitigationFilters = document.getElementById('mitigationFilters');
+            mitigationFilters?.addEventListener('change', () => {
+                const params = new URLSearchParams(new FormData(mitigationFilters));
+                loadMitigationTable(`${mitigationFilters.action}?${params.toString()}`);
+            });
+            mitigationFilters?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const params = new URLSearchParams(new FormData(mitigationFilters));
+                loadMitigationTable(`${mitigationFilters.action}?${params.toString()}`);
+            });
+            let mitigationSearchTimer;
+            mitigationFilters?.querySelector('[name="search"]')?.addEventListener('input', () => {
+                window.clearTimeout(mitigationSearchTimer);
+                mitigationSearchTimer = window.setTimeout(() => {
+                    const params = new URLSearchParams(new FormData(mitigationFilters));
+                    loadMitigationTable(`${mitigationFilters.action}?${params.toString()}`);
+                }, 300);
+            });
+            document.addEventListener('click', (event) => {
+                const link = event.target.closest('#mitigationTableData .pagination a');
+                if (!link) return;
+                event.preventDefault();
+                loadMitigationTable(link.href);
+            });
+            bindMitigationTableActions();
 
             if (menuToggle && menu) {
                 menuToggle.addEventListener('click', () => menu.classList.toggle('show'));

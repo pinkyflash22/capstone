@@ -10,6 +10,7 @@
     </div>
 @endif
 
+<div class="mitigation-form-section"><i class="fa-solid fa-clipboard-list"></i> Plan details <small>What action is needed?</small></div>
 <div class="mitigation-field">
     <label for="stationMitigationBarangay">Barangay</label>
     <select id="stationMitigationBarangay" name="barangay_id" required>
@@ -59,6 +60,7 @@
     <input id="stationMitigationTargetDate" name="target_date" type="date" value="{{ old('target_date', $draft['target_date'] ?? '') }}">
 </div>
 
+<div class="mitigation-form-section"><i class="fa-solid fa-users"></i> Ownership and links <small>Who is responsible and what is affected?</small></div>
 <div class="mitigation-field">
     <label for="stationMitigationResponsibleTeam">Responsible Team</label>
     <select id="stationMitigationResponsibleTeam" name="responsible_team_id">
@@ -138,6 +140,7 @@
     <textarea id="stationMitigationRemarks" name="remarks">{{ old('remarks', $draft['remarks'] ?? '') }}</textarea>
 </div>
 
+<div class="mitigation-form-section"><i class="fa-solid fa-screwdriver-wrench"></i> Delivery and evaluation <small>Record progress, proof, and results.</small></div>
 <div class="mitigation-field mitigation-field--full">
     <label for="stationMitigationImplementationNotes">Implementation Updates</label>
     <textarea id="stationMitigationImplementationNotes" name="implementation_notes">{{ old('implementation_notes', $draft['implementation_notes'] ?? '') }}</textarea>

@@ -3784,18 +3784,26 @@ private function trimAiPrompt(string $prompt): string
 
             $checklists = $query->get();
             $linkedMitigationCounts = MitigationAction::query()
-                ->selectRaw('ai_action_plan_checklist_id, COUNT(*) as aggregate_count')
+                ->selectRaw('ai_action_plan_checklist_id, COUNT(*) as aggregate_count, MAX(mitigation_action_id) as mitigation_action_id')
                 ->whereNotNull('ai_action_plan_checklist_id')
                 ->whereIn('ai_action_plan_checklist_id', $checklists->pluck('ai_action_plan_checklist_id')->all())
                 ->groupBy('ai_action_plan_checklist_id')
-                ->pluck('aggregate_count', 'ai_action_plan_checklist_id');
+                ->get()
+                ->keyBy('ai_action_plan_checklist_id');
 
             return response()->json([
                 'success' => true,
                 'data' => $checklists->map(function (AiActionPlanChecklist $item) use ($linkedMitigationCounts) {
                     $payload = $item->toArray();
+                    $linkedMitigation = $linkedMitigationCounts->get($item->ai_action_plan_checklist_id);
                     $payload['checklist_progress'] = $item->checklist_progress;
-                    $payload['linked_mitigation_count'] = (int) ($linkedMitigationCounts[$item->ai_action_plan_checklist_id] ?? 0);
+                    $payload['linked_mitigation_count'] = (int) ($linkedMitigation->aggregate_count ?? 0);
+                    $payload['linked_mitigation_id'] = $linkedMitigation?->mitigation_action_id ? (int) $linkedMitigation->mitigation_action_id : null;
+                    $payload['linked_mitigation_url'] = $payload['linked_mitigation_id']
+                        ? route('station-admin.mitigations', [
+                            'mitigation_action_id' => $payload['linked_mitigation_id'],
+                        ]) . '#mitigation-row-' . $payload['linked_mitigation_id']
+                        : null;
                     $payload['mitigation_draft_url'] = route('station-admin.mitigations', [
                         'draft_ai_action_plan_checklist_id' => $item->ai_action_plan_checklist_id,
                         'analysis_id' => $item->analysis_id,

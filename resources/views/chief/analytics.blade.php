@@ -7263,6 +7263,12 @@
                                 </div>
                             ` : ''}
                             <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                                ${item.linked_mitigation_url ? `
+                                    <a href="${escapeHtml(item.linked_mitigation_url)}" style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:#0f172a; color:#fff; font-size:12px; font-weight:800; text-decoration:none;">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                        <span>View Linked Mitigation</span>
+                                    </a>
+                                ` : ''}
                                 <a href="${escapeHtml(item.mitigation_draft_url || '#')}" style="display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; background:linear-gradient(135deg, #dc2626, #f59e0b); color:#fff; font-size:12px; font-weight:800; text-decoration:none;">
                                     <i class="fa-solid fa-shield-halved"></i>
                                     <span>Create Mitigation Draft</span>

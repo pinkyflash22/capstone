@@ -1646,6 +1646,8 @@ class StationAdminController extends Controller
                 'status' => request()->string('status')->toString() ?: null,
                 'responsible_team_id' => request()->integer('responsible_team_id') ?: null,
                 'source_type' => request()->string('source_type')->toString() ?: null,
+                'mitigation_action_id' => request()->integer('mitigation_action_id') ?: null,
+                'search' => trim(request()->string('search')->toString()) ?: null,
             ];
 
             try {
@@ -1718,6 +1720,14 @@ class StationAdminController extends Controller
                 });
 
             $mitigationActions = (clone $mitigationBaseQuery)
+                ->when($filters['mitigation_action_id'], fn ($query, $value) => $query->where('mitigation_action_id', $value))
+                ->when($filters['search'], function ($query, $value) {
+                    $query->where(function ($searchQuery) use ($value) {
+                        $searchQuery->where('title', 'like', '%' . $value . '%')
+                            ->orWhere('description', 'like', '%' . $value . '%')
+                            ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%' . $value . '%'));
+                    });
+                })
                 ->when($filters['barangay_id'], fn ($query, $value) => $query->where('barangay_id', $value))
                 ->when($filters['category'], function ($query, $value) {
                     $query->whereIn('category', $this->mitigationCategoryFilterAliases($value));
@@ -1770,8 +1780,10 @@ class StationAdminController extends Controller
                 ")
                 ->orderBy('target_date')
                 ->orderByDesc('created_at')
-                ->get()
-                ->each(function (MitigationAction $action) {
+                ->paginate(10)
+                ->withQueryString();
+
+            $mitigationActions->getCollection()->each(function (MitigationAction $action) {
                     $action->category = $this->normalizeMitigationCategory($action->category);
                     $action->source_type = $this->resolveMitigationSourceType($action->toArray());
                 });
