@@ -96,7 +96,10 @@ services:
         value: capstone-ai/fire_model_metadata.json
 
       - key: RUN_MIGRATIONS
-        value: "false"
+        # The mitigation workflow relies on additive schema migrations. Laravel
+        # records applied migrations, so running this at deploy time is safe and
+        # keeps the production database aligned with the deployed code.
+        value: "true"
 
       # OpenRouter
       - key: OPENROUTER_MODEL
