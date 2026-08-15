@@ -1116,14 +1116,21 @@
                 table.setAttribute('aria-busy', 'true');
                 table.style.opacity = '.55';
                 try {
-                    const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    const requestUrl = new URL(url, window.location.origin);
+                    requestUrl.pathname = '{{ route('station-admin.mitigations.table', [], false) }}';
+                    const response = await fetch(requestUrl, { headers: { 'Accept': 'application/json' } });
                     if (!response.ok) throw new Error('Unable to load mitigation records.');
-                    const html = await response.text();
-                    const nextTable = new DOMParser().parseFromString(html, 'text/html').getElementById('mitigationTableData');
-                    if (!nextTable) throw new Error('Mitigation table was not found.');
-                    table.replaceWith(nextTable);
+                    const result = await response.json();
+                    const rows = Array.isArray(result.data) ? result.data : [];
+                    const meta = result.meta || {};
+                    const pageUrl = new URL(url, window.location.origin);
+                    const pageLink = (page) => { const link = new URL(pageUrl); link.searchParams.set('page', page); return link.href; };
+                    table.innerHTML = rows.length ? `
+                        <div class="table-wrap"><table><thead><tr><th>Title</th><th>Barangay / Location</th><th>Category</th><th>Priority</th><th>Stage</th><th>Responsible</th><th>Target</th><th>Source</th><th></th></tr></thead><tbody>
+                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Title"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="note note--clamp">${escapeHtml(item.description || '')}</div></td><td data-label="Location"><div class="title" style="font-size:.86rem;">${escapeHtml(item.barangay || '—')}</div><div class="note">${escapeHtml(item.location || 'No linked location')}</div></td><td data-label="Category"><span class="chip">${escapeHtml(item.category || 'other')}</span></td><td data-label="Priority"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span></td><td data-label="Stage"><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></td><td data-label="Responsible">${escapeHtml(item.responsible || 'Unassigned')}</td><td data-label="Target">${escapeHtml(item.target_date || '—')}</td><td data-label="Source"><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
+                        </tbody></table></div>
+                        <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
                     window.history.replaceState({}, '', url);
-                    bindMitigationTableActions();
                 } catch (error) {
                     console.error(error);
                     table.style.opacity = '1';
@@ -1150,7 +1157,7 @@
                 }, 300);
             });
             document.addEventListener('click', (event) => {
-                const link = event.target.closest('#mitigationTableData .pagination a');
+                const link = event.target.closest('#mitigationTableData .table-pagination a');
                 if (!link) return;
                 event.preventDefault();
                 loadMitigationTable(link.href);

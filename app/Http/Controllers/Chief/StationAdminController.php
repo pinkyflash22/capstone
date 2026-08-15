@@ -2006,6 +2006,61 @@ class StationAdminController extends Controller
         }
     }
 
+    public function mitigationTable(Request $request)
+    {
+        $barangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+        $filters = [
+            'barangay_id' => $request->integer('barangay_id') ?: null,
+            'category' => $request->string('category')->toString() ?: null,
+            'priority_level' => $request->string('priority_level')->toString() ?: null,
+            'status' => $request->string('status')->toString() ?: null,
+            'responsible_team_id' => $request->integer('responsible_team_id') ?: null,
+            'source_type' => $request->string('source_type')->toString() ?: null,
+            'mitigation_action_id' => $request->integer('mitigation_action_id') ?: null,
+            'search' => trim($request->string('search')->toString()) ?: null,
+        ];
+
+        $actions = MitigationAction::query()
+            ->with(['barangay:barangay_id,barangay_name', 'riskArea.marker:marker_id,title', 'responsibleUser:user_id,first_name,middle_name,last_name'])
+            ->when(empty($barangayIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds))
+            ->when($filters['mitigation_action_id'], fn ($query, $value) => $query->whereKey($value))
+            ->when($filters['search'], function ($query, $value) {
+                $query->where(function ($searchQuery) use ($value) {
+                    $searchQuery->where('title', 'like', '%' . $value . '%')
+                        ->orWhere('description', 'like', '%' . $value . '%')
+                        ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%' . $value . '%'));
+                });
+            })
+            ->when($filters['barangay_id'], fn ($query, $value) => $query->where('barangay_id', $value))
+            ->when($filters['category'], fn ($query, $value) => $query->whereIn('category', $this->mitigationCategoryFilterAliases($value)))
+            ->when($filters['priority_level'], fn ($query, $value) => $query->where('priority_level', $value))
+            ->when($filters['status'], fn ($query, $value) => $query->where('status', $value))
+            ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
+            ->when($filters['source_type'], fn ($query, $value) => $query->where('source_type', $value))
+            ->orderByRaw("FIELD(priority_level, 'critical', 'high', 'medium', 'low')")
+            ->orderByDesc('created_at')
+            ->paginate(10);
+
+        return response()->json([
+            'data' => $actions->through(fn (MitigationAction $action) => [
+                'id' => $action->mitigation_action_id,
+                'title' => $action->title,
+                'description' => $action->description,
+                'barangay' => $action->barangay?->barangay_name,
+                'location' => $action->riskArea?->marker?->title,
+                'category' => $this->normalizeMitigationCategory($action->category),
+                'priority' => $action->priority_level,
+                'status' => $action->status,
+                'target_date' => optional($action->target_date)->format('M d, Y'),
+                'source' => $this->resolveMitigationSourceType($action->toArray()),
+                'responsible' => $action->responsibleUser?->full_name,
+            ])->items(),
+            'meta' => ['current_page' => $actions->currentPage(), 'last_page' => $actions->lastPage(), 'total' => $actions->total()],
+        ]);
+    }
+
     public function approveGeneratedMitigationDraft(Request $request, int $checklistId)
     {
         $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()

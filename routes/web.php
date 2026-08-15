@@ -359,6 +359,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/alerts',[StationAdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
         Route::get('/mitigations', [StationAdminController::class, 'mitigations'])->name('mitigations');
+        Route::get('/mitigations/table', [StationAdminController::class, 'mitigationTable'])->name('mitigations.table');
         Route::post('/mitigations', [StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
