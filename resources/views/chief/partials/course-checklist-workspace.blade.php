@@ -50,10 +50,29 @@
             <button type="button" class="icon-button" data-checklist-reset title="Clear filters" aria-label="Clear filters"><i class="fa-solid fa-rotate-left"></i></button>
         </form>
 
+        <div class="bulk-toolbar" data-bulk-toolbar>
+            <span class="bulk-toolbar__count"><i class="fa-solid fa-check-double"></i> <b data-selected-count>0</b> selected</span>
+            <select data-bulk-assignee aria-label="Assign selected checklists">
+                <option value="">Keep assignee</option>
+                <option value="unassigned">Unassign</option>
+                @foreach ($assignees as $assignee)
+                    <option value="{{ $assignee->user_id }}">{{ trim(($assignee->first_name ?? '') . ' ' . ($assignee->last_name ?? '')) }}</option>
+                @endforeach
+            </select>
+            <select data-bulk-status aria-label="Set status for selected checklists">
+                <option value="">Keep status</option>
+                @foreach (['pending', 'in_progress', 'submitted', 'confirmed', 'rejected'] as $bulkStatus)
+                    <option value="{{ $bulkStatus }}">{{ ucfirst(str_replace('_', ' ', $bulkStatus)) }}</option>
+                @endforeach
+            </select>
+            <button type="button" class="action-button action-button--confirmed" data-apply-bulk disabled><i class="fa-solid fa-wand-magic-sparkles"></i><span>Apply</span></button>
+        </div>
+
         <div class="checklist-table-wrap">
             <table class="checklist-table">
                 <thead>
                     <tr>
+                        <th><input type="checkbox" data-select-all aria-label="Select all rows on this page"></th>
                         <th>Action plan</th>
                         <th>Area</th>
                         <th>Priority</th>
@@ -78,6 +97,7 @@
                                 ]);
                         @endphp
                         <tr data-checklist-row="{{ $checklist->ai_action_plan_checklist_id }}">
+                            <td data-label="Select"><input type="checkbox" data-select-checklist value="{{ $checklist->ai_action_plan_checklist_id }}" aria-label="Select {{ $checklist->plan_title }}"></td>
                             <td data-label="Action plan">
                                 <div class="plan-cell">
                                     <span class="plan-cell__icon"><i class="fa-solid fa-clipboard-check"></i></span>
@@ -107,6 +127,7 @@
                                         <span class="priority-pill priority-pill--{{ $priority }}"><i class="fa-solid fa-flag"></i> {{ ucfirst($priority) }}</span>
                                         <span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span>
                                         <span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span>
+                                        @if ($checklist->assignee)<span class="table-location"><i class="fa-solid fa-user-shield"></i> {{ trim(($checklist->assignee->first_name ?? '') . ' ' . ($checklist->assignee->last_name ?? '')) }}</span>@endif
                                     </div>
                                     <h3>{{ $checklist->plan_title ?: 'Action Plan Checklist' }}</h3>
                                     <p>{{ $checklist->plan_description ?: $checklist->source_description ?: 'No additional plan description was provided.' }}</p>
@@ -155,13 +176,18 @@
                                 </div>
                             </section>
 
+                            <section class="modal-section">
+                                <div class="modal-section__head"><h4><i class="fa-solid fa-clock-rotate-left"></i> Activity history</h4><span>Newest first</span></div>
+                                <div class="history-list" data-checklist-history="{{ $checklist->ai_action_plan_checklist_id }}"><div class="modal-empty"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading history...</span></div></div>
+                            </section>
+
                             <div class="modal-links">
                                 <a href="{{ route('station-admin.analytics') }}"><i class="fa-solid fa-chart-line"></i><span>Forecast source</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                                 <a href="{{ $mitigationUrl }}"><i class="fa-solid fa-shield-halved"></i><span>{{ $mitigation ? 'Linked mitigation (' . $checklist->mitigation_actions_count . ')' : 'Create mitigation draft' }}</span><i class="fa-solid fa-arrow-right"></i></a>
                             </div>
                         </template>
                     @empty
-                        <tr><td colspan="7"><div class="checklist-empty"><i class="fa-regular fa-folder-open"></i><strong>No checklist records found</strong><span>Clear the filters or run a forecast analysis to generate action plans.</span></div></td></tr>
+                        <tr><td colspan="8"><div class="checklist-empty"><i class="fa-regular fa-folder-open"></i><strong>No checklist records found</strong><span>Clear the filters or run a forecast analysis to generate action plans.</span></div></td></tr>
                     @endforelse
                 </tbody>
             </table>

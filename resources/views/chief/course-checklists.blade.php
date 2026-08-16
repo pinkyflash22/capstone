@@ -22,6 +22,10 @@
         @media(max-width:1050px){.checklist-metrics{grid-template-columns:repeat(2,1fr)}.checklist-filters{grid-template-columns:1fr 1fr 1fr}.checklist-search{grid-column:span 2}.forecast-hero{grid-template-columns:1fr}.workflow-nav{width:max-content}}
         @media(max-width:767px){.checklist-main{padding:10px}.checklist-topbar{top:8px;border-radius:18px;padding:10px 12px}.mobile-menu{display:grid;place-items:center}.checklist-topbar__icon{display:none}.profile-pill b{display:none}.forecast-hero{padding:20px;border-radius:21px}.workflow-nav{width:100%;overflow:auto}.workflow-nav a{flex:1;justify-content:center}.checklist-metrics{grid-template-columns:1fr 1fr;gap:8px}.checklist-metric{min-height:68px;padding:11px}.checklist-metric__icon{width:35px;height:35px}.checklist-metric strong{font-size:19px}.checklist-register{border-radius:21px}.checklist-register__head{padding:17px;align-items:center}.checklist-register__head p{display:none}.checklist-filters{grid-template-columns:1fr 1fr;padding:0 15px 14px}.checklist-search{grid-column:1/-1}.checklist-filters select[name=barangay_id]{grid-column:1/-1}.checklist-table{min-width:0}.checklist-table thead{display:none}.checklist-table,.checklist-table tbody,.checklist-table tr,.checklist-table td{display:block;width:100%}.checklist-table tr{position:relative;padding:13px 56px 13px 14px;border-top:1px solid #eee8e1}.checklist-table td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border:0}.checklist-table td:before{content:attr(data-label);font-size:9px;color:#929aa7;text-transform:uppercase;letter-spacing:.07em;font-weight:800}.checklist-table td:first-child:before,.checklist-table td:last-child:before{display:none}.checklist-table td:first-child{display:block}.checklist-table td:last-child{position:absolute;right:12px;top:13px}.plan-cell strong{white-space:normal}.table-actions{flex-direction:column}.checklist-modal{padding:8px;align-items:end}.checklist-modal__card{max-height:92dvh;border-radius:23px 23px 15px 15px}.checklist-modal__body{padding:15px}.modal-step{grid-template-columns:28px 1fr}.modal-step__actions{grid-column:2;justify-content:flex-end}.modal-progress-card>div:first-child{display:block}.modal-progress-card strong{display:block;margin-top:4px}.modal-links{grid-template-columns:1fr}}
     </style>
+    <style>
+        .bulk-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 24px 14px}.bulk-toolbar__count{margin-right:auto;display:inline-flex;align-items:center;gap:7px;color:#6d7889;font-size:10px;font-weight:800}.bulk-toolbar select{height:35px;min-width:145px;border:1px solid #ddd8d2;border-radius:10px;background:#fff;padding:0 10px;color:#475467;font-size:10px}.bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}.checklist-table input[type=checkbox]{width:15px;height:15px;accent-color:#d55327;cursor:pointer}.history-list{display:grid;gap:8px}.history-event{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;padding:9px;border:1px solid #ece7e1;border-radius:12px;background:#fdfcfb}.history-event__icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#c24824}.history-event strong,.history-event small{display:block}.history-event strong{font-size:11px}.history-event small{margin-top:3px;color:#7d8796;font-size:9.5px;line-height:1.4}.history-event time{color:#9098a5;font-size:9px;white-space:nowrap}.history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px}.history-pagination button{width:29px;height:29px;border:1px solid #ddd8d2;border-radius:9px;background:#fff;color:#647084;cursor:pointer}.history-pagination button:disabled{opacity:.4;cursor:not-allowed}
+        @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}}
+    </style>
 </head>
 <body class="chief-legacy-layout">
 <div class="checklist-shell">
@@ -76,6 +80,49 @@
         window.setTimeout(() => toast.remove(), 3200);
     }
 
+    function escapeChecklistHtml(value) {
+        const node = document.createElement('div');
+        node.textContent = value == null ? '' : String(value);
+        return node.innerHTML;
+    }
+
+    function updateBulkToolbar() {
+        const selected = [...document.querySelectorAll('[data-select-checklist]:checked')];
+        const count = document.querySelector('[data-selected-count]');
+        const apply = document.querySelector('[data-apply-bulk]');
+        const all = document.querySelector('[data-select-all]');
+        if (count) count.textContent = String(selected.length);
+        if (apply) apply.disabled = selected.length === 0;
+        if (all) {
+            const total = document.querySelectorAll('[data-select-checklist]').length;
+            all.checked = total > 0 && selected.length === total;
+            all.indeterminate = selected.length > 0 && selected.length < total;
+        }
+    }
+
+    async function loadChecklistHistory(checklistId, page = 1) {
+        const container = document.querySelector(`[data-checklist-history="${checklistId}"]`);
+        if (!container) return;
+        container.innerHTML = '<div class="modal-empty"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading history...</span></div>';
+        try {
+            const response = await fetch(`/station-admin/api/action-plan-checklists/${checklistId}/history?page=${page}&per_page=6`, {headers:{'Accept':'application/json'}});
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) throw new Error(result.message || 'History could not be loaded.');
+            const events = Array.isArray(result.data) ? result.data : [];
+            container.innerHTML = events.length ? events.map((item) => {
+                const date = item.created_at ? new Date(item.created_at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'Unknown date';
+                const change = item.old_value || item.new_value ? `${item.old_value ? escapeChecklistHtml(item.old_value.replaceAll('_',' ')) + ' → ' : ''}${escapeChecklistHtml((item.new_value || '').replaceAll('_',' '))}` : '';
+                return `<article class="history-event"><span class="history-event__icon"><i class="fa-solid ${item.event_type === 'step_reviewed' ? 'fa-check' : item.event_type === 'assignment_changed' ? 'fa-user-shield' : 'fa-pen'}"></i></span><span><strong>${escapeChecklistHtml(item.label)}</strong><small>${escapeChecklistHtml(item.actor)}${change ? ' · ' + change : ''}${item.notes ? '<br>' + escapeChecklistHtml(item.notes) : ''}</small></span><time>${escapeChecklistHtml(date)}</time></article>`;
+            }).join('') : '<div class="modal-empty"><i class="fa-regular fa-clock"></i><span>No activity has been recorded yet.</span></div>';
+            const pagination = result.pagination || {};
+            if ((pagination.last_page || 1) > 1) {
+                container.insertAdjacentHTML('beforeend', `<div class="history-pagination"><button type="button" data-history-page="${Math.max(1, page - 1)}" data-history-id="${checklistId}" ${page <= 1 ? 'disabled' : ''} aria-label="Previous history page"><i class="fa-solid fa-chevron-left"></i></button><small>Page ${page} of ${pagination.last_page}</small><button type="button" data-history-page="${Math.min(pagination.last_page, page + 1)}" data-history-id="${checklistId}" ${page >= pagination.last_page ? 'disabled' : ''} aria-label="Next history page"><i class="fa-solid fa-chevron-right"></i></button></div>`);
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="modal-empty"><i class="fa-solid fa-triangle-exclamation"></i><span>${escapeChecklistHtml(error.message)}</span></div>`;
+        }
+    }
+
     function openChecklistModal(id, trigger = null) {
         const template = document.getElementById(`checklistDetail-${id}`);
         const modal = document.getElementById('checklistModal');
@@ -85,6 +132,7 @@
         modal.hidden = false;
         document.body.style.overflow = 'hidden';
         document.getElementById('closeChecklistModal').focus();
+        loadChecklistHistory(id);
     }
 
     function closeChecklistModal() {
@@ -137,6 +185,33 @@
         }
     }
 
+    async function applyBulkChecklistUpdate(button) {
+        const ids = [...document.querySelectorAll('[data-select-checklist]:checked')].map((item) => Number(item.value));
+        const assigned = document.querySelector('[data-bulk-assignee]')?.value || '';
+        const status = document.querySelector('[data-bulk-status]')?.value || '';
+        if (!ids.length) return;
+        if (!assigned && !status) { showChecklistToast('Choose an assignee or status first.', 'error'); return; }
+        const payload = {checklist_ids: ids};
+        if (assigned) payload.assigned_to = assigned === 'unassigned' ? null : Number(assigned);
+        if (status) payload.status = status;
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.classList.add('is-loading');
+        button.innerHTML = '<i class="fa-solid fa-spinner"></i><span>Applying</span>';
+        try {
+            const response = await fetch('/station-admin/api/action-plan-checklists/bulk', {method:'PATCH',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':checklistCsrf},body:JSON.stringify(payload)});
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) throw new Error(result.message || 'Bulk update failed.');
+            await loadChecklistWorkspace(window.location.href, {push:false});
+            showChecklistToast(`${result.updated || ids.length} checklist(s) updated.`);
+        } catch (error) {
+            button.disabled = false;
+            button.classList.remove('is-loading');
+            button.innerHTML = original;
+            showChecklistToast(error.message || 'Bulk update failed.', 'error');
+        }
+    }
+
     document.addEventListener('click', (event) => {
         const open = event.target.closest('[data-open-checklist]');
         if (open) { openChecklistModal(open.dataset.openChecklist, open); return; }
@@ -145,6 +220,10 @@
         if (reset) { loadChecklistWorkspace(checklistPageUrl); return; }
         const pageLink = event.target.closest('.checklist-pagination a');
         if (pageLink) { event.preventDefault(); loadChecklistWorkspace(pageLink.href); return; }
+        const historyPage = event.target.closest('[data-history-page]');
+        if (historyPage && !historyPage.disabled) { loadChecklistHistory(historyPage.dataset.historyId, Number(historyPage.dataset.historyPage)); return; }
+        const bulk = event.target.closest('[data-apply-bulk]');
+        if (bulk) { applyBulkChecklistUpdate(bulk); return; }
         const step = event.target.closest('[data-step-status]');
         if (step) { patchChecklist(`/station-admin/api/action-plan-checklists/${step.dataset.checklistId}/items`, {item_id:Number(step.dataset.itemId),status:step.dataset.status}, step, step.dataset.checklistId); return; }
         const status = event.target.closest('[data-checklist-status]');
@@ -163,6 +242,12 @@
     });
 
     document.addEventListener('change', (event) => {
+        if (event.target.matches('[data-select-all]')) {
+            document.querySelectorAll('[data-select-checklist]').forEach((item) => item.checked = event.target.checked);
+            updateBulkToolbar();
+            return;
+        }
+        if (event.target.matches('[data-select-checklist]')) { updateBulkToolbar(); return; }
         if (!event.target.closest('#checklistFilters select')) return;
         event.target.form?.requestSubmit();
     });

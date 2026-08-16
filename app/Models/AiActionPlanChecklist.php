@@ -109,6 +109,12 @@ class AiActionPlanChecklist extends Model
             ->orderBy('item_order');
     }
 
+    public function activities()
+    {
+        return $this->hasMany(AiActionPlanChecklistActivity::class, 'ai_action_plan_checklist_id', 'ai_action_plan_checklist_id')
+            ->latest('created_at');
+    }
+
     public function getChecklistProgressAttribute(): array
     {
         $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Chief;
 use App\Http\Controllers\Controller;
 use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistItem;
+use App\Models\AiActionPlanChecklistActivity;
 use App\Models\AiRecommendationSuggestion;
 use App\Models\Analysis;
 use App\Models\MitigationAction;
@@ -18,6 +19,7 @@ use App\Services\PredictionFeedbackSignalService;
 use App\Support\BarangayNotificationService;
 use App\Support\ForecastIncidentCalibration;
 use App\Support\PeakHourEstimator;
+use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
@@ -133,9 +135,21 @@ class AnalyticController extends Controller
             ->sortBy('barangay_name')
             ->values();
 
+        $assignees = StationOfficer::query()
+            ->with('user.role')
+            ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
+            ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'))
+            ->get()
+            ->pluck('user')
+            ->filter()
+            ->unique('user_id')
+            ->sortBy(fn ($user) => strtolower(trim(($user->last_name ?? '') . ' ' . ($user->first_name ?? ''))))
+            ->values();
+
         $viewData = [
             'checklists' => $checklists,
             'barangays' => $barangays,
+            'assignees' => $assignees,
             'summary' => $summary,
             'filters' => [
                 'barangay_id' => $request->input('barangay_id'),
@@ -4800,12 +4814,16 @@ private function trimAiPrompt(string $prompt): string
                 ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
                 ->findOrFail($id);
 
+            $oldStatus = (string) $checklist->status;
+
             $checklist->update([
                 'status' => $validated['status'],
                 'confirmed_by' => Auth::id(),
                 'confirmed_at' => now(),
                 'confirmation_notes' => $validated['confirmation_notes'] ?? null,
             ]);
+            $this->recordChecklistActivity($checklist, 'status_changed', $oldStatus, $validated['status'], $validated['confirmation_notes'] ?? null);
+            UserActivityLogger::log('reviewed AI checklist', Auth::id(), $request);
 
             return response()->json([
                 'success' => true,
@@ -4849,6 +4867,7 @@ private function trimAiPrompt(string $prompt): string
             }
 
             $itemStatus = $validated['status'];
+            $oldItemStatus = (string) $item->status;
             $item->update([
                 'status' => $itemStatus,
                 'reviewed_by' => $itemStatus === 'pending' ? null : Auth::id(),
@@ -4875,6 +4894,16 @@ private function trimAiPrompt(string $prompt): string
             $checklist->update([
                 'status' => $status,
             ]);
+            $this->recordChecklistActivity(
+                $checklist,
+                'step_reviewed',
+                $oldItemStatus,
+                $itemStatus,
+                $validated['review_notes'] ?? null,
+                $item->ai_action_plan_checklist_item_id,
+                ['item_order' => $item->item_order, 'item_text' => $item->item_text]
+            );
+            UserActivityLogger::log('reviewed AI checklist step', Auth::id(), $request);
 
             return response()->json([
                 'success' => true,
@@ -4888,6 +4917,200 @@ private function trimAiPrompt(string $prompt): string
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function getChecklistHistory(Request $request, int $id)
+    {
+        $checklist = $this->scopedChecklistQuery()->with(['items.reviewer', 'confirmer', 'assignee'])->findOrFail($id);
+        $perPage = max(5, min(20, $request->integer('per_page', 6)));
+
+        if (Schema::hasTable('ai_action_plan_checklist_activities')) {
+            $history = AiActionPlanChecklistActivity::query()
+                ->with('user')
+                ->where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)
+                ->latest('created_at')
+                ->paginate($perPage);
+
+            if ($history->total() > 0) {
+                return response()->json([
+                    'success' => true,
+                    'data' => collect($history->items())->map(fn ($event) => $this->formatChecklistActivity($event))->values(),
+                    'pagination' => [
+                        'current_page' => $history->currentPage(),
+                        'last_page' => max(1, $history->lastPage()),
+                        'total' => $history->total(),
+                    ],
+                ]);
+            }
+        }
+
+        $fallback = collect([[
+            'id' => 'created-' . $checklist->ai_action_plan_checklist_id,
+            'event_type' => 'created',
+            'label' => 'Checklist created',
+            'actor' => 'AI forecast workflow',
+            'old_value' => null,
+            'new_value' => $checklist->status,
+            'notes' => $checklist->source_title,
+            'created_at' => optional($checklist->created_at)?->toIso8601String(),
+        ]])->concat($checklist->items->filter->reviewed_at->map(fn ($item) => [
+            'id' => 'item-' . $item->ai_action_plan_checklist_item_id,
+            'event_type' => 'step_reviewed',
+            'label' => 'Step ' . $item->item_order . ' marked ' . str_replace('_', ' ', $item->status),
+            'actor' => trim(($item->reviewer?->first_name ?? '') . ' ' . ($item->reviewer?->last_name ?? '')) ?: 'Station reviewer',
+            'old_value' => null,
+            'new_value' => $item->status,
+            'notes' => $item->review_notes ?: $item->item_text,
+            'created_at' => optional($item->reviewed_at)?->toIso8601String(),
+        ]))->when($checklist->confirmed_at, fn ($events) => $events->push([
+            'id' => 'review-' . $checklist->ai_action_plan_checklist_id,
+            'event_type' => 'status_changed',
+            'label' => 'Checklist marked ' . str_replace('_', ' ', $checklist->status),
+            'actor' => trim(($checklist->confirmer?->first_name ?? '') . ' ' . ($checklist->confirmer?->last_name ?? '')) ?: 'Station reviewer',
+            'old_value' => null,
+            'new_value' => $checklist->status,
+            'notes' => $checklist->confirmation_notes,
+            'created_at' => optional($checklist->confirmed_at)?->toIso8601String(),
+        ]))->sortByDesc('created_at')->values();
+
+        $page = max(1, $request->integer('page', 1));
+        return response()->json([
+            'success' => true,
+            'data' => $fallback->forPage($page, $perPage)->values(),
+            'pagination' => ['current_page' => $page, 'last_page' => max(1, (int) ceil($fallback->count() / $perPage)), 'total' => $fallback->count()],
+        ]);
+    }
+
+    public function bulkUpdateActionPlanChecklists(Request $request)
+    {
+        $validated = $request->validate([
+            'checklist_ids' => 'required|array|min:1|max:100',
+            'checklist_ids.*' => 'required|integer|min:1',
+            'assigned_to' => 'nullable|integer|exists:users,user_id',
+            'status' => 'nullable|in:pending,in_progress,submitted,confirmed,rejected',
+        ]);
+        abort_if(! $request->exists('assigned_to') && ! $request->filled('status'), 422, 'Choose an assignee or status to update.');
+
+        $checklists = $this->scopedChecklistQuery()
+            ->whereIn('ai_action_plan_checklist_id', array_unique($validated['checklist_ids']))
+            ->get();
+        abort_if($checklists->count() !== count(array_unique($validated['checklist_ids'])), 403, 'One or more checklists are outside your station scope.');
+
+        $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
+        if (! empty($validated['assigned_to'])) {
+            $assigneeQuery = StationOfficer::where('user_id', $validated['assigned_to'])
+                ->when($stationOfficer?->station_id, fn ($query) => $query->where('station_id', $stationOfficer->station_id));
+            abort_unless($assigneeQuery->exists(), 422, 'The assignee must be an eligible station officer.');
+        }
+
+        DB::transaction(function () use ($checklists, $validated) {
+            foreach ($checklists as $checklist) {
+                if (array_key_exists('assigned_to', $validated)) {
+                    $oldAssignee = $checklist->assigned_to;
+                    $checklist->assigned_to = $validated['assigned_to'];
+                    $this->recordChecklistActivity($checklist, 'assignment_changed', (string) ($oldAssignee ?? ''), (string) ($validated['assigned_to'] ?? ''));
+                }
+                if (! empty($validated['status'])) {
+                    $oldStatus = (string) $checklist->status;
+                    $checklist->status = $validated['status'];
+                    if (in_array($validated['status'], ['confirmed', 'rejected'], true)) {
+                        $checklist->confirmed_by = Auth::id();
+                        $checklist->confirmed_at = now();
+                    }
+                    $this->recordChecklistActivity($checklist, 'status_changed', $oldStatus, $validated['status'], 'Bulk checklist update');
+                }
+                $checklist->save();
+            }
+        });
+
+        UserActivityLogger::log('bulk updated AI checklists', Auth::id(), $request);
+        return response()->json(['success' => true, 'updated' => $checklists->count()]);
+    }
+
+    private function scopedChecklistQuery()
+    {
+        $stationId = StationOfficer::where('user_id', Auth::id())->value('station_id');
+        $isProvincialAdmin = strtolower(trim((string) (Auth::user()?->role?->role ?? ''))) === 'provincial admin';
+
+        return AiActionPlanChecklist::query()
+            ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+            ->when(! $stationId && ! $isProvincialAdmin, fn ($query) => $query->whereRaw('1 = 0'));
+    }
+
+    private function recordChecklistActivity(AiActionPlanChecklist $checklist, string $eventType, ?string $oldValue, ?string $newValue, ?string $notes = null, ?int $itemId = null, array $metadata = []): void
+    {
+        if (! Schema::hasTable('ai_action_plan_checklist_activities')) return;
+
+        if (! AiActionPlanChecklistActivity::where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)->exists()) {
+            AiActionPlanChecklistActivity::create([
+                'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                'event_type' => 'created',
+                'new_value' => 'pending',
+                'notes' => $checklist->source_title,
+                'created_at' => $checklist->created_at ?? now(),
+            ]);
+
+            $checklist->items()->whereNotNull('reviewed_at')
+                ->when($itemId, fn ($query) => $query->where('ai_action_plan_checklist_item_id', '!=', $itemId))
+                ->get()
+                ->each(fn ($item) => AiActionPlanChecklistActivity::create([
+                    'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                    'ai_action_plan_checklist_item_id' => $item->ai_action_plan_checklist_item_id,
+                    'user_id' => $item->reviewed_by,
+                    'event_type' => 'step_reviewed',
+                    'new_value' => $item->status,
+                    'notes' => $item->review_notes,
+                    'metadata' => ['item_order' => $item->item_order, 'item_text' => $item->item_text],
+                    'created_at' => $item->reviewed_at,
+                ]));
+
+            if ($eventType !== 'status_changed' && $checklist->confirmed_at) {
+                AiActionPlanChecklistActivity::create([
+                    'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                    'user_id' => $checklist->confirmed_by,
+                    'event_type' => 'status_changed',
+                    'new_value' => $checklist->status,
+                    'notes' => $checklist->confirmation_notes,
+                    'created_at' => $checklist->confirmed_at,
+                ]);
+            }
+        }
+
+        AiActionPlanChecklistActivity::create([
+            'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+            'ai_action_plan_checklist_item_id' => $itemId,
+            'user_id' => Auth::id(),
+            'event_type' => $eventType,
+            'old_value' => $oldValue ?: null,
+            'new_value' => $newValue ?: null,
+            'notes' => $notes,
+            'metadata' => $metadata ?: null,
+            'created_at' => now(),
+        ]);
+    }
+
+    private function formatChecklistActivity(AiActionPlanChecklistActivity $event): array
+    {
+        $labels = [
+            'created' => 'Checklist created',
+            'status_changed' => 'Checklist status changed',
+            'step_reviewed' => 'Checklist step reviewed',
+            'assignment_changed' => 'Checklist assignment changed',
+        ];
+        if ($event->event_type === 'step_reviewed' && data_get($event->metadata, 'item_order')) {
+            $labels['step_reviewed'] = 'Step ' . data_get($event->metadata, 'item_order') . ' reviewed';
+        }
+
+        return [
+            'id' => $event->ai_action_plan_checklist_activity_id,
+            'event_type' => $event->event_type,
+            'label' => $labels[$event->event_type] ?? ucfirst(str_replace('_', ' ', $event->event_type)),
+            'actor' => trim(($event->user?->first_name ?? '') . ' ' . ($event->user?->last_name ?? '')) ?: 'System',
+            'old_value' => $event->old_value,
+            'new_value' => $event->new_value,
+            'notes' => $event->notes,
+            'created_at' => optional($event->created_at)?->toIso8601String(),
+        ];
     }
     
     /**

@@ -300,6 +300,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);
         Route::patch('/api/action-plan-checklists/{id}/confirm', [App\Http\Controllers\Chief\AnalyticController::class, 'confirmActionPlanChecklist']);
         Route::patch('/api/action-plan-checklists/{id}/items', [App\Http\Controllers\Chief\AnalyticController::class, 'updateChecklistItemReview']);
+        Route::get('/api/action-plan-checklists/{id}/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getChecklistHistory']);
+        Route::patch('/api/action-plan-checklists/bulk', [App\Http\Controllers\Chief\AnalyticController::class, 'bulkUpdateActionPlanChecklists']);
         Route::get('/api/recommendation-suggestions', [App\Http\Controllers\Chief\AnalyticController::class, 'getRecommendationSuggestions']);
     
         // });
@@ -428,6 +430,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'getActionPlanChecklists']);
         Route::patch('/api/action-plan-checklists/{id}/confirm', [App\Http\Controllers\Chief\AnalyticController::class, 'confirmActionPlanChecklist']);
         Route::patch('/api/action-plan-checklists/{id}/items', [App\Http\Controllers\Chief\AnalyticController::class, 'updateChecklistItemReview']);
+        Route::get('/api/action-plan-checklists/{id}/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getChecklistHistory']);
+        Route::patch('/api/action-plan-checklists/bulk', [App\Http\Controllers\Chief\AnalyticController::class, 'bulkUpdateActionPlanChecklists']);
         Route::get('/api/recommendation-suggestions', [App\Http\Controllers\Chief\AnalyticController::class, 'getRecommendationSuggestions']);
     
         // });
