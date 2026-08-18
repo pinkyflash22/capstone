@@ -1016,6 +1016,7 @@
             }
         }
     </style>
+    @stack('styles')
 </head>
 <body class="barangay-portal-shell">
     @php
