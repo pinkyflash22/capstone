@@ -14,6 +14,7 @@ use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\User;
 use App\Support\IncidentContextDispatcher;
+use App\Services\IncidentResponderSnapshotService;
 use App\Models\Role;
 use App\Models\Province;
 use Illuminate\Http\Request;
@@ -90,9 +91,9 @@ class ManagementController extends Controller
     /**
      * Get incidents data for API with filters
      */
-    public function getIncidents(Request $request)
+    public function getIncidents(Request $request, IncidentResponderSnapshotService $snapshotService)
     {
-        $query = Incident::with(['marker', 'reporter']);
+        $query = Incident::with(['marker', 'reporter', 'team', 'responderSnapshot']);
         
         // Apply search filter
         if ($request->has('search') && $request->search) {
@@ -133,6 +134,7 @@ class ManagementController extends Controller
         $query->orderBy($sortBy, $sortOrder);
         
         $incidents = $query->get();
+        $snapshotService->attachResponderDetails($incidents);
         
         return response()->json([
             'success' => true,

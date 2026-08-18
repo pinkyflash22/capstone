@@ -1893,6 +1893,30 @@ class ManagementPage {
         const recordedDate = historical?.incident_date || item.created_at;
         const recordedTime = historical?.incident_time || null;
         const location = historical?.incident_location || (item.marker ? `${item.marker.lat}, ${item.marker.lng}` : 'N/A');
+        const responders = Array.isArray(item.responder_details) ? item.responder_details : [];
+        const responderRows = responders.length
+            ? responders.map((responder, index) => `
+                <div class="info-row">
+                    <span class="info-label"><i class="fa-solid fa-user-shield"></i> Responder ${index + 1}</span>
+                    <span class="info-value">
+                        <strong>${this.escapeHtml(responder.name || `Officer #${responder.station_officer_id}`)}</strong><br>
+                        <small>${this.escapeHtml(responder.rank || 'Station Officer')} &middot; ${this.escapeHtml(responder.station_name || `Station #${responder.station_id}`)}</small>
+                    </span>
+                </div>
+            `).join('')
+            : `<p>${item.team_id ? 'No saved responder snapshot is available for this incident.' : 'No response team has been assigned.'}</p>`;
+        const respondersBlock = `
+            <div class="info-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-helmet-safety"></i>
+                    <h3>Saved Responders</h3>
+                </div>
+                <div class="card-content">
+                    ${responderRows}
+                    ${item.responder_snapshot?.created_at ? `<div class="info-row"><span class="info-label">Snapshot saved:</span><span class="info-value">${formatDate(item.responder_snapshot.created_at)}</span></div>` : ''}
+                </div>
+            </div>
+        `;
         const historyBlock = historical ? `
             <div class="info-card">
                 <div class="card-title">
@@ -1965,6 +1989,7 @@ class ManagementPage {
                         <p>${this.escapeHtml(item.marker?.description || item.description || 'No description provided.')}</p>
                     </div>
                 </div>
+                ${respondersBlock}
                 ${historyBlock}
             </div>
         `;

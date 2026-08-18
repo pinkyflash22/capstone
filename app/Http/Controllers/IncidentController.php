@@ -143,7 +143,7 @@ class IncidentController extends Controller
 
     private function getIncidentRelations(): array
     {
-        return ['marker', 'team', 'station', 'reporter', 'barangay.city'];
+        return ['marker', 'team', 'station', 'reporter', 'barangay.city', 'responderSnapshot'];
     }
 
     private function supportsBarangayResolution(): bool

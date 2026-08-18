@@ -15,6 +15,10 @@ $columns = DB::select(<<<'SQL'
         c.column_name,
         c.data_type,
         c.udt_name,
+        c.character_maximum_length,
+        c.numeric_precision,
+        c.numeric_scale,
+        c.datetime_precision,
         c.is_nullable,
         c.column_default,
         c.ordinal_position,
@@ -29,6 +33,23 @@ $columns = DB::select(<<<'SQL'
               and tc.constraint_type = 'PRIMARY KEY'
               and kcu.column_name = c.column_name
         ) as is_primary
+        , exists (
+            select 1
+            from information_schema.table_constraints utc
+            join information_schema.key_column_usage ukcu
+              on utc.constraint_name = ukcu.constraint_name
+             and utc.constraint_schema = ukcu.constraint_schema
+            where utc.table_schema = 'public'
+              and utc.table_name = c.table_name
+              and utc.constraint_type = 'UNIQUE'
+              and ukcu.column_name = c.column_name
+              and (
+                  select count(*)
+                  from information_schema.key_column_usage ukcu_count
+                  where ukcu_count.constraint_schema = utc.constraint_schema
+                    and ukcu_count.constraint_name = utc.constraint_name
+              ) = 1
+        ) as is_unique
     from information_schema.columns c
     join information_schema.tables t
       on t.table_schema = c.table_schema

@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Support\UserActivityLogger;
+use App\Services\IncidentResponderSnapshotService;
 use Carbon\Carbon;
 
 class ManagementController extends Controller
@@ -370,11 +371,11 @@ class ManagementController extends Controller
 //         'station_officers' => $stationperson  // Include if needed
 //     ]);
 // }
-public function getIncidents(Request $request)
+public function getIncidents(Request $request, IncidentResponderSnapshotService $snapshotService)
 {
     if ($this->isProvincialAdmin()) {
         $query = Incident::query()
-            ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay']);
+            ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay', 'responderSnapshot']);
 
         if ($request->has('search') && $request->search) {
             $search = mb_substr(trim((string) $request->search), 0, 100);
@@ -430,6 +431,7 @@ public function getIncidents(Request $request)
         $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
         $incidents = $query->paginate($this->perPage($request));
+        $snapshotService->attachResponderDetails($incidents->getCollection());
 
         return response()->json([
             'success' => true,
@@ -456,7 +458,7 @@ public function getIncidents(Request $request)
     $stationTeamIds = $this->stationTeamIds((int) $stationOfficer->station_id, $stationOfficerIds);
 
     $query = $this->buildStationIncidentQuery((int) $stationOfficer->station_id, $stationTeamIds, $stationUserIds)
-        ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay']);
+        ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay', 'responderSnapshot']);
     
     // Apply search filter
     if ($request->has('search') && $request->search) {
@@ -517,6 +519,7 @@ public function getIncidents(Request $request)
     $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
     $query->orderBy($sortBy, $sortOrder);
     $incidents = $query->paginate($this->perPage($request));
+    $snapshotService->attachResponderDetails($incidents->getCollection());
     
     return response()->json([
         'success' => true,

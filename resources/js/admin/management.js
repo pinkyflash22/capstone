@@ -1586,6 +1586,30 @@ class ManagementPage {
         
         const statusMap = {1: 'reported', 2: 'responding', 3: 'active', 4: 'resolved'};
         const status = statusMap[item.incident_status_id] || 'reported';
+        const responders = Array.isArray(item.responder_details) ? item.responder_details : [];
+        const responderRows = responders.length
+            ? responders.map((responder, index) => `
+                <div class="info-row">
+                    <span class="info-label"><i class="fa-solid fa-user-shield"></i> Responder ${index + 1}</span>
+                    <span class="info-value">
+                        <strong>${this.escapeHtml(responder.name || `Officer #${responder.station_officer_id}`)}</strong><br>
+                        <small>${this.escapeHtml(responder.rank || 'Station Officer')} &middot; ${this.escapeHtml(responder.station_name || `Station #${responder.station_id}`)}</small>
+                    </span>
+                </div>
+            `).join('')
+            : `<p>${item.team_id ? 'No saved responder snapshot is available for this incident.' : 'No response team has been assigned.'}</p>`;
+        const respondersBlock = `
+            <div class="info-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-helmet-safety"></i>
+                    <h3>Saved Responders</h3>
+                </div>
+                <div class="card-content">
+                    ${responderRows}
+                    ${item.responder_snapshot?.created_at ? `<div class="info-row"><span class="info-label">Snapshot saved:</span><span class="info-value">${formatDate(item.responder_snapshot.created_at)}</span></div>` : ''}
+                </div>
+            </div>
+        `;
 
         viewContent.innerHTML = `
             <div class="detail-container">
@@ -1640,6 +1664,7 @@ class ManagementPage {
                         <p>${this.escapeHtml(item.marker?.description || item.description || 'No description provided.')}</p>
                     </div>
                 </div>
+                ${respondersBlock}
             </div>
         `;
     }

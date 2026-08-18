@@ -17,6 +17,8 @@ use App\Models\IncidentReport;
 use App\Models\IncidentContext;
 use App\Models\Barangay;
 use App\Models\Station;
+use App\Services\IncidentResponderSnapshotService;
+use Illuminate\Support\Facades\Log;
 
 class Incident extends Model
 {
@@ -58,6 +60,26 @@ class Incident extends Model
             if (in_array(strtolower((string) $incident->status), ['closed', 'completed'], true)
                 && ! $incident->incident_completed_at) {
                 $incident->incident_completed_at = now();
+            }
+        });
+
+        static::saved(function (self $incident) {
+            $shouldCapture = filled($incident->team_id)
+                && ($incident->wasRecentlyCreated
+                    || $incident->wasChanged('team_id'));
+
+            if (! $shouldCapture) {
+                return;
+            }
+
+            try {
+                app(IncidentResponderSnapshotService::class)->captureForIncident($incident);
+            } catch (\Throwable $exception) {
+                Log::error('Unable to capture the incident responder snapshot.', [
+                    'incident_id' => $incident->incident_id,
+                    'team_id' => $incident->team_id,
+                    'error' => $exception->getMessage(),
+                ]);
             }
         });
     }
@@ -115,5 +137,10 @@ class Incident extends Model
     public function context()
     {
         return $this->hasOne(IncidentContext::class, 'incident_id', 'incident_id');
+    }
+
+    public function responderSnapshot()
+    {
+        return $this->hasOne(IncidentResponse::class, 'incident_id', 'incident_id');
     }
 }
