@@ -19,6 +19,7 @@ class MarkerFeedBuilder
             'barangayHall.address.barangay.city',
             'barangayHall.barangay.city',
             'hydrants.station',
+            'incidents',
             'riskAreas.barangayHall.barangay.city',
             'riskAreas.reporter',
             'riskAreas.photos',
@@ -40,6 +41,13 @@ class MarkerFeedBuilder
 
         $station = $marker->stations->first();
         $hydrant = $marker->hydrants->first();
+        $incident = $marker->incidents
+            ->sortByDesc(fn ($item) => implode('|', [
+                optional($item->updated_at)->timestamp ?? 0,
+                optional($item->created_at)->timestamp ?? 0,
+                (int) ($item->incident_id ?? 0),
+            ]))
+            ->first();
 
         return [
             'marker_id' => $marker->marker_id,
@@ -69,6 +77,12 @@ class MarkerFeedBuilder
                 'code' => static::publicValue($hydrant->hydrant_code),
                 'type' => static::publicValue($hydrant->type),
                 'station_name' => static::publicValue($hydrant->station?->station_name),
+            ] : null,
+            'incident_public' => $incident ? [
+                'id' => $incident->incident_id,
+                'status' => static::publicValue($incident->status),
+                'created_at' => $incident->created_at,
+                'updated_at' => $incident->updated_at,
             ] : null,
             'barangay_public' => $marker->barangayHall ? [
                 'name' => static::publicValue($marker->barangayHall->hall_name)
@@ -100,7 +114,7 @@ class MarkerFeedBuilder
                     ->all(),
             ] : null,
             'created_at' => $marker->created_at,
-            'updated_at' => collect([$marker->updated_at, $riskArea?->updated_at])
+            'updated_at' => collect([$marker->updated_at, $riskArea?->updated_at, $incident?->updated_at])
                 ->filter()
                 ->sortByDesc(fn ($date) => $date->timestamp)
                 ->first(),

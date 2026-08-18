@@ -9,6 +9,7 @@ use App\Models\Barangay;
 use App\Models\BarangayFireRecord;
 use App\Models\BarangayHall;
 use App\Models\BarangayPredictionChecklist;
+use App\Models\BoundaryLocation;
 use App\Models\City;
 use App\Models\CommunityActivityRequest;
 use App\Models\FullAddress;
@@ -1152,9 +1153,75 @@ class BarangayDashboardController extends Controller
         return view('barangay.hazards', $this->buildPortalData());
     }
 
-    public function riskMap()
+    public function riskMap(Request $request)
     {
-        return view('barangay.risk-map', $this->buildPortalData());
+        $data = $this->buildPortalData();
+        /** @var BarangayHall|null $hall */
+        $hall = $data['hall'] ?? null;
+
+        $riskAreaFeed = RiskArea::query()
+            ->select([
+                'risk_area_id',
+                'marker_id',
+                'station_id',
+                'barangay_hall_id',
+                'risk_type',
+                'risk_factor',
+                'hazard_type',
+                'assessment_level',
+                'risk_score',
+                'street_or_sitio',
+                'remarks',
+                'status',
+                'created_at',
+            ])
+            ->with([
+                'marker:marker_id,title,description,category,lat,lng',
+                'station:station_id,station_name',
+                'photos:risk_area_photo_id,risk_area_id,photo_path,photo_name',
+            ])
+            ->when(
+                $hall,
+                fn ($query) => $query->where('barangay_hall_id', $hall->barangay_hall_id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->latest('created_at')
+            ->paginate(5, ['*'], 'risk_page')
+            ->withQueryString();
+
+        $markerInventory = Marker::query()
+            ->select(['marker_id', 'title', 'description', 'lat', 'lng', 'category', 'status'])
+            ->whereIn('category', ['barangay', 'fire', 'school', 'hydrant', 'bridge', 'station', 'risk', 'hazard'])
+            ->latest('marker_id')
+            ->paginate(6, ['*'], 'marker_page')
+            ->withQueryString();
+
+        $riskAreaStatusCounts = RiskArea::query()
+            ->when(
+                $hall,
+                fn ($query) => $query->where('barangay_hall_id', $hall->barangay_hall_id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->selectRaw('LOWER(status) AS normalized_status, COUNT(*) AS aggregate')
+            ->groupByRaw('LOWER(status)')
+            ->pluck('aggregate', 'normalized_status');
+
+        $barangayBoundary = ($data['barangay'] ?? null)
+            ? BoundaryLocation::query()
+                ->where('barangay_id', $data['barangay']->barangay_id)
+                ->where('boundary_type', 'barangay')
+                ->whereNotNull('geojson')
+                ->latest('updated_at')
+                ->first()
+            : null;
+
+        $data['riskAreaFeed'] = $riskAreaFeed;
+        $data['markerInventory'] = $markerInventory;
+        $data['riskAreaStatusCounts'] = $riskAreaStatusCounts;
+        $data['barangayBoundaryGeojson'] = $barangayBoundary?->geojson;
+        $data['portalStats']['risk_markers'] = $riskAreaFeed->total();
+
+        return view('barangay.risk-map', $data);
     }
 
     public function patrols()

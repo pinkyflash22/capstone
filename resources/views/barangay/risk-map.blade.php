@@ -2,20 +2,21 @@
 
 @section('active_nav', 'risk-map')
 @section('page_title', 'Map')
-@section('page_subtitle', 'Layered barangay map for hazards, risks, incidents, and local resources')
-@section('hero_title', 'Use one map view for hazards, risk markers, and response resources.')
-@section('hero_copy', 'This page mirrors the system’s mapping context by surfacing relevant markers and hazard-linked points that can affect patrol routing and early warning decisions.')
+@section('page_subtitle', 'Incidents, risks, hydrants, and response points')
+@section('hero_title', 'Barangay Risk Map')
+@section('hero_copy', 'View local fire-safety markers and submit a risk area.')
 
 @section('hero_badges')
-    <span class="hero-badge"><i class="fa-solid fa-location-dot"></i> Marker inventory</span>
-    <span class="hero-badge"><i class="fa-solid fa-school"></i> Exposure points</span>
-    <span class="hero-badge"><i class="fa-solid fa-water"></i> Resource awareness</span>
+    <span class="hero-badge"><i class="fa-solid fa-layer-group"></i> Operational layers</span>
+    <span class="hero-badge"><i class="fa-solid fa-location-dot"></i> Barangay vicinity</span>
 @endsection
 
 @php
     $riskAreaMapPayload = $riskAreas->map(function ($riskArea) {
         return [
             'id' => $riskArea->risk_area_id,
+            'marker_id' => $riskArea->marker_id,
+            'entry_type' => $riskArea->entry_type,
             'title' => $riskArea->marker?->title,
             'description' => $riskArea->marker?->description,
             'lat' => $riskArea->marker?->lat,
@@ -290,7 +291,199 @@
         line-height: 1.4;
     }
 
+    .barangay-risk-launch {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .barangay-risk-launch__button,
+    .barangay-risk-wizard__button {
+        border: 0;
+        border-radius: 14px;
+        min-height: 42px;
+        padding: 0 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .barangay-risk-launch__button,
+    .barangay-risk-wizard__button--next {
+        color: #fff;
+        background: linear-gradient(135deg, #ea580c, #dc2626);
+        box-shadow: 0 12px 24px rgba(234, 88, 12, 0.18);
+    }
+
+    .barangay-risk-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .barangay-risk-modal.hidden { display: none; }
+    body.risk-modal-open { overflow: hidden; }
+    .barangay-risk-feed-grid { display: grid; gap: 1.25rem; }
+
+    .barangay-risk-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.58);
+        backdrop-filter: blur(5px);
+    }
+
+    .barangay-risk-modal__dialog {
+        position: relative;
+        width: min(820px, 100%);
+        max-height: calc(100dvh - 2rem);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        border-radius: 24px;
+        background: #fffdf9;
+        box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
+    }
+
+    .barangay-risk-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.15rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .barangay-risk-modal__close {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        color: #64748b;
+    }
+
+    .barangay-risk-modal__body {
+        min-height: 0;
+        overflow-y: auto;
+        padding: 1rem 1.15rem 1.15rem;
+    }
+
+    .barangay-risk-wizard__progress {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.45rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .barangay-risk-wizard__progress-item {
+        min-width: 0;
+        border: 0;
+        border-radius: 12px;
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 0.6rem 0.45rem;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-align: center;
+    }
+
+    .barangay-risk-wizard__progress-item.is-active {
+        background: #fff7ed;
+        color: #c2410c;
+        box-shadow: inset 0 0 0 1px #fed7aa;
+    }
+
+    .barangay-risk-form .barangay-risk-step { display: none; }
+    .barangay-risk-form .barangay-risk-step.is-active { display: block; }
+    .barangay-risk-step > summary { pointer-events: none; }
+
+    .barangay-risk-wizard__actions {
+        position: sticky;
+        bottom: -1.15rem;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 0.2rem -1.15rem -1.15rem;
+        padding: 0.85rem 1.15rem;
+        border-top: 1px solid #f1f5f9;
+        background: rgba(255, 253, 249, 0.96);
+        backdrop-filter: blur(10px);
+    }
+
+    .barangay-risk-wizard__button--back {
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        background: #fff;
+    }
+
+    .barangay-risk-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-top: 0.9rem;
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .barangay-risk-pagination__actions { display: flex; gap: 0.4rem; }
+    .barangay-risk-pagination a,
+    .barangay-risk-pagination span.is-disabled {
+        min-width: 34px;
+        height: 32px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+        background: #fff;
+        text-decoration: none;
+    }
+
+    .barangay-risk-pagination span.is-disabled { opacity: 0.42; }
+
+    #barangayOperationsMap .leaflet-control-layers {
+        border: 1px solid rgba(203, 213, 225, 0.95);
+        border-radius: 14px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.13);
+        overflow: hidden;
+    }
+
+    #barangayOperationsMap .leaflet-control-layers-expanded {
+        max-width: min(290px, calc(100vw - 4rem));
+        max-height: min(62vh, 430px);
+        padding: 0.8rem;
+        overflow: auto;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
     @media (max-width: 768px) {
+        .barangay-risk-launch { align-items: flex-start; flex-direction: column; }
+        .barangay-risk-launch__button { width: 100%; }
+        .barangay-risk-modal { padding: 0.45rem; }
+        .barangay-risk-modal__dialog { max-height: calc(100dvh - 0.9rem); border-radius: 18px; }
+        .barangay-risk-modal__header,
+        .barangay-risk-modal__body { padding-left: 0.8rem; padding-right: 0.8rem; }
+        .barangay-risk-wizard__progress-item { font-size: 0; }
+        .barangay-risk-wizard__progress-item::before { content: attr(data-step); font-size: 0.7rem; }
+        .barangay-risk-wizard__actions { margin-left: -0.8rem; margin-right: -0.8rem; padding-left: 0.8rem; padding-right: 0.8rem; }
         .barangay-risk-step {
             border-radius: 22px;
             margin-inline: -2px;
@@ -348,13 +541,12 @@
     <section class="panel-card">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <div class="panel-eyebrow">Operational Map</div>
-                <h3 class="panel-title">Barangay monitoring layers</h3>
-                <p class="panel-copy">The map is shown first so barangay officers can immediately see live incidents, verified risk markers, hazard-related points, hydrants and other resource references, barangay halls, and fire stations in one working view.</p>
+                <div class="panel-eyebrow">Map</div>
+                <h3 class="panel-title">Local safety markers</h3>
             </div>
             <div class="grid grid-cols-2 gap-3 lg:min-w-[320px]">
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="tiny-label">Live</div>
+                    <div class="tiny-label">Active Fires</div>
                     <div id="barangayMapLiveCount" class="summary-value !mt-1">0</div>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -372,44 +564,47 @@
             </div>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div class="mt-6">
             <div class="rounded-[26px] border border-slate-200 bg-white p-3 shadow-sm">
                 <div id="barangayOperationsMap" style="height: 560px; border-radius: 20px; overflow: hidden;"></div>
             </div>
-            <aside class="rounded-[26px] border border-slate-200 bg-slate-50/70 p-5">
-                <div class="tiny-label">Layer Guide</div>
-                <div class="list-stack !mt-4">
-                    <div class="list-item">
-                        <h4>Live</h4>
-                        <p>Active incidents that are still operational. Uncheck this layer if you do not want live markers displayed.</p>
-                    </div>
-                    <div class="list-item">
-                        <h4>Incidents</h4>
-                        <p>Recent incident markers, including already controlled or closed events returned by the incident feed.</p>
-                    </div>
-                    <div class="list-item">
-                        <h4>Risk, Hazard, Resources</h4>
-                        <p>Risk markers come from barangay submissions. Hazard and resource points come from mapped system markers such as hydrants, schools, bridges, and other support references.</p>
-                    </div>
-                    <div class="list-item">
-                        <h4>Barangay and Station</h4>
-                        <p>These layers help officers see barangay hall references and station locations while checking local fire exposure.</p>
-                    </div>
-                </div>
-            </aside>
         </div>
     </section>
 
-    <section class="panel-grid two">
-        <article class="panel-card">
-            <div class="panel-eyebrow">Risk Submission</div>
-            <h3 class="panel-title">Mark a local risk area</h3>
-            <div class="map-card">
-                <p class="panel-copy">Create a mapped local risk marker for congestion, wiring, flammable buildup, or other recurring field hazards. This page serves as the barangay map workspace, where risk entries can later be reviewed alongside other layers such as incidents, hazards, and response resources.</p>
+    <section class="panel-card barangay-risk-launch">
+        <div>
+            <div class="panel-eyebrow">Submit</div>
+            <h3 class="panel-title">Add risk marker</h3>
+        </div>
+        <button type="button" class="barangay-risk-launch__button" data-open-risk-modal>
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+            Add Risk Marker
+        </button>
+    </section>
+
+    <section class="barangay-risk-feed-grid">
+        <article id="barangayRiskSubmissionModal" class="barangay-risk-modal hidden" aria-hidden="true">
+            <div class="barangay-risk-modal__backdrop" data-close-risk-modal></div>
+            <div class="barangay-risk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="barangayRiskModalTitle">
+                <header class="barangay-risk-modal__header">
+                    <div>
+                                <div class="panel-eyebrow">Submit</div>
+                        <h3 class="panel-title" id="barangayRiskModalTitle">Add risk marker</h3>
+                    </div>
+                    <button type="button" class="barangay-risk-modal__close" data-close-risk-modal aria-label="Close risk submission"><i class="fa-solid fa-xmark"></i></button>
+                </header>
+                <div class="barangay-risk-modal__body">
+                    <div class="barangay-risk-wizard__progress" aria-label="Submission progress">
+                        <button type="button" class="barangay-risk-wizard__progress-item is-active" data-risk-step-target="0" data-step="1">1. Basics</button>
+                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="1" data-step="2">2. Profile</button>
+                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="2" data-step="3">3. Evidence</button>
+                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="3" data-step="4">4. Location</button>
+                    </div>
 
                 <form method="POST" action="{{ route('barangay.risk-map.store') }}" class="barangay-risk-form mt-6" enctype="multipart/form-data">
                     @csrf
-                    <details class="barangay-risk-step" open>
+                    <input type="hidden" name="entry_type" value="risk">
+                    <details class="barangay-risk-step is-active" open>
                         <summary>
                             <div class="barangay-risk-step__head">
                                 <div>
@@ -424,12 +619,12 @@
                             <div class="barangay-risk-grid">
                             <div class="barangay-risk-field barangay-risk-field--full">
                                 <label for="risk_area_title">Risk Marker Title <span class="barangay-risk-field__required">Required</span></label>
-                                <input id="risk_area_title" name="title" type="text" value="{{ old('title') }}" class="barangay-risk-input" placeholder="Example: Dense light-material housing near creek">
+                                <input id="risk_area_title" name="title" type="text" value="{{ old('title') }}" class="barangay-risk-input" placeholder="Example: Dense light-material housing near creek" required>
                                 <p class="barangay-risk-field__hint"><i class="fa-solid fa-signature text-orange-500 mr-1"></i>Use a short area name officers will recognize quickly.</p>
                             </div>
                             <div class="barangay-risk-field barangay-risk-field--full">
                                 <label for="risk_area_location_description">Location Description <span class="barangay-risk-field__required">Required</span></label>
-                                <textarea id="risk_area_location_description" name="location_description" rows="3" class="barangay-risk-textarea" placeholder="Purok, street, landmark, access constraints">{{ old('location_description') }}</textarea>
+                                <textarea id="risk_area_location_description" name="location_description" rows="3" class="barangay-risk-textarea" placeholder="Purok, street, landmark, access constraints" required>{{ old('location_description') }}</textarea>
                                 <p class="barangay-risk-field__hint"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>Say what responders should look for when approaching the area.</p>
                             </div>
                             <div class="barangay-risk-field">
@@ -464,48 +659,26 @@
                         <div class="barangay-risk-grid">
                             <div class="barangay-risk-field">
                                 <label for="risk_area_type">Risk Type</label>
-                                <select id="risk_area_type" name="risk_type" class="barangay-risk-select">
+                                <select id="risk_area_type" name="risk_type" class="barangay-risk-select" required>
                                     <option value="">Select risk type</option>
-                                    @foreach ([
-                                        'electrical_hazard' => 'Electrical hazard',
-                                        'overcrowded_area' => 'Overcrowded area',
-                                        'narrow_road_access' => 'Narrow road access',
-                                        'informal_settlement' => 'Informal settlement',
-                                        'cooking_fire_prone_activity' => 'Cooking / fire-prone activity',
-                                        'blocked_hydrant' => 'Blocked hydrant',
-                                        'combustible_materials' => 'Combustible materials',
-                                        'poor_waste_disposal' => 'Poor waste disposal',
-                                        'previous_fire_prone_location' => 'Previous fire-prone location',
-                                    ] as $riskTypeValue => $riskTypeLabel)
-                                        <option value="{{ $riskTypeValue }}" @selected(old('risk_type') === $riskTypeValue)>{{ $riskTypeLabel }}</option>
+                                    @foreach ($riskTypeGroups as $group => $riskTypes)
+                                        <optgroup label="{{ $group }}">
+                                            @foreach ($riskTypes as $riskTypeValue)
+                                                <option value="{{ $riskTypeValue }}" @selected(old('risk_type') === $riskTypeValue)>{{ $riskTypeOptions[$riskTypeValue] ?? ucwords(str_replace('_', ' ', $riskTypeValue)) }}</option>
+                                            @endforeach
+                                        </optgroup>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="barangay-risk-field">
-                                <label for="risk_area_factor">Risk Factor</label>
-                                <select id="risk_area_factor" name="risk_factor" class="barangay-risk-select">
-                                    <option value="people_density" @selected(old('risk_factor') === 'people_density')>People Density</option>
-                                    <option value="housing_material" @selected(old('risk_factor') === 'housing_material')>Housing Material</option>
-                                    <option value="housing_spacing" @selected(old('risk_factor') === 'housing_spacing')>Housing Spacing</option>
-                                    <option value="electrical_risk" @selected(old('risk_factor') === 'electrical_risk')>Electrical Risk</option>
-                                    <option value="wiring" @selected(old('risk_factor') === 'wiring')>Wiring</option>
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_mode">Condition / Mode</label>
-                                <select id="risk_area_mode" name="mode" class="barangay-risk-select">
-                                    @foreach (['low', 'medium', 'high', 'concrete', 'mixed', 'light_materials', 'dikit_dikit', 'nearly_dikit_dikit', 'moderate', 'far', 'none', 'octopus', 'straight', 'overflow'] as $modeOption)
-                                        <option value="{{ $modeOption }}" @selected(old('mode') === $modeOption)>{{ str_replace('_', ' ', ucfirst($modeOption)) }}</option>
+                                <label for="risk_area_condition">Risk Condition</label>
+                                <select id="risk_area_condition" name="condition_code" class="barangay-risk-select" required>
+                                    <option value="">Select a risk type first</option>
+                                    @foreach ($riskConditionOptions as $riskTypeValue => $conditions)
+                                        @foreach ($conditions as $conditionValue => $conditionLabel)
+                                            <option value="{{ $conditionValue }}" data-risk-type="{{ $riskTypeValue }}" @selected(old('condition_code') === $conditionValue)>{{ $conditionLabel }}</option>
+                                        @endforeach
                                     @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_hazard_type">Hazard Type</label>
-                                <select id="risk_area_hazard_type" name="hazard_type" class="barangay-risk-select">
-                                    <option value="overcrowding" @selected(old('hazard_type') === 'overcrowding')>Overcrowding</option>
-                                    <option value="electrical" @selected(old('hazard_type') === 'electrical')>Electrical</option>
-                                    <option value="flammable" @selected(old('hazard_type') === 'flammable')>Flammable</option>
-                                    <option value="none" @selected(old('hazard_type', 'none') === 'none')>None / General</option>
                                 </select>
                             </div>
                             <div class="barangay-risk-field">
@@ -671,11 +844,11 @@
                             <div class="barangay-risk-grid mt-4">
                                 <div class="barangay-risk-field">
                                     <label for="risk_area_lat">Latitude</label>
-                                    <input id="risk_area_lat" name="lat" type="text" value="{{ old('lat') }}" class="barangay-risk-input" readonly>
+                                    <input id="risk_area_lat" name="lat" type="text" value="{{ old('lat') }}" class="barangay-risk-input" readonly required>
                                 </div>
                                 <div class="barangay-risk-field">
                                     <label for="risk_area_lng">Longitude</label>
-                                    <input id="risk_area_lng" name="lng" type="text" value="{{ old('lng') }}" class="barangay-risk-input" readonly>
+                                    <input id="risk_area_lng" name="lng" type="text" value="{{ old('lng') }}" class="barangay-risk-input" readonly required>
                                 </div>
                             </div>
                         </div>
@@ -706,18 +879,28 @@
                         </div>
                         </div>
                     </details>
+                    <div class="barangay-risk-wizard__actions">
+                        <button type="button" class="barangay-risk-wizard__button barangay-risk-wizard__button--back" data-risk-step-back disabled>
+                            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back
+                        </button>
+                        <span class="text-xs font-bold text-slate-500" data-risk-step-label>Step 1 of 4</span>
+                        <button type="button" class="barangay-risk-wizard__button barangay-risk-wizard__button--next" data-risk-step-next>
+                            Next <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </form>
+                </div>
             </div>
         </article>
 
         <article class="panel-card">
-            <div class="panel-eyebrow">Risk Feed</div>
-            <h3 class="panel-title">Latest barangay risk markers</h3>
-            @if($riskAreas->isEmpty())
+            <div class="panel-eyebrow">Risk Markers</div>
+            <h3 class="panel-title">Recent submissions</h3>
+            @if($riskAreaFeed->isEmpty())
                 <div class="empty-state">No barangay risk markers are available yet.</div>
             @else
                 <div class="list-stack">
-                    @foreach($riskAreas->take(7) as $riskArea)
+                    @foreach($riskAreaFeed as $riskArea)
                         <div class="list-item">
                             <h4>{{ $riskArea->marker?->title ?? 'Untitled risk marker' }}</h4>
                             <p>{{ $riskArea->marker?->description ?? 'No marker description provided.' }}</p>
@@ -752,19 +935,34 @@
                         </div>
                     @endforeach
                 </div>
+                <nav class="barangay-risk-pagination" aria-label="Risk marker pages">
+                    <span>Page {{ $riskAreaFeed->currentPage() }} of {{ max(1, $riskAreaFeed->lastPage()) }} · {{ $riskAreaFeed->total() }} records</span>
+                    <div class="barangay-risk-pagination__actions">
+                        @if($riskAreaFeed->onFirstPage())
+                            <span class="is-disabled"><i class="fa-solid fa-chevron-left"></i></span>
+                        @else
+                            <a href="{{ $riskAreaFeed->previousPageUrl() }}" aria-label="Previous risk marker page"><i class="fa-solid fa-chevron-left"></i></a>
+                        @endif
+                        @if($riskAreaFeed->hasMorePages())
+                            <a href="{{ $riskAreaFeed->nextPageUrl() }}" aria-label="Next risk marker page"><i class="fa-solid fa-chevron-right"></i></a>
+                        @else
+                            <span class="is-disabled"><i class="fa-solid fa-chevron-right"></i></span>
+                        @endif
+                    </div>
+                </nav>
             @endif
         </article>
     </section>
 
     <section class="panel-grid two">
         <article class="panel-card">
-            <div class="panel-eyebrow">Marker Inventory</div>
-            <h3 class="panel-title">Relevant mapped points in context</h3>
-            @if($markers->isEmpty())
+            <div class="panel-eyebrow">Map Records</div>
+            <h3 class="panel-title">Other mapped points</h3>
+            @if($markerInventory->isEmpty())
                 <div class="empty-state">No marker records are available yet.</div>
             @else
                 <div class="list-stack">
-                    @foreach($markers->take(8) as $marker)
+                    @foreach($markerInventory as $marker)
                         <div class="list-item">
                             <h4>{{ $marker->title ?? 'Untitled marker' }}</h4>
                             <p>{{ $marker->description ?? 'No marker description provided.' }}</p>
@@ -775,12 +973,27 @@
                         </div>
                     @endforeach
                 </div>
+                <nav class="barangay-risk-pagination" aria-label="Mapped point pages">
+                    <span>Page {{ $markerInventory->currentPage() }} of {{ max(1, $markerInventory->lastPage()) }} · {{ $markerInventory->total() }} records</span>
+                    <div class="barangay-risk-pagination__actions">
+                        @if($markerInventory->onFirstPage())
+                            <span class="is-disabled"><i class="fa-solid fa-chevron-left"></i></span>
+                        @else
+                            <a href="{{ $markerInventory->previousPageUrl() }}" aria-label="Previous mapped point page"><i class="fa-solid fa-chevron-left"></i></a>
+                        @endif
+                        @if($markerInventory->hasMorePages())
+                            <a href="{{ $markerInventory->nextPageUrl() }}" aria-label="Next mapped point page"><i class="fa-solid fa-chevron-right"></i></a>
+                        @else
+                            <span class="is-disabled"><i class="fa-solid fa-chevron-right"></i></span>
+                        @endif
+                    </div>
+                </nav>
             @endif
         </article>
 
         <article class="panel-card">
-            <div class="panel-eyebrow">Summary</div>
-            <h3 class="panel-title">Barangay risk marker totals</h3>
+            <div class="panel-eyebrow">Totals</div>
+            <h3 class="panel-title">Risk status</h3>
             <div class="list-stack">
                 <div class="stat-line">
                     <strong>Total risk markers</strong>
@@ -788,15 +1001,15 @@
                 </div>
                 <div class="stat-line">
                     <strong>Pending review</strong>
-                    <span class="tag pending">{{ $riskAreas->where('status', 'pending')->count() }}</span>
+                    <span class="tag pending">{{ (int) ($riskAreaStatusCounts['pending'] ?? 0) }}</span>
                 </div>
                 <div class="stat-line">
                     <strong>Verified</strong>
-                    <span class="tag complied">{{ $riskAreas->where('status', 'verified')->count() }}</span>
+                    <span class="tag complied">{{ (int) ($riskAreaStatusCounts['verified'] ?? 0) }}</span>
                 </div>
                 <div class="stat-line">
                     <strong>Resolved</strong>
-                    <span class="tag low">{{ $riskAreas->where('status', 'resolved')->count() }}</span>
+                    <span class="tag low">{{ (int) ($riskAreaStatusCounts['resolved'] ?? 0) }}</span>
                 </div>
             </div>
         </article>
@@ -806,6 +1019,113 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const riskModal = document.getElementById('barangayRiskSubmissionModal');
+        const riskForm = riskModal?.querySelector('.barangay-risk-form');
+        const riskSteps = Array.from(riskForm?.querySelectorAll('.barangay-risk-step') || []);
+        const progressItems = Array.from(riskModal?.querySelectorAll('[data-risk-step-target]') || []);
+        const backButton = riskModal?.querySelector('[data-risk-step-back]');
+        const nextButton = riskModal?.querySelector('[data-risk-step-next]');
+        const stepLabel = riskModal?.querySelector('[data-risk-step-label]');
+        const riskTypeSelect = document.getElementById('risk_area_type');
+        const conditionSelect = document.getElementById('risk_area_condition');
+        let activeRiskStep = 0;
+        let furthestRiskStep = 0;
+
+        function syncRiskConditions() {
+            if (!riskTypeSelect || !conditionSelect) return;
+
+            const selectedType = riskTypeSelect.value;
+            let selectedOptionVisible = false;
+
+            Array.from(conditionSelect.options).forEach((option, index) => {
+                if (index === 0) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    option.textContent = selectedType ? 'Select risk condition' : 'Select a risk type first';
+                    return;
+                }
+
+                const isVisible = option.dataset.riskType === selectedType;
+                option.hidden = !isVisible;
+                option.disabled = !isVisible;
+                if (isVisible && option.selected) selectedOptionVisible = true;
+            });
+
+            if (!selectedOptionVisible) conditionSelect.value = '';
+        }
+
+        function validateRiskStep(index) {
+            const step = riskSteps[index];
+            if (!step) return true;
+
+            const requiredControls = Array.from(step.querySelectorAll('[required]'));
+            for (const control of requiredControls) {
+                if (!control.checkValidity()) {
+                    control.reportValidity();
+                    control.focus({ preventScroll: false });
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function showRiskStep(index, options = {}) {
+            const boundedIndex = Math.max(0, Math.min(riskSteps.length - 1, Number(index) || 0));
+            if (options.validateForward && boundedIndex > activeRiskStep && !validateRiskStep(activeRiskStep)) return;
+
+            activeRiskStep = boundedIndex;
+            furthestRiskStep = Math.max(furthestRiskStep, activeRiskStep);
+            riskSteps.forEach((step, stepIndex) => {
+                const isActive = stepIndex === activeRiskStep;
+                step.classList.toggle('is-active', isActive);
+                step.open = isActive;
+            });
+            progressItems.forEach((item, stepIndex) => item.classList.toggle('is-active', stepIndex === activeRiskStep));
+            if (backButton) backButton.disabled = activeRiskStep === 0;
+            if (nextButton) nextButton.hidden = activeRiskStep === riskSteps.length - 1;
+            if (stepLabel) stepLabel.textContent = `Step ${activeRiskStep + 1} of ${riskSteps.length}`;
+
+            if (activeRiskStep === riskSteps.length - 1) {
+                window.setTimeout(() => window.barangayRiskPickerMap?.invalidateSize(), 120);
+            }
+        }
+
+        function openRiskModal() {
+            if (!riskModal) return;
+            riskModal.classList.remove('hidden');
+            riskModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('risk-modal-open');
+            showRiskStep(activeRiskStep);
+            window.setTimeout(() => window.barangayRiskPickerMap?.invalidateSize(), 120);
+        }
+
+        function closeRiskModal() {
+            if (!riskModal) return;
+            riskModal.classList.add('hidden');
+            riskModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('risk-modal-open');
+        }
+
+        document.querySelectorAll('[data-open-risk-modal]').forEach((button) => button.addEventListener('click', openRiskModal));
+        riskModal?.querySelectorAll('[data-close-risk-modal]').forEach((button) => button.addEventListener('click', closeRiskModal));
+        backButton?.addEventListener('click', () => showRiskStep(activeRiskStep - 1));
+        nextButton?.addEventListener('click', () => showRiskStep(activeRiskStep + 1, { validateForward: true }));
+        progressItems.forEach((item) => item.addEventListener('click', () => {
+            const target = Number(item.dataset.riskStepTarget || 0);
+            if (target <= furthestRiskStep) showRiskStep(target);
+            else if (target === activeRiskStep + 1) showRiskStep(target, { validateForward: true });
+        }));
+        riskTypeSelect?.addEventListener('change', syncRiskConditions);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !riskModal?.classList.contains('hidden')) closeRiskModal();
+        });
+        syncRiskConditions();
+        showRiskStep(0);
+
+        if (@json($errors->any())) {
+            openRiskModal();
+        }
+
         if (typeof L === 'undefined') {
             return;
         }
@@ -918,6 +1238,7 @@
         const riskAreaRecords = @json($riskAreaMapPayload);
         const fallbackMarkerRecords = @json($fallbackMarkerMapPayload);
         const hallRecord = @json($hallMapPayload);
+        const barangayBoundaryGeojson = @json($barangayBoundaryGeojson);
         const defaultLat = hallRecord && hallRecord.lat !== null && hallRecord.lat !== undefined
             ? Number(hallRecord.lat)
             : 15.8222;
@@ -931,25 +1252,29 @@
         const updatedAtElement = document.getElementById('barangayMapUpdatedAt');
 
         function buildOperationalIcon(options) {
-            const size = options.size || 18;
+            const size = options.size || 32;
             const iconHtml = options.iconHtml
                 ? `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${options.iconHtml}</span>`
-                : `<i class="fa-solid ${options.icon || 'fa-location-dot'}" style="font-size:${options.fontSize || 8}px;"></i>`;
+                : `<i class="fa-solid ${options.icon || 'fa-location-dot'}" style="font-size:${options.fontSize || 15}px;"></i>`;
+            const imageHtml = options.image
+                ? `<img src="${options.image}" alt="" draggable="false" style="width:${size}px;height:${size}px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(15,23,42,.24));" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">`
+                : '';
 
             return L.divIcon({
-                className: 'barangay-operational-marker',
+                className: 'barangay-operational-marker pyro-map-marker-icon',
                 html: `
+                    ${imageHtml}
                     <div style="
                         width:${size}px;
                         height:${size}px;
                         border-radius:999px;
                         background:${options.color};
-                        display:flex;
+                        display:${options.image ? 'none' : 'flex'};
                         align-items:center;
                         justify-content:center;
                         color:#fff;
-                        border:2px solid rgba(255,255,255,0.94);
-                        box-shadow:0 0 0 3px rgba(255,255,255,0.92), 0 12px 24px rgba(15,23,42,0.16);
+                        border:2px solid #fff;
+                        box-shadow:0 4px 6px rgba(0,0,0,.28);
                     ">
                         ${iconHtml}
                     </div>
@@ -963,42 +1288,51 @@
         function getMarkerVisual(category, options = {}) {
             const normalized = String(category || '').trim().toLowerCase();
             const isLive = options.isLive === true;
-            const barangayIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><circle cx="8" cy="9" r="2"></circle><circle cx="16" cy="9" r="2"></circle><circle cx="12" cy="7" r="2"></circle><path d="M4 18a4 4 0 0 1 8 0"></path><path d="M12 18a4 4 0 0 1 8 0"></path><path d="M8 16a4 4 0 0 1 8 0"></path></svg>';
 
             if (isLive) {
-                return { color: '#dc2626', icon: 'fa-fire-flame-curved', label: 'Live Incident', size: 22, fontSize: 10 };
+                return { color: '#dc2626', icon: 'fa-fire', image: '/fire.png', label: 'Active Fire', size: 42, fontSize: 18 };
             }
 
             switch (normalized) {
                 case 'incident':
                 case 'fire':
-                    return { color: '#ef4444', icon: 'fa-fire', label: 'Incident', size: 20, fontSize: 9 };
+                    return { color: '#ef4444', icon: 'fa-fire', image: '/fire.png', label: 'Incident', size: 42, fontSize: 18 };
                 case 'risk':
-                    return { color: '#b91c1c', icon: 'fa-triangle-exclamation', label: 'Risk', size: 19, fontSize: 8 };
+                    return { color: '#0284c7', icon: 'fa-triangle-exclamation', image: '/hazard.png', label: 'Risk', size: 34, fontSize: 17 };
                 case 'hazard':
-                    return { color: '#f59e0b', icon: 'fa-circle-exclamation', label: 'Hazard', size: 18, fontSize: 8 };
+                    return { color: '#d97706', icon: 'fa-radiation', image: '/hazard.png', label: 'Hazard', size: 34, fontSize: 17 };
                 case 'hydrant':
-                    return { color: '#ef4444', icon: 'fa-fire-extinguisher', label: 'Hydrant', size: 18, fontSize: 8 };
+                    return { color: '#ef4444', icon: 'fa-fire-extinguisher', image: '/hydrant.png', label: 'Hydrant', size: 28, fontSize: 15 };
                 case 'school':
-                    return { color: '#7c3aed', icon: 'fa-school', label: 'Resource', size: 18, fontSize: 8 };
+                    return { color: '#eab308', icon: 'fa-school', label: 'School', size: 32, fontSize: 16 };
                 case 'bridge':
-                    return { color: '#475569', icon: 'fa-road-bridge', label: 'Resource', size: 18, fontSize: 8 };
+                    return { color: '#6b7280', icon: 'fa-bridge', label: 'Bridge', size: 36, fontSize: 16 };
                 case 'barangay':
-                    return { color: '#0f766e', iconHtml: barangayIcon, label: 'Barangay', size: 19 };
+                    return { color: '#eab308', icon: 'fa-landmark', image: '/hall.png', label: 'Barangay Hall', size: 32, fontSize: 16 };
                 case 'station':
-                    return { color: '#2563eb', icon: 'fa-building', label: 'Station', size: 19, fontSize: 8 };
+                    return { color: '#2563eb', icon: 'fa-building', image: '/station.png', label: 'Fire Station', size: 32, fontSize: 16 };
                 default:
-                    return { color: '#6b7280', icon: 'fa-map-marker-alt', label: 'Marker', size: 18, fontSize: 8 };
+                    return { color: '#6b7280', icon: 'fa-location-dot', label: 'Other Marker', size: 24, fontSize: 12 };
             }
         }
 
+        function escapeMapText(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
         function buildPopup(title, subtitle, description, extras = []) {
+            const safeExtras = extras.filter(Boolean).map(escapeMapText);
             return `
                 <div style="min-width:220px;">
-                    <strong style="display:block;color:#0f172a;font-size:0.94rem;">${title || 'Untitled marker'}</strong>
-                    ${subtitle ? `<div style="margin-top:6px;color:#64748b;font-size:0.74rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;">${subtitle}</div>` : ''}
-                    ${description ? `<p style="margin:8px 0 0;color:#475569;font-size:0.84rem;line-height:1.55;">${description}</p>` : ''}
-                    ${extras.filter(Boolean).length ? `<div style="margin-top:10px;color:#64748b;font-size:0.78rem;line-height:1.5;">${extras.filter(Boolean).join('<br>')}</div>` : ''}
+                    <strong style="display:block;color:#0f172a;font-size:0.94rem;">${escapeMapText(title || 'Untitled marker')}</strong>
+                    ${subtitle ? `<div style="margin-top:6px;color:#64748b;font-size:0.74rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;">${escapeMapText(subtitle)}</div>` : ''}
+                    ${description ? `<p style="margin:8px 0 0;color:#475569;font-size:0.84rem;line-height:1.55;">${escapeMapText(description)}</p>` : ''}
+                    ${safeExtras.length ? `<div style="margin-top:10px;color:#64748b;font-size:0.78rem;line-height:1.5;">${safeExtras.join('<br>')}</div>` : ''}
                 </div>
             `;
         }
@@ -1291,6 +1625,205 @@
             window.setTimeout(() => map.invalidateSize(), 180);
         }
 
+        async function initFirefighterStyleOperationsMap() {
+            if (!operationsMapElement) return;
+
+            const map = L.map(operationsMapElement, { zoomControl: true, scrollWheelZoom: true })
+                .setView([defaultLat, defaultLng], 14);
+            window.barangayOperationsMap = map;
+
+            const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
+            }).addTo(map);
+            const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+            });
+            const hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                maxZoom: 19, attribution: '&copy; OpenStreetMap, HOT',
+            });
+            const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18, attribution: 'Tiles &copy; Esri',
+            });
+            const waterReference = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18, attribution: 'Hydro reference &copy; Esri',
+            });
+
+            const stationLayer = L.layerGroup().addTo(map);
+            const incidentLayer = L.layerGroup().addTo(map);
+            const hydrantLayer = L.layerGroup().addTo(map);
+            const riskHazardLayer = L.layerGroup().addTo(map);
+            const otherLayer = L.layerGroup().addTo(map);
+            const boundaryLayer = L.layerGroup().addTo(map);
+
+            const baseMaps = {
+                'Carto Light': cartoLight,
+                'OSM Standard': street,
+                'OSM HOT': hotStreet,
+                'Satellite': satellite,
+            };
+            const overlays = {
+                'Fire Stations': stationLayer,
+                'Incidents': incidentLayer,
+                'Fire Hydrants': hydrantLayer,
+                'Risk & Hazard Reports': riskHazardLayer,
+                'Other Markers': otherLayer,
+                'Barangay Boundary': boundaryLayer,
+                'Water Reference': waterReference,
+            };
+
+            L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+
+            function ringContains(ring, lat, lng) {
+                let inside = false;
+                for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                    const current = ring[i] || [];
+                    const previous = ring[j] || [];
+                    const xi = Number(current[0]);
+                    const yi = Number(current[1]);
+                    const xj = Number(previous[0]);
+                    const yj = Number(previous[1]);
+                    const intersects = ((yi > lat) !== (yj > lat))
+                        && (lng < ((xj - xi) * (lat - yi) / ((yj - yi) || 1e-12)) + xi);
+                    if (intersects) inside = !inside;
+                }
+                return inside;
+            }
+
+            function polygonContains(rings, lat, lng) {
+                if (!Array.isArray(rings) || !rings.length || !ringContains(rings[0], lat, lng)) return false;
+                return !rings.slice(1).some((hole) => ringContains(hole, lat, lng));
+            }
+
+            function geometryContains(geojson, lat, lng) {
+                if (!geojson || typeof geojson !== 'object') return false;
+                if (geojson.type === 'Feature') return geometryContains(geojson.geometry, lat, lng);
+                if (geojson.type === 'FeatureCollection') return (geojson.features || []).some((feature) => geometryContains(feature, lat, lng));
+                if (geojson.type === 'Polygon') return polygonContains(geojson.coordinates || [], lat, lng);
+                if (geojson.type === 'MultiPolygon') return (geojson.coordinates || []).some((polygon) => polygonContains(polygon, lat, lng));
+                return false;
+            }
+
+            function distanceKm(lat1, lng1, lat2, lng2) {
+                const radians = (value) => value * Math.PI / 180;
+                const earthRadius = 6371;
+                const dLat = radians(lat2 - lat1);
+                const dLng = radians(lng2 - lng1);
+                const a = Math.sin(dLat / 2) ** 2
+                    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLng / 2) ** 2;
+                return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+
+            function belongsToBarangay(marker) {
+                const lat = Number(marker?.lat);
+                const lng = Number(marker?.lng);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+                if (!barangayBoundaryGeojson) return distanceKm(defaultLat, defaultLng, lat, lng) <= 8;
+                if (geometryContains(barangayBoundaryGeojson, lat, lng)) return true;
+                return String(marker?.category || '').toLowerCase() === 'station'
+                    && distanceKm(defaultLat, defaultLng, lat, lng) <= 20;
+            }
+
+            if (barangayBoundaryGeojson) {
+                const boundary = L.geoJSON(barangayBoundaryGeojson, {
+                    style: { color: '#0f766e', weight: 2, opacity: 0.85, fillColor: '#14b8a6', fillOpacity: 0.06, dashArray: '7 6' },
+                }).addTo(boundaryLayer);
+                const boundaryBounds = boundary.getBounds();
+                if (boundaryBounds.isValid()) map.fitBounds(boundaryBounds.pad(0.08));
+            }
+
+            function incidentStatus(marker) {
+                return String(marker?.incident_public?.status || marker?.incident_status || marker?.status || 'reported').trim().toLowerCase();
+            }
+
+            function isActiveIncident(marker) {
+                return ['active', 'reported', 'responding', 'en-route', 'en route', 'on-scene', 'on scene']
+                    .includes(incidentStatus(marker));
+            }
+
+            function addMarker(marker, seenIds, bounds) {
+                if (!marker || !belongsToBarangay(marker)) return;
+                const markerKey = marker.marker_id === null || marker.marker_id === undefined ? null : String(marker.marker_id);
+                if (markerKey && seenIds.has(markerKey)) return;
+                if (markerKey) seenIds.add(markerKey);
+
+                const category = String(marker.category || 'other').trim().toLowerCase();
+                const lat = Number(marker.lat);
+                const lng = Number(marker.lng);
+                const visual = getMarkerVisual(category, { isLive: category === 'fire' && isActiveIncident(marker) });
+                const popupExtras = [];
+                if (marker.station_public?.contact_number) popupExtras.push(`Contact: ${marker.station_public.contact_number}`);
+                if (marker.hydrant_public?.code) popupExtras.push(`Hydrant: ${marker.hydrant_public.code}`);
+                if (marker.risk_area_public?.condition_label) popupExtras.push(`Condition: ${marker.risk_area_public.condition_label}`);
+                if (marker.risk_area_public?.review_status) popupExtras.push(`Review: ${marker.risk_area_public.review_status}`);
+
+                const leafletMarker = L.marker([lat, lng], {
+                    icon: buildOperationalIcon(visual),
+                    zIndexOffset: category === 'fire' ? 400 : 100,
+                }).bindPopup(buildPopup(
+                    marker.title || visual.label,
+                    category === 'fire' ? incidentStatus(marker) : visual.label,
+                    marker.description || '',
+                    popupExtras
+                ));
+
+                if (category === 'station') leafletMarker.addTo(stationLayer);
+                else if (category === 'fire' || category === 'incident') leafletMarker.addTo(incidentLayer);
+                else if (category === 'hydrant') leafletMarker.addTo(hydrantLayer);
+                else if (category === 'risk' || category === 'hazard') leafletMarker.addTo(riskHazardLayer);
+                else leafletMarker.addTo(otherLayer);
+
+                if (!barangayBoundaryGeojson || geometryContains(barangayBoundaryGeojson, lat, lng)) bounds.extend([lat, lng]);
+            }
+
+            async function refreshMarkers({ fit = false } = {}) {
+                const response = await fetch('/map/markers/feed', {
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' },
+                });
+                const payload = response.ok ? await response.json() : [];
+                const feedMarkers = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+                const mergedMarkers = feedMarkers.length ? feedMarkers : fallbackMarkerRecords;
+
+                stationLayer.clearLayers();
+                incidentLayer.clearLayers();
+                hydrantLayer.clearLayers();
+                riskHazardLayer.clearLayers();
+                otherLayer.clearLayers();
+
+                const seenIds = new Set();
+                const bounds = L.latLngBounds();
+                mergedMarkers.forEach((marker) => addMarker(marker, seenIds, bounds));
+                riskAreaRecords.forEach((riskArea) => addMarker({
+                    ...riskArea,
+                    category: riskArea.entry_type === 'hazard' ? 'hazard' : 'risk',
+                    risk_area_public: {
+                        condition_label: riskArea.risk_type || riskArea.hazard_type,
+                        review_status: riskArea.status,
+                    },
+                }, seenIds, bounds));
+
+                const activeIncidentIds = new Set(
+                    mergedMarkers
+                        .filter((marker) => belongsToBarangay(marker))
+                        .filter((marker) => ['fire', 'incident'].includes(String(marker.category || '').trim().toLowerCase()))
+                        .filter(isActiveIncident)
+                        .map((marker) => marker.marker_id ?? `${marker.lat}|${marker.lng}`)
+                );
+                const activeIncidents = activeIncidentIds.size;
+                if (liveCountElement) liveCountElement.textContent = String(activeIncidents);
+                if (incidentCountElement) incidentCountElement.textContent = String(incidentLayer.getLayers().length);
+                if (riskCountElement) riskCountElement.textContent = String(riskHazardLayer.getLayers().length);
+                if (updatedAtElement) updatedAtElement.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+                if (fit && !barangayBoundaryGeojson && bounds.isValid()) map.fitBounds(bounds.pad(0.14));
+            }
+
+            await refreshMarkers({ fit: true });
+            const refreshTimer = window.setInterval(() => refreshMarkers().catch((error) => console.warn('Barangay marker refresh failed:', error)), 30000);
+            window.addEventListener('pagehide', () => window.clearInterval(refreshTimer), { once: true });
+            window.setTimeout(() => map.invalidateSize(), 180);
+        }
+
         function initRiskPickerMap() {
             const mapElement = document.getElementById('barangayRiskAreaMap');
             const latInput = document.getElementById('risk_area_lat');
@@ -1304,6 +1837,7 @@
             const pickerLat = parseFloat(latInput.value || String(defaultLat));
             const pickerLng = parseFloat(lngInput.value || String(defaultLng));
             const map = L.map(mapElement).setView([pickerLat, pickerLng], 14);
+            window.barangayRiskPickerMap = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -1350,7 +1884,7 @@
             }, 120);
         }
 
-        initOperationsMap().catch((error) => {
+        initFirefighterStyleOperationsMap().catch((error) => {
             console.error('Failed to initialize barangay operations map:', error);
         });
         initRiskPickerMap();
