@@ -4,7 +4,7 @@ const voiceConfig = window.PyroSenseVoiceCall || {};
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
 const isResponder = ['station admin', 'chief', 'chief station admin'].includes(role);
-const isCitizen = ['citizen', 'anonymous'].includes(role);
+const isCaller = ['citizen', 'anonymous', 'barangay', 'barangay captain', 'firefighter'].includes(role);
 const isMobileHubPage = document.body?.classList.contains('mobile-hub-page');
 
 let incomingPollTimer = null;
@@ -41,7 +41,7 @@ function routeFor(name, callId = '') {
 }
 
 async function ensureCitizenVoiceSession() {
-    if (!isCitizen || role !== 'anonymous' || !routes.anonymousSession) {
+    if (!isCaller || role !== 'anonymous' || !routes.anonymousSession) {
         return true;
     }
 
@@ -115,7 +115,7 @@ function setCallerTriggerState(trigger, state = 'idle') {
 function setAgoraJoinState(state = 'idle') {
     agoraJoinState = state;
 
-    if (activeCall && isCitizen) {
+    if (activeCall && isCaller) {
         renderCallerDock(activeCall);
     }
 }
@@ -171,7 +171,7 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 async function primeCallerVoiceAccess() {
-    if (callerVoicePrimeAttempted || !isCitizen || !navigator.mediaDevices?.getUserMedia) {
+    if (callerVoicePrimeAttempted || !isCaller || !navigator.mediaDevices?.getUserMedia) {
         return;
     }
 
@@ -988,7 +988,7 @@ function stopOutgoingRinging() {
 }
 
 function syncOutgoingRinging(status) {
-    if (!isCitizen) return;
+    if (!isCaller) return;
     if (['ringing', 'queued'].includes(String(status || '').toLowerCase())) {
         startOutgoingRinging();
         return;
@@ -1062,7 +1062,7 @@ async function leaveAgora() {
 function startDurationTicker() {
     clearInterval(durationTimer);
     durationTimer = setInterval(() => {
-        if (isCitizen && activeCall) renderCallerDock(activeCall);
+        if (isCaller && activeCall) renderCallerDock(activeCall);
     }, 1000);
 }
 

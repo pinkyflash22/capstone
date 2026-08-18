@@ -8,17 +8,19 @@ function getCategoryVisual(category) {
 
     switch (normalized) {
         case 'fire':
-            return { color: '#dc2626', icon: 'fa-fire', label: 'Fire' };
+            return { color: '#dc2626', icon: 'fa-fire', image: '/fire.png', label: 'Fire' };
         case 'barangay':
-            return { color: '#0f766e', iconHtml: BARANGAY_GROUP_ICON_SVG, label: 'Barangay' };
+            return { color: '#0f766e', iconHtml: BARANGAY_GROUP_ICON_SVG, image: '/hall.png', label: 'Barangay' };
         case 'station':
-            return { color: '#2563eb', icon: 'fa-building', label: 'Station' };
+            return { color: '#2563eb', icon: 'fa-building', image: '/station.png', label: 'Station' };
         case 'risk':
-            return { color: '#b91c1c', icon: 'fa-triangle-exclamation', label: 'Risk Area' };
+            return { color: '#0284c7', icon: 'fa-triangle-exclamation', image: '/hazard.png', label: 'Risk Area' };
+        case 'hazard':
+            return { color: '#d97706', icon: 'fa-radiation', image: '/hazard.png', label: 'Hazard' };
         case 'hydrant':
-            return { color: '#ef4444', icon: 'fa-fire-extinguisher', label: 'Hydrant' };
+            return { color: '#ef4444', icon: 'fa-fire-extinguisher', image: '/hydrant.png', label: 'Hydrant' };
         case 'school':
-            return { color: '#7c3aed', icon: 'fa-school', label: 'School' };
+            return { color: '#eab308', icon: 'fa-school', label: 'School' };
         case 'bridge':
             return { color: '#475569', icon: 'fa-road-bridge', label: 'Bridge' };
         default:
@@ -26,30 +28,36 @@ function getCategoryVisual(category) {
     }
 }
 
-function buildIcon(category, emphasized = false) {
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function normalizeIncidentStatus(marker = {}) {
+    const status = String(marker.incident_status || marker.status || '').trim().toLowerCase();
+    return ['controlled', 'completed', 'closed', 'inactive'].includes(status) ? status : 'active';
+}
+
+function buildIcon(category, emphasized = false, marker = {}) {
     const visual = getCategoryVisual(category);
-    const size = emphasized ? 22 : 18;
-    const ring = emphasized ? '0 0 0 4px rgba(255,255,255,0.92), 0 12px 24px rgba(15,23,42,0.20)' : '0 0 0 3px rgba(255,255,255,0.92), 0 10px 20px rgba(15,23,42,0.14)';
-    const glyph = visual.iconHtml
-        ? `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${visual.iconHtml}</span>`
-        : `<i class="fa-solid ${visual.icon}" style="font-size:${emphasized ? '10px' : '8px'};"></i>`;
+    const normalizedCategory = String(category || '').trim().toLowerCase();
+    const sizes = { fire: 42, station: 43, hydrant: 38, school: 43, barangay: 43, risk: 36, hazard: 36 };
+    const size = (sizes[normalizedCategory] || 32) + (emphasized ? 4 : 0);
+    const activeFire = normalizedCategory === 'fire' && normalizeIncidentStatus(marker) === 'active';
+    const fallback = visual.iconHtml || `<i class="fa-solid ${visual.icon}"></i>`;
+    const glyph = visual.image
+        ? `<img src="${visual.image}" alt="" draggable="false" style="width:${size}px;height:${size}px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(15,23,42,.24));position:relative;z-index:2;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><span style="display:none;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:${visual.color};color:#fff;border:2px solid #fff;">${fallback}</span>`
+        : `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:50%;background:${visual.color};color:#fff;border:2px solid #fff;">${fallback}</span>`;
 
     return L.divIcon({
-        className: 'barangay-dashboard-marker',
+        className: 'barangay-dashboard-marker pyro-map-marker-icon',
         html: `
-            <div style="
-                width:${size}px;
-                height:${size}px;
-                border-radius:999px;
-                background:${visual.color};
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                color:#fff;
-                box-shadow:${ring};
-                border:2px solid rgba(255,255,255,0.9);
-                position:relative;
-            ">
+            <div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;position:relative;">
+                ${activeFire ? '<span class="barangay-dashboard-marker__pulse"></span>' : ''}
                 ${glyph}
             </div>
         `,
@@ -92,16 +100,16 @@ function createPopupContent(marker, highlighted = false) {
         <div style="min-width:220px;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                 <span style="width:10px;height:10px;border-radius:999px;background:${visual.color};display:inline-block;"></span>
-                <strong style="color:#0f172a;font-size:0.92rem;">${marker.title || 'Untitled marker'}</strong>
+                <strong style="color:#0f172a;font-size:0.92rem;">${escapeHtml(marker.title || 'Untitled marker')}</strong>
             </div>
             <div style="color:#64748b;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;font-weight:800;">
                 ${visual.label}${highlighted ? ' · Latest Local Pin' : ''}
             </div>
             <p style="margin:8px 0 0;color:#475569;font-size:0.84rem;line-height:1.5;">
-                ${marker.description || marker.meta || 'No marker description provided.'}
+                ${escapeHtml(marker.description || marker.meta || 'No description provided.')}
             </p>
             <div style="margin-top:10px;color:#94a3b8;font-size:0.74rem;">
-                ${marker.lat}, ${marker.lng}
+                ${escapeHtml(marker.lat)}, ${escapeHtml(marker.lng)}
             </div>
         </div>
     `;
@@ -118,8 +126,6 @@ async function loadDashboardMap() {
     const incidentCountElement = document.getElementById('barangayMapIncidentCount');
     const lastUpdatedElement = document.getElementById('barangayMapLastUpdated');
     const filterButtons = Array.from(document.querySelectorAll('[data-map-filter]'));
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const currentUserId = document.querySelector('meta[name="user-id"]')?.getAttribute('content') || '';
     const latestPins = (() => {
         try {
             return JSON.parse(mapElement.dataset.miniMapPins || '[]');
@@ -134,13 +140,13 @@ async function loadDashboardMap() {
         scrollWheelZoom: true,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     }).addTo(map);
 
     const allMarkerLayer = L.layerGroup().addTo(map);
-    const latestPinLayer = L.layerGroup().addTo(map);
     const userLayer = L.layerGroup().addTo(map);
     const categoryLayers = {
         incidents: L.layerGroup(),
@@ -155,7 +161,8 @@ async function loadDashboardMap() {
     let markers = [];
 
     try {
-        const response = await fetch('/api/markers', {
+        const markerFeedUrl = mapElement.dataset.markerFeedUrl || '/map/markers/feed';
+        const response = await fetch(markerFeedUrl, {
             headers: {
                 Accept: 'application/json',
             },
@@ -178,7 +185,7 @@ async function loadDashboardMap() {
     validMarkers.forEach((marker) => {
         const filterKey = getFilterKey(marker.category);
         const leafletMarker = L.marker([Number(marker.lat), Number(marker.lng)], {
-            icon: buildIcon(marker.category, false),
+            icon: buildIcon(marker.category, false, marker),
         });
 
         leafletMarker.bindPopup(createPopupContent(marker, false));
@@ -187,21 +194,6 @@ async function loadDashboardMap() {
             leafletMarker.addTo(categoryLayers[filterKey]);
         }
         bounds.extend([Number(marker.lat), Number(marker.lng)]);
-    });
-
-    latestPins.forEach((pin) => {
-        if (pin.lat === null || pin.lng === null || pin.lat === undefined || pin.lng === undefined) {
-            return;
-        }
-
-        const highlightedMarker = L.marker([Number(pin.lat), Number(pin.lng)], {
-            icon: buildIcon(pin.category, true),
-            zIndexOffset: 500,
-        });
-
-        highlightedMarker.bindPopup(createPopupContent(pin, true));
-        highlightedMarker.addTo(latestPinLayer);
-        bounds.extend([Number(pin.lat), Number(pin.lng)]);
     });
 
     if (bounds.isValid()) {
@@ -242,7 +234,6 @@ async function loadDashboardMap() {
 
     const overlays = {
         'All Markers': allMarkerLayer,
-        'Latest Hazard Pins': latestPinLayer,
         'Your Location': userLayer,
     };
 
@@ -265,7 +256,6 @@ async function loadDashboardMap() {
             allMarkerLayer.addTo(map);
         }
 
-        latestPinLayer.addTo(map);
         userLayer.addTo(map);
     }
 
@@ -280,30 +270,6 @@ async function loadDashboardMap() {
     });
 
     applyMapFilter('all');
-
-    async function persistUserLocation(latitude, longitude) {
-        if (!currentUserId || !csrfToken) {
-            return;
-        }
-
-        try {
-            await fetch('/api/firefighter/location', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({
-                    user_id: currentUserId,
-                    latitude,
-                    longitude,
-                }),
-            });
-        } catch (error) {
-            console.error('Failed to persist barangay user location:', error);
-        }
-    }
 
     function updateUserLocationOnMap(latitude, longitude, accuracy = 0) {
         const latLng = [Number(latitude), Number(longitude)];
@@ -348,13 +314,12 @@ async function loadDashboardMap() {
 
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
-            async (position) => {
+            (position) => {
                 const latitude = position.coords.latitude;
                 const longitude = position.coords.longitude;
                 const accuracy = position.coords.accuracy || 0;
 
                 updateUserLocationOnMap(latitude, longitude, accuracy);
-                await persistUserLocation(latitude, longitude);
             },
             (error) => {
                 console.error('Barangay dashboard geolocation error:', error);
@@ -372,4 +337,146 @@ async function loadDashboardMap() {
     }, 120);
 }
 
-document.addEventListener('DOMContentLoaded', loadDashboardMap);
+function initializeDashboardRecords() {
+    const tableBody = document.getElementById('dashboardRecordsBody');
+    const pagination = document.getElementById('dashboardRecordsPagination');
+    const summary = document.getElementById('dashboardRecordsSummary');
+    const modal = document.getElementById('dashboardRecordModal');
+    const modalBody = document.getElementById('dashboardRecordModalBody');
+    const initialData = document.getElementById('dashboardRecordsInitialData');
+
+    if (!tableBody || !pagination || !modal || !modalBody) {
+        return;
+    }
+
+    const records = new Map();
+    let lastFocusedElement = null;
+
+    try {
+        JSON.parse(initialData?.textContent || '[]').forEach((record) => {
+            records.set(Number(record.id), record);
+        });
+    } catch (error) {
+        console.error('Unable to read initial barangay records:', error);
+    }
+
+    function statusClass(record) {
+        return record.verified ? 'complied' : 'pending';
+    }
+
+    function renderRows(items) {
+        records.clear();
+        items.forEach((record) => records.set(Number(record.id), record));
+
+        tableBody.innerHTML = items.map((record) => `
+            <tr class="dashboard-record-row" data-record-id="${Number(record.id)}">
+                <td><strong>${escapeHtml(record.date)}</strong><br><span class="text-slate-400">${escapeHtml(record.time)}</span></td>
+                <td><strong>${escapeHtml(record.classification)}</strong><br><span class="text-slate-400">${escapeHtml(record.cause)}</span></td>
+                <td>${escapeHtml(record.location)}</td>
+                <td><span class="tag ${statusClass(record)}">${escapeHtml(record.status)}</span></td>
+                <td>
+                    <button type="button" class="dashboard-record-view" data-record-view="${Number(record.id)}" aria-label="View fire record">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderPagination(page) {
+        const currentPage = Number(page.current_page || 1);
+        const lastPage = Math.max(1, Number(page.last_page || 1));
+
+        if (summary) {
+            summary.textContent = page.total > 0
+                ? `Showing ${page.from}–${page.to} of ${page.total}`
+                : 'No fire records found';
+        }
+
+        pagination.querySelector('.dashboard-record-pagination__buttons').innerHTML = `
+            <button type="button" class="dashboard-page-button" data-record-page="${Math.max(1, currentPage - 1)}" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Previous records">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" class="dashboard-page-button" disabled>${currentPage} / ${lastPage}</button>
+            <button type="button" class="dashboard-page-button" data-record-page="${Math.min(lastPage, currentPage + 1)}" ${currentPage >= lastPage ? 'disabled' : ''} aria-label="Next records">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        `;
+    }
+
+    function openRecord(recordId) {
+        const record = records.get(Number(recordId));
+        if (!record) return;
+
+        lastFocusedElement = document.activeElement;
+        modalBody.innerHTML = `
+            <div class="dashboard-record-detail-grid">
+                <div class="dashboard-record-detail"><span>Date</span><strong>${escapeHtml(record.date)} · ${escapeHtml(record.time)}</strong></div>
+                <div class="dashboard-record-detail"><span>Status</span><strong>${escapeHtml(record.status)}</strong></div>
+                <div class="dashboard-record-detail dashboard-record-detail--wide"><span>Location</span><strong>${escapeHtml(record.location)}</strong></div>
+                <div class="dashboard-record-detail"><span>Classification</span><strong>${escapeHtml(record.classification)}</strong></div>
+                <div class="dashboard-record-detail"><span>Cause</span><strong>${escapeHtml(record.cause)}</strong></div>
+                <div class="dashboard-record-detail"><span>Occurrences</span><strong>${Number(record.incident_count || 1)}</strong></div>
+                <div class="dashboard-record-detail"><span>Estimated damage</span><strong>${escapeHtml(record.estimated_damage)}</strong></div>
+                <div class="dashboard-record-detail"><span>Injured</span><strong>${Number(record.injured_count || 0)}</strong></div>
+                <div class="dashboard-record-detail"><span>Deaths</span><strong>${Number(record.death_count || 0)}</strong></div>
+                <div class="dashboard-record-detail dashboard-record-detail--wide"><span>Source</span><strong>${escapeHtml(record.source)}</strong></div>
+                <div class="dashboard-record-detail dashboard-record-detail--wide"><span>Notes</span><strong>${escapeHtml(record.notes)}</strong></div>
+            </div>
+        `;
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        modal.querySelector('[data-record-modal-close]')?.focus();
+    }
+
+    function closeRecord() {
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        lastFocusedElement?.focus?.();
+    }
+
+    async function loadPage(pageNumber) {
+        const endpoint = pagination.dataset.endpoint;
+        if (!endpoint) return;
+
+        pagination.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+
+        try {
+            const url = new URL(endpoint, window.location.origin);
+            url.searchParams.set('records_page', String(pageNumber));
+            url.searchParams.set('per_page', '6');
+
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!response.ok) throw new Error(`Record request failed with status ${response.status}`);
+
+            const payload = await response.json();
+            const page = payload.records;
+            renderRows(Array.isArray(page?.data) ? page.data : []);
+            renderPagination(page || {});
+        } catch (error) {
+            console.error('Unable to load barangay fire records:', error);
+            renderPagination({ current_page: 1, last_page: 1, total: records.size, from: records.size ? 1 : null, to: records.size });
+        }
+    }
+
+    tableBody.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-record-view], [data-record-id]');
+        if (trigger) openRecord(trigger.dataset.recordView || trigger.dataset.recordId);
+    });
+
+    pagination.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-record-page]');
+        if (button && !button.disabled) loadPage(Number(button.dataset.recordPage || 1));
+    });
+
+    modal.querySelectorAll('[data-record-modal-close]').forEach((button) => button.addEventListener('click', closeRecord));
+    modal.addEventListener('click', (event) => { if (event.target === modal) closeRecord(); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.hidden) closeRecord();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboardMap();
+    initializeDashboardRecords();
+});

@@ -77,7 +77,7 @@ class VoiceCallController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($this->isCitizen($user), 403);
+        abort_unless($this->isCaller($user), 403);
 
         $data = $request->validate([
             'station_id' => ['nullable', 'integer', 'exists:stations,station_id'],
@@ -646,7 +646,18 @@ class VoiceCallController extends Controller
             return (int) $request->integer('station_id');
         }
 
-        $barangayId = $user->address?->barangay_id;
+        if (Str::lower((string) $user->role?->role) === 'firefighter') {
+            $officerStationId = StationOfficer::query()
+                ->where('user_id', $user->user_id)
+                ->value('station_id');
+
+            if ($officerStationId) {
+                return (int) $officerStationId;
+            }
+        }
+
+        $user->loadMissing(['address', 'barangayOfficer']);
+        $barangayId = $user->barangayOfficer?->barangay_id ?? $user->address?->barangay_id;
         if ($barangayId) {
             $coveredStationId = StationBarangayCoverage::query()
                 ->where('barangay_id', $barangayId)
@@ -668,9 +679,15 @@ class VoiceCallController extends Controller
         return $stationId ? (int) $stationId : null;
     }
 
-    private function isCitizen(User $user): bool
+    private function isCaller(User $user): bool
     {
-        return in_array(Str::lower((string) $user->role?->role), ['citizen', 'anonymous'], true);
+        return in_array(Str::lower((string) $user->role?->role), [
+            'citizen',
+            'anonymous',
+            'barangay',
+            'barangay captain',
+            'firefighter',
+        ], true);
     }
 
     private function isAnonymousUser(?User $user): bool

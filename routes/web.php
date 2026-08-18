@@ -604,6 +604,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
 
     Route::middleware(['role:barangay,barangay captain'])->prefix('barangay')->name('barangay.')->group(function () {
         Route::get('/dashboard', [BarangayDashboardController::class, 'dashboard'])->name('dashboard');
+        Route::get('/dashboard/records', [BarangayDashboardController::class, 'dashboardRecords'])->name('dashboard.records');
         Route::get('/hazards', [BarangayDashboardController::class, 'hazards'])->name('hazards');
         Route::get('/risk-map', [BarangayDashboardController::class, 'riskMap'])->name('risk-map');
         Route::post('/risk-map', [BarangayDashboardController::class, 'storeRiskArea'])->name('risk-map.store');
@@ -617,6 +618,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');
         Route::get('/reports', [BarangayDashboardController::class, 'reports'])->name('reports');
+        Route::get('/reports/data', [BarangayDashboardController::class, 'reportRecords'])->name('reports.data');
         Route::post('/reports/fire', [BarangayDashboardController::class, 'storeFireReport'])->name('reports.fire.store');
         Route::put('/reports/fire/{recordId}', [BarangayDashboardController::class, 'updateFireReport'])->name('reports.fire.update');
         Route::delete('/reports/fire/{recordId}', [BarangayDashboardController::class, 'destroyFireReport'])->name('reports.fire.destroy');

@@ -75,6 +75,10 @@
 
             <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-barangay-nav-center>
                 <div class="barangay-mobile-dock__burst" data-barangay-nav-burst>
+                    <button type="button" class="barangay-mobile-dock__burst-item" data-pyro-voice-call aria-label="Call the assigned BFP station">
+                        <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">phone_in_talk</span>
+                        <span class="barangay-mobile-dock__burst-label">Call BFP</span>
+                    </button>
                     @foreach ($mobileCenterActions as $action)
                         <a href="{{ route($action['route']) }}" class="barangay-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
                             <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>

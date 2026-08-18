@@ -438,7 +438,7 @@ class BarangayDashboardController extends Controller
         ];
     }
 
-    protected function buildPortalData(): array
+    protected function buildPortalData(bool $loadAllChecklistRecords = false, bool $loadFireRecords = true): array
     {
         $context = $this->resolveBarangayContext();
         /** @var Barangay|null $barangay */
@@ -455,6 +455,20 @@ class BarangayDashboardController extends Controller
         $mitigationActions = collect();
         $markers = collect();
         $miniMapPins = collect();
+        $historicalStats = [
+            'total' => 0,
+            'incident_count' => 0,
+            'recent_30_days' => 0,
+            'previous_30_days' => 0,
+        ];
+        $checklistStats = [
+            'total' => 0,
+            'completed' => 0,
+            'open' => 0,
+            'critical' => 0,
+        ];
+        $riskLevelCounts = ['high' => 0, 'medium' => 0, 'low' => 0];
+        $openMitigationCount = 0;
         $stations = Station::query()->orderBy('station_name')->get();
 
         if ($barangay) {
@@ -476,11 +490,25 @@ class BarangayDashboardController extends Controller
                 ->limit(12)
                 ->get();
 
+            $historicalBase = HistoricalFireIncident::query()
+                ->where('barangay_id', $barangay->barangay_id);
+            $historicalStats = [
+                'total' => (clone $historicalBase)->count(),
+                'incident_count' => (int) (clone $historicalBase)->sum('incident_count'),
+                'recent_30_days' => (clone $historicalBase)->whereDate('incident_date', '>=', now()->subDays(30))->count(),
+                'previous_30_days' => (clone $historicalBase)
+                    ->whereDate('incident_date', '>=', now()->subDays(60))
+                    ->whereDate('incident_date', '<', now()->subDays(30))
+                    ->count(),
+            ];
+
             $predictionChecklists = BarangayPredictionChecklist::query()
                 ->select([
                     'barangay_prediction_checklist_id',
                     'barangay_id',
+                    'analysis_id',
                     'title',
+                    'checklist_type',
                     'ai_output',
                     'planning_notes',
                     'priority_level',
@@ -489,8 +517,10 @@ class BarangayDashboardController extends Controller
                     'assigned_to',
                     'reviewed_by',
                     'compliance_remarks',
+                    'is_ai_generated',
                 ])
                 ->with([
+                    'analysis:analysis_id,sector,period,risk_level,confidence_data,analysis_data,predictions,incident_count,probability,revision_number,created_at',
                     'assignee:user_id,first_name,middle_name,last_name',
                     'reviewer:user_id,first_name,middle_name,last_name',
                 ])
@@ -505,16 +535,29 @@ class BarangayDashboardController extends Controller
                     END
                 ")
                 ->orderBy('target_date')
-                ->limit(12)
+                ->when(! $loadAllChecklistRecords, fn ($query) => $query->limit(12))
                 ->get();
+
+            $predictionBase = BarangayPredictionChecklist::query()
+                ->where('barangay_id', $barangay->barangay_id);
+            $checklistStats = [
+                'total' => (clone $predictionBase)->count(),
+                'completed' => (clone $predictionBase)->where('status', 'complied')->count(),
+                'open' => (clone $predictionBase)->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count(),
+                'critical' => (clone $predictionBase)->whereIn('priority_level', ['critical', 'high'])->count(),
+            ];
 
             $aiActionPlanChecklists = AiActionPlanChecklist::query()
                 ->select([
                     'ai_action_plan_checklist_id',
                     'barangay_id',
+                    'analysis_id',
+                    'source_type',
+                    'source_title',
                     'source_description',
                     'plan_title',
                     'plan_description',
+                    'success_indicator',
                     'priority_level',
                     'status',
                     'target_date',
@@ -524,12 +567,13 @@ class BarangayDashboardController extends Controller
                     'confirmation_notes',
                 ])
                 ->with([
+                    'analysis:analysis_id,sector,period,risk_level,confidence_data,analysis_data,predictions,incident_count,probability,revision_number,created_at',
                     'assignee:user_id,first_name,middle_name,last_name',
                     'confirmer:user_id,first_name,middle_name,last_name',
                     'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,item_text,status',
                 ])
                 ->where('barangay_id', $barangay->barangay_id)
-                ->where('status', 'confirmed')
+                ->whereIn('status', ['confirmed', 'in_progress', 'submitted'])
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1
@@ -540,7 +584,7 @@ class BarangayDashboardController extends Controller
                     END
                 ")
                 ->orderBy('target_date')
-                ->limit(12)
+                ->when(! $loadAllChecklistRecords, fn ($query) => $query->limit(12))
                 ->get();
 
             $markers = Marker::query()
@@ -562,11 +606,13 @@ class BarangayDashboardController extends Controller
         }
 
         if ($hall) {
-            $fireRecords = BarangayFireRecord::query()
-                ->with(['incident.marker:marker_id,title,category,lat,lng'])
-                ->where('barangay_hall_id', $hall->barangay_hall_id)
-                ->orderByDesc('incident_date')
-                ->get();
+            if ($loadFireRecords) {
+                $fireRecords = BarangayFireRecord::query()
+                    ->with(['incident.marker:marker_id,title,category,lat,lng'])
+                    ->where('barangay_hall_id', $hall->barangay_hall_id)
+                    ->orderByDesc('incident_date')
+                    ->get();
+            }
 
             $riskAreas = RiskArea::query()
                 ->select([
@@ -593,6 +639,32 @@ class BarangayDashboardController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(12)
                 ->get();
+
+            $riskLevelCounts = RiskArea::query()
+                ->where('barangay_hall_id', $hall->barangay_hall_id)
+                ->where(function ($query) {
+                    $query->whereNull('review_status')->orWhere('review_status', '!=', 'rejected');
+                })
+                ->where(function ($query) {
+                    $query->where('review_type', '!=', 'delete')
+                        ->orWhereNull('review_type')
+                        ->orWhere('review_status', '!=', 'approved');
+                })
+                ->get(['assessment_level', 'risk_score'])
+                ->map(function (RiskArea $riskArea) {
+                    $assessment = strtolower(trim((string) ($riskArea->assessment_level ?? '')));
+                    $score = (float) ($riskArea->risk_score ?? 0);
+
+                    if ($assessment === 'high' || $score >= 70) return 'high';
+                    if (in_array($assessment, ['moderate', 'medium'], true) || $score >= 40) return 'medium';
+                    return 'low';
+                })
+                ->countBy()
+                ->pipe(fn (Collection $counts) => [
+                    'high' => (int) $counts->get('high', 0),
+                    'medium' => (int) $counts->get('medium', 0),
+                    'low' => (int) $counts->get('low', 0),
+                ]);
 
             $mitigationActions = MitigationAction::query()
                 ->select([
@@ -639,8 +711,13 @@ class BarangayDashboardController extends Controller
                 ")
                 ->orderBy('target_date')
                 ->orderByDesc('created_at')
-                ->limit(16)
+                ->when(! $loadAllChecklistRecords, fn ($query) => $query->limit(16))
                 ->get();
+
+            $openMitigationCount = MitigationAction::query()
+                ->where('barangay_id', $barangay?->barangay_id)
+                ->whereIn('status', ['planned', 'in_progress', 'blocked'])
+                ->count();
 
             if ($hall->marker && $hall->marker->lat !== null && $hall->marker->lng !== null) {
                 $miniMapPins->push([
@@ -676,26 +753,6 @@ class BarangayDashboardController extends Controller
             'priority_level',
             ['critical', 'high', 'medium', 'low']
         );
-
-        $riskAreaCounts = $historicalIncidents
-            ->groupBy(function (HistoricalFireIncident $incident) {
-                return trim((string) ($incident->incident_location ?: 'Unspecified area'));
-            })
-            ->map(function (Collection $group) {
-                $score = (int) $group->sum(function (HistoricalFireIncident $incident) {
-                    return max(1, (int) ($incident->incident_count ?? 1));
-                });
-
-                if ($score >= 3) {
-                    return 'high';
-                }
-
-                if ($score >= 2) {
-                    return 'medium';
-                }
-
-                return 'low';
-            });
 
         $miniMapPins = $miniMapPins
             ->merge(
@@ -757,22 +814,20 @@ class BarangayDashboardController extends Controller
             'hazardMix' => $hazardMix,
             'statusMix' => $statusMix,
             'priorityMix' => $priorityMix,
-            'riskAreaCounts' => [
-                'high' => $riskAreaCounts->filter(fn (string $level) => $level === 'high')->count(),
-                'medium' => $riskAreaCounts->filter(fn (string $level) => $level === 'medium')->count(),
-                'low' => $riskAreaCounts->filter(fn (string $level) => $level === 'low')->count(),
-            ],
+            'riskAreaCounts' => $riskLevelCounts,
             'portalStats' => [
-                'historical_total' => $historicalIncidents->count(),
-                'open_actions' => $predictionChecklists->whereIn('status', ['pending', 'in_progress'])->count(),
-                'critical_actions' => $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->count() + $aiActionPlanChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
-                'mitigation_open' => $mitigationActions->whereIn('status', ['planned', 'in_progress', 'blocked'])->count(),
+                'historical_total' => $historicalStats['total'],
+                'recent_incidents' => $historicalStats['recent_30_days'],
+                'previous_incidents' => $historicalStats['previous_30_days'],
+                'checklist_total' => $checklistStats['total'],
+                'checklist_completed' => $checklistStats['completed'],
+                'open_actions' => $checklistStats['open'],
+                'critical_actions' => $checklistStats['critical'] + $aiActionPlanChecklists->whereIn('priority_level', ['critical', 'high'])->count(),
+                'mitigation_open' => $openMitigationCount,
                 'recorded_reports' => $fireRecords->count(),
                 'risk_markers' => $riskAreas->count(),
-                'total_hazards_reported' => (int) $historicalIncidents->sum(function (HistoricalFireIncident $incident) {
-                    return max(1, (int) ($incident->incident_count ?? 1));
-                }),
-                'pending_inspections' => $predictionChecklists->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count()
+                'total_hazards_reported' => max($historicalStats['total'], $historicalStats['incident_count']),
+                'pending_inspections' => $checklistStats['open']
                     + $aiActionPlanChecklists->whereIn('status', ['pending', 'in_progress', 'submitted'])->count(),
             ],
             'riskTypeOptions' => $this->riskTypeOptions(),
@@ -989,9 +1044,107 @@ class BarangayDashboardController extends Controller
         ];
     }
 
-    public function dashboard()
+    public function dashboard(Request $request)
     {
-        return view('barangay.dashboard', $this->buildPortalData());
+        $data = $this->buildPortalData();
+        $data['dashboardRecords'] = $this->paginateDashboardRecords(
+            $data['barangay'] ?? null,
+            $request
+        );
+
+        return view('barangay.dashboard', $data);
+    }
+
+    public function dashboardRecords(Request $request)
+    {
+        $context = $this->resolveBarangayContext();
+
+        return response()->json([
+            'success' => true,
+            'records' => $this->paginateDashboardRecords($context['barangay'] ?? null, $request),
+        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+    }
+
+    protected function paginateDashboardRecords(?Barangay $barangay, Request $request)
+    {
+        $perPage = min(10, max(4, (int) $request->integer('per_page', 6)));
+
+        $query = HistoricalFireIncident::query()
+            ->select([
+                'historical_fire_incident_id',
+                'barangay_id',
+                'incident_id',
+                'incident_date',
+                'incident_time',
+                'incident_count',
+                'fire_classification',
+                'fire_cause',
+                'incident_location',
+                'source_name',
+                'source_type',
+                'injured_count',
+                'death_count',
+                'estimated_damage',
+                'is_verified',
+                'notes',
+            ])
+            ->with([
+                'incident:incident_id,marker_id,status,created_at,updated_at',
+                'incident.marker:marker_id,title,description,category,lat,lng,status',
+            ])
+            ->when(
+                $barangay,
+                fn ($builder) => $builder->where('barangay_id', $barangay->barangay_id),
+                fn ($builder) => $builder->whereRaw('1 = 0')
+            )
+            ->orderByDesc('incident_date')
+            ->orderByDesc('incident_time')
+            ->orderByDesc('historical_fire_incident_id');
+
+        return $query
+            ->paginate($perPage, ['*'], 'records_page')
+            ->withQueryString()
+            ->through(fn (HistoricalFireIncident $record) => $this->serializeDashboardRecord($record));
+    }
+
+    protected function serializeDashboardRecord(HistoricalFireIncident $record): array
+    {
+        $incidentStatus = trim((string) ($record->incident?->status ?? ''));
+        $displayStatus = $incidentStatus !== ''
+            ? $incidentStatus
+            : ($record->is_verified ? 'Verified' : 'Pending review');
+
+        $date = $record->incident_date?->format('M d, Y');
+        $time = $record->incident_time
+            ? date('h:i A', strtotime((string) $record->incident_time))
+            : null;
+
+        return [
+            'id' => (int) $record->historical_fire_incident_id,
+            'incident_id' => $record->incident_id ? (int) $record->incident_id : null,
+            'date' => $date ?: 'Date not recorded',
+            'time' => $time ?: 'Time not recorded',
+            'classification' => ucfirst(trim((string) ($record->fire_classification ?: 'Undetermined'))),
+            'cause' => trim((string) ($record->fire_cause ?: 'Pending investigation')),
+            'location' => trim((string) ($record->incident_location ?: $record->incident?->marker?->title ?: 'Location not recorded')),
+            'status' => $displayStatus,
+            'status_key' => strtolower(str_replace([' ', '_'], '-', $displayStatus)),
+            'verified' => (bool) $record->is_verified,
+            'incident_count' => max(1, (int) ($record->incident_count ?? 1)),
+            'injured_count' => max(0, (int) ($record->injured_count ?? 0)),
+            'death_count' => max(0, (int) ($record->death_count ?? 0)),
+            'estimated_damage' => $record->estimated_damage !== null
+                ? 'PHP ' . number_format((float) $record->estimated_damage, 2)
+                : 'Not recorded',
+            'source' => trim((string) ($record->source_name ?: $record->source_type ?: 'System record')),
+            'notes' => trim((string) ($record->notes ?: 'No additional notes.')),
+            'marker' => $record->incident?->marker ? [
+                'title' => $record->incident->marker->title,
+                'description' => $record->incident->marker->description,
+                'lat' => $record->incident->marker->lat,
+                'lng' => $record->incident->marker->lng,
+            ] : null,
+        ];
     }
 
     public function hazards()
@@ -1016,66 +1169,97 @@ class BarangayDashboardController extends Controller
 
     public function checklists()
     {
-        return view('barangay.checklists', $this->buildPortalData());
+        return view('barangay.checklists', $this->buildPortalData(true));
     }
 
     public function checklistsContent()
     {
-        return view('barangay.partials.checklists-content', $this->buildPortalData());
+        return view('barangay.partials.checklists-content', $this->buildPortalData(true));
     }
 
-    public function reports()
+    public function reports(Request $request)
     {
-        $data = $this->buildPortalData();
+        $data = $this->buildPortalData(false, false);
         $context = $this->resolveBarangayContext();
         $hall = $context['hall'];
-        $filters = request()->only(['search', 'classification', 'date_from', 'date_to']);
-
-        $filteredFireRecords = collect();
-
-        if ($hall) {
-            $query = BarangayFireRecord::query()
-                ->with(['incident.marker'])
-                ->where('barangay_hall_id', $hall->barangay_hall_id);
-
-            if (! empty($filters['classification'])) {
-                $query->where('fire_classification', $filters['classification']);
-            }
-
-            if (! empty($filters['date_from'])) {
-                $query->whereDate('incident_date', '>=', $filters['date_from']);
-            }
-
-            if (! empty($filters['date_to'])) {
-                $query->whereDate('incident_date', '<=', $filters['date_to']);
-            }
-
-            if (! empty($filters['search'])) {
-                $search = trim((string) $filters['search']);
-
-                $query->where(function ($builder) use ($search) {
-                    $builder->where('fire_cause', 'like', '%' . $search . '%')
-                        ->orWhere('notes', 'like', '%' . $search . '%')
-                        ->orWhereHas('incident.marker', function ($markerQuery) use ($search) {
-                            $markerQuery->where('title', 'like', '%' . $search . '%')
-                                ->orWhere('description', 'like', '%' . $search . '%');
-                        });
-                });
-            }
-
-            $filteredFireRecords = $query
-                ->orderByDesc('incident_date')
-                ->orderByDesc('barangay_fire_record_id')
-                ->get();
-        }
-
-        $data['fireRecords'] = $filteredFireRecords;
+        $filters = $request->only(['search', 'classification', 'date_from', 'date_to']);
+        $data['fireRecords'] = $this->paginateFireReportRecords($hall, $request);
         $data['fireRecordFilters'] = $filters;
         $data['fireRecordTotalCount'] = $hall
             ? BarangayFireRecord::query()->where('barangay_hall_id', $hall->barangay_hall_id)->count()
             : 0;
 
         return view('barangay.reports', $data);
+    }
+
+    public function reportRecords(Request $request)
+    {
+        $context = $this->resolveBarangayContext();
+
+        return response()->json([
+            'success' => true,
+            'records' => $this->paginateFireReportRecords($context['hall'] ?? null, $request),
+        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+    }
+
+    protected function paginateFireReportRecords(?BarangayHall $hall, Request $request)
+    {
+        $perPage = min(12, max(5, (int) $request->integer('per_page', 8)));
+        $query = BarangayFireRecord::query()
+            ->select([
+                'barangay_fire_record_id', 'barangay_hall_id', 'incident_id', 'incident_date',
+                'incident_count', 'fire_classification', 'fire_cause', 'notes', 'created_at',
+            ])
+            ->with(['incident:incident_id,marker_id,status', 'incident.marker:marker_id,title,description,lat,lng,category,status'])
+            ->when($hall, fn ($builder) => $builder->where('barangay_hall_id', $hall->barangay_hall_id), fn ($builder) => $builder->whereRaw('1 = 0'));
+
+        $classification = strtolower(trim((string) $request->input('classification', '')));
+        if (in_array($classification, ['accidental', 'intentional', 'undetermined'], true)) {
+            $query->where('fire_classification', $classification);
+        }
+        if ($request->filled('date_from')) $query->whereDate('incident_date', '>=', $request->input('date_from'));
+        if ($request->filled('date_to')) $query->whereDate('incident_date', '<=', $request->input('date_to'));
+
+        $search = strtolower(trim((string) $request->input('search', '')));
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $query->where(function ($builder) use ($like) {
+                $builder->whereRaw('LOWER(COALESCE(fire_cause, \'\')) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(COALESCE(notes, \'\')) LIKE ?', [$like])
+                    ->orWhereHas('incident.marker', function ($markerQuery) use ($like) {
+                        $markerQuery->whereRaw('LOWER(COALESCE(title, \'\')) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(COALESCE(description, \'\')) LIKE ?', [$like]);
+                    });
+            });
+        }
+
+        return $query->orderByDesc('incident_date')
+            ->orderByDesc('barangay_fire_record_id')
+            ->paginate($perPage, ['*'], 'reports_page')
+            ->withQueryString()
+            ->through(fn (BarangayFireRecord $record) => $this->serializeFireReportRecord($record));
+    }
+
+    protected function serializeFireReportRecord(BarangayFireRecord $record): array
+    {
+        $marker = $record->incident?->marker;
+
+        return [
+            'id' => (int) $record->barangay_fire_record_id,
+            'incident_id' => $record->incident_id ? (int) $record->incident_id : null,
+            'date' => $record->incident_date?->format('M d, Y') ?: 'No date',
+            'incident_date' => $record->incident_date?->toDateString() ?: now()->toDateString(),
+            'title' => $marker?->title ?: 'Barangay Fire Record',
+            'classification' => ucfirst($record->fire_classification ?: 'undetermined'),
+            'classification_key' => strtolower($record->fire_classification ?: 'undetermined'),
+            'cause' => $record->fire_cause ?: 'Pending assessment',
+            'location' => $marker?->description ?: 'No location description',
+            'incident_count' => max(1, (int) ($record->incident_count ?? 1)),
+            'status' => $record->incident?->status ?: 'Reported',
+            'lat' => $marker?->lat,
+            'lng' => $marker?->lng,
+            'notes' => $record->notes ?: '',
+        ];
     }
 
     protected function fireReportValidationRules(bool $isUpdate = false): array

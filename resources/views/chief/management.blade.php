@@ -2838,6 +2838,205 @@
                 padding: 0 !important;
             }
         }
+
+        /* Compact, responsive management dialogs. Keep this block last so the
+           older generic modal rules cannot enlarge these station dialogs. */
+        #viewModal .modal-content,
+        #formModal .modal-content,
+        #editStationModal .modal-content {
+            display: flex;
+            flex-direction: column;
+            width: min(520px, calc(100vw - 32px));
+            max-width: 520px !important;
+            max-height: min(82dvh, 680px);
+            overflow: hidden;
+            border-radius: 20px;
+        }
+
+        #editStationModal .modal-content {
+            width: min(500px, calc(100vw - 32px));
+            max-width: 500px !important;
+        }
+
+        #deleteModal .modal-content {
+            display: flex;
+            flex-direction: column;
+            width: min(360px, calc(100vw - 32px));
+            max-width: 360px !important;
+            max-height: min(78dvh, 330px);
+            overflow: hidden;
+            border-radius: 20px;
+        }
+
+        #viewModal .modal-header,
+        #formModal .modal-header,
+        #editStationModal .modal-header,
+        #deleteModal .modal-header {
+            flex: 0 0 auto;
+            padding: 14px 16px 12px;
+        }
+
+        #viewModal .modal-header h2,
+        #formModal .modal-header h2,
+        #editStationModal .modal-header h2,
+        #deleteModal .modal-header h2 {
+            font-size: 1rem;
+            line-height: 1.25;
+        }
+
+        #viewModal .modal-close,
+        #formModal .modal-close,
+        #editStationModal .modal-close,
+        #deleteModal .modal-close {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            min-height: 32px;
+            border-radius: 10px;
+        }
+
+        #viewModal .modal-body,
+        #formModal .modal-body,
+        #editStationModal .modal-body,
+        #deleteModal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 14px 16px;
+        }
+
+        #viewModal .modal-footer,
+        #formModal .modal-footer,
+        #editStationModal .modal-footer,
+        #deleteModal .modal-footer {
+            position: static;
+            flex: 0 0 auto;
+            padding: 10px 16px 14px;
+            border-top: 1px solid rgba(226, 232, 240, 0.85);
+            background: rgba(255, 255, 255, 0.96);
+        }
+
+        #editStationModal .form-group {
+            margin-bottom: 12px;
+        }
+
+        #editStationModal .form-label {
+            margin-bottom: 5px;
+            font-size: 0.76rem;
+        }
+
+        #editStationModal .form-input {
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 0.82rem;
+        }
+
+        .management-delete-prompt {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+            color: #475569;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            text-align: left;
+        }
+
+        .management-delete-prompt__icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            background: #fef2f2;
+            color: #dc2626;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 640px) {
+            #viewModal.modal,
+            #formModal.modal,
+            #editStationModal.modal,
+            #deleteModal.modal {
+                align-items: center;
+                padding: 12px;
+            }
+
+            #viewModal .modal-content,
+            #formModal .modal-content,
+            #editStationModal .modal-content {
+                width: 100%;
+                max-width: 100% !important;
+                max-height: calc(100dvh - 24px);
+                margin: 0;
+                border-radius: 16px;
+            }
+
+            #deleteModal .modal-content {
+                width: min(100%, 340px);
+                max-width: 340px !important;
+                max-height: calc(100dvh - 24px);
+                margin: 0;
+                border-radius: 16px;
+            }
+
+            #viewModal .modal-content::before,
+            #formModal .modal-content::before,
+            #editStationModal .modal-content::before,
+            #deleteModal .modal-content::before {
+                display: none;
+            }
+
+            #viewModal .modal-header,
+            #formModal .modal-header,
+            #editStationModal .modal-header,
+            #deleteModal .modal-header {
+                padding: 11px 12px 9px;
+            }
+
+            #viewModal .modal-header h2,
+            #formModal .modal-header h2,
+            #editStationModal .modal-header h2,
+            #deleteModal .modal-header h2 {
+                font-size: 0.9rem;
+            }
+
+            #viewModal .modal-body,
+            #formModal .modal-body,
+            #editStationModal .modal-body,
+            #deleteModal .modal-body {
+                padding: 10px 12px;
+            }
+
+            #viewModal .modal-footer,
+            #formModal .modal-footer,
+            #editStationModal .modal-footer,
+            #deleteModal .modal-footer {
+                padding: 9px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+            }
+
+            #editStationModal .form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .management-delete-prompt {
+                grid-template-columns: 36px minmax(0, 1fr);
+                gap: 10px;
+                font-size: 0.76rem;
+            }
+
+            .management-delete-prompt__icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 11px;
+                font-size: 0.95rem !important;
+                margin: 0 !important;
+            }
+        }
         </style>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
     @vite(['resources/css/admin/resource-management.css'])
@@ -3339,11 +3538,11 @@
     </main>
 
     <!-- View Modal -->
-    <div id="viewModal" class="modal">
+    <div id="viewModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>View Details</h2>
-                <button class="modal-close" id="viewModalClose">
+                <h2 id="viewModalTitle">View Details</h2>
+                <button type="button" class="modal-close" id="viewModalClose" aria-label="Close details">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -3357,11 +3556,11 @@
     </div>
 
     <!-- Add/Edit Form Modal -->
-    <div id="formModal" class="modal">
+    <div id="formModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalTitle">Add New Item</h2>
-                <button class="modal-close" id="formModalClose">
+                <button type="button" class="modal-close" id="formModalClose" aria-label="Close form">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -3412,19 +3611,18 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="modal">
+    <div id="deleteModal" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalDescription">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Confirm Delete</h2>
-                <button class="modal-close" id="deleteModalClose">
+                <h2 id="deleteModalTitle">Delete item?</h2>
+                <button type="button" class="modal-close" id="deleteModalClose" aria-label="Close confirmation">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <p style="text-align: center; margin: 20px 0;">
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 48px; color: #dc2626; margin-bottom: 16px;"></i>
-                    <br>
-                    Are you sure you want to delete this item? This action cannot be undone.
+                <p class="management-delete-prompt" id="deleteModalDescription">
+                    <i class="fa-solid fa-triangle-exclamation management-delete-prompt__icon" aria-hidden="true"></i>
+                    <span>This item will be permanently removed. This action cannot be undone.</span>
                 </p>
             </div>
             <div class="modal-footer">
@@ -3434,11 +3632,11 @@
         </div>
     </div>
     @if($currentRoleName === 'chief' && $currentStation)
-    <div id="editStationModal" class="modal">
-        <div class="modal-content" style="max-width: 720px;">
+    <div id="editStationModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editStationModalTitle">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fa-solid fa-building"></i> Edit Station Information</h2>
-                <button class="modal-close" id="editStationModalClose">
+                <h2 id="editStationModalTitle"><i class="fa-solid fa-building"></i> Edit Station Information</h2>
+                <button type="button" class="modal-close" id="editStationModalClose" aria-label="Close station form">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>

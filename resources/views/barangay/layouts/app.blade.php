@@ -279,6 +279,33 @@
             pointer-events: none;
         }
 
+        .portal-call-bfp-btn {
+            min-height: 42px;
+            padding: 0 16px;
+            border: 1px solid rgba(20, 93, 104, 0.14);
+            border-radius: 999px;
+            background: linear-gradient(135deg, #145d68 0%, #0f766e 100%);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            white-space: nowrap;
+            box-shadow: 0 12px 24px rgba(20, 93, 104, 0.18);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+
+        .portal-call-bfp-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(20, 93, 104, 0.24);
+        }
+
+        .portal-call-bfp-btn.is-loading,
+        .portal-call-bfp-btn.is-active-call {
+            opacity: 0.75;
+        }
+
         .user-dropdown-toggle {
             display: flex;
             align-items: center;
@@ -1015,6 +1042,11 @@
             </div>
 
             <div class="hidden md:flex portal-top-actions">
+                <button type="button" class="portal-call-bfp-btn" data-pyro-voice-call aria-label="Call the assigned BFP station">
+                    <i class="fa-solid fa-phone-volume" aria-hidden="true"></i>
+                    <span>Call BFP</span>
+                </button>
+
                 @hasSection('top_bar_actions')
                     @yield('top_bar_actions')
                 @else
@@ -1620,6 +1652,7 @@
     </script>
     @include('chief.partials.logs-modal', ['chiefLogsAllowAll' => false])
     @include('chief.partials.logs-script', ['chiefLogsAllowAll' => false])
+    @include('partials.voice-call-config')
     @include('partials.pwa-body')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     @stack('scripts')

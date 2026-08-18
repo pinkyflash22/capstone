@@ -8,14 +8,12 @@
     $pendingInspections = (int) ($portalStats['pending_inspections'] ?? 0);
     $pendingActions = (int) ($portalStats['open_actions'] ?? 0);
     $criticalActions = (int) ($portalStats['critical_actions'] ?? 0);
-    $totalChecklists = max(0, (int) $predictionChecklists->count());
-    $completedChecklists = (int) $predictionChecklists->where('status', 'complied')->count();
+    $totalChecklists = max(0, (int) ($portalStats['checklist_total'] ?? 0));
+    $completedChecklists = (int) ($portalStats['checklist_completed'] ?? 0);
     $inspectionCompletionRate = $totalChecklists > 0 ? (int) round(($completedChecklists / $totalChecklists) * 100) : 0;
-    $recentThirtyDays = now()->subDays(30);
-    $previousThirtyDays = now()->subDays(60);
-    $recentIncidentCount = (int) $historicalIncidents->filter(fn ($incident) => optional($incident->incident_date)->gte($recentThirtyDays))->count();
-    $previousIncidentCount = (int) $historicalIncidents->filter(fn ($incident) => optional($incident->incident_date)->between($previousThirtyDays, $recentThirtyDays))->count();
-    $hydrantReferenceCount = (int) collect($markers ?? collect())->where('category', 'hydrant')->count();
+    $recentIncidentCount = (int) ($portalStats['recent_incidents'] ?? 0);
+    $previousIncidentCount = (int) ($portalStats['previous_incidents'] ?? 0);
+    $openMitigations = (int) ($portalStats['mitigation_open'] ?? 0);
     $riskScoreRaw = min(100, (int) round(
         ($highRiskAreas * 18)
         + ($mediumRiskAreas * 10)
@@ -34,7 +32,7 @@
         $pendingInspections > 0 ? $pendingInspections . ' pending inspection item' . ($pendingInspections === 1 ? '' : 's') : null,
         $criticalActions > 0 ? $criticalActions . ' high-priority action' . ($criticalActions === 1 ? '' : 's') : null,
         $recentIncidentCount > 0 ? $recentIncidentCount . ' recent fire-related report' . ($recentIncidentCount === 1 ? '' : 's') : null,
-        $hydrantReferenceCount > 0 ? $hydrantReferenceCount . ' hydrant reference point' . ($hydrantReferenceCount === 1 ? '' : 's') . ' to validate' : null,
+        $openMitigations > 0 ? $openMitigations . ' open mitigation' . ($openMitigations === 1 ? '' : 's') : null,
     ])->filter()->take(4)->values();
     $preparednessScore = max(18, min(100, (int) round(
         (35 * ($inspectionCompletionRate / 100))
@@ -60,11 +58,11 @@
             'copy' => 'Barangay risk conditions that remain open or not complied with.',
         ],
         [
-            'label' => 'Hydrant issues',
-            'value' => $hydrantReferenceCount,
-            'icon' => 'bi-droplet-half',
+            'label' => 'Open mitigations',
+            'value' => $openMitigations,
+            'icon' => 'bi-shield-check',
             'class' => 'medium',
-            'copy' => 'Hydrant and water-access reference points that should be verified onsite.',
+            'copy' => 'Mitigation actions still being handled.',
         ],
         [
             'label' => 'High-priority reports',
@@ -78,14 +76,14 @@
 
 @section('active_nav', 'dashboard')
 @section('page_title', 'Barangay Dashboard')
-@section('page_subtitle', 'Fire risk monitoring, preparedness status, and live community response signals')
-@section('hero_title', 'Monitor barangay fire exposure before incidents escalate.')
-@section('hero_copy', 'Use this dashboard to detect active risk pressure, prioritize unresolved preparedness work, and act on the latest mapped fire-related signals across your barangay.')
+@section('page_subtitle', 'Local fire risk and response overview')
+@section('hero_title', 'Barangay fire safety overview')
+@section('hero_copy', 'Review current risks, incidents, and pending actions.')
 
 @section('hero_badges')
-    <span class="hero-badge"><i class="bi bi-fire"></i> Fire risk monitoring</span>
-    <span class="hero-badge"><i class="bi bi-map"></i> GIS incident visibility</span>
-    <span class="hero-badge"><i class="bi bi-clipboard-data"></i> Preparedness action tracking</span>
+    <span class="hero-badge"><i class="bi bi-fire"></i> Risks</span>
+    <span class="hero-badge"><i class="bi bi-map"></i> Live map</span>
+    <span class="hero-badge"><i class="bi bi-clipboard-data"></i> Actions</span>
 @endsection
 
 @push('scripts')
@@ -694,6 +692,223 @@ document.addEventListener('DOMContentLoaded', function () {
                 flex-direction: column;
             }
         }
+
+        .dashboard-record-row {
+            cursor: pointer;
+            transition: background-color 0.18s ease;
+        }
+
+        .dashboard-record-row:hover,
+        .dashboard-record-row:focus-within {
+            background: #fff8ef;
+        }
+
+        .dashboard-record-view {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            border-radius: 10px;
+            background: #fff;
+            color: #b45309;
+        }
+
+        .dashboard-record-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 14px;
+            color: #64748b;
+            font-size: 0.78rem;
+        }
+
+        .dashboard-record-pagination__buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dashboard-page-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            height: 32px;
+            padding: 0 10px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 10px;
+            background: #fff;
+            color: #475569;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .dashboard-page-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+        }
+
+        .dashboard-record-modal[hidden] {
+            display: none;
+        }
+
+        .dashboard-record-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(6px);
+        }
+
+        .dashboard-record-modal__card {
+            display: flex;
+            flex-direction: column;
+            width: min(440px, 100%);
+            max-height: min(78dvh, 560px);
+            overflow: hidden;
+            border: 1px solid rgba(245, 158, 11, 0.18);
+            border-radius: 20px;
+            background: #fff;
+            box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+        }
+
+        .dashboard-record-modal__header,
+        .dashboard-record-modal__footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex: 0 0 auto;
+            padding: 14px 16px;
+        }
+
+        .dashboard-record-modal__header {
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .dashboard-record-modal__header h3 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 900;
+        }
+
+        .dashboard-record-modal__close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            color: #64748b;
+        }
+
+        .dashboard-record-modal__body {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 14px 16px;
+        }
+
+        .dashboard-record-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .dashboard-record-detail {
+            padding: 10px 12px;
+            border: 1px solid #f1f5f9;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+
+        .dashboard-record-detail--wide {
+            grid-column: 1 / -1;
+        }
+
+        .dashboard-record-detail span,
+        .dashboard-record-detail strong {
+            display: block;
+        }
+
+        .dashboard-record-detail span {
+            margin-bottom: 3px;
+            color: #94a3b8;
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .dashboard-record-detail strong {
+            color: #334155;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .dashboard-record-modal__footer {
+            justify-content: flex-end;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+        }
+
+        .dashboard-record-modal__footer button {
+            min-height: 34px;
+            padding: 0 14px;
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            border-radius: 10px;
+            background: #fff7ed;
+            color: #b45309;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .barangay-dashboard-marker__pulse {
+            position: absolute;
+            inset: 2px;
+            border: 2px solid rgba(220, 38, 38, 0.72);
+            border-radius: 999px;
+            animation: barangayMarkerPulse 1.8s ease-out infinite;
+        }
+
+        @keyframes barangayMarkerPulse {
+            0% { opacity: 0.8; transform: scale(0.9); }
+            100% { opacity: 0; transform: scale(1.8); }
+        }
+
+        @media (max-width: 640px) {
+            .dashboard-record-pagination {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .dashboard-record-modal {
+                padding: 10px;
+            }
+
+            .dashboard-record-modal__card {
+                max-height: calc(100dvh - 20px);
+                border-radius: 16px;
+            }
+
+            .dashboard-record-detail-grid {
+                grid-template-columns: 1fr;
+                gap: 7px;
+            }
+
+            .dashboard-record-detail--wide {
+                grid-column: auto;
+            }
+        }
     </style>
 
     <div class="barangay-dashboard-stack">
@@ -705,10 +920,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <i class="bi bi-shield-exclamation"></i>
                             Current Barangay Risk Status
                         </span>
-                        <h2 class="risk-status-title">{{ $riskLevel }} fire risk posture across the barangay</h2>
-                        <p class="risk-status-copy">
-                            The current forecast combines mapped high-risk locations, unresolved inspections, recent fire-related reports, and high-priority preparedness actions already tracked in PyroSense.
-                        </p>
+                        <h2 class="risk-status-title">{{ $riskLevel }} fire risk</h2>
                     </div>
                     <span class="trend-pill {{ $riskTrendClass }}">
                         <i class="bi {{ $riskTrendIcon }}"></i>
@@ -720,12 +932,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="risk-status-metric">
                         <div class="label">Risk Level</div>
                         <div class="value">{{ $riskLevel }}</div>
-                        <div class="sub">Community risk posture based on active local conditions.</div>
+                        <div class="sub">Current local conditions</div>
                     </div>
                     <div class="risk-status-metric">
                         <div class="label">Predicted Risk</div>
                         <div class="value">{{ $predictedRiskPercentage }}%</div>
-                        <div class="sub">Estimated fire-risk probability from current barangay indicators.</div>
+                        <div class="sub">Current indicator estimate</div>
                     </div>
                     <div class="risk-status-metric">
                         <div class="label">Main Driver</div>
@@ -757,8 +969,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             <div class="risk-side-card">
                 <article class="decision-card">
-                    <h3>What should the barangay do next?</h3>
-                    <p>These recommendations are based on current hazard density, inspection backlog, and high-priority response items.</p>
+                    <h3>Next Actions</h3>
 
                     <div class="next-actions-list">
                         <div class="next-action-item">
@@ -789,7 +1000,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="compact-profile-header">
                         <div>
                             <h3>Barangay Information</h3>
-                            <p>Compact reference details for coordination and record validation.</p>
                         </div>
                         <span class="tag low"><i class="bi bi-buildings"></i> Reference</span>
                     </div>
@@ -798,22 +1008,18 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="compact-profile-item">
                             <div class="label">Barangay</div>
                             <div class="value">{{ $barangay?->barangay_name ?? 'Not linked' }}</div>
-                            <div class="meta">Primary local jurisdiction in the dashboard context.</div>
                         </div>
                         <div class="compact-profile-item">
                             <div class="label">City</div>
                             <div class="value">{{ $city?->city_name ?? 'No city data' }}</div>
-                            <div class="meta">LGU grouping used for risk and address references.</div>
                         </div>
                         <div class="compact-profile-item">
                             <div class="label">Barangay Hall</div>
                             <div class="value">{{ $hall?->hall_name ?? 'Hall profile pending' }}</div>
-                            <div class="meta">Coordination point for field reporting and validation.</div>
                         </div>
                         <div class="compact-profile-item">
                             <div class="label">Officer</div>
                             <div class="value">{{ auth()->user()->full_name }}</div>
-                            <div class="meta">Current authenticated barangay account holder.</div>
                         </div>
                     </div>
                 </article>
@@ -824,7 +1030,6 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="barangay-section-heading">
                 <div>
                     <h2>Operational Metrics</h2>
-                    <p>Quick performance indicators showing where the barangay stands on hazards, response pressure, and inspection follow-through.</p>
                 </div>
             </div>
 
@@ -835,8 +1040,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="metric-card-icon"><i class="bi bi-fire"></i></span>
                     </div>
                     <div class="metric-card-number">{{ $totalHazardsReported }}</div>
-                    <div class="metric-card-description">Historical fire-related hazard reports currently linked to this barangay context.</div>
-                    <div class="metric-card-foot">Tracks accumulated exposure and recurrence over time.</div>
+                    <div class="metric-card-description">Fire records linked to this barangay.</div>
                 </article>
 
                 <article class="metric-card metric-card--enhanced">
@@ -845,8 +1049,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="metric-card-icon"><i class="bi bi-exclamation-triangle"></i></span>
                     </div>
                     <div class="metric-card-number">{{ $highRiskAreas }}</div>
-                    <div class="metric-card-description">Locations with repeated fire signals or concentrated unresolved risk conditions.</div>
-                    <div class="metric-card-foot">Use these zones to focus patrols, reminders, and rapid validation.</div>
+                    <div class="metric-card-description">Locations requiring priority review.</div>
                 </article>
 
                 <article class="metric-card metric-card--enhanced">
@@ -855,8 +1058,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="metric-card-icon"><i class="bi bi-list-task"></i></span>
                     </div>
                     <div class="metric-card-number">{{ $pendingActions }}</div>
-                    <div class="metric-card-description">Open response, mitigation, and inspection items still waiting for barangay follow-through.</div>
-                    <div class="metric-card-foot">Includes pending and in-progress operational tasks.</div>
+                    <div class="metric-card-description">Pending and in-progress tasks.</div>
                 </article>
 
                 <article class="metric-card metric-card--enhanced">
@@ -865,8 +1067,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="metric-card-icon"><i class="bi bi-clipboard2-check"></i></span>
                     </div>
                     <div class="metric-card-number">{{ $inspectionCompletionRate }}%</div>
-                    <div class="metric-card-description">Percent of checklist items already marked complied out of all barangay prediction checklist entries.</div>
-                    <div class="metric-card-foot">{{ $completedChecklists }} of {{ $totalChecklists }} checklist items completed.</div>
+                    <div class="metric-card-description">{{ $completedChecklists }} of {{ $totalChecklists }} completed.</div>
                 </article>
             </section>
         </section>
@@ -874,9 +1075,8 @@ document.addEventListener('DOMContentLoaded', function () {
         <section class="map-monitoring-card">
             <div class="map-card-header">
                 <div>
-                    <div class="panel-eyebrow">Live Incident Monitoring</div>
-                    <h3>Map-based incident and hazard awareness</h3>
-                    <p>Live barangay map for incidents, stations, and hazards. Existing Leaflet marker interactions and GIS behavior remain active.</p>
+                    <div class="panel-eyebrow">Live Map</div>
+                    <h3>Incidents and hazards</h3>
                 </div>
                 <div class="map-meta">
                     <span class="map-meta-chip"><i class="bi bi-broadcast-pin"></i> Active incidents: <strong id="barangayMapIncidentCount">0</strong></span>
@@ -906,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     style="height:360px;border-radius:22px;overflow:hidden;background:#f8fafc;border:1px solid rgba(226,232,240,0.92);"
                     data-barangay-name="{{ $barangay?->barangay_name ?? '' }}"
                     data-mini-map-pins='@json($miniMapPins ?? [])'
+                    data-marker-feed-url="{{ route('map.markers.feed') }}"
                 ></div>
                 <div class="two-col" style="margin-top:16px;">
                     <div>
@@ -934,7 +1135,6 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="barangay-section-heading">
                 <div>
                     <h2>Requires Attention</h2>
-                    <p>Immediate items that barangay officials should review to reduce risk exposure and improve response readiness.</p>
                 </div>
             </div>
 
@@ -971,46 +1171,61 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <section class="panel-grid two">
             <article class="hazard-table-card">
-                <div class="panel-eyebrow">Recent Hazard Reports</div>
-                <h3>Latest barangay fire-related reports</h3>
-                <p>Structured view of the most recent hazard history already linked to the barangay for quick review and prioritization.</p>
+                <div class="panel-eyebrow">Fire Records</div>
+                <h3>Recent incidents</h3>
 
-                @if($historicalIncidents->isEmpty())
-                    <div class="empty-state">No hazard reports are linked to this barangay yet.</div>
+                @if($dashboardRecords->isEmpty())
+                    <div class="empty-state" id="dashboardRecordsEmpty">No fire records found.</div>
                 @else
-                    <table class="hazard-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Hazard Type</th>
-                                <th>Location</th>
-                                <th>Risk Level</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($historicalIncidents->take(8) as $incident)
-                                @php
-                                    $incidentRiskLevel = max(1, (int) ($incident->incident_count ?? 1)) >= 3 ? 'High' : (max(1, (int) ($incident->incident_count ?? 1)) >= 2 ? 'Moderate' : 'Low');
-                                    $incidentRiskClass = $incidentRiskLevel === 'High' ? 'high' : ($incidentRiskLevel === 'Moderate' ? 'medium' : 'low');
-                                    $incidentStatus = $incident->is_verified ? 'Verified' : 'Pending review';
-                                @endphp
+                    <div style="overflow-x:auto;">
+                        <table class="hazard-table" id="dashboardRecordsTable">
+                            <thead>
                                 <tr>
-                                    <td>
-                                        <strong>{{ optional($incident->incident_date)->format('M d, Y') ?? 'No date' }}</strong><br>
-                                        <span class="text-slate-400">{{ optional($incident->incident_date)->format('h:i A') ?? 'Time not set' }}</span>
-                                    </td>
-                                    <td>
-                                        <strong>{{ ucfirst($incident->fire_classification ?? 'Undetermined') }}</strong><br>
-                                        <span class="text-slate-400">{{ $incident->fire_cause ?: 'Cause pending validation' }}</span>
-                                    </td>
-                                    <td>{{ $incident->incident_location ?: 'Unspecified area' }}</td>
-                                    <td><span class="tag {{ $incidentRiskClass }}">{{ $incidentRiskLevel }}</span></td>
-                                    <td><span class="tag {{ $incident->is_verified ? 'complied' : 'pending' }}">{{ $incidentStatus }}</span></td>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                    <th aria-label="Actions"></th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody id="dashboardRecordsBody">
+                                @foreach($dashboardRecords as $record)
+                                    <tr class="dashboard-record-row" data-record-id="{{ $record['id'] }}">
+                                        <td><strong>{{ $record['date'] }}</strong><br><span class="text-slate-400">{{ $record['time'] }}</span></td>
+                                        <td><strong>{{ $record['classification'] }}</strong><br><span class="text-slate-400">{{ $record['cause'] }}</span></td>
+                                        <td>{{ $record['location'] }}</td>
+                                        <td><span class="tag {{ $record['verified'] ? 'complied' : 'pending' }}">{{ $record['status'] }}</span></td>
+                                        <td>
+                                            <button type="button" class="dashboard-record-view" data-record-view="{{ $record['id'] }}" aria-label="View fire record">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div
+                        class="dashboard-record-pagination"
+                        id="dashboardRecordsPagination"
+                        data-endpoint="{{ route('barangay.dashboard.records') }}"
+                    >
+                        <span id="dashboardRecordsSummary">
+                            Showing {{ $dashboardRecords->firstItem() }}–{{ $dashboardRecords->lastItem() }} of {{ $dashboardRecords->total() }}
+                        </span>
+                        <div class="dashboard-record-pagination__buttons">
+                            <button type="button" class="dashboard-page-button" data-record-page="{{ max(1, $dashboardRecords->currentPage() - 1) }}" @disabled($dashboardRecords->onFirstPage())>
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button type="button" class="dashboard-page-button" disabled>
+                                {{ $dashboardRecords->currentPage() }} / {{ max(1, $dashboardRecords->lastPage()) }}
+                            </button>
+                            <button type="button" class="dashboard-page-button" data-record-page="{{ min($dashboardRecords->lastPage(), $dashboardRecords->currentPage() + 1) }}" @disabled(! $dashboardRecords->hasMorePages())>
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
                 @endif
             </article>
 
@@ -1052,6 +1267,23 @@ document.addEventListener('DOMContentLoaded', function () {
             </article>
         </section>
     </div>
+
+    <div id="dashboardRecordModal" class="dashboard-record-modal" role="dialog" aria-modal="true" aria-labelledby="dashboardRecordModalTitle" hidden>
+        <div class="dashboard-record-modal__card">
+            <div class="dashboard-record-modal__header">
+                <h3 id="dashboardRecordModalTitle">Fire Record</h3>
+                <button type="button" class="dashboard-record-modal__close" data-record-modal-close aria-label="Close record details">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="dashboard-record-modal__body" id="dashboardRecordModalBody"></div>
+            <div class="dashboard-record-modal__footer">
+                <button type="button" data-record-modal-close><i class="bi bi-x-circle"></i> Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="application/json" id="dashboardRecordsInitialData">@json($dashboardRecords->items())</script>
 @endsection
 
 @push('scripts')
