@@ -362,6 +362,7 @@ Route::get('/fire-risk-areas', [FireRiskAreaOverlayController::class, 'index']);
 Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
 
 Route::middleware(['web', 'auth', 'role:station admin,chief'])->group(function () {
+    Route::put('/markers/{markerId}/location', [MarkerController::class, 'updateLocation']);
     Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
     Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
     Route::get('/boundaries/barangays/{cityId}', [BoundaryLocationController::class, 'availableBarangays']);

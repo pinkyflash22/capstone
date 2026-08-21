@@ -539,6 +539,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
         Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
+        Route::delete('/investigation-reports/{reportType}/{reportId}/proof-images/{imageId}', [App\Http\Controllers\staff\InvestigationReportImageController::class, 'destroy'])
+            ->whereIn('reportType', ['spot', 'progress', 'final'])
+            ->name('investigation-reports.proof-images.destroy');
         Route::redirect('/equipments', '/firefighter/fsic');
         Route::redirect('/fsic-requests', '/firefighter/fsic');
         Route::get('/fsic', [FirefighterController::class, 'equipments'])->name('equipments');

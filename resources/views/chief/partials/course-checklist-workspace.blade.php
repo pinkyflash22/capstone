@@ -101,7 +101,7 @@
                             <td data-label="Action plan">
                                 <div class="plan-cell">
                                     <span class="plan-cell__icon"><i class="fa-solid fa-clipboard-check"></i></span>
-                                    <span><strong>{{ $checklist->plan_title ?: $checklist->source_title ?: 'Untitled action plan' }}</strong><small>#{{ $checklist->ai_action_plan_checklist_id }} · {{ optional($checklist->created_at)->format('M d, Y') }}</small></span>
+                                    <span><strong>{{ $checklist->plan_title ?: $checklist->source_title ?: 'Untitled action plan' }}</strong></span>
                                 </div>
                             </td>
                             <td data-label="Area"><span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span></td>

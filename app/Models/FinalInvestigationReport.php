@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasInvestigationProofImages;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\StationOfficer;
 
 class FinalInvestigationReport extends Model
 {
-    use HasFactory;
+    use HasFactory, HasInvestigationProofImages;
 
     protected $table ='final_investigation_report';
     protected $primaryKey = 'final_investigation_report_id';
@@ -58,5 +59,10 @@ class FinalInvestigationReport extends Model
     public function approvedBy()
     {
         return $this->belongsTo(StationOfficer::class, 'approved_by_station_officer_id', 'station_officer_id');
+    }
+
+    protected function investigationReportType(): string
+    {
+        return 'final';
     }
 }

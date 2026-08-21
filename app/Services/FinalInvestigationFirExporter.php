@@ -40,6 +40,10 @@ class FinalInvestigationFirExporter
         'Photographs of the fire scene',
     ];
 
+    public function __construct(private readonly DocxProofImageAppender $proofImageAppender)
+    {
+    }
+
     public function buildDocx(FinalInvestigationReport $report): string
     {
         $templatePath = storage_path(self::TEMPLATE_PATH);
@@ -78,6 +82,7 @@ class FinalInvestigationFirExporter
         }
 
         $zip->addFromString($documentEntryName, $this->populateDocumentXml($documentXml, $this->buildDocumentData($report)));
+        $this->proofImageAppender->append($zip, $report->proofImages()->get());
         $zip->close();
 
         return $docxPath;

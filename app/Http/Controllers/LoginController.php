@@ -51,13 +51,21 @@ class LoginController extends Controller
     /**
      * Show the login form
      */
-    public function index()
+    public function index(Request $request)
     {
         if (Auth::check()) {
             $user = Auth::user();
             $role = strtolower($user->role->role ?? '');
 
-            return $this->redirectBasedOnRole($role);
+            if ($role === 'anonymous') {
+                // Public emergency calls may create an authenticated anonymous session.
+                // Clear it before showing sign-in or the role redirect loops back home.
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            } else {
+                return $this->redirectBasedOnRole($role);
+            }
 
         }
 

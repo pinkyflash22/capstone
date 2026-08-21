@@ -9,6 +9,7 @@ use App\Models\StationOfficer;
 use App\Models\User;
 use App\Models\Incident;
 use App\Services\ProgressNarrativeDraftService;
+use App\Services\InvestigationReportImageService;
 use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Carbon;
@@ -33,7 +34,7 @@ class ProgressInvestigationReportController extends Controller
         return view('admin.investigations.progress-reports.create', compact('spotReports', 'fireOrigins', 'users'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, InvestigationReportImageService $imageService)
     {
         $validated = $request->validate([
             'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id|unique:progress_investigation_report,spot_investigation_id',
@@ -50,7 +51,10 @@ class ProgressInvestigationReportController extends Controller
             'disposition' => 'nullable|string',
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
+            ...InvestigationReportImageService::validationRules(),
         ]);
+
+        unset($validated['proof_images']);
 
         $validated['fire_origin_id'] = $this->resolveFireOriginId(
             $validated['fire_origin_id'] ?? null,
@@ -59,12 +63,13 @@ class ProgressInvestigationReportController extends Controller
         unset($validated['fire_origin_other']);
 
         $data = ProgressInvestigationReport::create($validated);
+        $imageService->store($request, $data, 'progress');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->spotInvestigation?->incident_id);
         UserActivityLogger::log('created progress rpt', auth()->user()?->user_id, $request);
 
         return response()->json([
             'success'=> true,
-            'data'=> $data->load(['fireOrigin', 'notedBy.user', 'approvedBy.user']),
+            'data'=> InvestigationReportImageService::responsePayload($data->load(['fireOrigin', 'notedBy.user', 'approvedBy.user'])),
         ]);
     }
      public function getAvailableSpotInvestigations()
@@ -105,7 +110,7 @@ class ProgressInvestigationReportController extends Controller
         return view('admin.investigations.progress-reports.edit', compact('progressInvestigationReport', 'spotReports', 'fireOrigins', 'users'));
     }
 
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
         $progress = ProgressInvestigationReport::find($id);
           if (!$progress) {
@@ -124,8 +129,10 @@ class ProgressInvestigationReportController extends Controller
             'disposition' => 'nullable|string',
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
+            ...InvestigationReportImageService::validationRules(),
         ]);
 
+        unset($validated['proof_images']);
         $validated['fire_origin_id'] = $this->resolveFireOriginId(
             $validated['fire_origin_id'] ?? null,
             $validated['fire_origin_other'] ?? null
@@ -133,9 +140,10 @@ class ProgressInvestigationReportController extends Controller
         unset($validated['fire_origin_other']);
 
         $progress->update($validated);
+        $imageService->store($request, $progress, 'progress');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated progress rpt', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true]);
+        return response()->json(['success'=>true, 'data' => InvestigationReportImageService::responsePayload($progress->fresh()->load('fireOrigin'))]);
     }
 
     public function draftNarrative(Request $request, ProgressNarrativeDraftService $draftService)
@@ -226,6 +234,7 @@ class ProgressInvestigationReportController extends Controller
         }
 
         $incidentId = (int) $progressInvestigationReport->spotInvestigation?->incident_id;
+        InvestigationReportImageService::deleteForReport($progressInvestigationReport);
         $progressInvestigationReport->delete();
         HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted progress rpt', auth()->user()?->user_id, request());

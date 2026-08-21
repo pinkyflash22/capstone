@@ -2794,23 +2794,35 @@ private function trimAiPrompt(string $prompt): string
             $sourceRecommendation = $recommendations[$index] ?? $recommendations[0];
 
             foreach ($targetBarangayIds as $targetBarangayId) {
-                $riskAreaId = $this->resolveChecklistRiskAreaId($rawData, (array) $sourceRecommendation, $index, $targetBarangayId);
+                $effectivePlan = (array) $plan;
+                $effectiveRecommendation = (array) $sourceRecommendation;
+
+                if (count($targetBarangayIds) > 1) {
+                    [$effectivePlan, $effectiveRecommendation] = $this->localizeStationWideActionPlan(
+                        $effectivePlan,
+                        $effectiveRecommendation,
+                        (int) $targetBarangayId,
+                        $rawData
+                    );
+                }
+
+                $riskAreaId = $this->resolveChecklistRiskAreaId($rawData, $effectiveRecommendation, $index, $targetBarangayId);
                 $matchedRiskArea = $this->resolveChecklistRiskAreaSummary($rawData, $riskAreaId);
-                $planPayload = array_merge($plan, [
+                $planPayload = array_merge($effectivePlan, [
                     'workflow_type' => 'analysis_action_plan',
                     'analysis_id' => $analysisId,
                     'barangay_id' => $targetBarangayId,
                     'risk_area_id' => $riskAreaId,
                     'matched_risk_area' => $matchedRiskArea,
                     'source_recommendation' => [
-                        'title' => $sourceRecommendation['title'] ?? null,
-                        'description' => $sourceRecommendation['description'] ?? null,
-                        'priority' => $sourceRecommendation['priority'] ?? null,
+                        'title' => $effectiveRecommendation['title'] ?? null,
+                        'description' => $effectiveRecommendation['description'] ?? null,
+                        'priority' => $effectiveRecommendation['priority'] ?? null,
                     ],
                 ]);
 
-                $sourceTitle = $plan['source_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan');
-                $planTitle = $plan['plan_title'] ?? ($sourceRecommendation['title'] ?? 'AI Action Plan');
+                $sourceTitle = $effectivePlan['source_title'] ?? ($effectiveRecommendation['title'] ?? 'AI Action Plan');
+                $planTitle = $effectivePlan['plan_title'] ?? ($effectiveRecommendation['title'] ?? 'AI Action Plan');
                 $sourceSignature = $this->buildActionPlanRevisionSignature(
                     (int) ($rawData['station_id'] ?? 0),
                     (int) $targetBarangayId,
@@ -2824,19 +2836,19 @@ private function trimAiPrompt(string $prompt): string
                     'risk_area_id' => $riskAreaId,
                     'source_type' => 'action_plan',
                     'source_title' => $sourceTitle,
-                    'source_description' => $sourceRecommendation['description'] ?? null,
+                    'source_description' => $effectiveRecommendation['description'] ?? null,
                     'plan_title' => $planTitle,
                     'plan_description' => $this->decoratePlanDescriptionForBarangay(
-                        $plan['plan_description'] ?? ($sourceRecommendation['description'] ?? null),
+                        $effectivePlan['plan_description'] ?? ($effectiveRecommendation['description'] ?? null),
                         $targetBarangayId,
                         $rawData,
                         $matchedRiskArea
                     ),
-                    'checklist_items' => array_values(array_filter($plan['checklist_items'] ?? [])),
-                    'success_indicator' => $plan['success_indicator'] ?? null,
-                    'priority_level' => strtolower($plan['priority_level'] ?? ($sourceRecommendation['priority'] ?? 'medium')),
+                    'checklist_items' => array_values(array_filter($effectivePlan['checklist_items'] ?? [])),
+                    'success_indicator' => $effectivePlan['success_indicator'] ?? null,
+                    'priority_level' => strtolower($effectivePlan['priority_level'] ?? ($effectiveRecommendation['priority'] ?? 'medium')),
                     'status' => 'pending',
-                    'target_date' => isset($plan['target_days']) ? now()->addDays((int) $plan['target_days'])->toDateString() : null,
+                    'target_date' => isset($effectivePlan['target_days']) ? now()->addDays((int) $effectivePlan['target_days'])->toDateString() : null,
                     'ai_payload' => $planPayload,
                     'is_ai_generated' => $aiGenerated,
                     'source_signature' => $sourceSignature,
@@ -2856,7 +2868,7 @@ private function trimAiPrompt(string $prompt): string
                         && Str::lower(trim((string) $existing->source_title)) === Str::lower(trim((string) $sourceTitle));
                 });
 
-                $checklistItems = array_values(array_filter($plan['checklist_items'] ?? []));
+                $checklistItems = array_values(array_filter($effectivePlan['checklist_items'] ?? []));
                 $itemsChanged = true;
                 $wasCreated = false;
 
@@ -3068,6 +3080,99 @@ private function trimAiPrompt(string $prompt): string
         return $base !== '' ? $base : null;
     }
 
+    /**
+     * Convert the single station-wide recommendation into a barangay-specific plan.
+     * This prevents every barangay from receiving the same title, priority and steps.
+     */
+    private function localizeStationWideActionPlan(
+        array $plan,
+        array $recommendation,
+        int $barangayId,
+        array $rawData
+    ): array {
+        $prediction = collect($rawData['barangay_predictions'] ?? [])
+            ->first(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $barangayId) ?? [];
+        $finding = collect(data_get($rawData, 'recommendation_context.focus_findings', []))
+            ->filter(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $barangayId)
+            ->sortBy(function ($item) {
+                return match (strtolower((string) ($item['assessment_level'] ?? ''))) {
+                    'critical' => 0,
+                    'high' => 1,
+                    'moderate', 'medium' => 2,
+                    default => 3,
+                };
+            })
+            ->first() ?? [];
+
+        $barangayName = trim((string) ($prediction['barangay_name'] ?? $finding['barangay_name'] ?? "Barangay {$barangayId}"));
+        $probability = is_numeric($prediction['probability_percent'] ?? null)
+            ? round((float) $prediction['probability_percent'], 1)
+            : null;
+        $riskLevel = strtolower((string) ($prediction['risk_level'] ?? $finding['assessment_level'] ?? 'medium'));
+        $priority = $this->barangayActionPlanPriority($riskLevel, $probability);
+        $condition = trim((string) ($finding['condition_label'] ?? $finding['type_label'] ?? 'fire-risk conditions'));
+        $location = trim((string) ($finding['street_or_sitio'] ?? 'priority areas'));
+        $title = Str::limit("Inspect {$condition} in {$location}, {$barangayName}", 180, '');
+
+        $context = [
+            "{$barangayName} is assessed at " . strtoupper($riskLevel) . ' fire risk' . ($probability !== null ? " ({$probability}% probability)." : '.'),
+            ! empty($finding['summary']) ? 'Local focus: ' . trim((string) $finding['summary']) . '.' : null,
+        ];
+        $driver = collect($prediction['drivers'] ?? [])->first();
+        $driverSummary = is_array($driver) ? ($driver['summary'] ?? null) : $driver;
+        if (filled($driverSummary)) {
+            $context[] = 'Leading signal: ' . trim((string) $driverSummary) . '.';
+        }
+        $description = implode(' ', array_filter($context));
+
+        $targetDays = match ($priority) {
+            'critical' => 7,
+            'high' => 14,
+            'medium' => 30,
+            default => 45,
+        };
+        $items = [
+            "Validate the {$condition} finding in {$location}, {$barangayName}.",
+            "Assign a barangay focal person and response team for {$barangayName}.",
+            "Apply and document the required control for {$condition}.",
+            "Verify completion with dated field evidence and update the {$barangayName} risk record.",
+        ];
+
+        $localizedRecommendation = array_merge($recommendation, [
+            'title' => $title,
+            'description' => $description,
+            'priority' => $priority,
+        ]);
+        $localizedPlan = array_merge($plan, [
+            'source_title' => $title,
+            'plan_title' => $title,
+            'plan_description' => $description,
+            'priority_level' => $priority,
+            'target_days' => $targetDays,
+            'checklist_items' => $items,
+            'success_indicator' => "The {$condition} finding in {$barangayName} is verified, controlled, and supported by field evidence.",
+        ]);
+
+        return [$localizedPlan, $localizedRecommendation];
+    }
+
+    private function barangayActionPlanPriority(string $riskLevel, ?float $probability): string
+    {
+        if ($riskLevel === 'critical' || ($probability !== null && $probability >= 80)) {
+            return 'critical';
+        }
+
+        if ($riskLevel === 'high' || ($probability !== null && $probability >= 60)) {
+            return 'high';
+        }
+
+        if (in_array($riskLevel, ['moderate', 'medium'], true) || ($probability !== null && $probability >= 35)) {
+            return 'medium';
+        }
+
+        return 'low';
+    }
+
     private function generateAndStoreRecommendationSuggestions(int $analysisId, array $recommendations, array $savedPlans): array
     {
         $recommendations = array_values(array_filter($recommendations, fn ($recommendation) => is_array($recommendation)));
@@ -3104,7 +3209,11 @@ private function trimAiPrompt(string $prompt): string
 
             $recommendation = is_array($matchedRecommendation)
                 ? $matchedRecommendation
-                : ($recommendations[$index] ?? $recommendations[0] ?? []);
+                : [
+                    'title' => $actionPlanChecklist->source_title ?? $actionPlanChecklist->plan_title,
+                    'description' => $actionPlanChecklist->source_description ?? $actionPlanChecklist->plan_description,
+                    'priority' => $actionPlanChecklist->priority_level ?? 'medium',
+                ];
 
             $recommendationTitle = $this->normalizeRecommendationTitle($recommendation['title'] ?? $actionPlanChecklist->source_title ?? null);
             $recommendationDescription = $recommendation['description'] ?? $actionPlanChecklist->plan_description;

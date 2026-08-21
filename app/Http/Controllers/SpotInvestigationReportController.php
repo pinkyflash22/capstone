@@ -7,6 +7,7 @@ use App\Models\Incident;
 use App\Models\Weather;
 use App\Models\StationOfficer;
 use App\Services\SpotNarrativeDraftService;
+use App\Services\InvestigationReportImageService;
 use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\IncidentOccurrenceSynchronizer;
 use App\Support\UserActivityLogger;
@@ -85,7 +86,7 @@ class SpotInvestigationReportController extends Controller
     }
 
 
-    public function store(Request $request)
+    public function store(Request $request, InvestigationReportImageService $imageService)
     {
         $validated = $request->validate([
             'incident_id' => 'required|exists:incidents,incident_id|unique:spot_investigation_report,incident_id',
@@ -112,9 +113,13 @@ class SpotInvestigationReportController extends Controller
             'disposition' => 'nullable|string',
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
+            ...InvestigationReportImageService::validationRules(),
         ]);
 
+        unset($validated['proof_images']);
+
         $response = SpotInvestigationReport::create($validated);
+        $imageService->store($request, $response, 'spot');
         if ($response->fire_started) {
             $incident = Incident::find($response->incident_id);
             if ($incident) {
@@ -128,7 +133,7 @@ class SpotInvestigationReportController extends Controller
         }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $response->incident_id);
         UserActivityLogger::log('created spot report', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true, 'data'=>$response]);
+        return response()->json(['success'=>true, 'data'=>InvestigationReportImageService::responsePayload($response)]);
     }
 
     public function show(SpotInvestigationReport $spotInvestigationReport)
@@ -146,7 +151,7 @@ class SpotInvestigationReportController extends Controller
         return view('admin.investigations.spot-reports.edit', compact('spotInvestigationReport', 'incidents', 'users', 'weatherReports'));
     }
 
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
          $spot = SpotInvestigationReport::find($id);
           if (!$spot) {
@@ -175,9 +180,12 @@ class SpotInvestigationReportController extends Controller
             'disposition' => 'nullable|string',
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
+            ...InvestigationReportImageService::validationRules(),
         ]);
 
+        unset($validated['proof_images']);
         $spot->update($validated);
+        $imageService->store($request, $spot, 'spot');
         if (array_key_exists('fire_started', $validated) && $spot->fire_started) {
             $incident = Incident::find($spot->incident_id);
             if ($incident) {
@@ -191,7 +199,7 @@ class SpotInvestigationReportController extends Controller
         }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $spot->incident_id);
         UserActivityLogger::log('updated spot report', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true]);
+        return response()->json(['success'=>true, 'data' => InvestigationReportImageService::responsePayload($spot->fresh())]);
     }
 
     public function draftNarrative(Request $request, SpotNarrativeDraftService $draftService)
@@ -282,6 +290,7 @@ class SpotInvestigationReportController extends Controller
         }
 
         $incidentId = (int) $spot->incident_id;
+        InvestigationReportImageService::deleteForReport($spot);
         $spot->delete();
         HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted spot report', auth()->user()?->user_id, request());

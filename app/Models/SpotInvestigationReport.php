@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasInvestigationProofImages;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SpotInvestigationReport extends Model
 {
-    use HasFactory;
+    use HasFactory, HasInvestigationProofImages;
     protected $table = 'spot_investigation_report';
     protected $primaryKey = 'spot_investigation_report_id';
     protected $fillable = [
@@ -73,5 +74,10 @@ class SpotInvestigationReport extends Model
     public function approvedBy()
     {
         return $this->belongsTo(StationOfficer::class, 'approved_by_station_officer_id', 'station_officer_id');
+    }
+
+    protected function investigationReportType(): string
+    {
+        return 'spot';
     }
 }

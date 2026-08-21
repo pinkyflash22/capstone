@@ -19,6 +19,10 @@ class SpotInvestigationSirExporter
     private const TEMPLATE_PATH = 'app/private/templates/sir-template-follow.docx';
     private const POWERSHELL_PATH = 'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
+    public function __construct(private readonly DocxProofImageAppender $proofImageAppender)
+    {
+    }
+
     public function buildDocx(SpotInvestigationReport $report): string
     {
         $templatePath = storage_path(self::TEMPLATE_PATH);
@@ -56,6 +60,7 @@ class SpotInvestigationSirExporter
         }
 
         $zip->addFromString('word/document.xml', $this->populateDocumentXml($documentXml, $this->buildDocumentData($report)));
+        $this->proofImageAppender->append($zip, $report->proofImages()->get());
         $zip->close();
 
         return $docxPath;

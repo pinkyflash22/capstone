@@ -89,6 +89,7 @@ const TRUCK_REALTIME_REFRESH_MS = 2000;
 // Shape management variables
 let manageShapesMode = false;
 let selectedShapeForEdit = null;
+let activeShapeGeometryEdit = null;
 let shapeFeatureGroup = null;
 let fireRiskAreaLayerGroup = null;
 let currentRiskAnalysisLayerGroup = null;
@@ -107,6 +108,7 @@ let currentDetailsIncident = null;
 // Edit modal
 let editModal = null;
 let currentEditMarker = null;
+let markerLocationPicker = null;
 
 let userLocation = null;
 let currentIncident = null;
@@ -5560,6 +5562,17 @@ async function openEditModal(marker) {
                 ${categoriesHtml}
             </select>
         </div>
+        <div class="edit-form-group">
+            <label><i class="fas fa-location-crosshairs"></i> Marker Location</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <input type="number" id="editMarkerLat" step="0.0000001" min="-90" max="90" aria-label="Marker latitude" value="${escapeHtml(String(marker.lat ?? ''))}">
+                <input type="number" id="editMarkerLng" step="0.0000001" min="-180" max="180" aria-label="Marker longitude" value="${escapeHtml(String(marker.lng ?? ''))}">
+            </div>
+            <button type="button" id="editMarkerPickLocation" style="display:flex;width:100%;min-height:42px;margin-top:9px;align-items:center;justify-content:center;gap:8px;border:1px solid rgba(37,99,235,.2);border-radius:12px;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:850;cursor:pointer;">
+                <i class="fas fa-map-location-dot"></i> Move Marker on Map
+            </button>
+            <small style="display:block;margin-top:7px;color:#64748b;line-height:1.45;">Click the map or drag the preview marker to its correct real-world position.</small>
+        </div>
         ${extraFieldsHtml}
         <div class="edit-modal-actions">
             <button class="edit-btn-save" id="editSaveBtn"><i class="fas fa-save"></i> Update Marker</button>
@@ -5585,6 +5598,7 @@ async function openEditModal(marker) {
     document.body.classList.add('map-edit-modal-open');
     
     const saveBtn = document.getElementById('editSaveBtn');
+    document.getElementById('editMarkerPickLocation')?.addEventListener('click', () => beginMarkerLocationPicker(marker));
     if (saveBtn) {
         const newSaveBtn = saveBtn.cloneNode(true);
         saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
@@ -5600,10 +5614,16 @@ async function updateMarker(markerId) {
     const titleInput = document.getElementById('editTitle');
     const descriptionInput = document.getElementById('editDescription');
     const categorySelect = document.getElementById('editCategory');
+    const latitude = Number(document.getElementById('editMarkerLat')?.value);
+    const longitude = Number(document.getElementById('editMarkerLng')?.value);
     
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descriptionInput ? descriptionInput.value : '';
     const categoryId = categorySelect ? categorySelect.value : '';
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        showNotification('Choose a valid marker location before updating.', 'warning');
+        return;
+    }
     
     // if (!title) {
     //     alert('Please enter marker title');
@@ -5639,6 +5659,20 @@ async function updateMarker(markerId) {
         if (!markerResponse.ok) {
             const errorText = await markerResponse.text();
             throw new Error(`Failed to update marker: ${errorText}`);
+        }
+
+        const locationResponse = await fetch(`/api/markers/${markerId}/location`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ lat: latitude, lng: longitude })
+        });
+        if (!locationResponse.ok) {
+            const locationError = await locationResponse.json().catch(() => ({}));
+            throw new Error(locationError.message || 'Failed to save the marker location.');
         }
         
         if (categoryName.toLowerCase().includes('station')) {
@@ -5693,7 +5727,93 @@ async function updateMarker(markerId) {
     }
 }
 
+function ensureMarkerLocationPickerToolbar() {
+    let toolbar = document.getElementById('markerLocationPickerToolbar');
+    if (toolbar) return toolbar;
+    toolbar = document.createElement('section');
+    toolbar.id = 'markerLocationPickerToolbar';
+    toolbar.hidden = true;
+    toolbar.style.cssText = 'position:fixed;left:50%;bottom:28px;z-index:2450;display:flex;max-width:min(650px,calc(100vw - 32px));align-items:center;gap:13px;padding:13px 14px;border:1px solid rgba(37,99,235,.2);border-radius:18px;background:rgba(255,255,255,.98);box-shadow:0 18px 44px rgba(15,23,42,.22);transform:translateX(-50%);';
+    toolbar.style.display = 'none';
+    toolbar.innerHTML = `
+        <div style="display:grid;width:42px;height:42px;flex:0 0 auto;place-items:center;border-radius:13px;background:#eff6ff;color:#2563eb;"><i class="fas fa-location-crosshairs"></i></div>
+        <div style="min-width:0;flex:1;"><strong style="display:block;color:#0f172a;font-size:13px;">Move marker</strong><span data-marker-picker-coordinates style="display:block;margin-top:3px;color:#64748b;font-size:11px;">Click the map or drag the marker.</span></div>
+        <button type="button" data-marker-picker-cancel style="min-height:38px;padding:0 13px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:11px;font-weight:850;cursor:pointer;">Cancel</button>
+        <button type="button" data-marker-picker-use style="min-height:38px;padding:0 13px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:11px;font-weight:850;cursor:pointer;"><i class="fas fa-check"></i> Use Position</button>
+    `;
+    document.body.appendChild(toolbar);
+    L.DomEvent.disableClickPropagation(toolbar);
+    toolbar.querySelector('[data-marker-picker-cancel]')?.addEventListener('click', () => finishMarkerLocationPicker(false));
+    toolbar.querySelector('[data-marker-picker-use]')?.addEventListener('click', () => finishMarkerLocationPicker(true));
+    return toolbar;
+}
+
+function updateMarkerLocationPickerPosition(latlng) {
+    if (!markerLocationPicker || !latlng) return;
+    markerLocationPicker.latlng = L.latLng(latlng.lat, latlng.lng);
+    markerLocationPicker.preview.setLatLng(markerLocationPicker.latlng);
+    const label = document.querySelector('[data-marker-picker-coordinates]');
+    if (label) label.textContent = `${markerLocationPicker.latlng.lat.toFixed(7)}, ${markerLocationPicker.latlng.lng.toFixed(7)}`;
+}
+
+function beginMarkerLocationPicker(marker) {
+    if (!window.map || !marker?.marker_id) return;
+    const lat = Number(document.getElementById('editMarkerLat')?.value ?? marker.lat);
+    const lng = Number(document.getElementById('editMarkerLng')?.value ?? marker.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        showNotification('This marker has no valid starting coordinates.', 'warning');
+        return;
+    }
+
+    const sourceLayer = existingMarkers[marker.marker_id];
+    const sourceOpacity = Number(sourceLayer?.options?.opacity ?? 1);
+    sourceLayer?.setOpacity?.(0.25);
+    const previewOptions = { draggable: true, zIndexOffset: 2000, opacity: 0.9 };
+    if (sourceLayer?.options?.icon) previewOptions.icon = sourceLayer.options.icon;
+    const preview = L.marker([lat, lng], previewOptions).addTo(window.map);
+    const mapClickHandler = (event) => updateMarkerLocationPickerPosition(event.latlng);
+    markerLocationPicker = { markerId: marker.marker_id, preview, latlng: L.latLng(lat, lng), mapClickHandler, sourceLayer, sourceOpacity };
+    preview.on('dragend', () => updateMarkerLocationPickerPosition(preview.getLatLng()));
+    window.map.on('click', mapClickHandler);
+    window.map.closePopup();
+    editModal.style.display = 'none';
+    editModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('map-edit-modal-open');
+    const toolbar = ensureMarkerLocationPickerToolbar();
+    toolbar.hidden = false;
+    toolbar.style.display = 'flex';
+    updateMarkerLocationPickerPosition(markerLocationPicker.latlng);
+    window.map.setView([lat, lng], Math.max(window.map.getZoom(), 17), { animate: true });
+}
+
+function finishMarkerLocationPicker(usePosition) {
+    if (!markerLocationPicker) return;
+    const { preview, mapClickHandler, latlng, sourceLayer, sourceOpacity } = markerLocationPicker;
+    window.map?.off('click', mapClickHandler);
+    if (preview && window.map?.hasLayer(preview)) window.map.removeLayer(preview);
+    sourceLayer?.setOpacity?.(sourceOpacity);
+    markerLocationPicker = null;
+    const toolbar = document.getElementById('markerLocationPickerToolbar');
+    if (toolbar) {
+        toolbar.hidden = true;
+        toolbar.style.display = 'none';
+    }
+    if (usePosition) {
+        const latInput = document.getElementById('editMarkerLat');
+        const lngInput = document.getElementById('editMarkerLng');
+        if (latInput) latInput.value = latlng.lat.toFixed(7);
+        if (lngInput) lngInput.value = latlng.lng.toFixed(7);
+    }
+    if (editModal && currentEditMarker) {
+        editModal.classList.add('active');
+        editModal.style.display = 'flex';
+        editModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('map-edit-modal-open');
+    }
+}
+
 function closeEditModal() {
+    if (markerLocationPicker) finishMarkerLocationPicker(false);
     if (editModal) {
         if (editModal.contains(document.activeElement)) {
             document.activeElement?.blur?.();
@@ -10129,6 +10249,9 @@ async function respondIncident(location) {
 
 function toggleShapeManagement() {
     manageShapesMode = !manageShapesMode;
+    if (!manageShapesMode && activeShapeGeometryEdit) {
+        cancelShapeGeometryEdit();
+    }
     const toggleBtn = document.getElementById('toggleShapeMode');
     if (toggleBtn) {
         toggleBtn.innerHTML = manageShapesMode ? '<i class="fas fa-shapes mr-1"></i> Manage Shapes: ON' : '<i class="fas fa-shapes mr-1"></i> Manage Shapes: OFF';
@@ -10169,18 +10292,25 @@ function getShapePopupMarkup(shapeId, shapeName) {
                     value="${safeName}"
                     style="width: 100%; height: 40px; border-radius: 12px; border: 1px solid #fed7aa; background: #fff7ed; color: #7c2d12; padding: 0 12px; font-size: 13px; outline: none;"
                 >
-                <div style="display:flex; gap:10px; margin-top: 12px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top: 12px;">
                     <button
                         id="shapeEditBtn_${shapeId}"
                         type="button"
                         style="flex:1; height:40px; border:0; border-radius:12px; background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%); color:#fff; font-size:12px; font-weight:800; cursor:pointer;"
                     >
-                        <i class="fas fa-pen-to-square" style="margin-right:6px;"></i>Save
+                        <i class="fas fa-font" style="margin-right:6px;"></i>Rename
+                    </button>
+                    <button
+                        id="shapeGeometryEditBtn_${shapeId}"
+                        type="button"
+                        style="height:40px; border:1px solid rgba(37, 99, 235, 0.18); border-radius:12px; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:800; cursor:pointer;"
+                    >
+                        <i class="fas fa-draw-polygon" style="margin-right:6px;"></i>Edit Boundary
                     </button>
                     <button
                         id="shapeDeleteBtn_${shapeId}"
                         type="button"
-                        style="flex:1; height:40px; border:1px solid rgba(198, 61, 38, 0.14); border-radius:12px; background:#fff7f3; color:#9a3412; font-size:12px; font-weight:800; cursor:pointer;"
+                        style="grid-column:1 / -1; height:40px; border:1px solid rgba(198, 61, 38, 0.14); border-radius:12px; background:#fff7f3; color:#9a3412; font-size:12px; font-weight:800; cursor:pointer;"
                     >
                         <i class="fas fa-trash" style="margin-right:6px;"></i>Delete
                     </button>
@@ -10204,6 +10334,7 @@ function onShapeClick(shapeId, layer, latlng) {
 
     setTimeout(() => {
         const editBtn = document.getElementById(`shapeEditBtn_${shapeId}`);
+        const geometryEditBtn = document.getElementById(`shapeGeometryEditBtn_${shapeId}`);
         const deleteBtn = document.getElementById(`shapeDeleteBtn_${shapeId}`);
 
         if (editBtn) {
@@ -10211,6 +10342,14 @@ function onShapeClick(shapeId, layer, latlng) {
                 e.preventDefault();
                 e.stopPropagation();
                 editShape(selectedShapeForEdit);
+            });
+        }
+
+        if (geometryEditBtn) {
+            geometryEditBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                beginShapeGeometryEdit(selectedShapeForEdit);
             });
         }
 
@@ -10222,6 +10361,130 @@ function onShapeClick(shapeId, layer, latlng) {
             });
         }
     }, 0);
+}
+
+function editableLayersForShape(rootLayer) {
+    const editableLayers = [];
+    const visit = (layer) => {
+        if (layer?.editing && typeof layer.editing.enable === 'function') {
+            editableLayers.push(layer);
+            return;
+        }
+        if (typeof layer?.eachLayer === 'function') layer.eachLayer(visit);
+    };
+    visit(rootLayer);
+    return editableLayers;
+}
+
+function ensureShapeGeometryEditor() {
+    let editor = document.getElementById('shapeGeometryEditor');
+    if (editor) return editor;
+
+    if (!document.getElementById('shapeGeometryEditorStyles')) {
+        const style = document.createElement('style');
+        style.id = 'shapeGeometryEditorStyles';
+        style.textContent = `
+            .shape-geometry-editor{position:fixed;left:50%;bottom:28px;z-index:2400;display:flex;max-width:min(620px,calc(100vw - 32px));align-items:center;gap:14px;padding:13px 14px;border:1px solid rgba(37,99,235,.2);border-radius:18px;background:rgba(255,255,255,.98);box-shadow:0 18px 44px rgba(15,23,42,.22);transform:translateX(-50%)}
+            .shape-geometry-editor[hidden]{display:none!important}.shape-geometry-editor__icon{display:grid;width:42px;height:42px;flex:0 0 auto;place-items:center;border-radius:13px;background:#eff6ff;color:#2563eb}.shape-geometry-editor__copy{min-width:0;flex:1}.shape-geometry-editor__copy strong{display:block;color:#0f172a;font-size:13px}.shape-geometry-editor__copy span{display:block;margin-top:3px;color:#64748b;font-size:11px}.shape-geometry-editor__actions{display:flex;gap:8px}.shape-geometry-editor button{min-height:38px;padding:0 13px;border-radius:11px;font-size:11px;font-weight:850;cursor:pointer}.shape-geometry-editor__cancel{border:1px solid #cbd5e1;background:#fff;color:#475569}.shape-geometry-editor__save{border:0;background:#2563eb;color:#fff}
+            @media(max-width:768px){.shape-geometry-editor{left:12px;right:12px;bottom:calc(var(--mobile-bottom-nav-h,84px) + 12px + env(safe-area-inset-bottom,0px));max-width:none;flex-wrap:wrap;transform:none}.shape-geometry-editor__copy{width:calc(100% - 58px)}.shape-geometry-editor__actions{width:100%}.shape-geometry-editor button{flex:1}}
+        `;
+        document.head.appendChild(style);
+    }
+
+    editor = document.createElement('section');
+    editor.id = 'shapeGeometryEditor';
+    editor.className = 'shape-geometry-editor';
+    editor.hidden = true;
+    editor.innerHTML = `
+        <div class="shape-geometry-editor__icon"><i class="fas fa-draw-polygon" aria-hidden="true"></i></div>
+        <div class="shape-geometry-editor__copy"><strong data-shape-geometry-title>Edit boundary</strong><span>Drag the white vertex handles to remove the overlap, then save.</span></div>
+        <div class="shape-geometry-editor__actions">
+            <button type="button" class="shape-geometry-editor__cancel" data-shape-geometry-cancel>Cancel</button>
+            <button type="button" class="shape-geometry-editor__save" data-shape-geometry-save><i class="fas fa-check" aria-hidden="true"></i> Save Changes</button>
+        </div>
+    `;
+    document.body.appendChild(editor);
+    L.DomEvent.disableClickPropagation(editor);
+    editor.querySelector('[data-shape-geometry-cancel]')?.addEventListener('click', cancelShapeGeometryEdit);
+    editor.querySelector('[data-shape-geometry-save]')?.addEventListener('click', saveShapeGeometryEdit);
+    return editor;
+}
+
+function beginShapeGeometryEdit(shapeData) {
+    if (!shapeData?.layer) return;
+    if (activeShapeGeometryEdit) cancelShapeGeometryEdit();
+
+    const editableLayers = editableLayersForShape(shapeData.layer);
+    if (!editableLayers.length) {
+        showNotification('This saved shape type cannot be edited with map vertices.', 'warning');
+        return;
+    }
+
+    window.map?.closePopup?.();
+    editableLayers.forEach((layer) => layer.editing.enable());
+    activeShapeGeometryEdit = {
+        ...shapeData,
+        editableLayers,
+        originalGeojson: JSON.parse(JSON.stringify(shapeData.layer.shapeGeojson || shapeData.layer.toGeoJSON())),
+    };
+    const editor = ensureShapeGeometryEditor();
+    editor.querySelector('[data-shape-geometry-title]').textContent = `Editing ${shapeData.name || 'boundary'}`;
+    editor.hidden = false;
+    window.map?.getContainer?.().classList.add('is-editing-saved-boundary');
+    showNotification('Boundary editing enabled. Drag a vertex to adjust the saved shape.', 'info');
+}
+
+function editedGeojsonForShape(editState) {
+    const exported = editState.layer.toGeoJSON();
+    const originalType = editState.originalGeojson?.type;
+    const singleFeature = exported?.type === 'FeatureCollection' && exported.features?.length === 1
+        ? exported.features[0]
+        : exported;
+    if (originalType === 'Feature') return singleFeature;
+    if (originalType && !['Feature', 'FeatureCollection'].includes(originalType)) return singleFeature?.geometry || singleFeature;
+    return exported;
+}
+
+function finishShapeGeometryEdit() {
+    activeShapeGeometryEdit?.editableLayers?.forEach((layer) => layer.editing.disable());
+    activeShapeGeometryEdit = null;
+    const editor = document.getElementById('shapeGeometryEditor');
+    if (editor) editor.hidden = true;
+    window.map?.getContainer?.().classList.remove('is-editing-saved-boundary');
+}
+
+async function cancelShapeGeometryEdit() {
+    if (!activeShapeGeometryEdit) return;
+    finishShapeGeometryEdit();
+    invalidateShapeData();
+    await loadShapes({ force: true });
+    showNotification('Boundary changes canceled.', 'info');
+}
+
+async function saveShapeGeometryEdit() {
+    if (!activeShapeGeometryEdit) return;
+    const editState = activeShapeGeometryEdit;
+    const saveButton = document.querySelector('[data-shape-geometry-save]');
+    if (saveButton) saveButton.disabled = true;
+    try {
+        const response = await fetch(`/api/shapes/${editState.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            body: JSON.stringify({ geojson: editedGeojsonForShape(editState) }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || `Server error ${response.status}`);
+        finishShapeGeometryEdit();
+        invalidateShapeData();
+        announceBoundaryChange(payload.boundary_version);
+        await loadShapes({ force: true });
+        showNotification('Boundary geometry saved successfully!', 'success');
+    } catch (error) {
+        console.error('Error updating boundary geometry:', error);
+        showNotification('Failed to save boundary geometry: ' + error.message, 'error');
+    } finally {
+        if (saveButton) saveButton.disabled = false;
+    }
 }
 
 function editShape(shapeData) {
@@ -10278,6 +10541,7 @@ function deleteShape(shapeId) {
             if (shapeFeatureGroup) shapeFeatureGroup.removeLayer(shapeLayers[shapeId]);
             delete shapeLayers[shapeId];
         }
+
         window.map.closePopup();
         showNotification('Shape deleted successfully!', 'success');
         announceBoundaryChange(data.boundary_version);
@@ -10328,6 +10592,7 @@ async function loadShapes(options = {}) {
                     layer.shapeBarangayId = shape.barangay_id || null;
                     layer.shapeBoundaryType = shape.boundary_type || 'custom';
                     layer.shapeSource = shape.source || 'manual';
+                    layer.shapeGeojson = geojson;
                     layer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(shape.id, layer, e.latlng); } });
                     if (shapeFeatureGroup) shapeFeatureGroup.addLayer(layer);
                     shapeLayers[shape.id] = layer;
@@ -10373,6 +10638,7 @@ async function loadShapes(options = {}) {
                 layer.shapeBarangayId = shape.barangay_id || null;
                 layer.shapeBoundaryType = shape.boundary_type || 'custom';
                 layer.shapeSource = shape.source || 'manual';
+                layer.shapeGeojson = geojson;
                 layer.on('click', function(e) { if (manageShapesMode) { L.DomEvent.stopPropagation(e); onShapeClick(shape.id, layer, e.latlng); } });
                 if (shapeFeatureGroup) shapeFeatureGroup.addLayer(layer);
                 shapeLayers[shape.id] = layer;

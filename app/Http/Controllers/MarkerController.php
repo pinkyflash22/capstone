@@ -294,6 +294,26 @@ public function update(Request $request, $markerId)
     }
 }
 
+    public function updateLocation(Request $request, int $markerId)
+    {
+        $validated = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $marker = Marker::query()->findOrFail($markerId);
+        $marker->update([
+            'lat' => round((float) $validated['lat'], 7),
+            'lng' => round((float) $validated['lng'], 7),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Marker location updated successfully',
+            'data' => $marker->fresh(),
+        ]);
+    }
+
     public function destroy($id)
     {
         try {

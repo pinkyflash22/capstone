@@ -648,7 +648,7 @@ class FirefighterController extends Controller
     protected function loadSpotReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return SpotInvestigationReport::query()
-            ->with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user'])
+            ->with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -658,7 +658,7 @@ class FirefighterController extends Controller
     protected function loadProgressReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return ProgressInvestigationReport::query()
-            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation'])
+            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -668,7 +668,7 @@ class FirefighterController extends Controller
     protected function loadFinalReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return FinalInvestigationReport::query()
-            ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])
+            ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -720,6 +720,7 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_progress' => (bool) $report->progressInvestigation,
                 ],
             ];
@@ -761,6 +762,7 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_final' => (bool) $report->finalInvestigation,
                 ],
             ];
@@ -810,9 +812,20 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                 ],
             ];
         })->all();
+    }
+
+    protected function mapInvestigationProofImages($images): array
+    {
+        return collect($images)->map(fn ($image) => [
+            'id' => $image->investigation_report_image_id,
+            'name' => $image->file_name,
+            'url' => MediaPath::url($image->file_path),
+            'size' => (int) $image->file_size,
+        ])->values()->all();
     }
 
     protected function loadAvailableSpotIncidents($stationTeamIds, BoundaryMatcherService $boundaryMatcherService)

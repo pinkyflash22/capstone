@@ -16,6 +16,10 @@ class ProgressInvestigationPirExporter
     private const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
     private const TEMPLATE_PATH = 'app/private/templates/progress-investigation-template-edited.docx';
 
+    public function __construct(private readonly DocxProofImageAppender $proofImageAppender)
+    {
+    }
+
     public function buildDocx(ProgressInvestigationReport $report): string
     {
         $templatePath = storage_path(self::TEMPLATE_PATH);
@@ -54,6 +58,7 @@ class ProgressInvestigationPirExporter
         }
 
         $zip->addFromString($documentEntryName, $this->populateDocumentXml($documentXml, $this->buildDocumentData($report)));
+        $this->proofImageAppender->append($zip, $report->proofImages()->get());
         $zip->close();
 
         return $docxPath;

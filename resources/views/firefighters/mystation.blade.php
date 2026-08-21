@@ -291,6 +291,12 @@
                             <label class="form-label">Disposition</label>
                             <textarea name="disposition" class="form-textarea" rows="4" placeholder="Assessment, case status, and whether this will be elevated to a higher office"></textarea>
                         </div>
+                        <div class="form-section-label">Photo documentation</div>
+                        <div class="form-group full">
+                            <label class="form-label">Proof Images</label>
+                            <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
+                        </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
                             <label class="form-label">Noted By</label>
@@ -390,6 +396,12 @@
                         <div class="form-group full">
                             <label class="form-label">Disposition</label>
                             <textarea name="disposition" class="form-textarea" rows="4"></textarea>
+                        </div>
+                        <div class="form-section-label">Photo documentation</div>
+                        <div class="form-group full">
+                            <label class="form-label">Proof Images</label>
+                            <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
                         </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
@@ -510,6 +522,12 @@
                             <label class="form-label">Recommendation</label>
                             <textarea name="recommendation" class="form-textarea" rows="4"></textarea>
                         </div>
+                        <div class="form-section-label">Photo documentation</div>
+                        <div class="form-group full">
+                            <label class="form-label">Proof Images</label>
+                            <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
+                        </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
                             <label class="form-label">Noted By</label>
@@ -569,6 +587,11 @@
                 progressCreate: '/api/progress-investigation',
                 finalCreate: '/api/final-investigation',
                 reportManageBase: '/api',
+                proofImageDeleteTemplate: @json(route('firefighter.investigation-reports.proof-images.destroy', [
+                    'reportType' => '__REPORT_TYPE__',
+                    'reportId' => '__REPORT_ID__',
+                    'imageId' => '__IMAGE_ID__',
+                ])),
                 sirTemplate: @json(route('firefighter.spot-reports.sir.word', ['spotReportId' => '__SPOT_REPORT_ID__'])),
                 pirTemplate: @json(route('firefighter.progress-reports.pir.word', ['progressReportId' => '__PROGRESS_REPORT_ID__'])),
                 firTemplate: @json(route('firefighter.final-reports.fir.word', ['finalReportId' => '__FINAL_REPORT_ID__'])),

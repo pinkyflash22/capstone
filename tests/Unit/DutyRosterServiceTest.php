@@ -110,6 +110,34 @@ class DutyRosterServiceTest extends TestCase
         $this->assertSame('off-duty', DB::table('station_officers')->where('station_officer_id', 1)->value('status'));
     }
 
+    public function test_one_person_cannot_hold_multiple_positions_in_the_same_shift(): void
+    {
+        $controller = app(DutyRosterController::class);
+        $method = new \ReflectionMethod($controller, 'validateAssignments');
+
+        try {
+            $method->invoke($controller, [
+                ['station_officer_id' => 1, 'team_role' => 'team_leader'],
+                ['station_officer_id' => 1, 'team_role' => 'commander_driver'],
+                ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+            ], 10, Carbon::parse('2026-08-22 08:00:00'), Carbon::parse('2026-08-22 20:00:00'));
+
+            $this->fail('Duplicate personnel assignments should be rejected.');
+        } catch (\ReflectionException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $validation = $exception instanceof \Illuminate\Validation\ValidationException
+                ? $exception
+                : $exception->getPrevious();
+
+            $this->assertInstanceOf(\Illuminate\Validation\ValidationException::class, $validation);
+            $this->assertSame(
+                'Each person can only hold one duty position per shift.',
+                $validation->errors()['assignments'][0]
+            );
+        }
+    }
+
     public function test_weekly_template_generates_overnight_occurrences_without_overwriting_an_override(): void
     {
         $template = DutyRosterTemplate::create([

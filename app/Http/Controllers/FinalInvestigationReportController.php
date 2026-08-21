@@ -6,6 +6,7 @@ use App\Models\FinalInvestigationReport;
 use App\Models\FullAddress;
 use App\Models\ProgressInvestigationReport;
 use App\Services\FinalNarrativeDraftService;
+use App\Services\InvestigationReportImageService;
 use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class FinalInvestigationReportController extends Controller
         return view('admin.investigations.final-reports.create', compact('progressReports', 'addresses'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, InvestigationReportImageService $imageService)
     {
         $validated = $request->validate([
             'progress_investigation_id' => 'required|exists:progress_investigation_report,progress_investigation_report_id|unique:final_investigation_report,progress_investigation_id',
@@ -56,17 +57,21 @@ class FinalInvestigationReportController extends Controller
             'recommendation' => 'nullable|string',
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
+            ...InvestigationReportImageService::validationRules(),
         ]);
+
+        unset($validated['proof_images']);
 
         $progressReport = $this->resolveLinkedProgressReport((int) $validated['progress_investigation_id']);
         $validated = $this->mergeDerivedDefaults($validated, $progressReport);
         $data = FinalInvestigationReport::create($validated);
+        $imageService->store($request, $data, 'final');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('created final report', auth()->user()?->user_id, $request);
 
         return response()->json([
             'success'=>true,
-            'data'=>$data->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user']),
+            'data'=>InvestigationReportImageService::responsePayload($data->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])),
         ]);
     }
 
@@ -107,7 +112,7 @@ class FinalInvestigationReportController extends Controller
         return view('admin.investigations.final-reports.edit', compact('finalInvestigationReport', 'progressReports', 'addresses'));
     }
 
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
         $final = FinalInvestigationReport::find($id);
           if (!$final) {
@@ -132,15 +137,18 @@ class FinalInvestigationReportController extends Controller
             'noted_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'approved_by_station_officer_id' => 'nullable|exists:station_officers,station_officer_id',
             'total_damage' => 'required|numeric|min:0',
+            ...InvestigationReportImageService::validationRules(),
         ]);
 
+        unset($validated['proof_images']);
         $validated = $this->mergeDerivedDefaults($validated, $final->progressInvestigation);
         $final->update($validated);
+        $imageService->store($request, $final, 'final');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated final report', auth()->user()?->user_id, $request);
         return response()->json([
             'success'=>true,
-            'data' => $final->fresh()->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user']),
+            'data' => InvestigationReportImageService::responsePayload($final->fresh()->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])),
         ]);
 
         
@@ -221,6 +229,7 @@ class FinalInvestigationReportController extends Controller
     public function destroy(FinalInvestigationReport $finalInvestigationReport)
     {
         $incidentId = (int) $finalInvestigationReport->progressInvestigation?->spotInvestigation?->incident_id;
+        InvestigationReportImageService::deleteForReport($finalInvestigationReport);
         $finalInvestigationReport->delete();
         HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted final report', auth()->user()?->user_id, request());

@@ -67,6 +67,46 @@ if (app) {
         $('#dutyShiftForm [name="station_duty"]').innerHTML = options(command, 'Select chief/admin');
         $('#dutyShiftForm [name="station_duty_backup"]').innerHTML = options(command, 'None');
         $('#dutyExceptionForm [name="station_officer_id"]').innerHTML = options(state.data.officers);
+        syncAssignmentAvailability();
+    }
+
+    function syncAssignmentAvailability() {
+        const form = $('#dutyShiftForm');
+        if (!form) return;
+
+        const personnelSelects = [
+            ...roles.map(([key]) => form.elements[key]),
+            form.elements.station_duty,
+            form.elements.station_duty_backup,
+        ].filter(Boolean);
+        const selectedValues = personnelSelects
+            .map(select => String(select.value || ''))
+            .filter(Boolean);
+
+        personnelSelects.forEach(select => {
+            [...select.options].forEach(option => {
+                if (!option.value) return;
+                option.disabled = option.value !== String(select.value || '') && selectedValues.includes(option.value);
+            });
+        });
+    }
+
+    function duplicateAssignmentName(form) {
+        const selects = [
+            ...roles.map(([key]) => form.elements[key]),
+            form.elements.station_duty,
+            form.elements.station_duty_backup,
+        ].filter(Boolean);
+        const seen = new Set();
+
+        for (const select of selects) {
+            const value = String(select.value || '');
+            if (!value) continue;
+            if (seen.has(value)) return select.selectedOptions[0]?.textContent?.trim() || 'Selected personnel';
+            seen.add(value);
+        }
+
+        return null;
     }
 
     function renderMetrics() {
@@ -179,6 +219,7 @@ if (app) {
         const stationDuty = shift.assignments.filter(item => item.team_role === 'station_duty');
         form.elements.station_duty.value = stationDuty[0]?.station_officer_id || '';
         form.elements.station_duty_backup.value = stationDuty[1]?.station_officer_id || '';
+        syncAssignmentAvailability();
         form.elements.recurrence.value = shift.is_recurring ? 'weekly' : 'none';
         form.elements.recurrence.disabled = true;
         form.elements.recurrence_until.value = shift.recurrence_until || inputFromIso(shift.ends_at).slice(0, 10);
@@ -212,10 +253,18 @@ if (app) {
     });
 
     $('#dutyShiftForm [name="recurrence"]').addEventListener('change', event => toggleRecurrenceFields(event.currentTarget.form));
+    $('#dutyShiftForm').addEventListener('change', event => {
+        if (event.target.matches('select[name]')) syncAssignmentAvailability();
+    });
 
     $('#dutyShiftForm').addEventListener('submit', async event => {
         event.preventDefault();
         const form = event.currentTarget; const data = new FormData(form);
+        const duplicateName = duplicateAssignmentName(form);
+        if (duplicateName) {
+            form.querySelector('[data-form-error]').textContent = `${duplicateName} is already assigned to another duty position.`;
+            return;
+        }
         const assignments = roles.map(([key]) => ({ team_role: key, station_officer_id: data.get(key) })).filter(item => item.station_officer_id);
         assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty') });
         if (data.get('station_duty_backup')) assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty_backup') });

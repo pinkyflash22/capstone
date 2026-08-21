@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasInvestigationProofImages;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ProgressInvestigationReport extends Model
 {
-    use HasFactory;
+    use HasFactory, HasInvestigationProofImages;
 
     protected $table = 'progress_investigation_report';
     protected $primaryKey = 'progress_investigation_report_id';
@@ -60,5 +61,10 @@ class ProgressInvestigationReport extends Model
     public function finalInvestigation()
     {
         return $this->hasOne(FinalInvestigationReport::class, 'progress_investigation_id', 'progress_investigation_report_id');
+    }
+
+    protected function investigationReportType(): string
+    {
+        return 'progress';
     }
 }

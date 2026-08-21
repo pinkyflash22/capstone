@@ -232,6 +232,12 @@ class DutyRosterController extends Controller
     private function validateAssignments(array $assignments, int $stationId, Carbon $startsAt, Carbon $endsAt, ?int $exceptShiftId = null): void
     {
         $officerIds = collect($assignments)->pluck('station_officer_id')->map(fn ($id) => (int) $id);
+        if ($officerIds->unique()->count() !== $officerIds->count()) {
+            throw ValidationException::withMessages([
+                'assignments' => 'Each person can only hold one duty position per shift.',
+            ]);
+        }
+
         $deployableRoles = collect($assignments)->pluck('team_role')->filter(fn ($role) => in_array($role, DutyRosterService::DEPLOYABLE_ROLES, true));
         if ($deployableRoles->unique()->count() !== $deployableRoles->count()) throw ValidationException::withMessages(['assignments' => 'Each deployable team role can only be assigned once per shift.']);
         $officers = StationOfficer::query()->with('user.role')->where('station_id', $stationId)->whereIn('station_officer_id', $officerIds)->get()->keyBy('station_officer_id');
