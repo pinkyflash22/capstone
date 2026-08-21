@@ -143,4 +143,9 @@ class Incident extends Model
     {
         return $this->hasOne(IncidentResponse::class, 'incident_id', 'incident_id');
     }
+
+    public function responseUnits()
+    {
+        return $this->hasMany(IncidentResponseUnit::class, 'incident_id', 'incident_id');
+    }
 }

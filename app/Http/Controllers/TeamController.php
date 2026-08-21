@@ -67,10 +67,16 @@ class TeamController extends Controller
         return view('admin.incidents.teams.create', compact('stations', 'firefighters'));
     }
 
-    public function updateStatus(Request $request,string $id){
-        $team = Team::findOrFail($id);
-        $this->assertStationAccess((int) ($team->station_id ?: $team->teamLeader?->station_id));
-        $validated = $request->validate([
+      public function updateStatus(Request $request,string $id){
+          $team = Team::findOrFail($id);
+          $this->assertStationAccess((int) ($team->station_id ?: $team->teamLeader?->station_id));
+          if ($team->roster_managed) {
+              return response()->json([
+                  'success' => false,
+                  'message' => 'This team is controlled by the duty roster. Change its schedule instead of overriding the live status.',
+              ], 409);
+          }
+          $validated = $request->validate([
             'status' => 'required|in:available,responding,off',
         ]);
 
@@ -131,6 +137,7 @@ class TeamController extends Controller
     public function update(Request $request, string $id)
     {
         $team = Team::findOrFail($id);
+        abort_if($team->roster_managed, 409, 'This team is controlled by the duty roster. Edit its scheduled shift instead.');
         
         $validated = $request->validate([
             'commander_driver' => 'sometimes|required|exists:station_officers,station_officer_id',

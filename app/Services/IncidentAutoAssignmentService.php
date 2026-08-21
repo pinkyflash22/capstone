@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Models\Incident;
 use App\Models\Station;
-use App\Models\StationOfficer;
-use App\Models\Team;
 use Illuminate\Support\Facades\DB;
 
 class IncidentAutoAssignmentService
@@ -76,10 +74,24 @@ class IncidentAutoAssignmentService
 
             foreach ($nearestStations as $station) {
                 $stationId = (int) $station->station_id;
-                $team = $this->findAvailableTeamForStation($stationId);
+                $team = app(IncidentResourceDispatchService::class)->findAvailableTeamForStation($stationId);
 
                 if (! $team) {
                     continue;
+                }
+
+                $resources = app(IncidentResourceDispatchService::class);
+                $responseUnit = null;
+                if ($resources->incidentRequiresFiretruck($lockedIncident)) {
+                    $responseUnit = $resources->reservePrimary(
+                        $lockedIncident,
+                        $team,
+                        $stationId,
+                        isset($station->distance_meters) ? (float) $station->distance_meters : null,
+                    );
+                    if (! $responseUnit) continue;
+                } else {
+                    $resources->dispatchTeam($team);
                 }
 
                 $lockedIncident->team_id = $team->team_id;
@@ -87,14 +99,13 @@ class IncidentAutoAssignmentService
                 $lockedIncident->updated_at = now();
                 $lockedIncident->save();
 
-                $this->markTeamResponding($team);
-
                 return [
                     'incident_id' => $lockedIncident->incident_id,
                     'team_id' => $team->team_id,
                     'station_id' => $stationId,
                     'status' => 'en-route',
                     'team_status_updated' => true,
+                    'response_unit_id' => $responseUnit?->incident_response_unit_id,
                     'created_at' => optional($lockedIncident->created_at)->toISOString(),
                 ];
             }
@@ -139,24 +150,6 @@ class IncidentAutoAssignmentService
             ->values();
     }
 
-    private function findAvailableTeamForStation(int $stationId): ?Team
-    {
-        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('station_officer_id')
-            ->filter()
-            ->values();
-
-        if ($stationOfficerIds->isEmpty()) {
-            return null;
-        }
-
-        return Team::where('status', 'available')
-            ->whereIn('team_leader', $stationOfficerIds->all())
-            ->lockForUpdate()
-            ->orderBy('team_id')
-            ->first();
-    }
-
     private function getCandidateStationsForIncident(Incident $incident, float $lat, float $lng)
     {
         $stationLimit = strtolower((string) ($incident->marker?->category ?? '')) === 'fire' ? 3 : 1;
@@ -189,28 +182,4 @@ class IncidentAutoAssignmentService
             ->values();
     }
 
-    private function markTeamResponding(Team $team): void
-    {
-        $team->status = 'responding';
-        $team->updated_at = now();
-        $team->save();
-
-        $teamMemberStationOfficerIds = collect([
-            $team->commander_driver,
-            $team->pumper,
-            $team->team_leader,
-            $team->firefighter_officer_1,
-            $team->firefighter_officer_2,
-            $team->firefighter_officer_3,
-            $team->rescue_radio,
-        ])->filter()->unique()->values();
-
-        if ($teamMemberStationOfficerIds->isNotEmpty()) {
-            StationOfficer::whereIn('station_officer_id', $teamMemberStationOfficerIds->all())
-                ->update([
-                    'status' => 'dispatched',
-                    'updated_at' => now(),
-                ]);
-        }
-    }
 }

@@ -1107,6 +1107,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     data-barangay-name="{{ $barangay?->barangay_name ?? '' }}"
                     data-mini-map-pins='@json($miniMapPins ?? [])'
                     data-marker-feed-url="{{ route('map.markers.feed') }}"
+                    data-barangay-boundaries='@json($barangayBoundaryCollection ?? [])'
+                    data-current-barangay-id="{{ $currentBarangayId ?? '' }}"
                 ></div>
                 <div class="two-col" style="margin-top:16px;">
                     <div>

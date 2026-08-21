@@ -215,6 +215,13 @@ class IncidentController extends Controller
 
     private function syncTeamAndStationOfficerStatuses(Incident $incident, int $statusId): void
     {
+        $resourceDispatch = app(\App\Services\IncidentResourceDispatchService::class);
+        if ($statusId === self::STATUS_ON_SCENE) {
+            $resourceDispatch->markIncidentUnitsOnScene($incident);
+        } elseif (in_array($statusId, [self::STATUS_CONTROLLED, self::STATUS_CLOSED], true)) {
+            $resourceDispatch->releaseIncidentUnits($incident);
+        }
+
         if (!$incident->team_id) {
             return;
         }
@@ -251,6 +258,11 @@ class IncidentController extends Controller
             'status' => $teamStatus,
             'updated_at' => now()
         ]);
+
+        if (in_array($statusId, [self::STATUS_CONTROLLED, self::STATUS_CLOSED], true) && $team->roster_managed) {
+            app(\App\Services\DutyRosterService::class)->syncTeam($team->fresh());
+            $team->refresh();
+        }
 
         $teamMemberStationOfficerIds = $this->getTeamMemberStationOfficerIds($team);
         if ($stationOfficerStatus && $teamMemberStationOfficerIds->isNotEmpty()) {

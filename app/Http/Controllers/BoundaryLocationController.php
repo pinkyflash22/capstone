@@ -9,13 +9,14 @@ use App\Models\City;
 use App\Models\Station;
 use App\Models\StationOfficer;
 use App\Services\BoundaryMatcherService;
+use App\Services\BoundaryManagementScope;
 use App\Services\GeoapifyBoundaryService;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BoundaryLocationController extends Controller
 {
@@ -27,7 +28,7 @@ class BoundaryLocationController extends Controller
             'station_id' => ['nullable', 'exists:stations,station_id'],
         ]);
 
-        $cacheKey = 'map:shapes:index:' . md5(json_encode($validated));
+        $cacheKey = 'map:shapes:index:' . BoundaryLocation::mapCacheVersion() . ':' . md5(json_encode($validated));
 
         $shapes = Cache::remember($cacheKey, now()->addMinutes(3), function () use ($validated) {
             return BoundaryLocation::query()
@@ -46,7 +47,17 @@ class BoundaryLocationController extends Controller
                 ->all();
         });
 
-        return response()->json($shapes);
+        return response()->json($shapes)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
+    public function latest(): JsonResponse
+    {
+        return response()->json([
+            'signature' => BoundaryLocation::mapCacheVersion(),
+            'count' => BoundaryLocation::query()->count(),
+            'updated_at' => BoundaryLocation::query()->max('updated_at'),
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function create()
@@ -56,15 +67,21 @@ class BoundaryLocationController extends Controller
         return view('admin.boundaries.create', compact('stations'));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
         $validated = $this->validateBoundaryPayload($request);
+        $payload = $this->normalizeBoundaryPayload($validated);
+        $barangayId = $this->requiredBarangayId($payload);
+        $payload['station_id'] = $scope->stationForBarangay($user, $barangayId);
+        $this->assertNoCompetingBoundary($scope, $user, $barangayId);
 
-        $shape = BoundaryLocation::create($this->normalizeBoundaryPayload($validated));
+        $shape = BoundaryLocation::create($payload);
 
         return response()->json([
             'success' => true,
             'shape' => $this->serializeBoundary($shape->fresh(['station', 'barangay.city'])),
+            'boundary_version' => BoundaryLocation::mapCacheVersion(),
         ], 201);
     }
 
@@ -82,27 +99,43 @@ class BoundaryLocationController extends Controller
         return view('admin.boundaries.edit', compact('boundary', 'stations'));
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, int $id, BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
         $boundary = BoundaryLocation::query()->findOrFail($id);
+        $scope->stationForBoundary($user, $boundary);
         $validated = $this->validateBoundaryPayload($request, true);
+        $payload = $this->normalizeBoundaryPayload($validated, $boundary);
+        $barangayId = (int) ($payload['barangay_id'] ?? $boundary->barangay_id);
+        $payload['station_id'] = $scope->stationForBarangay(
+            $user,
+            $barangayId,
+            $barangayId === (int) $boundary->barangay_id && $boundary->station_id
+                ? (int) $boundary->station_id
+                : null,
+        );
+        $this->assertNoCompetingBoundary($scope, $user, $barangayId, (int) $boundary->getKey());
 
-        $boundary->update($this->normalizeBoundaryPayload($validated, $boundary));
+        $boundary->update($payload);
 
         return response()->json([
             'success' => true,
             'shape' => $this->serializeBoundary($boundary->fresh(['station', 'barangay.city'])),
+            'boundary_version' => BoundaryLocation::mapCacheVersion(),
         ]);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id, BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
         $shape = BoundaryLocation::query()->findOrFail($id);
+        $scope->stationForBoundary($user, $shape);
         $shape->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Shape deleted',
+            'boundary_version' => BoundaryLocation::mapCacheVersion(),
         ]);
     }
 
@@ -111,10 +144,14 @@ class BoundaryLocationController extends Controller
         return $this->index(request());
     }
 
-    public function cityOptions(): JsonResponse
+    public function cityOptions(BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
+        $coveredBarangayIds = $scope->coveredBarangayIds($user);
+
         $cities = City::query()
             ->with('province')
+            ->whereHas('barangays', fn ($query) => $query->whereIn('barangay_id', $coveredBarangayIds->all()))
             ->orderBy('city_name')
             ->get()
             ->map(function (City $city) {
@@ -130,11 +167,12 @@ class BoundaryLocationController extends Controller
         return response()->json($cities);
     }
 
-    public function editorContext(): JsonResponse
+    public function editorContext(BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
         $stationOfficer = StationOfficer::query()
             ->with(['station.address.barangay.city'])
-            ->where('user_id', Auth::user()?->user_id)
+            ->where('user_id', $user->getKey())
             ->first();
 
         $city = $stationOfficer?->station?->address?->barangay?->city;
@@ -148,8 +186,10 @@ class BoundaryLocationController extends Controller
         ]);
     }
 
-    public function availableBarangays(int $cityId): JsonResponse
+    public function availableBarangays(int $cityId, BoundaryManagementScope $scope): JsonResponse
     {
+        $user = $scope->assertManager(Auth::user());
+        $coveredBarangayIds = $scope->coveredBarangayIds($user);
         $existingBoundaryBarangayIds = BoundaryLocation::query()
             ->where('boundary_type', 'barangay')
             ->whereNotNull('barangay_id')
@@ -159,6 +199,7 @@ class BoundaryLocationController extends Controller
 
         $barangays = Barangay::query()
             ->where('city_id', $cityId)
+            ->whereIn('barangay_id', $coveredBarangayIds->all())
             ->when(
                 $existingBoundaryBarangayIds->isNotEmpty(),
                 fn ($query) => $query->whereNotIn('barangay_id', $existingBoundaryBarangayIds->all())
@@ -172,9 +213,17 @@ class BoundaryLocationController extends Controller
     public function importBarangayBoundary(
         Request $request,
         int $barangayId,
-        GeoapifyBoundaryService $geoapifyBoundaryService
+        GeoapifyBoundaryService $geoapifyBoundaryService,
+        BoundaryManagementScope $scope,
     ): JsonResponse {
-        $this->authorizeBoundarySync();
+        $user = $scope->assertManager(Auth::user());
+        $existingBoundary = BoundaryLocation::query()
+            ->where('barangay_id', $barangayId)
+            ->where('boundary_type', 'barangay')
+            ->first();
+        $stationId = $existingBoundary
+            ? $scope->stationForBoundary($user, $existingBoundary)
+            : $scope->stationForBarangay($user, $barangayId);
 
         $request->validate([
             'geometry' => ['nullable', Rule::in(['geometry_1000', 'geometry_5000', 'geometry_10000'])],
@@ -183,7 +232,7 @@ class BoundaryLocationController extends Controller
         try {
             $boundary = $geoapifyBoundaryService->syncBarangayBoundary(
                 $barangayId,
-                null,
+                $stationId,
                 Auth::id(),
                 (string) $request->input('geometry', config('services.geoapify.boundary_geometry', 'geometry_1000')),
                 true,
@@ -199,6 +248,7 @@ class BoundaryLocationController extends Controller
             'success' => true,
             'message' => 'Barangay boundary imported successfully.',
             'shape' => $this->serializeBoundary($boundary->fresh(['station', 'barangay.city'])),
+            'boundary_version' => BoundaryLocation::mapCacheVersion(),
         ]);
     }
 
@@ -333,13 +383,37 @@ class BoundaryLocationController extends Controller
         ];
     }
 
-    protected function authorizeBoundarySync(): void
+    protected function requiredBarangayId(array $payload): int
     {
-        $user = Auth::user();
-        $role = strtolower(trim((string) ($user?->role->role ?? '')));
-
-        if (! in_array($role, ['admin', 'chief', 'station admin'], true)) {
-            throw new AuthorizationException('You are not allowed to sync barangay boundaries.');
+        if (empty($payload['barangay_id'])) {
+            throw ValidationException::withMessages([
+                'barangay_id' => 'Select a barangay so station coverage can be verified.',
+            ]);
         }
+
+        return (int) $payload['barangay_id'];
+    }
+
+    protected function assertNoCompetingBoundary(
+        BoundaryManagementScope $scope,
+        \App\Models\User $user,
+        int $barangayId,
+        ?int $exceptBoundaryId = null,
+    ): void {
+        $existing = BoundaryLocation::query()
+            ->where('barangay_id', $barangayId)
+            ->when($exceptBoundaryId, fn ($query) => $query->whereKeyNot($exceptBoundaryId))
+            ->first();
+
+        if (! $existing) {
+            return;
+        }
+
+        // Produces a 403 when the existing record belongs to another station.
+        $scope->stationForBoundary($user, $existing);
+
+        throw ValidationException::withMessages([
+            'barangay_id' => 'This barangay already has a boundary. Edit the existing polygon instead.',
+        ]);
     }
 }

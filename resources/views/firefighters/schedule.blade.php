@@ -118,6 +118,7 @@
         }
 
         .schedule-dot.official { background: #c63d26; }
+        .schedule-dot.duty { background: #2563eb; }
         .schedule-dot.personal { background: #16a34a; }
 
         .schedule-dot-row {
@@ -313,6 +314,7 @@
         .calendar-event-pill.inspection { background: #ecfeff; color: #0f766e; }
         .calendar-event-pill.command { background: #fef3c7; color: #92400e; }
         .calendar-event-pill.logistics { background: #f1f5f9; color: #334155; }
+        .calendar-event-pill.duty { background: #dbeafe; color: #1d4ed8; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18); }
         .calendar-event-pill.personal-event {
             box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.16);
         }
@@ -417,6 +419,7 @@
         .agenda-type.inspection { background: #ecfeff; color: #0f766e; }
         .agenda-type.command { background: #fef3c7; color: #92400e; }
         .agenda-type.logistics { background: #f1f5f9; color: #334155; }
+        .agenda-type.duty { background: #dbeafe; color: #1d4ed8; }
 
         .source-chip.official {
             background: #fff7ed;
@@ -427,6 +430,12 @@
             background: #ecfdf5;
             color: #166534;
         }
+
+        .source-chip.duty { background: #dbeafe; color: #1d4ed8; }
+        .agenda-event.duty { border-color: rgba(37, 99, 235, 0.25); background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%); }
+        .duty-detail-row { display: flex; flex-wrap: wrap; gap: 7px; }
+        .duty-detail-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: .7rem; font-weight: 800; }
+        .duty-detail-chip.alert { background: #fff1f2; color: #be123c; }
 
         .agenda-event h5 {
             margin: 0;
@@ -909,6 +918,10 @@
                         <div class="schedule-summary-value" id="scheduleOfficialCount">--</div>
                     </div>
                     <div class="schedule-summary-card">
+                        <div class="schedule-summary-label">Duty Shifts</div>
+                        <div class="schedule-summary-value" id="scheduleDutyCount">--</div>
+                    </div>
+                    <div class="schedule-summary-card">
                         <div class="schedule-summary-label">Personal</div>
                         <div class="schedule-summary-value" id="schedulePersonalCount">--</div>
                     </div>
@@ -934,6 +947,7 @@
 
                         <div class="schedule-legend" aria-label="Schedule legend">
                             <span><i class="schedule-dot official" aria-hidden="true"></i> Official</span>
+                            <span><i class="schedule-dot duty" aria-hidden="true"></i> Duty Shift</span>
                             <span><i class="schedule-dot personal" aria-hidden="true"></i> Personal</span>
                         </div>
                     </div>
@@ -1070,6 +1084,7 @@
             const monthLabel = document.getElementById('calendarMonthLabel');
             const monthSummary = document.getElementById('scheduleMonthSummary');
             const officialCount = document.getElementById('scheduleOfficialCount');
+            const dutyCount = document.getElementById('scheduleDutyCount');
             const personalCount = document.getElementById('schedulePersonalCount');
             const upcomingCount = document.getElementById('scheduleUpcomingCount');
             const grid = document.getElementById('firefighterScheduleCalendarGrid');
@@ -1370,13 +1385,14 @@
 
             function getUpcomingEvents() {
                 return [...scheduleEventsData]
+                    .filter(event => event.event_date >= getTodayKey())
                     .sort((a, b) => `${a.event_date} ${a.start_time}`.localeCompare(`${b.event_date} ${b.start_time}`))
                     .slice(0, 6);
             }
 
             function buildAgendaCard(event) {
                 return `
-                    <article class="agenda-event">
+                    <article class="agenda-event ${event.source_type === 'duty' ? 'duty' : ''}">
                         <div class="agenda-meta">
                             <div class="agenda-time">${event.schedule || `${event.start_time} - ${event.end_time}`}</div>
                             <div class="agenda-chip-row">
@@ -1386,6 +1402,7 @@
                         </div>
                         <h5>${event.event}</h5>
                         <p><i class="fa-regular fa-location-dot"></i> ${event.barangay || stationName}</p>
+                        ${event.source_type === 'duty' ? `<div class="duty-detail-row"><span class="duty-detail-chip"><i class="fa-solid fa-people-group"></i> Team ${event.team_id}</span><span class="duty-detail-chip"><i class="fa-solid fa-user-shield"></i> ${event.duty_role_label}</span><span class="duty-detail-chip${event.availability_type ? ' alert' : ''}"><i class="fa-solid ${event.availability_type ? 'fa-calendar-xmark' : 'fa-circle-check'}"></i> ${event.status_label}</span>${event.is_recurring ? '<span class="duty-detail-chip"><i class="fa-solid fa-repeat"></i> Weekly</span>' : ''}</div>` : ''}
                         ${event.notes ? `<p>${event.notes}</p>` : ''}
                         ${event.can_edit || event.can_delete ? `
                             <div class="agenda-actions">
@@ -1401,11 +1418,12 @@
                 const selectedDate = new Date(`${state.selectedDateKey}T00:00:00`);
                 const events = getEventsForDate(state.selectedDateKey);
                 const officialCount = events.filter(event => event.source_type === 'official').length;
+                const dutyCountForDay = events.filter(event => event.source_type === 'duty').length;
                 const personalCountForDay = events.filter(event => event.source_type === 'personal').length;
 
                 selectedDayLabel.textContent = formatLongDate(selectedDate);
                 selectedDaySummary.textContent = events.length
-                    ? `${officialCount} official · ${personalCountForDay} personal`
+                    ? `${dutyCountForDay} duty · ${officialCount} official · ${personalCountForDay} personal`
                     : 'Nothing is scheduled for this day.';
 
                 if (!events.length) {
@@ -1448,6 +1466,7 @@
                 `;
 
                 officialCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'official').length);
+                dutyCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'duty').length);
                 personalCount.textContent = String(scheduleEventsData.filter(event => event.source_type === 'personal').length);
                 upcomingCount.textContent = String(upcoming.length);
             }
@@ -1470,6 +1489,7 @@
                     const dateKey = formatDateKey(cellDate);
                     const events = getEventsForDate(dateKey);
                     const officialEvents = events.filter(event => event.source_type === 'official');
+                    const dutyEvents = events.filter(event => event.source_type === 'duty');
                     const personalEvents = events.filter(event => event.source_type === 'personal');
                     const isCurrentMonth = cellDate.getMonth() === month;
                     const isToday = dateKey === todayKey;
@@ -1491,6 +1511,7 @@
                         </div>
                         <div class="calendar-event-stack">
                             ${officialEvents.length ? `<span class="calendar-event-pill operations" title="${officialEvents.length} official schedule">${officialEvents.length > 1 ? officialEvents.length + ' official' : 'Official'}</span>` : ''}
+                            ${dutyEvents.length ? `<span class="calendar-event-pill duty" title="${dutyEvents.length} assigned duty shift">${dutyEvents.length > 1 ? dutyEvents.length + ' duties' : 'Duty Shift'}</span>` : ''}
                             ${personalEvents.length ? `<span class="calendar-event-pill personal-event" title="${personalEvents.length} personal schedule">${personalEvents.length > 1 ? personalEvents.length + ' personal' : 'Personal'}</span>` : ''}
                         </div>
                     `;

@@ -9,6 +9,7 @@ use App\Models\StationBarangayCoverage;
 use App\Models\StationOfficer;
 use App\Models\User;
 use App\Models\VoiceCall;
+use App\Models\VoiceResponderPresence;
 use App\Services\AgoraTokenService;
 use App\Support\IncidentContextDispatcher;
 use App\Support\UserActivityLogger;
@@ -94,7 +95,9 @@ class VoiceCallController extends Controller
 
         $call = VoiceCall::create([
             'channel_name' => 'pyro_' . $user->user_id . '_' . now()->format('YmdHis') . '_' . Str::lower(Str::random(10)),
+            'direction' => VoiceCall::DIRECTION_INBOUND,
             'caller_id' => $user->user_id,
+            'initiated_by' => $user->user_id,
             'station_id' => $this->resolveStationIdForCaller($user, $request),
             'incident_id' => $data['incident_id'] ?? null,
             'caller_latitude' => $data['caller_latitude'] ?? null,
@@ -121,6 +124,8 @@ class VoiceCallController extends Controller
         $this->releaseSessionLock($request);
 
         try {
+            $this->touchResponderPresence($user);
+            $this->distributeWaitingCalls($user);
             $this->expireStaleCalls($request);
 
             return response()->json($this->responderPayload($user));
@@ -153,6 +158,8 @@ class VoiceCallController extends Controller
                 }
 
                 try {
+                    $this->touchResponderPresence($user);
+                    $this->distributeWaitingCalls($user);
                     $this->expireStaleCalls($request);
                     $payload = $this->responderPayload($user);
                 } catch (\Throwable $error) {
@@ -209,25 +216,23 @@ class VoiceCallController extends Controller
         $this->releaseSessionLock($request);
 
         $acceptedCall = DB::transaction(function () use ($voiceCall, $user) {
-            $lockedAdminCall = VoiceCall::query()
-                ->where('assigned_admin_id', $user->user_id)
-                ->where('status', VoiceCall::STATUS_ANSWERED)
-                ->whereNull('ended_at')
-                ->lockForUpdate()
-                ->first();
-
-            if ($lockedAdminCall) {
-                abort(response()->json([
-                    'success' => false,
-                    'message' => 'End your active call before accepting another.',
-                    'call' => $this->serializeCall($lockedAdminCall->load($this->callRelations()), $user),
-                ], 409));
-            }
-
             $call = VoiceCall::query()->whereKey($voiceCall->id)->lockForUpdate()->firstOrFail();
             $this->authorizeResponderForCall($call, $user);
 
-            if (! in_array($call->status, [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED], true) || $call->assigned_admin_id) {
+            if ($call->status === VoiceCall::STATUS_ANSWERED && (int) $call->assigned_admin_id === (int) $user->user_id) {
+                return $call->load($this->callRelations());
+            }
+
+            $activeCount = $this->occupiedResponderCallCount($user);
+            if ($activeCount >= $this->maxConcurrentResponderCalls()) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => 'Your concurrent call limit has been reached. End one call before answering another.',
+                ], 409));
+            }
+
+            if (! in_array($call->status, [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED], true)
+                || ($call->assigned_admin_id && (int) $call->assigned_admin_id !== (int) $user->user_id)) {
                 abort(response()->json([
                     'success' => false,
                     'message' => 'This call is no longer available.',
@@ -240,16 +245,9 @@ class VoiceCallController extends Controller
                 'station_id' => $call->station_id ?: $this->adminStationId($user),
                 'status' => VoiceCall::STATUS_ANSWERED,
                 'answered_at' => now(),
+                'held_at' => null,
+                'held_by' => null,
             ])->save();
-
-            VoiceCall::query()
-                ->whereKeyNot($call->id)
-                ->where('station_id', $call->station_id)
-                ->where('status', VoiceCall::STATUS_RINGING)
-                ->update([
-                    'status' => VoiceCall::STATUS_QUEUED,
-                    'updated_at' => now(),
-                ]);
 
             return $call->load($this->callRelations());
         });
@@ -261,6 +259,155 @@ class VoiceCallController extends Controller
             'call' => $this->serializeCall($acceptedCall, $user),
             'agora' => $agora->rtcToken($acceptedCall->channel_name, (int) $user->user_id),
         ]);
+    }
+
+    public function callback(Request $request, AgoraTokenService $agora): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isStationResponder($user), 403);
+        $this->releaseSessionLock($request);
+
+        $data = $request->validate([
+            'citizen_user_id' => ['required', 'integer', 'exists:users,user_id'],
+            'callback_of' => ['nullable', 'integer', 'exists:voice_calls,id'],
+        ]);
+        $stationId = $this->adminStationId($user);
+        abort_unless($stationId, 422, 'Your account is not assigned to a station.');
+
+        $citizen = User::query()->with('role')->findOrFail((int) $data['citizen_user_id']);
+        abort_unless(Str::lower((string) $citizen->role?->role) === 'citizen', 422, 'Only registered citizens can receive station callbacks.');
+
+        $priorCall = VoiceCall::query()
+            ->where('caller_id', $citizen->user_id)
+            ->where('station_id', $stationId)
+            ->where(function ($query) {
+                $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
+            })
+            ->whereIn('status', VoiceCall::TERMINAL_STATUSES)
+            ->when(! empty($data['callback_of']), fn ($query) => $query->whereKey((int) $data['callback_of']))
+            ->latest('created_at')
+            ->first();
+        abort_unless($priorCall, 403, 'This citizen has not previously contacted your station.');
+
+        $call = DB::transaction(function () use ($user, $citizen, $stationId, $priorCall) {
+            $existing = VoiceCall::query()
+                ->where('direction', VoiceCall::DIRECTION_OUTBOUND)
+                ->where('caller_id', $citizen->user_id)
+                ->where('assigned_admin_id', $user->user_id)
+                ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_ANSWERED])
+                ->whereNull('ended_at')
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                return $existing->load($this->callRelations());
+            }
+
+            if ($this->occupiedResponderCallCount($user) >= $this->maxConcurrentResponderCalls()) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => 'Your concurrent call limit has been reached.',
+                ], 409));
+            }
+
+            return VoiceCall::create([
+                'channel_name' => 'callback_' . $citizen->user_id . '_' . now()->format('YmdHis') . '_' . Str::lower(Str::random(10)),
+                'direction' => VoiceCall::DIRECTION_OUTBOUND,
+                'caller_id' => $citizen->user_id,
+                'initiated_by' => $user->user_id,
+                'callback_of' => $priorCall->id,
+                'assigned_admin_id' => $user->user_id,
+                'station_id' => $stationId,
+                'status' => VoiceCall::STATUS_RINGING,
+                'queued_at' => now(),
+            ])->load($this->callRelations());
+        });
+
+        $this->logCallForParticipants($call, $request, 'received callback from station', 'called citizen back');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Calling citizen ' . $citizen->user_id . '.',
+            'call' => $this->serializeCall($call, $user),
+            'agora' => $agora->rtcToken($call->channel_name, (int) $user->user_id),
+        ], 201);
+    }
+
+    public function incomingCallback(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isCaller($user), 403);
+        $this->releaseSessionLock($request);
+        $this->expireStaleCalls($request);
+
+        $call = VoiceCall::query()
+            ->with($this->callRelations())
+            ->where('direction', VoiceCall::DIRECTION_OUTBOUND)
+            ->where('caller_id', $user->user_id)
+            ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_ANSWERED])
+            ->whereNull('ended_at')
+            ->latest('created_at')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'callback' => $call ? $this->serializeCall($call, $user) : null,
+        ]);
+    }
+
+    public function acceptCallback(Request $request, VoiceCall $voiceCall, AgoraTokenService $agora): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isCaller($user), 403);
+        $this->releaseSessionLock($request);
+
+        $call = DB::transaction(function () use ($voiceCall, $user) {
+            $call = VoiceCall::query()->whereKey($voiceCall->id)->lockForUpdate()->firstOrFail();
+            abort_unless($call->direction === VoiceCall::DIRECTION_OUTBOUND, 403);
+            abort_unless((int) $call->caller_id === (int) $user->user_id, 403);
+            abort_unless(in_array($call->status, [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_ANSWERED], true), 409, 'This callback is no longer available.');
+
+            if ($call->status !== VoiceCall::STATUS_ANSWERED) {
+                $call->forceFill(['status' => VoiceCall::STATUS_ANSWERED, 'answered_at' => now()])->save();
+            }
+
+            return $call->load($this->callRelations());
+        });
+
+        return response()->json([
+            'success' => true,
+            'call' => $this->serializeCall($call, $user),
+            'agora' => $agora->rtcToken($call->channel_name, (int) $user->user_id),
+        ]);
+    }
+
+    public function rejectCallback(Request $request, VoiceCall $voiceCall): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isCaller($user), 403);
+
+        $call = DB::transaction(function () use ($voiceCall, $user) {
+            $call = VoiceCall::query()->whereKey($voiceCall->id)->lockForUpdate()->firstOrFail();
+            abort_unless($call->direction === VoiceCall::DIRECTION_OUTBOUND, 403);
+            abort_unless((int) $call->caller_id === (int) $user->user_id, 403);
+            if ($call->status === VoiceCall::STATUS_RINGING) {
+                $call->forceFill(['status' => VoiceCall::STATUS_REJECTED, 'ended_at' => now()])->save();
+            }
+
+            return $call->load($this->callRelations());
+        });
+
+        return response()->json(['success' => true, 'call' => $this->serializeCall($call, $user)]);
+    }
+
+    public function hold(Request $request, VoiceCall $voiceCall): JsonResponse
+    {
+        return $this->setHoldState($request, $voiceCall, true);
+    }
+
+    public function resume(Request $request, VoiceCall $voiceCall): JsonResponse
+    {
+        return $this->setHoldState($request, $voiceCall, false);
     }
 
     public function reject(Request $request, VoiceCall $voiceCall): JsonResponse
@@ -302,6 +449,8 @@ class VoiceCallController extends Controller
                 $call->forceFill([
                     'status' => VoiceCall::STATUS_ENDED,
                     'ended_at' => now(),
+                    'held_at' => null,
+                    'held_by' => null,
                 ])->save();
             }
 
@@ -325,7 +474,10 @@ class VoiceCallController extends Controller
         $this->releaseSessionLock($request);
         $voiceCall->load(['caller', 'assignedAdmin']);
 
-        abort_unless($voiceCall->status === VoiceCall::STATUS_ANSWERED, 403);
+        $responderWaitingOnCallback = $voiceCall->direction === VoiceCall::DIRECTION_OUTBOUND
+            && $voiceCall->status === VoiceCall::STATUS_RINGING
+            && (int) $voiceCall->assigned_admin_id === (int) $user->user_id;
+        abort_unless($voiceCall->status === VoiceCall::STATUS_ANSWERED || $responderWaitingOnCallback, 403);
         abort_unless((int) $voiceCall->caller_id === (int) $user->user_id || (int) $voiceCall->assigned_admin_id === (int) $user->user_id, 403);
 
         return response()->json([
@@ -470,6 +622,9 @@ class VoiceCallController extends Controller
         return [
             'id' => $call->id,
             'channel_name' => $call->channel_name,
+            'direction' => $call->direction ?: VoiceCall::DIRECTION_INBOUND,
+            'is_callback' => $call->direction === VoiceCall::DIRECTION_OUTBOUND,
+            'callback_of' => $call->callback_of,
             'status' => $call->status,
             'caller_id' => $call->caller_id,
             'assigned_admin_id' => $call->assigned_admin_id,
@@ -505,8 +660,18 @@ class VoiceCallController extends Controller
             'queued_at' => $call->queued_at?->toIso8601String(),
             'answered_at' => $call->answered_at?->toIso8601String(),
             'ended_at' => $call->ended_at?->toIso8601String(),
+            'held_at' => $call->held_at?->toIso8601String(),
+            'is_on_hold' => filled($call->held_at),
             'ringing_seconds' => max(0, now()->diffInSeconds($createdAt, true)),
-            'can_accept' => $viewer && $this->isStationResponder($viewer) && ! $this->activeCallForAdmin($viewer),
+            'can_accept' => $viewer
+                && $this->isStationResponder($viewer)
+                && $call->direction !== VoiceCall::DIRECTION_OUTBOUND
+                && $this->occupiedResponderCallCount($viewer) < $this->maxConcurrentResponderCalls(),
+            'can_callback' => $viewer
+                && $this->isStationResponder($viewer)
+                && ! $anonymousCaller
+                && $call->direction !== VoiceCall::DIRECTION_OUTBOUND
+                && in_array($call->status, VoiceCall::TERMINAL_STATUSES, true),
         ];
     }
 
@@ -527,11 +692,14 @@ class VoiceCallController extends Controller
             ->get();
 
         foreach ($staleRingingCalls as $staleCall) {
-            $staleCall->forceFill([
-                'status' => VoiceCall::STATUS_MISSED,
-                'ended_at' => now(),
-            ])->save();
-            $this->logCallForParticipants($staleCall, $request, 'voice call missed', 'citizen voice call missed');
+            $expired = VoiceCall::query()
+                ->whereKey($staleCall->id)
+                ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED])
+                ->whereNull('answered_at')
+                ->update(['status' => VoiceCall::STATUS_MISSED, 'ended_at' => now(), 'updated_at' => now()]);
+            if ($expired) {
+                $this->logCallForParticipants($staleCall->refresh(), $request, 'voice call missed', 'citizen voice call missed');
+            }
         }
 
         $staleAnsweredCalls = VoiceCall::query()
@@ -543,18 +711,26 @@ class VoiceCallController extends Controller
             ->get();
 
         foreach ($staleAnsweredCalls as $staleCall) {
-            $staleCall->forceFill([
-                'status' => VoiceCall::STATUS_ENDED,
-                'ended_at' => now(),
-            ])->save();
-            $this->logCallForParticipants($staleCall, $request, 'voice call auto-ended after timeout', 'voice call auto-ended after timeout');
+            $expired = VoiceCall::query()
+                ->whereKey($staleCall->id)
+                ->where('status', VoiceCall::STATUS_ANSWERED)
+                ->whereNull('ended_at')
+                ->update(['status' => VoiceCall::STATUS_ENDED, 'ended_at' => now(), 'updated_at' => now()]);
+            if ($expired) {
+                $this->logCallForParticipants($staleCall->refresh(), $request, 'voice call auto-ended after timeout', 'voice call auto-ended after timeout');
+            }
         }
     }
 
     private function activeCallForAdmin(User $user): ?VoiceCall
     {
+        return $this->activeCallsForAdmin($user)->first();
+    }
+
+    private function activeCallsForAdmin(User $user)
+    {
         if (! $this->voiceCallsStorageReady()) {
-            return null;
+            return collect();
         }
 
         return VoiceCall::query()
@@ -563,7 +739,7 @@ class VoiceCallController extends Controller
             ->where('status', VoiceCall::STATUS_ANSWERED)
             ->whereNull('ended_at')
             ->latest('answered_at')
-            ->first();
+            ->get();
     }
 
     private function responderPayload(User $user): array
@@ -581,22 +757,32 @@ class VoiceCallController extends Controller
         }
 
         $stationId = $this->adminStationId($user);
-        $activeCall = $this->activeCallForAdmin($user);
+        $activeCalls = $this->activeCallsForAdmin($user);
 
         $incoming = VoiceCall::query()
             ->with($this->callRelations())
             ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED])
+            ->where(function ($query) {
+                $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
+            })
+            ->where(function ($query) use ($user) {
+                $query->whereNull('assigned_admin_id')->orWhere('assigned_admin_id', $user->user_id);
+            })
             ->when($stationId, fn ($query) => $query->where(function ($inner) use ($stationId) {
                 $inner->where('station_id', $stationId)->orWhereNull('station_id');
             }))
             ->orderBy('created_at')
             ->limit(12)
-            ->get()
-            ->each(function (VoiceCall $call) use ($activeCall) {
-                if ($activeCall && $call->status === VoiceCall::STATUS_RINGING) {
-                    $call->forceFill(['status' => VoiceCall::STATUS_QUEUED]);
-                }
-            });
+            ->get();
+
+        $outgoingCallbacks = VoiceCall::query()
+            ->with($this->callRelations())
+            ->where('direction', VoiceCall::DIRECTION_OUTBOUND)
+            ->where('assigned_admin_id', $user->user_id)
+            ->where('status', VoiceCall::STATUS_RINGING)
+            ->whereNull('ended_at')
+            ->latest('created_at')
+            ->get();
 
         $missedCalls = VoiceCall::query()
             ->with($this->callRelations())
@@ -608,11 +794,27 @@ class VoiceCallController extends Controller
             ->limit(8)
             ->get();
 
+        $recentContacts = VoiceCall::query()
+            ->with($this->callRelations())
+            ->whereIn('status', [VoiceCall::STATUS_ENDED, VoiceCall::STATUS_REJECTED])
+            ->where(function ($query) {
+                $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
+            })
+            ->when($stationId, fn ($query) => $query->where(function ($inner) use ($stationId) {
+                $inner->where('station_id', $stationId)->orWhereNull('station_id');
+            }))
+            ->latest('ended_at')
+            ->limit(8)
+            ->get();
+
         return [
             'success' => true,
-            'active_call' => $activeCall ? $this->serializeCall($activeCall->load($this->callRelations()), $user) : null,
+            'active_call' => $activeCalls->first() ? $this->serializeCall($activeCalls->first(), $user) : null,
+            'active_calls' => $activeCalls->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
+            'outgoing_calls' => $outgoingCallbacks->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
             'incoming_calls' => $incoming->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
             'missed_calls' => $missedCalls->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
+            'recent_contacts' => $recentContacts->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
             'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
             'server_time' => now()->toIso8601String(),
         ];
@@ -702,7 +904,135 @@ class VoiceCallController extends Controller
 
     private function callRelations(): array
     {
-        return ['caller', 'assignedAdmin', 'station', 'incident', 'createdIncident.marker', 'flaggedBy'];
+        return ['caller', 'assignedAdmin', 'initiatedBy', 'station', 'incident', 'createdIncident.marker', 'flaggedBy'];
+    }
+
+    private function maxConcurrentResponderCalls(): int
+    {
+        return max(1, min(8, (int) config('services.voice_calls.max_concurrent_responder_calls', 4)));
+    }
+
+    private function setHoldState(Request $request, VoiceCall $voiceCall, bool $held): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isStationResponder($user), 403);
+
+        $call = DB::transaction(function () use ($voiceCall, $user, $held) {
+            $call = VoiceCall::query()->whereKey($voiceCall->id)->lockForUpdate()->firstOrFail();
+            abort_unless($call->status === VoiceCall::STATUS_ANSWERED, 409, 'Only connected calls can be placed on hold.');
+            abort_unless((int) $call->assigned_admin_id === (int) $user->user_id, 403);
+            $call->forceFill([
+                'held_at' => $held ? ($call->held_at ?: now()) : null,
+                'held_by' => $held ? $user->user_id : null,
+            ])->save();
+
+            return $call->load($this->callRelations());
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => $held ? 'Call placed on hold.' : 'Call resumed.',
+            'call' => $this->serializeCall($call, $user),
+        ]);
+    }
+
+    private function touchResponderPresence(User $user): void
+    {
+        $stationId = $this->adminStationId($user);
+        if (! $stationId || ! Schema::hasTable('voice_responder_presence')) {
+            return;
+        }
+
+        VoiceResponderPresence::query()->updateOrCreate(
+            ['user_id' => $user->user_id],
+            [
+                'station_id' => $stationId,
+                'active_call_count' => $this->responderWorkloadCount($user),
+                'last_seen_at' => now(),
+            ]
+        );
+    }
+
+    private function distributeWaitingCalls(User $viewer): void
+    {
+        $stationId = $this->adminStationId($viewer);
+        if (! $stationId || ! Schema::hasTable('voice_responder_presence')) {
+            return;
+        }
+
+        $online = VoiceResponderPresence::query()
+            ->where('station_id', $stationId)
+            ->where('last_seen_at', '>=', now()->subSeconds(15))
+            ->orderBy('active_call_count')
+            ->orderBy('last_seen_at', 'desc')
+            ->get();
+        if ($online->isEmpty()) {
+            return;
+        }
+
+        $onlineIds = $online->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+        VoiceCall::query()
+            ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED])
+            ->where(function ($query) {
+                $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
+            })
+            ->where('station_id', $stationId)
+            ->whereNotNull('assigned_admin_id')
+            ->whereNotIn('assigned_admin_id', $onlineIds)
+            ->update(['assigned_admin_id' => null, 'updated_at' => now()]);
+
+        $waiting = VoiceCall::query()
+            ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED])
+            ->where(function ($query) {
+                $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
+            })
+            ->where(function ($query) use ($stationId) {
+                $query->where('station_id', $stationId)->orWhereNull('station_id');
+            })
+            ->whereNull('assigned_admin_id')
+            ->where('created_at', '<=', now()->subSeconds(2))
+            ->orderBy('created_at')
+            ->limit(20)
+            ->get();
+
+        foreach ($waiting as $call) {
+            $target = $online->sortBy(fn ($presence) => [(int) $presence->active_call_count, $presence->last_seen_at?->timestamp ?? 0])->first();
+            if (! $target || (int) $target->active_call_count >= $this->maxConcurrentResponderCalls()) {
+                break;
+            }
+            $claimed = VoiceCall::query()->whereKey($call->id)->whereNull('assigned_admin_id')->update([
+                'assigned_admin_id' => $target->user_id,
+                'station_id' => $stationId,
+                'updated_at' => now(),
+            ]);
+            if ($claimed) {
+                $target->active_call_count++;
+            }
+        }
+    }
+
+    private function occupiedResponderCallCount(User $user): int
+    {
+        return VoiceCall::query()
+            ->where('assigned_admin_id', $user->user_id)
+            ->whereNull('ended_at')
+            ->where(function ($query) {
+                $query->where('status', VoiceCall::STATUS_ANSWERED)
+                    ->orWhere(function ($callback) {
+                        $callback->where('direction', VoiceCall::DIRECTION_OUTBOUND)
+                            ->where('status', VoiceCall::STATUS_RINGING);
+                    });
+            })
+            ->count();
+    }
+
+    private function responderWorkloadCount(User $user): int
+    {
+        return VoiceCall::query()
+            ->where('assigned_admin_id', $user->user_id)
+            ->whereNull('ended_at')
+            ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED, VoiceCall::STATUS_ANSWERED])
+            ->count();
     }
 
     private function callerName(VoiceCall $call): string
@@ -793,7 +1123,7 @@ class VoiceCallController extends Controller
                 return false;
             }
 
-            foreach (['status', 'answered_at', 'ended_at', 'flagged_at', 'assigned_admin_id'] as $column) {
+            foreach (['status', 'answered_at', 'ended_at', 'flagged_at', 'assigned_admin_id', 'direction', 'initiated_by', 'held_at'] as $column) {
                 if (! Schema::hasColumn('voice_calls', $column)) {
                     return false;
                 }

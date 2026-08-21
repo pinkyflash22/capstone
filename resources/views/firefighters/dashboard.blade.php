@@ -1494,6 +1494,11 @@
             </div>
             <div class="map-container overflow-hidden rounded-2xl border border-slate-200">
                 <div id="firefighterDashboardMap" class="bg-gray-200" style="height: 500px;"></div>
+                <aside id="activeResponseUnitsPanel" class="ff-response-units" aria-live="polite" aria-label="Active response units">
+                    <div class="ff-response-units__head"><span><i class="fas fa-truck-fast"></i> Response Units</span><strong id="activeResponseUnitsCount">0</strong></div>
+                    <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span><button type="button" id="apparatusTrackingInstall" hidden><i class="fas fa-download"></i> Install app</button></div>
+                    <div id="activeResponseUnitsList" class="ff-response-units__list"><p>No units currently dispatched.</p></div>
+                </aside>
                 <button type="button" class="ff-mobile-map-layers-button" data-ff-mobile-map-layers-button aria-label="Open map layers">
                     <i class="fas fa-layer-group" aria-hidden="true"></i>
                     <span data-ff-mobile-map-layers-count hidden>0</span>
@@ -1993,12 +1998,12 @@
                             <span>Other marker</span>
                         </div>
                         <div class="firefighter-mobile-map-panel__legend-item">
-                            <span class="firefighter-mobile-map-panel__legend-route" aria-hidden="true"></span>
-                            <span>Route</span>
+                            <span class="firefighter-mobile-map-panel__legend-swatch firefighter-mobile-map-panel__legend-swatch-other"><i class="fas fa-location-arrow" aria-hidden="true"></i></span>
+                            <span>Navigation arrow</span>
                         </div>
                         <div class="firefighter-mobile-map-panel__legend-item">
                             <span class="firefighter-mobile-map-panel__legend-swatch"><img src="{{ asset('truck.png') }}" alt="Responding unit" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><i class="fas fa-truck-fast" aria-hidden="true" style="display:none;"></i></span>
-                            <span>Responding unit</span>
+                            <span>Dispatched apparatus</span>
                         </div>
                     </div>
                 </details>
@@ -2833,6 +2838,7 @@
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
+        let backupButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -2885,6 +2891,9 @@
         }
         
         const incidentType = getIncidentTypeLabel(incident);
+        if ([2, 3].includes(parseInt(statusId)) && String(incidentType).toLowerCase().includes('fire')) {
+            backupButton = `<button type="button" class="request-incident-backup ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}"><i class="fas fa-tower-broadcast"></i><span>Request Backup</span></button>`;
+        }
         const incidentTitle = incident.marker?.title || 'Emergency Incident';
         const lat = incident.marker?.lat;
         const lng = incident.marker?.lng;
@@ -2936,6 +2945,7 @@
                 </button>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
+                    ${backupButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -2962,6 +2972,10 @@
             const currentStatus = parseInt(btn.dataset.status);
             await respondToIncident(incidentId, currentStatus, btn);
         });
+    });
+
+    document.querySelectorAll('.request-incident-backup').forEach(btn => {
+        btn.addEventListener('click', async () => requestIncidentBackup(btn.dataset.incidentId, btn));
     });
 
     // Event Listeners for Complete buttons (status 2)
@@ -3170,7 +3184,7 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
     
     try {
         const newStatusId = 2;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/respond`, {
             method: 'PUT',
             headers: {
                 'Accept': 'application/json',
@@ -3195,6 +3209,23 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error responding to incident:', error);
         showToast('Failed to update incident status', 'error');
+    }
+}
+
+async function requestIncidentBackup(incidentId, triggerButton = null) {
+    if (!confirm('Request another available firetruck and crew? Your station will be checked first, then the nearest available station.')) return;
+    const previous = triggerButton?.innerHTML;
+    if (triggerButton) { triggerButton.disabled = true; triggerButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Finding unit...</span>'; }
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'No backup unit is available.');
+        showToast(result.message, 'success');
+        await fetchAssignedIncidents(true);
+    } catch (error) {
+        showToast(error.message || 'Unable to dispatch backup.', 'error');
+    } finally {
+        if (triggerButton?.isConnected) { triggerButton.disabled = false; triggerButton.innerHTML = previous; }
     }
 }
 
@@ -4155,7 +4186,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     --}}
     </div>
-    @include('partials.pwa-body')
+    @include('partials.pwa-body', ['showPwaInstallButton' => true])
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         window.pyroPwa?.registerPageSnapshot?.({

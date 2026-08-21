@@ -130,7 +130,9 @@ window.thisIncidents = null;
 // Route polling interval
 let routePollingInterval = null;
 let markerStatePollingInterval = null;
+let boundaryStatePollingInterval = null;
 let lastMarkerStateSignature = null;
+let lastBoundaryStateSignature = null;
 let lastMarkersFetchAt = 0;
 let lastStationsFetchAt = 0;
 let lastShapesFetchAt = 0;
@@ -140,18 +142,32 @@ const ROUTE_POLL_INTERVAL_MS = 15000;
 const MARKER_STATE_POLL_INTERVAL_MS = 30000;
 const FIREFIGHTER_ROUTE_POLL_INTERVAL_MS = 25000;
 const FIREFIGHTER_MARKER_STATE_POLL_INTERVAL_MS = 90000;
+const BOUNDARY_STATE_POLL_INTERVAL_MS = 15000;
 const STATIC_LAYER_REFETCH_INTERVAL_MS = 180000;
 const LOCATION_WRITE_DEDUP_WINDOW_MS = 90000;
 const LATEST_INCIDENTS_CACHE_TTL_MS = 10000;
 const TRUCK_REALTIME_ROUTE_SYNC_MS = 5000;
+const NAVIGATION_OFF_ROUTE_THRESHOLD_METERS = 120;
+const NAVIGATION_REROUTE_COOLDOWN_MS = 30000;
 const LIVE_FETCH_TIMEOUT_MS = 15000;
 const STATIC_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
+const BOUNDARY_CHANGE_STORAGE_KEY = 'pyrosense:boundary-change';
 const liveRequestRegistry = new Map();
 let routePollingInFlight = false;
 let markerStatePollingInFlight = false;
+let boundaryStatePollingInFlight = false;
+let shapeFetchController = null;
+let shapeFetchSequence = 0;
+let markerFeedFetchController = null;
+let markerFeedFetchSequence = 0;
+let riskAreaFetchController = null;
+let riskAreaFetchSequence = 0;
+let dynamicMapRefreshPromise = null;
+let dynamicMapRefreshQueued = false;
 let mapPollingVisibilityHandler = null;
 let mapPollingPageHideHandler = null;
 let mapPollingBeforeUnloadHandler = null;
+let mapBoundaryStorageHandler = null;
 
 function isPageVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -180,8 +196,12 @@ function destroyPyroMapRuntime(options = {}) {
     stopAllSimulations();
     abortLiveRequestsByPrefix('route-active');
     abortLiveRequestsByPrefix('markers-poll');
+    abortLiveRequestsByPrefix('boundaries-poll');
     abortLiveRequestsByPrefix('incident-latest-poll');
     abortLiveRequestsByPrefix('chief-incident-map');
+    shapeFetchController?.abort();
+    markerFeedFetchController?.abort();
+    riskAreaFetchController?.abort();
 
     if (removeMap && window.map) {
         try {
@@ -209,6 +229,11 @@ function stopMapLivePolling() {
         clearInterval(markerStatePollingInterval);
         markerStatePollingInterval = null;
     }
+
+    if (boundaryStatePollingInterval) {
+        clearInterval(boundaryStatePollingInterval);
+        boundaryStatePollingInterval = null;
+    }
 }
 
 function bindMapPollingLifecycle() {
@@ -226,10 +251,25 @@ function bindMapPollingLifecycle() {
     };
     mapPollingPageHideHandler = () => destroyPyroMapRuntime({ removeMap: false });
     mapPollingBeforeUnloadHandler = () => destroyPyroMapRuntime({ removeMap: false });
+    mapBoundaryStorageHandler = (event) => {
+        if (event.key !== BOUNDARY_CHANGE_STORAGE_KEY || !event.newValue) return;
+
+        try {
+            const payload = JSON.parse(event.newValue);
+            if (payload?.signature) {
+                lastBoundaryStateSignature = String(payload.signature);
+            }
+        } catch (error) {
+            console.warn('Unable to parse boundary change event:', error);
+        }
+
+        refreshDynamicMapData({ reason: 'boundary-cross-tab' });
+    };
 
     document.addEventListener('visibilitychange', mapPollingVisibilityHandler);
     window.addEventListener('pagehide', mapPollingPageHideHandler);
     window.addEventListener('beforeunload', mapPollingBeforeUnloadHandler);
+    window.addEventListener('storage', mapBoundaryStorageHandler);
 }
 
 function unbindMapPollingLifecycle() {
@@ -242,10 +282,14 @@ function unbindMapPollingLifecycle() {
     if (mapPollingBeforeUnloadHandler) {
         window.removeEventListener('beforeunload', mapPollingBeforeUnloadHandler);
     }
+    if (mapBoundaryStorageHandler) {
+        window.removeEventListener('storage', mapBoundaryStorageHandler);
+    }
 
     mapPollingVisibilityHandler = null;
     mapPollingPageHideHandler = null;
     mapPollingBeforeUnloadHandler = null;
+    mapBoundaryStorageHandler = null;
 }
 
 function isFirefighterDashboardMapInstance() {
@@ -680,6 +724,53 @@ function getClosestSimulationPointIndex(points = [], lat, lng, fallbackIndex = 0
     return bestIndex;
 }
 
+function getDistanceFromNavigationRoute(points = [], lat, lng) {
+    if (!Array.isArray(points) || points.length === 0) return Number.POSITIVE_INFINITY;
+    return points.reduce((closest, point) => {
+        if (!Array.isArray(point) || point.length < 2) return closest;
+        return Math.min(closest, calculateDistanceBetweenPoints(lat, lng, Number(point[0]), Number(point[1])));
+    }, Number.POSITIVE_INFINITY);
+}
+
+async function maybeRerouteNavigation(routeId, location) {
+    const truck = activeTrucks.get(routeId);
+    if (!truck || truck.rerouteInFlight || isDemoRouteSource(truck.routeSource) || !window.geoapifyKey) return false;
+    const destinationLat = Number(truck.routeDestination?.lat);
+    const destinationLng = Number(truck.routeDestination?.lng);
+    if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) return false;
+    const distanceFromRoute = getDistanceFromNavigationRoute(truck.simulationPoints, location.lat, location.lng);
+    if (distanceFromRoute <= NAVIGATION_OFF_ROUTE_THRESHOLD_METERS) return false;
+    if (truck.lastRerouteAt && Date.now() - truck.lastRerouteAt < NAVIGATION_REROUTE_COOLDOWN_MS) return false;
+
+    truck.rerouteInFlight = true;
+    truck.lastRerouteAt = Date.now();
+    try {
+        const waypoints = `${location.lat},${location.lng}|${destinationLat},${destinationLng}`;
+        const response = await fetch(`https://api.geoapify.com/v1/routing?waypoints=${waypoints}&mode=drive&apiKey=${window.geoapifyKey}`);
+        if (!response.ok) throw new Error(`Reroute request failed (${response.status}).`);
+        const payload = await response.json();
+        const points = extractRouteLatLngs(payload.features?.[0]);
+        if (points.length < 2) throw new Error('Reroute returned no usable road geometry.');
+
+        const latestTruck = activeTrucks.get(routeId);
+        if (!latestTruck) return false;
+        latestTruck.simulationPoints = points;
+        latestTruck.originalSimulationPoints = [...points];
+        latestTruck.currentPointIndex = 0;
+        latestTruck.routeLayer?.setLatLngs(points);
+        latestTruck.traveledLayer?.setLatLngs([[location.lat, location.lng]]);
+        updateRouteInfoCard();
+        showToast('Off-route movement detected. Navigation recalculated.', 'warning');
+        return true;
+    } catch (error) {
+        console.warn('Unable to recalculate navigation route:', error);
+        return false;
+    } finally {
+        const latestTruck = activeTrucks.get(routeId);
+        if (latestTruck) latestTruck.rerouteInFlight = false;
+    }
+}
+
 function updateTruckTraveledPath(truck, lat, lng) {
     if (!truck || !truck.traveledLayer || !Array.isArray(truck.simulationPoints)) {
         return;
@@ -723,6 +814,7 @@ function updateTruckMarkerFromRealtimeLocation(routeId, location) {
     );
     truck.usesRealtimeTracking = true;
     updateTruckTraveledPath(truck, location.lat, location.lng);
+    maybeRerouteNavigation(routeId, location).catch(error => console.warn('Navigation reroute failed:', error));
 
     const progressPercent = truck.simulationPoints?.length
         ? Math.min((truck.currentPointIndex / Math.max(truck.simulationPoints.length - 1, 1)) * 100, 100)
@@ -1647,7 +1739,7 @@ async function sendUserLocationToServer(latitude, longitude) {
     }
     
     try {
-        const response = await fetch('/api/firefighter/location', {
+        const response = await fetch('/firefighter/api/location', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1655,7 +1747,6 @@ async function sendUserLocationToServer(latitude, longitude) {
                 'Accept': 'application/json'
             },
             body: JSON.stringify({
-                user_id: window.currentUserId,
                 latitude: latitude,
                 longitude: longitude,
                 timestamp: new Date().toISOString()
@@ -2084,13 +2175,15 @@ function createFirefighterMapLegend() {
             ${createLegendItemHtml({ iconClass: 'fa-triangle-exclamation', imagePath: '/hazard.png', bgColor: '#c2410c', label: 'Risk & Hazard Report' })}
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
+            ${createLegendItemHtml({ iconClass: 'fa-location-arrow', bgColor: '#2563eb', label: 'Navigation Arrow' })}
+            ${createLegendItemHtml({ iconClass: 'fa-truck-fast', bgColor: '#b42318', label: 'Dispatched Apparatus' })}
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
-                <span class="ff-clean-map-legend__label">Medium Fire Risk</span>
+                <span class="ff-clean-map-legend__label">Medium Risk Heat</span>
             </div>
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
-                <span class="ff-clean-map-legend__label">High Fire Risk</span>
+                <span class="ff-clean-map-legend__label">High Risk Heat</span>
             </div>
         </div>
     `;
@@ -2114,11 +2207,11 @@ function createChiefMapLegend() {
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
-                <span class="ff-clean-map-legend__label">Medium Fire Risk</span>
+                <span class="ff-clean-map-legend__label">Medium Risk Heat</span>
             </div>
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
-                <span class="ff-clean-map-legend__label">High Fire Risk</span>
+                <span class="ff-clean-map-legend__label">High Risk Heat</span>
             </div>
         </div>
     `;
@@ -2148,8 +2241,8 @@ function updateRouteInfoCard() {
             <div style="border-left: 3px solid ${color}; padding: 8px 12px; margin-bottom: 8px; background: #f9fafb; border-radius: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; font-size: 13px;">
-                        <i class="fa-solid fa-truck" style="color: ${color};"></i>
-                        Truck ${index}
+                        <i class="fa-solid fa-location-arrow" style="color: ${color};"></i>
+                        Navigation ${index}
                     </span>
                     <button onclick="stopSimulationForRoute(${routeId})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 12px;">
                         <i class="fas fa-times"></i> Stop
@@ -5580,10 +5673,7 @@ async function updateMarker(markerId) {
         closeEditModal();
         showNotification('Marker updated successfully!', 'success');
         invalidateMarkerReferenceData();
-        await Promise.allSettled([
-            fetchStations({ force: true }),
-            fetchCoordinate({ force: true })
-        ]);
+        await refreshDynamicMapData({ reason: 'marker-updated' });
         
     } catch (error) {
         console.error('Error updating marker:', error);
@@ -6155,6 +6245,8 @@ function unregisterRouteRendering(routeId) {
 async function fetchCoordinate(options = {}) {
     const { preferSeeded = false, revalidate = true, force = false } = options;
     let renderedFallbackData = false;
+    let fetchSequence = null;
+    let fetchController = null;
 
     try {
         if (force) {
@@ -6195,9 +6287,19 @@ async function fetchCoordinate(options = {}) {
             return;
         }
 
-        const response = await fetch(getMarkerFeedEndpoint(), { cache: 'no-store' });
+        fetchSequence = ++markerFeedFetchSequence;
+        markerFeedFetchController?.abort();
+        fetchController = new AbortController();
+        markerFeedFetchController = fetchController;
+        const response = await fetch(getMarkerFeedEndpoint(), {
+            cache: 'no-store',
+            signal: fetchController.signal
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
+        if (fetchSequence !== markerFeedFetchSequence) {
+            return;
+        }
         let coordinates;
         if (result.data && Array.isArray(result.data)) {
             coordinates = result.data;
@@ -6215,9 +6317,16 @@ async function fetchCoordinate(options = {}) {
         lastMarkersFetchAt = Date.now();
         writeStaticMapCache('markers', coordinates);
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Fetch error in fetchCoordinate:', error);
         if (!renderedFallbackData && !isChiefDashboardMapInstance()) {
             showNotification('Failed to fetch markers: ' + error.message, 'error');
+        }
+    } finally {
+        if (fetchSequence === markerFeedFetchSequence) {
+            markerFeedFetchController = null;
         }
     }
 }
@@ -6333,6 +6442,45 @@ async function pollMarkerStateChanges() {
         console.error('Marker state polling failed:', error);
     } finally {
         markerStatePollingInFlight = false;
+    }
+}
+
+async function pollBoundaryStateChanges() {
+    if (!isPageVisible() || boundaryStatePollingInFlight) {
+        return;
+    }
+
+    boundaryStatePollingInFlight = true;
+
+    try {
+        const response = await fetchLiveResponseOnce('boundaries-poll', '/api/shapes/latest', {
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to poll boundaries: ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const nextSignature = String(payload?.signature || `${payload?.count || 0}:${payload?.updated_at || ''}`);
+        if (!lastBoundaryStateSignature) {
+            lastBoundaryStateSignature = nextSignature;
+            return;
+        }
+        if (lastBoundaryStateSignature === nextSignature) {
+            return;
+        }
+
+        lastBoundaryStateSignature = nextSignature;
+        await refreshDynamicMapData({ reason: 'boundary-change' });
+    } catch (error) {
+        if (error?.name !== 'AbortError') {
+            console.error('Boundary state polling failed:', error);
+        }
+    } finally {
+        boundaryStatePollingInFlight = false;
     }
 }
 
@@ -8442,16 +8590,13 @@ async function finalizeTruckArrival(routeId, lat = null, lng = null) {
         : 100;
 
     try {
-        if (truck.incidentId) {
-            await updateIncidentStatusFromRoute(routeId, 3);
-        }
         await updateRouteStatus(routeId, 'inactive', truck.currentPointIndex, finalLat, finalLng, progress);
     } catch (error) {
         truck.arrivalHandled = false;
         truck.onSceneStatusSent = false;
         truck.routeStatusSyncInFlight = false;
         console.error('Failed to finalize truck arrival:', error);
-        showToast(error.message || 'Failed to update incident to On Scene', 'error');
+        showToast(error.message || 'Failed to finish navigation', 'error');
         return;
     } finally {
         if (truck) {
@@ -8460,7 +8605,7 @@ async function finalizeTruckArrival(routeId, lat = null, lng = null) {
     }
 
     await stopSimulationForRoute(routeId, false, false);
-    showToast(`Truck ${routeId} reached destination`, 'success');
+    showToast('Navigation reached the destination', 'success');
 }
 
 async function syncTruckArrivalStatus(routeId, lat, lng) {
@@ -8762,7 +8907,9 @@ async function displayAndStartRoute(routeId, route, destination) {
         statusChangedByRoute: false,
         usesRealtimeTracking: false,
         lastRealtimeRouteSyncAt: 0,
-        lastRealtimeLocationSignature: null
+        lastRealtimeLocationSignature: null,
+        rerouteInFlight: false,
+        lastRerouteAt: 0
     };
     
     activeTrucks.set(routeId, truckData);
@@ -8852,14 +8999,7 @@ async function startSimulationForRoute(routeId) {
     }
     
     try {
-        // Only transition to responding when this route starts from a reported incident.
-        if (truck.incidentId && Number(truck.incidentStatusId) === 1) {
-            await updateIncidentStatusFromRoute(routeId, 2);
-            truck.incidentStatusId = 2;
-            truck.statusChangedByRoute = true;
-        }
-
-        // Keep the route record in sync with the truck while it is moving.
+        // Directions never dispatch resources or mutate the incident lifecycle.
         await updateRouteStatus(
             routeId,
             'moving',
@@ -8890,10 +9030,10 @@ async function startSimulationForRoute(routeId) {
     
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createFireTruckIcon(truckColors[colorIndex]),
+        icon: createNavigationArrowIcon(truckColors[colorIndex]),
         zIndexOffset: 1000
     }));
-    bindTruckDetailsPopup(routeId, truck.animatedVehicle, truck);
+    bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
     if (truck.simulationPoints[1]) {
         const nextPoint = truck.simulationPoints[1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -8912,15 +9052,15 @@ async function startSimulationForRoute(routeId) {
     const realtimeLocation = getTruckRealtimeLocation(truck);
     if (realtimeLocation) {
         updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
-        showToast(`Live responder tracking enabled for truck ${routeId}`, 'success');
+        showToast('Live navigation tracking enabled', 'success');
         return;
     }
 
     startSmoothAnimationForTruck(routeId);
     showToast(
         isDemoRouteSource(truck.routeSource)
-            ? `Demo movement started for truck ${routeId}!`
-            : `Movement started for truck ${routeId}!`,
+            ? 'Demo navigation started.'
+            : 'Navigation started.',
         'success'
     );
 }
@@ -8953,7 +9093,7 @@ function startSmoothAnimationForTruck(routeId) {
     if (startIndex >= truck.simulationPoints.length - 1) {
         console.log('Truck already at or near destination, marking as complete');
         finalizeTruckArrival(routeId).then(() => {
-            showToast(`Truck ${routeId} arrived at destination!`, 'success');
+            showToast('Navigation reached the destination.', 'success');
         }).catch((error) => {
             console.error('Failed to finalize truck arrival:', error);
         });
@@ -9033,10 +9173,10 @@ function startSmoothAnimationForTruck(routeId) {
         let progress = Math.min(elapsed / totalRemainingDuration, 1);
         
         if (progress >= 1) {
-            console.log(`Truck ${routeId} arrived at destination!`);
+            console.log(`Navigation route ${routeId} arrived at destination.`);
             currentTruck.currentPointIndex = currentTruck.simulationPoints.length - 1;
             finalizeTruckArrival(routeId).then(() => {
-                showToast(`Truck ${routeId} arrived at destination!`, 'success');
+                showToast('Navigation reached the destination.', 'success');
             }).catch((error) => {
                 console.error('Failed to finalize truck arrival:', error);
             });
@@ -9177,7 +9317,7 @@ function startRealTimeLocationUpdatesForTruck(routeId) {
                 const locationDisplay = document.getElementById('userLocation');
                 if (locationDisplay) {
                     const trackingLabel = realtimeLocation ? 'Live' : 'Moving';
-                    locationDisplay.innerHTML = `<i class="fa-solid fa-location-dot"></i> Truck ${routeId}: ${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} (${trackingLabel})`;
+                    locationDisplay.innerHTML = `<i class="fa-solid fa-location-arrow"></i> Navigation: ${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} (${trackingLabel})`;
                 }
             }
         }
@@ -9231,16 +9371,6 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
             try {
                 await updateRouteStatus(routeId, 'inactive');
 
-                const shouldReturnToReported = truck.incidentId
-                    && !truck.arrivalHandled
-                    && truck.statusChangedByRoute
-                    && Number(truck.lastSentIncidentStatus) === 2;
-
-                if (shouldReturnToReported) {
-                    await updateIncidentStatusFromRoute(routeId, 1);
-                    truck.incidentStatusId = 1;
-                    truck.statusChangedByRoute = false;
-                }
             } catch (error) {
                 console.error(`Failed to stop simulation for route ${routeId}:`, error);
                 showToast(error.message || 'Failed to stop route simulation cleanly', 'error');
@@ -9256,7 +9386,7 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
         updateRouteInfoCard();
 
         if (showStoppedToast) {
-            showToast(`Truck ${routeId} simulation stopped`, 'info');
+            showToast('Navigation stopped', 'info');
         }
     })();
 
@@ -9268,28 +9398,21 @@ async function stopAllSimulations() {
     await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId)));
 }
 
-function createFireTruckIcon(color = '#dc2626') {
-    const iconConfig = ICON_ARRAY.find(icon => icon.id === 'firetruck') || {
-        icon: 'fa-truck-fire',
-        bgColor: color
-    };
-    const publicMarkerImageMap = getPublicMarkerImageMap();
-
+function createNavigationArrowIcon(color = '#2563eb') {
     return L.divIcon({
-        className: 'custom-fa-icon fire-truck-icon',
-        html: buildImageBackedMarkerHtml({
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            imagePath: publicMarkerImageMap.firetruck || '/truck.png',
-            fallbackIconClass: iconConfig.icon,
-            bgColor: color,
-            iconFontSize: 22
-        }),
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
-        popupAnchor: [0, -24]
+        className: 'pyro-navigation-arrow-wrap',
+        html: `<span class="pyro-navigation-arrow" style="display:grid;place-items:center;width:44px;height:44px;color:${color};filter:drop-shadow(0 6px 6px rgba(15,23,42,.35))"><svg width="44" height="44" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4 41 42 24 34 7 42 24 4Z" fill="currentColor" stroke="white" stroke-width="3" stroke-linejoin="round"/></svg></span>`,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+        popupAnchor: [0, -22]
     });
+}
+
+function bindNavigationDetailsPopup(routeId, marker, route = null) {
+    if (!marker) return;
+    const destination = route?.routeDestination?.title || 'Selected destination';
+    const source = isDemoRouteSource(route?.routeSource) ? 'Demo navigation' : 'Live navigation';
+    marker.bindPopup(`<div style="min-width:190px;font-family:system-ui,-apple-system,sans-serif"><strong style="color:#1d4ed8">${source}</strong><div style="margin-top:5px;font-size:12px;color:#475569">Directions to ${escapeHtml(destination)}</div><small style="display:block;margin-top:7px;color:#64748b">This arrow represents navigation only. Apparatus appears after a response is accepted.</small></div>`);
 }
 
 function applyTruckHeading(marker, angle) {
@@ -9302,7 +9425,7 @@ function applyTruckHeading(marker, angle) {
         return;
     }
 
-    const visual = markerElement.querySelector('img') || markerElement.querySelector('.leaflet-marker-icon') || markerElement;
+    const visual = markerElement.querySelector('.pyro-navigation-arrow') || markerElement.querySelector('img') || markerElement.querySelector('.leaflet-marker-icon') || markerElement;
     visual.style.transformOrigin = '50% 50%';
     const currentTransform = visual.style.transform || '';
     const baseTransform = currentTransform.replace(/\s*rotate\([^)]*\)/g, '').trim();
@@ -9417,7 +9540,9 @@ function startRoutePolling() {
                     lastSentIncidentStatus: null,
                     usesRealtimeTracking: false,
                     lastRealtimeRouteSyncAt: 0,
-                    lastRealtimeLocationSignature: null
+                    lastRealtimeLocationSignature: null,
+                    rerouteInFlight: false,
+                    lastRerouteAt: 0
                 };
                 
                 activeTrucks.set(routeData.route_id, truckData);
@@ -9498,6 +9623,11 @@ function startMapLivePolling() {
     if (!markerStatePollingInterval) {
         markerStatePollingInterval = setInterval(pollMarkerStateChanges, getMarkerStatePollIntervalMs());
     }
+
+    if (!boundaryStatePollingInterval) {
+        boundaryStatePollingInterval = setInterval(pollBoundaryStateChanges, BOUNDARY_STATE_POLL_INTERVAL_MS);
+        pollBoundaryStateChanges();
+    }
 }
 
 async function startSimulationFromPosition(routeId, startIndex) {
@@ -9550,10 +9680,10 @@ async function startSimulationFromPosition(routeId, startIndex) {
     console.log('Creating truck at position:', [startPoint[0], startPoint[1]]);
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createFireTruckIcon(truckColors[colorIndex]),
+        icon: createNavigationArrowIcon(truckColors[colorIndex]),
         zIndexOffset: 1000
     }));
-    bindTruckDetailsPopup(routeId, truck.animatedVehicle, truck);
+    bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
     if (truck.simulationPoints[startIndex + 1]) {
         const nextPoint = truck.simulationPoints[startIndex + 1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -9940,10 +10070,7 @@ function deleteMarker(value) {
         if (data.success) {
             showNotification(data.message || 'Marker deleted successfully!', 'success');
             invalidateMarkerReferenceData();
-            Promise.allSettled([
-                fetchStations({ force: true }),
-                fetchCoordinate({ force: true })
-            ]);
+            refreshDynamicMapData({ reason: 'marker-deleted' });
             if (currentDetailsMarker && currentDetailsMarker.marker_id == value) closeDetailsPanel();
         } else {
             showNotification(data.message || 'Failed to delete marker', 'error');
@@ -9972,10 +10099,7 @@ async function saveMarker(lat, lng, title, description, categoryId) {
         if (titleInput) titleInput.value = '';
         if (descInput) descInput.value = '';
         invalidateMarkerReferenceData();
-        await Promise.allSettled([
-            fetchStations({ force: true }),
-            fetchCoordinate({ force: true })
-        ]);
+        await refreshDynamicMapData({ reason: 'marker-created' });
         showNotification('Marker created successfully!', 'success');
         return markerId;
     } catch (err) {
@@ -10118,8 +10242,8 @@ function editShape(shapeData) {
         shapeData.layer.unbindTooltip();
         shapeData.layer.bindTooltip(newName, { permanent: false, direction: "top", sticky: true, opacity: 0.9 });
         window.map.closePopup();
-        invalidateShapeData();
-        loadShapes({ force: true });
+        announceBoundaryChange(data.boundary_version);
+        refreshDynamicMapData({ reason: 'boundary-renamed' });
     })
     .catch(err => {
         console.error('Error updating shape:', err);
@@ -10146,8 +10270,8 @@ function deleteShape(shapeId) {
         }
         window.map.closePopup();
         showNotification('Shape deleted successfully!', 'success');
-        invalidateShapeData();
-        loadShapes({ force: true });
+        announceBoundaryChange(data.boundary_version);
+        refreshDynamicMapData({ reason: 'boundary-deleted' });
     })
     .catch(err => {
         console.error('Error deleting shape:', err);
@@ -10157,16 +10281,10 @@ function deleteShape(shapeId) {
 
 async function loadShapes(options = {}) {
     const { force = false } = options;
+    let fetchSequence = null;
+    let fetchController = null;
 
     try {
-        if (isFirefighterDashboardMapInstance()) {
-            if (shapeFeatureGroup) {
-                shapeFeatureGroup.clearLayers();
-            }
-            shapeLayers = {};
-            return;
-        }
-
         if (!force && lastShapesFetchAt > 0) {
             return;
         }
@@ -10174,6 +10292,11 @@ async function loadShapes(options = {}) {
         if (!force && shouldSkipStaticLayerRefetch(lastShapesFetchAt)) {
             return;
         }
+
+        fetchSequence = ++shapeFetchSequence;
+        shapeFetchController?.abort();
+        fetchController = new AbortController();
+        shapeFetchController = fetchController;
 
         if (shapeFeatureGroup) shapeFeatureGroup.clearLayers();
         shapeLayers = {};
@@ -10209,9 +10332,16 @@ async function loadShapes(options = {}) {
             }
         }
 
-        const response = await fetch('/api/shapes', { headers: { 'Accept': 'application/json' } });
+        const response = await fetch('/api/shapes', {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' },
+            signal: fetchController.signal
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const shapesPayload = await response.json();
+        if (fetchSequence !== shapeFetchSequence) {
+            return;
+        }
         const shapes = Array.isArray(shapesPayload?.data) ? shapesPayload.data : (Array.isArray(shapesPayload) ? shapesPayload : []);
         writeStaticMapCache('shapes', shapes);
         if (shapeFeatureGroup) {
@@ -10241,9 +10371,16 @@ async function loadShapes(options = {}) {
         });
         lastShapesFetchAt = Date.now();
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Error loading shapes:', error);
         if (!isChiefDashboardMapInstance()) {
             showNotification('Error loading shapes', 'error');
+        }
+    } finally {
+        if (fetchSequence === shapeFetchSequence) {
+            shapeFetchController = null;
         }
     }
 }
@@ -10263,6 +10400,115 @@ function normalizeFireRiskAreaGeojson(rawGeojson) {
     }
 
     return rawGeojson;
+}
+
+function fireRiskHeatWeight(point = {}, area = {}) {
+    const areaLevel = String(area.risk_level || '').toLowerCase();
+    const areaBaseline = areaLevel === 'high' ? 0.82 : areaLevel === 'medium' ? 0.58 : 0.36;
+    const assessment = String(point.assessment_level || '').toLowerCase();
+    const assessmentWeight = assessment === 'high'
+        ? 0.96
+        : ['moderate', 'medium'].includes(assessment) ? 0.68 : 0;
+    const pointScore = Number(point.risk_score);
+    const scoreWeight = Number.isFinite(pointScore) && pointScore > 0
+        ? Math.min(1, Math.max(0.25, pointScore / 100))
+        : 0;
+    const incidentCount = Math.max(1, Number(point.incident_count) || 1);
+    const incidentWeight = point.source_type === 'historical_incident'
+        ? Math.min(0.92, 0.48 + (Math.log2(incidentCount) * 0.12))
+        : 0;
+
+    return Math.min(1, Math.max(0.25, areaBaseline, assessmentWeight, scoreWeight, incidentWeight));
+}
+
+function fireRiskHeatPoints(area = {}) {
+    const evidencePoints = Array.isArray(area.evidence_points) ? area.evidence_points : [];
+
+    return evidencePoints
+        .map((point) => ({
+            lat: Number(point.lat),
+            lng: Number(point.lng),
+            intensity: fireRiskHeatWeight(point, area),
+            riskLevel: String(area.risk_level || 'medium').toLowerCase()
+        }))
+        .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+}
+
+function createFireRiskHeatLayer(points = []) {
+    const riskRank = { low: 0, medium: 1, high: 2 };
+    const validPoints = points
+        .filter((point) => (
+            Number.isFinite(point.lat)
+            && Number.isFinite(point.lng)
+            && Number.isFinite(point.intensity)
+        ))
+        .sort((left, right) => (
+            (riskRank[left.riskLevel] ?? 1) - (riskRank[right.riskLevel] ?? 1)
+            || left.intensity - right.intensity
+        ));
+
+    return new (L.Layer.extend({
+        onAdd(map) {
+            this._map = map;
+            this._canvas = L.DomUtil.create('canvas', 'leaflet-risk-heatmap-layer');
+            this._canvas.setAttribute('aria-hidden', 'true');
+            this._canvas.style.pointerEvents = 'none';
+            this._canvas.style.mixBlendMode = 'multiply';
+            map.getPane('overlayPane').appendChild(this._canvas);
+            map.on('moveend zoomend resize', this._reset, this);
+            this._reset();
+        },
+
+        onRemove(map) {
+            map.off('moveend zoomend resize', this._reset, this);
+            this._canvas?.remove();
+            this._canvas = null;
+            this._map = null;
+        },
+
+        _reset() {
+            if (!this._map || !this._canvas) return;
+
+            const size = this._map.getSize();
+            const ratio = Math.max(1, window.devicePixelRatio || 1);
+            const origin = this._map.containerPointToLayerPoint([0, 0]);
+            L.DomUtil.setPosition(this._canvas, origin);
+            this._canvas.style.width = `${size.x}px`;
+            this._canvas.style.height = `${size.y}px`;
+            this._canvas.width = Math.round(size.x * ratio);
+            this._canvas.height = Math.round(size.y * ratio);
+
+            const context = this._canvas.getContext('2d');
+            context.setTransform(ratio, 0, 0, ratio, 0, 0);
+            context.clearRect(0, 0, size.x, size.y);
+
+            const zoom = this._map.getZoom();
+            const radius = Math.max(24, Math.min(58, 26 + ((zoom - 11) * 6)));
+            validPoints.forEach((point) => {
+                const pixel = this._map.latLngToContainerPoint([point.lat, point.lng]);
+                if (pixel.x < -radius || pixel.y < -radius || pixel.x > size.x + radius || pixel.y > size.y + radius) {
+                    return;
+                }
+
+                const alpha = Math.max(0.16, Math.min(0.72, point.intensity * 0.7));
+                const gradient = context.createRadialGradient(pixel.x, pixel.y, 0, pixel.x, pixel.y, radius);
+                if (point.riskLevel === 'high') {
+                    gradient.addColorStop(0, `rgba(185, 28, 28, ${alpha})`);
+                    gradient.addColorStop(0.34, `rgba(239, 68, 68, ${alpha * 0.82})`);
+                } else if (point.riskLevel === 'low') {
+                    gradient.addColorStop(0, `rgba(34, 197, 94, ${alpha * 0.82})`);
+                    gradient.addColorStop(0.34, `rgba(132, 204, 22, ${alpha * 0.7})`);
+                } else {
+                    gradient.addColorStop(0, `rgba(234, 88, 12, ${alpha})`);
+                    gradient.addColorStop(0.34, `rgba(245, 158, 11, ${alpha * 0.82})`);
+                }
+                gradient.addColorStop(0.68, `rgba(250, 204, 21, ${alpha * 0.44})`);
+                gradient.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                context.fillStyle = gradient;
+                context.fillRect(pixel.x - radius, pixel.y - radius, radius * 2, radius * 2);
+            });
+        }
+    }))();
 }
 
 function getFireRiskAreaStyle(area = {}) {
@@ -10324,7 +10570,11 @@ function buildFireRiskAreaPopup(area = {}) {
         ? 'Barangay hall reference only; no geographic risk footprint is implied'
         : area.geometry_precision === 'barangay_boundary'
             ? 'Synced barangay boundary'
-            : 'Localized verified-evidence cluster';
+            : area.geometry_precision === 'original_evidence_points'
+                ? 'Heat intensity at original report and incident positions'
+                : area.geometry_precision === 'supporting_evidence_positions'
+                    ? 'Forecast heat anchored to supporting historical evidence positions'
+                : 'Localized verified-evidence cluster';
     const scopeLabel = area.overlay_type === 'next_month_forecast'
         ? 'Next-month forecast'
         : area.overlay_type === 'current_analysis'
@@ -10332,6 +10582,8 @@ function buildFireRiskAreaPopup(area = {}) {
             : 'Verified risk evidence';
     const subtitle = area.geometry_type === 'point'
         ? escapeHtml(area.city_name || 'Barangay reference location')
+        : area.geometry_type === 'heatmap'
+        ? `${escapeHtml(area.city_name || 'Localized evidence')} · ${Number(metrics.support_points || 0)} source positions`
         : area.geometry_type === 'circle'
         ? `${escapeHtml(area.city_name || 'Clustered nearby evidence')} · ${radiusMeters > 0 ? `${Math.round(radiusMeters)}m display radius` : 'Risk zone'}`
         : escapeHtml(area.city_name || 'Mapped barangay boundary');
@@ -10389,6 +10641,11 @@ function buildFireRiskAreaPopup(area = {}) {
 }
 
 function createFireRiskAreaLayer(area = {}) {
+    if (String(area.geometry_type || '').toLowerCase() === 'heatmap') {
+        const points = fireRiskHeatPoints(area);
+        return points.length ? createFireRiskHeatLayer(points) : null;
+    }
+
     if (String(area.geometry_type || '').toLowerCase() === 'point') {
         const centerLat = Number(area?.center?.lat);
         const centerLng = Number(area?.center?.lng);
@@ -10438,7 +10695,7 @@ function createFireRiskAreaLayer(area = {}) {
 }
 
 function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
-    if (area.overlay_type !== 'verified_evidence' || !targetGroup) {
+    if (!targetGroup) {
         return;
     }
 
@@ -10455,15 +10712,19 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
             ? `Historical fire incident${point.incident_date ? ` · ${point.incident_date}` : ''}`
             : `${point.entry_type === 'hazard' ? 'Verified hazard' : 'Verified risk'}${point.marker_title ? ` · ${point.marker_title}` : ''}`;
         L.circleMarker([lat, lng], {
-            radius: 5,
+            radius: 3.5,
             color: '#ffffff',
-            weight: 2,
+            weight: 1.5,
             fillColor: isIncident ? '#dc2626' : '#f59e0b',
-            fillOpacity: 1,
+            fillOpacity: 0.88,
             interactive: true,
             pane: 'overlayPane'
         })
             .bindTooltip(escapeHtml(label), { direction: 'top', sticky: true })
+            .bindPopup(buildFireRiskAreaPopup(area), {
+                maxWidth: 320,
+                className: 'fire-risk-area-popup-shell'
+            })
             .addTo(targetGroup);
     });
 }
@@ -10472,6 +10733,11 @@ async function loadFireRiskAreas() {
     if (!window.map || !fireRiskAreaLayerGroup) {
         return;
     }
+
+    const fetchSequence = ++riskAreaFetchSequence;
+    riskAreaFetchController?.abort();
+    const fetchController = new AbortController();
+    riskAreaFetchController = fetchController;
 
     try {
         const query = new URLSearchParams({ levels: 'low,medium,high' });
@@ -10483,7 +10749,8 @@ async function loadFireRiskAreas() {
             headers: {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
-            }
+            },
+            signal: fetchController.signal
         });
 
         if (!response.ok) {
@@ -10491,13 +10758,31 @@ async function loadFireRiskAreas() {
         }
 
         const payload = await response.json();
+        if (fetchSequence !== riskAreaFetchSequence) {
+            return;
+        }
         const areas = Array.isArray(payload?.data) ? payload.data : [];
         fireRiskAreaLayerGroup.clearLayers();
         currentRiskAnalysisLayerGroup?.clearLayers();
         nextMonthForecastLayerGroup?.clearLayers();
+        const heatmapBuckets = new Map();
 
         areas.forEach((area) => {
             try {
+                const targetGroup = area.overlay_type === 'next_month_forecast'
+                    ? nextMonthForecastLayerGroup
+                    : area.overlay_type === 'current_analysis'
+                        ? currentRiskAnalysisLayerGroup
+                        : fireRiskAreaLayerGroup;
+
+                if (String(area.geometry_type || '').toLowerCase() === 'heatmap') {
+                    const bucket = heatmapBuckets.get(targetGroup) || { points: [], areas: [] };
+                    bucket.points.push(...fireRiskHeatPoints(area));
+                    bucket.areas.push(area);
+                    heatmapBuckets.set(targetGroup, bucket);
+                    return;
+                }
+
                 const layer = createFireRiskAreaLayer(area);
                 if (!layer) {
                     return;
@@ -10513,11 +10798,6 @@ async function loadFireRiskAreas() {
                     maxWidth: 320,
                     className: 'fire-risk-area-popup-shell'
                 });
-                const targetGroup = area.overlay_type === 'next_month_forecast'
-                    ? nextMonthForecastLayerGroup
-                    : area.overlay_type === 'current_analysis'
-                        ? currentRiskAnalysisLayerGroup
-                        : fireRiskAreaLayerGroup;
                 layer.addTo(targetGroup || fireRiskAreaLayerGroup);
                 addFireRiskEvidencePoints(area, targetGroup || fireRiskAreaLayerGroup);
             } catch (error) {
@@ -10525,14 +10805,79 @@ async function loadFireRiskAreas() {
             }
         });
 
+        heatmapBuckets.forEach((bucket, targetGroup) => {
+            if (!targetGroup || !bucket.points.length) return;
+            createFireRiskHeatLayer(bucket.points).addTo(targetGroup);
+            bucket.areas.forEach((area) => addFireRiskEvidencePoints(area, targetGroup));
+        });
+
         console.log('Fire risk areas loaded:', areas.length);
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return;
+        }
         console.error('Error loading fire risk areas:', error);
         if (!isChiefDashboardMapInstance()) {
             showNotification?.('Unable to load fire risk areas', 'warning');
         }
+    } finally {
+        if (fetchSequence === riskAreaFetchSequence) {
+            riskAreaFetchController = null;
+        }
     }
 }
+
+function announceBoundaryChange(signature = null) {
+    if (signature) {
+        lastBoundaryStateSignature = String(signature);
+    }
+
+    try {
+        window.localStorage?.setItem(BOUNDARY_CHANGE_STORAGE_KEY, JSON.stringify({
+            signature: signature || lastBoundaryStateSignature || '',
+            changedAt: Date.now()
+        }));
+    } catch (error) {
+        console.warn('Unable to announce boundary change to other tabs:', error);
+    }
+}
+
+async function refreshDynamicMapData(options = {}) {
+    dynamicMapRefreshQueued = true;
+    if (dynamicMapRefreshPromise) {
+        return dynamicMapRefreshPromise;
+    }
+
+    dynamicMapRefreshPromise = (async () => {
+        do {
+            dynamicMapRefreshQueued = false;
+            invalidateShapeData();
+
+            const refreshes = [
+                fetchCoordinate({ force: true, forceIncidents: true }),
+                fetchStations({ force: true }),
+                loadShapes({ force: true }),
+                loadFireRiskAreas()
+            ];
+            if (typeof window.refreshChiefDashboardStats === 'function') {
+                refreshes.push(window.refreshChiefDashboardStats());
+            }
+
+            const results = await Promise.allSettled(refreshes);
+            results.forEach((result) => {
+                if (result.status === 'rejected' && result.reason?.name !== 'AbortError') {
+                    console.error('Dynamic map refresh task failed:', result.reason);
+                }
+            });
+        } while (dynamicMapRefreshQueued);
+    })().finally(() => {
+        dynamicMapRefreshPromise = null;
+    });
+
+    return dynamicMapRefreshPromise;
+}
+
+window.refreshDynamicMapData = refreshDynamicMapData;
 
 function showLoadingModal(message) {
     if (document.getElementById('loadingModal')) return;
@@ -11127,7 +11472,8 @@ function initAfterMapReady() {
             "Verified Risk Evidence": fireRiskAreaLayerGroup,
             "Current Risk Analysis": currentRiskAnalysisLayerGroup,
             "Next-Month Forecast": nextMonthForecastLayerGroup,
-            "Water Reference": waterReference
+            "Water Reference": waterReference,
+            "Shapes": shapeFeatureGroup
         }
         : isCitizenDashboardMap
             ? {
@@ -11297,8 +11643,8 @@ function initAfterMapReady() {
                 if (data.shape) {
                     cachedBoundaryBarangaysByCity.delete(boundaryMeta.city_id);
                     showNotification('Shape saved successfully!', 'success');
-                    invalidateShapeData();
-                    loadShapes({ force: true });
+                    announceBoundaryChange(data.boundary_version);
+                    refreshDynamicMapData({ reason: 'boundary-created' });
                 }
             })
             .catch(err => {
@@ -11319,8 +11665,8 @@ function initAfterMapReady() {
                     .then(res => res.json())
                     .then(data => {
                         showNotification('Shape updated successfully!', 'success');
-                        invalidateShapeData();
-                        loadShapes({ force: true });
+                        announceBoundaryChange(data.boundary_version);
+                        refreshDynamicMapData({ reason: 'boundary-edited' });
                     })
                     .catch(err => console.error('Error updating shape:', err));
                 }
@@ -11335,8 +11681,8 @@ function initAfterMapReady() {
                     .then(res => res.json())
                     .then(data => {
                         showNotification('Shape deleted successfully!', 'success');
-                        invalidateShapeData();
-                        loadShapes({ force: true });
+                        announceBoundaryChange(data.boundary_version);
+                        refreshDynamicMapData({ reason: 'boundary-deleted' });
                     })
                     .catch(err => console.error('Error deleting shape:', err));
                 }
@@ -11344,16 +11690,14 @@ function initAfterMapReady() {
         });
     }
     
-    if (!isFirefighterDashboardMap) {
-        if (isChiefDashboardMapInstance()) {
-            window.setTimeout(() => {
-                loadShapes();
-                setTimeout(focusBoundaryEditorContext, 350);
-            }, 1800);
-        } else {
-            loadShapes();
+    if (isChiefDashboardMapInstance()) {
+        window.setTimeout(() => {
+            loadShapes({ force: true });
             setTimeout(focusBoundaryEditorContext, 350);
-        }
+        }, 1800);
+    } else {
+        loadShapes({ force: true });
+        setTimeout(focusBoundaryEditorContext, 350);
     }
     if (!isCitizenDashboardMap) {
         if (isChiefDashboardMapInstance()) {
@@ -11682,10 +12026,7 @@ async function saveMarkerOptimisticallyFromForm(saveButton) {
         await saveMarkerDetailsForCategory(markerId, context, jsonHeaders);
         removeOptimisticMapMarker(optimisticMarkerId);
         invalidateMarkerReferenceData();
-        await Promise.allSettled([
-            fetchStations({ force: true }),
-            fetchCoordinate({ force: true })
-        ]);
+        await refreshDynamicMapData({ reason: 'marker-created' });
         showMarkerFeedback('Marker saved and added to the map.', 'success', 'Marker saved');
     } catch (error) {
         console.error('Error saving marker:', error);
@@ -11948,10 +12289,7 @@ setTimeout(() => {
                     modal.setAttribute('aria-hidden', 'true');
                 }
                 invalidateMarkerReferenceData();
-                await Promise.allSettled([
-                    fetchStations({ force: true }),
-                    fetchCoordinate({ force: true })
-                ]);
+                await refreshDynamicMapData({ reason: 'marker-created' });
             } catch (error) {
                 console.error('Error saving:', error);
                 alert('Error: ' + error.message);

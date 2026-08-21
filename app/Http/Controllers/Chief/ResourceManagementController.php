@@ -14,11 +14,15 @@ use App\Models\Team;
 use App\Models\Province;
 use App\Models\Barangay;
 use App\Models\BoundaryLocation;
+use App\Models\Apparatus;
+use App\Models\BarangayOfficer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use App\Services\DutyRosterService;
 
 
 
@@ -42,6 +46,8 @@ class ResourceManagementController extends Controller
         if ($this->isProvincialAdmin()) {
             $cacheKey = 'resource-management:provincial:v3';
             $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
+            $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->orderBy('station_id')->orderBy('unit_number')->get();
+            $stationEquipmentAssignments = EquipmentToStation::with(['station', 'equipment'])->orderBy('station_id')->orderBy('equipment_station_id')->get();
             $stationOfficers = Cache::remember("{$cacheKey}:officers", now()->addSeconds(60), fn () => StationOfficer::with('user.role', 'station')->orderBy('station_officer_id')->get());
             $activeStations = Cache::remember("{$cacheKey}:stations", now()->addMinutes(5), fn () => Station::with(['marker', 'address.barangay.city.province'])->orderBy('station_name')->get());
             $currentStation = null;
@@ -58,6 +64,8 @@ class ResourceManagementController extends Controller
             $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
             $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
             $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList(null, null));
+            $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->orderBy('barangay_id')->orderBy('position')->get();
+            $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))->orderBy('last_name')->get();
             $systemUsers = $allusers;
             $teamData = $this->serializeTeams($allTeam);
             [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries] = $this->filterTableCollections(
@@ -88,6 +96,7 @@ class ResourceManagementController extends Controller
                 'boundaryPage',
                 'systemUsers',
                 'teamData'
+                ,'apparatusRecords', 'stationEquipmentAssignments', 'barangayOfficers', 'eligibleBarangayOfficerUsers'
             ));
         }
 
@@ -97,10 +106,15 @@ class ResourceManagementController extends Controller
         $thisStation = StationOfficer::where('user_id', $thisUser)->first();
         //ito na ung station nya mismo
         $stationExact = $thisStation?->station_id;
+        if ($stationExact) {
+            app(DutyRosterService::class)->sync((int) $stationExact);
+        }
 
        
         $cacheKey = "resource-management:station:{$stationExact}:v3";
         $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
+        $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->where('station_id', $stationExact)->orderBy('unit_number')->get();
+        $stationEquipmentAssignments = EquipmentToStation::with(['station', 'equipment'])->where('station_id', $stationExact)->orderBy('equipment_station_id')->get();
       
         $stationOfficers = Cache::remember("{$cacheKey}:officers", now()->addSeconds(45), fn () => StationOfficer::where('station_id', $stationExact)
             ->with('user.role', 'station')
@@ -154,6 +168,13 @@ class ResourceManagementController extends Controller
         $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
         $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
         $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList($stationExact, $chiefCityId));
+        $coveredBarangayIds = collect($boundaryBarangays)->pluck('barangay_id')->filter()->map(fn ($id) => (int) $id);
+        $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->whereIn('barangay_id', $coveredBarangayIds)->orderBy('barangay_id')->orderBy('position')->get();
+        $eligibleBarangayOfficerUsers = User::with(['role', 'address.barangay'])->whereDoesntHave('barangayOfficer')
+            ->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))
+            ->where(function ($query) use ($coveredBarangayIds) {
+                $query->whereNull('address_id')->orWhereHas('address', fn ($address) => $address->whereIn('barangay_id', $coveredBarangayIds));
+            })->orderBy('last_name')->orderBy('first_name')->get();
         $systemUsers = $allusers->concat($citizens)->unique('user_id')->values();
         $teamData = $this->serializeTeams($allTeam);
         [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries] = $this->filterTableCollections(
@@ -185,6 +206,7 @@ class ResourceManagementController extends Controller
             'boundaryPage',
             'systemUsers',
             'teamData'
+            ,'apparatusRecords', 'stationEquipmentAssignments', 'barangayOfficers', 'eligibleBarangayOfficerUsers'
         ));
     }
 

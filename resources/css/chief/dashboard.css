@@ -3310,13 +3310,13 @@ body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon >
 }
 
 body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon.is-risk-medium {
-  border-color: #d97706;
-  background: rgba(245, 158, 11, 0.22);
+  border-color: transparent;
+  background: radial-gradient(circle, #ea580c 0%, rgba(245, 158, 11, 0.78) 42%, rgba(250, 204, 21, 0) 100%);
 }
 
 body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon.is-risk-high {
-  border-color: #b91c1c;
-  background: rgba(239, 68, 68, 0.24);
+  border-color: transparent;
+  background: radial-gradient(circle, #b91c1c 0%, rgba(239, 68, 68, 0.8) 42%, rgba(250, 204, 21, 0) 100%);
 }
 
 body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__label {

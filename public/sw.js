@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260815-2';
+const CACHE_VERSION = 'pyrosense-pwa-v20260821-3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;

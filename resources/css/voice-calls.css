@@ -9,6 +9,202 @@
     pointer-events: none;
 }
 
+/* Dispatch workspace: supports several independently controlled calls. */
+.pyro-voice-panel {
+    top: 88px;
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(760px, calc(100vh - 112px));
+    border-color: rgba(148, 163, 184, 0.28);
+    border-radius: 28px;
+    background: rgba(248, 250, 252, 0.98);
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2), 0 4px 16px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+}
+
+.pyro-voice-panel__header {
+    padding: 18px 20px;
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+    background:
+        radial-gradient(circle at 88% 10%, rgba(251, 191, 36, 0.24), transparent 36%),
+        linear-gradient(135deg, #172033 0%, #27364f 62%, #3c2a25 100%);
+}
+
+.pyro-voice-panel__heading,
+.pyro-voice-panel__summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pyro-voice-panel__summary {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.pyro-voice-panel__live-dot {
+    width: 11px;
+    height: 11px;
+    flex: 0 0 auto;
+    border: 3px solid rgba(74, 222, 128, 0.24);
+    border-radius: 999px;
+    background: #4ade80;
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0.08);
+    animation: pyro-voice-live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pyro-voice-live-pulse {
+    50% { box-shadow: 0 0 0 9px rgba(74, 222, 128, 0); }
+}
+
+.pyro-voice-panel__header .pyro-voice-panel__eyebrow { color: #fbbf24; }
+.pyro-voice-panel__header .pyro-voice-panel__title { color: #fff; }
+.pyro-voice-panel__header .pyro-voice-badge {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+.pyro-voice-panel__body {
+    max-height: 650px;
+    gap: 16px;
+    padding: 16px;
+}
+
+.pyro-voice-section__label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+}
+
+.pyro-voice-section__label::after {
+    height: 1px;
+    flex: 1;
+    background: #e2e8f0;
+    content: "";
+}
+
+.pyro-voice-call-card {
+    gap: 12px;
+    padding: 15px;
+    border-color: rgba(203, 213, 225, 0.78);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.pyro-voice-call-card:hover {
+    border-color: rgba(217, 119, 6, 0.32);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+}
+
+.pyro-voice-call-card--active {
+    border-left: 4px solid #22c55e;
+    background: linear-gradient(110deg, rgba(240, 253, 244, 0.9), #fff 42%);
+}
+
+.pyro-voice-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pyro-voice-actions--triage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pyro-voice-actions--triage .pyro-voice-btn:first-child {
+    grid-column: 1 / -1;
+}
+
+.pyro-voice-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.pyro-voice-btn:not(:disabled):hover {
+    box-shadow: 0 7px 18px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+}
+
+.pyro-voice-btn.is-active {
+    border-color: rgba(217, 119, 6, 0.3);
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.pyro-voice-callback-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pyro-voice-call-health {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 6px 9px;
+    border-radius: 11px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.pyro-voice-call-health span:last-child {
+    margin-left: auto;
+}
+
+.pyro-voice-call-health__dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #94a3b8;
+}
+
+.pyro-voice-call-health__dot--good { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12); }
+.pyro-voice-call-health__dot--fair { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12); }
+.pyro-voice-call-health__dot--poor { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12); }
+
+.pyro-voice-callback-actions[hidden],
+.pyro-voice-controls[hidden],
+.pyro-voice-caller-dock__footer[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .pyro-voice-panel {
+        max-height: min(72vh, 640px);
+    }
+
+    .pyro-voice-panel__header {
+        align-items: flex-start;
+        padding: 14px;
+    }
+
+    .pyro-voice-panel__summary {
+        max-width: 94px;
+    }
+
+    .pyro-voice-panel__body {
+        max-height: calc(72vh - 82px);
+    }
+
+    .pyro-voice-actions,
+    .pyro-voice-actions--triage {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .pyro-voice-actions > .pyro-voice-btn--danger:last-child {
+        grid-column: 1 / -1;
+    }
+}
+
 .pyro-voice-toast {
     display: flex;
     align-items: center;
@@ -589,4 +785,39 @@ body.mobile-hub-page .pyro-voice-btn--endcall {
         min-height: 82px;
         border-radius: 20px;
     }
+}
+
+/* Final dispatch overrides intentionally follow the legacy responsive rules. */
+body .pyro-voice-panel {
+    top: 88px;
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(760px, calc(100vh - 112px));
+    border-color: rgba(148, 163, 184, 0.28);
+    border-radius: 28px;
+    background: rgba(248, 250, 252, 0.98);
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2), 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+body .pyro-voice-panel__header {
+    padding: 18px 20px;
+    background: radial-gradient(circle at 88% 10%, rgba(251, 191, 36, 0.24), transparent 36%), linear-gradient(135deg, #172033 0%, #27364f 62%, #3c2a25 100%);
+}
+
+body .pyro-voice-panel__body { max-height: 650px; padding: 16px; }
+body .pyro-voice-call-card { padding: 15px; border-radius: 20px; background: #fff; }
+body .pyro-voice-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body .pyro-voice-actions--triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 768px) {
+    body .pyro-voice-panel {
+        top: auto;
+        right: 10px;
+        bottom: calc(var(--mobile-nav-height, 92px) + env(safe-area-inset-bottom) + 10px);
+        left: 10px;
+        width: auto;
+        max-height: min(72vh, 640px);
+    }
+    body .pyro-voice-panel__body { max-height: calc(72vh - 82px); padding: 10px; }
+    body .pyro-voice-actions,
+    body .pyro-voice-actions--triage { grid-template-columns: 1fr 1fr; }
 }

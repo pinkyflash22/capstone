@@ -31,6 +31,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     let ffLocationPullInterval = null;
     let ffAssignedIncidentsInterval = null;
     let ffAutoAssignInterval = null;
+    let apparatusLocationWatchId = null;
     let ffDashboardWidgetsRequest = null;
     let ffDashboardPostsRequest = null;
     const FF_FETCH_TIMEOUT_MS = 10000;
@@ -39,11 +40,21 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     let ffAutoAssignRequest = null;
     let ffAssignedIncidentsLastFetchedAt = 0;
     let ffAssignedQueuePage = 1;
+    let responseUnitLayer = null;
+    let activeResponseUnitsData = [];
+    const apparatusTelemetryState = new Map();
+    const APPARATUS_TELEMETRY_QUEUE_KEY = `pyrosense_apparatus_telemetry_${window.currentUserId || 'guest'}`;
+    let apparatusWakeLock = null;
+    let apparatusTelemetryFlushInFlight = false;
     function firefighterDashboardIsVisible() {
         return document.visibilityState === 'visible';
     }
 
-    function clearFirefighterDashboardIntervals() {
+    function firefighterPwaIsStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    function clearFirefighterDashboardIntervals(keepApparatusWatch = false) {
         if (ffLocationPushInterval) {
             clearInterval(ffLocationPushInterval);
             ffLocationPushInterval = null;
@@ -60,10 +71,31 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             clearInterval(ffAutoAssignInterval);
             ffAutoAssignInterval = null;
         }
+        if (!keepApparatusWatch && apparatusLocationWatchId !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(apparatusLocationWatchId);
+            apparatusLocationWatchId = null;
+        }
+    }
+
+    function startApparatusLocationWatch() {
+        if (!navigator.geolocation || apparatusLocationWatchId !== null) return;
+        apparatusLocationWatchId = navigator.geolocation.watchPosition(
+            position => {
+                if (!firefighterDashboardIsVisible() && !firefighterPwaIsStandalone()) return;
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                updateUserLocation(window.currentUserId, lat, lng);
+                if (window.userMarker) window.userMarker.setLatLng([lat, lng]);
+                publishDriverApparatusLocation(position);
+            },
+            error => console.warn('Live apparatus GPS watch unavailable:', error),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+        );
     }
 
     function startFirefighterDashboardIntervals() {
         clearFirefighterDashboardIntervals();
+        startApparatusLocationWatch();
 
         ffLocationPushInterval = setInterval(() => {
             if (!firefighterDashboardIsVisible()) return;
@@ -74,6 +106,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                     const lng = position.coords.longitude;
                     updateUserLocation(window.currentUserId, lat, lng);
                     sendUserLocationToServer(lat, lng);
+                    publishDriverApparatusLocation(position);
 
                     if (window.userMarker) {
                         window.userMarker.setLatLng([lat, lng]);
@@ -444,6 +477,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             writeDashboardCache(FF_ASSIGNED_CACHE_KEY, incidents);
             
             displayAssignedIncidents(incidents);
+            refreshActiveResponseUnits(incidents);
             syncFirefighterAssignedFabCount(incidents);
             if (typeof updateChartsWithData === 'function') {
                 updateChartsWithData(incidents);
@@ -790,6 +824,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
+        let backupButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -842,6 +877,9 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         }
         
         const incidentType = getIncidentTypeLabel(incident);
+        if ([2, 3].includes(parseInt(statusId)) && String(incidentType).toLowerCase().includes('fire')) {
+            backupButton = `<button type="button" class="request-incident-backup ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}"><i class="fas fa-tower-broadcast"></i><span>Request Backup</span></button>`;
+        }
         const incidentTitle = incident.marker?.title || 'Emergency Incident';
         const lat = incident.marker?.lat;
         const lng = incident.marker?.lng;
@@ -893,6 +931,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                 </button>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
+                    ${backupButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -945,6 +984,10 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             const currentStatus = parseInt(btn.dataset.status);
             await markIncidentFalseAlarm(incidentId, currentStatus, btn);
         });
+    });
+
+    document.querySelectorAll('.request-incident-backup').forEach(btn => {
+        btn.addEventListener('click', async () => requestIncidentBackup(btn.dataset.incidentId, btn));
     });
 
     hydrateAssignedIncidentLocations(pageIncidents);
@@ -1147,8 +1190,8 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
     
     try {
         const newStatusId = 2;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/respond`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -1303,6 +1346,224 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
         showToast('Failed to tag false alarm', 'error');
     }
 }
+
+async function requestIncidentBackup(incidentId, triggerButton = null) {
+    if (!confirm('Request another available firetruck and crew? Your station will be checked first, then the nearest available station.')) return;
+    const previous = triggerButton?.innerHTML;
+    if (triggerButton) { triggerButton.disabled = true; triggerButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Finding unit...</span>'; }
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'No backup unit is available.');
+        showToast(result.message, 'success');
+        await fetchAssignedIncidents(true);
+        await refreshActiveResponseUnits(window.assignedIncidentsData || []);
+    } catch (error) {
+        showToast(error.message || 'Unable to dispatch backup.', 'error');
+    } finally {
+        if (triggerButton?.isConnected) { triggerButton.disabled = false; triggerButton.innerHTML = previous; }
+    }
+}
+
+    async function refreshActiveResponseUnits(incidents = window.assignedIncidentsData || []) {
+    const list = document.getElementById('activeResponseUnitsList');
+    const count = document.getElementById('activeResponseUnitsCount');
+    if (!list || !count) return [];
+    const activeIncidents = (Array.isArray(incidents) ? incidents : []).filter(incident => [2, 3].includes(Number(getIncidentStatusId(incident))));
+    if (!activeIncidents.length) {
+        activeResponseUnitsData = [];
+        window.activeResponseUnitsData = [];
+        renderActiveResponseUnits([]);
+        updateApparatusTrackingState();
+        return [];
+    }
+
+    const responses = await Promise.allSettled(activeIncidents.map(async incident => {
+        const response = await fetch(`/firefighter/incidents/${incident.incident_id}/response-resources`, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return (payload.units || []).map(unit => ({ ...unit, incident_id: incident.incident_id, incident_title: incident.marker?.title || `Incident #${incident.incident_id}` }));
+    }));
+    const units = responses.flatMap(result => result.status === 'fulfilled' ? result.value : []).filter(unit => ['reserved', 'en_route', 'on_scene'].includes(unit.status));
+    activeResponseUnitsData = units;
+    window.activeResponseUnitsData = units;
+    renderActiveResponseUnits(units);
+    updateApparatusTrackingState();
+    flushQueuedApparatusTelemetry();
+    return units;
+}
+
+function renderActiveResponseUnits(units) {
+    const list = document.getElementById('activeResponseUnitsList');
+    const count = document.getElementById('activeResponseUnitsCount');
+    if (!list || !count) return;
+    count.textContent = String(units.length);
+    list.innerHTML = units.length ? units.map(unit => {
+        const eta = unit.status === 'on_scene' ? 'On scene' : (unit.eta_minutes !== null && unit.eta_minutes !== undefined ? `~${Math.max(0, Math.ceil(Number(unit.eta_minutes)))} min` : 'ETA pending');
+        const identity = unit.unit_number || unit.equipment || `Run ${unit.run_number}`;
+        const gps = unit.gps_status === 'station_fallback' ? 'station location' : `${String(unit.gps_status || 'offline').replace('_', ' ')} GPS`;
+        const members = Array.isArray(unit.team_members) ? unit.team_members : [];
+        const apparatusMeta = [unit.plate_number, unit.water_capacity_liters ? `${Number(unit.water_capacity_liters).toLocaleString()} L` : null, `${members.length} crew`].filter(Boolean).join(' / ');
+        return `<article class="ff-response-unit">
+            <span class="ff-response-unit__icon"><i class="fas fa-truck-fast"></i></span>
+            <span class="ff-response-unit__copy"><strong>${escapeHtml(identity)} / Run ${escapeHtml(unit.run_number)}</strong><small>${escapeHtml(apparatusMeta || unit.apparatus_type || 'Registered apparatus')}</small><small>${escapeHtml(unit.station_name || 'Station')} / ${escapeHtml(gps)}</small></span>
+            <span class="ff-response-unit__eta"><strong>${escapeHtml(eta)}</strong>${escapeHtml(String(unit.status).replace('_', ' '))}</span>
+            ${unit.can_recall ? `<button type="button" class="ff-response-unit__recall" onclick="recallResponseBackup(${Number(unit.incident_id)},${Number(unit.id)})"><i class="fas fa-rotate-left"></i> Recall backup</button>` : ''}
+        </article>`;
+    }).join('') : '<p>No units currently dispatched.</p>';
+    renderResponseUnitMapMarkers(units);
+}
+
+function renderResponseUnitMapMarkers(units) {
+    if (!window.map || typeof L === 'undefined') return;
+    if (!responseUnitLayer || responseUnitLayer._map !== window.map) {
+        responseUnitLayer = L.layerGroup().addTo(window.map);
+    } else {
+        responseUnitLayer.clearLayers();
+    }
+    units.forEach(unit => {
+        const lat = Number(unit.lat); const lng = Number(unit.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const identity = escapeHtml(unit.unit_number || unit.equipment || `Run ${unit.run_number}`);
+        const eta = unit.status === 'on_scene' ? 'On scene' : (unit.eta_minutes !== null ? `ETA ${Math.max(0, Math.ceil(Number(unit.eta_minutes)))} min` : 'ETA pending');
+        const members = Array.isArray(unit.team_members) ? unit.team_members : [];
+        const memberRows = members.length ? members.map(member => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid #e2e8f0"><span><strong>${escapeHtml(member.name)}</strong>${member.rank ? `<small style="display:block;color:#64748b">${escapeHtml(member.rank)}</small>` : ''}</span><small style="color:#9f231c;text-align:right">${escapeHtml(member.role)}</small></div>`).join('') : '<small style="color:#64748b">No crew roster is attached.</small>';
+        const capacity = unit.water_capacity_liters ? `${Number(unit.water_capacity_liters).toLocaleString()} liters` : 'Not recorded';
+        const loadout = Array.isArray(unit.loadout) ? unit.loadout : [];
+        const loadoutRows = loadout.length ? loadout.map(item => `<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid #e2e8f0"><span>${escapeHtml(item.name || 'Equipment')}</span><strong>×${Number(item.quantity) || 0}</strong></div>`).join('') : '<small style="color:#64748b">No onboard loadout recorded.</small>';
+        const gpsSeen = unit.gps_last_seen_at ? new Date(unit.gps_last_seen_at) : null;
+        const gpsAge = gpsSeen && !Number.isNaN(gpsSeen.getTime()) ? Math.max(0, Math.round((Date.now() - gpsSeen.getTime()) / 1000)) : null;
+        const gpsDetail = unit.gps_status === 'station_fallback' ? 'Shown at station until live apparatus GPS is available.' : `Apparatus GPS: ${escapeHtml(unit.gps_status)}${gpsAge !== null ? ` / ${gpsAge < 60 ? `${gpsAge}s` : `${Math.floor(gpsAge / 60)}m`} ago` : ''}${unit.gps_accuracy_meters !== null && unit.gps_accuracy_meters !== undefined ? ` / ±${Math.round(Number(unit.gps_accuracy_meters))}m` : ''}`;
+        const marker = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<span class="pyro-response-unit-marker"><i class="fas fa-truck-fast"></i></span>', iconSize: [40, 40], iconAnchor: [20, 20] }) });
+        marker.bindPopup(`<div style="min-width:270px;max-width:330px;font-family:system-ui,-apple-system,sans-serif"><div style="margin:-12px -12px 10px;padding:12px 14px;border-radius:12px 12px 0 0;color:#fff;background:linear-gradient(135deg,#b42318,#681512)"><strong style="font-size:15px">${identity}</strong><small style="display:block;margin-top:3px;opacity:.85">Actual dispatched apparatus / Run ${escapeHtml(unit.run_number)}</small></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;font-size:11px"><span><b>Plate</b><br>${escapeHtml(unit.plate_number || 'Not recorded')}</span><span><b>Capacity</b><br>${escapeHtml(capacity)}</span><span><b>Station</b><br>${escapeHtml(unit.station_name || 'Responding station')}</span><span><b>Status / ETA</b><br>${escapeHtml(String(unit.status).replace('_', ' '))} / ${escapeHtml(eta)}</span></div><div style="margin:8px 0 5px;color:#9f231c;font-size:10px;font-weight:800;letter-spacing:.08em">ONBOARD EQUIPMENT</div>${loadoutRows}<div style="margin:8px 0 5px;color:#9f231c;font-size:10px;font-weight:800;letter-spacing:.08em">${escapeHtml(unit.team_label || 'RESPONSE TEAM')}</div>${memberRows}<small style="display:block;margin-top:8px;color:#64748b">${gpsDetail}</small></div>`, { minWidth: 270, maxWidth: 350 });
+        marker.addTo(responseUnitLayer);
+    });
+}
+
+async function publishDriverApparatusLocation(position) {
+    if (!position?.coords || !window.currentUserId) return;
+    const driverUnits = activeResponseUnitsData.filter(unit => unit.apparatus_id && ['reserved', 'en_route', 'on_scene'].includes(unit.status)
+        && Array.isArray(unit.team_members)
+        && unit.team_members.some(member => Number(member.user_id) === Number(window.currentUserId) && member.role === 'Commander / Driver'));
+    for (const unit of driverUnits) {
+        const signature = `${Number(position.coords.latitude).toFixed(5)}:${Number(position.coords.longitude).toFixed(5)}`;
+        const previous = apparatusTelemetryState.get(unit.id);
+        if (previous?.pending || (previous && Date.now() - previous.sentAt < 5000) || (previous?.signature === signature && Date.now() - previous.sentAt < 15000)) continue;
+        apparatusTelemetryState.set(unit.id, { signature, sentAt: Date.now(), pending: true });
+        const telemetryPayload = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            speed_kph: Number.isFinite(position.coords.speed) ? position.coords.speed * 3.6 : null,
+            heading: Number.isFinite(position.coords.heading) ? position.coords.heading : null,
+        };
+        try {
+            const response = await fetch(`/firefighter/response-units/${unit.id}/apparatus-location`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                body: JSON.stringify(telemetryPayload),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const requestError = new Error(payload.message || 'Unable to update apparatus GPS.');
+                requestError.canQueue = response.status >= 500 || response.status === 503;
+                throw requestError;
+            }
+            const index = activeResponseUnitsData.findIndex(item => Number(item.id) === Number(unit.id));
+            if (index >= 0 && payload.unit) activeResponseUnitsData[index] = { ...activeResponseUnitsData[index], ...payload.unit };
+            renderActiveResponseUnits(activeResponseUnitsData);
+        } catch (error) {
+            console.warn('Apparatus telemetry update failed:', error);
+            if (!navigator.onLine || error.canQueue) queueApparatusTelemetry(unit.id, telemetryPayload);
+        } finally {
+            const latest = apparatusTelemetryState.get(unit.id) || {};
+            apparatusTelemetryState.set(unit.id, { ...latest, pending: false });
+        }
+    }
+}
+
+function getQueuedApparatusTelemetry() {
+    try { return JSON.parse(localStorage.getItem(APPARATUS_TELEMETRY_QUEUE_KEY) || '[]'); } catch (_) { return []; }
+}
+
+function queueApparatusTelemetry(unitId, payload) {
+    const queue = getQueuedApparatusTelemetry().filter(item => Number(item.unitId) !== Number(unitId));
+    queue.push({ unitId: Number(unitId), payload, queuedAt: new Date().toISOString() });
+    localStorage.setItem(APPARATUS_TELEMETRY_QUEUE_KEY, JSON.stringify(queue.slice(-100)));
+    updateApparatusTrackingState();
+}
+
+async function flushQueuedApparatusTelemetry() {
+    if (!navigator.onLine || apparatusTelemetryFlushInFlight) return;
+    const queue = getQueuedApparatusTelemetry();
+    if (!queue.length) return;
+    apparatusTelemetryFlushInFlight = true;
+    const remaining = [];
+    for (const item of queue) {
+        try {
+            const response = await fetch(`/firefighter/response-units/${item.unitId}/apparatus-location`, {
+                method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }, body: JSON.stringify(item.payload),
+            });
+            if (!response.ok && ![403, 404, 409, 422].includes(response.status)) remaining.push(item);
+        } catch (_) { remaining.push(item); }
+    }
+    localStorage.setItem(APPARATUS_TELEMETRY_QUEUE_KEY, JSON.stringify(remaining.slice(-100)));
+    apparatusTelemetryFlushInFlight = false;
+    updateApparatusTrackingState();
+}
+
+function currentUserIsActiveApparatusDriver() {
+    return activeResponseUnitsData.some(unit => unit.apparatus_id && ['reserved', 'en_route', 'on_scene'].includes(unit.status)
+        && Array.isArray(unit.team_members) && unit.team_members.some(member => Number(member.user_id) === Number(window.currentUserId) && member.role === 'Commander / Driver'));
+}
+
+async function updateApparatusTrackingState() {
+    const state = document.getElementById('apparatusTrackingState');
+    const wrapper = state?.closest('.ff-apparatus-tracking');
+    const install = document.getElementById('apparatusTrackingInstall');
+    if (!state || !wrapper) return;
+    const isDriver = currentUserIsActiveApparatusDriver();
+    const queued = getQueuedApparatusTelemetry().length;
+    wrapper.classList.toggle('is-live', isDriver && navigator.onLine);
+    wrapper.classList.toggle('is-queued', queued > 0);
+    state.innerHTML = queued > 0
+        ? `<i class="fas fa-cloud-arrow-up"></i> ${queued} GPS update${queued === 1 ? '' : 's'} queued offline`
+        : (isDriver ? `<i class="fas fa-satellite-dish"></i> Live apparatus GPS active${apparatusWakeLock ? ' / screen awake' : ''}` : '<i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run');
+    const standalone = firefighterPwaIsStandalone();
+    if (install) install.hidden = standalone || !window.laravelPwaInstall?.canInstall?.();
+    if (isDriver && document.visibilityState === 'visible' && 'wakeLock' in navigator && !apparatusWakeLock) {
+        try {
+            apparatusWakeLock = await navigator.wakeLock.request('screen');
+            apparatusWakeLock.addEventListener('release', () => { apparatusWakeLock = null; updateApparatusTrackingState(); });
+        } catch (error) { console.warn('Screen wake lock unavailable:', error); }
+    } else if (!isDriver && apparatusWakeLock) {
+        await apparatusWakeLock.release().catch(() => {});
+        apparatusWakeLock = null;
+    }
+}
+
+document.getElementById('apparatusTrackingInstall')?.addEventListener('click', () => window.laravelPwaInstall?.showPrompt?.());
+window.addEventListener('online', flushQueuedApparatusTelemetry);
+window.addEventListener('pwa-installable', updateApparatusTrackingState);
+
+async function recallResponseBackup(incidentId, unitId) {
+    const reason = window.prompt('Reason for recalling this backup?', 'Fire is controlled / backup is no longer required.');
+    if (reason === null) return;
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/response-resources/${unitId}/recall`, {
+            method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }, body: JSON.stringify({ reason })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(Object.values(payload.errors || {}).flat()[0] || payload.message || 'Unable to recall backup.');
+        showToast(payload.message || 'Backup recalled.', 'success');
+        await Promise.all([fetchAssignedIncidents(true), refreshActiveResponseUnits(window.assignedIncidentsData || [])]);
+    } catch (error) {
+        showToast(error.message || 'Unable to recall backup.', 'error');
+    }
+}
+
+window.refreshActiveResponseUnits = refreshActiveResponseUnits;
+window.recallResponseBackup = recallResponseBackup;
 
 async function refreshFirefighterLiveMap() {
     if (typeof window.refreshMapMarkers !== 'function') {
@@ -1482,6 +1743,7 @@ function showFalseAlarmConfirmationToast() {
                 updateUserLocation(window.currentUserId, lat, lng);
                 paintCurrentUserLocation(lat, lng);
                 sendUserLocationToServer(lat, lng);
+                publishDriverApparatusLocation(position);
                 document.dispatchEvent(new Event("locationReady"));
             },
             function(error) {
@@ -1633,6 +1895,7 @@ function showFalseAlarmConfirmationToast() {
         }
 
         const firefighterDashboardVisibilityHandler = function () {
+            updateApparatusTrackingState();
             if (firefighterDashboardIsVisible()) {
                 fetchAssignedIncidents(true);
                 if (typeof fetchAllFirefighterLocations === 'function') {
@@ -1642,7 +1905,7 @@ function showFalseAlarmConfirmationToast() {
                 return;
             }
 
-            clearFirefighterDashboardIntervals();
+            clearFirefighterDashboardIntervals(firefighterPwaIsStandalone() && currentUserIsActiveApparatusDriver());
         };
 
         bootstrapFirefighterDashboard();

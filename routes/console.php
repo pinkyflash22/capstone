@@ -5,6 +5,8 @@ use App\Models\Incident;
 use App\Jobs\SyncBarangayBoundaryJob;
 use App\Services\PredictionFeedbackSignalService;
 use App\Services\StationBarangayCoverageService;
+use App\Services\DutyRosterService;
+use App\Services\DutyRosterRecurrenceService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -100,6 +102,18 @@ Schedule::command('coverage:sync-stations')
 Schedule::command('boundaries:sync-covered')
     ->dailyAt('02:00')
     ->withoutOverlapping();
+
+Artisan::command('duty-roster:sync {--station=}', function (DutyRosterService $service, DutyRosterRecurrenceService $recurrence) {
+    $station = $this->option('station');
+    $stationId = $station !== null && $station !== '' ? (int) $station : null;
+    $generated = $recurrence->generate($stationId);
+    $summary = $service->sync($stationId);
+    if ($generated > 0) $this->info("Generated {$generated} recurring shift occurrence(s).");
+    $this->info("Checked {$summary['checked']} roster-managed team(s): {$summary['activated']} active, {$summary['off_duty']} off duty, {$summary['deferred']} deferred while responding.");
+    return 0;
+})->purpose('Activate scheduled duty rosters and apply shift handoffs.');
+
+Schedule::command('duty-roster:sync')->everyMinute()->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

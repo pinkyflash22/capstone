@@ -65,6 +65,11 @@ class Station extends Model
         return $this->hasMany(EquipmentToStation::class, 'station_id', 'station_id');
     }
 
+    public function apparatus()
+    {
+        return $this->hasMany(Apparatus::class, 'station_id', 'station_id');
+    }
+
     public function boundaryLocations()
     {
         return $this->hasMany(BoundaryLocation::class, 'station_id', 'station_id');

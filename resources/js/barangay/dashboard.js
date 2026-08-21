@@ -79,6 +79,23 @@ function normalizeMarkers(payload) {
     return [];
 }
 
+function parseBoundaryCollection(payload) {
+    if (!payload) {
+        return [];
+    }
+
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    try {
+        return JSON.parse(payload);
+    } catch (error) {
+        console.error('Failed to parse barangay boundaries:', error);
+        return [];
+    }
+}
+
 function getFilterKey(category) {
     const normalized = String(category || '').trim().toLowerCase();
 
@@ -126,6 +143,8 @@ async function loadDashboardMap() {
     const incidentCountElement = document.getElementById('barangayMapIncidentCount');
     const lastUpdatedElement = document.getElementById('barangayMapLastUpdated');
     const filterButtons = Array.from(document.querySelectorAll('[data-map-filter]'));
+    const currentBarangayId = Number(mapElement.dataset.currentBarangayId || 0);
+    const boundaryRecords = parseBoundaryCollection(mapElement.dataset.barangayBoundaries);
     const latestPins = (() => {
         try {
             return JSON.parse(mapElement.dataset.miniMapPins || '[]');
@@ -148,6 +167,7 @@ async function loadDashboardMap() {
 
     const allMarkerLayer = L.layerGroup().addTo(map);
     const userLayer = L.layerGroup().addTo(map);
+    const boundaryLayer = L.layerGroup().addTo(map);
     const categoryLayers = {
         incidents: L.layerGroup(),
         stations: L.layerGroup(),
@@ -157,6 +177,7 @@ async function loadDashboardMap() {
     let userMarker = null;
     let userAccuracyCircle = null;
     let hasCenteredOnUser = false;
+    let highlightedBoundaryBounds = null;
 
     let markers = [];
 
@@ -196,7 +217,43 @@ async function loadDashboardMap() {
         bounds.extend([Number(marker.lat), Number(marker.lng)]);
     });
 
-    if (bounds.isValid()) {
+    boundaryRecords.forEach((boundaryRecord) => {
+        if (!boundaryRecord?.geojson) {
+            return;
+        }
+
+        const isCurrentBarangay = Number(boundaryRecord.barangay_id || 0) === currentBarangayId;
+        const layer = L.geoJSON(boundaryRecord.geojson, {
+            style: {
+                color: isCurrentBarangay ? '#ea580c' : '#94a3b8',
+                weight: isCurrentBarangay ? 2.6 : 1.6,
+                opacity: isCurrentBarangay ? 0.95 : 0.72,
+                fillColor: isCurrentBarangay ? '#f59e0b' : '#cbd5e1',
+                fillOpacity: isCurrentBarangay ? 0.16 : 0.08,
+                dashArray: isCurrentBarangay ? null : '6 5',
+            },
+        });
+
+        layer.bindPopup(`
+            <div style="min-width:180px;">
+                <strong style="color:#0f172a;">${escapeHtml(boundaryRecord.barangay_name || 'Barangay boundary')}</strong>
+                <p style="margin:8px 0 0;color:#475569;font-size:0.84rem;">
+                    ${isCurrentBarangay ? 'Your barangay coverage area.' : 'Nearby barangay coverage area.'}
+                </p>
+            </div>
+        `);
+
+        layer.addTo(boundaryLayer);
+
+        const layerBounds = layer.getBounds();
+        if (isCurrentBarangay && layerBounds.isValid()) {
+            highlightedBoundaryBounds = layerBounds;
+        }
+    });
+
+    if (highlightedBoundaryBounds?.isValid()) {
+        map.fitBounds(highlightedBoundaryBounds.pad(0.08));
+    } else if (bounds.isValid()) {
         map.fitBounds(bounds.pad(0.18));
     }
 
@@ -234,6 +291,7 @@ async function loadDashboardMap() {
 
     const overlays = {
         'All Markers': allMarkerLayer,
+        'Barangay Boundaries': boundaryLayer,
         'Your Location': userLayer,
     };
 
@@ -256,6 +314,7 @@ async function loadDashboardMap() {
             allMarkerLayer.addTo(map);
         }
 
+        boundaryLayer.addTo(map);
         userLayer.addTo(map);
     }
 

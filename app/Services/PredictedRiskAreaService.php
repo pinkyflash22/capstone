@@ -25,6 +25,10 @@ class PredictedRiskAreaService
             ]);
 
         $locations = $this->forecastBarangayLocations($stationId);
+        $forecastEvidenceByBarangay = $this->riskEvidencePoints($stationId)
+            ->concat($this->historicalIncidentEvidencePoints($stationId))
+            ->filter(fn (array $point) => ! empty($point['barangay_id']))
+            ->groupBy(fn (array $point) => (int) $point['barangay_id']);
         $areas = collect();
         $seen = [];
 
@@ -89,14 +93,19 @@ class PredictedRiskAreaService
                     $area['geometry_type'] = 'geojson';
                     $area['geometry_precision'] = 'barangay_boundary';
                     $area['geojson'] = $location->geojson;
-                } elseif (is_numeric($location->lat) && is_numeric($location->lng)) {
-                    // A barangay hall is only a reference point. Do not imply that a
-                    // fixed geographic radius around the hall is the predicted zone.
-                    $area['geometry_type'] = 'point';
-                    $area['geometry_precision'] = 'barangay_hall_reference';
-                    $area['center'] = ['lat' => (float) $location->lat, 'lng' => (float) $location->lng];
                 } else {
-                    continue;
+                    $forecastEvidence = collect($forecastEvidenceByBarangay->get($barangayId, []))->values();
+                    if ($forecastEvidence->isEmpty()) {
+                        // A barangay hall is an administrative reference, not risk
+                        // evidence. Omitting the overlay is more accurate than
+                        // placing a forecast hotspot at the hall.
+                        continue;
+                    }
+
+                    $area['geometry_type'] = 'heatmap';
+                    $area['geometry_precision'] = 'supporting_evidence_positions';
+                    $area['evidence_points'] = $forecastEvidence->all();
+                    $area['metrics']['support_points'] = $forecastEvidence->count();
                 }
 
                 $seen[$dedupeKey] = true;
@@ -528,7 +537,10 @@ class PredictedRiskAreaService
                 'cluster_radius_meters' => (int) $cluster['radius_meters'],
                 'pressure_score' => $pressure,
             ],
-            'geometry_type' => 'circle',
+            // The center and radius remain useful cluster metrics, but the map
+            // renders the original evidence coordinates instead of this centroid.
+            'geometry_type' => 'heatmap',
+            'geometry_precision' => 'original_evidence_points',
             'center' => [
                 'lat' => (float) $cluster['center_lat'],
                 'lng' => (float) $cluster['center_lng'],

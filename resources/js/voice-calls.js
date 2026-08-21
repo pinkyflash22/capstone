@@ -9,6 +9,7 @@ const isMobileHubPage = document.body?.classList.contains('mobile-hub-page');
 
 let incomingPollTimer = null;
 let callerPollTimer = null;
+let callbackPollTimer = null;
 let durationTimer = null;
 let activeCall = null;
 let activeAgora = null;
@@ -28,8 +29,11 @@ let agoraJoinState = 'idle';
 let incomingPollInFlight = null;
 let voiceSessionBootstrapPromise = null;
 let knownMissedIds = new Set();
+let knownCallbackId = null;
 let isSpeakerEnabled = true;
 const remoteAudioTracks = new Map();
+const responderSessions = new Map();
+let activeResponderCalls = new Map();
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
@@ -349,11 +353,17 @@ function ensureIncomingPanel() {
     panel.hidden = true;
     panel.innerHTML = `
         <div class="pyro-voice-panel__header">
-            <div>
-                <p class="pyro-voice-panel__eyebrow">Emergency voice</p>
-                <h2 class="pyro-voice-panel__title">Incoming calls</h2>
+            <div class="pyro-voice-panel__heading">
+                <span class="pyro-voice-panel__live-dot" aria-hidden="true"></span>
+                <div>
+                    <p class="pyro-voice-panel__eyebrow">BFP communications</p>
+                    <h2 class="pyro-voice-panel__title">Dispatch call center</h2>
+                </div>
             </div>
-            <span class="pyro-voice-badge" data-pyro-voice-count>0</span>
+            <div class="pyro-voice-panel__summary">
+                <span class="pyro-voice-badge" data-pyro-voice-active-count>0 active</span>
+                <span class="pyro-voice-badge" data-pyro-voice-count>0 total</span>
+            </div>
         </div>
         <div class="pyro-voice-panel__body" data-pyro-voice-list></div>
     `;
@@ -397,6 +407,14 @@ function ensureCallerDock() {
                     <span>Speaker</span>
                 </button>
             </div>
+            <div class="pyro-voice-callback-actions" data-pyro-voice-callback-actions hidden>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--success" data-pyro-voice-accept-callback>
+                    <i class="fa-solid fa-phone"></i><span>Answer</span>
+                </button>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-reject-callback>
+                    <i class="fa-solid fa-phone-slash"></i><span>Decline</span>
+                </button>
+            </div>
             <div class="pyro-voice-caller-dock__footer">
                 <button type="button" class="pyro-voice-btn pyro-voice-btn--danger pyro-voice-btn--endcall" data-pyro-voice-end>
                     <i class="fa-solid fa-phone-slash"></i>
@@ -414,7 +432,13 @@ function renderCallCard(call, active = false) {
     const callerName = call?.caller?.name || 'Anonymous caller';
     const location = callLocation(call);
     const locationText = location.has_location ? location.display : 'Location unavailable';
-    const state = active ? 'Active' : call.status;
+    const session = responderSessions.get(Number(call.id)) || responderSessions.get(call.id);
+    const muted = Boolean(session?.muted);
+    const speakerEnabled = session?.speakerEnabled !== false;
+    const callbackWaiting = call.is_callback && call.status === 'ringing';
+    const onHold = Boolean(call.is_on_hold || session?.held);
+    const quality = responderQualityLabel(session);
+    const state = callbackWaiting ? 'Calling citizen' : (active ? 'Connected' : call.status);
     const hasIncident = Boolean(call.created_incident_id || call.incident_id);
     const flaggedClass = call.is_flagged_prank ? 'pyro-voice-call-card--flagged' : '';
     return `
@@ -431,9 +455,30 @@ function renderCallCard(call, active = false) {
                 <span class="pyro-voice-call-card__location-icon" aria-hidden="true">⌖</span>
                 <span>${escapeHtml(locationText)}</span>
             </div>
+            ${(active || callbackWaiting) ? `
+                <div class="pyro-voice-call-health" data-pyro-voice-quality="${call.id}">
+                    <span class="pyro-voice-call-health__dot pyro-voice-call-health__dot--${quality.tone}"></span>
+                    <span>${quality.label}</span>
+                    <span>${onHold ? 'On hold' : (session?.localAudioTrack ? 'Mic ready' : 'Connecting audio')}</span>
+                </div>
+            ` : ''}
             <div class="pyro-voice-actions">
-                ${active ? `
-                    <button type="button" class="pyro-voice-btn" data-pyro-voice-mute>${isMuted ? 'Unmute' : 'Mute'}</button>
+                ${active || callbackWaiting ? `
+                    ${session ? `
+                        <button type="button" class="pyro-voice-btn ${muted ? 'is-active' : ''}" data-pyro-voice-mute ${session.localAudioTrack ? '' : 'disabled'}>
+                            <i class="fa-solid ${muted ? 'fa-microphone-slash' : 'fa-microphone'}"></i> ${muted ? 'Unmute' : 'Mute'}
+                        </button>
+                        <button type="button" class="pyro-voice-btn ${speakerEnabled ? '' : 'is-active'}" data-pyro-voice-card-speaker>
+                            <i class="fa-solid ${speakerEnabled ? 'fa-volume-high' : 'fa-volume-xmark'}"></i> ${speakerEnabled ? 'Speaker' : 'Silent'}
+                        </button>
+                    ` : `
+                        <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-reconnect>
+                            <i class="fa-solid fa-headset"></i> Connect audio
+                        </button>
+                    `}
+                    <button type="button" class="pyro-voice-btn ${onHold ? 'is-active' : ''}" data-pyro-voice-hold>
+                        <i class="fa-solid ${onHold ? 'fa-play' : 'fa-pause'}"></i> ${onHold ? 'Resume' : 'Hold'}
+                    </button>
                     <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-end>End</button>
                 ` : `
                     <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-accept ${call.can_accept ? '' : 'disabled'}>Accept</button>
@@ -449,6 +494,15 @@ function renderCallCard(call, active = false) {
             </div>
         </article>
     `;
+}
+
+function responderQualityLabel(session) {
+    if (!session || session.joinState !== 'connected') return { label: 'Connecting', tone: 'neutral' };
+    const score = Math.max(Number(session.uplinkQuality || 0), Number(session.downlinkQuality || 0));
+    if (score === 0) return { label: 'Checking quality', tone: 'neutral' };
+    if (score <= 2) return { label: 'Strong connection', tone: 'good' };
+    if (score === 3) return { label: 'Fair connection', tone: 'fair' };
+    return { label: 'Poor connection', tone: 'poor' };
 }
 
 function renderMissedCallCard(call) {
@@ -475,6 +529,31 @@ function renderMissedCallCard(call) {
                     ${hasIncident ? 'Incident created' : 'Create Incident from Missed Call'}
                 </button>
                 <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}>View caller location</button>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-callback ${call.can_callback ? '' : 'disabled'}>
+                    <i class="fa-solid fa-phone"></i> Call citizen back
+                </button>
+            </div>
+        </article>
+    `;
+}
+
+function renderRecentContactCard(call) {
+    const callerName = call?.caller?.name || 'Citizen';
+    const statusLabel = call.status === 'rejected' ? 'Declined' : 'Completed';
+    return `
+        <article class="pyro-voice-call-card" data-call-id="${call.id}">
+            <div class="pyro-voice-call-card__top">
+                <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
+                <div>
+                    <p class="pyro-voice-call-card__name">${escapeHtml(callerName)}</p>
+                    <p class="pyro-voice-call-card__meta">User #${escapeHtml(call.caller?.id || '—')} · ${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Registered citizen')}</p>
+                </div>
+                <span class="pyro-voice-badge">${statusLabel}</span>
+            </div>
+            <div class="pyro-voice-actions">
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--primary pyro-voice-btn--wide" data-pyro-voice-callback ${call.can_callback ? '' : 'disabled'}>
+                    <i class="fa-solid fa-phone"></i> Call citizen back
+                </button>
             </div>
         </article>
     `;
@@ -484,15 +563,23 @@ function renderIncoming(payload) {
     const panel = ensureIncomingPanel();
     const list = panel.querySelector('[data-pyro-voice-list]');
     const count = panel.querySelector('[data-pyro-voice-count]');
+    const activeCount = panel.querySelector('[data-pyro-voice-active-count]');
     const calls = payload.incoming_calls || [];
     const missedCalls = payload.missed_calls || [];
-    const total = calls.length + (payload.active_call ? 1 : 0) + missedCalls.length;
+    const recentContacts = payload.recent_contacts || [];
+    const activeCalls = payload.active_calls || (payload.active_call ? [payload.active_call] : []);
+    const outgoingCalls = payload.outgoing_calls || [];
+    const liveCalls = [...activeCalls, ...outgoingCalls];
+    const total = calls.length + liveCalls.length + missedCalls.length + recentContacts.length;
 
     panel.hidden = total === 0;
     count.textContent = String(total);
+    activeCount.textContent = `${liveCalls.length} active`;
 
     if (!total) {
         stopRinging();
+        activeResponderCalls = new Map();
+        responderSessions.forEach((session, callId) => leaveResponderAgora(callId).catch(() => {}));
         knownIncomingIds = new Set();
         knownCallsById = new Map();
         knownMissedIds = new Set();
@@ -500,10 +587,17 @@ function renderIncoming(payload) {
     }
 
     knownCallsById = new Map([
-        ...(payload.active_call ? [[payload.active_call.id, payload.active_call]] : []),
+        ...liveCalls.map((call) => [call.id, call]),
         ...calls.map((call) => [call.id, call]),
         ...missedCalls.map((call) => [call.id, call]),
+        ...recentContacts.map((call) => [call.id, call]),
     ]);
+    activeResponderCalls = new Map(liveCalls.map((call) => [Number(call.id), call]));
+    responderSessions.forEach((session, callId) => {
+        if (!activeResponderCalls.has(Number(callId))) {
+            leaveResponderAgora(callId).catch(() => {});
+        }
+    });
 
     const newIds = calls.map((call) => call.id).filter((id) => !knownIncomingIds.has(id));
     const newMissedIds = missedCalls.map((call) => call.id).filter((id) => !knownMissedIds.has(id));
@@ -519,13 +613,13 @@ function renderIncoming(payload) {
 
     const sections = [];
 
-    if (payload.active_call || calls.length) {
+    if (liveCalls.length || calls.length) {
         sections.push(`
             <section class="pyro-voice-section">
                 <div class="pyro-voice-section__label">Live calls</div>
                 <div class="pyro-voice-section__cards">
                     ${[
-                        payload.active_call ? renderCallCard(payload.active_call, true) : '',
+                        ...liveCalls.map((call) => renderCallCard(call, true)),
                         ...calls.map((call) => renderCallCard(call)),
                     ].join('')}
                 </div>
@@ -539,6 +633,17 @@ function renderIncoming(payload) {
                 <div class="pyro-voice-section__label">Missed calls</div>
                 <div class="pyro-voice-section__cards">
                     ${missedCalls.map((call) => renderMissedCallCard(call)).join('')}
+                </div>
+            </section>
+        `);
+    }
+
+    if (recentContacts.length) {
+        sections.push(`
+            <section class="pyro-voice-section">
+                <div class="pyro-voice-section__label">Recent citizen contacts</div>
+                <div class="pyro-voice-section__cards">
+                    ${recentContacts.map((call) => renderRecentContactCard(call)).join('')}
                 </div>
             </section>
         `);
@@ -664,6 +769,27 @@ async function handleIncomingClick(event) {
         return;
     }
 
+    if (event.target.closest('[data-pyro-voice-callback]')) {
+        const button = event.target.closest('button');
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        try {
+            const payload = await jsonFetch(routes.callback, {
+                method: 'POST',
+                body: { citizen_user_id: call?.caller?.id, callback_of: callId },
+            });
+            await joinResponderAgora(payload.call, payload.agora);
+            toast(payload.message || 'Calling citizen back.');
+            await pollIncoming();
+        } catch (error) {
+            toast(error.message || 'Unable to call this citizen back.', 'error');
+            button.disabled = false;
+        } finally {
+            button.removeAttribute('aria-busy');
+        }
+        return;
+    }
+
     if (event.target.closest('[data-pyro-voice-accept]')) {
         const button = event.target.closest('button');
         button.disabled = true;
@@ -674,16 +800,10 @@ async function handleIncomingClick(event) {
                 timeoutMs: 10000,
                 timeoutMessage: 'Accept request took too long. Please try again.',
             });
-            activeCall = payload.call;
-            activeAgora = payload.agora;
             stopRinging();
-            renderIncoming({
-                active_call: activeCall,
-                incoming_calls: [],
-            });
             try {
                 await withTimeout(
-                    joinAgora(activeCall, activeAgora),
+                    joinResponderAgora(payload.call, payload.agora),
                     AGORA_JOIN_TIMEOUT_MS,
                     'Voice connection took too long. Please try accepting again.'
                 );
@@ -713,13 +833,56 @@ async function handleIncomingClick(event) {
     }
 
     if (event.target.closest('[data-pyro-voice-end]')) {
-        await endCurrentCall(callId);
+        await endResponderCall(callId);
+        await pollIncoming();
+        return;
+    }
+
+    if (event.target.closest('[data-pyro-voice-reconnect]')) {
+        const button = event.target.closest('button');
+        button.disabled = true;
+        try {
+            const payload = await jsonFetch(routeFor('token', callId), { method: 'POST' });
+            await joinResponderAgora(call, payload.agora);
+            toast('Audio connected.');
+        } catch (error) {
+            toast(error.message || 'Unable to connect audio.', 'error');
+            button.disabled = false;
+        }
+        await pollIncoming();
+        return;
+    }
+
+    if (event.target.closest('[data-pyro-voice-hold]')) {
+        const session = responderSessions.get(Number(callId));
+        const shouldResume = Boolean(call?.is_on_hold || session?.held);
+        try {
+            const payload = await jsonFetch(routeFor(shouldResume ? 'resume' : 'hold', callId), { method: 'POST' });
+            if (session) {
+                session.held = !shouldResume;
+                if (session.localAudioTrack) {
+                    await session.localAudioTrack.setEnabled(shouldResume ? !session.muted : false);
+                }
+                session.remoteAudioTracks.forEach((track) => {
+                    try { track.setVolume(shouldResume && session.speakerEnabled ? 100 : 0); } catch {}
+                });
+            }
+            toast(payload.message || (shouldResume ? 'Call resumed.' : 'Call placed on hold.'));
+        } catch (error) {
+            toast(error.message || 'Unable to change hold state.', 'error');
+        }
         await pollIncoming();
         return;
     }
 
     if (event.target.closest('[data-pyro-voice-mute]')) {
-        await toggleMute();
+        await toggleResponderMute(callId);
+        await pollIncoming();
+        return;
+    }
+
+    if (event.target.closest('[data-pyro-voice-card-speaker]')) {
+        toggleResponderSpeaker(callId);
         await pollIncoming();
     }
 }
@@ -733,10 +896,18 @@ function renderCallerDock(call) {
             : call.status);
     dock.hidden = false;
     dock.querySelector('[data-pyro-voice-caller-status]').textContent = status;
-    dock.querySelector('[data-pyro-voice-caller-title]').textContent = call.station?.name || 'Calling station';
+    const incomingCallback = call.is_callback && call.status === 'ringing';
+    dock.querySelector('.pyro-voice-caller-dock__eyebrow').textContent = incomingCallback ? 'Incoming station callback' : 'Emergency call';
+    dock.querySelector('[data-pyro-voice-caller-title]').textContent = call.station?.name || (incomingCallback ? 'BFP station' : 'Calling station');
     dock.querySelector('[data-pyro-voice-caller-line]').textContent = callerStatusText(call);
     const muteButton = dock.querySelector('[data-pyro-voice-mute]');
     const speakerButton = dock.querySelector('[data-pyro-voice-speaker]');
+    const controls = dock.querySelector('.pyro-voice-controls');
+    const callbackActions = dock.querySelector('[data-pyro-voice-callback-actions]');
+    const footer = dock.querySelector('.pyro-voice-caller-dock__footer');
+    controls.hidden = incomingCallback;
+    callbackActions.hidden = !incomingCallback;
+    footer.hidden = incomingCallback;
     muteButton.disabled = call.status !== 'answered' || !localAudioTrack;
     muteButton.classList.toggle('is-active', isMuted);
     muteButton.querySelector('span').textContent = isMuted ? 'Muted' : 'Mute';
@@ -747,6 +918,8 @@ function renderCallerDock(call) {
 }
 
 function callerStatusText(call) {
+    if (call.is_callback && call.status === 'ringing') return 'Your BFP station is calling you back.';
+    if (call.status === 'answered' && call.is_on_hold) return 'The responder placed this call on hold. Please stay on the line.';
     if (call.status === 'ringing') return `Ringing for ${formatSeconds(callAge(call))}`;
     if (call.status === 'queued') return 'Queued. A station admin will answer after the active call.';
     if (call.status === 'answered' && joinedCallId !== call.id) return 'Answered. Connecting voice channel...';
@@ -850,6 +1023,31 @@ async function pollCaller(callId) {
 }
 
 async function handleCallerDockClick(event) {
+    if (event.target.closest('[data-pyro-voice-accept-callback]') && activeCall?.id) {
+        const button = event.target.closest('button');
+        button.disabled = true;
+        try {
+            const payload = await jsonFetch(routeFor('acceptCallback', activeCall.id), { method: 'POST' });
+            activeCall = payload.call;
+            stopRinging();
+            await joinAgora(activeCall, payload.agora);
+            renderCallerDock(activeCall);
+            toast('Station callback connected.');
+        } catch (error) {
+            toast(error.message || 'Unable to answer callback.', 'error');
+            button.disabled = false;
+        }
+        return;
+    }
+    if (event.target.closest('[data-pyro-voice-reject-callback]') && activeCall?.id) {
+        await jsonFetch(routeFor('rejectCallback', activeCall.id), { method: 'POST' }).catch((error) => {
+            toast(error.message || 'Unable to decline callback.', 'error');
+        });
+        stopRinging();
+        ensureCallerDock().hidden = true;
+        activeCall = null;
+        return;
+    }
     if (event.target.closest('[data-pyro-voice-end]') && activeCall?.id) {
         await endCurrentCall(activeCall.id);
     }
@@ -861,6 +1059,173 @@ async function handleCallerDockClick(event) {
         toggleSpeaker();
         if (activeCall) renderCallerDock(activeCall);
     }
+}
+
+async function pollCitizenCallback() {
+    if (role !== 'citizen' || !routes.incomingCallback) return;
+    try {
+        const payload = await jsonFetch(routes.incomingCallback);
+        const callback = payload.callback;
+        if (!callback) {
+            if (activeCall?.is_callback) {
+                await leaveAgora();
+                ensureCallerDock().hidden = true;
+                activeCall = null;
+            }
+            knownCallbackId = null;
+            return;
+        }
+
+        activeCall = callback;
+        renderCallerDock(callback);
+        if (callback.status === 'ringing' && Number(knownCallbackId) !== Number(callback.id)) {
+            knownCallbackId = callback.id;
+            startRinging();
+            toast(`${callback.station?.name || 'Your BFP station'} is calling you back.`);
+        }
+        if (callback.status === 'answered' && joinedCallId !== callback.id) {
+            const tokenPayload = await jsonFetch(routeFor('token', callback.id), { method: 'POST' });
+            await joinAgora(callback, tokenPayload.agora);
+        }
+    } catch (error) {
+        console.warn('Citizen callback poll failed:', error);
+    }
+}
+
+async function joinResponderAgora(call, agora) {
+    const callId = Number(call?.id);
+    if (!callId || !agora?.app_id || !agora?.token) {
+        throw new Error('Voice token is unavailable.');
+    }
+    if (responderSessions.has(callId)) {
+        return responderSessions.get(callId);
+    }
+
+    const session = {
+        call,
+        agora,
+        client: AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }),
+        localAudioTrack: null,
+        remoteAudioTracks: new Map(),
+        muted: false,
+        speakerEnabled: true,
+        joinState: 'connecting',
+        held: Boolean(call.is_on_hold),
+        uplinkQuality: 0,
+        downlinkQuality: 0,
+        qualityTimer: null,
+    };
+    responderSessions.set(callId, session);
+
+    session.client.on('user-published', async (remoteUser, mediaType) => {
+        await session.client.subscribe(remoteUser, mediaType);
+        if (mediaType === 'audio' && remoteUser.audioTrack) {
+            session.remoteAudioTracks.set(remoteUser.uid, remoteUser.audioTrack);
+            remoteUser.audioTrack.setVolume(session.speakerEnabled && !session.held ? 100 : 0);
+            remoteUser.audioTrack.play();
+        }
+    });
+    session.client.on('user-unpublished', (remoteUser, mediaType) => {
+        if (mediaType === 'audio') session.remoteAudioTracks.delete(remoteUser.uid);
+    });
+    session.client.on('user-left', (remoteUser) => session.remoteAudioTracks.delete(remoteUser.uid));
+    session.client.on('network-quality', (stats) => {
+        session.uplinkQuality = Number(stats?.uplinkNetworkQuality || 0);
+        session.downlinkQuality = Number(stats?.downlinkNetworkQuality || 0);
+        updateResponderQualityBadge(callId);
+    });
+    session.client.on('token-privilege-will-expire', () => renewResponderToken(callId));
+    session.client.on('token-privilege-did-expire', () => renewResponderToken(callId));
+
+    try {
+        await session.client.join(agora.app_id, agora.channel_name, agora.token, agora.uid);
+        session.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        await session.client.publish([session.localAudioTrack]);
+        if (session.held) {
+            await session.localAudioTrack.setEnabled(false);
+        }
+        session.joinState = 'connected';
+        session.qualityTimer = setInterval(() => updateResponderQualityBadge(callId), 1000);
+        updateResponderQualityBadge(callId);
+        return session;
+    } catch (error) {
+        await leaveResponderAgora(callId);
+        throw error;
+    }
+}
+
+async function renewResponderToken(callId) {
+    const session = responderSessions.get(Number(callId));
+    if (!session) return;
+    try {
+        const payload = await jsonFetch(routeFor('token', callId), { method: 'POST' });
+        session.agora = payload.agora;
+        await session.client.renewToken(payload.agora.token);
+    } catch (error) {
+        toast(`Call ${callId} token renewal failed.`, 'error');
+    }
+}
+
+async function toggleResponderMute(callId) {
+    const session = responderSessions.get(Number(callId));
+    if (!session?.localAudioTrack) {
+        toast('Microphone is not available for this call.', 'error');
+        return;
+    }
+    session.muted = !session.muted;
+    await session.localAudioTrack.setEnabled(!session.muted && !session.held);
+    toast(session.muted ? 'This caller is muted.' : 'Microphone restored for this caller.');
+}
+
+function updateResponderQualityBadge(callId) {
+    const session = responderSessions.get(Number(callId));
+    const badge = document.querySelector(`[data-pyro-voice-quality="${Number(callId)}"]`);
+    if (!session || !badge) return;
+    const quality = responderQualityLabel(session);
+    const micLevel = session.localAudioTrack && !session.muted && !session.held
+        ? Number(session.localAudioTrack.getVolumeLevel?.() || 0)
+        : 0;
+    badge.innerHTML = `
+        <span class="pyro-voice-call-health__dot pyro-voice-call-health__dot--${quality.tone}"></span>
+        <span>${quality.label}</span>
+        <span>${session.held ? 'On hold' : (micLevel > 0.03 ? 'Mic active' : 'Mic ready')}</span>
+    `;
+}
+
+function toggleResponderSpeaker(callId) {
+    const session = responderSessions.get(Number(callId));
+    if (!session) return;
+    session.speakerEnabled = !session.speakerEnabled;
+    session.remoteAudioTracks.forEach((track) => {
+        try { track.setVolume(session.speakerEnabled ? 100 : 0); } catch {}
+    });
+}
+
+async function endResponderCall(callId) {
+    try {
+        await jsonFetch(routeFor('end', callId), { method: 'POST' });
+        toast('Call ended.');
+    } catch (error) {
+        toast(error.message || 'Unable to end call.', 'error');
+    } finally {
+        await leaveResponderAgora(callId);
+    }
+}
+
+async function leaveResponderAgora(callId) {
+    const numericId = Number(callId);
+    const session = responderSessions.get(numericId);
+    if (!session) return;
+    responderSessions.delete(numericId);
+    clearInterval(session.qualityTimer);
+    if (session.localAudioTrack) {
+        session.localAudioTrack.stop();
+        session.localAudioTrack.close();
+    }
+    try { await session.client.leave(); } catch (error) {
+        console.warn(`Agora leave failed for call ${numericId}:`, error);
+    }
+    session.remoteAudioTracks.clear();
 }
 
 async function joinAgora(call, agora) {
@@ -1113,6 +1478,11 @@ function initVoiceCalls() {
         document.addEventListener('click', requestNotificationPermissionOnGesture, { once: true });
     }
 
+    if (role === 'citizen' && routes.incomingCallback) {
+        pollCitizenCallback();
+        callbackPollTimer = setInterval(pollCitizenCallback, pollMs);
+    }
+
     window.addEventListener('visibilitychange', () => {
         if (!isResponder) {
             return;
@@ -1130,6 +1500,8 @@ function initVoiceCalls() {
         stopRinging();
         stopOutgoingRinging();
         clearIncomingPollTimer();
+        clearInterval(callbackPollTimer);
+        responderSessions.forEach((session, callId) => leaveResponderAgora(callId).catch(() => {}));
     });
 }
 

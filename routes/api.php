@@ -357,14 +357,18 @@ Route::get('/hydrant-types', [HydrantTypeController::class, 'index']);
 // Route::put('/personnel/{id}/availability', [PersonnelController::class, 'updateAvailability']);
 
 Route::get('/shapes', [BoundaryLocationController::class, 'index']); // fetch all shapes
+Route::get('/shapes/latest', [BoundaryLocationController::class, 'latest']);
 Route::get('/fire-risk-areas', [FireRiskAreaOverlayController::class, 'index']);
-Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
-Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
-Route::get('/boundaries/barangays/{cityId}', [BoundaryLocationController::class, 'availableBarangays']);
-Route::post('/shapes', [BoundaryLocationController::class, 'store']); // save new shape
-Route::put('/shapes/{id}', [BoundaryLocationController::class, 'update']);
-Route::delete('/shapes/{id}', [BoundaryLocationController::class, 'destroy']);
 Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
+
+Route::middleware(['web', 'auth', 'role:station admin,chief'])->group(function () {
+    Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
+    Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
+    Route::get('/boundaries/barangays/{cityId}', [BoundaryLocationController::class, 'availableBarangays']);
+    Route::post('/shapes', [BoundaryLocationController::class, 'store']);
+    Route::put('/shapes/{id}', [BoundaryLocationController::class, 'update']);
+    Route::delete('/shapes/{id}', [BoundaryLocationController::class, 'destroy']);
+});
 
 Route::post('/connection',[StationOfficerController::class, 'store'])->name('station-officer.store');
 // Route::get('/station-officers/{id}',[StationOfficerController::class, 'store'])->name('station-officer.store');

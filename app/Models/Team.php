@@ -21,8 +21,14 @@ class Team extends Model
         'firefighter_officer_3',
         'rescue_radio',
         'station_id',
-        'status'
+        'status',
+        'roster_managed',
+        'active_duty_shift_id',
+        'pending_duty_shift_id',
+        'roster_synced_at',
     ];
+
+    protected $casts = ['roster_managed' => 'boolean', 'roster_synced_at' => 'datetime'];
 
     public function commander()
     {

@@ -36,7 +36,8 @@ class FireRiskAreaOverlayController extends Controller
             ->buildPredictedAreas($stationId, self::DEFAULT_PROXIMITY_METERS)
             ->map(function (array $area) {
                 $area['overlay_type'] = 'verified_evidence';
-                $area['geometry_precision'] = 'localized_evidence_cluster';
+                $area['geometry_type'] = 'heatmap';
+                $area['geometry_precision'] = 'original_evidence_points';
                 return $area;
             });
         $forecastAreas = $this->predictedRiskAreaService->buildForecastAreas($stationId);

@@ -90,7 +90,13 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
-        if (! $request->filled('role_id')) {
+        $currentRole = strtolower(trim((string) Auth::user()?->role?->role));
+        $isManagedRegistration = Auth::check() && in_array($currentRole, ['provincial admin', 'admin', 'station admin', 'chief'], true);
+        if (! $isManagedRegistration) {
+            // Public registration is always a citizen registration. Privileged roles
+            // are created only through authenticated management routes.
+            $request->merge(['role_id' => $this->getCitizenRoleId()]);
+        } elseif (! $request->filled('role_id')) {
             $request->merge(['role_id' => $this->getCitizenRoleId()]);
         }
 

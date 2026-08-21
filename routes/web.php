@@ -26,6 +26,8 @@ use App\Http\Controllers\StationOfficerController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\UserLogController;
 use App\Http\Controllers\VoiceCallController;
+use App\Http\Controllers\DutyRosterController;
+use App\Http\Controllers\FirefighterIncidentResponseController;
 
 //station admin
 use App\Http\Controllers\Chief\StationAdminController;
@@ -117,7 +119,6 @@ Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'boot
 
     //locations based
     Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations']);
-    Route::post('/api/firefighter/location', [FirefighterController::class, 'updateLocation']);
 
     // Route::get('/', [LandingPageController::class, 'index'])->name('landing');
     Route::get('/api/stations', [LandingPageController::class, 'getStations'])->name('api.stations');
@@ -136,7 +137,7 @@ Route::get('/check-auth', function() {
         'admin' => route('admin.dashboard'),
         'station admin', 'chief' => route('station-admin.dashboard'),
         'firefighter' => route('firefighter.dashboard'),
-        'barangay', 'barangay captain' => route('barangay.dashboard'),
+        'barangay', 'barangay captain', 'barangay officer', 'barangay_officer' => route('barangay.dashboard'),
         'citizen' => route('citizen.dashboard'),
         default => null,
     };
@@ -226,10 +227,16 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/', [VoiceCallController::class, 'store'])->name('store');
         Route::get('/incoming', [VoiceCallController::class, 'incoming'])->name('incoming');
         Route::get('/stream', [VoiceCallController::class, 'stream'])->name('stream');
+        Route::post('/callbacks', [VoiceCallController::class, 'callback'])->name('callback');
+        Route::get('/callbacks/incoming', [VoiceCallController::class, 'incomingCallback'])->name('callbacks.incoming');
         Route::get('/{voiceCall}', [VoiceCallController::class, 'show'])->name('show');
         Route::post('/{voiceCall}/accept', [VoiceCallController::class, 'accept'])->name('accept');
+        Route::post('/{voiceCall}/accept-callback', [VoiceCallController::class, 'acceptCallback'])->name('accept-callback');
+        Route::post('/{voiceCall}/reject-callback', [VoiceCallController::class, 'rejectCallback'])->name('reject-callback');
         Route::post('/{voiceCall}/reject', [VoiceCallController::class, 'reject'])->name('reject');
         Route::post('/{voiceCall}/end', [VoiceCallController::class, 'end'])->name('end');
+        Route::post('/{voiceCall}/hold', [VoiceCallController::class, 'hold'])->name('hold');
+        Route::post('/{voiceCall}/resume', [VoiceCallController::class, 'resume'])->name('resume');
         Route::post('/{voiceCall}/create-incident', [VoiceCallController::class, 'createIncident'])->name('create-incident');
         Route::post('/{voiceCall}/flag-prank', [VoiceCallController::class, 'flagPrank'])->name('flag-prank');
         Route::post('/{voiceCall}/token', [VoiceCallController::class, 'token'])->name('token');
@@ -342,6 +349,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
         Route::resource('resource-management', App\Http\Controllers\Chief\ResourceManagementController::class);
+        Route::post('/apparatus', [App\Http\Controllers\ApparatusController::class, 'store'])->name('apparatus.store');
+        Route::put('/apparatus/{apparatus}', [App\Http\Controllers\ApparatusController::class, 'update'])->name('apparatus.update');
+        Route::delete('/apparatus/{apparatus}', [App\Http\Controllers\ApparatusController::class, 'destroy'])->name('apparatus.destroy');
+        Route::post('/users/register', [RegisterController::class, 'register'])->name('users.register');
         Route::post('/resource-management/assign-equipment', [App\Http\Controllers\Chief\ResourceManagementController::class, 'assignEquipmentToStation'])->name('resource-management.assign-equipment');
         Route::get('/fsic', [App\Http\Controllers\Chief\FsicManagementController::class, 'index'])->name('fsic');
         Route::post('/api/create-applicant', [App\Http\Controllers\Chief\FsicManagementController::class, 'createApplicant']);
@@ -356,9 +367,6 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
         Route::put('/barangays/{barangay}', [BarangayController::class, 'update'])->name('barangays.update');
         Route::delete('/barangays/{barangay}', [BarangayController::class, 'destroy'])->name('barangays.destroy');
-        Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])
-            ->name('barangay-boundaries.sync');
-    
      });
 
     Route::middleware(['role:station admin,chief'])->prefix('station-admin')->name('station-admin.')->group(function () {
@@ -463,6 +471,14 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
         Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
+        Route::prefix('duty-roster')->name('duty-roster.')->group(function () {
+            Route::get('/', [DutyRosterController::class, 'index'])->name('index');
+            Route::post('/shifts', [DutyRosterController::class, 'storeShift'])->name('shifts.store');
+            Route::put('/shifts/{dutyShift}', [DutyRosterController::class, 'updateShift'])->name('shifts.update');
+            Route::delete('/shifts/{dutyShift}', [DutyRosterController::class, 'destroyShift'])->name('shifts.destroy');
+            Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
+            Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
+        });
         // Route::get('/resource', function(){
         //     return view('admin.resource-management');
         // });
@@ -472,6 +488,13 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::resource('equipment', EquipmentController::class);
         Route::resource('incidents', IncidentController::class);
         Route::resource('resource-management', App\Http\Controllers\Chief\ResourceManagementController::class);
+        Route::post('/apparatus', [App\Http\Controllers\ApparatusController::class, 'store'])->name('apparatus.store');
+        Route::put('/apparatus/{apparatus}', [App\Http\Controllers\ApparatusController::class, 'update'])->name('apparatus.update');
+        Route::delete('/apparatus/{apparatus}', [App\Http\Controllers\ApparatusController::class, 'destroy'])->name('apparatus.destroy');
+        Route::post('/users/register', [RegisterController::class, 'register'])->name('users.register');
+        Route::post('/barangay-officers', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'store'])->name('barangay-officers.store');
+        Route::put('/barangay-officers/{barangayOfficer}', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'update'])->name('barangay-officers.update');
+        Route::delete('/barangay-officers/{barangayOfficer}', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'destroy'])->name('barangay-officers.destroy');
         Route::get('/barangays', [BarangayController::class, 'index'])->name('barangays.index');
         Route::get('/barangays/create', [BarangayController::class, 'create'])->name('barangays.create');
         Route::post('/barangays', [BarangayController::class, 'store'])->name('barangays.store');
@@ -525,6 +548,12 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/schedule', [FirefighterController::class, 'scheduleData'])->name('schedule.data');
         Route::get('/api/dashboard', [FirefighterController::class, 'dashboardData'])->name('dashboard.data');
         Route::get('/api/dashboard/posts', [FirefighterController::class, 'dashboardPostsData'])->name('dashboard.posts');
+        Route::post('/api/location', [FirefighterController::class, 'updateLocation'])->name('location.update');
+        Route::post('/response-units/{unit}/apparatus-location', [App\Http\Controllers\ApparatusLocationController::class, 'update'])->name('response-units.apparatus-location');
+        Route::post('/incidents/{incident}/respond', [FirefighterIncidentResponseController::class, 'respond'])->name('incidents.respond');
+        Route::post('/incidents/{incident}/backup', [FirefighterIncidentResponseController::class, 'requestBackup'])->name('incidents.backup');
+        Route::get('/incidents/{incident}/response-resources', [FirefighterIncidentResponseController::class, 'resources'])->name('incidents.response-resources');
+        Route::post('/incidents/{incident}/response-resources/{unit}/recall', [FirefighterIncidentResponseController::class, 'recallBackup'])->name('incidents.backup.recall');
         Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::put('/schedule/events/{eventActivity}', [FirefighterController::class, 'updateScheduleEvent'])->name('schedule.events.update');
         Route::delete('/schedule/events/{eventActivity}', [FirefighterController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');
@@ -602,7 +631,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/fsic/my-requests', [FsicRequestController::class, 'myRequests']);
     });
 
-    Route::middleware(['role:barangay,barangay captain'])->prefix('barangay')->name('barangay.')->group(function () {
+    Route::middleware(['role:barangay,barangay captain,barangay officer,barangay_officer'])->prefix('barangay')->name('barangay.')->group(function () {
         Route::get('/dashboard', [BarangayDashboardController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/records', [BarangayDashboardController::class, 'dashboardRecords'])->name('dashboard.records');
         Route::get('/hazards', [BarangayDashboardController::class, 'hazards'])->name('hazards');

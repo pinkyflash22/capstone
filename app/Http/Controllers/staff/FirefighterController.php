@@ -19,6 +19,9 @@ use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\EventActivity;
+use App\Models\DutyException;
+use App\Models\DutyShift;
+use App\Services\DutyRosterRecurrenceService;
 use App\Support\MediaPath;
 use App\Support\MarkerFeedBuilder;
 use Illuminate\Support\Facades\Auth;
@@ -89,6 +92,63 @@ class FirefighterController extends Controller
             'can_edit' => $isPersonal,
             'can_delete' => $isPersonal,
             'is_personal' => $isPersonal,
+        ];
+    }
+
+    protected function serializeDutyShift(DutyShift $shift, int $stationOfficerId, ?DutyException $exception = null): array
+    {
+        $assignment = $shift->assignments->firstWhere('station_officer_id', $stationOfficerId);
+        $roleLabel = match ($assignment?->team_role) {
+            'team_leader' => 'Team Leader',
+            'commander_driver' => 'Driver',
+            'pumper' => 'Pumper',
+            'firefighter_officer_1' => 'Firefighter Officer 1',
+            'firefighter_officer_2' => 'Firefighter Officer 2',
+            'firefighter_officer_3' => 'Firefighter Officer 3',
+            'rescue_radio' => 'Rescue / Radio',
+            default => 'Firefighter',
+        };
+        $isOvernight = $shift->starts_at?->toDateString() !== $shift->ends_at?->toDateString();
+        $availability = $exception?->type === 'leave' ? 'On Leave' : ($exception?->type === 'rest_day' ? 'Rest Day' : null);
+        $now = now();
+        $dutyStatus = $availability ?: ($shift->starts_at?->lte($now) && $shift->ends_at?->gt($now) ? 'On Duty' : ($shift->ends_at?->lte($now) ? 'Completed' : 'Scheduled'));
+        $details = ["Assigned as {$roleLabel}", $shift->duty_roster_template_id ? 'Weekly recurring shift' : 'One-time duty shift'];
+        if ($exception?->reason) $details[] = $exception->reason;
+        if ($shift->notes) $details[] = $shift->notes;
+
+        return [
+            'id' => 'duty-'.$shift->duty_shift_id,
+            'event_id' => 'duty-'.$shift->duty_shift_id,
+            'title' => "Team {$shift->team_id} Duty Shift",
+            'event' => "Team {$shift->team_id} Duty Shift",
+            'type' => 'duty',
+            'activity_type' => 'duty',
+            'date' => $shift->starts_at?->toDateString(),
+            'event_date' => $shift->starts_at?->toDateString(),
+            'startTime' => $shift->starts_at?->format('H:i'),
+            'start_time' => $shift->starts_at?->format('H:i'),
+            'endTime' => $shift->ends_at?->format('H:i'),
+            'end_time' => $shift->ends_at?->format('H:i'),
+            'timeLabel' => $shift->starts_at?->format('g:i A').' - '.$shift->ends_at?->format('g:i A').($isOvernight ? ' (next day)' : ''),
+            'schedule' => $shift->starts_at?->format('g:i A').' - '.$shift->ends_at?->format('g:i A').($isOvernight ? ' (next day)' : ''),
+            'location' => $shift->team?->station?->station_name,
+            'barangay' => $shift->team?->station?->station_name,
+            'description' => implode(' · ', $details),
+            'notes' => implode(' · ', $details),
+            'status' => strtolower(str_replace(' ', '_', $dutyStatus)),
+            'status_label' => $dutyStatus,
+            'station_id' => $shift->station_id,
+            'team_id' => $shift->team_id,
+            'duty_role' => $assignment?->team_role,
+            'duty_role_label' => $roleLabel,
+            'is_recurring' => (bool) $shift->duty_roster_template_id,
+            'is_override' => (bool) $shift->is_override,
+            'availability_type' => $exception?->type,
+            'source_type' => 'duty',
+            'source_label' => 'Official Duty Shift',
+            'can_edit' => false,
+            'can_delete' => false,
+            'is_personal' => false,
         ];
     }
 
@@ -296,7 +356,10 @@ class FirefighterController extends Controller
                 'reporter:user_id,first_name,last_name',
                 'team:team_id',
             ])
-            ->where('team_id', $teamId)
+            ->where(function ($query) use ($teamId) {
+                $query->where('team_id', $teamId)
+                    ->orWhereHas('responseUnits', fn ($unitQuery) => $unitQuery->where('team_id', $teamId));
+            })
             ->when($activeOnly, function ($query) {
                 $query->whereNotIn('status', [self::STATUS_DB_CONTROLLED, self::STATUS_DB_CLOSED]);
             })
@@ -1691,12 +1754,11 @@ public function updateLocation(Request $request)
         }
 
         $validated = $request->validate([
-            'user_id' => ['nullable', 'integer', 'exists:users,user_id'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
 
-        $resolvedUserId = Auth::user()?->user_id ?? $validated['user_id'] ?? null;
+        $resolvedUserId = Auth::id();
 
         if (! $resolvedUserId) {
             return response()->json([
@@ -2033,37 +2095,46 @@ public function getAssignedIncidents(string $id){
 
     protected function buildFirefighterSchedulePayload(int $userId): array
     {
-        return Cache::remember(
-            "firefighter:schedule:{$userId}",
-            now()->addSeconds(20),
-            function () use ($userId) {
-                $stationOfficer = $this->getStationOfficerForUserId($userId, true);
-                $stationId = $stationOfficer?->station_id;
-                $stationName = $stationOfficer?->station?->station_name;
+        $stationOfficer = $this->getStationOfficerForUserId($userId, true);
+        $stationId = $stationOfficer?->station_id;
+        $stationName = $stationOfficer?->station?->station_name;
 
-                $scheduleEvents = EventActivity::query()
-                    ->where(function ($query) use ($stationId, $userId) {
-                        if ($stationId) {
-                            $query->where(function ($stationQuery) use ($stationId) {
-                                $stationQuery->where('station_id', $stationId)
-                                    ->whereNull('user_id');
-                            });
-                        }
+        $scheduleEvents = EventActivity::query()
+            ->where(function ($query) use ($stationId, $userId) {
+                if ($stationId) {
+                    $query->where(function ($stationQuery) use ($stationId) {
+                        $stationQuery->where('station_id', $stationId)->whereNull('user_id');
+                    });
+                }
+                $query->orWhere('user_id', $userId);
+            })
+            ->orderBy('event_date')->orderBy('start_time')->get()
+            ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId));
 
-                        $query->orWhere('user_id', $userId);
-                    })
-                    ->orderBy('event_date')
-                    ->orderBy('start_time')
-                    ->get()
-                    ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId))
-                    ->values();
+        $dutyEvents = collect();
+        if ($stationId && $stationOfficer) {
+            $from = now()->subMonths(6)->startOfDay();
+            $to = now()->addYear()->endOfDay();
+            app(DutyRosterRecurrenceService::class)->generate((int) $stationId, $from, $to);
+            $exceptions = DutyException::query()
+                ->where('station_officer_id', $stationOfficer->station_officer_id)
+                ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->get();
+            $dutyEvents = DutyShift::query()
+                ->with(['assignments' => fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id), 'team.station'])
+                ->where('station_id', $stationId)->where('status', 'scheduled')
+                ->where('starts_at', '<', $to)->where('ends_at', '>', $from)
+                ->whereHas('assignments', fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id))
+                ->orderBy('starts_at')->get()
+                ->map(function (DutyShift $shift) use ($stationOfficer, $exceptions) {
+                    $exception = $exceptions->first(fn (DutyException $item) => $item->starts_at->lt($shift->ends_at) && $item->ends_at->gt($shift->starts_at));
+                    return $this->serializeDutyShift($shift, (int) $stationOfficer->station_officer_id, $exception);
+                });
+        }
 
-                return [
-                    'station_id' => $stationId,
-                    'station_name' => $stationName ?: 'Unassigned Station',
-                    'events' => $scheduleEvents,
-                ];
-            }
-        );
+        return [
+            'station_id' => $stationId,
+            'station_name' => $stationName ?: 'Unassigned Station',
+            'events' => $scheduleEvents->concat($dutyEvents)->sortBy(fn ($event) => ($event['event_date'] ?? '').' '.($event['start_time'] ?? ''))->values(),
+        ];
     }
 }

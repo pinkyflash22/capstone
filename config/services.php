@@ -85,7 +85,8 @@ return [
     'voice_calls' => [
         'missed_after_seconds' => (int) env('VOICE_CALL_MISSED_AFTER_SECONDS', 90),
         'poll_interval_ms' => (int) env('VOICE_CALL_POLL_INTERVAL_MS', 2000),
-        'stale_answered_after_seconds' => (int) env('VOICE_CALL_STALE_ANSWERED_AFTER_SECONDS', 180),
+        'stale_answered_after_seconds' => (int) env('VOICE_CALL_STALE_ANSWERED_AFTER_SECONDS', 3600),
+        'max_concurrent_responder_calls' => (int) env('VOICE_CALL_MAX_CONCURRENT_RESPONDER_CALLS', 4),
     ],
 
     'ai_prediction' => [

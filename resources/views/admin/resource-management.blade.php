@@ -810,7 +810,7 @@
                 <div class="boundary-control-header">
                     <div>
                         <h3><i class="fa-solid fa-draw-polygon"></i> Barangay Boundary Control</h3>
-                        <p>Geoapify boundary sync only runs when an administrator clicks a sync button. Refresh one barangay at a time to update stored polygons, then fine-tune the line manually on the map if needed.</p>
+                        <p>Boundary status is read-only here. Station administrators and chiefs manage polygons for barangays inside their assigned station coverage.</p>
                     </div>
                     <div class="boundary-summary">
                         <span class="boundary-summary-pill"><i class="fa-solid fa-layer-group"></i> {{ $boundaryBarangays->count() }} barangays</span>
@@ -847,13 +847,9 @@
                                     <td>{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
                                     <td>
                                         <div class="boundary-action-group">
-                                            <form class="boundary-sync-form" method="POST" action="{{ route('admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route('admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
-                                                @csrf
-                                                <button type="submit" class="boundary-sync-btn" title="Fetch the latest barangay polygon from Geoapify">
-                                                    <i class="fa-solid fa-arrows-rotate"></i>
-                                                    {{ $boundaryBarangay['boundary_status'] === 'synced' ? 'Refresh' : 'Sync' }}
-                                                </button>
-                                            </form>
+                                            <span class="boundary-status-pill" title="Managed by the assigned station">
+                                                <i class="fa-solid fa-lock"></i> Station managed
+                                            </span>
                                             <a href="{{ route('admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-visit-btn" title="Open barangay boundary details">
                                                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Details
                                             </a>

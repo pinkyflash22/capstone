@@ -50,10 +50,84 @@
         'lng' => $hall->marker->lng,
         'category' => 'barangay',
     ] : null;
+
+    $formatRiskLabel = static function ($value) {
+        if (blank($value)) {
+            return 'Not set';
+        }
+
+        return strtoupper(str_replace('_', ' ', (string) $value));
+    };
 @endphp
 
 @push('styles')
 <style>
+    .barangay-risk-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .barangay-risk-grid-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.9fr);
+        gap: 1.1rem;
+        align-items: start;
+    }
+
+    .barangay-risk-section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .barangay-risk-section-heading h3 {
+        margin: 0;
+    }
+
+    .barangay-risk-section-heading p {
+        margin: 0.35rem 0 0;
+        color: #64748b;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        max-width: 58ch;
+    }
+
+    .barangay-risk-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .barangay-summary-card {
+        border-radius: 20px;
+        border: 1px solid rgba(226, 232, 240, 0.92);
+        background: rgba(248, 250, 252, 0.96);
+        padding: 0.9rem 1rem;
+        min-height: 92px;
+    }
+
+    .barangay-summary-card .tiny-label {
+        margin-bottom: 0.25rem;
+    }
+
+    .barangay-risk-map-shell {
+        margin-top: 1rem;
+        border-radius: 24px;
+        border: 1px solid rgba(226, 232, 240, 0.92);
+        background: #fff;
+        padding: 0.8rem;
+        box-shadow: inset 0 0 0 1px rgba(248, 250, 252, 0.8);
+    }
+
+    .barangay-risk-side-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
     .barangay-risk-form {
         display: grid;
         gap: 1rem;
@@ -296,7 +370,8 @@
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: 1.1rem 1.25rem;
+        padding: 1rem 1.1rem;
+        border-radius: 24px;
     }
 
     .barangay-risk-launch__button,
@@ -332,7 +407,12 @@
 
     .barangay-risk-modal.hidden { display: none; }
     body.risk-modal-open { overflow: hidden; }
-    .barangay-risk-feed-grid { display: grid; gap: 1.25rem; }
+    .barangay-risk-feed-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+    }
 
     .barangay-risk-modal__backdrop {
         position: absolute;
@@ -457,6 +537,191 @@
 
     .barangay-risk-pagination span.is-disabled { opacity: 0.42; }
 
+    .barangay-risk-feed-card {
+        padding: 1.1rem 1.15rem;
+    }
+
+    .barangay-risk-feed-card__header {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 0.9rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .barangay-risk-feed-card__header h3 {
+        margin: 0;
+    }
+
+    .barangay-risk-feed-card__header p {
+        margin: 0.3rem 0 0;
+        color: #64748b;
+        font-size: 0.85rem;
+        line-height: 1.55;
+    }
+
+    .barangay-risk-feed-count {
+        min-width: 62px;
+        padding: 0.55rem 0.75rem;
+        border-radius: 16px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 0.9rem;
+        font-weight: 900;
+        text-align: center;
+    }
+
+    .barangay-risk-feed-count small {
+        display: block;
+        margin-top: 0.2rem;
+        color: #64748b;
+        font-size: 0.63rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .barangay-risk-record-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 0.8rem;
+    }
+
+    .barangay-risk-record-copy {
+        min-width: 0;
+    }
+
+    .barangay-risk-record-action {
+        flex-shrink: 0;
+        min-height: 34px;
+        padding: 0 0.85rem;
+        border: 1px solid rgba(217, 119, 6, 0.18);
+        border-radius: 11px;
+        background: #fff7ed;
+        color: #b45309;
+        font-size: 0.74rem;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .barangay-risk-detail-modal[hidden] { display: none; }
+    .barangay-risk-detail-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10080;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        background: rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(6px);
+    }
+
+    .barangay-risk-detail-modal__card {
+        display: flex;
+        flex-direction: column;
+        width: min(500px, 100%);
+        max-height: min(78dvh, 620px);
+        overflow: hidden;
+        border: 1px solid rgba(245, 158, 11, 0.18);
+        border-radius: 20px;
+        background: #fff;
+        box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+    }
+
+    .barangay-risk-detail-modal__header,
+    .barangay-risk-detail-modal__footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex: 0 0 auto;
+        padding: 12px 14px;
+    }
+
+    .barangay-risk-detail-modal__header {
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .barangay-risk-detail-modal__header h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 0.95rem;
+        font-weight: 900;
+    }
+
+    .barangay-risk-detail-modal__header button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        background: #fff;
+        color: #64748b;
+    }
+
+    .barangay-risk-detail-modal__body {
+        min-height: 0;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: grid;
+        gap: 0.8rem;
+    }
+
+    .barangay-risk-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.65rem;
+    }
+
+    .barangay-risk-detail-item {
+        border-radius: 14px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: #f8fafc;
+        padding: 0.75rem 0.85rem;
+    }
+
+    .barangay-risk-detail-item span {
+        display: block;
+        color: #64748b;
+        font-size: 0.66rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .barangay-risk-detail-item strong {
+        display: block;
+        margin-top: 0.35rem;
+        color: #0f172a;
+        font-size: 0.86rem;
+        line-height: 1.45;
+        word-break: break-word;
+    }
+
+    .barangay-risk-detail-modal__footer {
+        justify-content: flex-end;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .barangay-risk-detail-modal__footer button {
+        min-height: 32px;
+        padding: 0 13px;
+        border: 1px solid rgba(217, 119, 6, 0.2);
+        border-radius: 9px;
+        background: #fff7ed;
+        color: #b45309;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+
     #barangayOperationsMap .leaflet-control-layers {
         border: 1px solid rgba(203, 213, 225, 0.95);
         border-radius: 14px;
@@ -472,6 +737,17 @@
         color: #334155;
         font-size: 0.78rem;
         font-weight: 700;
+    }
+
+    @media (max-width: 1100px) {
+        .barangay-risk-grid-shell,
+        .barangay-risk-feed-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .barangay-risk-metric-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 768px) {
@@ -504,7 +780,8 @@
 
         .barangay-risk-grid,
         .barangay-risk-chip-grid,
-        .barangay-risk-review__list {
+        .barangay-risk-review__list,
+        .barangay-risk-metric-grid {
             grid-template-columns: 1fr;
         }
 
@@ -512,398 +789,166 @@
             align-items: stretch;
         }
 
+        .barangay-risk-section-heading,
+        .barangay-risk-feed-card__header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
         .barangay-risk-location-btn,
         .barangay-risk-submit {
             width: 100%;
+        }
+
+        .barangay-risk-record-head {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .barangay-risk-detail-modal {
+            padding: 9px;
+        }
+
+        .barangay-risk-detail-modal__card {
+            max-height: calc(100dvh - 18px);
+            border-radius: 16px;
+        }
+
+        .barangay-risk-detail-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>
 @endpush
 
 @section('content')
-    @if (session('success'))
-        <div class="panel-card rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if ($errors->any())
-        <div class="panel-card rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <p class="font-semibold mb-1">Unable to submit the risk marker.</p>
-            <ul class="list-disc pl-5 space-y-1">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <section class="panel-card">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-                <div class="panel-eyebrow">Map</div>
-                <h3 class="panel-title">Local safety markers</h3>
+    <div class="barangay-risk-stack">
+        @if (session('success'))
+            <div class="panel-card rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                {{ session('success') }}
             </div>
-            <div class="grid grid-cols-2 gap-3 lg:min-w-[320px]">
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="tiny-label">Active Fires</div>
-                    <div id="barangayMapLiveCount" class="summary-value !mt-1">0</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="tiny-label">Incidents</div>
-                    <div id="barangayMapIncidentCount" class="summary-value !mt-1">0</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="tiny-label">Risk Markers</div>
-                    <div id="barangayMapRiskCount" class="summary-value !mt-1">{{ $riskAreas->count() }}</div>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div class="tiny-label">Last Updated</div>
-                    <div id="barangayMapUpdatedAt" class="text-sm font-bold text-slate-700 mt-2">Loading...</div>
-                </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="panel-card rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p class="font-semibold mb-1">Unable to submit the risk marker.</p>
+                <ul class="list-disc pl-5 space-y-1">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
-        </div>
+        @endif
 
-        <div class="mt-6">
-            <div class="rounded-[26px] border border-slate-200 bg-white p-3 shadow-sm">
-                <div id="barangayOperationsMap" style="height: 560px; border-radius: 20px; overflow: hidden;"></div>
-            </div>
-        </div>
-    </section>
-
-    <section class="panel-card barangay-risk-launch">
-        <div>
-            <div class="panel-eyebrow">Submit</div>
-            <h3 class="panel-title">Add risk marker</h3>
-        </div>
-        <button type="button" class="barangay-risk-launch__button" data-open-risk-modal>
-            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
-            Add Risk Marker
-        </button>
-    </section>
-
-    <section class="barangay-risk-feed-grid">
-        <article id="barangayRiskSubmissionModal" class="barangay-risk-modal hidden" aria-hidden="true">
-            <div class="barangay-risk-modal__backdrop" data-close-risk-modal></div>
-            <div class="barangay-risk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="barangayRiskModalTitle">
-                <header class="barangay-risk-modal__header">
+        <section class="barangay-risk-grid-shell">
+            <article class="panel-card">
+                <div class="barangay-risk-section-heading">
                     <div>
-                                <div class="panel-eyebrow">Submit</div>
-                        <h3 class="panel-title" id="barangayRiskModalTitle">Add risk marker</h3>
+                        <div class="panel-eyebrow">Map</div>
+                        <h3 class="panel-title">Local safety markers</h3>
+                        <p>Track incidents, hydrants, stations, and reported risk areas in your barangay.</p>
                     </div>
-                    <button type="button" class="barangay-risk-modal__close" data-close-risk-modal aria-label="Close risk submission"><i class="fa-solid fa-xmark"></i></button>
-                </header>
-                <div class="barangay-risk-modal__body">
-                    <div class="barangay-risk-wizard__progress" aria-label="Submission progress">
-                        <button type="button" class="barangay-risk-wizard__progress-item is-active" data-risk-step-target="0" data-step="1">1. Basics</button>
-                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="1" data-step="2">2. Profile</button>
-                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="2" data-step="3">3. Evidence</button>
-                        <button type="button" class="barangay-risk-wizard__progress-item" data-risk-step-target="3" data-step="4">4. Location</button>
+                </div>
+
+                <div class="barangay-risk-metric-grid">
+                    @include('barangay.partials.summary-metric-card', ['label' => 'Active Fires', 'value' => '<span id="barangayMapLiveCount">0</span>'])
+                    @include('barangay.partials.summary-metric-card', ['label' => 'Incidents', 'value' => '<span id="barangayMapIncidentCount">0</span>'])
+                    @include('barangay.partials.summary-metric-card', ['label' => 'Risk Markers', 'value' => '<span id="barangayMapRiskCount">' . e($riskAreas->count()) . '</span>'])
+                    @include('barangay.partials.summary-metric-card', ['label' => 'Last Updated', 'value' => '<span id="barangayMapUpdatedAt">Loading...</span>', 'valueClass' => 'text-sm font-bold text-slate-700 mt-2'])
+                </div>
+
+                <div class="barangay-risk-map-shell">
+                    <div id="barangayOperationsMap" style="height: 560px; border-radius: 20px; overflow: hidden;"></div>
+                </div>
+            </article>
+
+            <aside class="barangay-risk-side-stack">
+                <section class="panel-card barangay-risk-launch">
+                    <div>
+                        <div class="panel-eyebrow">Submit</div>
+                        <h3 class="panel-title">Add risk marker</h3>
+                        <p class="panel-copy !mt-1">Send a new risk area for review without leaving the map.</p>
+                    </div>
+                    <button type="button" class="barangay-risk-launch__button" data-open-risk-modal>
+                        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                        Add Risk Marker
+                    </button>
+                </section>
+
+                <article class="panel-card barangay-risk-feed-card">
+                    <div class="barangay-risk-feed-card__header">
+                        <div>
+                            <div class="panel-eyebrow">Totals</div>
+                            <h3 class="panel-title">Map records</h3>
+                            <p>Quick count of markers and submitted barangay risk points.</p>
+                        </div>
+                        <div class="barangay-risk-feed-count">
+                            {{ $riskAreaFeed->total() + $markerInventory->total() }}
+                            <small>Visible</small>
+                        </div>
                     </div>
 
-                <form method="POST" action="{{ route('barangay.risk-map.store') }}" class="barangay-risk-form mt-6" enctype="multipart/form-data">
-                    @csrf
-                    <input type="hidden" name="entry_type" value="risk">
-                    <details class="barangay-risk-step is-active" open>
-                        <summary>
-                            <div class="barangay-risk-step__head">
-                                <div>
-                                <div class="tiny-label">Step 1</div>
-                                <h4 class="mt-2 text-base font-extrabold text-slate-900">Basic information</h4>
-                                <p class="mt-1 text-sm text-slate-500">Add the title, area description, and the main local reference first.</p>
-                                </div>
-                                <span class="barangay-risk-step__status barangay-risk-step__status--required">Required</span>
-                            </div>
-                        </summary>
-                        <div class="barangay-risk-step__body">
-                            <div class="barangay-risk-grid">
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_title">Risk Marker Title <span class="barangay-risk-field__required">Required</span></label>
-                                <input id="risk_area_title" name="title" type="text" value="{{ old('title') }}" class="barangay-risk-input" placeholder="Example: Dense light-material housing near creek" required>
-                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-signature text-orange-500 mr-1"></i>Use a short area name officers will recognize quickly.</p>
-                            </div>
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_location_description">Location Description <span class="barangay-risk-field__required">Required</span></label>
-                                <textarea id="risk_area_location_description" name="location_description" rows="3" class="barangay-risk-textarea" placeholder="Purok, street, landmark, access constraints" required>{{ old('location_description') }}</textarea>
-                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>Say what responders should look for when approaching the area.</p>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_street">Street / Purok / Sitio</label>
-                                <input id="risk_area_street" name="street_or_sitio" type="text" value="{{ old('street_or_sitio') }}" class="barangay-risk-input" placeholder="Specific local reference">
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_station_id">Linked Station</label>
-                                <select id="risk_area_station_id" name="station_id" class="barangay-risk-select">
-                                    <option value="">No linked station</option>
-                                    @foreach ($stations as $station)
-                                        <option value="{{ $station->station_id }}" @selected((string) old('station_id') === (string) $station->station_id)>{{ $station->station_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            </div>
+                    <div class="list-stack">
+                        <div class="list-item">
+                            <h4>Risk submissions</h4>
+                            <p>{{ $riskAreaFeed->total() }} recorded barangay risk markers linked to this area.</p>
                         </div>
-                    </details>
-
-                    <details class="barangay-risk-step" open>
-                        <summary>
-                            <div class="barangay-risk-step__head">
-                                <div>
-                                <div class="tiny-label">Step 2</div>
-                                <h4 class="mt-2 text-base font-extrabold text-slate-900">Risk profile</h4>
-                                <p class="mt-1 text-sm text-slate-500">Capture the exposure type, density, access, and nearby support conditions.</p>
-                                </div>
-                                <span class="barangay-risk-step__status barangay-risk-step__status--review">Review-ready</span>
-                            </div>
-                        </summary>
-                        <div class="barangay-risk-step__body">
-                        <div class="barangay-risk-grid">
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_type">Risk Type</label>
-                                <select id="risk_area_type" name="risk_type" class="barangay-risk-select" required>
-                                    <option value="">Select risk type</option>
-                                    @foreach ($riskTypeGroups as $group => $riskTypes)
-                                        <optgroup label="{{ $group }}">
-                                            @foreach ($riskTypes as $riskTypeValue)
-                                                <option value="{{ $riskTypeValue }}" @selected(old('risk_type') === $riskTypeValue)>{{ $riskTypeOptions[$riskTypeValue] ?? ucwords(str_replace('_', ' ', $riskTypeValue)) }}</option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_condition">Risk Condition</label>
-                                <select id="risk_area_condition" name="condition_code" class="barangay-risk-select" required>
-                                    <option value="">Select a risk type first</option>
-                                    @foreach ($riskConditionOptions as $riskTypeValue => $conditions)
-                                        @foreach ($conditions as $conditionValue => $conditionLabel)
-                                            <option value="{{ $conditionValue }}" data-risk-type="{{ $riskTypeValue }}" @selected(old('condition_code') === $conditionValue)>{{ $conditionLabel }}</option>
-                                        @endforeach
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_population_density_level">Population Density</label>
-                                <select id="risk_area_population_density_level" name="population_density_level" class="barangay-risk-select">
-                                    <option value="">Select level</option>
-                                    @foreach (['low' => 'Low', 'moderate' => 'Moderate', 'high' => 'High'] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('population_density_level') === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_building_density_level">Building Density</label>
-                                <select id="risk_area_building_density_level" name="building_density_level" class="barangay-risk-select">
-                                    <option value="">Select level</option>
-                                    @foreach (['low' => 'Low', 'moderate' => 'Moderate', 'high' => 'High'] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('building_density_level') === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_road_accessibility">Road Accessibility</label>
-                                <select id="risk_area_road_accessibility" name="road_accessibility" class="barangay-risk-select">
-                                    <option value="">Select accessibility</option>
-                                    @foreach (['easy' => 'Easy', 'moderate' => 'Moderate', 'difficult' => 'Difficult', 'very_difficult' => 'Very Difficult'] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('road_accessibility') === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_assessment_level">Assessment Level</label>
-                                <select id="risk_area_assessment_level" name="assessment_level" class="barangay-risk-select">
-                                    <option value="">Select level</option>
-                                    @foreach (['low' => 'Low', 'moderate' => 'Moderate', 'high' => 'High'] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('assessment_level') === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_status">Status</label>
-                                <select id="risk_area_status" name="status" class="barangay-risk-select">
-                                    <option value="pending" @selected(old('status', 'pending') === 'pending')>Pending</option>
-                                    <option value="verified" @selected(old('status') === 'verified')>Verified</option>
-                                    <option value="resolved" @selected(old('status') === 'resolved')>Resolved</option>
-                                </select>
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_risk_score">Risk Score</label>
-                                <input id="risk_area_risk_score" name="risk_score" type="number" step="0.01" min="0" max="100" value="{{ old('risk_score') }}" class="barangay-risk-input" placeholder="0 to 100">
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_radius">Estimated Radius (m)</label>
-                                <input id="risk_area_radius" name="estimated_radius" type="number" step="0.01" min="0" max="10000" value="{{ old('estimated_radius') }}" class="barangay-risk-input" placeholder="Affected radius">
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_distance_to_hydrant">Distance to Hydrant (m)</label>
-                                <input id="risk_area_distance_to_hydrant" name="distance_to_hydrant" type="number" step="0.01" min="0" max="50000" value="{{ old('distance_to_hydrant') }}" class="barangay-risk-input" placeholder="Approximate distance">
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_distance_to_water_source">Distance to Water Source (m)</label>
-                                <input id="risk_area_distance_to_water_source" name="distance_to_water_source" type="number" step="0.01" min="0" max="50000" value="{{ old('distance_to_water_source') }}" class="barangay-risk-input" placeholder="Approximate distance">
-                            </div>
-                            <div class="barangay-risk-field">
-                                <label for="risk_area_estimated_affected_households">Affected Households</label>
-                                <input id="risk_area_estimated_affected_households" name="estimated_affected_households" type="number" min="0" max="100000" value="{{ old('estimated_affected_households') }}" class="barangay-risk-input" placeholder="Household count">
-                            </div>
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_nearby_establishments">Nearby Establishments</label>
-                                <textarea id="risk_area_nearby_establishments" name="nearby_establishments" rows="2" class="barangay-risk-textarea" placeholder="Schools, markets, stores, gas outlets">{{ old('nearby_establishments') }}</textarea>
-                            </div>
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_assessment_description">Assessment Description</label>
-                                <textarea id="risk_area_assessment_description" name="assessment_description" rows="3" class="barangay-risk-textarea" placeholder="Why this area is treated at the selected level">{{ old('assessment_description') }}</textarea>
-                            </div>
+                        <div class="list-item">
+                            <h4>Mapped points</h4>
+                            <p>{{ $markerInventory->total() }} related marker records currently available on the map feed.</p>
                         </div>
-                        </div>
-                    </details>
-
-                    <details class="barangay-risk-step" open>
-                        <summary>
-                            <div class="barangay-risk-step__head">
-                                <div>
-                                <div class="tiny-label">Step 3</div>
-                                <h4 class="mt-2 text-base font-extrabold text-slate-900">Evidence and supporting details</h4>
-                                <p class="mt-1 text-sm text-slate-500">Add site notes, photos, and support condition tags.</p>
-                                </div>
-                                <span class="barangay-risk-step__status barangay-risk-step__status--optional">Optional</span>
-                            </div>
-                        </summary>
-                        <div class="barangay-risk-step__body">
-                        <div class="barangay-risk-grid">
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_remarks">Remarks</label>
-                                <textarea id="risk_area_remarks" name="remarks" rows="3" class="barangay-risk-textarea" placeholder="Operational remarks, follow-ups, or field reminders">{{ old('remarks') }}</textarea>
-                            </div>
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_notes">Notes</label>
-                                <textarea id="risk_area_notes" name="notes" rows="3" class="barangay-risk-textarea" placeholder="Observed materials, blocked access, exposed wiring">{{ old('notes') }}</textarea>
-                            </div>
-                            <div class="barangay-risk-field barangay-risk-field--full">
-                                <label for="risk_area_photos">Photo Evidence</label>
-                                <input id="risk_area_photos" name="photos[]" type="file" multiple accept=".jpg,.jpeg,.png,.webp" class="barangay-risk-file bg-white">
-                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-camera text-orange-500 mr-1"></i>Optional: upload 1 to 3 clear photos, with a combined total of up to 5 MB.</p>
-                                <div id="barangayRiskPhotoUploadStatus" class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600" aria-live="polite">
-                                    No photos selected yet. You can save without photos, or add up to 3 images.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="barangay-risk-chip-grid mt-4">
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="near_hydrant" value="1" @checked(old('near_hydrant'))> Near hydrant
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="near_water_source" value="1" @checked(old('near_water_source'))> Near water source
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="blocked_hydrant" value="1" @checked(old('blocked_hydrant'))> Blocked hydrant
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="informal_settlement" value="1" @checked(old('informal_settlement'))> Informal settlement
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="cooking_fire_prone_activity" value="1" @checked(old('cooking_fire_prone_activity'))> Cooking / fire-prone activity
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="combustible_materials_present" value="1" @checked(old('combustible_materials_present'))> Combustible materials present
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="poor_waste_disposal" value="1" @checked(old('poor_waste_disposal'))> Poor waste disposal
-                            </label>
-                            <label class="barangay-risk-chip">
-                                <input type="checkbox" name="previous_fire_prone_location" value="1" @checked(old('previous_fire_prone_location'))> Previous fire-prone location
-                            </label>
-                        </div>
-                        </div>
-                    </details>
-
-                    <details class="barangay-risk-step" open>
-                        <summary>
-                            <div class="barangay-risk-step__head">
-                                <div>
-                                <div class="tiny-label">Step 4</div>
-                                <h4 class="mt-2 text-base font-extrabold text-slate-900">Map location and review</h4>
-                                <p class="mt-1 text-sm text-slate-500">Pin the area and confirm the location before saving.</p>
-                                </div>
-                                <span class="barangay-risk-step__status barangay-risk-step__status--map">Map required</span>
-                            </div>
-                        </summary>
-                        <div class="barangay-risk-step__body">
-                        <div class="barangay-risk-map-panel">
-                            <div class="barangay-risk-map-panel__head">
-                                <div>
-                                    <div class="tiny-label">Map Picker</div>
-                                    <p class="panel-copy !mt-1">Tap the map to place the marker or start from your current GPS point.</p>
-                                </div>
-                                <button type="button" id="useRiskCurrentLocationBtn" class="barangay-risk-location-btn">
-                                    <i class="fa-solid fa-location-crosshairs"></i>
-                                    Use My Current Location
-                                </button>
-                            </div>
-                            <div id="barangayRiskAreaMap" style="height: 320px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(226,232,240,0.92);"></div>
-                            <div class="barangay-risk-grid mt-4">
-                                <div class="barangay-risk-field">
-                                    <label for="risk_area_lat">Latitude</label>
-                                    <input id="risk_area_lat" name="lat" type="text" value="{{ old('lat') }}" class="barangay-risk-input" readonly required>
-                                </div>
-                                <div class="barangay-risk-field">
-                                    <label for="risk_area_lng">Longitude</label>
-                                    <input id="risk_area_lng" name="lng" type="text" value="{{ old('lng') }}" class="barangay-risk-input" readonly required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="barangay-risk-review mt-4">
-                            <div>
-                                <div class="tiny-label">Review before submit</div>
-                                <p class="panel-copy !mt-1">Check the pin, category, and field notes. The record goes to verification after saving.</p>
-                            </div>
-                            <div class="barangay-risk-review__list">
-                                <div class="barangay-risk-review__item">
-                                    <span>Risk type</span>
-                                    <strong>Set from Step 2</strong>
-                                </div>
-                                <div class="barangay-risk-review__item">
-                                    <span>Pin</span>
-                                    <strong>Latitude and longitude captured above</strong>
-                                </div>
-                                <div class="barangay-risk-review__item">
-                                    <span>Photos</span>
-                                    <strong>Optional evidence kept with the record</strong>
-                                </div>
-                            </div>
-                            <button type="submit" id="barangayRiskSubmitButton" class="barangay-risk-submit">
-                                <i class="fa-solid fa-floppy-disk"></i>
-                                Save Risk Marker
-                            </button>
-                        </div>
-                        </div>
-                    </details>
-                    <div class="barangay-risk-wizard__actions">
-                        <button type="button" class="barangay-risk-wizard__button barangay-risk-wizard__button--back" data-risk-step-back disabled>
-                            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back
-                        </button>
-                        <span class="text-xs font-bold text-slate-500" data-risk-step-label>Step 1 of 4</span>
-                        <button type="button" class="barangay-risk-wizard__button barangay-risk-wizard__button--next" data-risk-step-next>
-                            Next <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-                        </button>
                     </div>
-                </form>
+                </article>
+            </aside>
+        </section>
+
+        <section class="barangay-risk-feed-grid">
+        @include('barangay.partials.risk-map-submission-modal')
+
+        <article class="panel-card barangay-risk-feed-card">
+            <div class="barangay-risk-feed-card__header">
+                <div>
+                    <div class="panel-eyebrow">Risk Markers</div>
+                    <h3 class="panel-title">Recent submissions</h3>
+                    <p>Latest reported risk areas from this barangay.</p>
+                </div>
+                <div class="barangay-risk-feed-count">
+                    {{ $riskAreaFeed->total() }}
+                    <small>Records</small>
                 </div>
             </div>
-        </article>
-
-        <article class="panel-card">
-            <div class="panel-eyebrow">Risk Markers</div>
-            <h3 class="panel-title">Recent submissions</h3>
             @if($riskAreaFeed->isEmpty())
                 <div class="empty-state">No barangay risk markers are available yet.</div>
             @else
                 <div class="list-stack">
                     @foreach($riskAreaFeed as $riskArea)
+                        @php
+                            $riskAreaDetail = [
+                                'title' => $riskArea->marker?->title ?? 'Untitled risk marker',
+                                'kind' => 'Risk Marker',
+                                'description' => $riskArea->marker?->description ?? 'No marker description provided.',
+                                'fields' => [
+                                    ['label' => 'Risk Type', 'value' => $formatRiskLabel($riskArea->risk_type ?: $riskArea->risk_factor)],
+                                    ['label' => 'Status', 'value' => $formatRiskLabel($riskArea->status)],
+                                    ['label' => 'Assessment', 'value' => $formatRiskLabel($riskArea->assessment_level ?: $riskArea->hazard_type)],
+                                    ['label' => 'Station', 'value' => $riskArea->station?->station_name ?: 'No linked station'],
+                                    ['label' => 'Street / Sitio', 'value' => $riskArea->street_or_sitio ?: 'General area'],
+                                    ['label' => 'Remarks', 'value' => $riskArea->remarks ?: 'No remarks'],
+                                    ['label' => 'Photos', 'value' => $riskArea->photos->count() ? $riskArea->photos->count() . ' uploaded' : 'No photos'],
+                                ],
+                            ];
+                        @endphp
                         <div class="list-item">
-                            <h4>{{ $riskArea->marker?->title ?? 'Untitled risk marker' }}</h4>
-                            <p>{{ $riskArea->marker?->description ?? 'No marker description provided.' }}</p>
+                            <div class="barangay-risk-record-head">
+                                <div class="barangay-risk-record-copy">
+                                    <h4>{{ $riskArea->marker?->title ?? 'Untitled risk marker' }}</h4>
+                                    <p>{{ $riskArea->marker?->description ?? 'No marker description provided.' }}</p>
+                                </div>
+                                <button type="button" class="barangay-risk-record-action" data-risk-detail='@json($riskAreaDetail)'>
+                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    View
+                                </button>
+                            </div>
                             <div class="tag-row">
                                 <span class="tag medium">{{ strtoupper(str_replace('_', ' ', $riskArea->risk_type ?: $riskArea->risk_factor)) }}</span>
                                 <span class="tag {{ $riskArea->status }}">{{ strtoupper($riskArea->status) }}</span>
@@ -952,20 +997,48 @@
                 </nav>
             @endif
         </article>
-    </section>
 
-    <section class="panel-grid two">
-        <article class="panel-card">
-            <div class="panel-eyebrow">Map Records</div>
-            <h3 class="panel-title">Other mapped points</h3>
+        <article class="panel-card barangay-risk-feed-card">
+            <div class="barangay-risk-feed-card__header">
+                <div>
+                    <div class="panel-eyebrow">Map Records</div>
+                    <h3 class="panel-title">Other mapped points</h3>
+                    <p>Supporting markers and locations visible in the barangay layer.</p>
+                </div>
+                <div class="barangay-risk-feed-count">
+                    {{ $markerInventory->total() }}
+                    <small>Markers</small>
+                </div>
+            </div>
             @if($markerInventory->isEmpty())
                 <div class="empty-state">No marker records are available yet.</div>
             @else
                 <div class="list-stack">
                     @foreach($markerInventory as $marker)
+                        @php
+                            $markerDetail = [
+                                'title' => $marker->title ?? 'Untitled marker',
+                                'kind' => 'Mapped Point',
+                                'description' => $marker->description ?? 'No marker description provided.',
+                                'fields' => [
+                                    ['label' => 'Category', 'value' => $formatRiskLabel($marker->category ?? 'unknown')],
+                                    ['label' => 'Status', 'value' => $formatRiskLabel($marker->status ?? 'unknown')],
+                                    ['label' => 'Latitude', 'value' => filled($marker->lat) ? (string) $marker->lat : 'Not available'],
+                                    ['label' => 'Longitude', 'value' => filled($marker->lng) ? (string) $marker->lng : 'Not available'],
+                                ],
+                            ];
+                        @endphp
                         <div class="list-item">
-                            <h4>{{ $marker->title ?? 'Untitled marker' }}</h4>
-                            <p>{{ $marker->description ?? 'No marker description provided.' }}</p>
+                            <div class="barangay-risk-record-head">
+                                <div class="barangay-risk-record-copy">
+                                    <h4>{{ $marker->title ?? 'Untitled marker' }}</h4>
+                                    <p>{{ $marker->description ?? 'No marker description provided.' }}</p>
+                                </div>
+                                <button type="button" class="barangay-risk-record-action" data-risk-detail='@json($markerDetail)'>
+                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    View
+                                </button>
+                            </div>
                             <div class="tag-row">
                                 <span class="tag low">{{ strtoupper($marker->category ?? 'UNKNOWN') }}</span>
                                 <span class="tag {{ $marker->status === 'active' ? 'complied' : 'deferred' }}">{{ strtoupper($marker->status ?? 'UNKNOWN') }}</span>
@@ -991,9 +1064,14 @@
             @endif
         </article>
 
-        <article class="panel-card">
-            <div class="panel-eyebrow">Totals</div>
-            <h3 class="panel-title">Risk status</h3>
+        <article class="panel-card barangay-risk-feed-card">
+            <div class="barangay-risk-feed-card__header">
+                <div>
+                    <div class="panel-eyebrow">Totals</div>
+                    <h3 class="panel-title">Risk status</h3>
+                    <p>Current review breakdown for barangay risk submissions.</p>
+                </div>
+            </div>
             <div class="list-stack">
                 <div class="stat-line">
                     <strong>Total risk markers</strong>
@@ -1013,7 +1091,24 @@
                 </div>
             </div>
         </article>
-    </section>
+
+        <div class="barangay-risk-detail-modal" id="barangayRiskDetailModal" role="dialog" aria-modal="true" aria-labelledby="barangayRiskDetailTitle" hidden>
+            <div class="barangay-risk-detail-modal__card">
+                <div class="barangay-risk-detail-modal__header">
+                    <div>
+                        <div class="panel-eyebrow" id="barangayRiskDetailKind">Record</div>
+                        <h3 id="barangayRiskDetailTitle">Details</h3>
+                    </div>
+                    <button type="button" data-risk-detail-close aria-label="Close details"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="barangay-risk-detail-modal__body" id="barangayRiskDetailBody"></div>
+                <div class="barangay-risk-detail-modal__footer">
+                    <button type="button" data-risk-detail-close>Close</button>
+                </div>
+            </div>
+        </div>
+        </section>
+    </div>
 @endsection
 
 @push('scripts')
@@ -1028,8 +1123,21 @@
         const stepLabel = riskModal?.querySelector('[data-risk-step-label]');
         const riskTypeSelect = document.getElementById('risk_area_type');
         const conditionSelect = document.getElementById('risk_area_condition');
+        const detailModal = document.getElementById('barangayRiskDetailModal');
+        const detailModalKind = document.getElementById('barangayRiskDetailKind');
+        const detailModalTitle = document.getElementById('barangayRiskDetailTitle');
+        const detailModalBody = document.getElementById('barangayRiskDetailBody');
         let activeRiskStep = 0;
         let furthestRiskStep = 0;
+
+        function escapeRiskDetailHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         function syncRiskConditions() {
             if (!riskTypeSelect || !conditionSelect) return;
@@ -1121,6 +1229,56 @@
         });
         syncRiskConditions();
         showRiskStep(0);
+
+        function closeRiskDetailModal() {
+            if (!detailModal || !detailModalBody) return;
+            detailModal.hidden = true;
+            detailModalBody.innerHTML = '';
+        }
+
+        function openRiskDetailModal(payload) {
+            if (!detailModal || !detailModalBody || !detailModalTitle || !detailModalKind || !payload) return;
+
+            detailModalKind.textContent = payload.kind || 'Record';
+            detailModalTitle.textContent = payload.title || 'Details';
+
+            const fieldMarkup = Array.isArray(payload.fields)
+                ? payload.fields.map((field) => `
+                    <div class="barangay-risk-detail-item">
+                        <span>${escapeRiskDetailHtml(field.label || 'Field')}</span>
+                        <strong>${escapeRiskDetailHtml(field.value || 'Not available')}</strong>
+                    </div>
+                `).join('')
+                : '';
+
+            detailModalBody.innerHTML = `
+                <div class="list-item">
+                    <h4>${escapeRiskDetailHtml(payload.title || 'Details')}</h4>
+                    <p>${escapeRiskDetailHtml(payload.description || 'No description provided.')}</p>
+                </div>
+                <div class="barangay-risk-detail-grid">${fieldMarkup}</div>
+            `;
+
+            detailModal.hidden = false;
+            detailModal.querySelector('[data-risk-detail-close]')?.focus();
+        }
+
+        document.querySelectorAll('[data-risk-detail]').forEach((button) => {
+            button.addEventListener('click', () => {
+                try {
+                    openRiskDetailModal(JSON.parse(button.dataset.riskDetail || '{}'));
+                } catch (error) {
+                    console.error('Failed to read risk detail payload.', error);
+                }
+            });
+        });
+
+        detailModal?.querySelectorAll('[data-risk-detail-close]').forEach((button) => button.addEventListener('click', closeRiskDetailModal));
+        detailModal?.addEventListener('click', (event) => {
+            if (event.target === detailModal) {
+                closeRiskDetailModal();
+            }
+        });
 
         if (@json($errors->any())) {
             openRiskModal();
@@ -1217,7 +1375,7 @@
 
             return {
                 isValid: true,
-                message: `${files.length} photo(s) ready to upload • ${formatBarangayRiskFileSize(totalBytes)} total`,
+                message: `${files.length} photo(s) ready to upload - ${formatBarangayRiskFileSize(totalBytes)} total`,
                 tone: 'success',
             };
         }

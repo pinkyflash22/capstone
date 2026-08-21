@@ -38,6 +38,8 @@ class RedirectIfAuthenticated
                 case 'barangay':
                     return redirect()->route('barangay.dashboard');
                 case 'barangay captain':
+                case 'barangay officer':
+                case 'barangay_officer':
                     return redirect()->route('barangay.dashboard');
                 default:
                     return redirect()->route('citizen.dashboard');

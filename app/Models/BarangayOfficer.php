@@ -14,8 +14,10 @@ class BarangayOfficer extends Model
     protected $fillable = [
         'barangay_id',
         'user_id',
+        'previous_role_id',
         'position',
         'status',
+        'appointed_by',
     ];
 
     public function barangay()
@@ -26,6 +28,16 @@ class BarangayOfficer extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function previousRole()
+    {
+        return $this->belongsTo(Role::class, 'previous_role_id', 'role_id');
+    }
+
+    public function appointedBy()
+    {
+        return $this->belongsTo(User::class, 'appointed_by', 'user_id');
     }
 
     public function captainHall()

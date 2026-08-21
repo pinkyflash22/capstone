@@ -14,6 +14,7 @@
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
     @vite(['resources/js/admin/resource-management.js'])
     @vite(['resources/js/admin/resources.js'])
+    @vite(['resources/css/duty-roster.css', 'resources/js/duty-roster.js'])
 
     <style>
         * {
@@ -1893,11 +1894,15 @@
                         <button class="add-dropdown-btn" id="addDropdownBtn"><i class="fa-solid fa-plus"></i> Add New <i class="fa-solid fa-chevron-down"></i></button>
                         <div class="add-dropdown-content">
                             <a href="#" data-modal="registerUserModal"><i class="fa-solid fa-user-plus"></i> Register New User</a>
+                            @if(strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) !== 'provincial admin')
+                                <a href="#" onclick="openBarangayOfficerModal(); return false;"><i class="fa-solid fa-people-roof"></i> Add Barangay Officer</a>
+                            @endif
                             {{-- <a href="#" data-modal="officerModal"><i class="fa-solid fa-user-plus"></i> Add Officer to Station</a> --}}
                             <a href="#" data-modal="teamModal"><i class="fa-solid fa-user-plus"></i> Create Team</a>
                             <a href="#" data-modal="equipmentItemModal"><i class="fa-solid fa-box"></i> Add Equipment Item</a>
                             {{-- <a href="#" data-modal="equipmentCategoryModal"><i class="fa-solid fa-tags"></i> Add Equipment Category</a> --}}
                             <a href="#" data-modal="stationEquipmentModal"><i class="fa-solid fa-warehouse"></i> Add Equipment Station</a>
+                            <a href="#" data-modal="apparatusModal" onclick="openApparatusModal()"><i class="fa-solid fa-truck-field"></i> Register Apparatus</a>
                         </div>
                     </div>
                     
@@ -1984,6 +1989,93 @@
                 <div class="resource-pagination">{{ $personnelPage->onEachSide(1)->links() }}</div>
             </div>
 
+            @if(in_array(strtolower((string) (auth()->user()?->role?->role ?? '')), ['chief', 'station admin', 'chief station admin'], true))
+            <section class="duty-roster" id="dutyRosterApp" aria-labelledby="dutyRosterTitle">
+                <div class="duty-roster__header">
+                    <div>
+                        <span class="duty-roster__eyebrow"><i class="fa-solid fa-clock-rotate-left"></i> Live station staffing</span>
+                        <h3 id="dutyRosterTitle">Dynamic Duty Roster</h3>
+                        <p>Schedule handoffs, protect station command coverage, and keep deployed teams current automatically.</p>
+                    </div>
+                    <div class="duty-roster__actions">
+                        <span class="duty-roster__clock" id="dutyRosterClock">Loading station time…</span>
+                        <button type="button" class="duty-roster__button duty-roster__button--secondary" data-roster-action="exception">
+                            <i class="fa-solid fa-calendar-xmark"></i> Rest / Leave
+                        </button>
+                        <button type="button" class="duty-roster__button" data-roster-action="shift">
+                            <i class="fa-solid fa-calendar-plus"></i> Schedule Shift
+                        </button>
+                    </div>
+                </div>
+
+                <div class="duty-roster__metrics" aria-live="polite">
+                    <article><span>Deployable now</span><strong id="dutyMetricDeployable">—</strong><small>firefighters</small></article>
+                    <article><span>Station command</span><strong id="dutyMetricCommand">—</strong><small>chief/admin on station duty</small></article>
+                    <article><span>Rest / leave</span><strong id="dutyMetricExceptions">—</strong><small>active right now</small></article>
+                    <article><span>Next handoff</span><strong id="dutyMetricHandoff">—</strong><small id="dutyMetricHandoffLabel">No upcoming shift</small></article>
+                </div>
+
+                <div class="duty-roster__body">
+                    <div>
+                        <div class="duty-roster__subhead"><h4>Shift timeline</h4><span>Updates every 30 seconds</span></div>
+                        <div id="dutyShiftTimeline" class="duty-roster__timeline"><div class="duty-roster__loading">Loading duty shifts…</div></div>
+                    </div>
+                    <aside>
+                        <div class="duty-roster__subhead"><h4>Rest &amp; leave</h4><span>Not deployable</span></div>
+                        <div id="dutyExceptionList" class="duty-roster__exceptions"><div class="duty-roster__loading">Loading availability…</div></div>
+                    </aside>
+                </div>
+
+                <dialog class="duty-roster__dialog" id="dutyShiftDialog">
+                    <form id="dutyShiftForm" method="dialog">
+                        <div class="duty-roster__dialog-head"><div><span>Duty planning</span><h4 id="dutyShiftDialogTitle">Schedule a shift</h4></div><button type="button" data-dialog-close aria-label="Close">&times;</button></div>
+                        <div class="duty-roster__form-grid">
+                            <label>Shift name<input name="label" required maxlength="100" placeholder="e.g. Team 1 Night Shift"></label>
+                            <label>Response team<select name="team_id" required></select></label>
+                            <label>Starts<input name="starts_at" type="datetime-local" required></label>
+                            <label>Ends<input name="ends_at" type="datetime-local" required><small>For overnight duty, select the following date.</small></label>
+                        </div>
+                        <div class="duty-roster__form-grid duty-roster__recurrence" data-recurrence-fields>
+                            <label>Repeats<select name="recurrence"><option value="none">Does not repeat</option><option value="weekly">Every week</option></select></label>
+                            <label data-repeat-until hidden>Repeat until<input name="recurrence_until" type="date"><small>Up to one year. Each week remains editable.</small></label>
+                        </div>
+                        <div class="duty-roster__edit-scope" data-edit-scope hidden>
+                            <strong>Apply this change to</strong>
+                            <label><input type="radio" name="edit_scope" value="this" checked> This shift only</label>
+                            <label><input type="radio" name="edit_scope" value="future"> This and future shifts</label>
+                            <small>Completed shifts remain unchanged.</small>
+                        </div>
+                        <h5>Deployable firefighters</h5>
+                        <div class="duty-roster__assignment-grid" id="dutyAssignments"></div>
+                        <h5>Must remain at the station</h5>
+                        <div class="duty-roster__form-grid">
+                            <label>Chief / station admin<select name="station_duty" required></select></label>
+                            <label>Backup command (recommended)<select name="station_duty_backup"><option value="">None</option></select></label>
+                        </div>
+                        <label class="duty-roster__notes">Notes<textarea name="notes" maxlength="1000" rows="2" placeholder="Optional briefing or handoff note"></textarea></label>
+                        <div class="duty-roster__form-error" data-form-error></div>
+                        <div class="duty-roster__dialog-actions"><button type="button" class="duty-roster__button duty-roster__button--secondary" data-dialog-close>Cancel</button><button class="duty-roster__button" type="submit">Save shift</button></div>
+                    </form>
+                </dialog>
+
+                <dialog class="duty-roster__dialog" id="dutyExceptionDialog">
+                    <form id="dutyExceptionForm" method="dialog">
+                        <div class="duty-roster__dialog-head"><div><span>Availability</span><h4>Set rest day or leave</h4></div><button type="button" data-dialog-close aria-label="Close">&times;</button></div>
+                        <div class="duty-roster__form-grid">
+                            <label>Personnel<select name="station_officer_id" required></select></label>
+                            <label>Type<select name="type" required><option value="rest_day">Rest day</option><option value="leave">Leave</option></select></label>
+                            <label>Starts<input name="starts_at" type="datetime-local" required></label>
+                            <label>Ends<input name="ends_at" type="datetime-local" required></label>
+                        </div>
+                        <label class="duty-roster__notes">Reason<input name="reason" maxlength="255" placeholder="Optional reason"></label>
+                        <div class="duty-roster__form-error" data-form-error></div>
+                        <div class="duty-roster__dialog-actions"><button type="button" class="duty-roster__button duty-roster__button--secondary" data-dialog-close>Cancel</button><button class="duty-roster__button" type="submit">Save availability</button></div>
+                    </form>
+                </dialog>
+                <script type="application/json" id="dutyRosterConfig">{!! json_encode(['baseUrl' => url('/station-admin/duty-roster'), 'timezone' => config('app.timezone')], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
+            </section>
+            @endif
+
             <!-- Teams Table -->
             <div class="station-grid" id="teamsResourceSection">
                 <div class="section-header">
@@ -2052,6 +2144,34 @@
             </div>
 
            
+
+            @if(strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) !== 'provincial admin')
+            <div class="station-grid" id="barangayOfficerResourceSection">
+                <div class="section-header">
+                    <div><h3><i class="fa-solid fa-people-roof"></i> Barangay Officers</h3><small style="color:#64748b">Officers assigned within your station's active barangay coverage.</small></div>
+                    <div style="display:flex;align-items:center;gap:10px"><span class="stat-badge">{{ $barangayOfficers->count() }} assigned</span><button type="button" class="btn-primary" onclick="openBarangayOfficerModal()"><i class="fa-solid fa-user-plus"></i> Add Officer</button></div>
+                </div>
+                <div class="table-responsive mobile-card-table">
+                    <table class="station-table">
+                        <thead><tr><th>Officer</th><th>Barangay</th><th>Position</th><th>Portal Account</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            @forelse($barangayOfficers as $officer)
+                                <tr>
+                                    <td data-label="Officer"><strong>{{ trim(($officer->user?->first_name ?? '').' '.($officer->user?->middle_name ?? '').' '.($officer->user?->last_name ?? '')) ?: 'Unlinked officer' }}</strong><small style="display:block;color:#64748b">{{ $officer->user?->contact_number ?? 'No contact number' }}</small></td>
+                                    <td data-label="Barangay">{{ $officer->barangay?->barangay_name ?? 'Unknown' }}</td>
+                                    <td data-label="Position"><span class="status" style="background:#fff7ed;color:#9a3412">{{ $officer->position }}</span></td>
+                                    <td data-label="Portal Account">{{ $officer->user?->account_code ?? 'N/A' }}<small style="display:block;color:#64748b">{{ $officer->user?->email }}</small></td>
+                                    <td data-label="Status"><span class="status" style="background:{{ $officer->status === 'active' ? '#dcfce7' : '#f1f5f9' }};color:{{ $officer->status === 'active' ? '#166534' : '#475569' }}">{{ ucfirst($officer->status) }}</span></td>
+                                    <td data-label="Actions"><button type="button" class="action-btn" onclick="openBarangayOfficerModal({{ $officer->barangay_officer_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button><button type="button" class="action-btn delete-resource" onclick="deleteBarangayOfficer({{ $officer->barangay_officer_id }})" title="Remove assignment"><i class="fa-solid fa-user-minus"></i></button></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" style="text-align:center;padding:28px;color:#64748b">No barangay officers assigned yet. Add an existing eligible user or register a new officer.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
 
             <!-- All System Users Table with Enhanced Filtering and Edit Functionality -->
             <div class="station-grid" id="usersResourceSection">
@@ -2172,11 +2292,74 @@
                 <div class="resource-pagination">{{ $equipmentPage->onEachSide(1)->links() }}</div>
             </div>
 
+            <div class="station-grid" id="apparatusResourceSection" style="margin-top: 22px;">
+                <div class="section-header">
+                    <h3><i class="fa-solid fa-truck-field"></i> Fire Apparatus Registry</h3>
+                    <span class="stat-badge">{{ $apparatusRecords->count() }} units</span>
+                </div>
+                <div class="table-responsive mobile-card-table">
+                    <table class="station-table">
+                        <thead><tr><th>Unit</th><th>Station</th><th>Plate / Type</th><th>Capacity</th><th>Readiness</th><th>GPS</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            @forelse($apparatusRecords as $apparatus)
+                                @php
+                                    $ready = $apparatus->status === 'available' && $apparatus->maintenance_status === 'operational';
+                                    $gpsColor = $apparatus->gps_status === 'online' ? '#15803d' : ($apparatus->gps_status === 'stale' ? '#b45309' : '#64748b');
+                                @endphp
+                                <tr>
+                                    <td data-label="Unit"><strong>{{ $apparatus->unit_number }}</strong><br><small>{{ $apparatus->equipment?->equipment_name ?? 'Fire apparatus' }}</small></td>
+                                    <td data-label="Station">{{ $apparatus->station?->station_name ?? 'Unassigned' }}</td>
+                                    <td data-label="Plate / Type"><strong>{{ $apparatus->plate_number ?: 'No plate' }}</strong><br><small>{{ ucwords(str_replace('_', ' ', $apparatus->apparatus_type)) }}</small></td>
+                                    <td data-label="Capacity">{{ $apparatus->water_capacity_liters ? number_format($apparatus->water_capacity_liters).' L' : 'Not set' }}</td>
+                                    <td data-label="Readiness"><span class="status-badge" style="background:{{ $ready ? '#dcfce7' : '#fee2e2' }};color:{{ $ready ? '#166534' : '#991b1b' }};padding:5px 10px;border-radius:999px;">{{ $ready ? 'Ready' : ucwords(str_replace('_', ' ', $apparatus->maintenance_status === 'operational' ? $apparatus->status : $apparatus->maintenance_status)) }}</span></td>
+                                    <td data-label="GPS"><span style="color:{{ $gpsColor }};font-weight:700;"><i class="fa-solid fa-satellite-dish"></i> {{ ucwords(str_replace('_', ' ', $apparatus->gps_status)) }}</span></td>
+                                    <td class="actions" data-label="Actions">
+                                        <button class="action-btn edit-resource" type="button" onclick="openApparatusModal({{ $apparatus->apparatus_id }})" title="Edit apparatus"><i class="fa-solid fa-pen-to-square"></i></button>
+                                        <button class="action-btn delete-resource" type="button" onclick="deleteApparatus({{ $apparatus->apparatus_id }})" title="Remove apparatus"><i class="fa-solid fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="7" style="text-align:center;padding:28px;color:#64748b;">No individual apparatus registered yet. Existing aggregate firetruck inventory remains available as a temporary fallback.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
 
         </div>
     </main>
 
     <!-- ==================== MODALS ==================== -->
+
+    <div id="barangayOfficerModal" class="modal">
+        <div class="modal-content" style="max-width:760px">
+            <div class="modal-header"><h2><i class="fa-solid fa-people-roof"></i> <span id="barangayOfficerModalTitle">Add Barangay Officer</span></h2><button class="modal-close" type="button" onclick="closeModal('barangayOfficerModal')"><i class="fa-solid fa-times"></i></button></div>
+            <form id="barangayOfficerForm" method="POST" action="{{ url('/station-admin/barangay-officers') }}">
+                @csrf<input type="hidden" name="_method" id="barangayOfficerMethod" value="POST">
+                <div class="modal-body">
+                    <div id="barangayOfficerModeGroup" class="form-group full-width"><label class="form-label">Officer source *</label><div style="display:flex;gap:10px;flex-wrap:wrap"><label style="padding:10px 14px;border:1px solid #dbe4ee;border-radius:10px"><input type="radio" name="mode" value="existing" checked> Select existing user</label><label style="padding:10px 14px;border:1px solid #dbe4ee;border-radius:10px"><input type="radio" name="mode" value="new"> Register new account</label></div></div>
+                    <div id="barangayOfficerExistingFields" class="form-group full-width"><label class="form-label">Eligible user *</label><select class="form-select" name="user_id" id="barangayOfficerUser"><option value="">Select a user</option>@foreach($eligibleBarangayOfficerUsers as $eligibleUser)<option value="{{ $eligibleUser->user_id }}">{{ trim(($eligibleUser->first_name ?? '').' '.($eligibleUser->last_name ?? '')) }} — {{ ucfirst($eligibleUser->role?->role ?? 'user') }}{{ $eligibleUser->address?->barangay ? ' / '.$eligibleUser->address->barangay->barangay_name : '' }}</option>@endforeach</select><small>Firefighters, administrators, station administrators, and chiefs are excluded.</small></div>
+                    <div id="barangayOfficerNewFields" class="form-grid" style="display:none">
+                        <div class="form-group"><label class="form-label">First name *</label><input class="form-input" name="first_name" maxlength="100"></div>
+                        <div class="form-group"><label class="form-label">Middle name</label><input class="form-input" name="middle_name" maxlength="100"></div>
+                        <div class="form-group"><label class="form-label">Last name *</label><input class="form-input" name="last_name" maxlength="100"></div>
+                        <div class="form-group"><label class="form-label">Mobile number *</label><input class="form-input" name="contact_number" inputmode="numeric" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></div>
+                        <div class="form-group full-width"><label class="form-label">Email *</label><input type="email" class="form-input" name="email" maxlength="255"></div>
+                        <div class="form-group full-width"><label class="form-label">Street / office address</label><input class="form-input" name="street" maxlength="255" placeholder="Defaults to Barangay Hall"></div>
+                        <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" name="password" minlength="8" placeholder="Leave blank to generate"></div>
+                        <div class="form-group"><label class="form-label">Confirm password</label><input type="password" class="form-input" name="password_confirmation"></div>
+                    </div>
+                    <div class="form-grid" style="margin-top:14px">
+                        <div class="form-group"><label class="form-label">Covered barangay *</label><select class="form-select" name="barangay_id" id="barangayOfficerBarangay" required><option value="">Select barangay</option>@foreach($boundaryBarangays as $coveredBarangay)<option value="{{ $coveredBarangay['barangay_id'] }}">{{ $coveredBarangay['barangay_name'] }}{{ !empty($coveredBarangay['city_name']) ? ' — '.$coveredBarangay['city_name'] : '' }}</option>@endforeach</select></div>
+                        <div class="form-group"><label class="form-label">Position *</label><select class="form-select" name="position" id="barangayOfficerPosition" required><option value="captain">Captain</option><option value="kagawad">Kagawad</option><option value="secretary">Secretary</option><option value="treasurer">Treasurer</option><option value="tanod">Tanod</option><option value="officer" selected>Officer</option></select></div>
+                        <div class="form-group"><label class="form-label">Status *</label><select class="form-select" name="status" id="barangayOfficerStatus" required><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-outline" onclick="closeModal('barangayOfficerModal')">Cancel</button><button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Officer</button></div>
+            </form>
+        </div>
+    </div>
 
     <!-- Register User Modal -->
     <div id="registerUserModal" class="modal">
@@ -2185,7 +2368,7 @@
                 <h2><i class="fa-solid fa-user-plus"></i> Register New User</h2>
                 <button class="modal-close" onclick="closeModal('registerUserModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="registerUserForm" method="POST" action="{{ route('register.store') }}">
+            <form id="registerUserForm" method="POST" action="{{ url('/'.(strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) === 'provincial admin' ? 'admin' : 'station-admin').'/users/register') }}">
                 @csrf
                 <div class="modal-body">
                     <div class="form-grid">
@@ -3035,7 +3218,59 @@
             'vehicles',
         ];
         $equipmentTypeOptions = ['disposable', 'repairable'];
+        $apparatusRoutePrefix = strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) === 'provincial admin' ? 'admin' : 'station-admin';
     @endphp
+
+    <div id="apparatusModal" class="modal">
+        <div class="modal-content" style="max-width: 820px;">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-truck-field"></i> <span id="apparatusModalTitle">Register Fire Apparatus</span></h2>
+                <button class="modal-close" type="button" onclick="closeModal('apparatusModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="apparatusForm" method="POST" action="{{ url('/'.$apparatusRoutePrefix.'/apparatus') }}">
+                @csrf
+                <input type="hidden" id="apparatusMethod" name="_method" value="POST">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        @if($apparatusRoutePrefix === 'admin')
+                            <div class="form-group"><label class="form-label">Assigned Station *</label><select class="form-select" name="station_id" id="apparatusStationId" required>@foreach($activeStations as $station)<option value="{{ $station->station_id }}">{{ $station->station_name }}</option>@endforeach</select></div>
+                        @else
+                            <input type="hidden" name="station_id" id="apparatusStationId" value="{{ $currentStation?->station_id }}">
+                        @endif
+                        <div class="form-group"><label class="form-label">Vehicle Equipment Type *</label><select class="form-select" name="equipment_id" id="apparatusEquipmentId" required><option value="">Select vehicle type</option>@foreach($equipments->where('category', 'vehicles') as $equipment)<option value="{{ $equipment->equipment_id }}">{{ $equipment->equipment_name }}</option>@endforeach</select><small>Defines the catalog type; this unit remains directly owned by its station.</small></div>
+                        <div class="form-group"><label class="form-label">Unit Number *</label><input class="form-input" name="unit_number" id="apparatusUnitNumber" maxlength="50" placeholder="e.g. ENGINE 01" required></div>
+                        <div class="form-group"><label class="form-label">Plate Number</label><input class="form-input" name="plate_number" id="apparatusPlateNumber" maxlength="30" placeholder="e.g. BFP-1234"></div>
+                        <div class="form-group"><label class="form-label">Apparatus Type *</label><select class="form-select" name="apparatus_type" id="apparatusType" required><option value="fire_engine">Fire Engine</option><option value="pumper">Pumper</option><option value="tanker">Tanker</option><option value="ladder">Ladder Truck</option><option value="rescue">Rescue</option><option value="ambulance">Ambulance</option><option value="utility">Utility</option></select></div>
+                        <div class="form-group"><label class="form-label">Water Capacity (liters)</label><input type="number" class="form-input" name="water_capacity_liters" id="apparatusCapacity" min="0" max="100000"></div>
+                        <div class="form-group"><label class="form-label">Operational Status *</label><select class="form-select" name="status" id="apparatusStatus" required><option value="available">Available</option><option value="dispatched">Dispatched</option><option value="out_of_service">Out of Service</option></select></div>
+                        <div class="form-group"><label class="form-label">Maintenance Status *</label><select class="form-select" name="maintenance_status" id="apparatusMaintenanceStatus" required><option value="operational">Operational</option><option value="due">Maintenance Due</option><option value="in_maintenance">In Maintenance</option></select></div>
+                        <div class="form-group"><label class="form-label">Last Maintenance</label><input type="date" class="form-input" name="last_maintenance_at" id="apparatusLastMaintenance"></div>
+                        <div class="form-group"><label class="form-label">Next Maintenance Due</label><input type="date" class="form-input" name="next_maintenance_due_at" id="apparatusNextMaintenance"></div>
+                        <div class="form-group"><label class="form-label">GPS Status *</label><select class="form-select" name="gps_status" id="apparatusGpsStatus" required><option value="online">Online</option><option value="stale">Stale</option><option value="offline">Offline</option><option value="not_installed">Not Installed</option></select></div>
+                        <div class="form-group"><label class="form-label">Last GPS Latitude</label><input type="number" step="0.0000001" class="form-input" name="last_lat" id="apparatusLat" min="-90" max="90"></div>
+                        <div class="form-group"><label class="form-label">Last GPS Longitude</label><input type="number" step="0.0000001" class="form-input" name="last_lng" id="apparatusLng" min="-180" max="180"></div>
+                        <div class="form-group" style="grid-column:1/-1"><label class="form-label">Notes</label><textarea class="form-input" name="notes" id="apparatusNotes" rows="3" maxlength="1000"></textarea></div>
+                    </div>
+                    <section style="margin-top:18px;padding:16px;border:1px solid #dbe4ee;border-radius:14px;background:#f8fafc">
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
+                            <div><strong><i class="fa-solid fa-boxes-stacked"></i> Onboard equipment loadout</strong><small style="display:block;color:#64748b;margin-top:3px">Reserve equipment already assigned to this station. Quantities cannot exceed the station's serviceable stock.</small></div>
+                        </div>
+                        <div id="apparatusLoadoutRows" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+                            @foreach($stationEquipmentAssignments->filter(fn ($assignment) => strtolower((string) $assignment->equipment?->category) !== 'vehicles') as $assignment)
+                                <label class="apparatus-loadout-row" data-station-id="{{ $assignment->station_id }}" data-assignment-id="{{ $assignment->equipment_station_id }}" style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px">
+                                    <input type="hidden" name="loadout[{{ $loop->index }}][equipment_station_id]" value="{{ $assignment->equipment_station_id }}">
+                                    <span style="min-width:0;flex:1"><strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $assignment->equipment?->equipment_name }}</strong><small style="color:#64748b">{{ $assignment->available_quantity }} serviceable</small></span>
+                                    <input type="number" name="loadout[{{ $loop->index }}][quantity]" class="form-input apparatus-loadout-quantity" min="0" max="{{ $assignment->available_quantity }}" value="0" aria-label="Onboard quantity for {{ $assignment->equipment?->equipment_name }}" style="width:76px;padding:7px">
+                                </label>
+                            @endforeach
+                        </div>
+                        <p id="apparatusLoadoutEmpty" style="display:none;color:#64748b;margin:8px 0 0">No non-vehicle equipment is assigned to this station yet.</p>
+                    </section>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-outline" onclick="closeModal('apparatusModal')">Cancel</button><button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Apparatus</button></div>
+            </form>
+        </div>
+    </div>
 
     <!-- Add Equipment Category Modal -->
     <div id="equipmentCategoryModal" class="modal">
@@ -6223,6 +6458,176 @@ document.getElementById('createTeamForm')?.addEventListener('submit', function(e
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     });
+});
+
+const apparatusRegistry = @json($apparatusRecords);
+const apparatusBaseUrl = @json(url('/'.$apparatusRoutePrefix.'/apparatus'));
+const barangayOfficerRegistry = @json($barangayOfficers);
+const barangayOfficerBaseUrl = @json(url('/station-admin/barangay-officers'));
+
+function syncBarangayOfficerMode() {
+    const form = document.getElementById('barangayOfficerForm');
+    if (!form) return;
+    const mode = form.querySelector('input[name="mode"]:checked')?.value || 'existing';
+    const editing = document.getElementById('barangayOfficerMethod')?.value === 'PUT';
+    const existing = document.getElementById('barangayOfficerExistingFields');
+    const newFields = document.getElementById('barangayOfficerNewFields');
+    if (existing) existing.style.display = !editing && mode === 'existing' ? '' : 'none';
+    if (newFields) newFields.style.display = !editing && mode === 'new' ? 'grid' : 'none';
+    const userSelect = document.getElementById('barangayOfficerUser');
+    if (userSelect) userSelect.required = !editing && mode === 'existing';
+    ['first_name', 'last_name', 'email', 'contact_number'].forEach(name => {
+        const input = form.elements[name];
+        if (input) input.required = !editing && mode === 'new';
+    });
+}
+
+function openBarangayOfficerModal(officerId = null) {
+    const form = document.getElementById('barangayOfficerForm');
+    if (!form) return;
+    form.reset();
+    const officer = barangayOfficerRegistry.find(item => Number(item.barangay_officer_id) === Number(officerId));
+    const editing = Boolean(officer);
+    form.action = editing ? `${barangayOfficerBaseUrl}/${officerId}` : barangayOfficerBaseUrl;
+    document.getElementById('barangayOfficerMethod').value = editing ? 'PUT' : 'POST';
+    document.getElementById('barangayOfficerModalTitle').textContent = editing ? 'Edit Barangay Officer' : 'Add Barangay Officer';
+    document.getElementById('barangayOfficerModeGroup').style.display = editing ? 'none' : '';
+    const barangaySelect = document.getElementById('barangayOfficerBarangay');
+    barangaySelect.disabled = editing;
+    if (editing) {
+        barangaySelect.value = officer.barangay_id;
+        document.getElementById('barangayOfficerPosition').value = String(officer.position || 'officer').toLowerCase();
+        document.getElementById('barangayOfficerStatus').value = officer.status || 'active';
+    } else {
+        form.querySelector('input[name="mode"][value="existing"]').checked = true;
+        document.getElementById('barangayOfficerPosition').value = 'officer';
+        document.getElementById('barangayOfficerStatus').value = 'active';
+    }
+    syncBarangayOfficerMode();
+    document.getElementById('barangayOfficerModal').style.display = 'flex';
+    document.getElementById('barangayOfficerModal').classList.add('active');
+}
+
+document.querySelectorAll('#barangayOfficerForm input[name="mode"]').forEach(input => input.addEventListener('change', syncBarangayOfficerMode));
+document.getElementById('barangayOfficerForm')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const button = this.querySelector('button[type="submit"]');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    try {
+        const response = await fetch(this.action, { method: 'POST', body: new FormData(this), headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const payload = await response.json().catch(() => ({}));
+        const validationMessage = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+        if (!response.ok) throw new Error(validationMessage || payload.message || 'Unable to save barangay officer.');
+        if (payload.temporary_password) window.alert(`Officer account created. Temporary password: ${payload.temporary_password}\n\nCopy this now and ask the officer to change it after signing in.`);
+        showToast(payload.message || 'Barangay officer saved.', 'success');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        showToast(error.message || 'Unable to save barangay officer.', 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+    }
+});
+
+async function deleteBarangayOfficer(officerId) {
+    if (!confirm('Remove this barangay officer assignment? An existing user will be restored to their former account role.')) return;
+    try {
+        const response = await fetch(`${barangayOfficerBaseUrl}/${officerId}`, { method: 'DELETE', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Unable to remove barangay officer.');
+        showToast(payload.message, 'success');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        showToast(error.message || 'Unable to remove barangay officer.', 'error');
+    }
+}
+
+function syncApparatusLoadoutRows(loadout = []) {
+    const stationId = String(document.getElementById('apparatusStationId')?.value || '');
+    const quantities = new Map((Array.isArray(loadout) ? loadout : []).map(item => [String(item.equipment_station_id), Number(item.quantity) || 0]));
+    let visible = 0;
+    document.querySelectorAll('.apparatus-loadout-row').forEach(row => {
+        const enabled = row.dataset.stationId === stationId;
+        row.style.display = enabled ? 'flex' : 'none';
+        row.querySelectorAll('input').forEach(input => { input.disabled = !enabled; });
+        const quantity = row.querySelector('.apparatus-loadout-quantity');
+        if (quantity) quantity.value = enabled ? (quantities.get(row.dataset.assignmentId) || 0) : 0;
+        if (enabled) visible += 1;
+    });
+    const empty = document.getElementById('apparatusLoadoutEmpty');
+    if (empty) empty.style.display = visible ? 'none' : 'block';
+}
+
+function openApparatusModal(apparatusId = null) {
+    const form = document.getElementById('apparatusForm');
+    if (!form) return;
+    form.reset();
+    form.action = apparatusId ? `${apparatusBaseUrl}/${apparatusId}` : apparatusBaseUrl;
+    document.getElementById('apparatusMethod').value = apparatusId ? 'PUT' : 'POST';
+    document.getElementById('apparatusModalTitle').textContent = apparatusId ? 'Edit Fire Apparatus' : 'Register Fire Apparatus';
+    const item = apparatusRegistry.find(record => Number(record.apparatus_id) === Number(apparatusId));
+    if (item) {
+        const set = (id, value) => { const element = document.getElementById(id); if (element) element.value = value ?? ''; };
+        set('apparatusStationId', item.station_id);
+        set('apparatusEquipmentId', item.equipment_id);
+        set('apparatusUnitNumber', item.unit_number);
+        set('apparatusPlateNumber', item.plate_number);
+        set('apparatusType', item.apparatus_type);
+        set('apparatusCapacity', item.water_capacity_liters);
+        set('apparatusStatus', item.status);
+        set('apparatusMaintenanceStatus', item.maintenance_status);
+        set('apparatusLastMaintenance', item.last_maintenance_at ? String(item.last_maintenance_at).slice(0, 10) : '');
+        set('apparatusNextMaintenance', item.next_maintenance_due_at ? String(item.next_maintenance_due_at).slice(0, 10) : '');
+        set('apparatusGpsStatus', item.gps_status);
+        set('apparatusLat', item.last_lat);
+        set('apparatusLng', item.last_lng);
+        set('apparatusNotes', item.notes);
+    } else {
+        document.getElementById('apparatusStatus').value = 'available';
+        document.getElementById('apparatusMaintenanceStatus').value = 'operational';
+        document.getElementById('apparatusGpsStatus').value = 'offline';
+    }
+    syncApparatusLoadoutRows(item?.loadout || []);
+    document.getElementById('apparatusModal').style.display = 'flex';
+    document.getElementById('apparatusModal').classList.add('active');
+}
+
+document.getElementById('apparatusStationId')?.addEventListener('change', () => syncApparatusLoadoutRows([]));
+
+async function deleteApparatus(apparatusId) {
+    const item = apparatusRegistry.find(record => Number(record.apparatus_id) === Number(apparatusId));
+    if (!confirm(`Remove ${item?.unit_number || 'this apparatus'} from the registry?`)) return;
+    try {
+        const response = await fetch(`${apparatusBaseUrl}/${apparatusId}`, { method: 'DELETE', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Unable to remove apparatus.');
+        showToast(payload.message || 'Apparatus removed.', 'success');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        showToast(error.message || 'Unable to remove apparatus.', 'error');
+    }
+}
+
+document.getElementById('apparatusForm')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const button = this.querySelector('button[type="submit"]');
+    const original = button?.innerHTML;
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+    try {
+        const response = await fetch(this.action, { method: 'POST', body: new FormData(this), headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
+        const payload = await response.json().catch(() => ({}));
+        const validationMessage = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+        if (!response.ok) throw new Error(validationMessage || payload.message || 'Unable to save apparatus.');
+        showToast(payload.message || 'Apparatus saved.', 'success');
+        closeModal('apparatusModal');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        showToast(error.message || 'Unable to save apparatus.', 'error');
+    } finally {
+        if (button) { button.disabled = false; button.innerHTML = original; }
+    }
 });
 
 // Initialize on page load

@@ -8,6 +8,15 @@
     "theme_color": "#d14b24",
     "display": "standalone",
     "orientation": "natural",
+    "shortcuts": [
+        {
+            "name": "Firefighter Operations",
+            "short_name": "Operations",
+            "description": "Open live firefighter response operations",
+            "url": "/firefighter/dashboard?source=pwa-shortcut",
+            "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
+        }
+    ],
     "icons": [
         {
             "src": "/logo.png",

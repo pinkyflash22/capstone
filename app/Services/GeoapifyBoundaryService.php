@@ -49,8 +49,7 @@ class GeoapifyBoundaryService
             ['barangay_id' => $barangayId, 'boundary_type' => 'barangay'],
             [
                 'name' => $barangay->barangay_name,
-                // Barangay boundaries are reusable across all stations that cover them.
-                'station_id' => null,
+                'station_id' => $coverageStationId ?? $existing?->station_id,
                 'geojson' => $payload['feature_collection'],
                 'source' => 'geoapify',
                 'external_place_id' => $properties['place_id'] ?? $properties['id'] ?? null,

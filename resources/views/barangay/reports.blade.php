@@ -12,6 +12,13 @@
 @endsection
 
 @section('content')
+    @php
+        $reportsOnPage = $fireRecords->count();
+        $reportsTotal = (int) ($fireRecordTotalCount ?? $fireRecords->total());
+        $pendingRecords = collect($fireRecords->items())->filter(fn ($record) => strcasecmp((string) ($record['status'] ?? ''), 'Reported') === 0)->count();
+        $completedRecords = collect($fireRecords->items())->filter(fn ($record) => in_array(strtolower((string) ($record['status'] ?? '')), ['closed', 'completed'], true))->count();
+    @endphp
+
     @if (session('success'))
         <div class="panel-card rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
             {{ session('success') }}
@@ -29,7 +36,8 @@
         </div>
     @endif
 
-    <section class="panel-card">
+    <section class="fire-report-shell">
+    <section class="panel-card fire-report-shell__main">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <div class="panel-eyebrow">Barangay Fire Record Register</div>
@@ -118,6 +126,44 @@
         </div>
     </section>
 
+    <aside class="fire-report-shell__side">
+        <article class="panel-card fire-report-side-card">
+            <div class="panel-eyebrow">Scope</div>
+            <h3 class="panel-title">Barangay filter</h3>
+            <p class="panel-copy !mt-1">Only records tied to your logged-in barangay are loaded here.</p>
+
+            <div class="fire-report-summary-grid fire-report-summary-grid--side">
+                <article class="fire-report-summary-card">
+                    <div class="tiny-label">Visible</div>
+                    <strong>{{ $reportsOnPage }}</strong>
+                    <span>{{ $reportsTotal }} total record{{ $reportsTotal === 1 ? '' : 's' }}</span>
+                </article>
+                <article class="fire-report-summary-card">
+                    <div class="tiny-label">Reported</div>
+                    <strong>{{ $pendingRecords }}</strong>
+                    <span>Still marked as reported</span>
+                </article>
+                <article class="fire-report-summary-card">
+                    <div class="tiny-label">Closed</div>
+                    <strong>{{ $completedRecords }}</strong>
+                    <span>Closed or completed on this page</span>
+                </article>
+            </div>
+
+            <div class="list-stack mt-4">
+                <div class="stat-line">
+                    <strong>Barangay</strong>
+                    <span class="tag low">{{ $barangay?->barangay_name ?? 'Not linked' }}</span>
+                </div>
+                <div class="stat-line">
+                    <strong>Hall</strong>
+                    <span class="tag complied">{{ $hall?->hall_name ?? 'No hall linked' }}</span>
+                </div>
+            </div>
+        </article>
+    </aside>
+    </section>
+
     <script type="application/json" id="fireReportsInitialData">@json($fireRecords->items())</script>
 
     <div id="viewFireReportModal" class="fire-report-modal hidden">
@@ -194,6 +240,89 @@
 
 @push('styles')
 <style>
+    .fire-report-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.78fr);
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .fire-report-shell__main,
+    .fire-report-side-card {
+        padding: 1.15rem 1.2rem;
+    }
+
+    .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between {
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between .rounded-2xl.border.border-amber-100.bg-amber-50 {
+        min-width: 178px;
+        border-radius: 18px;
+        background: #f8fafc;
+        border-color: rgba(226, 232, 240, 0.92);
+        color: #64748b;
+    }
+
+    .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between .rounded-2xl.border.border-amber-100.bg-amber-50 strong {
+        color: #0f172a !important;
+        font-size: 1.2rem;
+        font-weight: 900;
+    }
+
+    .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between > div:last-child > button {
+        min-height: 44px;
+        border-radius: 14px;
+        padding-inline: 1rem;
+        font-size: 0.82rem;
+        font-weight: 800;
+        box-shadow: 0 12px 24px rgba(234, 88, 12, 0.18);
+    }
+
+    .fire-report-summary-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .fire-report-summary-card {
+        border-radius: 18px;
+        border: 1px solid rgba(226, 232, 240, 0.92);
+        background: #f8fafc;
+        padding: 0.85rem 0.95rem;
+    }
+
+    .fire-report-summary-card strong {
+        display: block;
+        margin-top: 0.35rem;
+        color: #0f172a;
+        font-size: 1.15rem;
+        font-weight: 900;
+    }
+
+    .fire-report-summary-card span {
+        display: block;
+        margin-top: 0.25rem;
+        color: #64748b;
+        font-size: 0.76rem;
+        line-height: 1.45;
+    }
+
+    .fire-report-side-card .stat-line {
+        padding: 0.8rem 0.85rem;
+        border-radius: 16px;
+        border: 1px solid rgba(226, 232, 240, 0.88);
+        background: #fff;
+    }
+
     .fire-report-modal {
         position: fixed;
         inset: 0;
@@ -395,6 +524,19 @@
     }
 
     @media (max-width: 768px) {
+        .fire-report-shell {
+            grid-template-columns: 1fr;
+        }
+
+        .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between > div:last-child {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .fire-report-shell__main > .flex.flex-col.gap-4.lg\:flex-row.lg\:items-center.lg\:justify-between > div:last-child > button {
+            width: 100%;
+        }
+
         .fire-report-form__section {
             border-radius: 22px;
             padding: 0.9rem;

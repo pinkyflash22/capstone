@@ -29,4 +29,14 @@ class EquipmentToStation extends Model
     {
         return $this->belongsTo(Equipment::class, 'equipment_id', 'equipment_id');
     }
+
+    public function responseUnits()
+    {
+        return $this->hasMany(IncidentResponseUnit::class, 'equipment_station_id', 'equipment_station_id');
+    }
+
+    public function apparatusLoadouts()
+    {
+        return $this->hasMany(ApparatusEquipment::class, 'equipment_station_id', 'equipment_station_id');
+    }
 }
