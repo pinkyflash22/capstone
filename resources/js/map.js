@@ -1,4 +1,5 @@
 import './bootstrap';
+import './routing-panel.js';
 import { station, getRoute, setName, getStations, getRouteDistance } from './functions.js';
 
 console.log('🔥🔥🔥 MAP.JS IS LOADED! 🔥🔥🔥');

@@ -1,5 +1,3 @@
-import AgoraRTC from 'agora-rtc-sdk-ng';
-
 const voiceConfig = window.PyroSenseVoiceCall || {};
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
@@ -40,11 +38,26 @@ let responderCallSearch = '';
 let responderCallFilter = 'all';
 let responderCallSort = 'newest';
 let latestResponderPayload = null;
+let agoraSdkPromise = null;
+let pendingNotificationCallId = null;
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
 const AGORA_JOIN_TIMEOUT_MS = 15000;
 const REQUEST_TIMEOUT_MS = 12000;
+
+async function loadAgoraRtc() {
+    if (!agoraSdkPromise) {
+        agoraSdkPromise = import('agora-rtc-sdk-ng')
+            .then((module) => module.default || module)
+            .catch((error) => {
+                agoraSdkPromise = null;
+                throw error;
+            });
+    }
+
+    return agoraSdkPromise;
+}
 
 function routeFor(name, callId = '') {
     return String(routes[name] || '').replace('__CALL__', callId);
@@ -383,17 +396,13 @@ function ensureIncomingPanel() {
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                 <input type="search" data-pyro-voice-search placeholder="Search caller, number, or location" autocomplete="off" aria-label="Search calls">
             </label>
-            <div class="pyro-voice-panel__selects">
-                <label>
-                    <span class="sr-only">Filter calls</span>
-                    <select data-pyro-voice-filter aria-label="Filter calls by status">
-                        <option value="all">All calls</option>
-                        <option value="incoming">Incoming</option>
-                        <option value="active">Active</option>
-                        <option value="missed">Missed</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                </label>
+            <div class="pyro-voice-filter-tabs" role="group" aria-label="Filter calls by status">
+                <button type="button" class="is-active" data-pyro-voice-filter="all" aria-pressed="true">All <span data-pyro-voice-filter-count="all">0</span></button>
+                <button type="button" data-pyro-voice-filter="active" aria-pressed="false">Active <span data-pyro-voice-filter-count="active">0</span></button>
+                <button type="button" data-pyro-voice-filter="missed" aria-pressed="false">Missed <span data-pyro-voice-filter-count="missed">0</span></button>
+                <button type="button" data-pyro-voice-filter="completed" aria-pressed="false">Completed <span data-pyro-voice-filter-count="completed">0</span></button>
+            </div>
+            <div class="pyro-voice-panel__selects pyro-voice-panel__selects--sort">
                 <label>
                     <span class="sr-only">Sort calls</span>
                     <select data-pyro-voice-sort aria-label="Sort calls">
@@ -413,8 +422,15 @@ function ensureIncomingPanel() {
         responderCallSearch = event.target.value.trim().toLowerCase();
         if (latestResponderPayload) renderIncoming(latestResponderPayload);
     });
-    panel.querySelector('[data-pyro-voice-filter]')?.addEventListener('change', (event) => {
-        responderCallFilter = event.target.value;
+    panel.querySelector('.pyro-voice-filter-tabs')?.addEventListener('click', (event) => {
+        const filter = event.target.closest('[data-pyro-voice-filter]');
+        if (!filter) return;
+        responderCallFilter = filter.dataset.pyroVoiceFilter || 'all';
+        panel.querySelectorAll('[data-pyro-voice-filter]').forEach((button) => {
+            const active = button === filter;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
         if (latestResponderPayload) renderIncoming(latestResponderPayload);
     });
     panel.querySelector('[data-pyro-voice-sort]')?.addEventListener('change', (event) => {
@@ -544,7 +560,7 @@ function renderCallCard(call, active = false) {
     const hasIncident = Boolean(call.created_incident_id || call.incident_id);
     const flaggedClass = call.is_flagged_prank ? 'pyro-voice-call-card--flagged' : '';
     return `
-        <article class="pyro-voice-call-card ${active ? 'pyro-voice-call-card--active' : ''} ${flaggedClass}" data-call-id="${call.id}">
+        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card ${active ? 'pyro-voice-call-card--active' : ''} ${flaggedClass}" data-call-id="${call.id}" tabindex="-1">
             <div class="pyro-voice-call-card__top">
                 <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
                 <div>
@@ -613,7 +629,7 @@ function renderMissedCallCard(call) {
     const locationText = location.has_location ? location.display : 'Location unavailable';
     const hasIncident = Boolean(call.created_incident_id || call.incident_id);
     return `
-        <article class="pyro-voice-call-card pyro-voice-call-card--missed" data-call-id="${call.id}">
+        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card pyro-voice-call-card--missed" data-call-id="${call.id}" tabindex="-1">
             <div class="pyro-voice-call-card__top">
                 <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
                 <div>
@@ -643,7 +659,7 @@ function renderRecentContactCard(call) {
     const callerName = call?.caller?.name || 'Citizen';
     const statusLabel = call.status === 'rejected' ? 'Declined' : 'Completed';
     return `
-        <article class="pyro-voice-call-card" data-call-id="${call.id}">
+        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card" data-call-id="${call.id}" tabindex="-1">
             <div class="pyro-voice-call-card__top">
                 <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
                 <div>
@@ -669,7 +685,8 @@ function responderCallTimestamp(call = {}) {
 
 function filterAndSortResponderCalls(calls = [], category = 'completed') {
     const filtered = calls.filter((call) => {
-        if (responderCallFilter !== 'all' && responderCallFilter !== category) return false;
+        const activeCategory = responderCallFilter === 'active' && category === 'incoming';
+        if (responderCallFilter !== 'all' && responderCallFilter !== category && !activeCategory) return false;
         if (!responderCallSearch) return true;
 
         const location = callLocation(call);
@@ -721,8 +738,18 @@ function renderIncoming(payload) {
 
     panel.hidden = !responderPanelOpen;
     count.textContent = `${total} total`;
-    activeCount.textContent = `${liveCalls.length} active`;
+    activeCount.textContent = `${liveCalls.length + calls.length} active`;
     panel.querySelector('[data-pyro-voice-results]').textContent = `${visibleTotal} shown`;
+    const filterCounts = {
+        all: total,
+        active: liveCalls.length + calls.length,
+        missed: missedCalls.length,
+        completed: recentContacts.length,
+    };
+    Object.entries(filterCounts).forEach(([category, value]) => {
+        const badge = panel.querySelector(`[data-pyro-voice-filter-count="${category}"]`);
+        if (badge) badge.textContent = String(value);
+    });
     updateResponderLauncher(calls.length + liveCalls.length + missedCalls.length, calls.length);
 
     if (!total) {
@@ -759,6 +786,8 @@ function renderIncoming(payload) {
     }
     if (newMissedIds.length) {
         toast(`${newMissedIds.length} missed call${newMissedIds.length === 1 ? '' : 's'} waiting for review.`, 'info');
+        const missedCall = missedCalls.find((call) => call.id === newMissedIds[0]);
+        notifyIncoming(missedCall, 'Missed PyroSense voice call');
     }
 
     const sections = [];
@@ -802,6 +831,10 @@ function renderIncoming(payload) {
     list.innerHTML = sections.length
         ? sections.join('')
         : '<div class="pyro-voice-panel__empty"><i class="fa-solid fa-filter-circle-xmark"></i><strong>No matching calls</strong><span>Try another search, filter, or sorting option.</span></div>';
+
+    if (pendingNotificationCallId) {
+        focusResponderCall(pendingNotificationCallId);
+    }
 }
 
 async function pollIncoming() {
@@ -1257,6 +1290,7 @@ async function joinResponderAgora(call, agora) {
         return responderSessions.get(callId);
     }
 
+    const AgoraRTC = await loadAgoraRtc();
     const session = {
         call,
         agora,
@@ -1392,6 +1426,7 @@ async function joinAgora(call, agora) {
     if (joinedCallId === call.id) return;
 
     setAgoraJoinState('connecting');
+    const AgoraRTC = await loadAgoraRtc();
     stopOutgoingRinging();
     await leaveAgora();
     agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
@@ -1599,13 +1634,66 @@ function stopRinging() {
     ringtoneState = null;
 }
 
-function notifyIncoming(call) {
-    if (!call || !('Notification' in window) || Notification.permission !== 'granted') return;
-    try {
-        new Notification('Incoming PyroSense voice call', {
-            body: call.caller?.name || 'Anonymous caller',
-            tag: `voice-call-${call.id}`,
+function notificationTarget(callId) {
+    const url = new URL(window.location.href);
+    url.hash = `voice-call-${callId}`;
+    return url.href;
+}
+
+function focusResponderCall(callId) {
+    if (!isResponder || !callId) return;
+    pendingNotificationCallId = Number(callId);
+    setResponderPanelOpen(true);
+
+    const call = knownCallsById.get(Number(callId)) || knownCallsById.get(String(callId));
+    if (call) {
+        const category = call.status === 'missed'
+            ? 'missed'
+            : (['ended', 'rejected'].includes(call.status) ? 'completed' : 'active');
+        responderCallFilter = category;
+        const panel = ensureIncomingPanel();
+        panel.querySelectorAll('[data-pyro-voice-filter]').forEach((button) => {
+            const active = button.dataset.pyroVoiceFilter === category;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
+        pendingNotificationCallId = null;
+        renderIncoming(latestResponderPayload || {});
+    }
+
+    window.setTimeout(() => {
+        const card = document.getElementById(`pyro-voice-call-${callId}`);
+        if (!card) return;
+        pendingNotificationCallId = null;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.focus({ preventScroll: true });
+        card.classList.add('is-notification-target');
+        window.setTimeout(() => card.classList.remove('is-notification-target'), 2400);
+    }, 80);
+}
+
+async function notifyIncoming(call, title = 'Incoming PyroSense voice call') {
+    if (!call || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const options = {
+        body: call.caller?.name || 'Anonymous caller',
+        tag: `voice-call-${call.id}`,
+        renotify: true,
+        data: { type: 'PYRO_VOICE_CALL', callId: call.id, url: notificationTarget(call.id) },
+    };
+    try {
+        const registration = await navigator.serviceWorker?.ready;
+        if (registration?.showNotification) {
+            await registration.showNotification(title, options);
+            return;
+        }
+    } catch {}
+    try {
+        const notification = new Notification(title, options);
+        notification.onclick = () => {
+            window.focus();
+            focusResponderCall(call.id);
+            notification.close();
+        };
     } catch {}
 }
 
@@ -1632,6 +1720,14 @@ function initVoiceCalls() {
             });
         }, getResponderVoiceBootDelay());
         document.addEventListener('click', requestNotificationPermissionOnGesture, { once: true });
+        navigator.serviceWorker?.addEventListener('message', (event) => {
+            if (event.data?.type === 'PYRO_OPEN_VOICE_CALL') {
+                focusResponderCall(event.data.callId);
+            }
+        });
+
+        const hashMatch = window.location.hash.match(/^#voice-call-(\d+)$/);
+        if (hashMatch) pendingNotificationCallId = Number(hashMatch[1]);
     }
 
     if (role === 'citizen' && routes.incomingCallback) {

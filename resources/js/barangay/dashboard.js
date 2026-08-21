@@ -1,3 +1,5 @@
+import '../routing-panel.js';
+
 const DEFAULT_CENTER = [15.8222, 120.3297];
 const DEFAULT_ZOOM = 13;
 const USER_FOCUS_ZOOM = 16;

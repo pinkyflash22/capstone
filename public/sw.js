@@ -158,6 +158,45 @@ self.addEventListener('message', (event) => {
     }
 });
 
+self.addEventListener('push', (event) => {
+    let payload = {};
+    try {
+        payload = event.data?.json?.() || {};
+    } catch {
+        payload = { body: event.data?.text?.() || '' };
+    }
+
+    if (payload.type !== 'PYRO_VOICE_CALL' && !payload.callId && !payload.data?.callId) return;
+    const callId = Number(payload.callId || payload.data?.callId);
+    const url = payload.url || payload.data?.url || `/#voice-call-${callId}`;
+    event.waitUntil(self.registration.showNotification(payload.title || 'Incoming PyroSense voice call', {
+        body: payload.body || 'A caller is waiting for dispatch.',
+        tag: `voice-call-${callId}`,
+        renotify: true,
+        data: { type: 'PYRO_VOICE_CALL', callId, url },
+    }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    const data = event.notification?.data || {};
+    if (data.type !== 'PYRO_VOICE_CALL') return;
+    event.notification.close();
+
+    event.waitUntil((async () => {
+        const targetUrl = new URL(data.url || `/#voice-call-${data.callId}`, self.location.origin);
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const existing = windows.find((client) => new URL(client.url).pathname === targetUrl.pathname);
+
+        if (existing) {
+            await existing.focus();
+            existing.postMessage({ type: 'PYRO_OPEN_VOICE_CALL', callId: data.callId });
+            return;
+        }
+
+        await self.clients.openWindow(targetUrl.href);
+    })());
+});
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
 

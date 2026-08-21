@@ -2,6 +2,7 @@
 // import './map.js';
 
 // import { getRoute, userLocation } from './functions.js';
+import './routing-panel.js';
 import { saveIncident, userLocation } from './functions.js';
 import { setName } from './functions.js';
 // Route and simulation variables for user map
