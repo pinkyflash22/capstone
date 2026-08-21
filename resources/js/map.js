@@ -1984,6 +1984,15 @@ function shouldDisplayMarker(marker = {}) {
         return false;
     }
 
+    const category = getMarkerCategoryKey(marker);
+    const riskReviewStatus = String(marker?.risk_area_public?.review_status || '').trim().toLowerCase();
+    const riskStatus = String(marker?.risk_area_public?.status || '').trim().toLowerCase();
+    if (['risk', 'hazard'].includes(category) && (riskReviewStatus === 'approved' || riskStatus === 'verified')) {
+        // Approved evidence is rendered by the heat layer at its original
+        // coordinates. Suppress the duplicate legacy pin.
+        return false;
+    }
+
     return true;
 }
 
@@ -10712,11 +10721,11 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
             ? `Historical fire incident${point.incident_date ? ` · ${point.incident_date}` : ''}`
             : `${point.entry_type === 'hazard' ? 'Verified hazard' : 'Verified risk'}${point.marker_title ? ` · ${point.marker_title}` : ''}`;
         L.circleMarker([lat, lng], {
-            radius: 3.5,
-            color: '#ffffff',
-            weight: 1.5,
-            fillColor: isIncident ? '#dc2626' : '#f59e0b',
-            fillOpacity: 0.88,
+            radius: 14,
+            color: 'transparent',
+            weight: 0,
+            fillColor: 'transparent',
+            fillOpacity: 0,
             interactive: true,
             pane: 'overlayPane'
         })
@@ -10775,9 +10784,10 @@ async function loadFireRiskAreas() {
                         ? currentRiskAnalysisLayerGroup
                         : fireRiskAreaLayerGroup;
 
-                if (String(area.geometry_type || '').toLowerCase() === 'heatmap') {
+                const heatPoints = fireRiskHeatPoints(area);
+                if (heatPoints.length) {
                     const bucket = heatmapBuckets.get(targetGroup) || { points: [], areas: [] };
-                    bucket.points.push(...fireRiskHeatPoints(area));
+                    bucket.points.push(...heatPoints);
                     bucket.areas.push(area);
                     heatmapBuckets.set(targetGroup, bucket);
                     return;

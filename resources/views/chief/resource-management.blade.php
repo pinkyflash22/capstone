@@ -1652,7 +1652,7 @@
         }
     </style>
 </head>
-<body class="chief-legacy-layout">
+<body class="chief-legacy-layout resource-management-page">
     <!-- Side Navigation -->
     @include('chief.partials.sidebar', ['active' => 'resources'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
@@ -1828,17 +1828,17 @@
                         <tbody>
                             @forelse ($boundaryPage as $boundaryBarangay)
                                 <tr>
-                                    <td><strong>{{ $boundaryBarangay['barangay_name'] }}</strong></td>
-                                    <td>{{ $boundaryBarangay['city_name'] ?? 'No city linked' }}</td>
-                                    <td>
+                                    <td data-label="Barangay"><strong>{{ $boundaryBarangay['barangay_name'] }}</strong></td>
+                                    <td data-label="City">{{ $boundaryBarangay['city_name'] ?? 'No city linked' }}</td>
+                                    <td data-label="Status">
                                         <span class="boundary-status-pill {{ $boundaryBarangay['boundary_status'] }}">
                                             <i class="fa-solid {{ $boundaryBarangay['boundary_status_icon'] }}"></i>
                                             {{ $boundaryBarangay['boundary_status_label'] }}
                                         </span>
                                     </td>
-                                    <td>{{ $boundaryBarangay['boundary_source'] ? strtoupper($boundaryBarangay['boundary_source']) : 'NONE' }}</td>
-                                    <td>{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
-                                    <td>
+                                    <td data-label="Source">{{ $boundaryBarangay['boundary_source'] ? strtoupper($boundaryBarangay['boundary_source']) : 'NONE' }}</td>
+                                    <td data-label="Last Sync">{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
+                                    <td data-label="Action" class="actions">
                                         <div class="boundary-action-group">
                                             <form class="boundary-sync-form" method="POST" action="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
                                                 @csrf
@@ -2155,7 +2155,7 @@
                     <table class="station-table">
                         <thead><tr><th>Officer</th><th>Barangay</th><th>Position</th><th>Portal Account</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody>
-                            @forelse($barangayOfficers as $officer)
+                            @forelse($barangayOfficersPage as $officer)
                                 <tr>
                                     <td data-label="Officer"><strong>{{ trim(($officer->user?->first_name ?? '').' '.($officer->user?->middle_name ?? '').' '.($officer->user?->last_name ?? '')) ?: 'Unlinked officer' }}</strong><small style="display:block;color:#64748b">{{ $officer->user?->contact_number ?? 'No contact number' }}</small></td>
                                     <td data-label="Barangay">{{ $officer->barangay?->barangay_name ?? 'Unknown' }}</td>
@@ -2170,6 +2170,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $barangayOfficersPage->onEachSide(1)->links() }}</div>
             </div>
             @endif
 
@@ -2301,7 +2302,7 @@
                     <table class="station-table">
                         <thead><tr><th>Unit</th><th>Station</th><th>Plate / Type</th><th>Capacity</th><th>Readiness</th><th>GPS</th><th>Actions</th></tr></thead>
                         <tbody>
-                            @forelse($apparatusRecords as $apparatus)
+                            @forelse($apparatusPage as $apparatus)
                                 @php
                                     $ready = $apparatus->status === 'available' && $apparatus->maintenance_status === 'operational';
                                     $gpsColor = $apparatus->gps_status === 'online' ? '#15803d' : ($apparatus->gps_status === 'stale' ? '#b45309' : '#64748b');
@@ -2324,6 +2325,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="resource-pagination">{{ $apparatusPage->onEachSide(1)->links() }}</div>
             </div>
 
 
@@ -5501,7 +5503,9 @@ function validateTeamMembers(formData) {
                 'personnelResourceSection',
                 'teamsResourceSection',
                 'usersResourceSection',
-                'equipmentResourceSection'
+                'equipmentResourceSection',
+                'barangayOfficerResourceSection',
+                'apparatusResourceSection'
             ];
 
             const bindDynamicStatusControls = () => {
@@ -5546,7 +5550,7 @@ function validateTeamMembers(formData) {
                 url.searchParams.set('user_role', roleFilter?.value || '');
                 url.searchParams.set('user_sort', sortFilter?.value || 'name_asc');
                 if (resetPages) {
-                    ['personnel_page', 'teams_page', 'users_page', 'equipment_page', 'boundaries_page'].forEach((key) => url.searchParams.delete(key));
+                    ['personnel_page', 'teams_page', 'users_page', 'equipment_page', 'boundaries_page', 'barangay_officers_page', 'apparatus_page'].forEach((key) => url.searchParams.delete(key));
                 }
 
                 resourceSectionIds.forEach((id) => document.getElementById(id)?.setAttribute('aria-busy', 'true'));

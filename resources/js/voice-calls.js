@@ -34,6 +34,12 @@ let isSpeakerEnabled = true;
 const remoteAudioTracks = new Map();
 const responderSessions = new Map();
 let activeResponderCalls = new Map();
+let responderPanelOpen = false;
+let responderPanelTotal = 0;
+let responderCallSearch = '';
+let responderCallFilter = 'all';
+let responderCallSort = 'newest';
+let latestResponderPayload = null;
 
 const routes = voiceConfig.routes || {};
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
@@ -345,12 +351,18 @@ function refreshIncidentMarkersFromVoice(payload) {
 
 function ensureIncomingPanel() {
     let panel = document.querySelector('[data-pyro-voice-panel]');
-    if (panel) return panel;
+    if (panel) {
+        ensureResponderLauncher();
+        return panel;
+    }
 
     panel = document.createElement('section');
     panel.className = 'pyro-voice-panel';
     panel.dataset.pyroVoicePanel = 'true';
     panel.hidden = true;
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'false');
+    panel.setAttribute('aria-label', 'Dispatch call center');
     panel.innerHTML = `
         <div class="pyro-voice-panel__header">
             <div class="pyro-voice-panel__heading">
@@ -363,13 +375,103 @@ function ensureIncomingPanel() {
             <div class="pyro-voice-panel__summary">
                 <span class="pyro-voice-badge" data-pyro-voice-active-count>0 active</span>
                 <span class="pyro-voice-badge" data-pyro-voice-count>0 total</span>
+                <button type="button" class="pyro-voice-panel__close" data-pyro-voice-panel-close aria-label="Close dispatch call center"><i class="fa-solid fa-xmark"></i></button>
             </div>
+        </div>
+        <div class="pyro-voice-panel__tools" aria-label="Call list controls">
+            <label class="pyro-voice-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" data-pyro-voice-search placeholder="Search caller, number, or location" autocomplete="off" aria-label="Search calls">
+            </label>
+            <div class="pyro-voice-panel__selects">
+                <label>
+                    <span class="sr-only">Filter calls</span>
+                    <select data-pyro-voice-filter aria-label="Filter calls by status">
+                        <option value="all">All calls</option>
+                        <option value="incoming">Incoming</option>
+                        <option value="active">Active</option>
+                        <option value="missed">Missed</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </label>
+                <label>
+                    <span class="sr-only">Sort calls</span>
+                    <select data-pyro-voice-sort aria-label="Sort calls">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="caller">Caller A–Z</option>
+                    </select>
+                </label>
+            </div>
+            <span class="pyro-voice-panel__results" data-pyro-voice-results aria-live="polite"></span>
         </div>
         <div class="pyro-voice-panel__body" data-pyro-voice-list></div>
     `;
     document.body.appendChild(panel);
     panel.addEventListener('click', handleIncomingClick);
+    panel.querySelector('[data-pyro-voice-search]')?.addEventListener('input', (event) => {
+        responderCallSearch = event.target.value.trim().toLowerCase();
+        if (latestResponderPayload) renderIncoming(latestResponderPayload);
+    });
+    panel.querySelector('[data-pyro-voice-filter]')?.addEventListener('change', (event) => {
+        responderCallFilter = event.target.value;
+        if (latestResponderPayload) renderIncoming(latestResponderPayload);
+    });
+    panel.querySelector('[data-pyro-voice-sort]')?.addEventListener('change', (event) => {
+        responderCallSort = event.target.value;
+        if (latestResponderPayload) renderIncoming(latestResponderPayload);
+    });
+    ensureResponderLauncher();
     return panel;
+}
+
+function ensureResponderLauncher() {
+    let launcher = document.querySelector('[data-pyro-voice-launcher]');
+    if (launcher) return launcher;
+    launcher = document.createElement('button');
+    launcher.type = 'button';
+    launcher.className = 'pyro-voice-launcher';
+    launcher.dataset.pyroVoiceLauncher = 'true';
+    launcher.setAttribute('aria-label', 'Open dispatch call center');
+    launcher.setAttribute('aria-expanded', 'false');
+    launcher.innerHTML = `<span class="pyro-voice-launcher__icon"><i class="fa-solid fa-headset"></i></span><span class="pyro-voice-launcher__copy"><strong>Calls</strong><small>Dispatch</small></span><span class="pyro-voice-launcher__badge" data-pyro-voice-launcher-count hidden>0</span>`;
+
+    const backdrop = document.createElement('button');
+    backdrop.type = 'button';
+    backdrop.className = 'pyro-voice-panel-backdrop';
+    backdrop.dataset.pyroVoicePanelBackdrop = 'true';
+    backdrop.hidden = true;
+    backdrop.setAttribute('aria-label', 'Close dispatch call center');
+    document.body.append(backdrop, launcher);
+    launcher.addEventListener('click', () => setResponderPanelOpen(!responderPanelOpen));
+    backdrop.addEventListener('click', () => setResponderPanelOpen(false));
+    return launcher;
+}
+
+function setResponderPanelOpen(open) {
+    if (!isResponder) return;
+    const panel = ensureIncomingPanel();
+    const launcher = ensureResponderLauncher();
+    const backdrop = document.querySelector('[data-pyro-voice-panel-backdrop]');
+    responderPanelOpen = Boolean(open);
+    panel.hidden = !responderPanelOpen;
+    panel.classList.toggle('is-open', responderPanelOpen);
+    panel.setAttribute('aria-modal', window.matchMedia('(max-width: 768px)').matches && responderPanelOpen ? 'true' : 'false');
+    launcher.setAttribute('aria-expanded', responderPanelOpen ? 'true' : 'false');
+    launcher.setAttribute('aria-label', responderPanelOpen ? 'Close dispatch call center' : 'Open dispatch call center');
+    if (backdrop) backdrop.hidden = !responderPanelOpen;
+    document.body.classList.toggle('pyro-voice-panel-open', responderPanelOpen);
+    if (responderPanelOpen) window.setTimeout(() => panel.querySelector('[data-pyro-voice-panel-close]')?.focus(), 0);
+}
+
+function updateResponderLauncher(actionableCount, incomingCount) {
+    const launcher = ensureResponderLauncher();
+    const badge = launcher.querySelector('[data-pyro-voice-launcher-count]');
+    responderPanelTotal = Math.max(0, Number(actionableCount || 0));
+    badge.textContent = responderPanelTotal > 99 ? '99+' : String(responderPanelTotal);
+    badge.hidden = responderPanelTotal === 0;
+    launcher.classList.toggle('has-calls', responderPanelTotal > 0);
+    launcher.classList.toggle('has-incoming', Number(incomingCount || 0) > 0);
 }
 
 function ensureCallerDock() {
@@ -559,7 +661,47 @@ function renderRecentContactCard(call) {
     `;
 }
 
+function responderCallTimestamp(call = {}) {
+    const value = call.answered_at || call.ended_at || call.updated_at || call.created_at;
+    const timestamp = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function filterAndSortResponderCalls(calls = [], category = 'completed') {
+    const filtered = calls.filter((call) => {
+        if (responderCallFilter !== 'all' && responderCallFilter !== category) return false;
+        if (!responderCallSearch) return true;
+
+        const location = callLocation(call);
+        const searchable = [
+            call.id,
+            call?.caller?.id,
+            call?.caller?.name,
+            call?.caller?.contact_number,
+            call?.caller?.email,
+            location.display,
+            call.status,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return searchable.includes(responderCallSearch);
+    });
+
+    return filtered.sort((left, right) => {
+        if (responderCallSort === 'caller') {
+            return String(left?.caller?.name || 'Anonymous caller').localeCompare(
+                String(right?.caller?.name || 'Anonymous caller'),
+                undefined,
+                { sensitivity: 'base' },
+            );
+        }
+
+        const difference = responderCallTimestamp(left) - responderCallTimestamp(right);
+        return responderCallSort === 'oldest' ? difference : -difference;
+    });
+}
+
 function renderIncoming(payload) {
+    latestResponderPayload = payload;
     const panel = ensureIncomingPanel();
     const list = panel.querySelector('[data-pyro-voice-list]');
     const count = panel.querySelector('[data-pyro-voice-count]');
@@ -571,12 +713,20 @@ function renderIncoming(payload) {
     const outgoingCalls = payload.outgoing_calls || [];
     const liveCalls = [...activeCalls, ...outgoingCalls];
     const total = calls.length + liveCalls.length + missedCalls.length + recentContacts.length;
+    const visibleLiveCalls = filterAndSortResponderCalls(liveCalls, 'active');
+    const visibleIncomingCalls = filterAndSortResponderCalls(calls, 'incoming');
+    const visibleMissedCalls = filterAndSortResponderCalls(missedCalls, 'missed');
+    const visibleRecentContacts = filterAndSortResponderCalls(recentContacts, 'completed');
+    const visibleTotal = visibleLiveCalls.length + visibleIncomingCalls.length + visibleMissedCalls.length + visibleRecentContacts.length;
 
-    panel.hidden = total === 0;
-    count.textContent = String(total);
+    panel.hidden = !responderPanelOpen;
+    count.textContent = `${total} total`;
     activeCount.textContent = `${liveCalls.length} active`;
+    panel.querySelector('[data-pyro-voice-results]').textContent = `${visibleTotal} shown`;
+    updateResponderLauncher(calls.length + liveCalls.length + missedCalls.length, calls.length);
 
     if (!total) {
+        list.innerHTML = '<div class="pyro-voice-panel__empty"><i class="fa-solid fa-phone-volume"></i><strong>No calls waiting</strong><span>Incoming and active calls will appear here.</span></div>';
         stopRinging();
         activeResponderCalls = new Map();
         responderSessions.forEach((session, callId) => leaveResponderAgora(callId).catch(() => {}));
@@ -613,43 +763,45 @@ function renderIncoming(payload) {
 
     const sections = [];
 
-    if (liveCalls.length || calls.length) {
+    if (visibleLiveCalls.length || visibleIncomingCalls.length) {
         sections.push(`
             <section class="pyro-voice-section">
                 <div class="pyro-voice-section__label">Live calls</div>
                 <div class="pyro-voice-section__cards">
                     ${[
-                        ...liveCalls.map((call) => renderCallCard(call, true)),
-                        ...calls.map((call) => renderCallCard(call)),
+                        ...visibleLiveCalls.map((call) => renderCallCard(call, true)),
+                        ...visibleIncomingCalls.map((call) => renderCallCard(call)),
                     ].join('')}
                 </div>
             </section>
         `);
     }
 
-    if (missedCalls.length) {
+    if (visibleMissedCalls.length) {
         sections.push(`
             <section class="pyro-voice-section">
                 <div class="pyro-voice-section__label">Missed calls</div>
                 <div class="pyro-voice-section__cards">
-                    ${missedCalls.map((call) => renderMissedCallCard(call)).join('')}
+                    ${visibleMissedCalls.map((call) => renderMissedCallCard(call)).join('')}
                 </div>
             </section>
         `);
     }
 
-    if (recentContacts.length) {
+    if (visibleRecentContacts.length) {
         sections.push(`
             <section class="pyro-voice-section">
                 <div class="pyro-voice-section__label">Recent citizen contacts</div>
                 <div class="pyro-voice-section__cards">
-                    ${recentContacts.map((call) => renderRecentContactCard(call)).join('')}
+                    ${visibleRecentContacts.map((call) => renderRecentContactCard(call)).join('')}
                 </div>
             </section>
         `);
     }
 
-    list.innerHTML = sections.join('');
+    list.innerHTML = sections.length
+        ? sections.join('')
+        : '<div class="pyro-voice-panel__empty"><i class="fa-solid fa-filter-circle-xmark"></i><strong>No matching calls</strong><span>Try another search, filter, or sorting option.</span></div>';
 }
 
 async function pollIncoming() {
@@ -715,6 +867,10 @@ function getResponderVoiceBootDelay() {
 }
 
 async function handleIncomingClick(event) {
+    if (event.target.closest('[data-pyro-voice-panel-close]')) {
+        setResponderPanelOpen(false);
+        return;
+    }
     const card = event.target.closest('[data-call-id]');
     if (!card) return;
     const callId = card.dataset.callId;
@@ -1502,6 +1658,10 @@ function initVoiceCalls() {
         clearIncomingPollTimer();
         clearInterval(callbackPollTimer);
         responderSessions.forEach((session, callId) => leaveResponderAgora(callId).catch(() => {}));
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && responderPanelOpen) setResponderPanelOpen(false);
     });
 }
 

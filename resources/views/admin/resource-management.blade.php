@@ -734,7 +734,7 @@
         }
     </style>
 </head>
-<body class="chief-dashboard-page">
+<body class="chief-dashboard-page resource-management-page">
     <!-- Side Navigation -->
     @include('admin.partials.sidebar', ['active' => 'resources'])
     {{-- <aside class="sidebar">

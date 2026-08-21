@@ -68,11 +68,11 @@ class ResourceManagementController extends Controller
             $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))->orderBy('last_name')->get();
             $systemUsers = $allusers;
             $teamData = $this->serializeTeams($allTeam);
-            [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries] = $this->filterTableCollections(
-                $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays
+            [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus] = $this->filterTableCollections(
+                $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays, $barangayOfficers, $apparatusRecords
             );
-            [$personnelPage, $teamsPage, $usersPage, $equipmentPage, $boundaryPage] = $this->buildTablePages(
-                $filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries
+            [$personnelPage, $teamsPage, $usersPage, $equipmentPage, $boundaryPage, $barangayOfficersPage, $apparatusPage] = $this->buildTablePages(
+                $filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus
             );
 
             return view('chief.resource-management', compact(
@@ -94,6 +94,8 @@ class ResourceManagementController extends Controller
                 'usersPage',
                 'equipmentPage',
                 'boundaryPage',
+                'barangayOfficersPage',
+                'apparatusPage',
                 'systemUsers',
                 'teamData'
                 ,'apparatusRecords', 'stationEquipmentAssignments', 'barangayOfficers', 'eligibleBarangayOfficerUsers'
@@ -177,11 +179,11 @@ class ResourceManagementController extends Controller
             })->orderBy('last_name')->orderBy('first_name')->get();
         $systemUsers = $allusers->concat($citizens)->unique('user_id')->values();
         $teamData = $this->serializeTeams($allTeam);
-        [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries] = $this->filterTableCollections(
-            $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays
+        [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus] = $this->filterTableCollections(
+            $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays, $barangayOfficers, $apparatusRecords
         );
-        [$personnelPage, $teamsPage, $usersPage, $equipmentPage, $boundaryPage] = $this->buildTablePages(
-            $filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries
+        [$personnelPage, $teamsPage, $usersPage, $equipmentPage, $boundaryPage, $barangayOfficersPage, $apparatusPage] = $this->buildTablePages(
+            $filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus
         );
         
         
@@ -204,6 +206,8 @@ class ResourceManagementController extends Controller
             'usersPage',
             'equipmentPage',
             'boundaryPage',
+            'barangayOfficersPage',
+            'apparatusPage',
             'systemUsers',
             'teamData'
             ,'apparatusRecords', 'stationEquipmentAssignments', 'barangayOfficers', 'eligibleBarangayOfficerUsers'
@@ -246,7 +250,7 @@ class ResourceManagementController extends Controller
         ])->values()->all();
     }
 
-    protected function buildTablePages(Collection $officers, Collection $teams, Collection $users, Collection $equipment, Collection $boundaries): array
+    protected function buildTablePages(Collection $officers, Collection $teams, Collection $users, Collection $equipment, Collection $boundaries, Collection $barangayOfficers, Collection $apparatus): array
     {
         return [
             $this->paginateCollection($officers, 'personnel_page'),
@@ -254,10 +258,12 @@ class ResourceManagementController extends Controller
             $this->paginateCollection($users, 'users_page'),
             $this->paginateCollection($equipment, 'equipment_page'),
             $this->paginateCollection($boundaries, 'boundaries_page'),
+            $this->paginateCollection($barangayOfficers, 'barangay_officers_page'),
+            $this->paginateCollection($apparatus, 'apparatus_page'),
         ];
     }
 
-    protected function filterTableCollections(Request $request, Collection $officers, Collection $teams, Collection $users, Collection $equipment, Collection $boundaries): array
+    protected function filterTableCollections(Request $request, Collection $officers, Collection $teams, Collection $users, Collection $equipment, Collection $boundaries, Collection $barangayOfficers, Collection $apparatus): array
     {
         $search = mb_strtolower(mb_substr(trim((string) $request->query('resource_search', '')), 0, 100));
         $status = mb_strtolower(mb_substr(trim((string) $request->query('resource_status', '')), 0, 30));
@@ -280,6 +286,16 @@ class ResourceManagementController extends Controller
             ));
             $equipment = $equipment->filter(fn ($item) => $contains($item->equipment_name, $item->type, $item->category, $item->model, $item->serial_number));
             $boundaries = $boundaries->filter(fn ($item) => $contains($item['barangay_name'] ?? null, $item['city_name'] ?? null, $item['boundary_status_label'] ?? null));
+            $barangayOfficers = $barangayOfficers->filter(fn ($officer) => $contains(
+                $officer->user?->first_name, $officer->user?->middle_name, $officer->user?->last_name,
+                $officer->user?->account_code, $officer->user?->email, $officer->position,
+                $officer->barangay?->barangay_name
+            ));
+            $apparatus = $apparatus->filter(fn ($unit) => $contains(
+                $unit->unit_number, $unit->plate_number, $unit->apparatus_type,
+                $unit->station?->station_name, $unit->equipment?->equipment_name,
+                $unit->status, $unit->maintenance_status, $unit->gps_status
+            ));
         }
 
         if ($status !== '') {
@@ -301,7 +317,15 @@ class ResourceManagementController extends Controller
             default => $users->sortBy(fn ($user) => mb_strtolower(trim("{$user->last_name} {$user->first_name}"))),
         };
 
-        return [$officers->values(), $teams->values(), $users->values(), $equipment->values(), $boundaries->values()];
+        return [
+            $officers->values(),
+            $teams->values(),
+            $users->values(),
+            $equipment->values(),
+            $boundaries->values(),
+            $barangayOfficers->values(),
+            $apparatus->values(),
+        ];
     }
 
     protected function paginateCollection(Collection $items, string $pageName, int $perPage = 10): LengthAwarePaginator

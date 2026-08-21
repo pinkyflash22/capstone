@@ -89,24 +89,17 @@ class PredictedRiskAreaService
                     'metrics' => [],
                 ];
 
-                if (! empty($location->geojson)) {
-                    $area['geometry_type'] = 'geojson';
-                    $area['geometry_precision'] = 'barangay_boundary';
-                    $area['geojson'] = $location->geojson;
-                } else {
-                    $forecastEvidence = collect($forecastEvidenceByBarangay->get($barangayId, []))->values();
-                    if ($forecastEvidence->isEmpty()) {
-                        // A barangay hall is an administrative reference, not risk
-                        // evidence. Omitting the overlay is more accurate than
-                        // placing a forecast hotspot at the hall.
-                        continue;
-                    }
-
-                    $area['geometry_type'] = 'heatmap';
-                    $area['geometry_precision'] = 'supporting_evidence_positions';
-                    $area['evidence_points'] = $forecastEvidence->all();
-                    $area['metrics']['support_points'] = $forecastEvidence->count();
+                $forecastEvidence = collect($forecastEvidenceByBarangay->get($barangayId, []))->values();
+                if ($forecastEvidence->isEmpty()) {
+                    // Neither a barangay boundary nor its hall is evidence of where
+                    // fire risk is concentrated. Do not invent a geographic hotspot.
+                    continue;
                 }
+
+                $area['geometry_type'] = 'heatmap';
+                $area['geometry_precision'] = 'supporting_evidence_positions';
+                $area['evidence_points'] = $forecastEvidence->all();
+                $area['metrics']['support_points'] = $forecastEvidence->count();
 
                 $seen[$dedupeKey] = true;
                 $areas->push($area);
