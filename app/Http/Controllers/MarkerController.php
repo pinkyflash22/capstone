@@ -9,9 +9,12 @@ use App\Models\Multimedia;
 use App\Support\MarkerFeedBuilder;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
+use App\Services\BoundaryMatcherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class MarkerController extends Controller
 {
@@ -294,7 +297,7 @@ public function update(Request $request, $markerId)
     }
 }
 
-    public function updateLocation(Request $request, int $markerId)
+    public function updateLocation(Request $request, int $markerId, BoundaryMatcherService $boundaryMatcherService)
     {
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
@@ -302,10 +305,29 @@ public function update(Request $request, $markerId)
         ]);
 
         $marker = Marker::query()->findOrFail($markerId);
-        $marker->update([
-            'lat' => round((float) $validated['lat'], 7),
-            'lng' => round((float) $validated['lng'], 7),
-        ]);
+        $lat = round((float) $validated['lat'], 7);
+        $lng = round((float) $validated['lng'], 7);
+        $isRiskOrHazard = in_array(strtolower((string) $marker->category), ['risk', 'hazard'], true)
+            || $marker->riskAreas()->exists();
+        $matchedHall = $isRiskOrHazard
+            ? $boundaryMatcherService->locateBarangayHall($lat, $lng)
+            : null;
+
+        if ($isRiskOrHazard && ! $matchedHall) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the risk or hazard marker inside a saved barangay boundary with a linked barangay hall.',
+            ]);
+        }
+
+        DB::transaction(function () use ($marker, $lat, $lng, $matchedHall) {
+            $marker->update(['lat' => $lat, 'lng' => $lng]);
+
+            if ($matchedHall) {
+                $marker->riskAreas()->update([
+                    'barangay_hall_id' => $matchedHall->barangay_hall_id,
+                ]);
+            }
+        });
 
         return response()->json([
             'success' => true,

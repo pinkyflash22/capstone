@@ -29,8 +29,10 @@ class InvestigationReportProofImageTest extends TestCase
     #[Test]
     public function proof_images_have_previews_and_station_protected_individual_deletion(): void
     {
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
         $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));
+        $controller = file_get_contents(app_path('Http/Controllers/staff/FirefighterController.php'));
         $route = Route::getRoutes()->getByName('firefighter.investigation-reports.proof-images.destroy');
 
         $this->assertStringContainsString('URL.createObjectURL(file)', $script);
@@ -38,6 +40,9 @@ class InvestigationReportProofImageTest extends TestCase
         $this->assertStringContainsString('data-delete-proof-image', $script);
         $this->assertStringContainsString("method: 'DELETE'", $script);
         $this->assertStringContainsString('.proof-image-grid', $styles);
+        $this->assertStringContainsString('proofImageDeleteTemplate: @json($proofImageDeleteTemplate)', $view);
+        $this->assertStringNotContainsString("proofImageDeleteTemplate: @json(route('firefighter.investigation-reports.proof-images.destroy', [", $view);
+        $this->assertStringContainsString("'proofImageDeleteTemplate' => route('firefighter.investigation-reports.proof-images.destroy'", $controller);
         $this->assertNotNull($route);
         $this->assertContains('auth', $route->gatherMiddleware());
         $this->assertContains('role:firefighter', $route->gatherMiddleware());

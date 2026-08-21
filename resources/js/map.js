@@ -1987,15 +1987,6 @@ function shouldDisplayMarker(marker = {}) {
         return false;
     }
 
-    const category = getMarkerCategoryKey(marker);
-    const riskReviewStatus = String(marker?.risk_area_public?.review_status || '').trim().toLowerCase();
-    const riskStatus = String(marker?.risk_area_public?.status || '').trim().toLowerCase();
-    if (['risk', 'hazard'].includes(category) && (riskReviewStatus === 'approved' || riskStatus === 'verified')) {
-        // Approved evidence is rendered by the heat layer at its original
-        // coordinates. Suppress the duplicate legacy pin.
-        return false;
-    }
-
     return true;
 }
 

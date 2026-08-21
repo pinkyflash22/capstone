@@ -62,6 +62,7 @@ class VoiceCallController extends Controller
             'success' => true,
             'user_id' => (int) $user->user_id,
             'role' => Str::lower((string) $user->role?->role),
+            'csrf_token' => csrf_token(),
         ]);
 
         if ($this->isAnonymousUser($user)) {
@@ -648,6 +649,7 @@ class VoiceCallController extends Controller
             'station' => [
                 'id' => $call->station?->station_id,
                 'name' => $call->station?->station_name,
+                'contact_number' => $call->station?->contact_number,
             ],
             'created_incident' => $call->createdIncident ? [
                 'id' => $call->createdIncident->incident_id,
@@ -858,6 +860,19 @@ class VoiceCallController extends Controller
             }
         }
 
+        if ($this->isAnonymousUser($user)
+            && $request->filled('caller_latitude')
+            && $request->filled('caller_longitude')) {
+            $nearestStationId = $this->nearestStationIdForCoordinates(
+                (float) $request->input('caller_latitude'),
+                (float) $request->input('caller_longitude')
+            );
+
+            if ($nearestStationId) {
+                return $nearestStationId;
+            }
+        }
+
         $user->loadMissing(['address', 'barangayOfficer']);
         $barangayId = $user->barangayOfficer?->barangay_id ?? $user->address?->barangay_id;
         if ($barangayId) {
@@ -872,6 +887,31 @@ class VoiceCallController extends Controller
         }
 
         return Station::query()->value('station_id');
+    }
+
+    private function nearestStationIdForCoordinates(float $latitude, float $longitude): ?int
+    {
+        $nearest = Station::query()
+            ->with('marker:marker_id,lat,lng')
+            ->whereHas('marker', fn ($query) => $query->whereNotNull('lat')->whereNotNull('lng'))
+            ->get(['station_id', 'marker_id'])
+            ->map(function (Station $station) use ($latitude, $longitude) {
+                $stationLatitude = (float) $station->marker->lat;
+                $stationLongitude = (float) $station->marker->lng;
+                $latitudeDelta = deg2rad($stationLatitude - $latitude);
+                $longitudeDelta = deg2rad($stationLongitude - $longitude);
+                $a = sin($latitudeDelta / 2) ** 2
+                    + cos(deg2rad($latitude)) * cos(deg2rad($stationLatitude)) * sin($longitudeDelta / 2) ** 2;
+
+                return [
+                    'station_id' => (int) $station->station_id,
+                    'distance' => 6371000 * 2 * atan2(sqrt($a), sqrt(max(0, 1 - $a))),
+                ];
+            })
+            ->sortBy('distance')
+            ->first();
+
+        return $nearest['station_id'] ?? null;
     }
 
     private function adminStationId(User $user): ?int

@@ -115,7 +115,9 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
     Route::get('/api/barangays/{cityId}', [RegisterController::class, 'getBarangays'])->name('api.barangays');
 Route::get('/api/postal-codes/{cityId}', [RegisterController::class, 'getPostalCodes'])->name('api.postal-codes');
 Route::get('/api/default-postal/{cityId}', [RegisterController::class, 'getDefaultPostalCode'])->name('api.default-postal');
-Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'bootstrapAnonymousSession'])->name('voice-calls.anonymous-session');
+Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'bootstrapAnonymousSession'])
+    ->middleware('throttle:20,1')
+    ->name('voice-calls.anonymous-session');
 
     //locations based
     Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations']);
@@ -646,6 +648,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/assessment', [BarangayDashboardController::class, 'assessment'])->name('assessment');
         Route::get('/checklists', [BarangayDashboardController::class, 'checklists'])->name('checklists');
         Route::get('/checklists/content', [BarangayDashboardController::class, 'checklistsContent'])->name('checklists.content');
+        Route::patch('/checklists/{checklistId}/items/{itemId}', [BarangayDashboardController::class, 'updateChecklistItem'])->name('checklists.items.update');
         Route::get('/notifications', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');

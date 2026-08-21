@@ -17,6 +17,7 @@
         'mitigations' => (int) ($legacyMitigationCounts[$item->barangay_prediction_checklist_id] ?? 0),
         'progress' => $item->status === 'complied' ? 100 : ($item->status === 'in_progress' ? 50 : 0),
         'steps' => collect(),
+        'checklist_id' => null,
     ]);
 
     $aiRecords = $aiActionPlanChecklists->map(function ($item) use ($aiMitigationCounts) {
@@ -36,6 +37,7 @@
             'mitigations' => (int) ($aiMitigationCounts[$item->ai_action_plan_checklist_id] ?? 0),
             'progress' => (int) ($progress['percent'] ?? 0),
             'steps' => $item->items->values(),
+            'checklist_id' => $item->ai_action_plan_checklist_id,
         ];
     });
 
@@ -112,7 +114,7 @@
             <div class="checklist-table-wrap"><table class="checklist-table" data-compact-list="checklists" data-page-size="6"><thead><tr><th>Checklist</th><th>Priority</th><th>Status</th><th>Progress</th><th></th></tr></thead><tbody>
             @foreach($checklistRecords as $item)
                 <tr data-compact-row><td><strong>{{ $item->title }}</strong><small>{{ $item->source }}</small></td><td><span class="tag {{ $item->priority }}">{{ strtoupper($item->priority) }}</span></td><td><span class="tag {{ $item->family === 'completed' ? 'completed' : $item->status }}">{{ strtoupper(str_replace('_', ' ', $item->status)) }}</span></td><td><strong>{{ $item->progress }}%</strong><small>{{ $item->mitigations }} mitigation linked</small></td><td><button type="button" class="checklist-view-button" data-checklist-detail="{{ $item->key }}"><i class="bi bi-eye"></i></button></td></tr>
-                <template id="{{ $item->key }}"><div class="checklist-detail-grid"><div class="wide"><span>Checklist</span><strong>{{ $item->title }}</strong></div><div class="wide"><span>Guidance</span><strong>{{ $item->detail }}</strong></div><div><span>Priority</span><strong>{{ strtoupper($item->priority) }}</strong></div><div><span>Status</span><strong>{{ strtoupper(str_replace('_', ' ', $item->status)) }}</strong></div><div><span>Assigned to</span><strong>{{ $item->assignee }}</strong></div><div><span>Reviewer</span><strong>{{ $item->reviewer }}</strong></div><div><span>Target</span><strong>{{ $item->target?->format('M d, Y') ?? 'No target date' }}</strong></div><div><span>Progress</span><strong>{{ $item->progress }}%</strong></div>@if($item->steps->isNotEmpty())<div class="wide"><span>Steps</span><ol class="checklist-detail-steps">@foreach($item->steps as $step)<li>{{ $step->item_text }} <em>{{ strtoupper(str_replace('_', ' ', $step->status)) }}</em></li>@endforeach</ol></div>@endif<div class="wide"><span>Compliance note</span><strong>{{ $item->note }}</strong></div></div></template>
+                <template id="{{ $item->key }}"><div class="checklist-detail-grid"><div class="wide"><span>Checklist</span><strong>{{ $item->title }}</strong></div><div class="wide"><span>Guidance</span><strong>{{ $item->detail }}</strong></div><div><span>Priority</span><strong>{{ strtoupper($item->priority) }}</strong></div><div><span>Status</span><strong>{{ strtoupper(str_replace('_', ' ', $item->status)) }}</strong></div><div><span>Assigned to</span><strong>{{ $item->assignee }}</strong></div><div><span>Reviewer</span><strong>{{ $item->reviewer }}</strong></div><div><span>Target</span><strong>{{ $item->target?->format('M d, Y') ?? 'No target date' }}</strong></div><div><span>Progress</span><strong>{{ $item->progress }}%</strong></div>@if($item->steps->isNotEmpty())<div class="wide"><span>Steps assigned to your barangay</span><ol class="checklist-detail-steps">@foreach($item->steps as $step)<li><form method="POST" action="{{ route('barangay.checklists.items.update', [$item->checklist_id, $step->ai_action_plan_checklist_item_id]) }}" class="checklist-step-form">@csrf @method('PATCH')<strong class="checklist-step-text">{{ $step->item_text }}</strong><div class="checklist-step-controls"><select name="status" aria-label="Status for {{ $step->item_text }}"><option value="pending" @selected($step->status === 'pending')>Pending</option><option value="followed" @selected($step->status === 'followed')>Followed</option><option value="not_followed" @selected($step->status === 'not_followed')>Not followed</option></select><input type="text" name="review_notes" value="{{ $step->review_notes }}" maxlength="1000" placeholder="Optional note" aria-label="Note for {{ $step->item_text }}"><button type="submit">Save</button></div></form></li>@endforeach</ol></div>@endif<div class="wide"><span>Compliance note</span><strong>{{ $item->note }}</strong></div></div></template>
             @endforeach
             </tbody></table></div><div class="checklist-compact-pagination" data-pagination-for="checklists"></div>
         @endif

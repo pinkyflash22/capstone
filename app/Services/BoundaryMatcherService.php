@@ -3,10 +3,25 @@
 namespace App\Services;
 
 use App\Models\BoundaryLocation;
+use App\Models\BarangayHall;
 use Illuminate\Support\Collection;
 
 class BoundaryMatcherService
 {
+    public function locateBarangayHall(float $lat, float $lng): ?BarangayHall
+    {
+        $boundary = $this->locateBarangayBoundary($lat, $lng);
+
+        if (! $boundary?->barangay_id) {
+            return null;
+        }
+
+        return BarangayHall::query()
+            ->with('barangay')
+            ->where('barangay_id', $boundary->barangay_id)
+            ->first();
+    }
+
     public function locateBarangayBoundary(float $lat, float $lng): ?BoundaryLocation
     {
         /** @var Collection<int, BoundaryLocation> $boundaries */

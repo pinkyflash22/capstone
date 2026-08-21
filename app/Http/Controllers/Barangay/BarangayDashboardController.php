@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Barangay;
 use App\Http\Controllers\RiskAreaReviewController;
 use App\Http\Controllers\Controller;
 use App\Models\AiActionPlanChecklist;
+use App\Models\AiActionPlanChecklistActivity;
 use App\Models\Barangay;
 use App\Models\BarangayFireRecord;
 use App\Models\BarangayHall;
@@ -28,9 +29,11 @@ use App\Support\IncidentContextDispatcher;
 use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
+use App\Services\BoundaryMatcherService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\Rule;
@@ -571,7 +574,7 @@ class BarangayDashboardController extends Controller
                     'analysis:analysis_id,sector,period,risk_level,confidence_data,analysis_data,predictions,incident_count,probability,revision_number,created_at',
                     'assignee:user_id,first_name,middle_name,last_name',
                     'confirmer:user_id,first_name,middle_name,last_name',
-                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,item_text,status',
+                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,item_text,status,reviewed_by,reviewed_at,review_notes',
                 ])
                 ->where('barangay_id', $barangay->barangay_id)
                 ->whereIn('status', ['confirmed', 'in_progress', 'submitted'])
@@ -1266,6 +1269,69 @@ class BarangayDashboardController extends Controller
         return view('barangay.partials.checklists-content', $this->buildPortalData(true));
     }
 
+    public function updateChecklistItem(Request $request, int $checklistId, int $itemId)
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['pending', 'followed', 'not_followed'])],
+            'review_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $context = $this->resolveBarangayContext();
+        $barangayId = (int) ($context['barangay']?->barangay_id ?? 0);
+
+        abort_if($barangayId <= 0, 403, 'Your account is not linked to a barangay.');
+
+        $checklist = AiActionPlanChecklist::query()
+            ->where('barangay_id', $barangayId)
+            ->whereIn('status', ['confirmed', 'in_progress', 'submitted'])
+            ->findOrFail($checklistId);
+        $item = $checklist->items()
+            ->where('ai_action_plan_checklist_item_id', $itemId)
+            ->firstOrFail();
+        $oldStatus = (string) $item->status;
+        $newStatus = (string) $validated['status'];
+
+        DB::transaction(function () use ($checklist, $item, $oldStatus, $newStatus, $validated, $request) {
+            $item->update([
+                'status' => $newStatus,
+                'reviewed_by' => $newStatus === 'pending' ? null : Auth::id(),
+                'reviewed_at' => $newStatus === 'pending' ? null : now(),
+                'review_notes' => $validated['review_notes'] ?? null,
+            ]);
+
+            $items = $checklist->items()->get();
+            $reviewedCount = $items->whereIn('status', ['followed', 'not_followed'])->count();
+            $followedCount = $items->where('status', 'followed')->count();
+            $totalCount = $items->count();
+            $checklist->update([
+                'status' => $reviewedCount === 0
+                    ? 'confirmed'
+                    : ($totalCount > 0 && $followedCount === $totalCount ? 'submitted' : 'in_progress'),
+            ]);
+
+            if (Schema::hasTable('ai_action_plan_checklist_activities')) {
+                AiActionPlanChecklistActivity::create([
+                    'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                    'ai_action_plan_checklist_item_id' => $item->ai_action_plan_checklist_item_id,
+                    'user_id' => Auth::id(),
+                    'event_type' => 'barangay_step_updated',
+                    'old_value' => $oldStatus,
+                    'new_value' => $newStatus,
+                    'notes' => $validated['review_notes'] ?? null,
+                    'metadata' => ['item_order' => $item->item_order, 'item_text' => $item->item_text],
+                    'created_at' => now(),
+                ]);
+            }
+
+            UserActivityLogger::log('updated assigned barangay checklist step', Auth::id(), $request);
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Checklist step updated.']);
+        }
+
+        return redirect()->route('barangay.checklists')->with('success', 'Checklist step updated.');
+    }
+
     public function reports(Request $request)
     {
         $data = $this->buildPortalData(false, false);
@@ -1575,7 +1641,7 @@ class BarangayDashboardController extends Controller
         ]);
     }
 
-    public function storeRiskArea(Request $request)
+    public function storeRiskArea(Request $request, BoundaryMatcherService $boundaryMatcherService)
     {
         $returnRoute = $request->input('return_to') === 'hazards'
             ? 'barangay.hazards'
@@ -1592,6 +1658,14 @@ class BarangayDashboardController extends Controller
             return redirect()
                 ->route($returnRoute)
                 ->withErrors(['risk_area' => 'Your barangay account is not linked to a barangay hall yet, so risk markers cannot be recorded.']);
+        }
+
+        $matchedHall = $boundaryMatcherService->locateBarangayHall((float) $validated['lat'], (float) $validated['lng']);
+
+        if (! $matchedHall || (int) $matchedHall->barangay_id !== (int) $hall->barangay_id) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the marker inside your assigned barangay boundary.',
+            ]);
         }
 
         $riskArea = DB::transaction(function () use ($validated, $hall, $request) {
@@ -1688,7 +1762,7 @@ class BarangayDashboardController extends Controller
             ->with('success', 'Risk area marker submitted successfully.');
     }
 
-    public function updateRiskArea(Request $request, int $riskAreaId)
+    public function updateRiskArea(Request $request, int $riskAreaId, BoundaryMatcherService $boundaryMatcherService)
     {
         $validated = $request->validate($this->riskAreaValidationRules());
         $this->validateRiskHazardPhotoUpload($request);
@@ -1698,6 +1772,13 @@ class BarangayDashboardController extends Controller
             : 'barangay.risk-map';
 
         $riskArea = $this->resolveOwnedRiskArea($riskAreaId);
+        $matchedHall = $boundaryMatcherService->locateBarangayHall((float) $validated['lat'], (float) $validated['lng']);
+
+        if (! $matchedHall || (int) $matchedHall->barangay_hall_id !== (int) $riskArea->barangay_hall_id) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the marker inside your assigned barangay boundary.',
+            ]);
+        }
 
         $riskArea = DB::transaction(function () use ($validated, $riskArea, $request) {
             $structuredNotes = $this->buildRiskAreaStructuredNotes($validated);

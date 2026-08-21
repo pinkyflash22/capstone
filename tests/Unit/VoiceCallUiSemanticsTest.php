@@ -12,6 +12,12 @@ class VoiceCallUiSemanticsTest extends TestCase
     {
         $script = file_get_contents(resource_path('js/voice-calls.js'));
         $styles = file_get_contents(resource_path('css/voice-calls.css'));
+        $bootstrap = file_get_contents(base_path('bootstrap/app.php'));
+        $controller = file_get_contents(app_path('Http/Controllers/VoiceCallController.php'));
+        $routes = file_get_contents(base_path('routes/web.php'));
+        $landingView = file_get_contents(resource_path('views/dashboard.blade.php'));
+        $landingScript = file_get_contents(resource_path('js/landing/main.js'));
+        $landingController = file_get_contents(app_path('Http/Controllers/LandingPageController.php'));
 
         $this->assertStringContainsString('let responderPanelOpen = false;', $script);
         $this->assertStringContainsString('panel.hidden = !responderPanelOpen;', $script);
@@ -30,6 +36,20 @@ class VoiceCallUiSemanticsTest extends TestCase
         $this->assertStringContainsString('focusResponderCall', $script);
         $this->assertStringContainsString('PYRO_OPEN_VOICE_CALL', $script);
         $this->assertStringContainsString('updateResponderLauncher(calls.length + liveCalls.length + missedCalls.length, calls.length);', $script);
+        $this->assertStringContainsString("'voice-calls/anonymous/session'", $bootstrap);
+        $this->assertStringContainsString("'csrf_token' => csrf_token()", $controller);
+        $this->assertStringContainsString("->middleware('throttle:20,1')", $routes);
+        $this->assertStringContainsString('let csrfToken =', $script);
+        $this->assertStringContainsString('csrfToken = payload.csrf_token;', $script);
+        $this->assertStringContainsString('data-pyro-landing-agora-call', $landingView);
+        $this->assertStringContainsString("window.addEventListener('pyro:voice-call-failed'", $landingScript);
+        $this->assertStringContainsString('resolveLandingEmergencyStation', $landingScript);
+        $this->assertStringContainsString('LANDING_STATION_DIRECTORY_CACHE_KEY', $landingScript);
+        $this->assertStringContainsString('window.startLandingStationCall', $landingScript);
+        $this->assertStringContainsString('window.location.href = `tel:${button.dataset.fallbackPhone}`', $landingScript);
+        $this->assertStringContainsString('nearestStationIdForCoordinates', $controller);
+        $this->assertStringContainsString("'contact_number' => \$call->station?->contact_number", $controller);
+        $this->assertStringContainsString("'station_id' => \$stationRecord?->station_id", $landingController);
 
         $this->assertStringContainsString('.pyro-voice-launcher', $styles);
         $this->assertStringContainsString('.pyro-voice-panel-backdrop:not([hidden])', $styles);

@@ -33,7 +33,7 @@
                     <i class="fa-solid fa-user-secret"></i>
                     Report Anonymously
                 </button>
-                <a href="tel:911" class="mobile-entry-btn mobile-entry-btn--call" data-emergency-call>
+                <a href="tel:911" class="mobile-entry-btn mobile-entry-btn--call" data-emergency-call data-pyro-landing-agora-call>
                     <i class="fa-solid fa-phone-volume"></i>
                     Call Emergency
                 </a>
@@ -161,7 +161,7 @@
 
             <div class="nav-actions">
                 <a href="{{ route('auth.login') }}" class="btn-login">Login</a>
-                <a class="btn-emergency" href="tel:911" data-emergency-call>
+                <a class="btn-emergency" href="tel:911" data-emergency-call data-pyro-landing-agora-call>
                     <i class="fa-solid fa-phone-alt"></i>
                     Emergency
                 </a>
@@ -402,7 +402,7 @@
                 <div class="footer-col">
                     <h4>Emergency</h4>
                     <ul class="footer-links">
-                        <li><a href="tel:911" data-emergency-call><i class="fa-solid fa-phone-alt"></i> 911 (Emergency)</a></li>
+                        <li><a href="tel:911" data-emergency-call data-pyro-landing-agora-call><i class="fa-solid fa-phone-alt"></i> 911 (Emergency)</a></li>
                         <li><a href="tel:+63253091234"><i class="fa-solid fa-phone"></i> (075) 530-1234</a></li>
                         <li><a href="mailto:emergency@pyrosense.gov"><i class="fa-solid fa-envelope"></i> emergency@pyrosense.gov</a></li>
                     </ul>

@@ -9,6 +9,7 @@ use App\Models\BarangayHall;
 use App\Models\StationOfficer;
 use App\Support\BarangayNotificationService;
 use App\Support\MediaPath;
+use App\Services\BoundaryMatcherService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,10 @@ class RiskAreaReviewController extends Controller
 {
     public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version:v2';
     protected const REVIEW_TEXT_REGEX = "/^[\\pL\\pN\\s\\.,:\\-\\(\\)]*$/u";
+
+    public function __construct(private readonly BoundaryMatcherService $boundaryMatcherService)
+    {
+    }
 
     public function adminIndex(Request $request): View
     {
@@ -571,9 +576,16 @@ class RiskAreaReviewController extends Controller
         $validated = $request->validate($this->createRiskAreaValidationRules($forcedStationId !== null));
         $this->assertRiskAreaSelectionValidity($validated);
 
-        $barangayHall = BarangayHall::query()
-            ->with('barangay')
-            ->findOrFail((int) $validated['barangay_hall_id']);
+        $barangayHall = $this->boundaryMatcherService->locateBarangayHall(
+            (float) $validated['lat'],
+            (float) $validated['lng']
+        );
+
+        if (! $barangayHall) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the marker inside a saved barangay boundary with a linked barangay hall.',
+            ]);
+        }
 
         if ($forcedStationId !== null) {
             $belongsToChiefCity = $chiefCityId !== null

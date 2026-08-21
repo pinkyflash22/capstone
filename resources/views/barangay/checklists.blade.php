@@ -293,8 +293,13 @@
         .checklist-detail-grid span { margin-bottom: 3px; color: #94a3b8; font-size: .61rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
         .checklist-detail-grid strong { color: #334155; font-size: .76rem; line-height: 1.45; overflow-wrap: anywhere; }
         .checklist-detail-steps { margin: 5px 0 0; padding-left: 18px; color: #334155; font-size: .74rem; }
-        .checklist-detail-steps li { margin: 5px 0; }
+        .checklist-detail-steps li { margin: 8px 0; }
         .checklist-detail-steps em { color: #b45309; font-size: .6rem; font-style: normal; font-weight: 900; }
+        .checklist-step-form { display: grid; gap: 7px; padding: 9px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+        .checklist-step-text { font-size: .73rem !important; }
+        .checklist-step-controls { display: grid; grid-template-columns: minmax(105px,.7fr) minmax(130px,1.3fr) auto; gap: 6px; }
+        .checklist-step-controls select, .checklist-step-controls input { min-width: 0; height: 34px; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font-size: .7rem; }
+        .checklist-step-controls button { height: 34px; padding: 0 11px; border: 0; border-radius: 8px; background: #b45309; color: #fff; font-size: .68rem; font-weight: 800; }
 
         @media (max-width: 900px) { .checklist-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
         @media (max-width: 520px) {
@@ -308,6 +313,7 @@
             .checklist-detail-modal__card { max-height: calc(100dvh - 18px); border-radius: 16px; }
             .checklist-detail-grid { grid-template-columns: 1fr; }
             .checklist-detail-grid > .wide { grid-column: auto; }
+            .checklist-step-controls { grid-template-columns: 1fr; }
         }
 
     </style>

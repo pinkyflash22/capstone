@@ -1,5 +1,5 @@
 const voiceConfig = window.PyroSenseVoiceCall || {};
-const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
 const isResponder = ['station admin', 'chief', 'chief station admin'].includes(role);
 const isCaller = ['citizen', 'anonymous', 'barangay', 'barangay captain', 'firefighter'].includes(role);
@@ -78,6 +78,10 @@ async function ensureCitizenVoiceSession() {
         timeoutMessage: 'Anonymous voice session setup timed out.',
     }).then((payload) => {
         voiceConfig.userId = payload.user_id || voiceConfig.userId;
+        if (payload.csrf_token) {
+            csrfToken = payload.csrf_token;
+            document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', csrfToken);
+        }
         return true;
     }).catch((error) => {
         voiceSessionBootstrapPromise = null;
@@ -1155,6 +1159,9 @@ async function triggerCitizenCall(trigger, event = null) {
         setCallerTriggerState(trigger, 'idle');
         stopOutgoingRinging();
         toast(error.message || 'Unable to start voice call.', 'error');
+        window.dispatchEvent(new CustomEvent('pyro:voice-call-failed', {
+            detail: { error, trigger },
+        }));
     }
 }
 

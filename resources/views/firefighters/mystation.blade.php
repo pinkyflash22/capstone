@@ -587,11 +587,7 @@
                 progressCreate: '/api/progress-investigation',
                 finalCreate: '/api/final-investigation',
                 reportManageBase: '/api',
-                proofImageDeleteTemplate: @json(route('firefighter.investigation-reports.proof-images.destroy', [
-                    'reportType' => '__REPORT_TYPE__',
-                    'reportId' => '__REPORT_ID__',
-                    'imageId' => '__IMAGE_ID__',
-                ])),
+                proofImageDeleteTemplate: @json($proofImageDeleteTemplate),
                 sirTemplate: @json(route('firefighter.spot-reports.sir.word', ['spotReportId' => '__SPOT_REPORT_ID__'])),
                 pirTemplate: @json(route('firefighter.progress-reports.pir.word', ['progressReportId' => '__PROGRESS_REPORT_ID__'])),
                 firTemplate: @json(route('firefighter.final-reports.fir.word', ['finalReportId' => '__FINAL_REPORT_ID__'])),

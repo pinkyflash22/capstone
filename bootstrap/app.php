@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ]);
     $middleware->validateCsrfTokens(except: [
         'logout',
+        'voice-calls/anonymous/session',
     ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

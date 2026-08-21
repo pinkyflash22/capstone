@@ -694,13 +694,18 @@ class PublicController extends Controller
             : $this->resolveCitizenQuickRiskTemplate($validated['report_kind']);
         $targetLat = (float) $validated['lat'];
         $targetLng = (float) $validated['lng'];
-        $hall = null;
+        $hall = $boundaryMatcherService->locateBarangayHall($targetLat, $targetLng);
+
+        if (! $hall) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected risk or hazard point is outside a saved barangay boundary, or the matched barangay has no linked hall yet.',
+            ], 422);
+        }
 
         if ($reportKind === 'hazard') {
             $userLat = isset($validated['user_lat']) ? (float) $validated['user_lat'] : null;
             $userLng = isset($validated['user_lng']) ? (float) $validated['user_lng'] : null;
-            $citizenHall = $user->address?->barangay?->hall;
-
             if ($userLat === null || $userLng === null) {
                 return response()->json([
                     'success' => false,
@@ -717,62 +722,6 @@ class PublicController extends Controller
                 ], 422);
             }
 
-            $boundary = $boundaryMatcherService->locateBarangayBoundary($targetLat, $targetLng);
-
-            if (! $boundary || ! $boundary->barangay_id) {
-                if (! $citizenHall) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'The selected hazard point is outside the saved barangay boundaries.',
-                    ], 422);
-                }
-
-                $hall = $citizenHall;
-
-                logger()->warning('Citizen concern point did not match a saved barangay boundary. Falling back to the citizen barangay hall.', [
-                    'user_id' => $user->user_id,
-                    'target_lat' => $targetLat,
-                    'target_lng' => $targetLng,
-                    'user_lat' => $userLat,
-                    'user_lng' => $userLng,
-                    'fallback_barangay_hall_id' => $citizenHall->barangay_hall_id,
-                    'fallback_barangay_id' => $citizenHall->barangay_id,
-                ]);
-            } else {
-                $hall = BarangayHall::query()
-                    ->with('barangay')
-                    ->where('barangay_id', $boundary->barangay_id)
-                    ->first();
-
-                if (! $hall) {
-                    if (! $citizenHall) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'The matched barangay does not have a linked barangay hall yet.',
-                        ], 422);
-                    }
-
-                    $hall = $citizenHall;
-
-                    logger()->warning('Citizen concern point matched a barangay boundary without a linked barangay hall. Falling back to the citizen barangay hall.', [
-                        'user_id' => $user->user_id,
-                        'target_lat' => $targetLat,
-                        'target_lng' => $targetLng,
-                        'matched_barangay_id' => $boundary->barangay_id,
-                        'fallback_barangay_hall_id' => $citizenHall->barangay_hall_id,
-                        'fallback_barangay_id' => $citizenHall->barangay_id,
-                    ]);
-                }
-            }
-        } else {
-            $hall = $user->address?->barangay?->hall;
-
-            if (! $hall) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Your citizen account is not linked to a barangay hall yet, so this report cannot be submitted.',
-                ], 422);
-            }
         }
 
         $riskArea = DB::transaction(function () use ($validated, $template, $hall, $user, $targetLat, $targetLng, $request) {

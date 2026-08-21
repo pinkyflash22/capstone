@@ -2258,20 +2258,10 @@ function shouldDisplayCitizenRiskOrHazardMarker(marker = {}, markerCategory = ''
         return true;
     }
 
-    const allowedReports = Array.isArray(window.citizenRiskMapReports)
-        ? window.citizenRiskMapReports
-        : [];
-    const markerId = marker?.marker_id !== null && marker?.marker_id !== undefined
-        ? String(marker.marker_id)
-        : '';
-
-    if (!markerId) {
-        return Boolean(marker?._citizenRiskReportMarker);
-    }
-
-    return allowedReports.some((report) => {
-        return String(report?.marker_id ?? report?.risk_area_id ?? '') === markerId;
-    });
+    // The server-side marker feed already applies review and role visibility.
+    // Do not gate a valid map marker on the separately refreshed report list,
+    // because those two requests can finish in either order.
+    return String(marker?.status || '').trim().toLowerCase() !== 'inactive';
 }
 
 export async function loadMarkers() {

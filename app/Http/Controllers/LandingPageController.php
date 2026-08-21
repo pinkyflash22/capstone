@@ -16,16 +16,20 @@ class LandingPageController extends Controller
     public function getStations()
     {
         $stations = Marker::where('category', 'station')
+            ->with(['stations:station_id,station_name,contact_number,marker_id'])
             ->select('marker_id', 'title', 'description', 'lat', 'lng')
             ->get()
             ->map(function ($station) {
+                $stationRecord = $station->stations->first();
+
                 return [
                     'id' => $station->marker_id,
-                    'name' => $station->title,
+                    'station_id' => $stationRecord?->station_id,
+                    'name' => $stationRecord?->station_name ?: $station->title,
                     'address' => $station->description ?? $station->title,
                     'lat' => (float) $station->lat,
                     'lng' => (float) $station->lng,
-                    'phone' => $station->phone ?? '(075) 123-4567'
+                    'phone' => $stationRecord?->contact_number,
                     // 'personnel' => $station->personnel ?? rand(20, 35),
                     // 'equipment' => $station->equipment ?? rand(2, 5) . ' fire trucks',
                     // 'captain' => $station->captain ?? 'Capt. ' . ['Reyes', 'Santos', 'Villanueva', 'Mendoza', 'Fernandez'][rand(0,4)]

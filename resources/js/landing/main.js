@@ -26,6 +26,7 @@ let landingBoundaryShapes = [];
 let landingRiskAreas = [];
 const LANDING_INCIDENT_VISIBILITY_RADIUS_METERS = 300;
 const LANDING_RESPONDER_CACHE_KEY = 'pyrosense:nearestResponder';
+const LANDING_STATION_DIRECTORY_CACHE_KEY = 'pyrosense:stationDirectory';
 const LANDING_RESPONDER_CACHE_MAX_AGE_MS = 60 * 1000;
 const LANDING_RESPONDER_CACHE_MAX_DISTANCE_METERS = 150;
 const OFFLINE_EMERGENCY_QUEUE_TYPE = 'offline_emergency_fire_report';
@@ -74,6 +75,7 @@ function loadStations() {
                     captain: station.captain ?? 'Officer on duty',
                     ...station,
                 }));
+                cacheLandingStationDirectory(stations);
                 updateNearbyStations(stations.slice(0, 5));
                 renderLandingMapResources();
                 renderMobilePreviewMarkers();
@@ -604,6 +606,8 @@ function initMobileEntryPage() {
 
         if (emergencyCallBfpButton) {
             emergencyCallBfpButton.hidden = true;
+            emergencyCallBfpButton.textContent = 'Call BFP station';
+            delete emergencyCallBfpButton.dataset.phone;
         }
 
         if (emergencyCallConfirmButton) {
@@ -698,6 +702,9 @@ function initMobileEntryPage() {
 
         if (emergencyCallBfpButton) {
             emergencyCallBfpButton.hidden = false;
+            const station = context.station || resolveLandingEmergencyStation();
+            emergencyCallBfpButton.dataset.phone = normalizeStationPhone(station.phone);
+            emergencyCallBfpButton.textContent = `Call ${station.name || 'BFP station'}`;
         }
 
         if (emergencyCallMessage) {
@@ -705,7 +712,7 @@ function initMobileEntryPage() {
         }
     }
 
-    async function openOfflineEmergencyCallFlow(event) {
+    async function openOfflineEmergencyCallFlow(event, preferredStation = null) {
         event?.preventDefault();
 
         if (offlineEmergencyCallInFlight) {
@@ -726,12 +733,14 @@ function initMobileEntryPage() {
         }
 
         const cachedLocation = getCachedEmergencyLocationLabel(coords);
+        const station = preferredStation || resolveLandingEmergencyStation(coords);
 
         if (coords) {
             const queued = queueOfflineEmergencyIncident(coords, cachedLocation);
             renderOfflineEmergencyModal({
                 coordsText: formatEmergencyCoordinates(coords),
                 cachedLocation,
+                station,
                 message: queued.queueItem
                     ? (
                         queued.wasAlreadyQueued
@@ -755,6 +764,7 @@ function initMobileEntryPage() {
             renderOfflineEmergencyModal({
                 coordsText: '',
                 cachedLocation,
+                station,
                 message: 'Location could not be determined, so no offline fire report was saved. You can still call BFP or 911 immediately.',
             });
             showLandingToast('Location could not be determined. Call BFP or 911 now.', true, 3600);
@@ -767,8 +777,13 @@ function initMobileEntryPage() {
 
     emergencyCallButtons.forEach((button) => {
         button.addEventListener('click', (event) => {
+            const station = resolveLandingEmergencyStation();
+            if (station?.station_id) button.dataset.voiceStationId = String(station.station_id);
+            if (station?.phone) button.dataset.fallbackPhone = normalizeStationPhone(station.phone);
+            if (station?.name) button.dataset.fallbackStationName = station.name;
+
             if (!window.navigator.onLine) {
-                openOfflineEmergencyCallFlow(event);
+                openOfflineEmergencyCallFlow(event, station);
                 return;
             }
 
@@ -789,7 +804,20 @@ function initMobileEntryPage() {
 
     emergencyCallConfirmButton?.addEventListener('click', () => openEmergencyDialer('911'));
     emergencyCallCopyCoordsButton?.addEventListener('click', copyEmergencyCoordinates);
-    emergencyCallBfpButton?.addEventListener('click', () => openEmergencyDialer(OFFLINE_BFP_DIAL_NUMBER));
+    emergencyCallBfpButton?.addEventListener('click', () => openEmergencyDialer(emergencyCallBfpButton.dataset.phone || OFFLINE_BFP_DIAL_NUMBER));
+
+    window.addEventListener('pyro:voice-call-failed', (event) => {
+        const trigger = event.detail?.trigger;
+        const station = resolveLandingEmergencyStation(null, trigger?.dataset?.voiceStationId);
+        renderOfflineEmergencyModal({
+            coordsText: formatEmergencyCoordinates(readCachedVisitorLocation()),
+            cachedLocation: getCachedEmergencyLocationLabel(),
+            station,
+            message: `The internet call could not connect. Use your phone network to call ${station.name || 'the BFP station'} instead.`,
+        });
+        openEmergencyCallConfirm();
+        showLandingToast('Internet call unavailable. Station telephone fallback is ready.', true, 3600);
+    });
 
     function closeMobileMapModal() {
         if (!mobileMapModal) return;
@@ -1423,6 +1451,66 @@ function getLandingDistanceMeters(lat1, lng1, lat2, lng2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return earthRadius * c;
+}
+
+function cacheLandingStationDirectory(directory) {
+    try {
+        const cacheable = (Array.isArray(directory) ? directory : [])
+            .filter(station => station?.phone)
+            .map(station => ({
+                id: Number(station.id) || null,
+                station_id: Number(station.station_id) || null,
+                name: station.name || 'BFP station',
+                phone: station.phone,
+                lat: Number(station.lat),
+                lng: Number(station.lng),
+            }));
+        window.localStorage.setItem(LANDING_STATION_DIRECTORY_CACHE_KEY, JSON.stringify(cacheable));
+    } catch (error) {
+        console.warn('Unable to cache the station contact directory:', error);
+    }
+}
+
+function readCachedLandingStationDirectory() {
+    try {
+        const cached = JSON.parse(window.localStorage.getItem(LANDING_STATION_DIRECTORY_CACHE_KEY) || '[]');
+        return Array.isArray(cached) ? cached : [];
+    } catch {
+        return [];
+    }
+}
+
+function normalizeStationPhone(phone) {
+    const normalized = String(phone || '').replace(/[^+\d]/g, '');
+    return normalized || OFFLINE_BFP_DIAL_NUMBER;
+}
+
+function resolveLandingEmergencyStation(coords = null, preferredStationId = null) {
+    const directory = (stations.length ? stations : readCachedLandingStationDirectory()).filter(station => station?.phone);
+    if (!directory.length) {
+        return { station_id: null, name: 'BFP station', phone: OFFLINE_BFP_DIAL_NUMBER };
+    }
+
+    if (preferredStationId) {
+        const preferred = directory.find(station => Number(station.station_id) === Number(preferredStationId));
+        if (preferred) return preferred;
+    }
+
+    const sourceCoords = coords || readCachedVisitorLocation();
+    if (sourceCoords && Number.isFinite(Number(sourceCoords.lat)) && Number.isFinite(Number(sourceCoords.lng))) {
+        const responder = readCachedLandingResponder(Number(sourceCoords.lat), Number(sourceCoords.lng));
+        if (responder?.stationId) {
+            const responderStation = directory.find(station => Number(station.station_id) === Number(responder.stationId));
+            if (responderStation) return responderStation;
+        }
+
+        return [...directory]
+            .filter(station => Number.isFinite(Number(station.lat)) && Number.isFinite(Number(station.lng)))
+            .sort((a, b) => getLandingDistanceMeters(sourceCoords.lat, sourceCoords.lng, a.lat, a.lng)
+                - getLandingDistanceMeters(sourceCoords.lat, sourceCoords.lng, b.lat, b.lng))[0] || directory[0];
+    }
+
+    return directory[0];
 }
 
 function readCachedLandingResponder(lat, lng) {
@@ -2090,7 +2178,7 @@ window.openStationModal = function(stationId) {
                     <i class="fa-solid fa-user-tie" style="color: #dc2626; width: 20px;"></i>
                     ${station.captain}
                 </div>
-                <button onclick="window.location.href='tel:${station.phone}'" 
+                <button type="button" onclick="startLandingStationCall(this, event, ${Number(station.id) || 0})"
                         style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 8px; width: 100%; margin-top: 1rem; cursor: pointer;">
                     <i class="fa-solid fa-phone-alt"></i> Call Station
                 </button>
@@ -2104,6 +2192,26 @@ window.openStationModal = function(stationId) {
 // Emergency call
 window.emergencyCall = function() {
     document.querySelector('[data-emergency-call]')?.click?.();
+}
+
+window.startLandingStationCall = function(button, event, stationMarkerId) {
+    event?.preventDefault?.();
+    const station = stations.find(item => Number(item.id) === Number(stationMarkerId))
+        || readCachedLandingStationDirectory().find(item => Number(item.id) === Number(stationMarkerId));
+    const fallback = station || resolveLandingEmergencyStation();
+
+    button.dataset.voiceStationId = fallback.station_id ? String(fallback.station_id) : '';
+    button.dataset.fallbackPhone = normalizeStationPhone(fallback.phone);
+    button.dataset.fallbackStationName = fallback.name || 'BFP station';
+
+    if (window.navigator.onLine
+        && window.PyroSenseVoiceCall?.configured
+        && typeof window.pyroStartVoiceCall === 'function') {
+        window.pyroStartVoiceCall(button, event);
+        return;
+    }
+
+    window.location.href = `tel:${button.dataset.fallbackPhone}`;
 }
 
 // Show/hide loading

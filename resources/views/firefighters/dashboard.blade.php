@@ -4186,7 +4186,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     --}}
     </div>
-    @include('partials.pwa-body', ['showPwaInstallButton' => true])
+    @include('partials.pwa-body', ['showPwaInstallButton' => false])
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         window.pyroPwa?.registerPageSnapshot?.({

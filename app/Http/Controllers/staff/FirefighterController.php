@@ -1236,6 +1236,11 @@ class FirefighterController extends Controller
             'stationImageUrl' => $context['stationImageUrl'],
             'currentOfficerName' => $context['currentOfficerName'],
             'activeReportTab' => request('report_tab', 'spot'),
+            'proofImageDeleteTemplate' => route('firefighter.investigation-reports.proof-images.destroy', [
+                'reportType' => '__REPORT_TYPE__',
+                'reportId' => '__REPORT_ID__',
+                'imageId' => '__IMAGE_ID__',
+            ]),
             'finalSubstantiatingDocumentOptions' => [
                 'Spot Investigation Report',
                 'Progress Investigation Report',
