@@ -196,7 +196,7 @@ function destroyPyroMapRuntime(options = {}) {
     stopMapLivePolling();
     unbindMapPollingLifecycle();
 
-    stopAllSimulations();
+    stopAllSimulations(false);
     abortLiveRequestsByPrefix('route-active');
     abortLiveRequestsByPrefix('markers-poll');
     abortLiveRequestsByPrefix('boundaries-poll');
@@ -6285,6 +6285,10 @@ function normalizeNullableInt(value) {
 }
 
 function shouldDisplayRouteForCurrentUser(routeData = {}) {
+    if (isDemoRouteSource(routeData.route_source || routeData.routeSource)) {
+        return true;
+    }
+
     const currentUserTeamId = normalizeNullableInt(window.userTeamId);
     const currentUserStationId = normalizeNullableInt(window.userStationId);
     const routeTeamId = normalizeNullableInt(routeData.route_team_id);
@@ -9514,9 +9518,9 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
     return truck.stopPromise;
 }
 
-async function stopAllSimulations() {
+async function stopAllSimulations(syncWithServer = true) {
     const routeIds = Array.from(activeTrucks.keys());
-    await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId)));
+    await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId, syncWithServer, false)));
 }
 
 function createNavigationArrowIcon(color = '#2563eb') {

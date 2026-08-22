@@ -27,9 +27,10 @@
 }
 
 .firefighter-map-stage .map-container { position: relative; }
-.ff-response-units { position:absolute; z-index:500; top:14px; right:14px; width:min(310px,calc(100% - 28px)); max-height:calc(100% - 28px); overflow:auto; border:1px solid rgba(148,163,184,.26); border-radius:17px; color:#1e293b; background:rgba(255,255,255,.94); box-shadow:0 18px 45px rgba(15,23,42,.2); backdrop-filter:blur(14px); }
-.ff-response-units__head { position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; color:#fff; background:linear-gradient(135deg,#9f231c,#651510); font-size:12px; font-weight:850; letter-spacing:.04em; }
-.ff-response-units__head strong { min-width:24px; height:24px; display:grid; place-items:center; border-radius:999px; background:rgba(255,255,255,.18); }
+.ff-response-units { position:static; width:100%; overflow:hidden; border:1px solid rgba(148,163,184,.26); border-radius:15px; color:#1e293b; background:#fff; box-shadow:none; }
+.ff-response-units--integrated { margin:0 0 12px; }
+.ff-response-units__head { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; color:#7f1d1d; background:#fff7f5; font-size:11px; font-weight:850; letter-spacing:.04em; }
+.ff-response-units__head strong { min-width:24px; height:24px; display:grid; place-items:center; border-radius:999px; color:#fff; background:#9f231c; }
 .ff-apparatus-tracking { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;border-bottom:1px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:10px;font-weight:750; }
 .ff-apparatus-tracking.is-live { background:#ecfdf5;color:#166534; }
 .ff-apparatus-tracking.is-queued { background:#fff7ed;color:#9a3412; }
@@ -40,8 +41,13 @@
 .ff-response-unit__icon { width:36px; height:36px; display:grid; place-items:center; border-radius:11px; color:#b42318; background:#fff0ed; }
 .ff-response-unit__copy { min-width:0; }.ff-response-unit__copy strong,.ff-response-unit__copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ff-response-unit__copy strong{font-size:12px}.ff-response-unit__copy small{margin-top:3px;color:#64748b;font-size:10px}
 .ff-response-unit__eta { text-align:right; color:#166534; font-size:10px; font-weight:800; }.ff-response-unit__eta strong{display:block;font-size:14px}.ff-response-unit__recall{grid-column:2/4;padding:6px 9px;border:0;border-radius:8px;color:#991b1b;background:#fee2e2;font-size:10px;font-weight:800;cursor:pointer}
-.pyro-response-unit-marker { width:40px;height:40px;display:grid;place-items:center;border:3px solid #fff;border-radius:13px;color:#fff;background:linear-gradient(135deg,#dc3528,#811b15);box-shadow:0 8px 20px rgba(127,29,29,.35);font-size:17px; }
-@media(max-width:768px){.ff-response-units{top:auto;right:8px;bottom:8px;left:8px;width:auto;max-height:180px}.ff-response-units__head{padding:9px 12px}.ff-response-units__list{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.ff-response-unit{padding:8px}}
+.ff-response-unit__icon img { width:31px; height:31px; object-fit:contain; filter:drop-shadow(0 4px 5px rgba(127,29,29,.22)); }
+.ff-assigned-incident-row__units { margin:0 14px 12px; padding:10px; border:1px solid #e2e8f0; border-radius:13px; background:#f8fafc; }
+.ff-assigned-incident-row__units[hidden] { display:none; }
+.ff-assigned-incident-row__units-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; color:#7f1d1d; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+.ff-assigned-incident-row__units-list { display:grid; gap:8px; }
+.pyro-response-unit-truck-marker { filter:drop-shadow(0 7px 6px rgba(127,29,29,.38)); }
+@media(max-width:768px){.ff-response-units{width:100%;max-height:none}.ff-response-units__head{padding:9px 11px}.ff-response-unit{grid-template-columns:34px minmax(0,1fr) auto;padding:8px}.ff-assigned-incident-row__units{margin:0 9px 10px;padding:8px}.ff-response-unit__recall{grid-column:1/4;width:100%}}
 
 .ff-app-notice.is-visible { transform: translateY(0); opacity: 1; }
 .ff-app-notice__icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #c94b2a, #db9218); }

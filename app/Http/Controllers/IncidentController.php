@@ -77,7 +77,8 @@ class IncidentController extends Controller
     {
         $recentIncidents = Incident::with(['marker'])
             ->where('created_at', '>=', now()->subMinutes($minutes))
-            ->where('status', self::STATUS_DB_REPORTED)
+            ->whereIn('status', [self::STATUS_DB_REPORTED, 'Responding', 'On Scene'])
+            ->when(Schema::hasColumn('incidents', 'duplicate_of_incident_id'), fn ($query) => $query->whereNull('duplicate_of_incident_id'))
             ->orderByDesc('created_at')
             ->get();
 
@@ -143,7 +144,7 @@ class IncidentController extends Controller
 
     private function getIncidentRelations(): array
     {
-        return ['marker', 'team', 'station', 'reporter', 'barangay.city', 'responderSnapshot'];
+        return ['marker', 'team', 'station', 'reporter', 'barangay.city', 'responderSnapshot', 'incidentReport'];
     }
 
     private function supportsBarangayResolution(): bool
@@ -165,8 +166,11 @@ class IncidentController extends Controller
 
     private function serializeIncident(Incident $incident): array
     {
+        $dispatch = app(\App\Services\IncidentDispatchStateService::class)->describe($incident);
+
         return [
             ...$incident->toArray(),
+            ...$dispatch,
             'incident_type' => $this->resolveIncidentTypeLabel($incident),
             'incident_type_name' => $this->resolveIncidentTypeLabel($incident),
             'incident_type_id' => null,
@@ -565,6 +569,7 @@ class IncidentController extends Controller
             'station_id' => 'nullable|exists:stations,station_id',
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
+            'dispatch_priority' => 'nullable|in:low,medium,high,critical',
         ]);
 
         $markerId = $validated['marker_id'] ?? null;
@@ -578,23 +583,29 @@ class IncidentController extends Controller
 
                 $duplicateIncident = $this->findRecentDuplicateIncident($lat, $lng);
                 if ($duplicateIncident) {
-                    throw new HttpResponseException(response()->json([
-                        'success' => false,
-                        'message' => 'A fire report was already submitted for this area recently.',
-                        'duplicate_incident_id' => $duplicateIncident->incident_id,
-                    ], 422));
+                    if (Schema::hasColumn('incidents', 'duplicate_of_incident_id')) {
+                        $validated['marker_id'] = $duplicateIncident->marker_id;
+                        $validated['duplicate_of_incident_id'] = $duplicateIncident->incident_id;
+                        $markerId = $duplicateIncident->marker_id;
+                    } else {
+                        throw new HttpResponseException(response()->json([
+                            'success' => false,
+                            'message' => 'A fire report was already submitted for this area recently.',
+                            'duplicate_incident_id' => $duplicateIncident->incident_id,
+                        ], 422));
+                    }
+                } else {
+                    $createdMarker = Marker::create([
+                        'title' => $validated['title'] ?? 'Citizen Fire Emergency',
+                        'description' => $validated['description'] ?? 'Citizen-submitted fire emergency.',
+                        'lat' => $lat,
+                        'lng' => $lng,
+                        'status' => 'inactive',
+                        'category' => 'fire',
+                    ]);
+
+                    $validated['marker_id'] = $createdMarker->marker_id;
                 }
-
-                $createdMarker = Marker::create([
-                    'title' => $validated['title'] ?? 'Citizen Fire Emergency',
-                    'description' => $validated['description'] ?? 'Citizen-submitted fire emergency.',
-                    'lat' => $lat,
-                    'lng' => $lng,
-                    'status' => 'inactive',
-                    'category' => 'fire',
-                ]);
-
-                $validated['marker_id'] = $createdMarker->marker_id;
             } else {
                 $validated['marker_id'] = $markerId;
             }
@@ -667,6 +678,11 @@ class IncidentController extends Controller
             $validated['status'] = empty($validated['status'])
                 ? self::STATUS_DB_REPORTED
                 : $this->resolveDatabaseStatusName($validated['status']);
+            if (Schema::hasColumn('incidents', 'dispatch_priority')) {
+                $validated['dispatch_priority'] = $validated['dispatch_priority'] ?? 'medium';
+            } else {
+                unset($validated['dispatch_priority']);
+            }
 
             $incident = Incident::create($validated);
 

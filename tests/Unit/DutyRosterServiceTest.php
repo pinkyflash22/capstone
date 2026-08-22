@@ -357,6 +357,50 @@ class DutyRosterServiceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_closing_a_legacy_incident_releases_its_primary_team_without_a_response_unit(): void
+    {
+        DB::table('teams')->where('team_id', 1)->update([
+            'status' => 'responding',
+            'roster_managed' => false,
+            'team_leader' => 1,
+            'commander_driver' => 2,
+        ]);
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'dispatched']);
+        DB::table('markers')->insert(['marker_id' => 70, 'title' => 'Legacy Fire', 'category' => 'fire', 'lat' => 14.6, 'lng' => 120.98]);
+        DB::table('incidents')->insert(['incident_id' => 70, 'marker_id' => 70, 'status' => 'Closed', 'station_id' => 10, 'team_id' => 1]);
+
+        $released = app(IncidentResourceDispatchService::class)->releaseIncidentUnits(Incident::findOrFail(70));
+
+        $this->assertSame(0, $released);
+        $this->assertSame('available', DB::table('teams')->where('team_id', 1)->value('status'));
+        $this->assertSame(2, DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->where('status', 'available')->count());
+    }
+
+    public function test_closing_an_incident_assigns_released_resources_to_the_waiting_queue(): void
+    {
+        DB::table('markers')->insert([
+            ['marker_id' => 80, 'title' => 'First Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98],
+            ['marker_id' => 81, 'title' => 'Waiting Fire', 'category' => 'fire', 'lat' => 14.61, 'lng' => 120.99],
+        ]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 80]);
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'responding', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'dispatched']);
+        DB::table('equipments')->insert(['equipment_id' => 80, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 80, 'station_id' => 10, 'equipment_id' => 80, 'available_quantity' => 0]);
+        DB::table('apparatus')->insert(['apparatus_id' => 80, 'station_id' => 10, 'equipment_id' => 80, 'unit_number' => 'ENGINE 80', 'status' => 'dispatched', 'maintenance_status' => 'operational']);
+        DB::table('incidents')->insert([
+            ['incident_id' => 80, 'marker_id' => 80, 'status' => 'Responding', 'station_id' => 10, 'team_id' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['incident_id' => 81, 'marker_id' => 81, 'status' => 'Reported', 'station_id' => 10, 'team_id' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('incident_response_units')->insert(['incident_response_unit_id' => 80, 'incident_id' => 80, 'station_id' => 10, 'team_id' => 1, 'equipment_station_id' => 80, 'apparatus_id' => 80, 'run_number' => 1, 'dispatch_source' => 'primary', 'status' => 'en_route']);
+
+        Incident::findOrFail(80)->update(['status' => 'Closed']);
+
+        $this->assertDatabaseHas('incidents', ['incident_id' => 81, 'team_id' => 1, 'status' => 'Responding']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 80, 'status' => 'dispatched']);
+        $this->assertDatabaseHas('incident_response_units', ['incident_id' => 81, 'team_id' => 1, 'apparatus_id' => 80, 'run_number' => 1, 'status' => 'en_route']);
+    }
+
     private function shift(string $label, string $start, string $end, array $assignments): DutyShift
     {
         $shift = DutyShift::create(['station_id' => 10, 'team_id' => 1, 'label' => $label, 'starts_at' => $start, 'ends_at' => $end, 'status' => 'scheduled']);

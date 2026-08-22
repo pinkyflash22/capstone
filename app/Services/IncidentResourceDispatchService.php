@@ -113,7 +113,7 @@ class IncidentResourceDispatchService
 
     public function releaseIncidentUnits(Incident $incident): int
     {
-        $teamIds = collect();
+        $teamIds = collect([$incident->team_id])->filter();
         $released = DB::transaction(function () use ($incident, &$teamIds) {
             $units = IncidentResponseUnit::query()->where('incident_id', $incident->incident_id)
                 ->whereIn('status', self::ACTIVE_UNIT_STATUSES)->lockForUpdate()->get();
@@ -131,6 +131,17 @@ class IncidentResourceDispatchService
         foreach ($teamIds->unique() as $teamId) {
             $team = Team::find($teamId);
             if (! $team) continue;
+            $hasAnotherActiveUnit = IncidentResponseUnit::query()
+                ->where('team_id', $teamId)
+                ->where('incident_id', '!=', $incident->incident_id)
+                ->whereIn('status', self::ACTIVE_UNIT_STATUSES)
+                ->exists();
+            $hasAnotherActiveIncident = Incident::query()
+                ->where('team_id', $teamId)
+                ->where('incident_id', '!=', $incident->incident_id)
+                ->whereIn('status', ['Reported', 'Responding', 'On Scene'])
+                ->exists();
+            if ($hasAnotherActiveUnit || $hasAnotherActiveIncident) continue;
             $team->forceFill(['status' => 'available'])->save();
             $members = StationOfficer::query()->whereIn('station_officer_id', $this->teamMemberIds($team))->get(['station_officer_id', 'user_id']);
             StationOfficer::query()->whereIn('station_officer_id', $members->pluck('station_officer_id'))->whereIn('status', ['dispatched', 'on-scene'])->update(['status' => 'available']);

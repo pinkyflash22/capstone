@@ -28,4 +28,24 @@ class IncidentObserver implements ShouldHandleEventsAfterCommit
             ]);
         }
     }
+
+    public function updated(Incident $incident): void
+    {
+        if (! $incident->wasChanged('status')) {
+            return;
+        }
+
+        if (! in_array(strtolower(trim((string) $incident->status)), ['controlled', 'closed', 'completed'], true)) {
+            return;
+        }
+
+        try {
+            app(\App\Services\IncidentResourceDispatchService::class)->releaseIncidentUnits($incident);
+            app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents(24 * 60);
+        } catch (\Throwable $e) {
+            Log::error('Incident resource release after closure failed: ' . $e->getMessage(), [
+                'incident_id' => $incident->incident_id,
+            ]);
+        }
+    }
 }

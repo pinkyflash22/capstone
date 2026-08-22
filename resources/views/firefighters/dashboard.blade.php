@@ -1494,11 +1494,6 @@
             </div>
             <div class="map-container overflow-hidden rounded-2xl border border-slate-200">
                 <div id="firefighterDashboardMap" class="bg-gray-200" style="height: 500px;"></div>
-                <aside id="activeResponseUnitsPanel" class="ff-response-units" aria-live="polite" aria-label="Active response units">
-                    <div class="ff-response-units__head"><span><i class="fas fa-truck-fast"></i> Response Units</span><strong id="activeResponseUnitsCount">0</strong></div>
-                    <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span><button type="button" id="apparatusTrackingInstall" hidden><i class="fas fa-download"></i> Install app</button></div>
-                    <div id="activeResponseUnitsList" class="ff-response-units__list"><p>No units currently dispatched.</p></div>
-                </aside>
                 <button type="button" class="ff-mobile-map-layers-button" data-ff-mobile-map-layers-button aria-label="Open map layers">
                     <i class="fas fa-layer-group" aria-hidden="true"></i>
                     <span data-ff-mobile-map-layers-count hidden>0</span>
@@ -1520,6 +1515,10 @@
                 <button id="refreshAssignedIncidents" class="view-all" aria-label="Refresh assigned incidents">
                     <i class="fas fa-rotate-right"></i><span class="ff-refresh-label">Refresh</span>
                 </button>
+            </div>
+            <div id="activeResponseUnitsPanel" class="ff-response-units ff-response-units--integrated" aria-live="polite" aria-label="Active response tracking">
+                <div class="ff-response-units__head"><span><i class="fas fa-truck-fast"></i> Assigned response tracking</span><strong id="activeResponseUnitsCount">0</strong></div>
+                <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span><button type="button" id="apparatusTrackingInstall" hidden><i class="fas fa-download"></i> Install app</button></div>
             </div>
             <div id="assignedIncidentsList" class="incident-list">
                 <div class="empty-incidents">

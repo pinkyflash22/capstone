@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Incident;
 use App\Models\RespondedTeam;
+use Illuminate\Support\Facades\Schema;
 
 class IncidentReport extends Model
 {
@@ -21,6 +22,24 @@ class IncidentReport extends Model
        'dateEnded',
        
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $report) {
+            if (! Schema::hasColumn('incidents', 'dispatch_priority')) {
+                return;
+            }
+
+            $priority = match (strtolower(trim((string) $report->severity))) {
+                'code red', 'critical' => 'critical',
+                'high' => 'high',
+                'low' => 'low',
+                default => 'medium',
+            };
+
+            $report->incident()->update(['dispatch_priority' => $priority]);
+        });
+    }
     public function incident(){
         return $this->belongsTo(Incident::class, 'incident_id', 'incident_id');
 

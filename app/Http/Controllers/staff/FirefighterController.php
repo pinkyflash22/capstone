@@ -372,8 +372,10 @@ class FirefighterController extends Controller
         $marker = $incident->marker;
         $reporter = $incident->reporter;
         $team = $incident->team;
+        $dispatch = app(\App\Services\IncidentDispatchStateService::class)->describe($incident);
 
         return [
+            ...$dispatch,
             'incident_id' => $incident->incident_id,
             'status' => $incident->status,
             'incident_status_id' => $this->getIncidentStatusId($incident->status),

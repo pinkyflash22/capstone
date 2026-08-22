@@ -178,8 +178,10 @@ class PublicController extends Controller
     private function serializeCitizenIncident(Incident $incident, ?float $distanceMeters = null): array
     {
         $status = (string) ($incident->status ?? 'Reported');
+        $dispatch = app(\App\Services\IncidentDispatchStateService::class)->describe($incident);
 
         return [
+            ...$dispatch,
             'incident_id' => $incident->incident_id,
             'status'=> $status,
             'incident_status' => $status,

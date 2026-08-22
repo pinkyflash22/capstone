@@ -600,12 +600,17 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     }
 
     function getAssignedIncidentQueue(incidents = []) {
+        const priorityRank = { critical: 0, high: 1, medium: 2, low: 3 };
         return (Array.isArray(incidents) ? incidents : [])
             .filter((incident) => {
                 const statusId = getIncidentStatusId(incident);
                 return [1, 2, 3].includes(statusId);
             })
             .sort((left, right) => {
+                const priorityDifference = (priorityRank[String(left?.dispatch_priority || 'medium').toLowerCase()] ?? 2)
+                    - (priorityRank[String(right?.dispatch_priority || 'medium').toLowerCase()] ?? 2);
+                if (priorityDifference !== 0) return priorityDifference;
+
                 const leftTime = Date.parse(left?.created_at || left?.updated_at || '') || 0;
                 const rightTime = Date.parse(right?.created_at || right?.updated_at || '') || 0;
 
@@ -887,6 +892,8 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         const reporterLabel = formatReporterLabel(incident);
         const reportedAt = formatHumanDateTime(incident.created_at);
         const assignedAt = formatHumanDateTime(incident.updated_at || incident.created_at);
+        const dispatchStateLabel = incident.dispatch_state_label || (statusId == 1 ? 'Awaiting dispatch' : 'Team dispatched');
+        const dispatchPriority = String(incident.dispatch_priority || 'medium').toUpperCase();
         const imageUrl = getIncidentImageUrl(incident);
         const incidentTypeIcon = getIncidentTypeIconClass(incidentType);
         const hasCoordinates = lat !== null && lat !== undefined && lng !== null && lng !== undefined;
@@ -922,6 +929,10 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                             <span>${escapeHtml(reporterLabel)}</span>
                         </div>
                         <div class="ff-assigned-incident-row__meta">
+                            <span>${escapeHtml(dispatchPriority)} priority</span>
+                            <span class="ff-assigned-incident-row__meta-separator">&bull;</span>
+                            <span>${escapeHtml(dispatchStateLabel)}</span>
+                            <span class="ff-assigned-incident-row__meta-separator">&bull;</span>
                             <span>${escapeHtml(reportedAt)}</span>
                             <span class="ff-assigned-incident-row__meta-separator">&bull;</span>
                             <span>Assigned ${escapeHtml(assignedAt)}</span>
@@ -929,6 +940,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                         <p class="ff-assigned-incident-row__summary">${escapeHtml(descriptionSummary)}</p>
                     </div>
                 </button>
+                <section class="ff-assigned-incident-row__units" data-response-units-for="${incident.incident_id}" aria-label="Response units for ${escapeHtml(incidentTitle)}" hidden></section>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
                     ${backupButton}
@@ -991,6 +1003,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     });
 
     hydrateAssignedIncidentLocations(pageIncidents);
+    renderActiveResponseUnits(activeResponseUnitsData);
     renderAssignedIncidentsPagination(totalQueued, totalPages, ffAssignedQueuePage);
 }
     // Professional Incident Details Modal
@@ -1366,9 +1379,8 @@ async function requestIncidentBackup(incidentId, triggerButton = null) {
 }
 
     async function refreshActiveResponseUnits(incidents = window.assignedIncidentsData || []) {
-    const list = document.getElementById('activeResponseUnitsList');
     const count = document.getElementById('activeResponseUnitsCount');
-    if (!list || !count) return [];
+    if (!count) return [];
     const activeIncidents = (Array.isArray(incidents) ? incidents : []).filter(incident => [2, 3].includes(Number(getIncidentStatusId(incident))));
     if (!activeIncidents.length) {
         activeResponseUnitsData = [];
@@ -1394,23 +1406,33 @@ async function requestIncidentBackup(incidentId, triggerButton = null) {
 }
 
 function renderActiveResponseUnits(units) {
-    const list = document.getElementById('activeResponseUnitsList');
     const count = document.getElementById('activeResponseUnitsCount');
-    if (!list || !count) return;
-    count.textContent = String(units.length);
-    list.innerHTML = units.length ? units.map(unit => {
+    if (count) count.textContent = String(units.length);
+
+    const renderUnit = (unit) => {
         const eta = unit.status === 'on_scene' ? 'On scene' : (unit.eta_minutes !== null && unit.eta_minutes !== undefined ? `~${Math.max(0, Math.ceil(Number(unit.eta_minutes)))} min` : 'ETA pending');
         const identity = unit.unit_number || unit.equipment || `Run ${unit.run_number}`;
         const gps = unit.gps_status === 'station_fallback' ? 'station location' : `${String(unit.gps_status || 'offline').replace('_', ' ')} GPS`;
         const members = Array.isArray(unit.team_members) ? unit.team_members : [];
         const apparatusMeta = [unit.plate_number, unit.water_capacity_liters ? `${Number(unit.water_capacity_liters).toLocaleString()} L` : null, `${members.length} crew`].filter(Boolean).join(' / ');
         return `<article class="ff-response-unit">
-            <span class="ff-response-unit__icon"><i class="fas fa-truck-fast"></i></span>
+            <span class="ff-response-unit__icon"><img src="/truck.png" alt="" aria-hidden="true"></span>
             <span class="ff-response-unit__copy"><strong>${escapeHtml(identity)} / Run ${escapeHtml(unit.run_number)}</strong><small>${escapeHtml(apparatusMeta || unit.apparatus_type || 'Registered apparatus')}</small><small>${escapeHtml(unit.station_name || 'Station')} / ${escapeHtml(gps)}</small></span>
             <span class="ff-response-unit__eta"><strong>${escapeHtml(eta)}</strong>${escapeHtml(String(unit.status).replace('_', ' '))}</span>
             ${unit.can_recall ? `<button type="button" class="ff-response-unit__recall" onclick="recallResponseBackup(${Number(unit.incident_id)},${Number(unit.id)})"><i class="fas fa-rotate-left"></i> Recall backup</button>` : ''}
         </article>`;
-    }).join('') : '<p>No units currently dispatched.</p>';
+    };
+
+    document.querySelectorAll('[data-response-units-for]').forEach(slot => {
+        const incidentId = Number(slot.dataset.responseUnitsFor);
+        const incidentUnits = units.filter(unit => Number(unit.incident_id) === incidentId);
+        slot.hidden = incidentUnits.length === 0;
+        slot.innerHTML = incidentUnits.length ? `
+            <div class="ff-assigned-incident-row__units-head"><span><i class="fas fa-truck-fast"></i> Dispatched units</span><strong>${incidentUnits.length}</strong></div>
+            <div class="ff-assigned-incident-row__units-list">${incidentUnits.map(renderUnit).join('')}</div>
+        ` : '';
+    });
+
     renderResponseUnitMapMarkers(units);
 }
 
@@ -1434,7 +1456,7 @@ function renderResponseUnitMapMarkers(units) {
         const gpsSeen = unit.gps_last_seen_at ? new Date(unit.gps_last_seen_at) : null;
         const gpsAge = gpsSeen && !Number.isNaN(gpsSeen.getTime()) ? Math.max(0, Math.round((Date.now() - gpsSeen.getTime()) / 1000)) : null;
         const gpsDetail = unit.gps_status === 'station_fallback' ? 'Shown at station until live apparatus GPS is available.' : `Apparatus GPS: ${escapeHtml(unit.gps_status)}${gpsAge !== null ? ` / ${gpsAge < 60 ? `${gpsAge}s` : `${Math.floor(gpsAge / 60)}m`} ago` : ''}${unit.gps_accuracy_meters !== null && unit.gps_accuracy_meters !== undefined ? ` / ±${Math.round(Number(unit.gps_accuracy_meters))}m` : ''}`;
-        const marker = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<span class="pyro-response-unit-marker"><i class="fas fa-truck-fast"></i></span>', iconSize: [40, 40], iconAnchor: [20, 20] }) });
+        const marker = L.marker([lat, lng], { icon: L.icon({ iconUrl: '/truck.png', className: 'pyro-response-unit-truck-marker', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -22] }) });
         marker.bindPopup(`<div style="min-width:270px;max-width:330px;font-family:system-ui,-apple-system,sans-serif"><div style="margin:-12px -12px 10px;padding:12px 14px;border-radius:12px 12px 0 0;color:#fff;background:linear-gradient(135deg,#b42318,#681512)"><strong style="font-size:15px">${identity}</strong><small style="display:block;margin-top:3px;opacity:.85">Actual dispatched apparatus / Run ${escapeHtml(unit.run_number)}</small></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;font-size:11px"><span><b>Plate</b><br>${escapeHtml(unit.plate_number || 'Not recorded')}</span><span><b>Capacity</b><br>${escapeHtml(capacity)}</span><span><b>Station</b><br>${escapeHtml(unit.station_name || 'Responding station')}</span><span><b>Status / ETA</b><br>${escapeHtml(String(unit.status).replace('_', ' '))} / ${escapeHtml(eta)}</span></div><div style="margin:8px 0 5px;color:#9f231c;font-size:10px;font-weight:800;letter-spacing:.08em">ONBOARD EQUIPMENT</div>${loadoutRows}<div style="margin:8px 0 5px;color:#9f231c;font-size:10px;font-weight:800;letter-spacing:.08em">${escapeHtml(unit.team_label || 'RESPONSE TEAM')}</div>${memberRows}<small style="display:block;margin-top:8px;color:#64748b">${gpsDetail}</small></div>`, { minWidth: 270, maxWidth: 350 });
         marker.addTo(responseUnitLayer);
     });

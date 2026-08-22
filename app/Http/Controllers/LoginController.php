@@ -77,6 +77,26 @@ class LoginController extends Controller
     }
 
     /**
+     * Return a token tied to the browser's current session. Login pages may
+     * remain open after logout or session expiry, so their embedded token can
+     * no longer be trusted at submission time.
+     */
+    public function refreshLoginSession(Request $request)
+    {
+        if (! $request->session()->has('_token')) {
+            $request->session()->regenerateToken();
+        }
+
+        return response()->json([
+            'csrf_token' => $request->session()->token(),
+        ])->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Sat, 01 Jan 2000 00:00:00 GMT',
+        ]);
+    }
+
+    /**
      * Handle login authentication with session-based attempt tracking
      */
     public function authenticate(Request $request)

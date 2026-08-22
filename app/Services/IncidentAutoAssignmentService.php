@@ -5,9 +5,14 @@ namespace App\Services;
 use App\Models\Incident;
 use App\Models\Station;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class IncidentAutoAssignmentService
 {
+    public function __construct(private readonly IncidentJurisdictionService $jurisdictionService)
+    {
+    }
+
     public function assignRecentUnassignedIncidents(int $minutes = 60): array
     {
         $cutoff = now()->subMinutes($minutes);
@@ -16,6 +21,11 @@ class IncidentAutoAssignmentService
             ->whereNull('team_id')
             ->where('status', 'Reported')
             ->where('created_at', '>=', $cutoff)
+            ->when(Schema::hasColumn('incidents', 'duplicate_of_incident_id'), fn ($query) => $query->whereNull('duplicate_of_incident_id'))
+            ->when(
+                Schema::hasColumn('incidents', 'dispatch_priority'),
+                fn ($query) => $query->orderByRaw("CASE LOWER(COALESCE(dispatch_priority, 'medium')) WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+            )
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -54,6 +64,12 @@ class IncidentAutoAssignmentService
                 ->first();
 
             if (! $lockedIncident) {
+                return null;
+            }
+
+            $lockedIncident = $this->jurisdictionService->apply($lockedIncident);
+
+            if (Schema::hasColumn('incidents', 'duplicate_of_incident_id') && $lockedIncident->duplicate_of_incident_id) {
                 return null;
             }
 

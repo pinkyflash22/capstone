@@ -40,6 +40,8 @@ class Incident extends Model
         'barangay_resolution_status',
         'barangay_resolution_source',
         'barangay_resolved_at',
+        'dispatch_priority',
+        'duplicate_of_incident_id',
     ];
 
     protected $casts = [
@@ -147,5 +149,15 @@ class Incident extends Model
     public function responseUnits()
     {
         return $this->hasMany(IncidentResponseUnit::class, 'incident_id', 'incident_id');
+    }
+
+    public function canonicalIncident()
+    {
+        return $this->belongsTo(self::class, 'duplicate_of_incident_id', 'incident_id');
+    }
+
+    public function duplicateReports()
+    {
+        return $this->hasMany(self::class, 'duplicate_of_incident_id', 'incident_id');
     }
 }

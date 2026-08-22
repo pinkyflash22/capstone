@@ -55,6 +55,21 @@ return Application::configure(basePath: dirname(__DIR__))
                 ? $exception->getStatusCode()
                 : 500;
 
+            // Some servers convert TokenMismatchException into an HTTP 419
+            // before render callbacks run. Never let that become the generic
+            // 400 page; always recover through a fresh login session.
+            if ($status === 419) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Your session expired. Refresh and try again.',
+                    ], 419);
+                }
+
+                return redirect()
+                    ->route('auth.login')
+                    ->with('error', 'Your session expired. The login form has been refreshed; please try again.');
+            }
+
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'message' => $status >= 500

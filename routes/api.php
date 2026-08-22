@@ -189,7 +189,6 @@ Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,ch
 // Add to your routes/api.php or web.php
 Route::get('/firefighter/assigned-incidents/{firefighterId}', [IncidentController::class, 'getAssignedIncidents']);
 Route::get('/incidents/{incidentId}', [IncidentController::class, 'show']);
-Route::get('/route/{id}/truck-details', [RouteController::class, 'truckDetails']);
 //for displaying markers
 // Simple working endpoint for recent incidents
 Route::get('/incidents/recent', function (Request $request) {
@@ -309,12 +308,24 @@ Route::put('/team/{id}', [TeamController::class, 'update']);
 
 Route::put('/teams/{id}', [TeamController::class, 'updateStatus']);
 
-//routes
-Route::get('/route/active', [RouteController::class, 'getActive']);
-Route::get('/route/active/{incidentId}', [RouteController::class, 'getActiveByIncident']);
-Route::post('/route/clear-active', [RouteController::class, 'clearActive']);
-Route::put('/route/{id}/status', [RouteController::class, 'updateStatus']);
-Route::resource('route', RouteController::class);
+// Every authenticated map user can observe shared routes.
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/route/active', [RouteController::class, 'getActive']);
+    Route::get('/route/active/{incidentId}', [RouteController::class, 'getActiveByIncident']);
+    Route::get('/route', [RouteController::class, 'index']);
+    Route::get('/route/{route}', [RouteController::class, 'show']);
+    Route::get('/route/{id}/truck-details', [RouteController::class, 'truckDetails']);
+});
+
+// Only responder/management roles can create, move, stop, or delete a shared route.
+Route::middleware(['web', 'auth', 'role:admin,station admin,chief,firefighter'])->group(function () {
+    Route::post('/route/clear-active', [RouteController::class, 'clearActive']);
+    Route::put('/route/{id}/status', [RouteController::class, 'updateStatus']);
+    Route::post('/route', [RouteController::class, 'store']);
+    Route::put('/route/{route}', [RouteController::class, 'update']);
+    Route::patch('/route/{route}', [RouteController::class, 'update']);
+    Route::delete('/route/{route}', [RouteController::class, 'destroy']);
+});
 
 
 // 

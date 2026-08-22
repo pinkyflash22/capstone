@@ -66,6 +66,7 @@ Route::get('/build/assets/map-{hash}.js', function () {
         Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
         Route::post('/register', [RegisterController::class, 'register'])->name('register.store');
         Route::get('/login',[LoginController::class, 'index'])->name('auth.login');
+        Route::get('/auth/session-refresh', [LoginController::class, 'refreshLoginSession'])->name('auth.session-refresh');
         Route::post('/auth', [LoginController::class, 'authenticate'])->name('auth.authenticate');
         Route::get('/forgot-password', [LoginController::class, 'showForgotPasswordForm'])->name('password.request');
         Route::post('/forgot-password/search', [LoginController::class, 'searchPasswordRecoveryAccount'])->name('password.lookup');

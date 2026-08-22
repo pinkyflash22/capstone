@@ -30,6 +30,7 @@ use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Services\BoundaryMatcherService;
+use App\Services\IncidentJurisdictionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1451,14 +1452,21 @@ class BarangayDashboardController extends Controller
         ];
     }
 
-    public function storeFireReport(Request $request)
+    public function storeFireReport(Request $request, IncidentJurisdictionService $jurisdictionService)
     {
         $validated = $request->validate($this->fireReportValidationRules());
 
         $context = $this->resolveBarangayContext();
         $hall = $context['hall'];
+        $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
 
-        DB::transaction(function () use ($validated, $hall, $request) {
+        if (! $hall || ! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the fire incident marker inside your assigned barangay boundary.',
+            ]);
+        }
+
+        DB::transaction(function () use ($validated, $hall, $jurisdiction, $request) {
             $marker = Marker::create([
                 'title' => $validated['title'],
                 'description' => $validated['location_description'],
@@ -1473,6 +1481,11 @@ class BarangayDashboardController extends Controller
                 'status' => 'Reported',
                 'team_id' => null,
                 'reported_by' => Auth::user()?->user_id,
+                'barangay_id' => $jurisdiction['barangay_id'],
+                'station_id' => $jurisdiction['station_id'],
+                'barangay_resolution_status' => 'matched',
+                'barangay_resolution_source' => 'saved_boundary',
+                'barangay_resolved_at' => now(),
             ]);
             IncidentContextDispatcher::dispatchFor($incident);
 
@@ -1584,7 +1597,7 @@ class BarangayDashboardController extends Controller
             ->with('success', 'Fire record deleted successfully.');
     }
 
-    public function storeQuickFireReport(Request $request)
+    public function storeQuickFireReport(Request $request, IncidentJurisdictionService $jurisdictionService)
     {
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
@@ -1595,8 +1608,15 @@ class BarangayDashboardController extends Controller
         $hall = $context['hall'];
         $userId = Auth::user()?->user_id;
         $timestamp = now();
+        $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
 
-        $incident = DB::transaction(function () use ($validated, $hall, $userId, $timestamp, $request) {
+        if (! $hall || ! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the fire incident marker inside your assigned barangay boundary.',
+            ]);
+        }
+
+        $incident = DB::transaction(function () use ($validated, $hall, $jurisdiction, $userId, $timestamp, $request) {
             $marker = Marker::create([
                 'title' => 'Barangay Fire Emergency',
                 'description' => 'Fire emergency reported from barangay quick action.',
@@ -1611,6 +1631,11 @@ class BarangayDashboardController extends Controller
                 'status' => 'Reported',
                 'team_id' => null,
                 'reported_by' => $userId,
+                'barangay_id' => $jurisdiction['barangay_id'],
+                'station_id' => $jurisdiction['station_id'],
+                'barangay_resolution_status' => 'matched',
+                'barangay_resolution_source' => 'saved_boundary',
+                'barangay_resolved_at' => now(),
             ]);
             IncidentContextDispatcher::dispatchFor($incident);
 

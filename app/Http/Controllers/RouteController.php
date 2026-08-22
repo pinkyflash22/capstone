@@ -7,9 +7,13 @@ use App\Models\Route;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
+use App\Models\Role;
+use App\Models\BarangayOfficer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class RouteController extends Controller
 {
@@ -19,7 +23,7 @@ class RouteController extends Controller
     public function index()
     {
         try {
-            $routes = Route::orderBy('created_at', 'desc')->get();
+            $routes = $this->visibleRouteQuery()->orderBy('created_at', 'desc')->get();
             return response()->json($routes);
         } catch (\Exception $e) {
             Log::error('Error fetching routes: ' . $e->getMessage());
@@ -54,8 +58,11 @@ class RouteController extends Controller
 
             $authenticatedTeam = $this->resolveAuthenticatedTeam();
             $requestedIncident = Incident::query()
-                ->select(['incident_id', 'team_id'])
+                ->with('team:team_id,station_id')
+                ->select(['incident_id', 'station_id', 'team_id', 'reported_by', 'barangay_id'])
                 ->find($validated['incident_id']);
+
+            abort_unless($requestedIncident && $this->canAccessIncident($requestedIncident), 403, 'You cannot create a route for this incident.');
 
             $requestedTeamId = $requestedIncident?->team_id ?? $authenticatedTeam?->team_id;
 
@@ -143,8 +150,7 @@ class RouteController extends Controller
     public function getActive()
     {
         try {
-            $activeRoutes = Cache::remember('map:routes:active:v2', now()->addSeconds(8), function () {
-                return Route::query()
+            $activeRoutes = $this->visibleRouteQuery()
                     ->select([
                         'route_id',
                         'incident_id',
@@ -165,7 +171,7 @@ class RouteController extends Controller
                         'last_updated_at',
                     ])
                     ->with([
-                        'incident:incident_id,team_id',
+                        'incident:incident_id,station_id,team_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->whereIn('status', ['active', 'moving'])
@@ -174,7 +180,6 @@ class RouteController extends Controller
                     ->map(fn ($route) => $this->transformRouteForFrontend($route))
                     ->values()
                     ->all();
-            });
             
             return response()->json($activeRoutes);
             
@@ -190,8 +195,7 @@ class RouteController extends Controller
     public function getActiveByIncident($incidentId)
     {
         try {
-            $activeRoutes = Cache::remember('map:routes:active:incident:' . $incidentId . ':v2', now()->addSeconds(8), function () use ($incidentId) {
-                return Route::query()
+            $activeRoutes = $this->visibleRouteQuery()
                     ->select([
                         'route_id',
                         'incident_id',
@@ -212,7 +216,7 @@ class RouteController extends Controller
                         'last_updated_at',
                     ])
                     ->with([
-                        'incident:incident_id,team_id',
+                        'incident:incident_id,station_id,team_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->where('incident_id', $incidentId)
@@ -222,7 +226,6 @@ class RouteController extends Controller
                     ->map(fn ($route) => $this->transformRouteForFrontend($route))
                     ->values()
                     ->all();
-            });
 
             return response()->json($activeRoutes);
         } catch (\Exception $e) {
@@ -240,7 +243,7 @@ class RouteController extends Controller
     public function updateStatus(Request $request, $id)
     {
         try {
-            $route = Route::findOrFail($id);
+            $route = $this->visibleRouteQuery()->findOrFail($id);
             
             $validated = $request->validate([
                 'status' => 'required|in:active,moving,inactive',
@@ -311,7 +314,7 @@ class RouteController extends Controller
     public function clearActive()
     {
         try {
-            $updated = Route::whereIn('status', ['active', 'moving'])
+            $updated = $this->visibleRouteQuery()->whereIn('status', ['active', 'moving'])
                 ->update(['status' => 'inactive']);
             $this->flushActiveRouteCaches();
             
@@ -336,7 +339,7 @@ class RouteController extends Controller
     public function show($id)
     {
         try {
-            $route = Route::findOrFail($id);
+            $route = $this->visibleRouteQuery()->findOrFail($id);
             
             // Format coordinates for frontend
             $route->formatted_coordinates = $route->getFormattedCoordinates();
@@ -358,7 +361,7 @@ class RouteController extends Controller
     public function truckDetails($id)
     {
         try {
-            $route = Route::with([
+            $route = $this->visibleRouteQuery()->with([
                 'incident.marker',
                 'incident.team.commander',
                 'incident.team.pumpers',
@@ -435,7 +438,7 @@ class RouteController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $route = Route::findOrFail($id);
+            $route = $this->visibleRouteQuery()->findOrFail($id);
             
             $validated = $request->validate([
                 'coordinates' => 'sometimes|json',
@@ -484,7 +487,7 @@ class RouteController extends Controller
     public function destroy($id)
     {
         try {
-            $route = Route::findOrFail($id);
+            $route = $this->visibleRouteQuery()->findOrFail($id);
             $incidentId = $route->incident_id;
             $route->delete();
             $this->flushActiveRouteCaches($incidentId);
@@ -529,7 +532,7 @@ class RouteController extends Controller
             'current_lng' => $route->current_lng,
             'progress_percentage' => $route->progress_percentage,
             'route_team_id' => $route->incident?->team_id,
-            'route_station_id' => $this->resolveRouteStationId($route->incident?->team),
+            'route_station_id' => $this->resolveRouteStationId($route->incident?->team, $route->incident?->station_id),
             'route_team_user_ids' => $this->resolveRouteTeamUserIds($route->incident?->team),
             'route_primary_user_id' => $this->resolvePrimaryRouteUserId($route->incident?->team),
             'created_at' => optional($route->created_at)->toISOString(),
@@ -538,8 +541,16 @@ class RouteController extends Controller
         ];
     }
 
-    private function resolveRouteStationId(?Team $team): ?int
+    private function resolveRouteStationId(?Team $team, ?int $incidentStationId = null): ?int
     {
+        if ($team?->station_id) {
+            return (int) $team->station_id;
+        }
+
+        if ($incidentStationId) {
+            return (int) $incidentStationId;
+        }
+
         if (!$team) {
             return null;
         }
@@ -651,5 +662,97 @@ class RouteController extends Controller
             })
             ->orderByDesc('route_id')
             ->first();
+    }
+
+    private function visibleRouteQuery(): Builder
+    {
+        $query = Route::query();
+        $user = Auth::user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $role = Role::roleNameForId((int) $user->role_id);
+        if (in_array($role, ['admin', 'chief', 'chief station admin'], true)) {
+            return $query;
+        }
+
+        if (in_array($role, ['firefighter', 'station admin'], true)) {
+            $stationId = StationOfficer::query()->where('user_id', $user->user_id)->value('station_id');
+
+            if (! $stationId) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->whereHas('incident', function ($incidentQuery) use ($stationId) {
+                $incidentQuery->where('station_id', $stationId)
+                    ->orWhereHas('team', fn ($teamQuery) => $teamQuery->where('station_id', $stationId));
+            });
+        }
+
+        if (in_array($role, ['barangay', 'barangay captain', 'barangay officer', 'barangay_officer'], true)) {
+            $barangayId = $this->resolveViewerBarangayId((int) $user->user_id);
+
+            return $barangayId
+                ? $query->whereHas('incident', fn ($incidentQuery) => $incidentQuery->where('barangay_id', $barangayId))
+                : $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('incident', function ($incidentQuery) use ($user) {
+            $incidentQuery->where('reported_by', $user->user_id);
+
+            if (Schema::hasColumn('incidents', 'duplicate_of_incident_id')) {
+                $incidentQuery->orWhereHas('duplicateReports', fn ($duplicates) => $duplicates->where('reported_by', $user->user_id));
+            }
+        });
+    }
+
+    private function canAccessIncident(Incident $incident): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        $role = Role::roleNameForId((int) $user->role_id);
+        if (in_array($role, ['admin', 'chief', 'chief station admin'], true)) {
+            return true;
+        }
+
+        if (in_array($role, ['firefighter', 'station admin'], true)) {
+            $stationId = StationOfficer::query()->where('user_id', $user->user_id)->value('station_id');
+            $incidentStationId = $incident->station_id ?: $incident->team?->station_id;
+
+            return $stationId && (int) $stationId === (int) $incidentStationId;
+        }
+
+        if (in_array($role, ['barangay', 'barangay captain', 'barangay officer', 'barangay_officer'], true)) {
+            $barangayId = $this->resolveViewerBarangayId((int) $user->user_id);
+
+            return $barangayId && (int) $barangayId === (int) $incident->barangay_id;
+        }
+
+        return (int) $incident->reported_by === (int) $user->user_id;
+    }
+
+    private function resolveViewerBarangayId(int $userId): ?int
+    {
+        if (Schema::hasTable('barangay_officers')) {
+            $barangayId = BarangayOfficer::query()->where('user_id', $userId)->value('barangay_id');
+            if ($barangayId) {
+                return (int) $barangayId;
+            }
+        }
+
+        if (Schema::hasTable('full_addresses') && Schema::hasColumn('full_addresses', 'user_id')) {
+            $barangayId = \Illuminate\Support\Facades\DB::table('full_addresses')
+                ->where('user_id', $userId)
+                ->value('barangay_id');
+
+            return $barangayId ? (int) $barangayId : null;
+        }
+
+        return null;
     }
 }

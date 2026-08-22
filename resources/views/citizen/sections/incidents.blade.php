@@ -228,7 +228,12 @@
                             @elseif($incident->status == 'responding')
                                 Crews responding · ETA {{ rand(3, 8) }} minutes
                             @else
-                                New report · Awaiting dispatch
+                                @php
+                                    $dispatchLabel = $incident instanceof \App\Models\Incident
+                                        ? app(\App\Services\IncidentDispatchStateService::class)->describe($incident)['dispatch_state_label']
+                                        : ($incident->dispatch_state_label ?? 'Awaiting dispatch');
+                                @endphp
+                                New report · {{ $dispatchLabel }}
                             @endif
                         </p>
                     </div>
@@ -526,7 +531,7 @@
                             @elseif($incident->incident_status_id == '2')
                                 Crews responding · ETA {{ rand(3, 8) }} minutes
                             @else
-                                New report · Awaiting dispatch
+                                New report · {{ $incident->dispatch_state_label ?? 'Awaiting dispatch' }}
                             @endif
                         </p>
                     </div>

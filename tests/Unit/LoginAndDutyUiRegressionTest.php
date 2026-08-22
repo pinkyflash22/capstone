@@ -35,4 +35,25 @@ class LoginAndDutyUiRegressionTest extends TestCase
         $this->assertStringContainsString('option.disabled', $script);
         $this->assertStringContainsString('is already assigned to another duty position', $script);
     }
+
+    public function test_login_refreshes_its_csrf_token_before_submitting(): void
+    {
+        $response = $this->getJson('/auth/session-refresh')
+            ->assertOk()
+            ->assertJsonStructure(['csrf_token']);
+
+        $this->assertNotEmpty($response->json('csrf_token'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        $view = file_get_contents(resource_path('views/auth/login.blade.php'));
+        $this->assertStringContainsString("route('auth.session-refresh')", $view);
+        $this->assertStringContainsString('HTMLFormElement.prototype.submit.call(this)', $view);
+    }
+
+    public function test_expired_login_sessions_are_not_rendered_as_bad_requests(): void
+    {
+        $bootstrap = file_get_contents(base_path('bootstrap/app.php'));
+        $this->assertStringContainsString('if ($status === 419)', $bootstrap);
+        $this->assertStringContainsString("->route('auth.login')", $bootstrap);
+    }
 }

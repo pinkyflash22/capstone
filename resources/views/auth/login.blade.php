@@ -1355,7 +1355,7 @@
         }
 
         // Form submission loading state
-        loginForm.addEventListener('submit', function(event) {
+        loginForm.addEventListener('submit', async function(event) {
             if (!this.checkValidity()) {
                 event.preventDefault();
                 this.reportValidity();
@@ -1379,25 +1379,70 @@
                 return;
             }
 
-            const csrfMeta = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const csrfInput = this.querySelector('input[name="_token"]');
-
-            if (csrfMeta && csrfInput) {
-                csrfInput.value = csrfMeta;
-            }
-
+            event.preventDefault();
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-spinner"></span> Signing in...';
+            const refreshController = new AbortController();
+            const refreshTimeout = window.setTimeout(() => refreshController.abort(), 8000);
 
-            loginSubmitRestoreTimer = window.setTimeout(() => {
-                if (window.location.pathname === new URL('{{ route('auth.login') }}', window.location.origin).pathname) {
-                    restoreLoginSubmitState();
+            try {
+                const refreshResponse = await fetch('{{ route('auth.session-refresh') }}', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    cache: 'no-store',
+                    signal: refreshController.signal
+                });
+
+                if (!refreshResponse.ok) {
+                    throw new Error('Unable to refresh the secure login session.');
                 }
-            }, 10000);
+
+                const refreshPayload = await refreshResponse.json();
+                const csrfInput = this.querySelector('input[name="_token"]');
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+
+                if (!refreshPayload.csrf_token || !csrfInput) {
+                    throw new Error('The refreshed login token is missing.');
+                }
+
+                csrfInput.value = refreshPayload.csrf_token;
+                csrfMeta?.setAttribute('content', refreshPayload.csrf_token);
+                window.sessionStorage.setItem('pyrosense-login-email', emailInput?.value || '');
+
+                // Native submission deliberately bypasses this listener after
+                // the form has received a token for the current session.
+                HTMLFormElement.prototype.submit.call(this);
+                return;
+            } catch (error) {
+                console.warn('Login session refresh failed:', error);
+                window.sessionStorage.setItem('pyrosense-login-email', emailInput?.value || '');
+                const loginUrl = new URL('{{ route('auth.login') }}', window.location.origin);
+                loginUrl.searchParams.set('session_refreshed', '1');
+                window.location.replace(loginUrl.toString());
+                return;
+            } finally {
+                window.clearTimeout(refreshTimeout);
+            }
         });
 
         window.addEventListener('pageshow', restoreLoginSubmitState);
         window.addEventListener('load', restoreLoginSubmitState);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const emailInput = document.getElementById('email');
+            const preservedEmail = window.sessionStorage.getItem('pyrosense-login-email');
+            if (emailInput && !emailInput.value && preservedEmail) {
+                emailInput.value = preservedEmail;
+            }
+
+            if (new URLSearchParams(window.location.search).has('session_refreshed')) {
+                showLoginToast('Your secure session was refreshed. Please sign in again.', 'info');
+            }
+        });
 
         (function() {
             const postLoginActionField = document.getElementById('postLoginActionField');
