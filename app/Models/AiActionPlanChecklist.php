@@ -115,6 +115,12 @@ class AiActionPlanChecklist extends Model
             ->latest('created_at');
     }
 
+    public function visits()
+    {
+        return $this->hasMany(ChecklistStepVisit::class, 'ai_action_plan_checklist_id', 'ai_action_plan_checklist_id')
+            ->latest('visited_at');
+    }
+
     public function getChecklistProgressAttribute(): array
     {
         $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();

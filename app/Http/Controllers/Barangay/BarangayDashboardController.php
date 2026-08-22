@@ -576,6 +576,9 @@ class BarangayDashboardController extends Controller
                     'assignee:user_id,first_name,middle_name,last_name',
                     'confirmer:user_id,first_name,middle_name,last_name',
                     'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_order,item_text,status,reviewed_by,reviewed_at,review_notes',
+                    'items.visits.firefighter:user_id,first_name,middle_name,last_name',
+                    'items.visits.signatory:user_id,first_name,middle_name,last_name',
+                    'items.visits.photos',
                 ])
                 ->where('barangay_id', $barangay->barangay_id)
                 ->whereIn('status', ['confirmed', 'in_progress', 'submitted'])

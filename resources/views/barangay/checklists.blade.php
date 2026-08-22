@@ -300,6 +300,20 @@
         .checklist-step-controls { display: grid; grid-template-columns: minmax(105px,.7fr) minmax(130px,1.3fr) auto; gap: 6px; }
         .checklist-step-controls select, .checklist-step-controls input { min-width: 0; height: 34px; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font-size: .7rem; }
         .checklist-step-controls button { height: 34px; padding: 0 11px; border: 0; border-radius: 8px; background: #b45309; color: #fff; font-size: .68rem; font-weight: 800; }
+        .barangay-visit-list { display: grid; gap: 7px; margin-top: 8px; }
+        .barangay-visit-card { padding: 9px; border: 1px solid rgba(14,116,144,.14); border-radius: 10px; background: #f0f9ff; }
+        .barangay-visit-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .barangay-visit-card__head strong { color: #0f4c5c; font-size: .66rem; }
+        .barangay-visit-card__head time { color: #64748b; font-size: .55rem; white-space: nowrap; }
+        .barangay-visit-card p { margin: 5px 0 0; color: #475569; font-size: .62rem; line-height: 1.45; }
+        .barangay-visit-photos { display: grid; grid-template-columns: repeat(auto-fill,minmax(64px,1fr)); gap: 5px; margin-top: 7px; }
+        .barangay-visit-photos a { overflow: hidden; border: 1px solid #dbeafe; border-radius: 7px; background: #fff; }
+        .barangay-visit-photos img { display: block; width: 100%; height: 54px; object-fit: cover; }
+        .barangay-signoff-form { display: grid; grid-template-columns: minmax(115px,.7fr) minmax(150px,1.3fr) auto; gap: 6px; margin-top: 8px; }
+        .barangay-signoff-form select, .barangay-signoff-form input { min-width: 0; height: 33px; padding: 0 8px; border: 1px solid #bae6fd; border-radius: 7px; background: #fff; color: #334155; font-size: .62rem; }
+        .barangay-signoff-form button { min-width: 76px; height: 33px; border: 0; border-radius: 7px; background: #0369a1; color: #fff; font-size: .61rem; font-weight: 850; }
+        .barangay-signoff-state { margin-top: 7px; padding: 6px 8px; border-radius: 7px; background: #ecfdf5; color: #047857; font-size: .6rem; font-weight: 800; line-height: 1.4; }
+        .barangay-signoff-state.needs_follow_up { background: #fef2f2; color: #b91c1c; }
 
         @media (max-width: 900px) { .checklist-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
         @media (max-width: 520px) {
@@ -314,6 +328,8 @@
             .checklist-detail-grid { grid-template-columns: 1fr; }
             .checklist-detail-grid > .wide { grid-column: auto; }
             .checklist-step-controls { grid-template-columns: 1fr; }
+            .barangay-visit-card__head { align-items: flex-start; flex-direction: column; }
+            .barangay-signoff-form { grid-template-columns: 1fr; }
         }
 
     </style>
@@ -441,6 +457,10 @@
             };
 
             initializePagination();
+            const requestedChecklist = new URLSearchParams(window.location.search).get('checklist');
+            if (requestedChecklist) {
+                container.querySelector(`[data-checklist-detail="${CSS.escape(requestedChecklist)}"]`)?.click();
+            }
             window.setInterval(refreshChecklistContent, 30000);
         });
     </script>

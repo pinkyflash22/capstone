@@ -9,6 +9,7 @@
                 ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'fas fa-tachometer-alt', 'route' => 'firefighter.dashboard', 'active' => ['dashboard']],
                 ['type' => 'link', 'label' => 'Incidents', 'icon' => 'fas fa-fire-extinguisher', 'route' => 'firefighter.incidents', 'active' => ['incidents']],
                 ['type' => 'link', 'label' => 'Risk Reviews', 'icon' => 'fas fa-triangle-exclamation', 'route' => 'firefighter.risk-reviews.index', 'active' => ['risk-reviews']],
+                ['type' => 'link', 'label' => 'Barangay Cooperation', 'icon' => 'fas fa-people-group', 'route' => 'firefighter.barangay-cooperation.index', 'active' => ['cooperation']],
                 ['type' => 'link', 'label' => 'My Station', 'icon' => 'fas fa-building', 'route' => 'firefighter.my-station', 'active' => ['station']],
                 ['type' => 'link', 'label' => 'Requests', 'icon' => 'fas fa-clipboard-list', 'route' => 'firefighter.equipments', 'active' => ['equipment', 'fsic']],
             ],
@@ -24,7 +25,7 @@
     ];
     $firefighterInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1));
     $firefighterImageUrl = \App\Support\MediaPath::url(auth()->user()->image ?? null);
-    $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'risk-reviews', 'station', 'equipment', 'fsic'], true);
+    $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'risk-reviews', 'cooperation', 'station', 'equipment', 'fsic'], true);
 @endphp
 
 <style>
@@ -865,6 +866,9 @@
             <a href="{{ route('firefighter.risk-reviews.index') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'risk-reviews' ? 'active' : '' }}" aria-label="Risk Reviews" data-ff-nav-link data-ff-nav-key="risk-reviews">
                 <span class="ff-mobile-icon" aria-hidden="true">fact_check</span>
             </a>
+            <a href="{{ route('firefighter.barangay-cooperation.index') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'cooperation' ? 'active' : '' }}" aria-label="Barangay Cooperation" data-ff-nav-link data-ff-nav-key="cooperation">
+                <span class="ff-mobile-icon" aria-hidden="true">diversity_3</span>
+            </a>
             <a href="{{ route('firefighter.my-station') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'station' ? 'active' : '' }}" aria-label="My Station" data-ff-nav-link data-ff-nav-key="station">
                 <span class="ff-mobile-icon" aria-hidden="true">apartment</span>
             </a>
@@ -930,6 +934,13 @@
                 <span class="ff-mobile-panel__copy">
                     <strong>Risk Reviews</strong>
                     <small>Verify pending hazard and risk submissions for your station.</small>
+                </span>
+            </a>
+            <a href="{{ route('firefighter.barangay-cooperation.index') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="cooperation">
+                <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">diversity_3</span></span>
+                <span class="ff-mobile-panel__copy">
+                    <strong>Barangay Cooperation</strong>
+                    <small>Review connected barangay plans and verify checklist steps during visits.</small>
                 </span>
             </a>
             <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="announcements">

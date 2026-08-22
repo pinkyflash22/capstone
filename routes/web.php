@@ -592,6 +592,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/incidents/registry/{incident}', [FirefighterController::class, 'incidentRegistryDetail'])->name('incidents.registry.detail');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'firefighterIndex'])->name('risk-reviews.index');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'firefighterReview'])->name('risk-reviews.review');
+        Route::get('/barangay-cooperation', [App\Http\Controllers\Firefighter\BarangayCooperationController::class, 'index'])->name('barangay-cooperation.index');
+        Route::patch('/barangay-cooperation/checklists/{checklistId}/items/{itemId}', [App\Http\Controllers\Firefighter\BarangayCooperationController::class, 'updateChecklistItem'])->name('barangay-cooperation.checklists.items.update');
 
         
 
@@ -665,6 +667,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/checklists', [BarangayDashboardController::class, 'checklists'])->name('checklists');
         Route::get('/checklists/content', [BarangayDashboardController::class, 'checklistsContent'])->name('checklists.content');
         Route::patch('/checklists/{checklistId}/items/{itemId}', [BarangayDashboardController::class, 'updateChecklistItem'])->name('checklists.items.update');
+        Route::patch('/checklists/visits/{visitId}/sign-off', [App\Http\Controllers\Barangay\ChecklistVisitController::class, 'signOff'])->name('checklists.visits.sign-off');
         Route::get('/notifications', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');

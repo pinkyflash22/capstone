@@ -3,11 +3,13 @@
 namespace App\Support;
 
 use App\Models\AiActionPlanChecklist;
+use App\Models\AiActionPlanChecklistItem;
 use App\Models\BarangayHall;
 use App\Models\BarangayPredictionChecklist;
 use App\Models\Incident;
 use App\Models\RiskArea;
 use App\Models\User;
+use App\Models\ChecklistStepVisit;
 use App\Notifications\BarangayPortalNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
@@ -62,6 +64,44 @@ class BarangayNotificationService
                 'barangay_id' => $checklist->barangay_id,
                 'priority_level' => $checklist->priority_level,
                 'status' => $checklist->status,
+            ]
+        ));
+    }
+
+    public static function notifyChecklistStepVerified(
+        AiActionPlanChecklist $checklist,
+        AiActionPlanChecklistItem $item,
+        ChecklistStepVisit $visit,
+        User $firefighter
+    ): void {
+        if (! $checklist->barangay_id) {
+            return;
+        }
+
+        $users = static::resolveBarangayUsers((int) $checklist->barangay_id);
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        $status = str_replace('_', ' ', $visit->verified_status);
+        $actor = $firefighter->full_name ?: 'A BFP firefighter';
+
+        NotificationFacade::send($users, new BarangayPortalNotification(
+            'checklist-visit',
+            'BFP checklist visit recorded',
+            $actor . ' marked step ' . $item->item_order . ' as ' . $status . '. Review and sign off the visit record.',
+            route('barangay.checklists', [
+                'checklist' => 'ai-checklist-' . $checklist->getKey(),
+                'visit' => $visit->getKey(),
+            ]),
+            'bi bi-person-check-fill',
+            [
+                'ai_action_plan_checklist_id' => $checklist->getKey(),
+                'ai_action_plan_checklist_item_id' => $item->getKey(),
+                'checklist_step_visit_id' => $visit->getKey(),
+                'barangay_id' => $checklist->barangay_id,
+                'verified_status' => $visit->verified_status,
+                'signoff_status' => $visit->signoff_status,
             ]
         ));
     }

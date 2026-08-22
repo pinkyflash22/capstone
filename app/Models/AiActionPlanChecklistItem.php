@@ -38,4 +38,10 @@ class AiActionPlanChecklistItem extends Model
     {
         return $this->belongsTo(User::class, 'reviewed_by', 'user_id');
     }
+
+    public function visits()
+    {
+        return $this->hasMany(ChecklistStepVisit::class, 'ai_action_plan_checklist_item_id', 'ai_action_plan_checklist_item_id')
+            ->latest('visited_at');
+    }
 }
