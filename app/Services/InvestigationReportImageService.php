@@ -7,16 +7,47 @@ use App\Support\MediaPath;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class InvestigationReportImageService
 {
-    public const MAX_IMAGE_KILOBYTES = 3072;
+    public const MAX_TOTAL_IMAGE_KILOBYTES = 25600;
+
+    public function cachedSubmissionResponse(Request $request, string $operation): ?array
+    {
+        $key = $this->submissionCacheKey($request, $operation);
+        $cached = $key ? Cache::get($key) : null;
+
+        return is_array($cached) ? $cached : null;
+    }
+
+    public function rememberSubmissionResponse(Request $request, string $operation, array $payload): array
+    {
+        $key = $this->submissionCacheKey($request, $operation);
+        if ($key) {
+            Cache::put($key, $payload, now()->addMinutes(15));
+        }
+
+        return $payload;
+    }
 
     public static function validationRules(): array
     {
         return [
-            'proof_images' => ['nullable', 'array'],
-            'proof_images.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:' . self::MAX_IMAGE_KILOBYTES],
+            'proof_images' => [
+                'nullable',
+                'array',
+                'max:20',
+                function (string $attribute, mixed $files, \Closure $fail): void {
+                    $totalBytes = collect(is_array($files) ? $files : [])
+                        ->sum(fn ($file) => is_object($file) && method_exists($file, 'getSize') ? (int) $file->getSize() : 0);
+
+                    if ($totalBytes > self::MAX_TOTAL_IMAGE_KILOBYTES * 1024) {
+                        $fail('The uploaded proof images exceed the 25 MB limit. Remove or replace images before submitting the report.');
+                    }
+                },
+            ],
+            'proof_images.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:' . self::MAX_TOTAL_IMAGE_KILOBYTES],
         ];
     }
 
@@ -73,5 +104,17 @@ class InvestigationReportImageService
             'url' => MediaPath::url($image->file_path),
             'size' => (int) $image->file_size,
         ])->values()->all();
+    }
+
+    private function submissionCacheKey(Request $request, string $operation): ?string
+    {
+        $requestId = trim((string) $request->header('X-Upload-Request-ID'));
+        if (! preg_match('/^[A-Za-z0-9-]{16,100}$/', $requestId)) {
+            return null;
+        }
+
+        $userId = (string) ($request->user()?->user_id ?? 'guest');
+
+        return 'investigation-report-upload:'.hash('sha256', "{$userId}|{$operation}|{$requestId}");
     }
 }

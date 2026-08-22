@@ -36,6 +36,10 @@ class ProgressInvestigationReportController extends Controller
 
     public function store(Request $request, InvestigationReportImageService $imageService)
     {
+        if ($cached = $imageService->cachedSubmissionResponse($request, 'progress:create')) {
+            return response()->json($cached);
+        }
+
         $validated = $request->validate([
             'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id|unique:progress_investigation_report,spot_investigation_id',
             'fire_origin_id' => 'nullable',
@@ -67,10 +71,12 @@ class ProgressInvestigationReportController extends Controller
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->spotInvestigation?->incident_id);
         UserActivityLogger::log('created progress rpt', auth()->user()?->user_id, $request);
 
-        return response()->json([
+        $payload = [
             'success'=> true,
             'data'=> InvestigationReportImageService::responsePayload($data->load(['fireOrigin', 'notedBy.user', 'approvedBy.user'])),
-        ]);
+        ];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, 'progress:create', $payload));
     }
      public function getAvailableSpotInvestigations()
     {
@@ -113,8 +119,11 @@ class ProgressInvestigationReportController extends Controller
     public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
         $progress = ProgressInvestigationReport::find($id);
-          if (!$progress) {
+        if (!$progress) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+        if ($cached = $imageService->cachedSubmissionResponse($request, "progress:update:{$id}")) {
+            return response()->json($cached);
         }
         $validated = $request->validate([
             'fire_origin_id' => 'nullable',
@@ -143,7 +152,9 @@ class ProgressInvestigationReportController extends Controller
         $imageService->store($request, $progress, 'progress');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated progress rpt', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true, 'data' => InvestigationReportImageService::responsePayload($progress->fresh()->load('fireOrigin'))]);
+        $payload = ['success'=>true, 'data' => InvestigationReportImageService::responsePayload($progress->fresh()->load('fireOrigin'))];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, "progress:update:{$id}", $payload));
     }
 
     public function draftNarrative(Request $request, ProgressNarrativeDraftService $draftService)

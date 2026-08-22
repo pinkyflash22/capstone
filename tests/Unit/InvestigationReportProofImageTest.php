@@ -7,6 +7,10 @@ use App\Services\DocxProofImageAppender;
 use App\Services\InvestigationReportImageService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Validator;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use ZipArchive;
@@ -14,7 +18,7 @@ use ZipArchive;
 class InvestigationReportProofImageTest extends TestCase
 {
     #[Test]
-    public function report_forms_and_server_rules_allow_multiple_three_mb_images(): void
+    public function report_forms_and_server_rules_allow_multiple_images_up_to_twenty_five_mb_combined(): void
     {
         $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
         $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
@@ -23,7 +27,20 @@ class InvestigationReportProofImageTest extends TestCase
         $this->assertGreaterThanOrEqual(3, substr_count($view, 'name="proof_images[]"'));
         $this->assertStringContainsString('multiple', $view);
         $this->assertStringContainsString('name="proof_images[]"', $script);
-        $this->assertContains('max:3072', $rules['proof_images.*']);
+        $this->assertContains('max:25600', $rules['proof_images.*']);
+        $this->assertContains('max:20', $rules['proof_images']);
+
+        $valid = Validator::make(['proof_images' => [
+            UploadedFile::fake()->image('scene-1.jpg')->size(10000),
+            UploadedFile::fake()->image('scene-2.jpg')->size(10000),
+        ]], $rules);
+        $tooLarge = Validator::make(['proof_images' => [
+            UploadedFile::fake()->image('scene-1.jpg')->size(13000),
+            UploadedFile::fake()->image('scene-2.jpg')->size(13000),
+        ]], $rules);
+
+        $this->assertFalse($valid->fails());
+        $this->assertTrue($tooLarge->fails());
     }
 
     #[Test]
@@ -37,6 +54,9 @@ class InvestigationReportProofImageTest extends TestCase
 
         $this->assertStringContainsString('URL.createObjectURL(file)', $script);
         $this->assertStringContainsString('new DataTransfer()', $script);
+        $this->assertStringContainsString('MAX_PROOF_UPLOAD_BYTES = 25 * 1024 * 1024', $script);
+        $this->assertStringContainsString("xhr.upload.addEventListener('progress'", $script);
+        $this->assertStringContainsString('exceed the 25 MB threshold', $script);
         $this->assertStringContainsString('data-delete-proof-image', $script);
         $this->assertStringContainsString("method: 'DELETE'", $script);
         $this->assertStringContainsString('.proof-image-grid', $styles);
@@ -46,6 +66,58 @@ class InvestigationReportProofImageTest extends TestCase
         $this->assertNotNull($route);
         $this->assertContains('auth', $route->gatherMiddleware());
         $this->assertContains('role:firefighter', $route->gatherMiddleware());
+    }
+
+    #[Test]
+    public function proof_images_are_compressed_retried_and_saved_in_document_order(): void
+    {
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
+        $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+        $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));
+        $imageController = file_get_contents(app_path('Http/Controllers/staff/InvestigationReportImageController.php'));
+        $relation = file_get_contents(app_path('Models/Concerns/HasInvestigationProofImages.php'));
+        $route = Route::getRoutes()->getByName('firefighter.investigation-reports.proof-images.order');
+
+        $this->assertStringContainsString('createImageBitmap(file)', $script);
+        $this->assertStringContainsString('const maximumDimension = 2400', $script);
+        $this->assertStringContainsString('Connection interrupted', $script);
+        $this->assertStringContainsString("xhr.setRequestHeader('X-Upload-Request-ID'", $script);
+        $this->assertStringContainsString('data-existing-proof-image', $script);
+        $this->assertStringContainsString('persistExistingProofImageOrder', $script);
+        $this->assertStringContainsString('.proof-image-drag', $styles);
+        $this->assertStringContainsString('proofImageOrderTemplate: @json($proofImageOrderTemplate)', $view);
+        $this->assertStringContainsString("'sort_order' => \$index + 1", $imageController);
+        $this->assertStringContainsString("->orderBy('sort_order')", $relation);
+        $this->assertNotNull($route);
+        $this->assertContains('auth', $route->gatherMiddleware());
+        $this->assertContains('role:firefighter', $route->gatherMiddleware());
+
+        Cache::flush();
+        $request = Request::create('/upload', 'POST');
+        $request->headers->set('X-Upload-Request-ID', '12345678-1234-1234-1234-123456789012');
+        $request->setUserResolver(fn () => (object) ['user_id' => 17]);
+        $service = app(InvestigationReportImageService::class);
+        $payload = ['success' => true, 'data' => ['id' => 91]];
+
+        $this->assertNull($service->cachedSubmissionResponse($request, 'spot:create'));
+        $service->rememberSubmissionResponse($request, 'spot:create', $payload);
+        $this->assertSame($payload, $service->cachedSubmissionResponse($request, 'spot:create'));
+    }
+
+    #[Test]
+    public function spot_report_uses_submission_time_alarm_options_and_compact_help(): void
+    {
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
+        $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+        $controller = file_get_contents(app_path('Http/Controllers/SpotInvestigationReportController.php'));
+
+        $this->assertStringContainsString('Recorded automatically when this report is submitted.', $view);
+        $this->assertStringContainsString('report-form-help__tooltip', $view);
+        $this->assertStringContainsString('<select name="highest_alarm_level"', $view);
+        $this->assertStringContainsString('<option value="5th Alarm">5th Alarm</option>', $view);
+        $this->assertStringContainsString('narrative-action-row', $view);
+        $this->assertStringContainsString("\$validated['report_completed_at'] = now();", $controller);
+        $this->assertStringContainsString("data.report_completed_at || new Date().toISOString()", $script);
     }
 
     #[Test]

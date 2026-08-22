@@ -1385,6 +1385,10 @@ class FirefighterController extends Controller
                 'reportId' => '__REPORT_ID__',
                 'imageId' => '__IMAGE_ID__',
             ]),
+            'proofImageOrderTemplate' => route('firefighter.investigation-reports.proof-images.order', [
+                'reportType' => '__REPORT_TYPE__',
+                'reportId' => '__REPORT_ID__',
+            ]),
             'finalSubstantiatingDocumentOptions' => [
                 'Spot Investigation Report',
                 'Progress Investigation Report',

@@ -36,6 +36,10 @@ class FinalInvestigationReportController extends Controller
 
     public function store(Request $request, InvestigationReportImageService $imageService)
     {
+        if ($cached = $imageService->cachedSubmissionResponse($request, 'final:create')) {
+            return response()->json($cached);
+        }
+
         $validated = $request->validate([
             'progress_investigation_id' => 'required|exists:progress_investigation_report,progress_investigation_report_id|unique:final_investigation_report,progress_investigation_id',
             'station_officer_id'=>'required|exists:station_officers,station_officer_id',
@@ -69,10 +73,12 @@ class FinalInvestigationReportController extends Controller
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('created final report', auth()->user()?->user_id, $request);
 
-        return response()->json([
+        $payload = [
             'success'=>true,
             'data'=>InvestigationReportImageService::responsePayload($data->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])),
-        ]);
+        ];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, 'final:create', $payload));
     }
 
     public function getAvailableProgressInvestigations()
@@ -115,8 +121,11 @@ class FinalInvestigationReportController extends Controller
     public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
         $final = FinalInvestigationReport::find($id);
-          if (!$final) {
+        if (!$final) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+        if ($cached = $imageService->cachedSubmissionResponse($request, "final:update:{$id}")) {
+            return response()->json($cached);
         }
         $validated = $request->validate([
             'report_completed_at' => 'nullable|date',
@@ -146,10 +155,12 @@ class FinalInvestigationReportController extends Controller
         $imageService->store($request, $final, 'final');
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated final report', auth()->user()?->user_id, $request);
-        return response()->json([
+        $payload = [
             'success'=>true,
             'data' => InvestigationReportImageService::responsePayload($final->fresh()->load(['progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user'])),
-        ]);
+        ];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, "final:update:{$id}", $payload));
 
         
     }

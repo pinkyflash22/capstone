@@ -88,6 +88,10 @@ class SpotInvestigationReportController extends Controller
 
     public function store(Request $request, InvestigationReportImageService $imageService)
     {
+        if ($cached = $imageService->cachedSubmissionResponse($request, 'spot:create')) {
+            return response()->json($cached);
+        }
+
         $validated = $request->validate([
             'incident_id' => 'required|exists:incidents,incident_id|unique:spot_investigation_report,incident_id',
             'station_officer_id' => 'required|exists:station_officers,station_officer_id',
@@ -99,13 +103,12 @@ class SpotInvestigationReportController extends Controller
             'estimated_damage' => 'required|numeric|min:0',
             'occupancy' => 'required|in:residential,commercial,industrial',
             'estimated_area' => 'required|numeric|min:0',
-            'report_completed_at' => 'nullable|date',
             'memorandum_for' => 'nullable|string|max:255',
             'place_of_occurrence' => 'nullable|string|max:255',
             'involved_structure' => 'nullable|string|max:255',
             'establishment_name' => 'nullable|string|max:255',
             'occupant' => 'nullable|string|max:255',
-            'highest_alarm_level' => 'nullable|string|max:50',
+            'highest_alarm_level' => 'nullable|in:1st Alarm,2nd Alarm,3rd Alarm,4th Alarm,5th Alarm',
             'affected_establishments_count' => 'nullable|integer|min:0',
             'description' => 'nullable|string',
             'fatality_details' => 'nullable|string',
@@ -117,6 +120,7 @@ class SpotInvestigationReportController extends Controller
         ]);
 
         unset($validated['proof_images']);
+        $validated['report_completed_at'] = now();
 
         $response = SpotInvestigationReport::create($validated);
         $imageService->store($request, $response, 'spot');
@@ -133,7 +137,9 @@ class SpotInvestigationReportController extends Controller
         }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $response->incident_id);
         UserActivityLogger::log('created spot report', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true, 'data'=>InvestigationReportImageService::responsePayload($response)]);
+        $payload = ['success'=>true, 'data'=>InvestigationReportImageService::responsePayload($response)];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, 'spot:create', $payload));
     }
 
     public function show(SpotInvestigationReport $spotInvestigationReport)
@@ -154,8 +160,11 @@ class SpotInvestigationReportController extends Controller
     public function update(Request $request, string $id, InvestigationReportImageService $imageService)
     {
          $spot = SpotInvestigationReport::find($id);
-          if (!$spot) {
+        if (!$spot) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+        if ($cached = $imageService->cachedSubmissionResponse($request, "spot:update:{$id}")) {
+            return response()->json($cached);
         }
         $validated = $request->validate([
             'dead' => 'sometimes|required|numeric|min:0',
@@ -166,13 +175,12 @@ class SpotInvestigationReportController extends Controller
             'estimated_damage' => 'sometimes|required|numeric|min:0',
             'occupancy' => 'sometimes|required|in:residential,commercial,industrial',
             'estimated_area' => 'sometimes|required|numeric|min:0',
-            'report_completed_at' => 'nullable|date',
             'memorandum_for' => 'nullable|string|max:255',
             'place_of_occurrence' => 'nullable|string|max:255',
             'involved_structure' => 'nullable|string|max:255',
             'establishment_name' => 'nullable|string|max:255',
             'occupant' => 'nullable|string|max:255',
-            'highest_alarm_level' => 'nullable|string|max:50',
+            'highest_alarm_level' => 'nullable|in:1st Alarm,2nd Alarm,3rd Alarm,4th Alarm,5th Alarm',
             'affected_establishments_count' => 'nullable|integer|min:0',
             'description' => 'nullable|string',
             'fatality_details' => 'nullable|string',
@@ -199,7 +207,9 @@ class SpotInvestigationReportController extends Controller
         }
         HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $spot->incident_id);
         UserActivityLogger::log('updated spot report', auth()->user()?->user_id, $request);
-        return response()->json(['success'=>true, 'data' => InvestigationReportImageService::responsePayload($spot->fresh())]);
+        $payload = ['success'=>true, 'data' => InvestigationReportImageService::responsePayload($spot->fresh())];
+
+        return response()->json($imageService->rememberSubmissionResponse($request, "spot:update:{$id}", $payload));
     }
 
     public function draftNarrative(Request $request, SpotNarrativeDraftService $draftService)
@@ -220,7 +230,7 @@ class SpotInvestigationReportController extends Controller
             'occupant' => 'nullable|string|max:255',
             'estimated_damage' => 'nullable',
             'estimated_area' => 'nullable',
-            'highest_alarm_level' => 'nullable|string|max:50',
+            'highest_alarm_level' => 'nullable|in:1st Alarm,2nd Alarm,3rd Alarm,4th Alarm,5th Alarm',
             'dead' => 'nullable',
             'injured' => 'nullable',
             'fatality_details' => 'nullable|string',

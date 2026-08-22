@@ -16,6 +16,9 @@ function bootFirefighterMyStationPage() {
     const reportStore = { spot: {}, progress: {}, final: {} };
     const referenceCache = { spot: null, progress: null, final: null };
     const requestControllers = new Map();
+    const MAX_PROOF_UPLOAD_BYTES = 25 * 1024 * 1024;
+    const MAX_PROOF_UPLOAD_FILES = 20;
+    const ALLOWED_PROOF_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
     const overviewSection = document.getElementById('stationOverviewSection');
     const personnelSection = document.getElementById('stationPersonnelSection');
@@ -96,10 +99,69 @@ function bootFirefighterMyStationPage() {
             .replace('__IMAGE_ID__', encodeURIComponent(imageId));
     }
 
+    function buildProofImageOrderRoute(reportType, reportId) {
+        return String(routes.proofImageOrderTemplate || '')
+            .replace('__REPORT_TYPE__', encodeURIComponent(reportType))
+            .replace('__REPORT_ID__', encodeURIComponent(reportId));
+    }
+
     function replaceFileInputFiles(input, files) {
         const transfer = new DataTransfer();
         files.forEach((file) => transfer.items.add(file));
         input.files = transfer.files;
+    }
+
+    async function compressProofImage(file) {
+        if (!ALLOWED_PROOF_IMAGE_TYPES.includes(file.type)) return file;
+
+        let bitmap;
+        try {
+            bitmap = await createImageBitmap(file);
+            const maximumDimension = 2400;
+            const scale = Math.min(1, maximumDimension / Math.max(bitmap.width, bitmap.height));
+            if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) return file;
+            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+            const compressedBlob = await new Promise((resolve) => canvas.toBlob(resolve, file.type, file.type === 'image/jpeg' ? 0.82 : undefined));
+            if (!compressedBlob || compressedBlob.size >= file.size) return file;
+            return new File([compressedBlob], file.name, { type: file.type, lastModified: file.lastModified });
+        } catch (error) {
+            return file;
+        } finally {
+            bitmap?.close?.();
+        }
+    }
+
+    function bindSelectedProofImageOrdering(input, preview) {
+        preview.querySelectorAll('[data-proof-file-index]').forEach((card) => {
+            card.addEventListener('dragstart', (event) => {
+                card.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.dataset.proofFileIndex);
+            });
+            card.addEventListener('dragend', () => card.classList.remove('is-dragging'));
+            card.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+            });
+            card.addEventListener('drop', (event) => {
+                event.preventDefault();
+                const fromIndex = Number(event.dataTransfer.getData('text/plain'));
+                const toIndex = Number(card.dataset.proofFileIndex);
+                if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) return;
+                const reordered = Array.from(input.files || []);
+                const [moved] = reordered.splice(fromIndex, 1);
+                reordered.splice(toIndex, 0, moved);
+                replaceFileInputFiles(input, reordered);
+                renderProofImagePreview(input);
+            });
+        });
     }
 
     function clearProofImagePreview(scope) {
@@ -108,7 +170,70 @@ function bootFirefighterMyStationPage() {
             input._proofPreviewUrls = [];
             const preview = input.parentElement?.querySelector('[data-proof-upload-preview]');
             if (preview) preview.innerHTML = '';
+            input.setCustomValidity('');
+            updateProofUploadStatus(input, { reset: true });
         });
+    }
+
+    function formatUploadSize(bytes) {
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 1024 ? 0 : 1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function ensureProofUploadStatus(input) {
+        let status = input.parentElement?.querySelector('[data-proof-upload-status]');
+        if (status) return status;
+        status = document.createElement('div');
+        status.className = 'proof-upload-status';
+        status.dataset.proofUploadStatus = '';
+        status.innerHTML = `
+            <div class="proof-upload-status__summary" data-proof-upload-summary>No images selected · 25 MB available</div>
+            <div class="proof-upload-progress" data-proof-upload-progress><span></span></div>
+        `;
+        input.parentElement?.appendChild(status);
+        return status;
+    }
+
+    function updateProofUploadStatus(input, options = {}) {
+        const status = ensureProofUploadStatus(input);
+        const summary = status.querySelector('[data-proof-upload-summary]');
+        const progress = status.querySelector('[data-proof-upload-progress]');
+        const progressBar = progress?.querySelector('span');
+        const files = Array.from(input.files || []);
+        const totalBytes = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+        const exceedsLimit = totalBytes > MAX_PROOF_UPLOAD_BYTES;
+        const exceedsCount = files.length > MAX_PROOF_UPLOAD_FILES;
+
+        if (options.reset) {
+            summary.textContent = 'No images selected · 25 MB available';
+            summary.classList.remove('is-error');
+            progress?.classList.remove('is-active');
+            if (progressBar) progressBar.style.width = '0%';
+            return true;
+        }
+
+        if (options.progress !== undefined) {
+            const percent = Math.max(0, Math.min(100, Number(options.progress) || 0));
+            progress?.classList.add('is-active');
+            if (progressBar) progressBar.style.width = `${percent}%`;
+            summary.textContent = options.label || `Uploading proof images · ${Math.round(percent)}%`;
+            summary.classList.remove('is-error');
+            return true;
+        }
+
+        const message = exceedsCount
+            ? `A maximum of ${MAX_PROOF_UPLOAD_FILES} images can be uploaded at once. Remove images to submit the form.`
+            : exceedsLimit
+            ? `Selected images use ${formatUploadSize(totalBytes)} and exceed the 25 MB threshold. Remove or replace images to submit the form.`
+            : files.length
+                ? `${files.length} image${files.length === 1 ? '' : 's'} selected · ${formatUploadSize(totalBytes)} of 25 MB`
+                : 'No images selected · 25 MB available';
+        summary.textContent = message;
+        summary.classList.toggle('is-error', exceedsLimit || exceedsCount);
+        progress?.classList.remove('is-active');
+        if (progressBar) progressBar.style.width = '0%';
+        input.setCustomValidity(exceedsLimit || exceedsCount ? message : '');
+        return !exceedsLimit && !exceedsCount;
     }
 
     function renderProofImagePreview(input) {
@@ -129,7 +254,10 @@ function bootFirefighterMyStationPage() {
             input._proofPreviewUrls.push(objectUrl);
             const card = document.createElement('figure');
             card.className = 'proof-image-card';
+            card.draggable = true;
+            card.dataset.proofFileIndex = String(index);
             card.innerHTML = `
+                <span class="proof-image-drag" title="Drag to reorder" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span>
                 <img src="${objectUrl}" alt="${escapeHtml(file.name)} preview">
                 <figcaption title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</figcaption>
                 <button type="button" class="proof-image-remove" aria-label="Remove ${escapeHtml(file.name)}"><i class="fa-solid fa-xmark"></i></button>
@@ -141,23 +269,21 @@ function bootFirefighterMyStationPage() {
             });
             preview.appendChild(card);
         });
+        bindSelectedProofImageOrdering(input, preview);
+        updateProofUploadStatus(input);
     }
 
     function bindProofImagePreviews(scope = document) {
         scope.querySelectorAll('input[name="proof_images[]"]').forEach((input) => {
             if (input.dataset.proofPreviewBound === 'true') return;
             input.dataset.proofPreviewBound = 'true';
-            input.addEventListener('change', () => {
+            ensureProofUploadStatus(input);
+            input.addEventListener('change', async () => {
                 const validFiles = [];
-                let rejectedLarge = false;
                 let rejectedType = false;
 
                 Array.from(input.files || []).forEach((file) => {
-                    if (file.size > 3 * 1024 * 1024) {
-                        rejectedLarge = true;
-                        return;
-                    }
-                    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                    if (!ALLOWED_PROOF_IMAGE_TYPES.includes(file.type)) {
                         rejectedType = true;
                         return;
                     }
@@ -167,9 +293,25 @@ function bootFirefighterMyStationPage() {
                 if (validFiles.length !== (input.files?.length || 0)) {
                     replaceFileInputFiles(input, validFiles);
                 }
-                if (rejectedLarge) showToast('Each proof image must not exceed 3 MB.', 'error');
                 if (rejectedType) showToast('Proof images must be JPG or PNG files.', 'error');
+                input.disabled = true;
+                try {
+                    const optimizedFiles = [];
+                    for (let index = 0; index < validFiles.length; index += 1) {
+                        updateProofUploadStatus(input, {
+                            progress: validFiles.length ? ((index + 1) / validFiles.length) * 100 : 0,
+                            label: `Optimizing image ${index + 1} of ${validFiles.length}…`,
+                        });
+                        optimizedFiles.push(await compressProofImage(validFiles[index]));
+                    }
+                    replaceFileInputFiles(input, optimizedFiles);
+                } finally {
+                    input.disabled = false;
+                }
                 renderProofImagePreview(input);
+                if (!updateProofUploadStatus(input)) {
+                    showToast('The selected proof images exceed 25 MB. Remove or replace images before submitting.', 'error');
+                }
             });
         });
     }
@@ -184,7 +326,8 @@ function bootFirefighterMyStationPage() {
             <div class="proof-image-existing" data-existing-proof-images>
                 <div class="proof-image-grid">
                     ${images.map((image) => `
-                        <figure class="proof-image-card" data-existing-proof-image="${escapeHtml(image.id)}">
+                        <figure class="proof-image-card" draggable="true" data-existing-proof-image="${escapeHtml(image.id)}">
+                            <span class="proof-image-drag" title="Drag to change document order" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span>
                             <a href="${escapeHtml(image.url || '#')}" target="_blank" rel="noopener">
                                 <img src="${escapeHtml(image.url || '')}" alt="${escapeHtml(image.name || 'Proof image')}">
                             </a>
@@ -239,6 +382,155 @@ function bootFirefighterMyStationPage() {
             button.dataset.deleteBound = 'true';
             button.addEventListener('click', () => deleteExistingProofImage(button));
         });
+    }
+
+    async function persistExistingProofImageOrder(container, reportType, reportId) {
+        const imageIds = Array.from(container.querySelectorAll('[data-existing-proof-image]'))
+            .map((card) => Number(card.dataset.existingProofImage));
+        const response = await fetch(buildProofImageOrderRoute(reportType, reportId), {
+            method: 'PATCH',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image_ids: imageIds }),
+        });
+        const result = await response.json();
+        if (!response.ok || result.success === false) {
+            throw new Error(result.message || 'Unable to save the proof-image order.');
+        }
+
+        const report = reportStore[reportType]?.[reportId];
+        if (report) {
+            const imagesById = new Map((report.proof_images || []).map((image) => [Number(image.id), image]));
+            report.proof_images = imageIds.map((imageId) => imagesById.get(imageId)).filter(Boolean);
+        }
+        showToast(result.message || 'Proof-image order saved.', 'success');
+    }
+
+    function bindExistingProofImageOrdering(scope, reportType, reportId) {
+        const container = scope?.querySelector('[data-existing-proof-images] .proof-image-grid');
+        if (!container || container.dataset.orderBound === 'true') return;
+        container.dataset.orderBound = 'true';
+        let draggedCard = null;
+        let originalIds = [];
+
+        container.querySelectorAll('[data-existing-proof-image]').forEach((card) => {
+            card.addEventListener('dragstart', (event) => {
+                draggedCard = card;
+                originalIds = Array.from(container.querySelectorAll('[data-existing-proof-image]'))
+                    .map((item) => item.dataset.existingProofImage);
+                card.classList.add('is-dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.dataset.existingProofImage);
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('is-dragging');
+                draggedCard = null;
+            });
+            card.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+            });
+            card.addEventListener('drop', async (event) => {
+                event.preventDefault();
+                if (!draggedCard || draggedCard === card) return;
+                const bounds = card.getBoundingClientRect();
+                const placeAfter = event.clientX > bounds.left + (bounds.width / 2);
+                container.insertBefore(draggedCard, placeAfter ? card.nextSibling : card);
+                try {
+                    await persistExistingProofImageOrder(container, reportType, reportId);
+                } catch (error) {
+                    const cards = new Map(Array.from(container.querySelectorAll('[data-existing-proof-image]'))
+                        .map((item) => [item.dataset.existingProofImage, item]));
+                    originalIds.forEach((imageId) => container.appendChild(cards.get(imageId)));
+                    showToast(error.message || 'Unable to save the proof-image order.', 'error');
+                }
+            });
+        });
+    }
+
+    function validateProofUploads(form) {
+        let valid = true;
+        form?.querySelectorAll('input[name="proof_images[]"]').forEach((input) => {
+            if (!updateProofUploadStatus(input)) valid = false;
+        });
+        if (!valid) {
+            form?.querySelector('input[name="proof_images[]"]:invalid')?.reportValidity();
+        }
+        return valid;
+    }
+
+    function setProofUploadProgress(form, progress, label) {
+        form?.querySelectorAll('input[name="proof_images[]"]').forEach((input) => {
+            if ((input.files?.length || 0) > 0) updateProofUploadStatus(input, { progress, label });
+        });
+    }
+
+    function sendMultipartAttempt(endpoint, formData, options = {}) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', endpoint, true);
+            xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.setRequestHeader('X-Upload-Request-ID', options.requestId);
+            if (options.methodOverride) xhr.setRequestHeader('X-HTTP-Method-Override', options.methodOverride);
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable && typeof options.onProgress === 'function') {
+                    options.onProgress((event.loaded / event.total) * 100);
+                }
+            });
+            xhr.addEventListener('load', () => {
+                let result = {};
+                try {
+                    result = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+                } catch (error) {
+                    const uploadError = new Error(xhr.status === 413
+                        ? 'The upload is larger than the server request limit.'
+                        : 'The server returned an invalid upload response.');
+                    uploadError.retryable = xhr.status >= 500 || xhr.status === 0;
+                    reject(uploadError);
+                    return;
+                }
+                if (xhr.status < 200 || xhr.status >= 300 || result.success === false) {
+                    const firstValidationError = Object.values(result.errors || {}).flat()[0];
+                    const uploadError = new Error(firstValidationError || result.message || 'Failed to upload the report.');
+                    uploadError.retryable = xhr.status === 408 || xhr.status === 429 || xhr.status >= 500;
+                    reject(uploadError);
+                    return;
+                }
+                resolve(result);
+            });
+            xhr.addEventListener('error', () => {
+                const uploadError = new Error('The upload could not be completed. Check your connection and try again.');
+                uploadError.retryable = true;
+                reject(uploadError);
+            });
+            xhr.addEventListener('abort', () => {
+                const uploadError = new Error('The upload was interrupted and will be retried.');
+                uploadError.retryable = true;
+                reject(uploadError);
+            });
+            xhr.send(formData);
+        });
+    }
+
+    async function sendMultipartRequest(endpoint, formData, options = {}) {
+        options.requestId = options.requestId || (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        const maxRetries = Number.isInteger(options.maxRetries) ? options.maxRetries : 2;
+        let attempt = 0;
+        while (true) {
+            try {
+                return await sendMultipartAttempt(endpoint, formData, options);
+            } catch (error) {
+                if (!error.retryable || attempt >= maxRetries) throw error;
+                attempt += 1;
+                options.onRetry?.(attempt, maxRetries);
+                await new Promise((resolve) => window.setTimeout(resolve, 600 * attempt));
+            }
+        }
     }
 
     function showToast(message, type = 'success', timeout = 3200) {
@@ -1219,7 +1511,7 @@ function bootFirefighterMyStationPage() {
                     <div class="form-group"><label class="form-label">Dead</label><input class="form-input" type="number" name="dead" min="0" step="1" value="${escapeHtml(report.dead || 0)}"></div>
                     <div class="form-group"><label class="form-label">Injured</label><input class="form-input" type="number" name="injured" min="0" step="1" value="${escapeHtml(report.injured || 0)}"></div>
                     <div class="form-group full"><label class="form-label">Owner</label><input class="form-input" type="text" name="owner" value="${escapeHtml(report.owner || '')}"></div>
-                    <div class="form-group"><label class="form-label">Report Completed</label><input class="form-input" type="datetime-local" name="report_completed_at" value="${escapeHtml((report.report_completed_at || '').slice(0, 16))}"></div>
+                    <div class="form-group"><label class="form-label">Report Completed</label><div class="form-auto-value"><i class="fa-solid fa-clock"></i><span>${escapeHtml(formatDateTime(report.report_completed_at))} · recorded when submitted</span></div></div>
                     <div class="form-group"><label class="form-label">Memorandum For</label><input class="form-input" type="text" name="memorandum_for" value="${escapeHtml(report.memorandum_for || '')}"></div>
                     <div class="form-group"><label class="form-label">Fire Occurred At</label><input class="form-input" type="datetime-local" name="fire_started" value="${escapeHtml((report.fire_started || '').slice(0, 16))}"><small class="table-muted">Correcting this updates the verified incident occurrence time and its audit history.</small></div>
                     <div class="form-group"><label class="form-label">Fire Out</label><input class="form-input" type="datetime-local" name="fire_out" value="${escapeHtml((report.fire_out || '').slice(0, 16))}"></div>
@@ -1227,11 +1519,11 @@ function bootFirefighterMyStationPage() {
                     <div class="form-group"><label class="form-label">Estimated Damage</label><input class="form-input" type="number" min="0" step="0.01" name="estimated_damage" value="${escapeHtml(report.estimated_damage || 0)}"></div>
                     <div class="form-group"><label class="form-label">Estimated Area</label><input class="form-input" type="number" min="0" step="0.01" name="estimated_area" value="${escapeHtml(report.estimated_area || 0)}"></div>
                     <div class="form-group"><label class="form-label">Affected Establishments</label><input class="form-input" type="number" min="0" step="1" name="affected_establishments_count" value="${escapeHtml(report.affected_establishments_count || 0)}"></div>
-                    <div class="form-group"><label class="form-label">Highest Alarm</label><input class="form-input" type="text" name="highest_alarm_level" value="${escapeHtml(report.highest_alarm_level || '')}"></div>
+                    <div class="form-group"><label class="form-label">Highest Alarm</label><select class="form-select" name="highest_alarm_level">${['', '1st Alarm', '2nd Alarm', '3rd Alarm', '4th Alarm', '5th Alarm'].map((level) => `<option value="${level}" ${String(report.highest_alarm_level || '') === level ? 'selected' : ''}>${level || 'Select alarm level'}</option>`).join('')}</select></div>
                     <div class="form-group full"><label class="form-label">Narrative</label><textarea class="form-textarea" name="details_of_investigation">${escapeHtml(report.details_of_investigation || '')}</textarea></div>
                     <div class="form-group full"><label class="form-label">Disposition</label><textarea class="form-textarea" name="disposition">${escapeHtml(report.disposition || '')}</textarea></div>
                     <div class="form-group full"><label class="form-label">Existing Proof Images</label>${renderExistingProofImages(report, type)}</div>
-                    <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Maximum 3 MB per image.</small></div>
+                    <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Combined selection must not exceed 25 MB.</small></div>
                     <div class="form-group"><label class="form-label">Noted By</label><select class="form-select" name="noted_by_station_officer_id">${renderOfficerSelectOptions(report.noted_by_station_officer_id || '')}</select></div>
                     <div class="form-group"><label class="form-label">Approved By</label><select class="form-select" name="approved_by_station_officer_id">${renderOfficerSelectOptions(report.approved_by_station_officer_id || '')}</select></div>
                 </form>
@@ -1255,7 +1547,7 @@ function bootFirefighterMyStationPage() {
                     <div class="form-group full"><label class="form-label">Facts of the Case</label><textarea class="form-textarea" name="facts_of_case">${escapeHtml(report.facts_of_case || '')}</textarea></div>
                     <div class="form-group full"><label class="form-label">Disposition</label><textarea class="form-textarea" name="disposition">${escapeHtml(report.disposition || '')}</textarea></div>
                     <div class="form-group full"><label class="form-label">Existing Proof Images</label>${renderExistingProofImages(report, type)}</div>
-                    <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Maximum 3 MB per image.</small></div>
+                    <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Combined selection must not exceed 25 MB.</small></div>
                     <div class="form-group"><label class="form-label">Noted By</label><select class="form-select" name="noted_by_station_officer_id">${renderOfficerSelectOptions(report.noted_by_station_officer_id || '')}</select></div>
                     <div class="form-group"><label class="form-label">Approved By</label><select class="form-select" name="approved_by_station_officer_id">${renderOfficerSelectOptions(report.approved_by_station_officer_id || '')}</select></div>
                 </form>
@@ -1280,7 +1572,7 @@ function bootFirefighterMyStationPage() {
                 <div class="form-group full"><label class="form-label">Recommendation</label><textarea class="form-textarea" name="recommendation">${escapeHtml(report.recommendation || '')}</textarea></div>
                 <div class="form-group full"><label class="form-label">Substantiating Documents</label><div class="checkbox-grid">${renderSubstantiatingDocumentCheckboxes(report.substantiating_documents || [])}</div></div>
                 <div class="form-group full"><label class="form-label">Existing Proof Images</label>${renderExistingProofImages(report, type)}</div>
-                <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Maximum 3 MB per image.</small></div>
+                <div class="form-group full"><label class="form-label">Add Proof Images</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">New images are appended. Combined selection must not exceed 25 MB.</small></div>
                 <div class="form-group"><label class="form-label">Noted By</label><select class="form-select" name="noted_by_station_officer_id">${renderOfficerSelectOptions(report.noted_by_station_officer_id || '')}</select></div>
                 <div class="form-group"><label class="form-label">Approved By</label><select class="form-select" name="approved_by_station_officer_id">${renderOfficerSelectOptions(report.approved_by_station_officer_id || '')}</select></div>
             </form>
@@ -1312,6 +1604,7 @@ function bootFirefighterMyStationPage() {
         manageReportModalBody.innerHTML = renderEditForm(type, report);
         bindProofImagePreviews(manageReportModalBody);
         bindProofImageDeletion(manageReportModalBody);
+        bindExistingProofImageOrdering(manageReportModalBody, type, report.id);
         manageReportModalFooter.innerHTML = `
             <button type="button" class="btn btn-outline" data-close-manage-modal>Cancel</button>
             <button type="button" class="btn btn-primary" id="saveManagedReportButton"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
@@ -1324,6 +1617,10 @@ function bootFirefighterMyStationPage() {
     async function saveManagedReport(type, reportId) {
         const form = document.getElementById('manageReportEditForm');
         if (!form) return;
+        if (!validateProofUploads(form)) {
+            showToast('Proof images exceed the 25 MB threshold. Remove or replace images before saving.', 'error');
+            return;
+        }
         const submitButton = document.getElementById('saveManagedReportButton');
         const originalHtml = submitButton.innerHTML;
         submitButton.disabled = true;
@@ -1331,20 +1628,12 @@ function bootFirefighterMyStationPage() {
 
         try {
             const formData = new FormData(form);
-            const response = await fetch(`${routes.reportManageBase}/${type}-investigation/${reportId}`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                    'X-HTTP-Method-Override': 'PUT',
-                },
-                body: formData,
+            const result = await sendMultipartRequest(`${routes.reportManageBase}/${type}-investigation/${reportId}`, formData, {
+                methodOverride: 'PUT',
+                onProgress: (progress) => setProofUploadProgress(form, progress, `Uploading proof images · ${Math.round(progress)}%`),
+                onRetry: (attempt, maximum) => setProofUploadProgress(form, 0, `Connection interrupted · retrying ${attempt} of ${maximum}`),
             });
-
-            const result = await response.json();
-            if (!response.ok || result.success === false) {
-                throw new Error(result.message || 'Failed to update report.');
-            }
+            setProofUploadProgress(form, 100, 'Proof images uploaded · 100%');
 
             const updated = { ...(reportStore[type][reportId] || {}) };
             updated.proof_images = result.data?.proof_images || updated.proof_images || [];
@@ -1353,7 +1642,7 @@ function bootFirefighterMyStationPage() {
                 updated.dead = formData.get('dead');
                 updated.injured = formData.get('injured');
                 updated.owner = formData.get('owner');
-                updated.report_completed_at = formData.get('report_completed_at');
+                updated.report_completed_at = result.data?.report_completed_at || updated.report_completed_at;
                 updated.memorandum_for = formData.get('memorandum_for');
                 updated.fire_started = formData.get('fire_started');
                 updated.fire_out = formData.get('fire_out');
@@ -1403,6 +1692,7 @@ function bootFirefighterMyStationPage() {
         } catch (error) {
             console.error('Update failed:', error);
             showToast(error.message || 'Failed to update report.', 'error');
+            form.querySelectorAll('input[name="proof_images[]"]').forEach((input) => updateProofUploadStatus(input));
         } finally {
             submitButton.disabled = false;
             submitButton.innerHTML = originalHtml;
@@ -1453,6 +1743,10 @@ function bootFirefighterMyStationPage() {
     }
 
     async function submitReportForm(form, endpoint, mapSuccessData, handleSuccess) {
+        if (!validateProofUploads(form)) {
+            showToast('Proof images exceed the 25 MB threshold. Remove or replace images before submitting.', 'error');
+            return null;
+        }
         const submitButton = form.querySelector('button[type="submit"]');
         const modal = form.closest('.report-modal');
         const originalHtml = submitButton.innerHTML;
@@ -1462,19 +1756,11 @@ function bootFirefighterMyStationPage() {
 
         try {
             const formData = new FormData(form);
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                },
-                body: formData,
+            const result = await sendMultipartRequest(endpoint, formData, {
+                onProgress: (progress) => setProofUploadProgress(form, progress, `Uploading proof images · ${Math.round(progress)}%`),
+                onRetry: (attempt, maximum) => setProofUploadProgress(form, 0, `Connection interrupted · retrying ${attempt} of ${maximum}`),
             });
-
-            const result = await response.json();
-            if (!response.ok || result.success === false) {
-                throw new Error(result.message || 'Failed to submit report.');
-            }
+            setProofUploadProgress(form, 100, 'Proof images uploaded · 100%');
 
             const mapped = mapSuccessData(formData, result.data || {});
             handleSuccess(mapped);
@@ -1485,6 +1771,7 @@ function bootFirefighterMyStationPage() {
         } catch (error) {
             console.error('Investigation report submission failed:', error);
             showToast(error.message || 'Failed to submit report.', 'error');
+            form.querySelectorAll('input[name="proof_images[]"]').forEach((input) => updateProofUploadStatus(input));
             return null;
         } finally {
             setReportModalState(modal, 'ready');
@@ -1628,7 +1915,7 @@ function bootFirefighterMyStationPage() {
                 dead: formData.get('dead'),
                 injured: formData.get('injured'),
                 owner: formData.get('owner'),
-                report_completed_at: formData.get('report_completed_at'),
+                report_completed_at: data.report_completed_at || new Date().toISOString(),
                 memorandum_for: formData.get('memorandum_for'),
                 place_of_occurrence: formData.get('place_of_occurrence'),
                 involved_structure: formData.get('involved_structure'),

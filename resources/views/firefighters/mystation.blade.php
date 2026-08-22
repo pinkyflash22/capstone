@@ -184,10 +184,15 @@
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid" data-report-form-content>
-                        <div class="report-form-hint full">
-                            <strong>Use this for first findings.</strong>
-                            <span>Record the scene, casualties, owner, damage estimate, and initial disposition.</span>
-                            <small>Example notes: fire started at kitchen, 1 injured, estimated damage 50000.</small>
+                        <div class="report-form-help full">
+                            <button type="button" class="report-form-help__trigger" aria-describedby="spotReportPurposeHelp">
+                                <i class="fa-solid fa-circle-info"></i><span>First findings guide</span>
+                            </button>
+                            <div class="report-form-help__tooltip" id="spotReportPurposeHelp" role="tooltip">
+                                <strong>Use this for first findings.</strong>
+                                <span>Record the scene, casualties, owner, damage estimate, and initial disposition.</span>
+                                <small>Example: fire started in the kitchen, one injured, estimated damage 50,000.</small>
+                            </div>
                         </div>
                         <div class="form-section-label">Incident reference</div>
                         <div class="form-group full">
@@ -212,7 +217,7 @@
                         <div class="form-section-label">Report timeline</div>
                         <div class="form-group">
                             <label class="form-label">Report Completed</label>
-                            <input type="datetime-local" name="report_completed_at" class="form-input">
+                            <div class="form-auto-value"><i class="fa-solid fa-clock"></i><span>Recorded automatically when this report is submitted.</span></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Memorandum For</label>
@@ -246,7 +251,14 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Highest Alarm</label>
-                            <input type="text" name="highest_alarm_level" class="form-input" placeholder="Example: 1st alarm, 2nd alarm">
+                            <select name="highest_alarm_level" class="form-select">
+                                <option value="">Select alarm level</option>
+                                <option value="1st Alarm">1st Alarm</option>
+                                <option value="2nd Alarm">2nd Alarm</option>
+                                <option value="3rd Alarm">3rd Alarm</option>
+                                <option value="4th Alarm">4th Alarm</option>
+                                <option value="5th Alarm">5th Alarm</option>
+                            </select>
                         </div>
                         <div class="form-section-label">Occupancy details</div>
                         <div class="form-group full">
@@ -283,9 +295,9 @@
                             <label class="form-label">Details of Investigation / Narrative</label>
                             <textarea name="details_of_investigation" class="form-textarea" rows="6" placeholder="Full fire incident narration, area affected, weather condition, observed conditions, and other initial findings"></textarea>
                             <div class="table-muted">Use field notes first, then let the system draft a cleaner narrative that you can still edit.</div>
-                            <button type="button" class="btn btn-outline" data-generate-spot-narrative style="margin-top: 0.85rem; width: fit-content;">
+                            <div class="narrative-action-row"><button type="button" class="btn btn-outline" data-generate-spot-narrative>
                                 <i class="fa-solid fa-magic"></i> Generate Narrative
-                            </button>
+                            </button></div>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Disposition</label>
@@ -295,7 +307,7 @@
                         <div class="form-group full">
                             <label class="form-label">Proof Images</label>
                             <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
-                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
+                            <small class="table-muted">Optional JPG or PNG images. Up to 20 images and 25 MB combined. Images are appended on a new page after the report content.</small>
                         </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
@@ -389,9 +401,9 @@
                         <div class="form-group full">
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="6"></textarea>
-                            <button type="button" class="btn btn-outline" data-generate-progress-narrative style="margin-top: 0.85rem; width: fit-content;">
+                            <div class="narrative-action-row"><button type="button" class="btn btn-outline" data-generate-progress-narrative>
                                 <i class="fa-solid fa-magic"></i> Generate Narrative
-                            </button>
+                            </button></div>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Disposition</label>
@@ -401,7 +413,7 @@
                         <div class="form-group full">
                             <label class="form-label">Proof Images</label>
                             <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
-                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
+                            <small class="table-muted">Optional JPG or PNG images. Up to 20 images and 25 MB combined. Images are appended on a new page after the report content.</small>
                         </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
@@ -506,9 +518,9 @@
                         <div class="form-group full">
                             <label class="form-label">Facts of the Case</label>
                             <textarea name="facts_of_case" class="form-textarea" rows="5"></textarea>
-                            <button type="button" class="btn btn-outline" data-generate-final-narrative style="margin-top: 0.85rem; width: fit-content;">
+                            <div class="narrative-action-row"><button type="button" class="btn btn-outline" data-generate-final-narrative>
                                 <i class="fa-solid fa-magic"></i> Generate Narrative
-                            </button>
+                            </button></div>
                         </div>
                         <div class="form-group full">
                             <label class="form-label">Discussion</label>
@@ -526,7 +538,7 @@
                         <div class="form-group full">
                             <label class="form-label">Proof Images</label>
                             <input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
-                            <small class="table-muted">Optional. Select multiple JPG or PNG images. Maximum 3 MB per image. Images are appended on a new page after the report content.</small>
+                            <small class="table-muted">Optional JPG or PNG images. Up to 20 images and 25 MB combined. Images are appended on a new page after the report content.</small>
                         </div>
                         <div class="form-section-label">Review and approval</div>
                         <div class="form-group">
@@ -588,6 +600,7 @@
                 finalCreate: '/api/final-investigation',
                 reportManageBase: '/api',
                 proofImageDeleteTemplate: @json($proofImageDeleteTemplate),
+                proofImageOrderTemplate: @json($proofImageOrderTemplate),
                 sirTemplate: @json(route('firefighter.spot-reports.sir.word', ['spotReportId' => '__SPOT_REPORT_ID__'])),
                 pirTemplate: @json(route('firefighter.progress-reports.pir.word', ['progressReportId' => '__PROGRESS_REPORT_ID__'])),
                 firTemplate: @json(route('firefighter.final-reports.fir.word', ['finalReportId' => '__FINAL_REPORT_ID__'])),
