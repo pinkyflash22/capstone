@@ -19,6 +19,7 @@ use App\Models\Barangay;
 use App\Models\Station;
 use App\Services\IncidentResponderSnapshotService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class Incident extends Model
 {
@@ -68,6 +69,8 @@ class Incident extends Model
         });
 
         static::saved(function (self $incident) {
+            Cache::forget("firefighter:registry:detail:{$incident->incident_id}");
+
             $shouldCapture = filled($incident->team_id)
                 && ($incident->wasRecentlyCreated
                     || $incident->wasChanged('team_id'));
@@ -86,6 +89,8 @@ class Incident extends Model
                 ]);
             }
         });
+
+        static::deleted(fn (self $incident) => Cache::forget("firefighter:registry:detail:{$incident->incident_id}"));
     }
 
     public function marker()

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class IncidentResponse extends Model
 {
@@ -19,6 +20,12 @@ class IncidentResponse extends Model
     protected $casts = [
         'responders' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $response) => Cache::forget("firefighter:registry:detail:{$response->incident_id}"));
+        static::deleted(fn (self $response) => Cache::forget("firefighter:registry:detail:{$response->incident_id}"));
+    }
 
     public function incident()
     {

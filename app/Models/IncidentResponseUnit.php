@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class IncidentResponseUnit extends Model
 {
@@ -22,6 +23,12 @@ class IncidentResponseUnit extends Model
         'released_at' => 'datetime',
         'recalled_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $unit) => Cache::forget("firefighter:registry:detail:{$unit->incident_id}"));
+        static::deleted(fn (self $unit) => Cache::forget("firefighter:registry:detail:{$unit->incident_id}"));
+    }
 
     public function incident() { return $this->belongsTo(Incident::class, 'incident_id', 'incident_id'); }
     public function station() { return $this->belongsTo(Station::class, 'station_id', 'station_id'); }

@@ -229,8 +229,8 @@
         }
         .incident-modal.active { display: flex; }
         .incident-modal-panel {
-            width: min(500px, 100%); max-height: min(76dvh, 680px); overflow: hidden;
-            border-radius: 24px; background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+            width: min(460px, 100%); max-height: min(70dvh, 620px); overflow: hidden;
+            border-radius: 20px; background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
             border: 1px solid rgba(226,232,240,.95); box-shadow: 0 30px 70px rgba(15,23,42,.28);
         }
         .incident-modal-header {
@@ -243,8 +243,8 @@
             width: 42px; height: 42px; border-radius: 999px; border: 1px solid rgba(226,232,240,.92);
             cursor: pointer; background: rgba(255,255,255,.94); color: #64748b; box-shadow: 0 10px 24px rgba(15,23,42,.08);
         }
-        .incident-modal-body { padding: 18px 20px 20px; overflow-y: auto; max-height: calc(100vh - 140px); display: grid; gap: 16px; }
-        .incident-brief { display: grid; gap: 16px; }
+        .incident-modal-body { padding: 16px 18px 18px; overflow-y: auto; max-height: calc(70dvh - 72px); display: grid; gap: 14px; }
+        .incident-brief { display: grid; gap: 14px; }
         .incident-brief__heading { display: grid; gap: 10px; }
         .incident-brief__chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .incident-brief__status,
@@ -311,6 +311,53 @@
         .incident-brief__coordinates {
             margin: -4px 0 0; color: #94a3b8; font-size: .72rem; text-align: right;
         }
+        .incident-brief__section { display: grid; gap: 9px; }
+        .incident-brief__section-title {
+            margin: 0; color: #334155; font-size: .76rem; font-weight: 900;
+            letter-spacing: .08em; text-transform: uppercase;
+        }
+        .incident-brief__people { display: grid; gap: 8px; }
+        .incident-brief__person {
+            display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center;
+        }
+        .incident-brief__person-icon {
+            width: 30px; height: 30px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(198,61,38,.08); color: #c63d26; font-size: .76rem;
+        }
+        .incident-brief__person strong { display: block; color: #172033; font-size: .84rem; line-height: 1.3; }
+        .incident-brief__person small { display: block; margin-top: 2px; color: #64748b; font-size: .72rem; line-height: 1.35; }
+        .incident-brief__timeline { list-style: none; margin: 0; padding: 0 0 0 8px; display: grid; gap: 0; }
+        .incident-brief__event {
+            position: relative; display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 10px; padding-bottom: 12px;
+        }
+        .incident-brief__event:not(:last-child)::after {
+            content: ''; position: absolute; left: 4px; top: 10px; bottom: 0; width: 1px; background: #dbe2ea;
+        }
+        .incident-brief__event-dot { width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: #c63d26; box-shadow: 0 0 0 3px #fff1ed; z-index: 1; }
+        .incident-brief__event strong { display: block; color: #172033; font-size: .82rem; }
+        .incident-brief__event time { display: block; margin-top: 2px; color: #475569; font-size: .74rem; }
+        .incident-brief__event small { display: block; margin-top: 2px; color: #94a3b8; font-size: .7rem; }
+        .incident-brief__units { display: grid; gap: 7px; }
+        .incident-brief__unit {
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+            padding: 8px 0; border-bottom: 1px solid #edf0f4;
+        }
+        .incident-brief__unit:last-child { border-bottom: 0; }
+        .incident-brief__unit strong { color: #172033; font-size: .8rem; }
+        .incident-brief__unit small { display: block; margin-top: 3px; color: #94a3b8; font-size: .68rem; line-height: 1.4; }
+        .incident-brief__unit span { color: #64748b; font-size: .72rem; text-align: right; }
+        .incident-brief__empty { margin: 0; color: #94a3b8; font-size: .78rem; }
+        .incident-detail-loading { display: grid; gap: 10px; padding: 4px 0; }
+        .incident-detail-loading span {
+            display: block; height: 12px; border-radius: 999px; overflow: hidden;
+            background: linear-gradient(90deg, #eef2f7 20%, #fff7f3 50%, #eef2f7 80%);
+            background-size: 220% 100%; animation: incident-detail-pulse 1.2s linear infinite;
+        }
+        .incident-detail-loading span:nth-child(1) { width: 42%; height: 18px; }
+        .incident-detail-loading span:nth-child(2) { width: 88%; }
+        .incident-detail-loading span:nth-child(3) { width: 72%; }
+        .incident-detail-loading span:nth-child(4) { width: 96%; height: 58px; border-radius: 12px; }
+        @keyframes incident-detail-pulse { to { background-position: -220% 0; } }
         .status-badge-reported { background: #fef3c7; color: #92400e; }
         .status-badge-responding { background: #dbeafe; color: #1d4ed8; }
         .status-badge-resolved { background: #dcfce7; color: #166534; }
@@ -573,9 +620,9 @@
             .shimmer-btn { height: 34px; }
             .incident-modal { padding: 0 10px calc(90px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
             .incident-modal-panel {
-                width: 100%;
-                max-height: min(58dvh, 520px);
-                border-radius: 24px 24px 18px 18px;
+                width: calc(100% - 14px);
+                max-height: min(54dvh, 480px);
+                border-radius: 20px 20px 16px 16px;
                 box-shadow: 0 -10px 28px rgba(15,23,42,.18);
             }
             .incident-modal-header {
@@ -591,7 +638,7 @@
             .incident-modal-body {
                 padding: 14px 12px 16px;
                 gap: 12px;
-                max-height: calc(58dvh - 82px);
+                max-height: calc(54dvh - 72px);
             }
             .incident-brief { gap: 14px; }
             .incident-brief__title { font-size: 1.02rem; }
@@ -697,9 +744,13 @@
 
     <script>
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
+        const registryDetailEndpointTemplate = `{{ route('firefighter.incidents.registry.detail', ['incident' => '__INCIDENT__']) }}`;
         const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 15000;
+        const INCIDENT_DETAIL_BROWSER_CACHE_MS = 30000;
         const INCIDENT_PAGE_SIZE = 6;
         const incidentState = { incidents: [], filter: 'active', search: '', sort: 'reported_desc', currentPage: 1, poller: null, request: null, lastFetchedAt: 0 };
+        const incidentDetailCache = new Map();
+        const incidentDetailRequests = new Map();
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
         const mobileResultsCount = document.getElementById('mobileResultsCount');
@@ -868,6 +919,7 @@
                 const investigationAction = incident.investigation_ready && incident.investigation_url
                     ? `<a class="action-btn investigation" href="${escapeHtml(incident.investigation_url)}"><i class="fa-solid fa-magnifying-glass"></i> Start Spot Report</a>`
                     : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '');
+                const viewAction = `<button type="button" class="action-btn primary" data-view-incident="${incident.incident_id}"><i class="fa-regular fa-eye"></i> View Details</button>`;
                 return `
                     <article class="incident-item is-clickable" data-incident-row data-incident-id="${incident.incident_id}" role="button" tabindex="0" aria-label="Open incident details for ${escapeHtml(incident.title || `Incident ${incident.incident_id}`)}">
                         <div class="incident-image">
@@ -887,7 +939,7 @@
                                 <div class="incident-meta-item incident-meta-item--secondary"><span class="incident-meta-label">Last Updated</span>${escapeHtml(formatDateTime(incident.updated_at))}</div>
                             </div>
                         </div>
-                        ${investigationAction ? `<div class="incident-actions" data-incident-actions>${investigationAction}</div>` : ''}
+                        <div class="incident-actions" data-incident-actions>${viewAction}${investigationAction}</div>
                     </article>`;
             }).join('')}</div>${renderIncidentPagination(incidents.length, totalPages, incidentState.currentPage)}`;
 
@@ -912,6 +964,10 @@
                     event.preventDefault();
                     openIncidentDetails(row.dataset.incidentId);
                 });
+            });
+
+            listState.querySelectorAll('[data-view-incident]').forEach((button) => {
+                button.addEventListener('click', () => openIncidentDetails(button.dataset.viewIncident));
             });
 
             listState.querySelector('[data-incident-page-action="prev"]')?.addEventListener('click', () => {
@@ -977,21 +1033,75 @@
                 return;
             }
 
-            if (!incidentState.incidents.some((incident) => Number(incident.incident_id) === Number(incidentId))) {
+            const summary = incidentState.incidents.find((incident) => Number(incident.incident_id) === Number(incidentId));
+            if (!summary) {
                 closeIncidentDetails();
                 return;
             }
 
+            const key = String(incidentId);
+            if (incidentDetailRequests.has(key)) return;
+            const cached = incidentDetailCache.get(key);
+            if (cached?.data?.updated_at === summary.updated_at && cached.expiresAt > Date.now()) return;
+            incidentDetailCache.delete(key);
             openIncidentDetails(incidentId, { silent: true });
         }
 
-        function openIncidentDetails(incidentId, options = {}) {
-            const incident = incidentState.incidents.find(item => Number(item.incident_id) === Number(incidentId));
-            if (!incident) {
+        async function fetchIncidentDetails(incidentId) {
+            const key = String(incidentId);
+            const cached = incidentDetailCache.get(key);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.data;
+            }
+            if (incidentDetailRequests.has(key)) {
+                return incidentDetailRequests.get(key);
+            }
+
+            const request = fetch(registryDetailEndpointTemplate.replace('__INCIDENT__', encodeURIComponent(key)), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store',
+            }).then(async (response) => {
+                const result = await response.json();
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.message || 'Failed to load incident details.');
+                }
+                incidentDetailCache.set(key, { data: result.data, expiresAt: Date.now() + INCIDENT_DETAIL_BROWSER_CACHE_MS });
+                return result.data;
+            }).finally(() => incidentDetailRequests.delete(key));
+
+            incidentDetailRequests.set(key, request);
+            return request;
+        }
+
+        async function openIncidentDetails(incidentId, options = {}) {
+            const summary = incidentState.incidents.find(item => Number(item.incident_id) === Number(incidentId));
+            if (!summary) {
                 showToast('Incident details not found.', true);
                 return;
             }
 
+            const modal = document.getElementById('incidentDetailModal');
+            const modalBody = document.getElementById('incidentModalBody');
+            const modalTitle = document.getElementById('incidentModalTitle');
+            const modalSubtitle = document.getElementById('incidentModalSubtitle');
+            modal.dataset.incidentId = String(incidentId);
+            modalTitle.innerHTML = `<i class="fa-solid fa-file-lines"></i> Incident #${escapeHtml(incidentId)}`;
+            modalSubtitle.textContent = '';
+            modalBody.innerHTML = `<div class="incident-detail-loading" role="status" aria-label="Loading complete incident details"><span></span><span></span><span></span><span></span></div>`;
+            modal.classList.add('active');
+
+            try {
+                const incident = await fetchIncidentDetails(incidentId);
+                if (modal.dataset.incidentId !== String(incidentId)) return;
+                renderIncidentDetails(incident);
+            } catch (error) {
+                if (modal.dataset.incidentId !== String(incidentId)) return;
+                modalBody.innerHTML = `<div class="list-empty"><i class="fa-solid fa-triangle-exclamation"></i><div class="text-sm font-semibold text-slate-700">Unable to load incident details.</div><div class="mt-2 text-xs text-slate-500">${escapeHtml(error.message || 'Please try again.')}</div></div>`;
+                if (!options.silent) showToast(error.message || 'Failed to load incident details.', true);
+            }
+        }
+
+        function renderIncidentDetails(incident) {
             const modal = document.getElementById('incidentDetailModal');
             const modalBody = document.getElementById('incidentModalBody');
             const modalTitle = document.getElementById('incidentModalTitle');
@@ -1013,14 +1123,11 @@
             const hasCoordinates = incident.coordinates?.lat !== null && incident.coordinates?.lat !== undefined && incident.coordinates?.lng !== null && incident.coordinates?.lng !== undefined;
             const overviewItems = [
                 { label: 'Reported by', value: reportedBy },
-                { label: 'Assigned team', value: incident.team_name || 'Not assigned' },
                 { label: 'Reported', value: createdAt },
+                { label: 'Finished', value: incident.completed_at ? formatDateTime(incident.completed_at) : 'In progress' },
+                { label: 'Report to finish', value: incident.response_minutes !== null && incident.response_minutes !== undefined ? formatMinutes(incident.response_minutes) : 'In progress' },
                 { label: 'Last updated', value: updatedAt },
             ];
-
-            if (incident.response_minutes !== null && incident.response_minutes !== undefined) {
-                overviewItems.push({ label: 'Response duration', value: formatMinutes(incident.response_minutes) });
-            }
 
             const overviewMarkup = overviewItems.map((item) => `
                 <div class="incident-brief__fact">
@@ -1028,6 +1135,35 @@
                     <dd>${escapeHtml(item.value)}</dd>
                 </div>
             `).join('');
+            const responders = Array.isArray(incident.responders) ? incident.responders : [];
+            const respondersMarkup = responders.length ? responders.map((member) => {
+                const assignment = [member.rank, member.role, member.station_name].filter(Boolean).join(' · ');
+                return `
+                    <div class="incident-brief__person">
+                        <span class="incident-brief__person-icon"><i class="fa-solid fa-user-shield"></i></span>
+                        <div><strong>${escapeHtml(member.name || 'Assigned firefighter')}</strong><small>${escapeHtml(assignment || 'Responder')}</small></div>
+                    </div>`;
+            }).join('') : `<p class="incident-brief__empty">No historical responder roster was recorded.</p>`;
+            const timeline = Array.isArray(incident.timeline) ? incident.timeline : [];
+            const timelineMarkup = timeline.length ? timeline.map((event) => `
+                <li class="incident-brief__event">
+                    <span class="incident-brief__event-dot"></span>
+                    <div><strong>${escapeHtml(event.label || 'Response update')}</strong><time>${escapeHtml(formatDateTime(event.timestamp))}</time>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}</div>
+                </li>
+            `).join('') : `<li class="incident-brief__empty">No response timeline is available.</li>`;
+            const responseUnits = Array.isArray(incident.response_units) ? incident.response_units : [];
+            const unitsMarkup = responseUnits.length ? responseUnits.map((unit) => {
+                const apparatus = unit.unit_number || unit.plate_number || unit.equipment || 'Apparatus not recorded';
+                const station = unit.station_name || 'Station not recorded';
+                const state = String(unit.status || 'assigned').replaceAll('_', ' ');
+                const unitTimes = [
+                    unit.dispatched_at ? `Dispatched ${formatDateTime(unit.dispatched_at)}` : null,
+                    unit.arrived_at ? `Arrived ${formatDateTime(unit.arrived_at)}` : null,
+                    unit.released_at ? `Released ${formatDateTime(unit.released_at)}` : null,
+                    unit.recalled_at ? `Recalled ${formatDateTime(unit.recalled_at)}` : null,
+                ].filter(Boolean).join(' · ');
+                return `<div class="incident-brief__unit"><div><strong>Run ${escapeHtml(unit.run_number || '—')} · ${escapeHtml(apparatus)}</strong>${unitTimes ? `<small>${escapeHtml(unitTimes)}</small>` : ''}</div><span>${escapeHtml(station)}<br>${escapeHtml(state)}</span></div>`;
+            }).join('') : `<p class="incident-brief__empty">No response-unit record is available.</p>`;
 
             modalTitle.innerHTML = `<i class="fa-solid fa-file-lines"></i> Incident #${escapeHtml(incident.incident_id)}`;
             modalSubtitle.textContent = '';
@@ -1042,8 +1178,23 @@
                         <p class="incident-brief__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(locationHeadline)}</span></p>
                     </header>
                     ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident evidence" class="incident-brief__image">` : ''}
-                    <p class="incident-brief__description">${escapeHtml(description)}</p>
                     <dl class="incident-brief__facts">${overviewMarkup}</dl>
+                    <section class="incident-brief__section">
+                        <h3 class="incident-brief__section-title">Incident narrative</h3>
+                        <p class="incident-brief__description">${escapeHtml(description)}</p>
+                    </section>
+                    <section class="incident-brief__section">
+                        <h3 class="incident-brief__section-title">Responding personnel (${responders.length})</h3>
+                        <div class="incident-brief__people">${respondersMarkup}</div>
+                    </section>
+                    <section class="incident-brief__section">
+                        <h3 class="incident-brief__section-title">Response timeline</h3>
+                        <ol class="incident-brief__timeline">${timelineMarkup}</ol>
+                    </section>
+                    <section class="incident-brief__section">
+                        <h3 class="incident-brief__section-title">Response units (${responseUnits.length})</h3>
+                        <div class="incident-brief__units">${unitsMarkup}</div>
+                    </section>
                     ${hasCoordinates ? `<p class="incident-brief__coordinates"><i class="fa-solid fa-location-crosshairs"></i> ${escapeHtml(`${incident.coordinates.lat}, ${incident.coordinates.lng}`)}</p>` : ''}
                 </article>
             `;

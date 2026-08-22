@@ -23,6 +23,8 @@ use App\Models\EventActivity;
 use App\Models\DutyException;
 use App\Models\DutyShift;
 use App\Services\DutyRosterRecurrenceService;
+use App\Services\IncidentResourceDispatchService;
+use App\Services\IncidentResponderSnapshotService;
 use App\Support\MediaPath;
 use App\Support\MarkerFeedBuilder;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +50,7 @@ use App\Support\UserActivityLogger;
 class FirefighterController extends Controller
 {
     private const REGISTRY_CACHE_SECONDS = 15;
+    private const REGISTRY_DETAIL_CACHE_SECONDS = 60;
     private const ASSIGNED_INCIDENTS_CACHE_SECONDS = 10;
     private const DASHBOARD_CACHE_SECONDS = 20;
     private const ACTIVE_FIREFIGHTER_LOCATIONS_CACHE_SECONDS = 12;
@@ -351,6 +354,8 @@ class FirefighterController extends Controller
                 'reported_by',
                 'station_id',
                 'barangay_id',
+                'dispatch_assigned_at',
+                'incident_completed_at',
                 'created_at',
                 'updated_at',
             ])
@@ -1070,9 +1075,13 @@ class FirefighterController extends Controller
                         $stats['closed']++;
                     }
 
+                    $completedAt = $incident->incident_completed_at;
+                    if (! $completedAt && in_array($incidentStatusId, [4, 5], true)) {
+                        $completedAt = $incident->updated_at;
+                    }
                     $responseMinutes = null;
-                    if ($incident->created_at && $arrivalAt) {
-                        $responseMinutes = Carbon::parse($incident->created_at)->diffInMinutes($arrivalAt);
+                    if ($incident->created_at && $completedAt) {
+                        $responseMinutes = Carbon::parse($incident->created_at)->diffInMinutes(Carbon::parse($completedAt));
                         $responseDurations[] = $responseMinutes;
                     }
 
@@ -1096,8 +1105,10 @@ class FirefighterController extends Controller
                         'updated_at' => optional($incident->updated_at)->toIso8601String(),
                         'created_at' => optional($incident->created_at)->toIso8601String(),
                         'arrival_at' => $arrivalAt?->toIso8601String(),
+                        'dispatch_assigned_at' => optional($incident->dispatch_assigned_at)->toIso8601String(),
+                        'completed_at' => $completedAt ? Carbon::parse($completedAt)->toIso8601String() : null,
                         'resolved_at' => in_array($incidentStatusId, [4, 5], true)
-                            ? optional($incident->updated_at)->toIso8601String()
+                            ? ($completedAt ? Carbon::parse($completedAt)->toIso8601String() : optional($incident->updated_at)->toIso8601String())
                             : null,
                         'response_minutes' => $responseMinutes,
                         'reporter_name' => $reporterName !== '' ? $reporterName : 'Concerned Citizen',
@@ -1132,6 +1143,93 @@ class FirefighterController extends Controller
                     'stats' => $stats,
                     'incidents' => $mappedIncidents,
                 ];
+            }
+        );
+    }
+
+    protected function buildFirefighterIncidentRegistryDetail(int $userId, int $incidentId): array
+    {
+        $userTeam = $this->resolveUserTeam($userId);
+        abort_unless($userTeam, 403, 'You are not assigned to a firefighter response team.');
+
+        $isAuthorized = Incident::query()
+            ->whereKey($incidentId)
+            ->where(function ($query) use ($userTeam) {
+                $query->where('team_id', $userTeam->team_id)
+                    ->orWhereHas('responseUnits', fn ($unitQuery) => $unitQuery->where('team_id', $userTeam->team_id));
+            })
+            ->exists();
+        abort_unless($isAuthorized, 404, 'Incident details not found for your response team.');
+
+        return Cache::remember(
+            "firefighter:registry:detail:{$incidentId}",
+            now()->addSeconds(self::REGISTRY_DETAIL_CACHE_SECONDS),
+            function () use ($userId, $incidentId) {
+                $summary = collect($this->buildFirefighterIncidentRegistryData($userId)['incidents'] ?? [])
+                    ->first(fn (array $item) => (int) ($item['incident_id'] ?? 0) === $incidentId);
+
+                if (! $summary) {
+                    Cache::forget("firefighter:registry:{$userId}");
+                    $summary = collect($this->buildFirefighterIncidentRegistryData($userId)['incidents'] ?? [])
+                        ->first(fn (array $item) => (int) ($item['incident_id'] ?? 0) === $incidentId);
+                }
+                abort_unless($summary, 404, 'Incident registry record not found.');
+
+                $incident = Incident::query()
+                    ->with([
+                        'responderSnapshot:incident_response_id,incident_id,responders',
+                        'responseUnits',
+                    ])
+                    ->findOrFail($incidentId);
+                app(IncidentResponderSnapshotService::class)->attachResponderDetails(collect([$incident]));
+                $resourceDispatch = app(IncidentResourceDispatchService::class);
+                $responseUnits = $incident->responseUnits
+                    ->sortBy('run_number')
+                    ->map(fn ($unit) => $resourceDispatch->serializeUnit($unit))
+                    ->values();
+
+                $unitResponders = $responseUnits
+                    ->flatMap(fn (array $unit) => collect($unit['team_members'] ?? [])->map(fn (array $member) => [
+                        'station_officer_id' => (int) ($member['station_officer_id'] ?? 0),
+                        'name' => $member['name'] ?? 'Assigned firefighter',
+                        'role' => $member['role'] ?? null,
+                        'rank' => $member['rank'] ?? null,
+                        'station_name' => $unit['station_name'] ?? null,
+                    ]));
+                $snapshotResponders = collect($incident->responder_details ?? [])->map(fn (array $member) => [
+                    'station_officer_id' => (int) ($member['station_officer_id'] ?? 0),
+                    'name' => $member['name'] ?? 'Assigned firefighter',
+                    'role' => null,
+                    'rank' => $member['rank'] ?? null,
+                    'station_name' => $member['station_name'] ?? null,
+                ]);
+                $responders = $unitResponders
+                    ->concat($snapshotResponders)
+                    ->filter(fn (array $member) => $member['station_officer_id'] > 0)
+                    ->unique('station_officer_id')
+                    ->values()
+                    ->all();
+
+                $dispatchedAt = $incident->responseUnits->pluck('dispatched_at')->filter()->sort()->first()
+                    ?: $incident->dispatch_assigned_at;
+                $arrivalAt = $incident->responseUnits->pluck('arrived_at')->filter()->sort()->first()
+                    ?: ($summary['arrival_at'] ?? null);
+                $completedAt = $incident->incident_completed_at ?: ($summary['completed_at'] ?? null);
+                $statusId = (int) ($summary['incident_status_id'] ?? 0);
+                $timeline = collect([
+                    ['label' => 'Incident reported', 'timestamp' => $summary['reported_at'] ?? null, 'detail' => $summary['reporter_name'] ?? 'Concerned Citizen'],
+                    ['label' => 'Response dispatched', 'timestamp' => $dispatchedAt ? Carbon::parse($dispatchedAt)->toIso8601String() : null, 'detail' => $responders !== [] ? count($responders).' responders dispatched' : 'Response team dispatched'],
+                    ['label' => 'Responders arrived', 'timestamp' => $arrivalAt ? Carbon::parse($arrivalAt)->toIso8601String() : null, 'detail' => $arrivalAt ? 'First response unit reached the incident' : null],
+                    ['label' => $statusId === 5 ? 'Incident closed' : 'Response completed', 'timestamp' => $completedAt ? Carbon::parse($completedAt)->toIso8601String() : null, 'detail' => isset($summary['response_minutes']) ? $summary['response_minutes'].' minutes after the report' : null],
+                ])->filter(fn (array $event) => filled($event['timestamp']))->values()->all();
+
+                return array_merge($summary, [
+                    'arrival_at' => $arrivalAt ? Carbon::parse($arrivalAt)->toIso8601String() : null,
+                    'dispatch_assigned_at' => $dispatchedAt ? Carbon::parse($dispatchedAt)->toIso8601String() : null,
+                    'responders' => $responders,
+                    'response_units' => $responseUnits->all(),
+                    'timeline' => $timeline,
+                ]);
             }
         );
     }
@@ -1908,6 +2006,17 @@ public function getAssignedIncidents(string $id){
         return response()->json([
             'success' => true,
             'data' => $this->buildFirefighterIncidentRegistryData($currentUserId),
+        ]);
+    }
+
+    public function incidentRegistryDetail(Incident $incident)
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->buildFirefighterIncidentRegistryDetail(
+                (int) Auth::user()->user_id,
+                (int) $incident->incident_id
+            ),
         ]);
     }
 

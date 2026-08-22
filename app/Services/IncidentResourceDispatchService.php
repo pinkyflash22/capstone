@@ -357,6 +357,7 @@ class IncidentResourceDispatchService
             'estimated_arrival_at' => $unit->estimated_arrival_at?->toIso8601String(),
             'dispatched_at' => $unit->dispatched_at?->toIso8601String(),
             'arrived_at' => $unit->arrived_at?->toIso8601String(),
+            'released_at' => $unit->released_at?->toIso8601String(),
             'recalled_at' => $unit->recalled_at?->toIso8601String(),
             'recall_reason' => $unit->recall_reason,
             'can_recall' => $unit->dispatch_source !== 'primary' && in_array($unit->status, ['reserved', 'en_route'], true),

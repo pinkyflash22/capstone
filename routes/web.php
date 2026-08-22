@@ -586,6 +586,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/assigned/{id}',[FirefighterController::class, 'getAssignedIncidents'])->name('assigned');
         Route::get('/incidents', [FirefighterController::class, 'incidentView'])->name('incidents');
         Route::get('/api/incidents/registry', [FirefighterController::class, 'incidentRegistryData'])->name('incidents.registry');
+        Route::get('/api/incidents/registry/{incident}', [FirefighterController::class, 'incidentRegistryDetail'])->name('incidents.registry.detail');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'firefighterIndex'])->name('risk-reviews.index');
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'firefighterReview'])->name('risk-reviews.review');
 

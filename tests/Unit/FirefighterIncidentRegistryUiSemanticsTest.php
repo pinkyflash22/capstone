@@ -42,4 +42,46 @@ class FirefighterIncidentRegistryUiSemanticsTest extends TestCase
         $this->assertStringContainsString('$barangayLocation', $controller);
         $this->assertStringContainsString("str_contains(\$normalizedTitle, 'emergency voice call')", $controller);
     }
+
+    public function test_registry_details_include_historical_responders_timeline_and_report_to_finish_duration(): void
+    {
+        $view = file_get_contents(__DIR__.'/../../resources/views/firefighters/incidents.blade.php');
+        $controller = file_get_contents(__DIR__.'/../../app/Http/Controllers/staff/FirefighterController.php');
+
+        $this->assertStringContainsString('data-view-incident', $view);
+        $this->assertStringContainsString('Responding personnel', $view);
+        $this->assertStringContainsString('Response timeline', $view);
+        $this->assertStringContainsString('Report to finish', $view);
+        $this->assertStringNotContainsString("{ label: 'Assigned team'", $view);
+        $this->assertStringContainsString('IncidentResponderSnapshotService::class', $controller);
+        $this->assertStringContainsString("'responders' => \$responders", $controller);
+        $this->assertStringContainsString("'timeline' => \$timeline", $controller);
+        $this->assertStringContainsString('diffInMinutes(Carbon::parse($completedAt))', $controller);
+    }
+
+    public function test_full_details_are_lazy_loaded_and_cached_per_incident(): void
+    {
+        $view = file_get_contents(__DIR__.'/../../resources/views/firefighters/incidents.blade.php');
+        $controller = file_get_contents(__DIR__.'/../../app/Http/Controllers/staff/FirefighterController.php');
+        $routes = file_get_contents(__DIR__.'/../../routes/web.php');
+        $incidentModel = file_get_contents(__DIR__.'/../../app/Models/Incident.php');
+        $unitModel = file_get_contents(__DIR__.'/../../app/Models/IncidentResponseUnit.php');
+
+        $listLoader = substr(
+            $controller,
+            strpos($controller, 'protected function loadTeamIncidentsForRegistry'),
+            strpos($controller, 'protected function transformAssignedIncident') - strpos($controller, 'protected function loadTeamIncidentsForRegistry')
+        );
+
+        $this->assertStringContainsString("name('incidents.registry.detail')", $routes);
+        $this->assertStringContainsString('registryDetailEndpointTemplate', $view);
+        $this->assertStringContainsString('async function fetchIncidentDetails', $view);
+        $this->assertStringContainsString('incidentDetailCache = new Map()', $view);
+        $this->assertStringContainsString('REGISTRY_DETAIL_CACHE_SECONDS = 60', $controller);
+        $this->assertStringContainsString('Cache::remember(', $controller);
+        $this->assertStringNotContainsString('responderSnapshot', $listLoader);
+        $this->assertStringNotContainsString("                'responseUnits',", $listLoader);
+        $this->assertStringContainsString('firefighter:registry:detail:', $incidentModel);
+        $this->assertStringContainsString('firefighter:registry:detail:', $unitModel);
+    }
 }
