@@ -9,12 +9,15 @@ use Illuminate\Support\Facades\Schema;
 
 class IncidentAutoAssignmentService
 {
+    public const DEFAULT_RESPONSE_TIMEOUT_MINUTES = 2;
+
     public function __construct(private readonly IncidentJurisdictionService $jurisdictionService)
     {
     }
 
     public function assignRecentUnassignedIncidents(int $minutes = 60): array
     {
+        $expired = $this->expireUnansweredAssignments();
         $cutoff = now()->subMinutes($minutes);
 
         $incidents = Incident::with('marker')
@@ -41,10 +44,11 @@ class IncidentAutoAssignmentService
         return [
             'checked' => $incidents->count(),
             'assigned' => $assignedIncidents,
+            'expired' => $expired,
         ];
     }
 
-    public function assignSingleIncidentById(int $incidentId): ?array
+    public function assignSingleIncidentById(int $incidentId, array $excludedTeamIds = []): ?array
     {
         $incident = Incident::with('marker')->find($incidentId);
 
@@ -52,12 +56,12 @@ class IncidentAutoAssignmentService
             return null;
         }
 
-        return $this->assignSingleIncident($incident);
+        return $this->assignSingleIncident($incident, $excludedTeamIds);
     }
 
-    public function assignSingleIncident(Incident $incident): ?array
+    public function assignSingleIncident(Incident $incident, array $excludedTeamIds = []): ?array
     {
-        return DB::transaction(function () use ($incident) {
+        return DB::transaction(function () use ($incident, $excludedTeamIds) {
             $lockedIncident = Incident::with('marker')
                 ->whereKey($incident->getKey())
                 ->lockForUpdate()
@@ -90,28 +94,22 @@ class IncidentAutoAssignmentService
 
             foreach ($nearestStations as $station) {
                 $stationId = (int) $station->station_id;
-                $team = app(IncidentResourceDispatchService::class)->findAvailableTeamForStation($stationId);
+                $resources = app(IncidentResourceDispatchService::class);
+                $team = $resources->findAvailableTeamForStation($stationId, $excludedTeamIds);
 
                 if (! $team) {
                     continue;
                 }
 
-                $resources = app(IncidentResourceDispatchService::class);
-                $responseUnit = null;
-                if ($resources->incidentRequiresFiretruck($lockedIncident)) {
-                    $responseUnit = $resources->reservePrimary(
-                        $lockedIncident,
-                        $team,
-                        $stationId,
-                        isset($station->distance_meters) ? (float) $station->distance_meters : null,
-                    );
-                    if (! $responseUnit) continue;
-                } else {
-                    $resources->dispatchTeam($team);
+                if ($resources->incidentRequiresFiretruck($lockedIncident)
+                    && ! $resources->stationHasFiretruckCapacityForPendingAssignment($stationId)) {
+                    continue;
                 }
 
                 $lockedIncident->team_id = $team->team_id;
-                $lockedIncident->status = 'Responding';
+                if (Schema::hasColumn('incidents', 'dispatch_assigned_at')) {
+                    $lockedIncident->dispatch_assigned_at = now();
+                }
                 $lockedIncident->updated_at = now();
                 $lockedIncident->save();
 
@@ -119,15 +117,126 @@ class IncidentAutoAssignmentService
                     'incident_id' => $lockedIncident->incident_id,
                     'team_id' => $team->team_id,
                     'station_id' => $stationId,
-                    'status' => 'en-route',
-                    'team_status_updated' => true,
-                    'response_unit_id' => $responseUnit?->incident_response_unit_id,
+                    'status' => 'awaiting-response',
+                    'team_status_updated' => false,
+                    'response_unit_id' => null,
                     'created_at' => optional($lockedIncident->created_at)->toISOString(),
                 ];
             }
 
             return null;
         });
+    }
+
+    public function reassignReportedIncidentsFromOccupiedTeam(int $teamId, int $respondingIncidentId): array
+    {
+        $incidentIds = Incident::query()
+            ->where('team_id', $teamId)
+            ->where('status', 'Reported')
+            ->where('incident_id', '!=', $respondingIncidentId)
+            ->orderBy('created_at')
+            ->pluck('incident_id');
+
+        $reassigned = [];
+        $queued = [];
+
+        foreach ($incidentIds as $incidentId) {
+            $released = DB::transaction(function () use ($incidentId, $teamId) {
+                $pending = Incident::query()->whereKey($incidentId)->lockForUpdate()->first();
+                if (! $pending || (int) $pending->team_id !== $teamId || $pending->status !== 'Reported') {
+                    return false;
+                }
+
+                $pending->team_id = null;
+                if (Schema::hasColumn('incidents', 'dispatch_assigned_at')) {
+                    $pending->dispatch_assigned_at = null;
+                }
+                $pending->save();
+                return true;
+            });
+
+            if (! $released) {
+                continue;
+            }
+
+            $assignment = $this->assignSingleIncidentById((int) $incidentId, [$teamId]);
+            if ($assignment) {
+                $reassigned[] = $assignment;
+            } else {
+                $queued[] = (int) $incidentId;
+            }
+        }
+
+        return ['reassigned' => $reassigned, 'queued' => $queued];
+    }
+
+    public function expireUnansweredAssignments(?int $timeoutMinutes = null): array
+    {
+        if (! Schema::hasColumn('incidents', 'dispatch_assigned_at')) {
+            return ['expired' => 0, 'reassigned' => [], 'renewed' => [], 'queued' => []];
+        }
+
+        $timeout = max(1, $timeoutMinutes ?? self::DEFAULT_RESPONSE_TIMEOUT_MINUTES);
+        $cutoff = now()->subMinutes($timeout);
+        $incidentIds = Incident::query()
+            ->where('status', 'Reported')
+            ->whereNotNull('team_id')
+            ->where(function ($query) use ($cutoff) {
+                $query->where('dispatch_assigned_at', '<=', $cutoff)
+                    ->orWhere(function ($legacy) use ($cutoff) {
+                        $legacy->whereNull('dispatch_assigned_at')->where('updated_at', '<=', $cutoff);
+                    });
+            })
+            ->orderBy('created_at')
+            ->pluck('incident_id');
+
+        $reassigned = [];
+        $renewed = [];
+        $queued = [];
+
+        foreach ($incidentIds as $incidentId) {
+            $previousTeamId = DB::transaction(function () use ($incidentId, $cutoff) {
+                $pending = Incident::query()->whereKey($incidentId)->lockForUpdate()->first();
+                if (! $pending || $pending->status !== 'Reported' || ! $pending->team_id) {
+                    return null;
+                }
+
+                $assignedAt = $pending->dispatch_assigned_at ?? $pending->updated_at;
+                if ($assignedAt && $assignedAt->isAfter($cutoff)) {
+                    return null;
+                }
+
+                $teamId = (int) $pending->team_id;
+                $pending->team_id = null;
+                $pending->dispatch_assigned_at = null;
+                $pending->save();
+                return $teamId;
+            });
+
+            if (! $previousTeamId) {
+                continue;
+            }
+
+            $alternative = $this->assignSingleIncidentById((int) $incidentId, [$previousTeamId]);
+            if ($alternative) {
+                $reassigned[] = $alternative;
+                continue;
+            }
+
+            $fallback = $this->assignSingleIncidentById((int) $incidentId);
+            if ($fallback) {
+                $renewed[] = $fallback;
+            } else {
+                $queued[] = (int) $incidentId;
+            }
+        }
+
+        return [
+            'expired' => $incidentIds->count(),
+            'reassigned' => $reassigned,
+            'renewed' => $renewed,
+            'queued' => $queued,
+        ];
     }
 
     private function calculateDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float

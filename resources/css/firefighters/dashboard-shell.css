@@ -8,7 +8,7 @@
     position: fixed;
     top: 24px;
     right: 24px;
-    z-index: 10100;
+    z-index: var(--ff-layer-notice, 10100);
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -62,7 +62,7 @@
 .ff-false-alarm-confirm {
     position: fixed;
     inset: 0;
-    z-index: 10110;
+    z-index: var(--ff-layer-modal, 10110);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -128,7 +128,7 @@
         border-radius: 0 !important;
         background: transparent !important;
         box-shadow: none !important;
-        z-index: 1 !important;
+        z-index: var(--ff-layer-map, 0) !important;
         isolation: isolate;
     }
 
@@ -209,7 +209,7 @@
 
 @media (max-width: 768px) {
     body.firefighter-dashboard-page .mobile-bottom-nav {
-        z-index: 1200 !important;
+        z-index: var(--ff-layer-mobile-dock, 2000) !important;
     }
 
     body.firefighter-dashboard-page .firefighter-mobile-welcome-toast {
@@ -226,7 +226,7 @@
         bottom: calc(var(--ff-mobile-dock-h, 92px) + 14px);
         left: 14px;
         width: auto;
-        z-index: 10050;
+        z-index: var(--ff-layer-notice, 6000);
         border-radius: 16px;
         transform: translateY(14px);
     }

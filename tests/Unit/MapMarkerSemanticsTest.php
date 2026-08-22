@@ -14,7 +14,9 @@ class MapMarkerSemanticsTest extends TestCase
         $dashboardStyles = file_get_contents(__DIR__.'/../../resources/css/firefighters/dashboard-shell.css');
 
         $this->assertStringContainsString('function createNavigationArrowIcon', $mapScript);
-        $this->assertStringContainsString('icon: createNavigationArrowIcon', $mapScript);
+        $this->assertStringContainsString('function createDemoTruckIcon', $mapScript);
+        $this->assertStringContainsString("iconUrl: '/truck.png'", $mapScript);
+        $this->assertStringContainsString('icon: createRouteMovementIcon(truck.routeSource', $mapScript);
         $this->assertStringNotContainsString('icon: createFireTruckIcon', $mapScript);
         $this->assertStringContainsString('Actual dispatched apparatus', $dashboardScript);
         $this->assertStringContainsString("iconUrl: '/truck.png'", $dashboardScript);
@@ -59,6 +61,8 @@ class MapMarkerSemanticsTest extends TestCase
         $controller = file_get_contents(__DIR__.'/../../app/Http/Controllers/RouteController.php');
 
         $this->assertStringContainsString("if (isDemoRouteSource(routeData.route_source || routeData.routeSource))", $script);
+        $this->assertStringContainsString("isDemoRouteSource(routeSource)\n        ? createDemoTruckIcon()", $script);
+        $this->assertStringContainsString('Demonstration only. This truck does not dispatch resources or update the incident status.', $script);
         $this->assertStringContainsString('stopAllSimulations(false);', $script);
         $this->assertStringContainsString('async function stopAllSimulations(syncWithServer = true)', $script);
         $this->assertStringContainsString('$route->incident?->station_id', $controller);

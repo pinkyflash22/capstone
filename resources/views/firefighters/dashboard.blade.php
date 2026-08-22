@@ -1531,37 +1531,38 @@
 <div id="routeInfoCard" class="route-info-card" style="display: none;" aria-live="polite">
         <div class="route-info-card__handle" aria-hidden="true"></div>
         <div class="route-card-header">
-            <h4><i class="fas fa-route"></i> Route details</h4>
+            <div>
+                <p class="route-info-card__eyebrow">Active navigation</p>
+                <h4><i class="fas fa-route"></i> Route details</h4>
+            </div>
             <span id="routeSourceBadge" class="route-source-badge live">
                 <i class="fas fa-location-crosshairs"></i><span>LIVE</span>
             </span>
         </div>
         <div class="route-info-card__body">
-            <div class="info-row info-row--destination">
-                <strong>Destination</strong> <span id="destinationTitle">Loading...</span>
+            <div class="route-info-card__destination">
+                <span class="route-info-card__destination-icon" aria-hidden="true"><i class="fas fa-location-dot"></i></span>
+                <span class="route-info-card__destination-copy">
+                    <strong>Destination</strong>
+                    <span id="destinationTitle">Selected destination</span>
+                </span>
             </div>
-            <div class="route-info-card__stats">
-                <div class="info-row">
-                    <strong>Distance</strong> <span id="routeDistance">0 km</span>
-                </div>
-                <div class="info-row">
-                    <strong>ETA</strong> <span id="routeETA">--:--</span>
-                </div>
-                <div class="info-row">
-                    <strong>Duration</strong> <span id="routeDuration">0 min</span>
-                </div>
+            <dl class="route-info-card__stats">
+                <div><dt>Distance</dt><dd id="routeDistance">Calculating</dd></div>
+                <div><dt>ETA</dt><dd id="routeETA">Calculating</dd></div>
+                <div><dt>Travel time</dt><dd id="routeDuration">Calculating</dd></div>
+            </dl>
+            <div class="route-info-card__tracking">
+                <i class="fas fa-satellite-dish" aria-hidden="true"></i>
+                <span id="routeTrackingMode">Waiting for GPS route data</span>
             </div>
         </div>
-        <div class="route-progress-container mt-3">
+        <div class="route-progress-container" aria-hidden="true">
             <div id="routeProgress" class="route-progress-bar" style="width: 0%"></div>
         </div>
-        <div class="speed-control mt-2">
-            <button class="speed-btn" data-speed="slow">🐢 Slow</button>
-            <button class="speed-btn active" data-speed="normal">🚒 Normal</button>
-            <button class="speed-btn" data-speed="fast">🐇 Fast</button>
-        </div>
-        <button class="route-stop-btn btn btn-sm btn-outline mt-2 w-full" onclick="stopSimulation()">
-            <i class="fas fa-stop"></i> Stop Simulation
+        <button type="button" id="stopAllSimulationsBtn" class="route-stop-btn" data-stop-route-navigation>
+            <i class="fas fa-stop" aria-hidden="true"></i>
+            <span>Stop navigation</span>
         </button>
     </div>
         <!-- Route Information Card (hidden until route is calculated) -->
@@ -2592,23 +2593,6 @@
 
     window.refreshFirefighterAssignedIncidents = fetchAssignedIncidents;
 
-    // Compatibility handler for the inline Stop Simulation button.
-    // map.js exposes stopAllSimulations / stopSimulationForRoute globally.
-    async function stopSimulation() {
-        try {
-            if (typeof window.stopAllSimulations === 'function') {
-                await window.stopAllSimulations();
-            } else if (typeof window.stopSimulationForRoute === 'function' && window.activeRoute?.route_id) {
-                await window.stopSimulationForRoute(window.activeRoute.route_id);
-            }
-        } catch (error) {
-            console.error('Error stopping simulation:', error);
-        } finally {
-            const routeCard = document.getElementById('routeInfoCard');
-            if (routeCard) routeCard.style.display = 'none';
-        }
-    }
-    
     function escapeHtml(value) {
         if (value === null || value === undefined) return '';
         const div = document.createElement('div');
@@ -2837,7 +2821,6 @@
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
-        let backupButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -2890,9 +2873,6 @@
         }
         
         const incidentType = getIncidentTypeLabel(incident);
-        if ([2, 3].includes(parseInt(statusId)) && String(incidentType).toLowerCase().includes('fire')) {
-            backupButton = `<button type="button" class="request-incident-backup ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}"><i class="fas fa-tower-broadcast"></i><span>Request Backup</span></button>`;
-        }
         const incidentTitle = incident.marker?.title || 'Emergency Incident';
         const lat = incident.marker?.lat;
         const lng = incident.marker?.lng;
@@ -2944,7 +2924,6 @@
                 </button>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
-                    ${backupButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -2971,10 +2950,6 @@
             const currentStatus = parseInt(btn.dataset.status);
             await respondToIncident(incidentId, currentStatus, btn);
         });
-    });
-
-    document.querySelectorAll('.request-incident-backup').forEach(btn => {
-        btn.addEventListener('click', async () => requestIncidentBackup(btn.dataset.incidentId, btn));
     });
 
     // Event Listeners for Complete buttons (status 2)
@@ -3208,23 +3183,6 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error responding to incident:', error);
         showToast('Failed to update incident status', 'error');
-    }
-}
-
-async function requestIncidentBackup(incidentId, triggerButton = null) {
-    if (!confirm('Request another available firetruck and crew? Your station will be checked first, then the nearest available station.')) return;
-    const previous = triggerButton?.innerHTML;
-    if (triggerButton) { triggerButton.disabled = true; triggerButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Finding unit...</span>'; }
-    try {
-        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
-        const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'No backup unit is available.');
-        showToast(result.message, 'success');
-        await fetchAssignedIncidents(true);
-    } catch (error) {
-        showToast(error.message || 'Unable to dispatch backup.', 'error');
-    } finally {
-        if (triggerButton?.isConnected) { triggerButton.disabled = false; triggerButton.innerHTML = previous; }
     }
 }
 

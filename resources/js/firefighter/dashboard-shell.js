@@ -829,7 +829,6 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
-        let backupButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -843,8 +842,8 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             statusClass = 'status-responding';
             statusText = 'RESPONDING';
             actionButton = `
-                <button type="button" class="ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" disabled>
-                    <i class="fas fa-truck-fast"></i><span>En Route</span>
+                <button type="button" class="arrive-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-location-dot"></i><span>Arrived</span>
                 </button>
             `;
         } else if (statusId == 3) {
@@ -882,9 +881,6 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         }
         
         const incidentType = getIncidentTypeLabel(incident);
-        if ([2, 3].includes(parseInt(statusId)) && String(incidentType).toLowerCase().includes('fire')) {
-            backupButton = `<button type="button" class="request-incident-backup ff-assigned-incident-row__action ff-assigned-incident-row__action--warn" data-incident-id="${incident.incident_id}"><i class="fas fa-tower-broadcast"></i><span>Request Backup</span></button>`;
-        }
         const incidentTitle = incident.marker?.title || 'Emergency Incident';
         const lat = incident.marker?.lat;
         const lng = incident.marker?.lng;
@@ -943,7 +939,6 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                 <section class="ff-assigned-incident-row__units" data-response-units-for="${incident.incident_id}" aria-label="Response units for ${escapeHtml(incidentTitle)}" hidden></section>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
-                    ${backupButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -998,8 +993,10 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         });
     });
 
-    document.querySelectorAll('.request-incident-backup').forEach(btn => {
-        btn.addEventListener('click', async () => requestIncidentBackup(btn.dataset.incidentId, btn));
+    document.querySelectorAll('.arrive-incident').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            await arriveAtIncident(btn.dataset.incidentId, parseInt(btn.dataset.status), btn);
+        });
     });
 
     hydrateAssignedIncidentLocations(pageIncidents);
@@ -1234,6 +1231,45 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
     }
 }
 
+async function arriveAtIncident(incidentId, currentStatusId, triggerButton = null) {
+    if (currentStatusId != 2) {
+        showToast('Only a responding incident can be marked on scene', 'error');
+        return;
+    }
+
+    if (!confirm('Confirm that your response team has arrived on scene?')) return;
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Confirming...',
+        badgeLabel: 'ARRIVING...'
+    });
+
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/arrive`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Failed to confirm arrival');
+        }
+
+        showToast(result.message || 'Incident updated to On Scene.', 'success');
+        await Promise.all([
+            fetchAssignedIncidents(true),
+            refreshFirefighterLiveMap()
+        ]);
+    } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
+        console.error('Error confirming incident arrival:', error);
+        showToast(error.message || 'Failed to confirm arrival', 'error');
+    }
+}
+
 async function completeIncident(incidentId, currentStatusId, triggerButton = null) {
     if (currentStatusId != 3) {
         showToast('Cannot mark controlled until the team is on scene', 'error');
@@ -1247,9 +1283,8 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
     });
     
     try {
-        const newStatusId = 4;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/complete`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -1289,9 +1324,8 @@ async function closeCase(incidentId, currentStatusId, triggerButton = null) {
     });
     
     try {
-        const newStatusId = 5;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/close`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -1360,24 +1394,6 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     }
 }
 
-async function requestIncidentBackup(incidentId, triggerButton = null) {
-    if (!confirm('Request another available firetruck and crew? Your station will be checked first, then the nearest available station.')) return;
-    const previous = triggerButton?.innerHTML;
-    if (triggerButton) { triggerButton.disabled = true; triggerButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Finding unit...</span>'; }
-    try {
-        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken } });
-        const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'No backup unit is available.');
-        showToast(result.message, 'success');
-        await fetchAssignedIncidents(true);
-        await refreshActiveResponseUnits(window.assignedIncidentsData || []);
-    } catch (error) {
-        showToast(error.message || 'Unable to dispatch backup.', 'error');
-    } finally {
-        if (triggerButton?.isConnected) { triggerButton.disabled = false; triggerButton.innerHTML = previous; }
-    }
-}
-
     async function refreshActiveResponseUnits(incidents = window.assignedIncidentsData || []) {
     const count = document.getElementById('activeResponseUnitsCount');
     if (!count) return [];
@@ -1419,7 +1435,6 @@ function renderActiveResponseUnits(units) {
             <span class="ff-response-unit__icon"><img src="/truck.png" alt="" aria-hidden="true"></span>
             <span class="ff-response-unit__copy"><strong>${escapeHtml(identity)} / Run ${escapeHtml(unit.run_number)}</strong><small>${escapeHtml(apparatusMeta || unit.apparatus_type || 'Registered apparatus')}</small><small>${escapeHtml(unit.station_name || 'Station')} / ${escapeHtml(gps)}</small></span>
             <span class="ff-response-unit__eta"><strong>${escapeHtml(eta)}</strong>${escapeHtml(String(unit.status).replace('_', ' '))}</span>
-            ${unit.can_recall ? `<button type="button" class="ff-response-unit__recall" onclick="recallResponseBackup(${Number(unit.incident_id)},${Number(unit.id)})"><i class="fas fa-rotate-left"></i> Recall backup</button>` : ''}
         </article>`;
     };
 
@@ -1568,24 +1583,7 @@ document.getElementById('apparatusTrackingInstall')?.addEventListener('click', (
 window.addEventListener('online', flushQueuedApparatusTelemetry);
 window.addEventListener('pwa-installable', updateApparatusTrackingState);
 
-async function recallResponseBackup(incidentId, unitId) {
-    const reason = window.prompt('Reason for recalling this backup?', 'Fire is controlled / backup is no longer required.');
-    if (reason === null) return;
-    try {
-        const response = await fetch(`/firefighter/incidents/${incidentId}/response-resources/${unitId}/recall`, {
-            method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }, body: JSON.stringify({ reason })
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(Object.values(payload.errors || {}).flat()[0] || payload.message || 'Unable to recall backup.');
-        showToast(payload.message || 'Backup recalled.', 'success');
-        await Promise.all([fetchAssignedIncidents(true), refreshActiveResponseUnits(window.assignedIncidentsData || [])]);
-    } catch (error) {
-        showToast(error.message || 'Unable to recall backup.', 'error');
-    }
-}
-
 window.refreshActiveResponseUnits = refreshActiveResponseUnits;
-window.recallResponseBackup = recallResponseBackup;
 
 async function refreshFirefighterLiveMap() {
     if (typeof window.refreshMapMarkers !== 'function') {

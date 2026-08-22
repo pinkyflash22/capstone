@@ -229,7 +229,7 @@
         }
         .incident-modal.active { display: flex; }
         .incident-modal-panel {
-            width: min(560px, 100%); max-height: min(78dvh, 720px); overflow: hidden;
+            width: min(500px, 100%); max-height: min(76dvh, 680px); overflow: hidden;
             border-radius: 24px; background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
             border: 1px solid rgba(226,232,240,.95); box-shadow: 0 30px 70px rgba(15,23,42,.28);
         }
@@ -244,26 +244,11 @@
             cursor: pointer; background: rgba(255,255,255,.94); color: #64748b; box-shadow: 0 10px 24px rgba(15,23,42,.08);
         }
         .incident-modal-body { padding: 18px 20px 20px; overflow-y: auto; max-height: calc(100vh - 140px); display: grid; gap: 16px; }
-        .incident-sheet {
-            display: grid;
-            gap: 16px;
-        }
-        .incident-sheet__hero {
-            display: grid;
-            gap: 14px;
-            padding: 18px;
-            border-radius: 22px;
-            background: linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.98));
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
-        .incident-sheet__hero-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .incident-sheet__status {
+        .incident-brief { display: grid; gap: 16px; }
+        .incident-brief__heading { display: grid; gap: 10px; }
+        .incident-brief__chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .incident-brief__status,
+        .incident-brief__type {
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -274,121 +259,57 @@
             font-weight: 800;
             letter-spacing: .4px;
         }
-        .incident-sheet__type {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: .55rem .8rem;
-            border-radius: 999px;
+        .incident-brief__type {
             border: 1px solid rgba(226,232,240,.92);
-            background: rgba(255,255,255,.92);
+            background: #fff;
             color: #c63d26;
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .02em;
         }
-        .incident-sheet__hero-body { display: grid; gap: 10px; }
-        .incident-sheet__eyebrow {
-            margin: 0;
-            color: #d18a16;
-            font-size: .72rem;
-            font-weight: 900;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-        }
-        .incident-sheet__title {
+        .incident-brief__title {
             margin: 0;
             color: #0f172a;
-            font-size: 1.2rem;
-            line-height: 1.2;
+            font-size: 1.12rem;
+            line-height: 1.3;
             font-weight: 900;
         }
-        .incident-sheet__subtitle {
-            margin: -4px 0 0;
+        .incident-brief__location {
+            margin: 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
             color: #475569;
             font-size: .9rem;
             line-height: 1.45;
-            font-weight: 700;
         }
-        .incident-sheet__summary {
-            margin: 0;
+        .incident-brief__location i { color: #c63d26; margin-top: 3px; }
+        .incident-brief__description {
+            margin: 0; padding-top: 14px; border-top: 1px solid #e2e8f0;
             color: #334155;
-            font-size: .94rem;
-            line-height: 1.6;
+            font-size: .9rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
         }
-        .incident-sheet .detail-image {
+        .incident-brief__image {
             width: 100%;
-            max-height: 220px;
+            max-height: 180px;
             object-fit: cover;
-            border-radius: 16px;
+            border-radius: 14px;
             border: 1px solid rgba(226,232,240,.92);
         }
-        .incident-sheet__section { display: grid; gap: 12px; }
-        .incident-sheet__section-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .incident-sheet__section-head h3 {
-            margin: 0;
-            color: #0f172a;
-            font-size: .96rem;
-            font-weight: 900;
-        }
-        .incident-sheet__section-note {
-            color: #64748b;
-            font-size: .74rem;
-            font-weight: 700;
-        }
-        .incident-sheet__meta-grid {
+        .incident-brief__facts {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
+            margin: 0; border-top: 1px solid #e2e8f0;
         }
-        .incident-sheet__meta-item {
-            display: grid;
-            grid-template-columns: 42px minmax(0, 1fr);
-            gap: 12px;
-            align-items: start;
-            padding: 13px 14px;
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        .incident-brief__fact {
+            min-width: 0; padding: 12px 8px 12px 0; border-bottom: 1px solid #e2e8f0;
         }
-        .incident-sheet__meta-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 14px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(198,61,38,.08);
-            color: #c63d26;
-            font-size: 1rem;
-        }
-        .incident-sheet__meta-copy { display: grid; gap: 4px; min-width: 0; }
-        .incident-sheet__meta-label {
+        .incident-brief__fact:nth-child(even) { padding-left: 12px; border-left: 1px solid #e2e8f0; }
+        .incident-brief__fact dt {
             color: #64748b; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
         }
-        .incident-sheet__meta-value {
-            color: #0f172a; font-size: .92rem; font-weight: 800; line-height: 1.4; word-break: break-word;
+        .incident-brief__fact dd {
+            margin: 4px 0 0; color: #0f172a; font-size: .86rem; font-weight: 750; line-height: 1.4; word-break: break-word;
         }
-        .incident-sheet__notes {
-            padding: 14px 16px; border-radius: 16px; border: 1px solid #e2e8f0;
-            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-            color: #334155; font-size: .92rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
-        }
-        .incident-sheet__footnote {
-            display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-            padding: 12px 14px; border-radius: 14px; border: 1px dashed #cbd5e1; background: rgba(248,250,252,.88);
-        }
-        .incident-sheet__footnote-label {
-            display: inline-flex; align-items: center; gap: 8px; color: #64748b; font-size: .78rem; font-weight: 800;
-        }
-        .incident-sheet__footnote-value {
-            color: #0f172a; font-size: .84rem; font-weight: 800; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        .incident-brief__coordinates {
+            margin: -4px 0 0; color: #94a3b8; font-size: .72rem; text-align: right;
         }
         .status-badge-reported { background: #fef3c7; color: #92400e; }
         .status-badge-responding { background: #dbeafe; color: #1d4ed8; }
@@ -672,41 +593,10 @@
                 gap: 12px;
                 max-height: calc(58dvh - 82px);
             }
-            .incident-sheet__hero {
-                padding: 15px;
-                border-radius: 18px;
-            }
-            .incident-sheet__hero-top {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-            .incident-sheet__meta-grid {
-                grid-template-columns: 1fr;
-            }
-            .incident-sheet__meta-item {
-                grid-template-columns: 38px minmax(0, 1fr);
-                gap: 10px;
-                padding: 12px;
-                border-radius: 14px;
-            }
-            .incident-sheet__meta-icon {
-                width: 38px;
-                height: 38px;
-                border-radius: 12px;
-                font-size: .92rem;
-            }
-            .incident-sheet__title {
-                font-size: 1.06rem;
-            }
-            .incident-sheet__summary,
-            .incident-sheet__notes,
-            .incident-sheet__meta-value {
-                font-size: .86rem;
-            }
-            .incident-sheet__footnote {
-                align-items: flex-start;
-                flex-direction: column;
-            }
+            .incident-brief { gap: 14px; }
+            .incident-brief__title { font-size: 1.02rem; }
+            .incident-brief__image { max-height: 150px; }
+            .incident-brief__fact { padding-top: 10px; padding-bottom: 10px; }
         }
         @media (max-width: 430px) {
             .main-content { padding-left: 8px; padding-right: 8px; }
@@ -745,7 +635,7 @@
             <section class="stats-grid" id="incidentStatsGrid">
                 <article class="stat-card"><div class="stat-card-label"><span>Total Responded</span><i class="fa-solid fa-list-check"></i></div><div class="stat-card-value" id="statTotal">--</div><div class="stat-card-meta">All team incidents tied to your active responder assignment</div></article>
                 <article class="stat-card"><div class="stat-card-label"><span>Active</span><i class="fa-solid fa-bolt"></i></div><div class="stat-card-value" id="statActive">--</div><div class="stat-card-meta">Currently responding or on-scene incidents</div></article>
-                <article class="stat-card"><div class="stat-card-label"><span>Controlled</span><i class="fa-solid fa-shield"></i></div><div class="stat-card-value" id="statControlled">--</div><div class="stat-card-meta">Incidents completed under controlled status</div></article>
+                <article class="stat-card"><div class="stat-card-label"><span>Completed</span><i class="fa-solid fa-shield"></i></div><div class="stat-card-value" id="statControlled">--</div><div class="stat-card-meta">Incidents completed under controlled status</div></article>
                 <article class="stat-card"><div class="stat-card-label"><span>Closed</span><i class="fa-solid fa-folder-check"></i></div><div class="stat-card-value" id="statClosed">--</div><div class="stat-card-meta">Incidents finalized and closed</div></article>
                 <article class="stat-card"><div class="stat-card-label"><span>Avg Response</span><i class="fa-solid fa-stopwatch"></i></div><div class="stat-card-value" id="statAvgResponse">--</div><div class="stat-card-meta">Based on completed incidents from report time to end time</div></article>
             </section>
@@ -768,10 +658,10 @@
                 </div>
 
                 <div class="filter-tabs" id="statusTabs">
-                    <button type="button" class="filter-tab active" data-filter="all">All</button>
-                    <button type="button" class="filter-tab" data-filter="active">Available / Active</button>
-                    <button type="button" class="filter-tab" data-filter="controlled">Controlled</button>
+                    <button type="button" class="filter-tab active" data-filter="active">Active / Available</button>
+                    <button type="button" class="filter-tab" data-filter="completed">Completed</button>
                     <button type="button" class="filter-tab" data-filter="closed">Closed</button>
+                    <button type="button" class="filter-tab" data-filter="all">All</button>
                 </div>
 
                 <div class="toolbar-card">
@@ -809,7 +699,7 @@
         const registryEndpoint = `{{ route('firefighter.incidents.registry') }}`;
         const INCIDENT_REGISTRY_POLL_INTERVAL_MS = 15000;
         const INCIDENT_PAGE_SIZE = 6;
-        const incidentState = { incidents: [], filter: 'all', search: '', sort: 'reported_desc', currentPage: 1, poller: null, request: null, lastFetchedAt: 0 };
+        const incidentState = { incidents: [], filter: 'active', search: '', sort: 'reported_desc', currentPage: 1, poller: null, request: null, lastFetchedAt: 0 };
         const listState = document.getElementById('incidentListState');
         const resultsCount = document.getElementById('resultsCount');
         const mobileResultsCount = document.getElementById('mobileResultsCount');
@@ -854,14 +744,14 @@
 
         function getStatusBucket(statusId) {
             const value = Number(statusId);
-            if (value === 4) return 'controlled';
+            if (value === 4) return 'completed';
             if (value === 5) return 'closed';
             return 'active';
         }
 
         function getStatusChipClass(statusId) {
             const bucket = getStatusBucket(statusId);
-            if (bucket === 'controlled') return 'chip-controlled';
+            if (bucket === 'completed') return 'chip-controlled';
             if (bucket === 'closed') return 'chip-closed';
             return 'chip-active';
         }
@@ -974,7 +864,7 @@
             listState.innerHTML = `<div class="incident-list">${pagedIncidents.map((incident) => {
                 const imageUrl = resolveStorageUrl(incident.image_url);
                 const statusBucket = getStatusBucket(incident.incident_status_id);
-                const statusLabel = statusBucket === 'active' ? 'Available / Active' : (statusBucket === 'controlled' ? 'Controlled' : 'Closed');
+                const statusLabel = statusBucket === 'active' ? 'Active / Available' : (statusBucket === 'completed' ? 'Completed' : 'Closed');
                 const investigationAction = incident.investigation_ready && incident.investigation_url
                     ? `<a class="action-btn investigation" href="${escapeHtml(incident.investigation_url)}"><i class="fa-solid fa-magnifying-glass"></i> Start Spot Report</a>`
                     : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '');
@@ -997,10 +887,7 @@
                                 <div class="incident-meta-item incident-meta-item--secondary"><span class="incident-meta-label">Last Updated</span>${escapeHtml(formatDateTime(incident.updated_at))}</div>
                             </div>
                         </div>
-                        <div class="incident-actions" data-incident-actions>
-                            ${investigationAction}
-                            <button type="button" class="action-btn ghost" onclick="copyIncidentId(${incident.incident_id})"><i class="fa-regular fa-copy"></i> Copy ID</button>
-                        </div>
+                        ${investigationAction ? `<div class="incident-actions" data-incident-actions>${investigationAction}</div>` : ''}
                     </article>`;
             }).join('')}</div>${renderIncidentPagination(incidents.length, totalPages, incidentState.currentPage)}`;
 
@@ -1114,118 +1001,53 @@
             const statusId = Number(incident.incident_status_id);
             const incidentTypeName = incident.incident_type_name || 'Incident';
             const incidentTypeIcon = getIncidentTypeIcon(incidentTypeName);
-            const statusText = statusId === 5 ? 'CLOSED' : (statusId === 4 ? 'CONTROLLED' : 'ACTIVE');
+            const statusText = statusId === 5 ? 'CLOSED' : (statusId === 4 ? 'COMPLETED' : 'ACTIVE / AVAILABLE');
             const statusClass = statusId === 5 ? 'status-badge-closed' : (statusId === 4 ? 'status-badge-resolved' : 'status-badge-responding');
             const statusIcon = statusId === 5 ? 'fa-folder' : (statusId === 4 ? 'fa-check-circle' : 'fa-bell');
-            const locationHeadline = incident.location || incident.title || `Incident #${incident.incident_id}`;
-            const incidentSubtitle = incident.title && incident.title !== locationHeadline ? incident.title : null;
+            const incidentTitle = incident.title || `Incident #${incident.incident_id}`;
+            const locationHeadline = incident.location || 'Location unavailable';
             const description = incident.description || 'No incident description was recorded for this incident.';
             const reportedBy = incident.reporter_name || 'Concerned Citizen';
-            const roleLabel = incident.reporter_role || 'Citizen';
             const createdAt = formatDateTime(incident.reported_at);
             const updatedAt = formatDateTime(incident.updated_at);
             const hasCoordinates = incident.coordinates?.lat !== null && incident.coordinates?.lat !== undefined && incident.coordinates?.lng !== null && incident.coordinates?.lng !== undefined;
             const overviewItems = [
-                { icon: 'fa-location-dot', label: 'Location', value: escapeHtml(locationHeadline) },
-                { icon: 'fa-user', label: 'Reporter', value: escapeHtml(reportedBy) },
-                { icon: 'fa-user-shield', label: 'Source', value: escapeHtml(roleLabel) },
-                { icon: 'fa-calendar-days', label: 'Reported', value: escapeHtml(createdAt) },
+                { label: 'Reported by', value: reportedBy },
+                { label: 'Assigned team', value: incident.team_name || 'Not assigned' },
+                { label: 'Reported', value: createdAt },
+                { label: 'Last updated', value: updatedAt },
             ];
 
-            if (incident.team_name) {
-                overviewItems.push({ icon: 'fa-users', label: 'Assigned Team', value: escapeHtml(incident.team_name) });
-            }
-
             if (incident.response_minutes !== null && incident.response_minutes !== undefined) {
-                overviewItems.push({ icon: 'fa-stopwatch', label: 'Response Duration', value: escapeHtml(formatMinutes(incident.response_minutes)) });
-            }
-
-            if (incident.updated_at) {
-                overviewItems.push({ icon: 'fa-clock', label: 'Last Updated', value: escapeHtml(updatedAt) });
+                overviewItems.push({ label: 'Response duration', value: formatMinutes(incident.response_minutes) });
             }
 
             const overviewMarkup = overviewItems.map((item) => `
-                <div class="incident-sheet__meta-item">
-                    <span class="incident-sheet__meta-icon"><i class="fa-solid ${item.icon}"></i></span>
-                    <div class="incident-sheet__meta-copy">
-                        <span class="incident-sheet__meta-label">${item.label}</span>
-                        <strong class="incident-sheet__meta-value">${item.value}</strong>
-                    </div>
+                <div class="incident-brief__fact">
+                    <dt>${escapeHtml(item.label)}</dt>
+                    <dd>${escapeHtml(item.value)}</dd>
                 </div>
             `).join('');
 
-            modalTitle.innerHTML = `<i class="fa-solid fa-file-alt"></i> Incident Details`;
+            modalTitle.innerHTML = `<i class="fa-solid fa-file-lines"></i> Incident #${escapeHtml(incident.incident_id)}`;
             modalSubtitle.textContent = '';
             modalBody.innerHTML = `
-                <div class="incident-sheet">
-                    <section class="incident-sheet__hero">
-                        <div class="incident-sheet__hero-top">
-                            <span class="incident-sheet__status ${statusClass}">
-                                <i class="fa-solid ${statusIcon}"></i>
-                                <span>${statusText}</span>
-                            </span>
-                            <span class="incident-sheet__type">
-                                <i class="fa-solid ${incidentTypeIcon}"></i>
-                                ${escapeHtml(incidentTypeName)}
-                            </span>
+                <article class="incident-brief">
+                    <header class="incident-brief__heading">
+                        <div class="incident-brief__chips">
+                            <span class="incident-brief__status ${statusClass}"><i class="fa-solid ${statusIcon}"></i>${statusText}</span>
+                            <span class="incident-brief__type"><i class="fa-solid ${incidentTypeIcon}"></i>${escapeHtml(incidentTypeName)}</span>
                         </div>
-                        <div class="incident-sheet__hero-body">
-                            <p class="incident-sheet__eyebrow">Response Summary</p>
-                            <h2 class="incident-sheet__title">${escapeHtml(locationHeadline)}</h2>
-                            ${incidentSubtitle ? `<p class="incident-sheet__subtitle">${escapeHtml(incidentSubtitle)}</p>` : ''}
-                            <p class="incident-sheet__summary">${escapeHtml(description)}</p>
-                            ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident Image" class="detail-image">` : ''}
-                        </div>
-                    </section>
-
-                    <section class="incident-sheet__section">
-                        <div class="incident-sheet__section-head">
-                            <h3>Overview</h3>
-                            <span class="incident-sheet__section-note">Operational details only</span>
-                        </div>
-                        <div class="incident-sheet__meta-grid">${overviewMarkup}</div>
-                    </section>
-
-                    <section class="incident-sheet__section">
-                        <div class="incident-sheet__section-head">
-                            <h3>Incident Notes</h3>
-                        </div>
-                        <div class="incident-sheet__notes">${escapeHtml(description)}</div>
-                    </section>
-
-                    ${hasCoordinates ? `
-                    <section class="incident-sheet__footnote">
-                        <span class="incident-sheet__footnote-label"><i class="fa-solid fa-location-crosshairs"></i> Coordinates</span>
-                        <span class="incident-sheet__footnote-value">${escapeHtml(`${incident.coordinates?.lat}, ${incident.coordinates?.lng}`)}</span>
-                    </section>
-                    ` : ''}
-                </div>
+                        <h2 class="incident-brief__title">${escapeHtml(incidentTitle)}</h2>
+                        <p class="incident-brief__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(locationHeadline)}</span></p>
+                    </header>
+                    ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident evidence" class="incident-brief__image">` : ''}
+                    <p class="incident-brief__description">${escapeHtml(description)}</p>
+                    <dl class="incident-brief__facts">${overviewMarkup}</dl>
+                    ${hasCoordinates ? `<p class="incident-brief__coordinates"><i class="fa-solid fa-location-crosshairs"></i> ${escapeHtml(`${incident.coordinates.lat}, ${incident.coordinates.lng}`)}</p>` : ''}
+                </article>
             `;
             modal.dataset.incidentId = String(incident.incident_id);
-            modal.classList.add('active');
-            return;
-
-            modalTitle.textContent = incident.title || `Incident #${incident.incident_id}`;
-            modalSubtitle.textContent = `${incident.incident_type_name || 'Incident'} · ${incident.incident_status_name || 'Unknown status'} · #${incident.incident_id}`;
-            modalBody.innerHTML = `
-                ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="Incident Image" class="detail-image">` : ''}
-                <div class="detail-grid">
-                    <div class="detail-card"><div class="detail-label">Incident Type</div><div class="detail-value">${escapeHtml(incident.incident_type_name || 'N/A')}</div></div>
-                    <div class="detail-card"><div class="detail-label">Status</div><div class="detail-value">${escapeHtml(incident.incident_status_name || 'N/A')}</div></div>
-                    <div class="detail-card"><div class="detail-label">Reported By</div><div class="detail-value">${escapeHtml(incident.reporter_name || 'Concerned Citizen')}</div></div>
-                    <div class="detail-card"><div class="detail-label">Team</div><div class="detail-value">${escapeHtml(incident.team_name || 'N/A')}</div></div>
-                    <div class="detail-card"><div class="detail-label">Reported At</div><div class="detail-value">${escapeHtml(formatDateTime(incident.reported_at))}</div></div>
-                    <div class="detail-card"><div class="detail-label">Ended / Updated At</div><div class="detail-value">${escapeHtml(formatDateTime(incident.updated_at))}</div></div>
-                    <div class="detail-card"><div class="detail-label">Response Duration</div><div class="detail-value">${escapeHtml(formatMinutes(incident.response_minutes))}</div></div>
-                    <div class="detail-card"><div class="detail-label">Coordinates</div><div class="detail-value">${escapeHtml(`${incident.coordinates?.lat ?? 'N/A'}, ${incident.coordinates?.lng ?? 'N/A'}`)}</div></div>
-                    <div class="detail-card"><div class="detail-label">Marker ID</div><div class="detail-value">${escapeHtml(incident.marker_id || 'N/A')}</div></div>
-                    <div class="detail-card"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(incident.location || 'N/A')}</div></div>
-                </div>
-                <div class="detail-description">
-                    <h3>Incident Narrative</h3>
-                    <p>${escapeHtml(incident.description || 'No narrative was recorded for this incident.')}</p>
-                </div>
-            `;
             modal.classList.add('active');
         }
 
@@ -1235,20 +1057,11 @@
             delete modal.dataset.incidentId;
         }
 
-        async function copyIncidentId(incidentId) {
-            try {
-                await navigator.clipboard.writeText(String(incidentId));
-                showToast(`Incident #${incidentId} copied.`);
-            } catch (error) {
-                showToast('Failed to copy incident ID.', true);
-            }
-        }
-
         function bindEvents() {
             statusTabs.addEventListener('click', (event) => {
                 const tab = event.target.closest('.filter-tab');
                 if (!tab) return;
-                incidentState.filter = tab.dataset.filter || 'all';
+                incidentState.filter = tab.dataset.filter || 'active';
                 incidentState.currentPage = 1;
                 document.querySelectorAll('.filter-tab').forEach(button => button.classList.toggle('active', button === tab));
                 renderIncidentList();
@@ -1280,7 +1093,6 @@
         });
 
         window.openIncidentDetails = openIncidentDetails;
-        window.copyIncidentId = copyIncidentId;
     </script>
     </div>
     @include('partials.pwa-body')

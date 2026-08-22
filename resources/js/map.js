@@ -119,7 +119,6 @@ let simulationInterval = null;
 
 // Real-time updates
 let realTimeLocationWatch = null;
-let simulationSpeed = 1;
 let lastLocationUpdate = null;
 
 // Marker layers
@@ -308,8 +307,16 @@ function isChiefCommandMapContext() {
     return configuredInstanceKey === 'chiefDashboard'
         || configuredInstanceKey === 'chiefIncidentMap'
         || currentPath.startsWith('/station-admin/')
+        || currentPath.startsWith('/admin/')
         || roleMeta === 'chief'
-        || roleMeta === 'station admin';
+        || roleMeta === 'station admin'
+        || roleMeta === 'provincial admin'
+        || roleMeta === 'admin';
+}
+
+function isDispatchCommandMapContext() {
+    const roleMeta = String(document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '').toLowerCase().trim();
+    return ['chief', 'station admin', 'provincial admin', 'admin'].includes(roleMeta);
 }
 
 function isChiefDashboardMapInstance() {
@@ -2221,15 +2228,36 @@ function createChiefMapLegend() {
 }
 
 function updateRouteInfoCard() {
-    const routesList = document.getElementById('activeRoutesList');
-    if (!routesList) return;
-    
+    const routeCard = document.getElementById('routeInfoCard');
     if (activeTrucks.size === 0) {
-        routesList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">No active routes</div>';
-        const routeCard = document.getElementById('routeInfoCard');
         if (routeCard) routeCard.style.display = 'none';
         return;
     }
+
+    const primaryTruck = Array.from(activeTrucks.values()).at(-1);
+    const destinationEl = document.getElementById('destinationTitle');
+    const progressEl = document.getElementById('routeProgress');
+    const trackingEl = document.getElementById('routeTrackingMode');
+    if (destinationEl) {
+        destinationEl.textContent = primaryTruck?.routeDestination?.title || 'Selected destination';
+    }
+    if (progressEl) {
+        const pointCount = primaryTruck?.simulationPoints?.length || 0;
+        const progress = pointCount > 1
+            ? Math.min(100, Math.max(0, (Number(primaryTruck.currentPointIndex || 0) / (pointCount - 1)) * 100))
+            : 0;
+        progressEl.style.width = `${progress}%`;
+    }
+    if (trackingEl) {
+        trackingEl.textContent = isDemoRouteSource(primaryTruck?.routeSource)
+            ? 'Demo route playback'
+            : (primaryTruck?.usesRealtimeTracking ? 'Tracking apparatus from live GPS' : 'Following the calculated GPS route');
+    }
+    updateRouteSourceBadge(primaryTruck?.routeSource || 'real');
+    if (routeCard) routeCard.style.display = 'block';
+
+    const routesList = document.getElementById('activeRoutesList');
+    if (!routesList) return;
     
     let html = '';
     let index = 1;
@@ -2265,14 +2293,7 @@ function updateRouteInfoCard() {
     }
     
     routesList.innerHTML = html;
-    const routeCard = document.getElementById('routeInfoCard');
     if (routeCard) routeCard.style.display = 'block';
-}
-
-function setAnimationSpeedGlobal(speed) {
-    if (animationFrame && simulationPoints && simulationPoints.length > 0 && isSimulating) {
-        startSmoothAnimation();
-    }
 }
 
 // ============================================================================
@@ -4110,28 +4131,6 @@ styleElement.textContent = `
         background: #3b82f6;
         transition: width 0.3s ease;
         border-radius: 10px;
-    }
-    
-    .speed-control {
-        margin-top: 8px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-    
-    .speed-btn {
-        padding: 4px 8px;
-        font-size: 11px;
-        background: #f3f4f6;
-        border: 1px solid #e5e7eb;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .speed-btn.active {
-        background: #3b82f6;
-        color: white;
-        border-color: #3b82f6;
     }
     
     .traveled-path {
@@ -7578,6 +7577,177 @@ function buildIncidentPopupLoadingMarkup(message = 'Loading latest incident deta
     `;
 }
 
+function buildIncidentCommandActionMarkup(incident, marker = null) {
+    if (!isDispatchCommandMapContext()) return '';
+    const incidentId = Number(incident?.incident_id ?? incident?.id ?? marker?.incident_id ?? 0);
+    if (!Number.isFinite(incidentId) || incidentId <= 0) return '';
+    const status = normalizeIncidentStatus(incident?.status || marker?.incident_status || 'reported');
+    if (!['reported', 'responding', 'on-scene', 'on scene'].includes(status)) return '';
+    const needsBackup = ['requesting_other_station', 'waiting_for_team', 'waiting_for_apparatus'].includes(String(incident?.dispatch_state || ''));
+    const label = status === 'reported' ? 'Manage Dispatch' : 'Call Nearest Station';
+
+    return `
+        ${needsBackup ? `
+            <div class="responder-marker-popup-alert command-needed">
+                <i class="fas fa-tower-broadcast"></i>
+                No capable local response is available. Command escalation is required.
+            </div>
+        ` : ''}
+        <button type="button" class="responder-marker-popup-btn command" onclick="window.openIncidentCommandPanel(${incidentId})">
+            <i class="fas fa-headset"></i>
+            ${label}
+        </button>
+    `;
+}
+
+function ensureIncidentCommandPanel() {
+    let modal = document.getElementById('incidentCommandDispatchModal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'incidentCommandDispatchModal';
+    modal.className = 'incident-command-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div class="incident-command-modal__backdrop" data-command-close></div>
+        <section class="incident-command-modal__card" role="dialog" aria-modal="true" aria-labelledby="incidentCommandTitle">
+            <header class="incident-command-modal__header">
+                <div><span>Command dispatch</span><h2 id="incidentCommandTitle">Incident response control</h2></div>
+                <button type="button" data-command-close aria-label="Close command dispatch"><i class="fas fa-xmark"></i></button>
+            </header>
+            <div class="incident-command-modal__body" id="incidentCommandBody"></div>
+        </section>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-command-close]').forEach((button) => button.addEventListener('click', closeIncidentCommandPanel));
+    return modal;
+}
+
+function closeIncidentCommandPanel() {
+    const modal = document.getElementById('incidentCommandDispatchModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('incident-command-open');
+}
+
+function commandResponseError(payload, fallback) {
+    return Object.values(payload?.errors || {}).flat().find(Boolean) || payload?.message || fallback;
+}
+
+async function submitIncidentCommandAction(incidentId, endpoint, body, button) {
+    const previous = button?.innerHTML;
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
+    try {
+        const response = await fetch(`/command/incidents/${incidentId}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(body)
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(commandResponseError(payload, 'Dispatch command failed.'));
+
+        incidentDetailsCache.delete(Number(incidentId));
+        closeIncidentCommandPanel();
+        showToast(payload.message || 'Dispatch command completed.', 'success');
+        await refreshIncidentMapImmediately({ forceIncidents: true });
+    } catch (error) {
+        showToast(error.message || 'Dispatch command failed.', 'error');
+        if (button?.isConnected) {
+            button.disabled = false;
+            button.innerHTML = previous;
+        }
+    }
+}
+
+async function openIncidentCommandPanel(incidentId) {
+    if (!isDispatchCommandMapContext()) return;
+    const id = Number(incidentId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const modal = ensureIncidentCommandPanel();
+    const body = document.getElementById('incidentCommandBody');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('incident-command-open');
+    body.innerHTML = '<div class="incident-command-modal__loading"><i class="fas fa-spinner fa-spin"></i><span>Checking teams, personnel, apparatus, and nearby stations...</span></div>';
+
+    try {
+        const response = await fetch(`/command/incidents/${id}/dispatch-options`, {
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            cache: 'no-store'
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(commandResponseError(payload, 'Unable to load dispatch options.'));
+
+        const data = payload.data || {};
+        const status = normalizeIncidentStatus(data.status || 'reported');
+        const isReported = status === 'reported';
+        const localTeams = Array.isArray(data.local_teams) ? data.local_teams : [];
+        const externalStations = Array.isArray(data.external_stations) ? data.external_stations : [];
+        const externalAllowed = !isReported || Boolean(data.needs_external_response);
+        const externalRows = externalStations.map((station, index) => `
+            <li class="${index === 0 ? 'nearest' : ''}">
+                <span><strong>${escapeHtml(station.station_name || `Station #${station.station_id}`)}</strong><small>${Math.max(0, Math.round(Number(station.distance_meters || 0) / 100) / 10)} km from incident</small></span>
+                <span><b>${Number(station.available_team_count || 0)}</b> team · <b>${Number(station.available_firetruck_count || 0)}</b> truck</span>
+            </li>
+        `).join('');
+
+        body.innerHTML = `
+            <div class="incident-command-summary ${data.needs_external_response ? 'needs-backup' : ''}">
+                <span class="incident-command-summary__icon"><i class="fas ${data.needs_external_response ? 'fa-triangle-exclamation' : 'fa-shield-halved'}"></i></span>
+                <div><strong>Incident #${id} · ${escapeHtml(String(data.status || 'Reported'))}</strong><p>${escapeHtml(data.dispatch_state_label || 'Dispatch status is being evaluated.')}</p></div>
+            </div>
+            <div class="incident-command-grid">
+                <section class="incident-command-section">
+                    <div class="incident-command-section__heading"><span>Local reassignment</span><strong>${escapeHtml(data.station_name || 'Incident station')}</strong></div>
+                    ${isReported ? (localTeams.length ? `
+                        <label>Available response team
+                            <select id="incidentCommandTeam">${localTeams.map(team => `<option value="${team.team_id}" ${Number(team.team_id) === Number(data.assigned_team_id) ? 'selected' : ''}>${escapeHtml(team.label)}</option>`).join('')}</select>
+                        </label>
+                    ` : '<div class="incident-command-empty"><i class="fas fa-users-slash"></i><span>No local team currently has both deployable personnel and an available firetruck.</span></div>')
+                    : '<div class="incident-command-empty"><i class="fas fa-circle-info"></i><span>An active incident cannot switch its primary team. Dispatch another station as backup instead.</span></div>'}
+                </section>
+                <section class="incident-command-section">
+                    <div class="incident-command-section__heading"><span>Nearest capable stations</span><strong>Measured from incident</strong></div>
+                    ${externalRows ? `<ol class="incident-command-stations">${externalRows}</ol>` : '<div class="incident-command-empty danger"><i class="fas fa-tower-broadcast"></i><span>No other capable station is available right now.</span></div>'}
+                </section>
+            </div>
+            <label class="incident-command-reason">Command reason
+                <textarea id="incidentCommandReason" maxlength="255" placeholder="Example: Local team already responding to another fire" required></textarea>
+            </label>
+            <footer class="incident-command-actions">
+                ${isReported && localTeams.length ? '<button type="button" class="local" id="incidentCommandReassign"><i class="fas fa-people-arrows"></i> Reassign Local Team</button>' : ''}
+                ${externalAllowed && externalStations.length ? `<button type="button" class="external" id="incidentCommandExternal"><i class="fas fa-tower-broadcast"></i> ${isReported ? 'Call Nearest Station' : 'Dispatch Nearest Backup'}</button>` : ''}
+            </footer>
+        `;
+
+        const reason = () => String(document.getElementById('incidentCommandReason')?.value || '').trim();
+        document.getElementById('incidentCommandReassign')?.addEventListener('click', (event) => {
+            if (!reason()) return showToast('Enter the reason for manual reassignment.', 'warning');
+            const teamId = Number(document.getElementById('incidentCommandTeam')?.value || 0);
+            submitIncidentCommandAction(id, 'reassign', { team_id: teamId, reason: reason() }, event.currentTarget);
+        });
+        document.getElementById('incidentCommandExternal')?.addEventListener('click', (event) => {
+            if (!reason()) return showToast('Enter the reason for calling another station.', 'warning');
+            if (!window.confirm('Dispatch the nearest capable station measured from this incident location?')) return;
+            submitIncidentCommandAction(id, 'external-response', { reason: reason() }, event.currentTarget);
+        });
+    } catch (error) {
+        body.innerHTML = `<div class="incident-command-modal__error"><i class="fas fa-circle-exclamation"></i><strong>Dispatch controls unavailable</strong><span>${escapeHtml(error.message || 'Please try again.')}</span></div>`;
+    }
+}
+
+window.openIncidentCommandPanel = openIncidentCommandPanel;
+window.closeIncidentCommandPanel = closeIncidentCommandPanel;
+
 function buildResponderPopupContent(marker, incident, imagePath = null, options = {}) {
     const markerPresentation = getResponderPopupPresentation(marker);
     const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status);
@@ -7709,7 +7879,9 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
     let actionMarkup = '';
 
     if (isIncidentMarker(marker)) {
-        if (canManageMarkers && normalizeIncidentStatus(marker.incident_status || incident?.status || 'reported') === 'reported') {
+        actionMarkup += buildIncidentCommandActionMarkup(incident, marker);
+
+        if (!isDispatchCommandMapContext() && canManageMarkers && normalizeIncidentStatus(marker.incident_status || incident?.status || 'reported') === 'reported') {
             actionMarkup += `
                 <button id="respond${marker.marker_id}" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" ${isIncidentRoutingBlocked ? 'type="button" disabled title="Your team is already navigating to another incident."' : ''}>
                     <i class="fas fa-phone-volume"></i>
@@ -8029,7 +8201,9 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
     const isIncidentRoutingBlocked = Boolean(blockingRoute);
 
     if (isIncidentMarker(marker)) {
-        if (canManageMarkers && incidentStatus === 'reported') {
+        actions.push(buildIncidentCommandActionMarkup(incident, marker));
+
+        if (!isDispatchCommandMapContext() && canManageMarkers && incidentStatus === 'reported') {
             actions.push(`
                 <button type="button" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.respondCurrentMapDetail()" ${isIncidentRoutingBlocked ? 'disabled title="Your team is already navigating to another incident."' : ''}>
                     <i class="fas fa-phone-volume"></i>
@@ -8284,6 +8458,15 @@ async function calculateRouteWithGeoapify(origin, destination) {
         route.route_source = routeSource;
         route.origin_lat = origin?.currentLatitude ?? null;
         route.origin_lng = origin?.currentLongitude ?? null;
+        route.destination_title = destination?.title || 'Selected destination';
+        route.destination_lat = destination?.lat ?? null;
+        route.destination_lng = destination?.lng ?? null;
+        routeDestination = {
+            ...destination,
+            title: route.destination_title,
+            routeSource,
+        };
+        window.routeDestination = routeDestination;
         window.activeRoute = route;
 
         if (window.thisIncidents) {
@@ -8325,15 +8508,11 @@ async function calculateRouteWithGeoapify(origin, destination) {
             updateRouteInfoFromGeoapify(route);
         }
 
+        updateRouteInfoFromGeoapify(route);
         console.log("displaying route data3: ", route);
 
         const routeCard = document.getElementById('routeInfoCard');
         if (routeCard) routeCard.style.display = 'block';
-
-        window.routeDestination = {
-            ...destination,
-            routeSource
-        };
 
         return { ok: true, route, routeSource };
         
@@ -8790,6 +8969,7 @@ function updateRouteInfoFromGeoapify(route) {
     const durationEl = document.getElementById('routeDuration');
     const etaEl = document.getElementById('routeETA');
     const destinationTitle = document.getElementById('destinationTitle');
+    const trackingMode = document.getElementById('routeTrackingMode');
     
     if (distanceEl) distanceEl.textContent = `${distance.toFixed(1)} km`;
     if (durationEl) durationEl.textContent = durationText;
@@ -8800,10 +8980,18 @@ function updateRouteInfoFromGeoapify(route) {
         etaEl.textContent = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     
-    if (destinationTitle && route.destination_title) {
-        destinationTitle.textContent = route.destination_title;
-    } else if (destinationTitle && routeDestination) {
-        destinationTitle.textContent = routeDestination.title || 'Destination';
+    const resolvedDestinationTitle = route?.destination_title
+        || route?.routeDestination?.title
+        || routeDestination?.title
+        || window.routeDestination?.title
+        || 'Selected destination';
+    if (destinationTitle) {
+        destinationTitle.textContent = resolvedDestinationTitle;
+    }
+    if (trackingMode) {
+        trackingMode.textContent = isDemoRouteSource(route?.route_source || route?.routeSource)
+            ? 'Demo route playback'
+            : 'Following the calculated GPS route';
     }
     
     const routeCard = document.getElementById('routeInfoCard');
@@ -8811,34 +8999,14 @@ function updateRouteInfoFromGeoapify(route) {
         routeCard.style.display = 'block';
     }
     
-    // Add progress bar if not exists
+    // Older route cards may not include the progress indicator.
     if (routeCard && !document.getElementById('routeProgress')) {
         const progressHTML = `
             <div class="route-progress-container" style="margin-top: 12px; background: #e5e7eb; border-radius: 10px; overflow: hidden; height: 6px;">
                 <div id="routeProgress" class="route-progress-bar" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s ease;"></div>
             </div>
-            <div class="speed-control" style="margin-top: 12px; display: flex; gap: 8px;">
-                <button class="speed-btn" data-speed="slow" style="padding: 6px 12px; font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">🐢 Slow</button>
-                <button class="speed-btn active" data-speed="normal" style="padding: 6px 12px; font-size: 12px; background: #3b82f6; color: white; border: 1px solid #3b82f6; border-radius: 6px; cursor: pointer;">🚒 Normal</button>
-                <button class="speed-btn" data-speed="fast" style="padding: 6px 12px; font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">🐇 Fast</button>
-            </div>
         `;
         routeCard.insertAdjacentHTML('beforeend', progressHTML);
-        
-        document.querySelectorAll('.speed-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.speed-btn').forEach(b => {
-                    b.classList.remove('active');
-                    b.style.background = '#f3f4f6';
-                    b.style.color = '#374151';
-                });
-                btn.classList.add('active');
-                btn.style.background = '#3b82f6';
-                btn.style.color = 'white';
-                const speed = btn.dataset.speed;
-                setAnimationSpeedGlobal(speed);
-            });
-        });
     }
 }
 
@@ -9155,7 +9323,7 @@ async function startSimulationForRoute(routeId) {
     
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createNavigationArrowIcon(truckColors[colorIndex]),
+        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex]),
         zIndexOffset: 1000
     }));
     bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
@@ -9289,6 +9457,10 @@ function startSmoothAnimationForTruck(routeId) {
         }
         
         const currentTruck = activeTrucks.get(routeId);
+        if (currentTruck?.isStoppingSimulation) {
+            currentTruck.animationFrame = null;
+            return;
+        }
         if (!currentTruck.animatedVehicle) {
             console.log('Truck vehicle missing, stopping animation');
             return;
@@ -9471,7 +9643,7 @@ function refreshRealtimeTrackedTrucks() {
 
 async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppedToast = true) {
     const truck = activeTrucks.get(routeId);
-    if (!truck) return;
+    if (!truck) return false;
 
     if (truck.isStoppingSimulation) {
         return truck.stopPromise || null;
@@ -9479,6 +9651,19 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
     
     truck.isStoppingSimulation = true;
     truck.stopPromise = (async () => {
+        if (syncWithServer) {
+            try {
+                await updateRouteStatus(routeId, 'inactive');
+
+            } catch (error) {
+                console.error(`Failed to stop simulation for route ${routeId}:`, error);
+                showToast(error.message || 'Failed to stop route simulation cleanly', 'error');
+                truck.isStoppingSimulation = false;
+                truck.stopPromise = null;
+                return false;
+            }
+        }
+
         if (truck.animationFrame) {
             cancelAnimationFrame(truck.animationFrame);
             truck.animationFrame = null;
@@ -9492,20 +9677,6 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
         unregisterRouteRendering(routeId);
         activeTrucks.delete(routeId);
 
-        if (syncWithServer) {
-            try {
-                await updateRouteStatus(routeId, 'inactive');
-
-            } catch (error) {
-                console.error(`Failed to stop simulation for route ${routeId}:`, error);
-                showToast(error.message || 'Failed to stop route simulation cleanly', 'error');
-                activeTrucks.set(routeId, truck);
-                truck.isStoppingSimulation = false;
-                truck.stopPromise = null;
-                return;
-            }
-        }
-
         truck.isStoppingSimulation = false;
         truck.stopPromise = null;
         updateRouteInfoCard();
@@ -9513,6 +9684,7 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
         if (showStoppedToast) {
             showToast('Navigation stopped', 'info');
         }
+        return true;
     })();
 
     return truck.stopPromise;
@@ -9520,8 +9692,40 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
 
 async function stopAllSimulations(syncWithServer = true) {
     const routeIds = Array.from(activeTrucks.keys());
-    await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId, syncWithServer, false)));
+    const results = await Promise.all(routeIds.map((routeId) => stopSimulationForRoute(routeId, syncWithServer, false)));
+    return {
+        requested: routeIds.length,
+        stopped: results.filter(Boolean).length,
+        remaining: activeTrucks.size,
+    };
 }
+
+document.addEventListener('click', async (event) => {
+    const button = event.target?.closest?.('[data-stop-route-navigation]');
+    if (!button || button.disabled) return;
+
+    button.disabled = true;
+    const label = button.querySelector('span');
+    const originalLabel = label?.textContent || 'Stop navigation';
+    if (label) label.textContent = 'Stopping…';
+
+    try {
+        const result = await stopAllSimulations(true);
+        if (result.remaining === 0) {
+            document.getElementById('routeInfoCard')?.style.setProperty('display', 'none');
+            showToast(result.stopped > 0 ? 'Navigation stopped' : 'No active navigation to stop', 'info');
+        } else {
+            showToast('Some routes could not be stopped. Please try again.', 'error');
+            updateRouteInfoCard();
+        }
+    } catch (error) {
+        console.error('Failed to stop navigation:', error);
+        showToast(error.message || 'Failed to stop navigation', 'error');
+    } finally {
+        button.disabled = false;
+        if (label) label.textContent = originalLabel;
+    }
+});
 
 function createNavigationArrowIcon(color = '#2563eb') {
     return L.divIcon({
@@ -9533,11 +9737,31 @@ function createNavigationArrowIcon(color = '#2563eb') {
     });
 }
 
+function createDemoTruckIcon() {
+    return L.icon({
+        iconUrl: '/truck.png',
+        className: 'pyro-demo-route-truck-marker',
+        iconSize: [52, 52],
+        iconAnchor: [26, 26],
+        popupAnchor: [0, -24],
+    });
+}
+
+function createRouteMovementIcon(routeSource, color = '#2563eb') {
+    return isDemoRouteSource(routeSource)
+        ? createDemoTruckIcon()
+        : createNavigationArrowIcon(color);
+}
+
 function bindNavigationDetailsPopup(routeId, marker, route = null) {
     if (!marker) return;
     const destination = route?.routeDestination?.title || 'Selected destination';
-    const source = isDemoRouteSource(route?.routeSource) ? 'Demo navigation' : 'Live navigation';
-    marker.bindPopup(`<div style="min-width:190px;font-family:system-ui,-apple-system,sans-serif"><strong style="color:#1d4ed8">${source}</strong><div style="margin-top:5px;font-size:12px;color:#475569">Directions to ${escapeHtml(destination)}</div><small style="display:block;margin-top:7px;color:#64748b">This arrow represents navigation only. Apparatus appears after a response is accepted.</small></div>`);
+    const isDemo = isDemoRouteSource(route?.routeSource);
+    const source = isDemo ? 'Demo truck route' : 'Live navigation';
+    const note = isDemo
+        ? 'Demonstration only. This truck does not dispatch resources or update the incident status.'
+        : 'This arrow represents navigation only. Apparatus appears after a response is accepted.';
+    marker.bindPopup(`<div style="min-width:190px;font-family:system-ui,-apple-system,sans-serif"><strong style="color:#1d4ed8">${source}</strong><div style="margin-top:5px;font-size:12px;color:#475569">Directions to ${escapeHtml(destination)}</div><small style="display:block;margin-top:7px;color:#64748b">${note}</small></div>`);
 }
 
 function applyTruckHeading(marker, angle) {
@@ -9547,6 +9771,10 @@ function applyTruckHeading(marker, angle) {
 
     const markerElement = marker.getElement();
     if (!markerElement) {
+        return;
+    }
+
+    if (markerElement.classList.contains('pyro-demo-route-truck-marker')) {
         return;
     }
 
@@ -9805,7 +10033,7 @@ async function startSimulationFromPosition(routeId, startIndex) {
     console.log('Creating truck at position:', [startPoint[0], startPoint[1]]);
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createNavigationArrowIcon(truckColors[colorIndex]),
+        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex]),
         zIndexOffset: 1000
     }));
     bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);

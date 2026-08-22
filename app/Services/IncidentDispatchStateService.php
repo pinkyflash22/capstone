@@ -18,6 +18,10 @@ class IncidentDispatchStateService
             return $this->result($priority, 'linked_to_active_incident', 'Linked to active dispatch');
         }
 
+        if ($incident->team_id && $status === 'reported') {
+            return $this->result($priority, 'awaiting_team_response', 'Team assigned · awaiting response confirmation');
+        }
+
         if ($incident->team_id || in_array($status, ['responding', 'en-route', 'en route', 'on scene', 'on-scene'], true)) {
             return $this->result($priority, 'dispatched', 'Team dispatched');
         }
@@ -34,7 +38,7 @@ class IncidentDispatchStateService
         $incident->loadMissing('marker');
         $requiresFiretruck = app(IncidentResourceDispatchService::class)->incidentRequiresFiretruck($incident);
         $hasTeam = $this->hasAvailableTeam($stationId);
-        $hasFiretruck = ! $requiresFiretruck || $this->availableFiretruckCount($stationId) > 0;
+        $hasFiretruck = ! $requiresFiretruck || $this->hasFiretruckCapacity($stationId);
 
         if ((! $hasTeam || ! $hasFiretruck) && $this->hasCapableAlternativeStation($stationId, $requiresFiretruck)) {
             return $this->result($priority, 'requesting_other_station', 'Requesting another station');
@@ -79,6 +83,7 @@ class IncidentDispatchStateService
         return Team::query()
             ->where('station_id', $stationId)
             ->where('status', 'available')
+            ->whereDoesntHave('incidents', fn ($query) => $query->where('status', 'Reported'))
             ->get()
             ->contains(function (Team $team) use ($stationId) {
                 $memberIds = collect([
@@ -95,13 +100,14 @@ class IncidentDispatchStateService
             });
     }
 
-    private function availableFiretruckCount(int $stationId): int
+    private function hasFiretruckCapacity(int $stationId): bool
     {
         if (! Schema::hasTable('apparatus') && ! Schema::hasTable('equipment_to_stations')) {
-            return 0;
+            return false;
         }
 
-        return app(IncidentResourceDispatchService::class)->stationAvailableFiretruckCount($stationId);
+        return app(IncidentResourceDispatchService::class)
+            ->stationHasFiretruckCapacityForPendingAssignment($stationId);
     }
 
     private function hasCapableAlternativeStation(int $primaryStationId, bool $requiresFiretruck): bool
@@ -114,7 +120,7 @@ class IncidentDispatchStateService
             ->where('station_id', '!=', $primaryStationId)
             ->pluck('station_id')
             ->contains(fn ($stationId) => $this->hasAvailableTeam((int) $stationId)
-                && (! $requiresFiretruck || $this->availableFiretruckCount((int) $stationId) > 0));
+                && (! $requiresFiretruck || $this->hasFiretruckCapacity((int) $stationId)));
     }
 
     private function supportsQueueFields(): bool

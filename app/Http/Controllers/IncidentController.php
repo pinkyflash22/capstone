@@ -843,6 +843,21 @@ class IncidentController extends Controller
             'team_id' => 'nullable|exists:teams,team_id',
         ]);
 
+        abort_unless(strtolower(trim((string) $incident->status)) === 'reported', 409, 'Only reported incidents can be reassigned.');
+        $team = ! empty($validated['team_id']) ? Team::findOrFail((int) $validated['team_id']) : null;
+        $role = strtolower(trim((string) Auth::user()?->role?->role));
+        if (! in_array($role, ['provincial admin', 'admin'], true)) {
+            $stationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
+            abort_unless($stationId && (int) $incident->station_id === (int) $stationId, 403);
+        }
+        if ($team) {
+            abort_unless((int) $team->station_id === (int) $incident->station_id, 422, 'Use the command backup control for another station.');
+            abort_unless(app(\App\Services\IncidentResourceDispatchService::class)->teamCanAcceptIncident($team, $incident->loadMissing('marker')), 422, 'The selected team is not dispatchable.');
+        }
+        if (Schema::hasColumn('incidents', 'dispatch_assigned_at')) {
+            $validated['dispatch_assigned_at'] = $team ? now() : null;
+        }
+
        $data =  $incident->update($validated);
        UserActivityLogger::log('updated incident team', Auth::user()?->user_id, $request);
 

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Http\Controllers\DutyRosterController;
+use App\Http\Controllers\FirefighterIncidentResponseController;
 use App\Http\Controllers\staff\FirefighterController;
 use App\Models\DutyShift;
 use App\Models\DutyRosterTemplate;
@@ -25,7 +26,7 @@ class DutyRosterServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        foreach (['apparatus_equipment', 'incident_response_units', 'apparatus', 'incidents', 'markers', 'equipments_to_stations', 'equipments', 'event_activities', 'duty_exceptions', 'duty_shift_assignments', 'duty_shifts', 'duty_roster_template_assignments', 'duty_roster_templates', 'teams', 'station_officers', 'stations', 'users', 'roles'] as $table) {
+        foreach (['incident_dispatch_audits', 'apparatus_equipment', 'incident_response_units', 'apparatus', 'incidents', 'markers', 'equipments_to_stations', 'equipments', 'event_activities', 'duty_exceptions', 'duty_shift_assignments', 'duty_shifts', 'duty_roster_template_assignments', 'duty_roster_templates', 'teams', 'station_officers', 'stations', 'users', 'roles'] as $table) {
             Schema::dropIfExists($table);
         }
         Schema::create('roles', function (Blueprint $table) { $table->id('role_id'); $table->string('role'); $table->timestamps(); });
@@ -50,8 +51,9 @@ class DutyRosterServiceTest extends TestCase
         Schema::create('apparatus', function (Blueprint $table) { $table->id('apparatus_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('equipment_id')->nullable(); $table->string('unit_number'); $table->string('plate_number')->nullable(); $table->string('apparatus_type')->default('fire_engine'); $table->unsignedInteger('water_capacity_liters')->nullable(); $table->string('status')->default('available'); $table->string('maintenance_status')->default('operational'); $table->date('last_maintenance_at')->nullable(); $table->date('next_maintenance_due_at')->nullable(); $table->string('gps_status')->default('offline'); $table->decimal('last_lat', 10, 7)->nullable(); $table->decimal('last_lng', 10, 7)->nullable(); $table->decimal('gps_accuracy_meters', 8, 2)->nullable(); $table->decimal('gps_speed_kph', 8, 2)->nullable(); $table->decimal('gps_heading', 6, 2)->nullable(); $table->timestamp('gps_last_seen_at')->nullable(); $table->text('notes')->nullable(); $table->timestamps(); $table->softDeletes(); });
         Schema::create('apparatus_equipment', function (Blueprint $table) { $table->id('apparatus_equipment_id'); $table->unsignedBigInteger('apparatus_id'); $table->unsignedBigInteger('equipment_station_id'); $table->unsignedInteger('quantity')->default(1); $table->string('notes')->nullable(); $table->timestamps(); $table->unique(['apparatus_id', 'equipment_station_id']); });
         Schema::create('markers', function (Blueprint $table) { $table->id('marker_id'); $table->string('title')->nullable(); $table->string('category')->nullable(); $table->decimal('lat', 10, 7)->nullable(); $table->decimal('lng', 10, 7)->nullable(); $table->timestamps(); });
-        Schema::create('incidents', function (Blueprint $table) { $table->id('incident_id'); $table->unsignedBigInteger('marker_id')->nullable(); $table->string('status'); $table->timestamp('occurred_at')->nullable(); $table->string('occurred_at_source')->nullable(); $table->timestamp('occurred_at_verified_at')->nullable(); $table->unsignedBigInteger('occurred_at_verified_by')->nullable(); $table->timestamp('incident_completed_at')->nullable(); $table->unsignedBigInteger('station_id')->nullable(); $table->unsignedBigInteger('team_id')->nullable(); $table->timestamps(); });
+        Schema::create('incidents', function (Blueprint $table) { $table->id('incident_id'); $table->unsignedBigInteger('marker_id')->nullable(); $table->string('status'); $table->timestamp('occurred_at')->nullable(); $table->string('occurred_at_source')->nullable(); $table->timestamp('occurred_at_verified_at')->nullable(); $table->unsignedBigInteger('occurred_at_verified_by')->nullable(); $table->timestamp('incident_completed_at')->nullable(); $table->unsignedBigInteger('station_id')->nullable(); $table->unsignedBigInteger('team_id')->nullable(); $table->timestamp('dispatch_assigned_at')->nullable(); $table->timestamps(); });
         Schema::create('incident_response_units', function (Blueprint $table) { $table->id('incident_response_unit_id'); $table->unsignedBigInteger('incident_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('team_id')->nullable(); $table->unsignedBigInteger('equipment_station_id'); $table->unsignedBigInteger('apparatus_id')->nullable(); $table->unsignedSmallInteger('run_number'); $table->string('dispatch_source'); $table->string('status'); $table->unsignedBigInteger('requested_by')->nullable(); $table->decimal('distance_meters', 12, 2)->nullable(); $table->timestamp('estimated_arrival_at')->nullable(); $table->timestamp('dispatched_at')->nullable(); $table->timestamp('arrived_at')->nullable(); $table->timestamp('released_at')->nullable(); $table->timestamp('recalled_at')->nullable(); $table->unsignedBigInteger('recalled_by')->nullable(); $table->string('recall_reason')->nullable(); $table->timestamps(); $table->unique(['incident_id', 'run_number']); });
+        Schema::create('incident_dispatch_audits', function (Blueprint $table) { $table->id('incident_dispatch_audit_id'); $table->unsignedBigInteger('incident_id'); $table->unsignedBigInteger('actor_user_id')->nullable(); $table->string('action'); $table->unsignedBigInteger('previous_team_id')->nullable(); $table->unsignedBigInteger('assigned_team_id')->nullable(); $table->unsignedBigInteger('source_station_id')->nullable(); $table->unsignedBigInteger('target_station_id')->nullable(); $table->unsignedBigInteger('response_unit_id')->nullable(); $table->string('reason')->nullable(); $table->json('metadata')->nullable(); $table->timestamps(); });
 
         DB::table('roles')->insert([['role_id' => 1, 'role' => 'firefighter'], ['role_id' => 2, 'role' => 'chief']]);
         DB::table('stations')->insert(['station_id' => 10, 'station_name' => 'Central Fire Station']);
@@ -290,7 +292,10 @@ class DutyRosterServiceTest extends TestCase
         $this->assertSame(20, $assigned['station_id']);
         $this->assertSame(2, $assigned['team_id']);
         $this->assertSame('available', DB::table('teams')->where('team_id', 1)->value('status'));
-        $this->assertSame(0, DB::table('equipments_to_stations')->where('equipment_station_id', 2)->value('available_quantity'));
+        $this->assertSame('Reported', DB::table('incidents')->where('incident_id', 1)->value('status'));
+        $this->assertSame('available', DB::table('teams')->where('team_id', 2)->value('status'));
+        $this->assertSame(1, DB::table('equipments_to_stations')->where('equipment_station_id', 2)->value('available_quantity'));
+        $this->assertDatabaseMissing('incident_response_units', ['incident_id' => 1]);
     }
 
     public function test_only_the_assigned_driver_can_publish_live_apparatus_telemetry(): void
@@ -396,9 +401,212 @@ class DutyRosterServiceTest extends TestCase
 
         Incident::findOrFail(80)->update(['status' => 'Closed']);
 
-        $this->assertDatabaseHas('incidents', ['incident_id' => 81, 'team_id' => 1, 'status' => 'Responding']);
-        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 80, 'status' => 'dispatched']);
-        $this->assertDatabaseHas('incident_response_units', ['incident_id' => 81, 'team_id' => 1, 'apparatus_id' => 80, 'run_number' => 1, 'status' => 'en_route']);
+        $this->assertDatabaseHas('incidents', ['incident_id' => 81, 'team_id' => 1, 'status' => 'Reported']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 80, 'status' => 'available']);
+        $this->assertDatabaseMissing('incident_response_units', ['incident_id' => 81]);
+    }
+
+    public function test_firefighter_buttons_drive_the_response_lifecycle_and_release_resources_on_completion(): void
+    {
+        DB::table('markers')->insert(['marker_id' => 90, 'title' => 'Button Controlled Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 90]);
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'available', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'available']);
+        DB::table('equipments')->insert(['equipment_id' => 90, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 90, 'station_id' => 10, 'equipment_id' => 90, 'available_quantity' => 1]);
+        DB::table('apparatus')->insert(['apparatus_id' => 90, 'station_id' => 10, 'equipment_id' => 90, 'unit_number' => 'ENGINE 90', 'status' => 'available', 'maintenance_status' => 'operational']);
+        DB::table('incidents')->insert(['incident_id' => 90, 'marker_id' => 90, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs(User::findOrFail(1));
+        $controller = app(FirefighterIncidentResponseController::class);
+        $resources = app(IncidentResourceDispatchService::class);
+
+        $controller->respond(Incident::findOrFail(90), $resources, app(IncidentAutoAssignmentService::class));
+        $this->assertDatabaseHas('incidents', ['incident_id' => 90, 'status' => 'Responding']);
+        $this->assertDatabaseHas('teams', ['team_id' => 1, 'status' => 'responding']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 90, 'status' => 'dispatched']);
+        $this->assertSame(2, DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->where('status', 'dispatched')->count());
+
+        $controller->arrive(Incident::findOrFail(90), $resources);
+        $this->assertDatabaseHas('incidents', ['incident_id' => 90, 'status' => 'On Scene']);
+        $this->assertSame(2, DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->where('status', 'on-scene')->count());
+
+        $controller->complete(Incident::findOrFail(90), $resources);
+        $this->assertDatabaseHas('incidents', ['incident_id' => 90, 'status' => 'Controlled']);
+        $this->assertDatabaseHas('teams', ['team_id' => 1, 'status' => 'available']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 90, 'status' => 'available']);
+        $this->assertSame(2, DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->where('status', 'available')->count());
+        $this->assertDatabaseHas('incident_response_units', ['incident_id' => 90, 'apparatus_id' => 90, 'status' => 'released']);
+    }
+
+    public function test_responding_team_reassigns_its_other_reported_incident_to_an_available_team(): void
+    {
+        DB::table('markers')->insert([
+            ['marker_id' => 100, 'title' => 'First Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98],
+            ['marker_id' => 101, 'title' => 'Second Fire', 'category' => 'fire', 'lat' => 14.61, 'lng' => 120.99],
+        ]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 100]);
+        foreach ([6, 7] as $id) {
+            DB::table('users')->insert(['user_id' => $id, 'role_id' => 1, 'first_name' => "Relief{$id}", 'last_name' => 'Firefighter']);
+            DB::table('station_officers')->insert(['station_officer_id' => $id, 'station_id' => 10, 'user_id' => $id, 'status' => 'available']);
+        }
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'available']);
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'available', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('teams')->insert(['team_id' => 2, 'station_id' => 10, 'status' => 'available', 'roster_managed' => false, 'team_leader' => 6, 'commander_driver' => 7]);
+        DB::table('equipments')->insert(['equipment_id' => 100, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 100, 'station_id' => 10, 'equipment_id' => 100, 'available_quantity' => 2]);
+        DB::table('apparatus')->insert([
+            ['apparatus_id' => 100, 'station_id' => 10, 'equipment_id' => 100, 'unit_number' => 'ENGINE 100', 'status' => 'available', 'maintenance_status' => 'operational'],
+            ['apparatus_id' => 101, 'station_id' => 10, 'equipment_id' => 100, 'unit_number' => 'ENGINE 101', 'status' => 'available', 'maintenance_status' => 'operational'],
+        ]);
+        DB::table('incidents')->insert([
+            ['incident_id' => 100, 'marker_id' => 100, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['incident_id' => 101, 'marker_id' => 101, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->actingAs(User::findOrFail(1));
+        app(FirefighterIncidentResponseController::class)->respond(
+            Incident::findOrFail(100),
+            app(IncidentResourceDispatchService::class),
+            app(IncidentAutoAssignmentService::class)
+        );
+
+        $this->assertDatabaseHas('incidents', ['incident_id' => 100, 'team_id' => 1, 'status' => 'Responding']);
+        $this->assertDatabaseHas('incidents', ['incident_id' => 101, 'team_id' => 2, 'status' => 'Reported']);
+        $this->assertDatabaseHas('teams', ['team_id' => 1, 'status' => 'responding']);
+        $this->assertDatabaseHas('teams', ['team_id' => 2, 'status' => 'available']);
+        $this->assertNotNull(DB::table('incidents')->where('incident_id', 101)->value('dispatch_assigned_at'));
+    }
+
+    public function test_unanswered_assignment_times_out_and_prefers_a_different_available_team(): void
+    {
+        Carbon::setTestNow('2026-08-22 12:05:00');
+        DB::table('markers')->insert(['marker_id' => 110, 'title' => 'Unanswered Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 110]);
+        foreach ([6, 7] as $id) {
+            DB::table('users')->insert(['user_id' => $id, 'role_id' => 1, 'first_name' => "Timeout{$id}", 'last_name' => 'Firefighter']);
+            DB::table('station_officers')->insert(['station_officer_id' => $id, 'station_id' => 10, 'user_id' => $id, 'status' => 'available']);
+        }
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'available']);
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'available', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('teams')->insert(['team_id' => 2, 'station_id' => 10, 'status' => 'available', 'roster_managed' => false, 'team_leader' => 6, 'commander_driver' => 7]);
+        DB::table('equipments')->insert(['equipment_id' => 110, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 110, 'station_id' => 10, 'equipment_id' => 110, 'available_quantity' => 1]);
+        DB::table('apparatus')->insert(['apparatus_id' => 110, 'station_id' => 10, 'equipment_id' => 110, 'unit_number' => 'ENGINE 110', 'status' => 'available', 'maintenance_status' => 'operational']);
+        DB::table('incidents')->insert(['incident_id' => 110, 'marker_id' => 110, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => '2026-08-22 12:00:00', 'created_at' => '2026-08-22 12:00:00', 'updated_at' => '2026-08-22 12:00:00']);
+
+        $result = app(IncidentAutoAssignmentService::class)->expireUnansweredAssignments(2);
+
+        $this->assertSame(1, $result['expired']);
+        $this->assertCount(1, $result['reassigned']);
+        $this->assertDatabaseHas('incidents', ['incident_id' => 110, 'team_id' => 2, 'status' => 'Reported']);
+        $this->assertGreaterThan(Carbon::parse('2026-08-22 12:00:00'), Incident::findOrFail(110)->dispatch_assigned_at);
+        Carbon::setTestNow();
+    }
+
+    public function test_second_incident_waits_when_the_only_team_responds_then_falls_back_after_completion(): void
+    {
+        DB::table('markers')->insert([
+            ['marker_id' => 120, 'title' => 'Active Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98],
+            ['marker_id' => 121, 'title' => 'Queued Fire', 'category' => 'fire', 'lat' => 14.61, 'lng' => 120.99],
+        ]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 120]);
+        DB::table('station_officers')->whereIn('station_officer_id', [1, 2])->update(['status' => 'available']);
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'available', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('equipments')->insert(['equipment_id' => 120, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 120, 'station_id' => 10, 'equipment_id' => 120, 'available_quantity' => 1]);
+        DB::table('apparatus')->insert(['apparatus_id' => 120, 'station_id' => 10, 'equipment_id' => 120, 'unit_number' => 'ENGINE 120', 'status' => 'available', 'maintenance_status' => 'operational']);
+        DB::table('incidents')->insert([
+            ['incident_id' => 120, 'marker_id' => 120, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['incident_id' => 121, 'marker_id' => 121, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->actingAs(User::findOrFail(1));
+        $controller = app(FirefighterIncidentResponseController::class);
+        $resources = app(IncidentResourceDispatchService::class);
+        $assignments = app(IncidentAutoAssignmentService::class);
+        $controller->respond(Incident::findOrFail(120), $resources, $assignments);
+
+        $this->assertDatabaseHas('incidents', ['incident_id' => 121, 'team_id' => null, 'status' => 'Reported']);
+
+        $controller->arrive(Incident::findOrFail(120), $resources);
+        $controller->complete(Incident::findOrFail(120), $resources);
+
+        $this->assertDatabaseHas('incidents', ['incident_id' => 121, 'team_id' => 1, 'status' => 'Reported']);
+        $this->assertDatabaseHas('teams', ['team_id' => 1, 'status' => 'available']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 120, 'status' => 'available']);
+    }
+
+    public function test_chief_can_safely_reassign_a_reported_incident_to_an_available_local_team(): void
+    {
+        DB::table('markers')->insert(['marker_id' => 130, 'title' => 'Command Fire', 'category' => 'fire', 'lat' => 14.60, 'lng' => 120.98]);
+        DB::table('stations')->where('station_id', 10)->update(['marker_id' => 130]);
+        foreach ([6, 7] as $id) {
+            DB::table('users')->insert(['user_id' => $id, 'role_id' => 1, 'first_name' => "Command{$id}", 'last_name' => 'Firefighter']);
+            DB::table('station_officers')->insert(['station_officer_id' => $id, 'station_id' => 10, 'user_id' => $id, 'status' => 'available']);
+        }
+        DB::table('teams')->where('team_id', 1)->update(['status' => 'available', 'roster_managed' => false]);
+        DB::table('teams')->insert(['team_id' => 2, 'station_id' => 10, 'status' => 'available', 'roster_managed' => false, 'team_leader' => 6, 'commander_driver' => 7]);
+        DB::table('equipments')->insert(['equipment_id' => 130, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert(['equipment_station_id' => 130, 'station_id' => 10, 'equipment_id' => 130, 'available_quantity' => 1]);
+        DB::table('apparatus')->insert(['apparatus_id' => 130, 'station_id' => 10, 'equipment_id' => 130, 'unit_number' => 'ENGINE 130', 'status' => 'available', 'maintenance_status' => 'operational']);
+        DB::table('incidents')->insert(['incident_id' => 130, 'marker_id' => 130, 'status' => 'Reported', 'station_id' => 10, 'team_id' => 1, 'dispatch_assigned_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs(User::findOrFail(5))->postJson('/command/incidents/130/reassign', [
+            'team_id' => 2,
+            'reason' => 'Original assignment was entered in error.',
+        ])->assertOk()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('incidents', ['incident_id' => 130, 'team_id' => 2, 'status' => 'Reported']);
+        $this->assertDatabaseHas('incident_dispatch_audits', [
+            'incident_id' => 130,
+            'actor_user_id' => 5,
+            'action' => 'manual_reassignment',
+            'previous_team_id' => 1,
+            'assigned_team_id' => 2,
+        ]);
+    }
+
+    public function test_command_backup_uses_the_capable_station_nearest_to_the_incident(): void
+    {
+        DB::table('markers')->insert([
+            ['marker_id' => 140, 'title' => 'Large Fire', 'category' => 'fire', 'lat' => 14.6000, 'lng' => 120.9800],
+            ['marker_id' => 141, 'title' => 'Near Station', 'category' => 'station', 'lat' => 14.6050, 'lng' => 120.9850],
+            ['marker_id' => 142, 'title' => 'Far Station', 'category' => 'station', 'lat' => 14.8000, 'lng' => 121.2000],
+        ]);
+        DB::table('stations')->insert([
+            ['station_id' => 20, 'station_name' => 'Near Mutual Aid', 'marker_id' => 141],
+            ['station_id' => 30, 'station_name' => 'Far Mutual Aid', 'marker_id' => 142],
+        ]);
+        foreach ([6, 7, 8, 9] as $id) {
+            $stationId = $id <= 7 ? 20 : 30;
+            DB::table('users')->insert(['user_id' => $id, 'role_id' => 1, 'first_name' => "Mutual{$id}", 'last_name' => 'Firefighter']);
+            DB::table('station_officers')->insert(['station_officer_id' => $id, 'station_id' => $stationId, 'user_id' => $id, 'status' => 'available']);
+        }
+        DB::table('teams')->where('team_id', 1)->update(['station_id' => 10, 'status' => 'responding', 'roster_managed' => false, 'team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('teams')->insert([
+            ['team_id' => 2, 'station_id' => 20, 'status' => 'available', 'roster_managed' => false, 'team_leader' => 6, 'commander_driver' => 7],
+            ['team_id' => 3, 'station_id' => 30, 'status' => 'available', 'roster_managed' => false, 'team_leader' => 8, 'commander_driver' => 9],
+        ]);
+        DB::table('equipments')->insert(['equipment_id' => 140, 'equipment_name' => 'Fire Engine', 'category' => 'vehicles']);
+        DB::table('equipments_to_stations')->insert([
+            ['equipment_station_id' => 140, 'station_id' => 20, 'equipment_id' => 140, 'available_quantity' => 1],
+            ['equipment_station_id' => 141, 'station_id' => 30, 'equipment_id' => 140, 'available_quantity' => 1],
+        ]);
+        DB::table('apparatus')->insert([
+            ['apparatus_id' => 140, 'station_id' => 20, 'equipment_id' => 140, 'unit_number' => 'NEAR ENGINE', 'status' => 'available', 'maintenance_status' => 'operational'],
+            ['apparatus_id' => 141, 'station_id' => 30, 'equipment_id' => 140, 'unit_number' => 'FAR ENGINE', 'status' => 'available', 'maintenance_status' => 'operational'],
+        ]);
+        DB::table('incidents')->insert(['incident_id' => 140, 'marker_id' => 140, 'status' => 'Responding', 'station_id' => 10, 'team_id' => 1, 'created_at' => now(), 'updated_at' => now()]);
+
+        $result = app(IncidentResourceDispatchService::class)->requestExternalResponse(Incident::findOrFail(140), 5);
+
+        $this->assertSame('backup_unit', $result['mode']);
+        $this->assertSame(20, (int) $result['station']->station_id);
+        $this->assertSame(2, (int) $result['team']->team_id);
+        $this->assertDatabaseHas('incident_response_units', ['incident_id' => 140, 'station_id' => 20, 'team_id' => 2, 'dispatch_source' => 'other_station']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 140, 'status' => 'dispatched']);
+        $this->assertDatabaseHas('apparatus', ['apparatus_id' => 141, 'status' => 'available']);
     }
 
     private function shift(string $label, string $start, string $end, array $assignments): DutyShift

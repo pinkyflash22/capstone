@@ -41,6 +41,7 @@ class Incident extends Model
         'barangay_resolution_source',
         'barangay_resolved_at',
         'dispatch_priority',
+        'dispatch_assigned_at',
         'duplicate_of_incident_id',
     ];
 
@@ -49,6 +50,7 @@ class Incident extends Model
         'occurred_at' => 'datetime',
         'occurred_at_verified_at' => 'datetime',
         'incident_completed_at' => 'datetime',
+        'dispatch_assigned_at' => 'datetime',
     ];
 
     protected static function booted(): void

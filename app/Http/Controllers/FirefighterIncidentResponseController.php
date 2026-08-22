@@ -7,17 +7,23 @@ use App\Models\IncidentResponseUnit;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Services\DutyRosterService;
+use App\Services\IncidentAutoAssignmentService;
 use App\Services\IncidentResourceDispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class FirefighterIncidentResponseController extends Controller
 {
-    public function respond(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    public function respond(
+        Incident $incident,
+        IncidentResourceDispatchService $resources,
+        IncidentAutoAssignmentService $assignments
+    ): JsonResponse
     {
-        $unit = DB::transaction(function () use ($incident, $resources) {
+        $response = DB::transaction(function () use ($incident, $resources) {
             $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
             $officer = $this->currentOfficer();
             $team = $this->respondingTeamForOfficer($locked, $officer);
@@ -26,7 +32,7 @@ class FirefighterIncidentResponseController extends Controller
 
             $existing = IncidentResponseUnit::query()->where('incident_id', $locked->incident_id)->where('team_id', $team->team_id)
                 ->whereIn('status', ['reserved', 'en_route', 'on_scene'])->first();
-            if ($existing) return $existing;
+            if ($existing) return ['unit' => $existing, 'team_id' => (int) $team->team_id];
 
             if ($resources->incidentRequiresFiretruck($locked)) {
                 $reserved = $resources->reservePrimary($locked, $team, (int) $officer->station_id, null, Auth::id());
@@ -36,14 +42,32 @@ class FirefighterIncidentResponseController extends Controller
                 $resources->dispatchTeam($team);
             }
 
-            $locked->forceFill(['status' => 'Responding'])->save();
-            return $existing;
+            $statusUpdate = ['status' => 'Responding'];
+            if (Schema::hasColumn('incidents', 'dispatch_assigned_at')) {
+                $statusUpdate['dispatch_assigned_at'] = null;
+            }
+            $locked->forceFill($statusUpdate)->save();
+            return ['unit' => $existing, 'team_id' => (int) $team->team_id];
         });
+
+        $queue = $assignments->reassignReportedIncidentsFromOccupiedTeam(
+            $response['team_id'],
+            (int) $incident->incident_id
+        );
+        $unit = $response['unit'];
+        $message = $unit ? 'Response confirmed and a firetruck has been reserved.' : 'Response confirmed.';
+        if (count($queue['reassigned']) > 0) {
+            $message .= ' Other waiting incident assignments were moved to available response teams.';
+        }
+        if (count($queue['queued']) > 0) {
+            $message .= ' Incidents without another available team remain queued for station escalation.';
+        }
 
         return response()->json([
             'success' => true,
-            'message' => $unit ? 'Response confirmed and a firetruck has been reserved.' : 'Response confirmed.',
+            'message' => $message,
             'unit' => $unit ? $resources->serializeUnit($unit) : null,
+            'queue' => $queue,
         ]);
     }
 
@@ -56,6 +80,51 @@ class FirefighterIncidentResponseController extends Controller
             'message' => "Backup run {$unit->run_number} dispatched from {$source}.",
             'unit' => $resources->serializeUnit($unit),
         ], 201);
+    }
+
+    public function arrive(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    {
+        DB::transaction(function () use ($incident, $resources) {
+            $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            $officer = $this->currentOfficer();
+            abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident response.');
+            abort_unless(strtolower(trim((string) $locked->status)) === 'responding', 409, 'Only a responding incident can be marked on scene.');
+
+            $locked->forceFill(['status' => 'On Scene'])->save();
+            $resources->markIncidentUnitsOnScene($locked);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Arrival confirmed. Incident updated to On Scene.']);
+    }
+
+    public function complete(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    {
+        $completed = DB::transaction(function () use ($incident) {
+            $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            $officer = $this->currentOfficer();
+            abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident response.');
+            abort_unless(strtolower(trim((string) $locked->status)) === 'on scene', 409, 'Confirm arrival before completing this incident.');
+
+            $locked->forceFill(['status' => 'Controlled'])->save();
+            return $locked;
+        });
+
+        $resources->releaseIncidentUnits($completed);
+
+        return response()->json(['success' => true, 'message' => 'Incident completed. Team, personnel, and apparatus are available again.']);
+    }
+
+    public function close(Incident $incident): JsonResponse
+    {
+        DB::transaction(function () use ($incident) {
+            $locked = Incident::query()->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            $officer = $this->currentOfficer();
+            abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident.');
+            abort_unless(strtolower(trim((string) $locked->status)) === 'controlled', 409, 'Complete the incident before closing the case.');
+            $locked->forceFill(['status' => 'Closed'])->save();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Incident case closed.']);
     }
 
     public function resources(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse

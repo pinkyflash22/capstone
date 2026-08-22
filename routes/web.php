@@ -28,6 +28,7 @@ use App\Http\Controllers\UserLogController;
 use App\Http\Controllers\VoiceCallController;
 use App\Http\Controllers\DutyRosterController;
 use App\Http\Controllers\FirefighterIncidentResponseController;
+use App\Http\Controllers\IncidentCommandDispatchController;
 
 //station admin
 use App\Http\Controllers\Chief\StationAdminController;
@@ -56,6 +57,15 @@ use App\Http\Controllers\OTPController;
 // use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth', 'role:station admin,chief,provincial admin'])
+    ->prefix('command')
+    ->name('command.')
+    ->group(function () {
+        Route::get('/incidents/{incident}/dispatch-options', [IncidentCommandDispatchController::class, 'options'])->name('incidents.dispatch-options');
+        Route::post('/incidents/{incident}/reassign', [IncidentCommandDispatchController::class, 'reassign'])->name('incidents.reassign');
+        Route::post('/incidents/{incident}/external-response', [IncidentCommandDispatchController::class, 'externalResponse'])->name('incidents.external-response');
+    });
 //note kailangan ko pang import ung controller para magamit ko yung mga functions nila sa routes
 Route::get('/build/assets/map-{hash}.js', function () {
     return redirect(\Illuminate\Support\Facades\Vite::asset('resources/js/map.js'));
@@ -557,9 +567,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/location', [FirefighterController::class, 'updateLocation'])->name('location.update');
         Route::post('/response-units/{unit}/apparatus-location', [App\Http\Controllers\ApparatusLocationController::class, 'update'])->name('response-units.apparatus-location');
         Route::post('/incidents/{incident}/respond', [FirefighterIncidentResponseController::class, 'respond'])->name('incidents.respond');
-        Route::post('/incidents/{incident}/backup', [FirefighterIncidentResponseController::class, 'requestBackup'])->name('incidents.backup');
+        Route::post('/incidents/{incident}/arrive', [FirefighterIncidentResponseController::class, 'arrive'])->name('incidents.arrive');
+        Route::post('/incidents/{incident}/complete', [FirefighterIncidentResponseController::class, 'complete'])->name('incidents.complete');
+        Route::post('/incidents/{incident}/close', [FirefighterIncidentResponseController::class, 'close'])->name('incidents.close');
         Route::get('/incidents/{incident}/response-resources', [FirefighterIncidentResponseController::class, 'resources'])->name('incidents.response-resources');
-        Route::post('/incidents/{incident}/response-resources/{unit}/recall', [FirefighterIncidentResponseController::class, 'recallBackup'])->name('incidents.backup.recall');
         Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');
         Route::put('/schedule/events/{eventActivity}', [FirefighterController::class, 'updateScheduleEvent'])->name('schedule.events.update');
         Route::delete('/schedule/events/{eventActivity}', [FirefighterController::class, 'destroyScheduleEvent'])->name('schedule.events.destroy');

@@ -7,6 +7,7 @@ use App\Services\PredictionFeedbackSignalService;
 use App\Services\StationBarangayCoverageService;
 use App\Services\DutyRosterService;
 use App\Services\DutyRosterRecurrenceService;
+use App\Services\IncidentAutoAssignmentService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -114,6 +115,25 @@ Artisan::command('duty-roster:sync {--station=}', function (DutyRosterService $s
 })->purpose('Activate scheduled duty rosters and apply shift handoffs.');
 
 Schedule::command('duty-roster:sync')->everyMinute()->withoutOverlapping();
+
+Artisan::command('incidents:dispatch-queue {--timeout=2}', function (IncidentAutoAssignmentService $assignments) {
+    $timeout = max(1, (int) $this->option('timeout'));
+    $expired = $assignments->expireUnansweredAssignments($timeout);
+    $queue = $assignments->assignRecentUnassignedIncidents(24 * 60);
+
+    $this->info(sprintf(
+        'Expired %d assignment(s), reassigned %d, renewed %d, queued %d; assigned %d waiting incident(s).',
+        $expired['expired'],
+        count($expired['reassigned']),
+        count($expired['renewed']),
+        count($expired['queued']),
+        count($queue['assigned'])
+    ));
+
+    return 0;
+})->purpose('Expire unanswered incident assignments and rematch the dispatch queue.');
+
+Schedule::command('incidents:dispatch-queue --timeout=2')->everyMinute()->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class IncidentResourceDispatchService
@@ -73,6 +74,7 @@ class IncidentResourceDispatchService
         $excluded = collect($excludedTeamIds)->filter()->map(fn ($id) => (int) $id)->all();
         $teams = Team::query()->where('station_id', $stationId)->where('status', 'available')
             ->when($excluded, fn ($query) => $query->whereNotIn('team_id', $excluded))
+            ->whereDoesntHave('incidents', fn ($query) => $query->where('status', 'Reported'))
             ->lockForUpdate()->orderBy('team_id')->get();
 
         foreach ($teams as $team) {
@@ -93,6 +95,149 @@ class IncidentResourceDispatchService
         return (int) $this->firetruckAssignments($stationId)->sum('available_quantity');
     }
 
+    public function stationHasFiretruckCapacityForPendingAssignment(int $stationId, ?int $ignoreIncidentId = null): bool
+    {
+        $available = $this->stationAvailableFiretruckCount($stationId);
+        if ($available < 1) return false;
+
+        $pendingFireAssignments = Incident::query()
+            ->with(['marker', 'team'])
+            ->where('status', 'Reported')
+            ->whereNotNull('team_id')
+            ->when($ignoreIncidentId, fn ($query) => $query->where('incident_id', '!=', $ignoreIncidentId))
+            ->whereHas('team', fn ($query) => $query->where('station_id', $stationId))
+            ->get()
+            ->filter(fn (Incident $pending) => $this->incidentRequiresFiretruck($pending))
+            ->count();
+
+        return $available > $pendingFireAssignments;
+    }
+
+    public function teamCanAcceptIncident(Team $team, Incident $incident): bool
+    {
+        app(DutyRosterService::class)->sync((int) $team->station_id);
+        $team->refresh();
+        if (strtolower((string) $team->status) !== 'available') return false;
+
+        $hasAnotherPendingIncident = $team->incidents()
+            ->where('status', 'Reported')
+            ->where('incident_id', '!=', $incident->incident_id)
+            ->exists();
+        if ($hasAnotherPendingIncident) return false;
+
+        $memberIds = $this->teamMemberIds($team);
+        if ($memberIds->count() < 2) return false;
+        $availableMembers = StationOfficer::query()
+            ->where('station_id', $team->station_id)
+            ->whereIn('station_officer_id', $memberIds)
+            ->where('status', 'available')
+            ->count();
+        if ($availableMembers < 2) return false;
+
+        return ! $this->incidentRequiresFiretruck($incident)
+            || $this->stationHasFiretruckCapacityForPendingAssignment(
+                (int) $team->station_id,
+                (int) $incident->incident_id
+            );
+    }
+
+    public function dispatchableTeamsForIncident(Incident $incident, int $stationId): Collection
+    {
+        return Team::query()->where('station_id', $stationId)->orderBy('team_id')->get()
+            ->filter(fn (Team $team) => $this->teamCanAcceptIncident($team, $incident))
+            ->values();
+    }
+
+    public function stationsByIncidentDistance(Incident $incident): Collection
+    {
+        $incident->loadMissing('marker');
+        if ($incident->marker?->lat === null || $incident->marker?->lng === null) return collect();
+
+        return Station::query()->with('marker')->get()
+            ->filter(fn (Station $station) => $station->marker?->lat !== null && $station->marker?->lng !== null)
+            ->map(function (Station $station) use ($incident) {
+                $station->distance_meters = $this->distanceMeters(
+                    (float) $incident->marker->lat,
+                    (float) $incident->marker->lng,
+                    (float) $station->marker->lat,
+                    (float) $station->marker->lng
+                );
+                return $station;
+            })
+            ->sortBy('distance_meters')
+            ->values();
+    }
+
+    public function requestExternalResponse(Incident $incident, int $requestedBy): array
+    {
+        return DB::transaction(function () use ($incident, $requestedBy) {
+            $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            if (! $this->incidentRequiresFiretruck($locked)) {
+                throw ValidationException::withMessages(['incident' => 'Cross-station firetruck response is available only for fire incidents.']);
+            }
+
+            $status = strtolower(trim((string) $locked->status));
+            if (! in_array($status, ['reported', 'responding', 'on scene'], true)) {
+                throw ValidationException::withMessages(['incident' => 'This incident is no longer eligible for another station response.']);
+            }
+
+            $originStationId = (int) ($locked->station_id ?? 0);
+            if ($status === 'reported' && $originStationId > 0
+                && $this->dispatchableTeamsForIncident($locked, $originStationId)->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'backup' => 'An available team still exists at the incident station. Reassign locally before calling another station.',
+                ]);
+            }
+            $activeStationIds = IncidentResponseUnit::query()
+                ->where('incident_id', $locked->incident_id)
+                ->whereIn('status', self::ACTIVE_UNIT_STATUSES)
+                ->pluck('station_id')->map(fn ($id) => (int) $id);
+            $excludedTeamIds = collect([$locked->team_id])
+                ->concat(IncidentResponseUnit::query()->where('incident_id', $locked->incident_id)
+                    ->whereIn('status', self::ACTIVE_UNIT_STATUSES)->pluck('team_id'))
+                ->filter()->map(fn ($id) => (int) $id)->unique()->values();
+
+            foreach ($this->stationsByIncidentDistance($locked) as $station) {
+                $stationId = (int) $station->station_id;
+                if ($stationId === $originStationId || $activeStationIds->contains($stationId)) continue;
+
+                $team = $this->findAvailableTeamForStation($stationId, $excludedTeamIds);
+                if (! $team || ! $this->stationHasFiretruckCapacityForPendingAssignment($stationId, (int) $locked->incident_id)) continue;
+
+                if ($status === 'reported') {
+                    $previousTeamId = $locked->team_id ? (int) $locked->team_id : null;
+                    $locked->team_id = $team->team_id;
+                    if (Schema::hasColumn('incidents', 'dispatch_assigned_at')) $locked->dispatch_assigned_at = now();
+                    $locked->save();
+                    return [
+                        'mode' => 'external_assignment',
+                        'incident' => $locked->fresh(['team', 'station']),
+                        'team' => $team,
+                        'station' => $station,
+                        'unit' => null,
+                        'previous_team_id' => $previousTeamId,
+                    ];
+                }
+
+                $unit = $this->reserveUnit($locked, $team, $stationId, 'other_station', $requestedBy, (float) $station->distance_meters);
+                if ($unit) {
+                    return [
+                        'mode' => 'backup_unit',
+                        'incident' => $locked,
+                        'team' => $team,
+                        'station' => $station,
+                        'unit' => $unit,
+                        'previous_team_id' => $locked->team_id ? (int) $locked->team_id : null,
+                    ];
+                }
+            }
+
+            throw ValidationException::withMessages([
+                'backup' => 'No other station currently has both an available firetruck and a deployable team.',
+            ]);
+        });
+    }
+
     public function incidentRequiresFiretruck(Incident $incident): bool
     {
         $category = strtolower(trim((string) $incident->marker?->category));
@@ -109,6 +254,17 @@ class IncidentResourceDispatchService
     {
         IncidentResponseUnit::query()->where('incident_id', $incident->incident_id)->whereIn('status', ['reserved', 'en_route'])
             ->update(['status' => 'on_scene', 'arrived_at' => now(), 'updated_at' => now()]);
+
+        $teamIds = collect([$incident->team_id])
+            ->concat(IncidentResponseUnit::query()->where('incident_id', $incident->incident_id)->where('status', 'on_scene')->pluck('team_id'))
+            ->filter()->unique();
+        foreach ($teamIds as $teamId) {
+            $team = Team::find($teamId);
+            if (! $team) continue;
+            $team->forceFill(['status' => 'responding'])->save();
+            StationOfficer::query()->whereIn('station_officer_id', $this->teamMemberIds($team))
+                ->where('status', 'dispatched')->update(['status' => 'on-scene', 'updated_at' => now()]);
+        }
     }
 
     public function releaseIncidentUnits(Incident $incident): int

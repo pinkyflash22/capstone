@@ -1603,6 +1603,15 @@ body {
   margin-bottom: 12px;
 }
 
+.route-info-card__eyebrow {
+  margin: 0 0 3px;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .route-source-badge {
   display: inline-flex;
   align-items: center;
@@ -1633,11 +1642,84 @@ body {
   gap: 10px;
 }
 
+.route-info-card__destination {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 2px 0 13px;
+}
+
+.route-info-card__destination-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  border-radius: 12px;
+  color: #c2410c;
+  background: #fff7ed;
+}
+
+.route-info-card__destination-copy {
+  min-width: 0;
+}
+
+.route-info-card__destination-copy strong,
+.route-info-card__destination-copy span {
+  display: block;
+}
+
+.route-info-card__destination-copy strong {
+  margin-bottom: 3px;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.route-info-card__destination-copy span {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .route-info-card__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
 }
+
+.route-info-card__stats > div {
+  min-width: 0;
+  padding: 0 10px;
+  border-right: 1px solid #e2e8f0;
+}
+
+.route-info-card__stats > div:first-child { padding-left: 0; }
+.route-info-card__stats > div:last-child { padding-right: 0; border-right: 0; }
+.route-info-card__stats dt { color:#94a3b8;font-size:9px;font-weight:900;letter-spacing:.07em;text-transform:uppercase; }
+.route-info-card__stats dd { margin:4px 0 0;color:#0f172a;font-size:12px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+
+.route-info-card__tracking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 11px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-info-card__tracking i { color: #0f766e; }
 
 #routeInfoCard .info-row,
 .route-info-card .info-row {
@@ -1680,6 +1762,7 @@ body {
 }
 
 .route-progress-container {
+  margin-top: 12px;
   background: rgba(226, 232, 240, 0.9) !important;
   border-radius: 999px !important;
   overflow: hidden !important;
@@ -1691,29 +1774,6 @@ body {
   width: 0;
   background: linear-gradient(135deg, #d9481e 0%, #e08a12 100%) !important;
   transition: width 0.28s ease;
-}
-
-.speed-control {
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px !important;
-}
-
-.speed-btn {
-  min-height: 34px;
-  border: 1px solid rgba(203, 213, 225, 0.9) !important;
-  border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.86) !important;
-  color: #64748b !important;
-  padding: 6px 8px !important;
-  font-size: 11px !important;
-  font-weight: 800;
-}
-
-.speed-btn.active {
-  color: #fff !important;
-  border-color: transparent !important;
-  background: linear-gradient(135deg, #d9481e 0%, #e08a12 100%) !important;
 }
 
 .route-stop-btn,
@@ -1730,7 +1790,11 @@ body {
   font-size: 12px !important;
   font-weight: 900 !important;
   text-decoration: none !important;
+  width: 100%;
+  margin-top: 11px;
 }
+
+#routeInfoCard .route-stop-btn:disabled { opacity:.62;cursor:wait; }
 
 #stopAllSimulationsBtn {
   display: inline-flex !important;
@@ -1833,17 +1897,6 @@ body {
   body.firefighter-dashboard-page #routeInfoCard .info-row strong,
   body.firefighter-dashboard-page .route-info-card .info-row strong {
     font-size: 8.5px;
-  }
-
-  body.firefighter-dashboard-page .speed-control {
-    gap: 6px !important;
-    margin-top: 8px !important;
-  }
-
-  body.firefighter-dashboard-page .speed-btn {
-    min-height: 36px;
-    padding: 6px !important;
-    font-size: 10px !important;
   }
 
   body.firefighter-dashboard-page .route-stop-btn,

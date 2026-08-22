@@ -128,7 +128,7 @@ use App\Http\Controllers\TelnyxWebhookController;
 //         'all_reports' => DB::table('incident_report')->select('id', 'incident_id')->get()
 //     ]);
 // });
-Route::prefix('/management')->group(function () {
+Route::middleware(['web', 'auth', 'role:provincial admin'])->prefix('/management')->group(function () {
     Route::get('/incidents', [ManagementController::class, 'getIncidents']);
     Route::get('/personnel', [ManagementController::class, 'getPersonnel']);
 
@@ -401,7 +401,8 @@ Route::post('/incidents/{incidentId}/auto-assign', [IncidentController::class, '
 Route::post('/incidents/auto-assign-recent-unassigned', [IncidentController::class, 'autoAssignRecentUnassignedIncidents']);
 // Route::post('/incidentReport', [IncidentReportController::class, 'store']);
 
-Route::put('/incident/{id}', [IncidentController::class, 'update']);
+Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])
+    ->put('/incident/{id}', [IncidentController::class, 'update']);
 // async function getPersonnels() { //javasctipt sample fetch
 //     const response = await fetch('/api/personnel');
 //     const data = await response.json();

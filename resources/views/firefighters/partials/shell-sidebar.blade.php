@@ -30,6 +30,24 @@
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@1&display=swap');
 
+    /* Shared firefighter layer scale. Keep map content inside the map layer so
+       Leaflet panes cannot cover navigation, notifications, or dialogs. */
+    :root {
+        --ff-layer-map: 0;
+        --ff-layer-map-ui: 100;
+        --ff-layer-page-chrome: 1000;
+        --ff-layer-mobile-dock: 2000;
+        --ff-layer-floating-action: 2100;
+        --ff-layer-sidebar-backdrop: 3000;
+        --ff-layer-sidebar: 3010;
+        --ff-layer-routing-backdrop: 4000;
+        --ff-layer-routing-panel: 4010;
+        --ff-layer-mobile-panel: 5000;
+        --ff-layer-notice: 6000;
+        --ff-layer-modal: 7000;
+        --ff-layer-critical: 8000;
+    }
+
     .ff-mobile-icon {
         font-family: "Material Symbols Rounded" !important;
         font-weight: normal;
@@ -53,8 +71,9 @@
     .ff-mobile-panel {
         position: fixed;
         inset: 0;
-        z-index: 9996;
+        z-index: var(--ff-layer-mobile-panel);
         display: none;
+        isolation: isolate;
     }
 
     .ff-mobile-panel.is-open {
@@ -71,6 +90,7 @@
     .ff-mobile-panel__sheet {
         position: absolute;
         inset: 0;
+        z-index: 1;
         background: linear-gradient(180deg, #fffaf4 0%, #fbf7ef 100%);
         padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(22px + env(safe-area-inset-bottom, 0px));
         overflow-y: auto;
@@ -184,7 +204,7 @@
 
     .ff-route-skeleton {
         position: fixed;
-        z-index: 10040;
+        z-index: var(--ff-layer-critical);
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
@@ -400,6 +420,55 @@
         }
     }
 
+    body.firefighter-portal-shell .firefighter-map-stage {
+        z-index: var(--ff-layer-map) !important;
+        isolation: isolate !important;
+    }
+
+    body.firefighter-portal-shell .firefighter-map-stage .map-container,
+    body.firefighter-portal-shell .firefighter-map-stage .leaflet-container {
+        position: relative;
+        z-index: var(--ff-layer-map) !important;
+        isolation: isolate;
+    }
+
+    body.firefighter-portal-shell .firefighter-map-stage .leaflet-control-container {
+        position: relative;
+        z-index: var(--ff-layer-map-ui);
+    }
+
+    body.firefighter-portal-shell .sidebar.ff-sidebar-shell {
+        z-index: var(--ff-layer-sidebar) !important;
+        isolation: isolate;
+    }
+
+    body.firefighter-portal-shell #{{ $backdropId }} {
+        z-index: var(--ff-layer-sidebar-backdrop) !important;
+    }
+
+    body.firefighter-portal-shell .mobile-bottom-nav--firefighter-app {
+        z-index: var(--ff-layer-mobile-dock) !important;
+        isolation: isolate;
+    }
+
+    body.firefighter-portal-shell .ff-mobile-panel {
+        z-index: var(--ff-layer-mobile-panel) !important;
+    }
+
+    body.firefighter-portal-shell .ff-app-notice,
+    body.firefighter-portal-shell .notification-container,
+    body.firefighter-portal-shell .incident-alert-toast-stack {
+        z-index: var(--ff-layer-notice) !important;
+    }
+
+    body.firefighter-portal-shell .boundary-save-modal,
+    body.firefighter-portal-shell .route-source-modal,
+    body.firefighter-portal-shell .responder-map-modal,
+    body.firefighter-portal-shell .edit-modal,
+    body.firefighter-portal-shell .ff-false-alarm-confirm {
+        z-index: var(--ff-layer-modal) !important;
+    }
+
     @media (max-width: 768px) {
         :root {
             --ff-mobile-dock-h: calc(92px + env(safe-area-inset-bottom, 0px));
@@ -420,7 +489,7 @@
             min-height: var(--ff-mobile-dock-h);
             background: linear-gradient(180deg, rgba(251, 247, 239, 0) 0%, rgba(251, 247, 239, 0.58) 46%, rgba(251, 247, 239, 0.94) 100%);
             backdrop-filter: blur(8px);
-            z-index: 9997;
+            z-index: var(--ff-layer-mobile-dock) !important;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock {

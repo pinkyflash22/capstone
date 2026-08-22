@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use App\Models\Post;
 use App\Models\Station;
 use App\Models\Incident;
+use App\Models\VoiceCall;
 use App\Models\StationOfficer;
 use App\Models\FsicRequest;
 use App\Models\FsicInspection;
@@ -348,6 +349,8 @@ class FirefighterController extends Controller
                 'status',
                 'team_id',
                 'reported_by',
+                'station_id',
+                'barangay_id',
                 'created_at',
                 'updated_at',
             ])
@@ -355,6 +358,11 @@ class FirefighterController extends Controller
                 'marker:marker_id,title,description,lat,lng,status,category,image',
                 'reporter:user_id,first_name,last_name',
                 'team:team_id',
+                'barangay:barangay_id,barangay_name,city_id',
+                'barangay.city:city_id,city_name',
+                'spotInvestigationReport:spot_investigation_report_id,incident_id,place_of_occurrence',
+                'spotInvestigationReport.progressInvestigation:progress_investigation_report_id,spot_investigation_id',
+                'spotInvestigationReport.progressInvestigation.finalInvestigation:final_investigation_report_id,progress_investigation_id,exact_address',
             ])
             ->where(function ($query) use ($teamId) {
                 $query->where('team_id', $teamId)
@@ -412,7 +420,7 @@ class FirefighterController extends Controller
         $markerTitle = trim((string) $markerTitle);
         $markerDescription = trim((string) $markerDescription);
 
-        $genericIncidentMarkerTitles = ['help emergency', 'fire emergency', 'emergency', 'incident'];
+        $genericIncidentMarkerTitles = ['help emergency', 'fire emergency', 'fire emergency voice call', 'fire emergency from voice call', 'emergency', 'incident'];
         $genericIncidentMarkerDescriptions = [
             'fire emergency reported by citizen.',
             'fire emergency reported by citizen',
@@ -422,7 +430,9 @@ class FirefighterController extends Controller
 
         $normalizedTitle = strtolower($markerTitle);
         $normalizedDescription = strtolower($markerDescription);
-        $hasGenericTitle = in_array($normalizedTitle, $genericIncidentMarkerTitles, true);
+        $hasGenericTitle = in_array($normalizedTitle, $genericIncidentMarkerTitles, true)
+            || str_contains($normalizedTitle, 'emergency voice call')
+            || str_contains($normalizedTitle, 'emergency from voice call');
         $hasGenericDescription = in_array($normalizedDescription, $genericIncidentMarkerDescriptions, true);
 
         if ($hasGenericTitle && $hasGenericDescription) {
@@ -999,6 +1009,22 @@ class FirefighterController extends Controller
                     ->pluck('spot_investigation_report_id', 'incident_id')
                     ->mapWithKeys(fn ($reportId, $incidentId) => [(int) $incidentId => (int) $reportId])
                     ->all();
+                $voiceLocationMap = collect();
+                if (\Illuminate\Support\Facades\Schema::hasTable('voice_calls')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('voice_calls', 'caller_location_label')) {
+                    $voiceLocationMap = VoiceCall::query()
+                        ->where(function ($query) use ($incidents) {
+                            $ids = $incidents->pluck('incident_id')->filter()->all();
+                            $query->whereIn('created_incident_id', $ids)->orWhereIn('incident_id', $ids);
+                        })
+                        ->whereNotNull('caller_location_label')
+                        ->latest('created_at')
+                        ->get(['incident_id', 'created_incident_id', 'caller_location_label'])
+                        ->mapWithKeys(function (VoiceCall $call) {
+                            $incidentId = (int) ($call->created_incident_id ?: $call->incident_id);
+                            return $incidentId > 0 ? [$incidentId => trim((string) $call->caller_location_label)] : [];
+                        });
+                }
 
                 $responseDurations = [];
                 $stats = [
@@ -1009,7 +1035,7 @@ class FirefighterController extends Controller
                     'avg_response_minutes' => 0,
                 ];
 
-                $mappedIncidents = $incidents->map(function ($incident) use (&$stats, &$responseDurations, $routeArrivalMap, $spotReportMap) {
+                $mappedIncidents = $incidents->map(function ($incident) use (&$stats, &$responseDurations, $routeArrivalMap, $spotReportMap, $voiceLocationMap) {
                     $marker = $incident->marker;
                     $arrivalTimestamp = $routeArrivalMap[$incident->incident_id] ?? null;
                     $arrivalAt = $arrivalTimestamp ? Carbon::parse($arrivalTimestamp) : null;
@@ -1017,6 +1043,24 @@ class FirefighterController extends Controller
                     $incidentStatusId = $this->getIncidentStatusId($incident->status);
                     $spotReportId = $spotReportMap[(int) $incident->incident_id] ?? null;
                     $investigationReady = $incidentStatusId === 4 && $spotReportId === null;
+                    $finalAddress = trim((string) ($incident->spotInvestigationReport?->progressInvestigation?->finalInvestigation?->exact_address ?? ''));
+                    $placeOfOccurrence = trim((string) ($incident->spotInvestigationReport?->place_of_occurrence ?? ''));
+                    $barangayLocation = collect([
+                        $incident->barangay?->barangay_name,
+                        $incident->barangay?->city?->city_name,
+                    ])->filter()->join(', ');
+                    $markerLocation = $this->resolveIncidentPrimaryLocation($marker?->title, $marker?->description);
+                    $coordinateLocation = $marker?->lat !== null && $marker?->lng !== null
+                        ? number_format((float) $marker->lat, 5).', '.number_format((float) $marker->lng, 5)
+                        : null;
+                    $location = collect([
+                        $voiceLocationMap->get((int) $incident->incident_id),
+                        $finalAddress,
+                        $placeOfOccurrence,
+                        $barangayLocation,
+                        $markerLocation,
+                        $coordinateLocation,
+                    ])->map(fn ($value) => trim((string) $value))->first(fn ($value) => $value !== '') ?: 'Location unavailable';
 
                     if (in_array($incidentStatusId, [2, 3], true)) {
                         $stats['active']++;
@@ -1043,7 +1087,7 @@ class FirefighterController extends Controller
                         'marker_id' => $incident->marker_id,
                         'title' => $marker?->title ?? ('Incident #' . $incident->incident_id),
                         'description' => $marker?->description,
-                        'location' => $marker?->title ?? 'Unnamed location',
+                        'location' => $location,
                         'coordinates' => [
                             'lat' => $marker?->lat,
                             'lng' => $marker?->lng,
