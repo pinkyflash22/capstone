@@ -45,6 +45,7 @@ export default defineConfig({
                 'resources/js/landing/main.js',
                 'resources/js/map.js',
                 'resources/js/mobile-hub.js',
+                'resources/js/unified-notifications.js',
                 'resources/js/staff/fire.js',
                 'resources/js/user.js',
                 'resources/js/voice-calls.js',

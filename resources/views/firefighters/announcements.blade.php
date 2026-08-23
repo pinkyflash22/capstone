@@ -1312,7 +1312,6 @@
         </div>
     </div>
 
-    <div class="announcement-toast-stack" id="announcementToastStack" aria-live="polite" aria-atomic="false"></div>
     <div class="announcement-confirm" id="announcementConfirm" hidden aria-hidden="true">
         <div class="announcement-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="announcementConfirmTitle" aria-describedby="announcementConfirmMessage">
             <div class="announcement-confirm__eyebrow" id="announcementConfirmEyebrow">Confirm action</div>

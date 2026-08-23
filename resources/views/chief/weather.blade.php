@@ -18,6 +18,7 @@
     </style>
 </head>
 <body>
+    @include('partials.unified-notifications')
     <h1>Fire Risk Weather Monitor</h1>
     
     <input type="text" id="location" placeholder="Enter location" value="London">

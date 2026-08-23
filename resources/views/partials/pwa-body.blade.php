@@ -1,3 +1,5 @@
+@include('partials.unified-notifications')
+
 @php
     $showPwaInstallButton = $showPwaInstallButton ?? false;
     $pwaServiceWorkerVersion = file_exists(public_path('sw.js')) ? (string) filemtime(public_path('sw.js')) : (string) time();

@@ -139,7 +139,6 @@
         <div id="historyList" class="bg-white rounded-xl shadow p-5"></div>
     </main>
     <div id="registerModal" class="modal"><div class="modal-content"><h3>Register for Training</h3><form id="registerForm"><div class="form-group"><label class="form-label">Training Title</label><input type="text" class="form-input" id="regTitle" required></div><div class="form-group"><label class="form-label">Training Date</label><input type="date" class="form-input" id="regDate" required></div><div class="form-group"><label class="form-label">Location</label><input type="text" class="form-input" id="regLocation" required></div><div class="form-group"><label class="form-label">Duration (hours)</label><input type="number" class="form-input" id="regDuration" required></div><div class="flex justify-end gap-2"><button type="button" class="btn btn-outline" onclick="closeRegisterModal()">Cancel</button><button type="submit" class="btn btn-primary">Register</button></div></form></div></div>
-    <div id="toast" class="toast"></div>
     <script>
         let trainings = [
             { id: 1, title: 'Advanced Firefighting Techniques', date: '2024-03-20', location: 'Training Ground', duration: 8, status: 'upcoming', registered: true },
@@ -154,7 +153,7 @@
         function viewTraining(id) { const t = trainings.find(t => t.id === id); if (t) alert(`Training: ${t.title}\nDate: ${formatDate(t.date)}\nLocation: ${t.location}\nDuration: ${t.duration} hours\nStatus: ${t.status}`); }
         function formatDate(dateStr) { const d = new Date(dateStr); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
-        function showToast(msg, type) { const toast = document.getElementById('toast'); toast.textContent = msg; toast.className = `toast toast-${type}`; toast.style.display = 'block'; setTimeout(() => { toast.style.display = 'none'; }, 3000); }
+        function showToast(message, type) { window.PyroNotify?.notify(message, type); }
         document.addEventListener('DOMContentLoaded', function() { renderTraining(); const sidebar = document.querySelector('.sidebar'); const openBtn = document.getElementById('openSidebar'); const backdrop = document.getElementById('sidebarBackdrop'); if (openBtn) openBtn.addEventListener('click', () => { sidebar.classList.add('open'); backdrop.classList.remove('hidden'); }); if (backdrop) backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.add('hidden'); }); });
         window.openRegisterModal = openRegisterModal; window.closeRegisterModal = closeRegisterModal; window.viewTraining = viewTraining;
     </script>

@@ -2102,36 +2102,7 @@ class ManagementPage {
     }
 
     showToast(message, type = 'info') {
-        const toastContainer = document.querySelector('.toast-container');
-        if (!toastContainer) return;
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icons = {
-            success: 'fa-circle-check',
-            error: 'fa-circle-exclamation',
-            warning: 'fa-triangle-exclamation',
-            info: 'fa-circle-info'
-        };
-
-        toast.innerHTML = `
-            <i class="fa-regular ${icons[type]}"></i>
-            <div class="toast-content">
-                <div class="toast-message">${message}</div>
-            </div>
-            <button class="toast-close" onclick="this.parentElement.remove()">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        `;
-
-        toastContainer.appendChild(toast);
-
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.remove();
-            }
-        }, 5000);
+        window.PyroNotify?.notify(message, type);
     }
 
     escapeHtml(text) {

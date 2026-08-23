@@ -292,6 +292,7 @@
     </style>
 </head>
 <body class="ff3-body">
+    @include('partials.unified-notifications')
     <div class="ff3-shell">
         <aside class="ff3-sidebar">
             <div class="ff3-brand">

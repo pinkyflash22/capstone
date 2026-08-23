@@ -3462,11 +3462,6 @@
         </div>
     </div>
 
-    <div id="analyticsToast" class="analytics-toast" data-type="info" role="status" aria-live="polite" hidden>
-        <span class="analytics-toast__icon"><i class="fa-solid fa-circle-info"></i></span>
-        <span id="analyticsToastMessage" class="analytics-toast__message"></span>
-    </div>
-
     <div id="analyticsConfirmModal" class="analytics-confirm" aria-hidden="true" hidden>
         <div class="analytics-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="analyticsConfirmTitle" aria-describedby="analyticsConfirmMessage">
             <div class="analytics-confirm__body">
@@ -3507,7 +3502,6 @@
         let currentSortedBarangayPredictions = [];
         let forecastNarrativeRuns = [];
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        let analyticsToastTimer = null;
         let analyticsConfirmResolver = null;
         let analyticsConfirmOpener = null;
         const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
@@ -3716,32 +3710,7 @@
         }
 
         function showAnalyticsToast(message, type = 'info') {
-            const toast = document.getElementById('analyticsToast');
-            const messageEl = document.getElementById('analyticsToastMessage');
-            const icon = toast?.querySelector('.analytics-toast__icon i');
-
-            if (!toast || !messageEl) return;
-
-            const iconMap = {
-                success: 'fa-circle-check',
-                error: 'fa-circle-exclamation',
-                warning: 'fa-triangle-exclamation',
-                info: 'fa-circle-info',
-            };
-
-            messageEl.textContent = message || 'Action updated.';
-            toast.dataset.type = type;
-            if (icon) {
-                icon.className = `fa-solid ${iconMap[type] || iconMap.info}`;
-            }
-
-            toast.hidden = false;
-            window.clearTimeout(analyticsToastTimer);
-            requestAnimationFrame(() => toast.classList.add('is-visible'));
-            analyticsToastTimer = window.setTimeout(() => {
-                toast.classList.remove('is-visible');
-                window.setTimeout(() => { toast.hidden = true; }, 200);
-            }, 3600);
+            window.PyroNotify?.notify(message || 'Action updated.', type, 3600);
         }
 
         function showAnalyticsConfirm(options = {}) {

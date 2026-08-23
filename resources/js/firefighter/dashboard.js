@@ -1490,16 +1490,7 @@ export class FirefighterDashboard {
     }
 
     showToast(message, type = 'info') {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        
-        toast.textContent = message;
-        toast.className = `toast toast-${type}`;
-        toast.style.display = 'block';
-        
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 3000);
+        window.PyroNotify?.notify(message, type);
     }
 
     escapeHtml(text) {

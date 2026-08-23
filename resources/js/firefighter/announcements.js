@@ -1012,23 +1012,7 @@ class AnnouncementSystem {
     }
 
     showNotification(message, type = 'info') {
-        const stack = this.getToastStack();
-        const notification = document.createElement('div');
-        notification.className = `announcement-toast announcement-toast--${type}`;
-        notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
-        notification.innerHTML = `
-            <i class="${this.getNotificationIcon(type)} announcement-toast__icon" aria-hidden="true"></i>
-            <span>${this.escapeHtml(message)}</span>
-            <button class="announcement-toast__close" type="button" aria-label="Close notification">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        `;
-
-        stack.appendChild(notification);
-        notification.querySelector('.announcement-toast__close')?.addEventListener('click', () => notification.remove());
-
-        const timeout = type === 'error' ? 5200 : 3200;
-        setTimeout(() => notification.remove(), timeout);
+        window.PyroNotify?.notify(message, type, type === 'error' ? 5200 : 3200);
     }
 
     updateComposerState() {
@@ -1103,28 +1087,6 @@ class AnnouncementSystem {
         const units = ['B', 'KB', 'MB', 'GB'];
         const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
         return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
-    }
-
-    getToastStack() {
-        let stack = document.getElementById('announcementToastStack');
-        if (!stack) {
-            stack = document.createElement('div');
-            stack.id = 'announcementToastStack';
-            stack.className = 'announcement-toast-stack';
-            stack.setAttribute('aria-live', 'polite');
-            document.body.appendChild(stack);
-        }
-        return stack;
-    }
-
-    getNotificationIcon(type) {
-        const icons = {
-            success: 'fa-solid fa-circle-check',
-            warning: 'fa-solid fa-triangle-exclamation',
-            error: 'fa-solid fa-circle-exclamation',
-            info: 'fa-solid fa-circle-info',
-        };
-        return icons[type] || icons.info;
     }
 
     getTimeAgo(date) {

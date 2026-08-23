@@ -1,3 +1,5 @@
+@include('partials.unified-notifications')
+
 @php
     $active = $active ?? '';
     $alertCount = $activeAlerts ?? 0;

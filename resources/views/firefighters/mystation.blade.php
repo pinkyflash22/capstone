@@ -574,7 +574,6 @@
         </div>
     </div>
 
-    <div id="reportToastStack" class="report-toast-stack"></div>
 
     <script>
         window.firefighterMyStationConfig = {

@@ -116,8 +116,7 @@ class Dashboard {
     }
 
     showNotification(message, type = 'info') {
-        // You can implement a toast notification here
-        console.log(`${type}: ${message}`);
+        window.PyroNotify?.notify(message, type);
     }
 
     // Emergency call

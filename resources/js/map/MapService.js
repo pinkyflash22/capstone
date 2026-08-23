@@ -625,22 +625,7 @@ class MapService {
     }
     
     showToast(message, type) {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            padding: 12px 24px;
-            background: ${type === 'error' ? '#ef4444' : '#22c55e'};
-            color: white;
-            border-radius: 8px;
-            z-index: 9999;
-            font-size: 14px;
-            font-weight: 500;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        window.PyroNotify?.notify(message, type);
     }
     
     cleanup() {

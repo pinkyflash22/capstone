@@ -982,11 +982,7 @@
         }
 
         function showToast(message, isError = false) {
-            if (window.showCitizenToast) {
-                window.showCitizenToast(message, isError, 3200);
-                return;
-            }
-            console[isError ? 'error' : 'log'](message);
+            window.PyroNotify?.notify(message, isError ? 'error' : 'success');
         }
 
         async function fetchIncidentRegistry(showLoading = true) {

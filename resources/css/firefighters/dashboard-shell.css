@@ -4,28 +4,6 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-.ff-app-notice {
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    z-index: var(--ff-layer-notice, 10100);
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
-    width: min(390px, calc(100vw - 48px));
-    padding: 13px 14px;
-    color: #28364b;
-    background: rgba(255, 253, 249, 0.98);
-    border: 1px solid rgba(198, 61, 38, 0.15);
-    border-radius: 18px;
-    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
-    backdrop-filter: blur(14px);
-    transform: translateY(-14px);
-    opacity: 0;
-    transition: transform 0.18s ease, opacity 0.18s ease;
-}
-
 .firefighter-map-stage .map-container { position: relative; }
 .ff-response-units { position:static; width:100%; overflow:hidden; border:1px solid rgba(148,163,184,.26); border-radius:15px; color:#1e293b; background:#fff; box-shadow:none; }
 .ff-response-units--integrated { margin:0 0 12px; }
@@ -48,16 +26,6 @@
 .ff-assigned-incident-row__units-list { display:grid; gap:8px; }
 .pyro-response-unit-truck-marker { filter:drop-shadow(0 7px 6px rgba(127,29,29,.38)); }
 @media(max-width:768px){.ff-response-units{width:100%;max-height:none}.ff-response-units__head{padding:9px 11px}.ff-response-unit{grid-template-columns:34px minmax(0,1fr) auto;padding:8px}.ff-assigned-incident-row__units{margin:0 9px 10px;padding:8px}.ff-response-unit__recall{grid-column:1/4;width:100%}}
-
-.ff-app-notice.is-visible { transform: translateY(0); opacity: 1; }
-.ff-app-notice__icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #c94b2a, #db9218); }
-.ff-app-notice__message { min-width: 0; font-size: 0.86rem; font-weight: 800; line-height: 1.35; }
-.ff-app-notice__close { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; color: #718096; background: transparent; border: 0; border-radius: 10px; cursor: pointer; }
-.ff-app-notice__close:hover { color: #9f2f1c; background: #fff1e8; }
-.ff-app-notice--error { border-color: rgba(185, 28, 28, 0.22); }
-.ff-app-notice--error .ff-app-notice__icon { background: linear-gradient(135deg, #b91c1c, #dc2626); }
-.ff-app-notice--warning .ff-app-notice__icon { background: linear-gradient(135deg, #c77013, #e5a32c); }
-.ff-app-notice--info .ff-app-notice__icon { background: linear-gradient(135deg, #124e5d, #247287); }
 
 .ff-false-alarm-confirm {
     position: fixed;
@@ -219,19 +187,6 @@
     body.firefighter-dashboard-page .firefighter-mobile-assigned-fab {
         z-index: 1320 !important;
     }
-
-    body.firefighter-dashboard-page .ff-app-notice {
-        top: auto;
-        right: 14px;
-        bottom: calc(var(--ff-mobile-dock-h, 92px) + 14px);
-        left: 14px;
-        width: auto;
-        z-index: var(--ff-layer-notice, 6000);
-        border-radius: 16px;
-        transform: translateY(14px);
-    }
-
-    body.firefighter-dashboard-page .ff-app-notice.is-visible { transform: translateY(0); }
 
     body.firefighter-dashboard-page .ff-false-alarm-confirm { z-index: 10110; }
 

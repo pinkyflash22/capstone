@@ -1363,15 +1363,6 @@
     --}}
     <!-- MAIN CONTENT -->
     <main class="main-content">
-        <div id="firefighterMobileWelcomeToast" class="firefighter-mobile-welcome-toast" role="status" aria-live="polite">
-            <div class="firefighter-mobile-welcome-toast__icon">
-                <i class="fas fa-fire"></i>
-            </div>
-            <div class="firefighter-mobile-welcome-toast__copy">
-                <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                <span>Assigned calls and map updates are available.</span>
-            </div>
-        </div>
         <!-- TOP NAVIGATIONBAR -->
         <nav class="lector-top-bar">
             <div class="flex items-center gap-4">
@@ -3371,16 +3362,7 @@ function showFalseAlarmConfirmationToast() {
     
     // Show toast notification
     function showToast(message, type = 'info') {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        
-        toast.textContent = message;
-        toast.className = `toast toast-${type}`;
-        toast.style.display = 'block';
-        
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 3000);
+        window.PyroNotify?.notify(message, type);
     }
     
     function paintCurrentUserLocation(lat, lng) {
@@ -3964,7 +3946,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
     const insightsContent = document.getElementById('firefighterMobileInsightsContent');
     const insightsCloseButtons = document.querySelectorAll('[data-ff-insights-close]');
-    const welcomeToast = document.getElementById('firefighterMobileWelcomeToast');
     const insightSections = Array.from(document.querySelectorAll('[data-ff-insights-source]'));
     const insightPlaceholders = new Map();
 
@@ -4027,12 +4008,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    if (welcomeToast && window.innerWidth <= 768) {
+    if (window.innerWidth <= 768) {
         window.setTimeout(function () {
-            welcomeToast.classList.add('is-visible');
-            window.setTimeout(function () {
-                welcomeToast.classList.remove('is-visible');
-            }, 3200);
+            window.PyroNotify?.info('Assigned calls and map updates are available.', {
+                title: @json('Welcome back, '.auth()->user()->first_name.'!'),
+                duration: 3200,
+            });
         }, 260);
     }
 });

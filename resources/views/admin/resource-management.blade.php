@@ -2095,8 +2095,6 @@
         </div>
     </div>
 
-    <div id="toast"></div>
-
     <script>
         window.resourcesData = {
             stationOfficers: @json($stationOfficers),
@@ -2207,13 +2205,7 @@ if (officerForm) {
         let currentUserId = null;
 
         function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.style.background = type === 'success' ? '#10b981' : '#ef4444';
-            toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
+            window.PyroNotify?.notify(message, type);
         }
 
         function closeModal(modalId) {

@@ -34,6 +34,7 @@
     </style>
 </head>
 <body>
+    @include('partials.unified-notifications')
     @php
         $isStationAdminRoute = request()->routeIs('station-admin.*');
         $mapRoute = $isStationAdminRoute ? 'station-admin.maps' : 'admin.maps';

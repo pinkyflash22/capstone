@@ -840,32 +840,7 @@ class AnnouncementSystem {
     }
 
     showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-
-        const colors = {
-            success: '#15803d',
-            warning: '#d97706',
-            error: '#dc2626',
-            info: '#1d4ed8',
-        };
-
-        notification.innerHTML = `<span>${this.escapeHtml(message)}</span>`;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${colors[type] || colors.info};
-            color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
-            box-shadow: 0 12px 24px rgba(15,23,42,0.18);
-            z-index: 9999;
-            font-weight: 700;
-        `;
-
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 2600);
+        window.PyroNotify?.notify(message, type, 2600);
     }
 
     getTimeAgo(date) {

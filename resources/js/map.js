@@ -106,8 +106,6 @@ let riskHeatBlendMeters = (() => {
 let boundaryEditorContext = null;
 
 // Notification system
-let notifications = [];
-let notificationPanel = null;
 
 // Details panel
 let detailsPanel = null;
@@ -2941,49 +2939,9 @@ function ensureIncidentAlertStyles() {
             align-items: center;
             justify-content: center;
         }
-        .incident-alert-toast-stack {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 5600;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        .incident-alert-toast {
-            width: min(22rem, calc(100vw - 2rem));
-            background: linear-gradient(135deg, #7f1d1d, #ea580c);
-            color: #ffffff;
-            border-radius: 1rem;
-            padding: 0.9rem 1rem;
-            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.28);
-        }
-        .incident-alert-toast-title {
-            font-size: 0.85rem;
-            font-weight: 800;
-        }
-        .incident-alert-toast-message {
-            font-size: 0.75rem;
-            line-height: 1.45;
-            margin-top: 0.3rem;
-            color: rgba(255, 255, 255, 0.9);
-        }
     `;
 
     document.head.appendChild(style);
-}
-
-function ensureIncidentAlertToastStack() {
-    let toastStack = document.getElementById('incidentAlertToastStack');
-    if (toastStack) {
-        return toastStack;
-    }
-
-    toastStack = document.createElement('div');
-    toastStack.id = 'incidentAlertToastStack';
-    toastStack.className = 'incident-alert-toast-stack';
-    document.body.appendChild(toastStack);
-    return toastStack;
 }
 
 function ensureIncidentAlertPanel() {
@@ -3337,18 +3295,11 @@ function bindIncidentAlertPermissionPrompt() {
 }
 
 function showIncidentAlertToast(entry) {
-    const toastStack = ensureIncidentAlertToastStack();
-    const toast = document.createElement('div');
-    toast.className = 'incident-alert-toast';
-    toast.innerHTML = `
-        <div class="incident-alert-toast-title">${escapeHtml(entry.title)}</div>
-        <div class="incident-alert-toast-message">${escapeHtml(entry.message)}</div>
-    `;
-    toastStack.prepend(toast);
-
-    window.setTimeout(() => {
-        toast.remove();
-    }, 5500);
+    window.PyroNotify?.notify(entry.message, {
+        type: 'warning',
+        title: entry.title,
+        duration: 5500,
+    });
 }
 
 function sendBrowserIncidentNotification(entry) {
@@ -5322,88 +5273,8 @@ document.head.appendChild(styleElement);
 // NOTIFICATION SYSTEM (keeping your existing functions)
 // ============================================================================
 
-function initNotificationSystem() {
-    if (!document.getElementById('notificationContainer')) {
-        notificationPanel = document.createElement('div');
-        notificationPanel.id = 'notificationContainer';
-        notificationPanel.className = 'notification-container';
-        document.body.appendChild(notificationPanel);
-    } else {
-        notificationPanel = document.getElementById('notificationContainer');
-    }
-}
-
 function showNotification(message, type = 'info', title = 'Notification') {
-    if (!notificationPanel) {
-        initNotificationSystem();
-    }
-    
-    const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    const icons = {
-        success: '<i class="fas fa-check-circle" style="color: #10b981;"></i>',
-        warning: '<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>',
-        error: '<i class="fas fa-times-circle" style="color: #ef4444;"></i>',
-        info: '<i class="fas fa-info-circle" style="color: #3b82f6;"></i>'
-    };
-    
-    const titles = {
-        success: 'Success',
-        warning: 'Warning',
-        error: 'Error',
-        info: 'Information'
-    };
-    
-    const notification = document.createElement('div');
-    notification.id = id;
-    notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <div class="notification-header">
-            <div class="notification-title">
-                ${icons[type] || icons.info}
-                <span>${title || titles[type]}</span>
-            </div>
-            <div class="notification-close" onclick="document.getElementById('${id}').remove()">
-                <i class="fas fa-times"></i>
-            </div>
-        </div>
-        <div class="notification-content">
-            ${message}
-        </div>
-    `;
-    
-    notificationPanel.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.classList.add('expanded');
-    }, 100);
-    
-    setTimeout(() => {
-        if (document.getElementById(id)) {
-            notification.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => {
-                if (document.getElementById(id)) {
-                    notification.remove();
-                }
-            }, 300);
-        }
-    }, 5000);
-    
-    const header = notification.querySelector('.notification-header');
-    header.addEventListener('click', (e) => {
-        if (!e.target.classList.contains('notification-close') && !e.target.closest('.notification-close')) {
-            notification.classList.toggle('expanded');
-        }
-    });
-    
-    notifications.push({
-        id: id,
-        element: notification,
-        message: message,
-        type: type,
-        timestamp: Date.now()
-    });
-    
-    return id;
+    return window.PyroNotify?.notify(message, { type, title }) ?? null;
 }
 
 // Allow page-specific shells to use the shared themed notification surface.
@@ -8573,16 +8444,7 @@ async function calculateRouteWithGeoapify(origin, destination) {
 }
 
 function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-    
-    toast.textContent = message;
-    toast.className = `toast toast-${type}`;
-    toast.style.display = 'block';
-    
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 3000);
+    return window.PyroNotify?.notify(message, type) ?? null;
 }
 
 function getTruckPopupLoadingMarkup(truck = {}) {
@@ -12009,7 +11871,6 @@ function initAfterMapReady() {
     hydrantFeatureGroup = window.hydrantFeatureGroup;
     otherFeatureGroup = window.otherFeatureGroup;
     
-    initNotificationSystem();
     initDetailsPanel();
     initEditModal();
     
@@ -13167,16 +13028,7 @@ window.currentUserId = window.currentUserId || null;
 
 // Expose helper functions
 window.showToast = function(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-    
-    toast.textContent = message;
-    toast.className = `toast toast-${type}`;
-    toast.style.display = 'block';
-    
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 3000);
+    return window.PyroNotify?.notify(message, type) ?? null;
 };
 
 console.log('Map.js fully loaded - All functions exposed globally');

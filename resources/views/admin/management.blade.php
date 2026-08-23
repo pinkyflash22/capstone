@@ -611,7 +611,6 @@
         </div>
     </div>
     <!-- Toast Container -->
-    <div class="toast-container"></div>
 
     <script>
         // Mobile sidebar toggle

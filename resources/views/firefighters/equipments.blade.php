@@ -1196,11 +1196,6 @@
         </div>
     </div>
 
-    <div id="toast" class="toast info">
-        <i class="fas fa-circle-info"></i>
-        <span id="toastMessage"></span>
-    </div>
-
     <script>
         const initialFsicRequests = @json($assignedFsicRequests);
         let fsicRequests = Array.isArray(initialFsicRequests) ? initialFsicRequests : [];
@@ -1208,14 +1203,7 @@
         let activeInspectionRequest = null;
 
         function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            const text = document.getElementById('toastMessage');
-            toast.className = `toast ${type} show`;
-            text.textContent = message;
-            window.clearTimeout(window.fsicToastTimeout);
-            window.fsicToastTimeout = window.setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3200);
+            window.PyroNotify?.notify(message, type);
         }
 
         function escapeHtml(value) {

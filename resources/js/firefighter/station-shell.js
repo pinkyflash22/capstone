@@ -26,7 +26,6 @@ function bootFirefighterMyStationPage() {
     const equipmentSection = document.getElementById('stationEquipmentSection');
     const reportsContainer = document.getElementById('stationReportsPanelContainer');
     const reportTabs = document.getElementById('reportTabs');
-    const reportToastStack = document.getElementById('reportToastStack');
     const manageReportModal = document.getElementById('manageReportModal');
     const manageReportModalTitle = document.getElementById('manageReportModalTitle');
     const manageReportModalBody = document.getElementById('manageReportModalBody');
@@ -605,22 +604,7 @@ function bootFirefighterMyStationPage() {
     }
 
     function showToast(message, type = 'success', timeout = 3200) {
-        if (typeof window.showNotification === 'function') {
-            window.showNotification(message, type);
-            return;
-        }
-
-        if (!reportToastStack) {
-            console[type === 'error' ? 'error' : 'log'](message);
-            return;
-        }
-
-        const toast = document.createElement('div');
-        toast.className = `report-toast ${type}`;
-        toast.textContent = message;
-        reportToastStack.appendChild(toast);
-
-        window.setTimeout(() => toast.remove(), timeout);
+        window.PyroNotify?.notify(message, { type, duration: timeout });
     }
 
     const mobilePickerMedia = window.matchMedia('(max-width: 767px)');

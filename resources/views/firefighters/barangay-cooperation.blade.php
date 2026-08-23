@@ -303,12 +303,7 @@
                 let lastFocused = null;
 
                 const toast = (message, type = 'success') => {
-                    document.querySelector('.coop-toast')?.remove();
-                    const node = document.createElement('div');
-                    node.className = `coop-toast ${type === 'error' ? 'error' : ''}`;
-                    node.textContent = message;
-                    document.body.appendChild(node);
-                    window.setTimeout(() => node.remove(), 3200);
+                    window.PyroNotify?.notify(message, type, 3200);
                 };
 
                 const clearProofPreviews = (scope = modalBody) => {

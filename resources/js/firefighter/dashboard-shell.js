@@ -1667,11 +1667,6 @@ function showFalseAlarmConfirmationToast() {
     
     // Firefighter actions use one concise themed notification on every screen size.
     function showToast(message, type = 'info') {
-        const existing = document.getElementById('firefighterAppNotice');
-        if (existing) {
-            existing.remove();
-        }
-
         const normalized = String(message || '').toLowerCase();
         const conciseMessage = type === 'success'
             ? (normalized.includes('false alarm') ? 'False alarm recorded.'
@@ -1681,29 +1676,10 @@ function showFalseAlarmConfirmationToast() {
                 : 'Update saved.')
             : (type === 'error' ? 'Could not update this incident. Please try again.' : String(message || 'Update in progress.'));
 
-        const icons = {
-            success: 'fa-check',
-            error: 'fa-triangle-exclamation',
-            warning: 'fa-triangle-exclamation',
-            info: 'fa-bolt'
-        };
-        const notice = document.createElement('div');
-        notice.id = 'firefighterAppNotice';
-        notice.className = `ff-app-notice ff-app-notice--${type}`;
-        notice.setAttribute('role', 'status');
-        notice.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
-        notice.innerHTML = `<span class="ff-app-notice__icon" aria-hidden="true"><i class="fas ${icons[type] || icons.info}"></i></span><span class="ff-app-notice__message"></span><button type="button" class="ff-app-notice__close" aria-label="Dismiss notification"><i class="fas fa-xmark" aria-hidden="true"></i></button>`;
-        notice.querySelector('.ff-app-notice__message').textContent = conciseMessage;
-        document.body.appendChild(notice);
-
-        requestAnimationFrame(() => notice.classList.add('is-visible'));
-        const dismiss = () => {
-            notice.classList.remove('is-visible');
-            window.setTimeout(() => notice.remove(), 180);
-        };
-
-        notice.querySelector('.ff-app-notice__close')?.addEventListener('click', dismiss);
-        window.setTimeout(dismiss, type === 'error' ? 5200 : 3600);
+        window.PyroNotify?.notify(conciseMessage, {
+            type,
+            duration: type === 'error' ? 5200 : 3600,
+        });
     }
     
     function paintCurrentUserLocation(lat, lng) {
@@ -2495,7 +2471,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 document.addEventListener('DOMContentLoaded', function () {
     const assignedFab = document.getElementById('firefighterMobileAssignedFab');
-    const welcomeToast = document.getElementById('firefighterMobileWelcomeToast');
     const assignedQueueModal = document.getElementById('firefighterAssignedQueueModal');
     const assignedQueueModalContent = document.getElementById('firefighterAssignedQueueModalContent');
     const assignedQueueModalRefresh = document.getElementById('refreshAssignedIncidentsModal');
@@ -2579,13 +2554,5 @@ document.addEventListener('DOMContentLoaded', function () {
 
     syncFirefighterAssignedFabCount(window.assignedIncidentsData || []);
 
-    if (welcomeToast) {
-        window.setTimeout(function () {
-            welcomeToast.classList.add('is-visible');
-            window.setTimeout(function () {
-                welcomeToast.classList.remove('is-visible');
-            }, window.innerWidth <= 768 ? 3200 : 2800);
-        }, 260);
-    }
 });
 }

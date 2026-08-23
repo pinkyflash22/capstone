@@ -2571,15 +2571,6 @@
                 </button>
             </div>
         </div>
-        <div id="citizenMobileWelcomeToast" class="citizen-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
-            <div class="citizen-mobile-welcome-toast__icon">
-                <i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i>
-            </div>
-            <div class="citizen-mobile-welcome-toast__copy">
-                <strong>Welcome back, {{ $displayName }}</strong>
-                <span>Citizen portal is ready with your alerts, map, and reports.</span>
-            </div>
-        </div>
         <div id="citizenMobileNavSnackbar" class="citizen-mobile-nav-snackbar md:hidden" role="status" aria-live="polite" aria-atomic="true">
             <span class="citizen-mobile-nav-snackbar__spinner" aria-hidden="true"></span>
             <span id="citizenMobileNavSnackbarText">Loading page...</span>
@@ -3472,7 +3463,6 @@ if (navigator.geolocation) {
         const citizenMapLayersCloseButtons = document.querySelectorAll('[data-citizen-map-layers-close]');
         const citizenOpenLogsButtons = document.querySelectorAll('[data-citizen-open-logs]');
         const citizenAlertsOpen = document.querySelector('[data-citizen-alerts-open]');
-        const citizenMobileWelcomeToast = document.getElementById('citizenMobileWelcomeToast');
         const citizenInsightsPanel = document.querySelector('[data-citizen-insights-panel]');
         const citizenInsightsOpenButtons = document.querySelectorAll('[data-citizen-insights-open]');
         const citizenInsightsCloseButtons = document.querySelectorAll('[data-citizen-insights-close]');
@@ -3748,11 +3738,11 @@ if (navigator.geolocation) {
             }, 20);
         });
 
-        if (citizenMobileWelcomeToast && window.innerWidth <= 768) {
-            citizenMobileWelcomeToast.classList.add('is-visible');
-            window.setTimeout(() => {
-                citizenMobileWelcomeToast.classList.remove('is-visible');
-            }, 3200);
+        if (window.innerWidth <= 768) {
+            window.PyroNotify?.info('Citizen portal is ready with your alerts, map, and reports.', {
+                title: @json('Welcome back, '.$displayName),
+                duration: 3200,
+            });
         }
 
         const restoreCitizenInsightsSources = () => {
@@ -5360,20 +5350,7 @@ window.updateIncidentReportLoading = function(stage, detail = '') {
 };
 
 window.showCitizenToast = function(message, isError = false, duration = 2800) {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-
-    toast.textContent = message;
-    toast.style.background = isError
-        ? 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)'
-        : 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)';
-    toast.classList.add('show');
-
-    window.clearTimeout(window.citizenIncidentToastTimer);
-    window.citizenIncidentToastTimer = window.setTimeout(() => {
-        toast.classList.remove('show');
-        toast.style.background = '';
-    }, duration);
+    window.PyroNotify?.notify(message, isError ? 'error' : 'success', duration);
 };
 
 const CITIZEN_NEARBY_INCIDENT_RADIUS_METERS = 3000;

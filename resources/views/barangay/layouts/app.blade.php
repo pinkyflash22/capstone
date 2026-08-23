@@ -1019,6 +1019,7 @@
     @stack('styles')
 </head>
 <body class="barangay-portal-shell">
+    @include('partials.unified-notifications')
     @php
         $initialBarangayNotifications = auth()->check()
             ? auth()->user()->notifications()->latest()->limit(8)->get()
@@ -1156,16 +1157,6 @@
             <div id="barangayQuickReportStatus" class="barangay-quick-report-status" role="status" aria-live="polite"></div>
             <div id="barangayLiveAlertToast" class="barangay-live-alert-toast" role="alert" aria-live="assertive"></div>
 
-            <div id="barangayWelcomeToast" class="chief-mobile-welcome-toast" role="status" aria-live="polite">
-                <div class="chief-mobile-welcome-toast__icon">
-                    <i class="fa-solid fa-shield-heart"></i>
-                </div>
-                <div class="chief-mobile-welcome-toast__copy">
-                    <strong>@yield('page_title', 'Barangay Portal')</strong>
-                    <span>{{ $barangay?->barangay_name ?? 'Barangay Desk' }} is ready.</span>
-                </div>
-            </div>
-
             @if (! trim($__env->yieldContent('hide_hero')))
                 <section class="hero-card">
                     <div>
@@ -1191,7 +1182,6 @@
         document.addEventListener('DOMContentLoaded', function () {
             const sidebar = document.getElementById('sidebar');
             const openBtn = document.getElementById('openSidebar');
-            const welcomeToast = document.getElementById('barangayWelcomeToast');
             const quickReportStatus = document.getElementById('barangayQuickReportStatus');
             const quickReportButtons = document.querySelectorAll('[data-barangay-quick-report]');
             const userDropdownBtn = document.getElementById('userDropdownBtn');
@@ -1203,7 +1193,6 @@
             const notificationList = notificationShell?.querySelector('[data-barangay-notification-list]');
             const notificationBadge = notificationShell?.querySelector('[data-barangay-notification-badge]');
             const readAllNotificationsBtn = notificationShell?.querySelector('[data-barangay-notification-read-all]');
-            let welcomeToastTimer = null;
             let quickReportTimer = null;
             let notificationRefreshTimer = null;
             let barangayLiveAlertTimer = null;
@@ -1213,13 +1202,10 @@
                 sidebar?.classList.toggle('open');
             });
 
-            if (welcomeToast) {
-                welcomeToast.classList.add('is-visible');
-                window.clearTimeout(welcomeToastTimer);
-                welcomeToastTimer = window.setTimeout(() => {
-                    welcomeToast.classList.remove('is-visible');
-                }, 2800);
-            }
+            window.PyroNotify?.info(@json(($barangay?->barangay_name ?? 'Barangay Desk').' is ready.'), {
+                title: @json(trim($__env->yieldContent('page_title')) ?: 'Barangay Portal'),
+                duration: 2800,
+            });
 
             if (userDropdownBtn && userDropdownMenu) {
                 userDropdownBtn.addEventListener('click', function (event) {

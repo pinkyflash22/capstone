@@ -1,3 +1,5 @@
+@include('partials.unified-notifications')
+
 @php
     $current = $active ?? 'dashboard';
     $user = auth()->user();

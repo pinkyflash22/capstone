@@ -38,8 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
         viewModal: document.getElementById('viewResourceModal'),
         resourceForm: document.getElementById('resourceForm'),
         resourceType: document.getElementById('resourceType'),
-        stationId: document.getElementById('stationId'),
-        toastContainer: document.querySelector('.toast-container')
+        stationId: document.getElementById('stationId')
     };
 
     // ===== INITIALIZATION =====
@@ -636,35 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showToast(message, type = 'info') {
-        if (!elements.toastContainer) return;
-        
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icons = {
-            success: 'fa-circle-check',
-            error: 'fa-circle-exclamation',
-            warning: 'fa-triangle-exclamation',
-            info: 'fa-circle-info'
-        };
-        
-        toast.innerHTML = `
-            <i class="fa-solid ${icons[type] || icons.info}"></i>
-            <div class="toast-content">
-                <div class="toast-message">${message}</div>
-            </div>
-            <button class="toast-close"><i class="fa-solid fa-times"></i></button>
-        `;
-
-        elements.toastContainer.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
-
-        toast.querySelector('.toast-close').addEventListener('click', () => {
-            toast.remove();
-        });
+        window.PyroNotify?.notify(message, type);
     }
 
     function setupSidebar() {

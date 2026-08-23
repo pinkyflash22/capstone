@@ -1575,16 +1575,6 @@
 
         <!-- DASHBOARD CONTENT -->
         <div class="dashboard-container">
-            <div id="adminDashboardWelcomeToast" class="dashboard-welcome-toast" role="status" aria-live="polite">
-                <div class="dashboard-welcome-toast__icon">
-                    <i class="fa-solid fa-signal"></i>
-                </div>
-                <div class="dashboard-welcome-toast__copy">
-                    <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                    <span>Your provincial command overview is ready with live station and incident visibility.</span>
-                </div>
-            </div>
-
             <div class="chief-dashboard-welcome bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-8 mb-8 flex items-start justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-amber-900 mb-2">Welcome back, Provincial Admin {{ auth()->user()->first_name }}!</h1>
@@ -2747,7 +2737,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        const welcomeToast = document.getElementById('adminDashboardWelcomeToast');
         // Alert bell toggle
         const alertBell = document.getElementById('alertBell');
         const alertsDropdown = document.getElementById('alertsDropdown');
@@ -2769,12 +2758,10 @@
         // Initialize all charts
         initializeCharts();
 
-        if (welcomeToast) {
-            welcomeToast.classList.add('is-visible');
-            window.setTimeout(() => {
-                welcomeToast.classList.remove('is-visible');
-            }, 3200);
-        }
+        window.PyroNotify?.info('Your provincial command overview is ready with live station and incident visibility.', {
+            title: @json('Welcome back, '.auth()->user()->first_name.'!'),
+            duration: 3200,
+        });
 
         initializeAdminDashboardPolling();
 

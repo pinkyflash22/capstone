@@ -47,11 +47,7 @@ if (app) {
     }
 
     function toast(message, error = false) {
-        const node = document.createElement('div');
-        node.className = `duty-roster__toast${error ? ' duty-roster__toast--error' : ''}`;
-        node.textContent = message;
-        document.body.appendChild(node);
-        setTimeout(() => node.remove(), 3200);
+        window.PyroNotify?.notify(message, error ? 'error' : 'success');
     }
 
     function options(officers, placeholder = 'Select personnel') {

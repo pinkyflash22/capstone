@@ -3783,7 +3783,6 @@
         </div>
     </div>
     <!-- Toast Container -->
-    <div class="toast-container"></div>
 
     <script>
         // Mobile sidebar toggle
@@ -3964,8 +3963,6 @@
             const galleryDeleteModal = document.getElementById('galleryDeleteModal');
             const galleryDeleteForm = document.getElementById('galleryDeleteForm');
             const galleryDeleteName = document.getElementById('galleryDeleteName');
-            const toastContainer = document.querySelector('.toast-container');
-
             const closeModalElement = (modal) => {
                 if (!modal) return;
                 modal.classList.remove('active');
@@ -3979,29 +3976,7 @@
             };
 
             const renderInlineToast = (message, type = 'info') => {
-                if (!toastContainer || !message) return;
-                const iconMap = {
-                    success: 'fa-circle-check',
-                    error: 'fa-circle-exclamation',
-                    warning: 'fa-triangle-exclamation',
-                    info: 'fa-circle-info',
-                };
-
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.innerHTML = `
-                    <i class="fa-regular ${iconMap[type] || iconMap.info}"></i>
-                    <div class="toast-content">
-                        <div class="toast-message">${message}</div>
-                    </div>
-                    <button class="toast-close" type="button">
-                        <i class="fa-solid fa-times"></i>
-                    </button>
-                `;
-
-                toast.querySelector('.toast-close')?.addEventListener('click', () => toast.remove());
-                toastContainer.appendChild(toast);
-                window.setTimeout(() => toast.remove(), 5000);
+                window.PyroNotify?.notify(message, type, 5000);
             };
 
             const flashSuccess = @json(session('success'));

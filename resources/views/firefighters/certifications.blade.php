@@ -182,8 +182,6 @@
     <!-- Upload Modal -->
     <div id="uploadModal" class="modal"><div class="modal-content"><h3 style="margin-bottom: 20px;">Upload Certification</h3><form id="uploadForm"><div class="form-group"><label class="form-label">Certification Name</label><input type="text" class="form-input" id="certName" required></div><div class="form-group"><label class="form-label">Issued By</label><input type="text" class="form-input" id="certIssuer" required></div><div class="form-group"><label class="form-label">Issue Date</label><input type="date" class="form-input" id="certIssueDate" required></div><div class="form-group"><label class="form-label">Expiry Date</label><input type="date" class="form-input" id="certExpiryDate"></div><div class="form-group"><label class="form-label">Certificate Number</label><input type="text" class="form-input" id="certNumber" placeholder="Optional"></div><div class="form-group"><label class="form-label">Upload File</label><input type="file" class="form-input" id="certFile" accept=".pdf,.jpg,.png"></div><div class="flex justify-end gap-2"><button type="button" class="btn btn-outline" onclick="closeUploadModal()">Cancel</button><button type="submit" class="btn btn-primary">Upload</button></div></form></div></div>
 
-    <div id="toast" class="toast"></div>
-
     <script>
         let certifications = [
             { id: 1, name: 'Firefighter I', issuer: 'BFP', issueDate: '2022-01-15', expiryDate: '2025-01-15', number: 'FF-001-2022', status: 'active' },
@@ -266,7 +264,7 @@
         
         function formatDate(dateStr) { if (!dateStr) return 'N/A'; const d = new Date(dateStr); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
-        function showToast(message, type) { const toast = document.getElementById('toast'); toast.textContent = message; toast.className = `toast toast-${type}`; toast.style.display = 'block'; setTimeout(() => { toast.style.display = 'none'; }, 3000); }
+        function showToast(message, type) { window.PyroNotify?.notify(message, type); }
         
         window.showUploadModal = showUploadModal; window.closeUploadModal = closeUploadModal; window.viewCert = viewCert; window.renewCert = renewCert;
     </script>

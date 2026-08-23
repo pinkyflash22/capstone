@@ -61,13 +61,3 @@
         </div>
     </div>
 </nav>
-
-<div id="adminMobileWelcomeToast" class="chief-mobile-welcome-toast md:hidden" role="status" aria-live="polite">
-    <div class="chief-mobile-welcome-toast__icon">
-        <i class="fa-solid fa-signal"></i>
-    </div>
-    <div class="chief-mobile-welcome-toast__copy">
-        <strong>{{ $title }}</strong>
-        <span>{{ $subtitle }}</span>
-    </div>
-</div>

@@ -503,16 +503,6 @@
 
         <!-- DASHBOARD CONTENT -->
         <div class="dashboard-container chief-dashboard-container">
-            <div id="chiefMobileWelcomeToast" class="dashboard-welcome-toast" role="status" aria-live="polite">
-                <div class="dashboard-welcome-toast__icon">
-                    <i class="fa-solid fa-signal"></i>
-                </div>
-                <div class="dashboard-welcome-toast__copy">
-                    <strong>Welcome back, {{ auth()->user()->first_name }}!</strong>
-                    <span>Chief Command is ready. Recent system insights are loaded below.</span>
-                </div>
-            </div>
-
             <div id="chiefMobileInsightsPanel" class="chief-mobile-insights-panel md:hidden" aria-hidden="true">
                 <div class="chief-mobile-insights-panel__backdrop" data-chief-insights-close></div>
                 <div class="chief-mobile-insights-panel__sheet">
@@ -1600,7 +1590,6 @@
             ]);
         });
 
-        const mobileWelcomeToast = document.getElementById('chiefMobileWelcomeToast');
         const insightsPanel = document.getElementById('chiefMobileInsightsPanel');
         const insightsContent = document.getElementById('chiefMobileInsightsContent');
         const insightsSources = Array.from(document.querySelectorAll('[data-chief-insights-source]'));
@@ -1611,18 +1600,11 @@
             return placeholder;
         });
         const isMobileViewport = () => window.innerWidth <= 768;
-        let mobileToastTimer = null;
-
         function showMobileWelcomeToast() {
-            if (!mobileWelcomeToast) {
-                return;
-            }
-
-            mobileWelcomeToast.classList.add('is-visible');
-            window.clearTimeout(mobileToastTimer);
-            mobileToastTimer = window.setTimeout(() => {
-                mobileWelcomeToast.classList.remove('is-visible');
-            }, 3200);
+            window.PyroNotify?.info('Chief Command is ready. Recent system insights are loaded below.', {
+                title: @json('Welcome back, '.auth()->user()->first_name.'!'),
+                duration: 3200,
+            });
         }
 
         function openInsightsPanel() {
@@ -3271,32 +3253,14 @@
     });
     
     window.showChiefRouteToast = function(message, state = 'loading') {
-        let toast = document.getElementById('chiefRouteToast');
-
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'chiefRouteToast';
-            toast.className = 'chief-route-toast';
-            toast.setAttribute('role', 'status');
-            toast.setAttribute('aria-live', 'polite');
-            toast.innerHTML = `
-                <span class="chief-route-toast__spinner" aria-hidden="true"></span>
-                <span class="chief-route-toast__icon" aria-hidden="true"></span>
-                <span class="chief-route-toast__copy"></span>
-            `;
-            document.body.appendChild(toast);
-        }
-
-        toast.classList.remove('chief-route-toast--loading', 'chief-route-toast--success', 'chief-route-toast--error');
-        toast.classList.add('is-visible', `chief-route-toast--${state}`);
-        toast.querySelector('.chief-route-toast__copy').textContent = message || 'Loading route...';
-
-        window.clearTimeout(window.__chiefRouteToastTimer);
-        if (state !== 'loading') {
-            window.__chiefRouteToastTimer = window.setTimeout(() => {
-                toast.classList.remove('is-visible');
-            }, 2600);
-        }
+        const type = state === 'error' ? 'error' : (state === 'success' ? 'success' : 'info');
+        window.PyroNotify?.notify(message || 'Loading route...', {
+            type,
+            title: state === 'loading' ? 'Preparing route' : 'Route update',
+            duration: 2600,
+            persistent: state === 'loading',
+            key: 'chief-route',
+        });
     };
 
     function installChiefRouteFeedbackWrappers() {

@@ -1,3 +1,5 @@
+@include('partials.unified-notifications')
+
 @php
     $sidebarId = $sidebarId ?? 'ffSidebar';
     $backdropId = $backdropId ?? 'ffSidebarBackdrop';

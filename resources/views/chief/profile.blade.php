@@ -359,8 +359,6 @@
         </div>
     </main>
 
-    <div id="toast"></div>
-
     <div id="chiefProfileLoadingOverlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm hidden items-center justify-center z-[120]">
         <div class="bg-white rounded-2xl shadow-xl px-6 py-5 flex items-center gap-3 text-slate-700">
             <span class="text-orange-600"><i class="fa-solid fa-spinner fa-spin"></i></span>
@@ -423,25 +421,13 @@
         const selectedBarangayId = @json((string) old('barangay_id', $profileBarangay?->barangay_id));
         const loadingOverlay = document.getElementById('chiefProfileLoadingOverlay');
         const saveBtn = document.getElementById('chiefProfileSaveBtn');
-        const toast = document.getElementById('toast');
 
         if (!profileForm || !citySelect || !barangaySelect) {
             return;
         }
 
         function showProfileToast(message, isError = false) {
-            if (!toast) {
-                return;
-            }
-
-            toast.textContent = message;
-            toast.style.background = isError ? 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)' : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)';
-            toast.classList.add('show');
-
-            window.clearTimeout(window.chiefProfileToastTimer);
-            window.chiefProfileToastTimer = window.setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2800);
+            window.PyroNotify?.notify(message, isError ? 'error' : 'success', 2800);
         }
 
         function clearProfileErrors() {

@@ -3442,8 +3442,6 @@
         </div>
     </div>
 
-    <div id="toast"></div>
-
     <script>
         window.resourcesData = {
             stationOfficers: @json($stationOfficers),
@@ -3552,30 +3550,8 @@ if (officerForm) {
         let currentOfficerId = null;
         let currentTeamId = null;
         let currentUserId = null;
-        let toastTimer = null;
-
         function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            if (!toast) return;
-
-            toast.textContent = message;
-            toast.style.display = '';
-            toast.className = '';
-            toast.classList.add(`toast-${type}`, 'show');
-
-            if (toastTimer) {
-                clearTimeout(toastTimer);
-            }
-
-            toastTimer = setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    if (!toast.classList.contains('show')) {
-                        toast.className = '';
-                        toast.style.display = 'none';
-                    }
-                }, 180);
-            }, 2800);
+            window.PyroNotify?.notify(message, type);
         }
 
         function closeModal(modalId) {

@@ -2004,11 +2004,8 @@
         <img id="firefighterProfileViewerImage" alt="Profile photo preview">
     </div>
 
-    <div class="profile-toast" id="profileToast" role="status" aria-live="polite"></div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const toast = document.getElementById('profileToast');
             const modals = Array.from(document.querySelectorAll('.profile-modal'));
             const discardConfirm = document.getElementById('profileDiscardConfirm');
             const keepEditingBtn = document.getElementById('profileKeepEditing');
@@ -2292,16 +2289,7 @@
             }
 
             function showProfileToast(message, tone = 'success') {
-                if (!toast || !message) return;
-                toast.textContent = message;
-                toast.style.background = tone === 'error'
-                    ? 'linear-gradient(135deg, #be123c 0%, #ef4444 100%)'
-                    : 'linear-gradient(135deg, #166534 0%, #22c55e 100%)';
-                toast.classList.add('show');
-                window.clearTimeout(showProfileToast.timer);
-                showProfileToast.timer = window.setTimeout(() => {
-                    toast.classList.remove('show');
-                }, 3200);
+                window.PyroNotify?.notify(message, tone, 3200);
             }
 
             function serializeForm(form) {

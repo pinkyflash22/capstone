@@ -95,6 +95,7 @@
                                     'draft_ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
                                     'analysis_id' => $checklist->analysis_id,
                                 ]);
+                            $evidence = data_get($checklist->ai_payload, 'evidence_summary', []);
                         @endphp
                         <tr data-checklist-row="{{ $checklist->ai_action_plan_checklist_id }}">
                             <td data-label="Select"><input type="checkbox" data-select-checklist value="{{ $checklist->ai_action_plan_checklist_id }}" aria-label="Select {{ $checklist->plan_title }}"></td>
@@ -141,6 +142,19 @@
                                 <div><span>Field progress</span><strong>{{ $progress['followed'] }} of {{ $progress['total'] }} steps followed</strong></div>
                                 <div class="modal-progress-card__bar"><span style="width:{{ $progress['percent'] }}%"></span></div>
                             </div>
+
+                            @if (is_array($evidence) && ! empty($evidence))
+                                <section class="modal-section">
+                                    <div class="modal-section__head"><h4><i class="fa-solid fa-database"></i> Barangay evidence used</h4><span>Analysis {{ $checklist->analysis_id }}</span></div>
+                                    <dl class="modal-evidence-grid">
+                                        <div><dt>Forecast</dt><dd>{{ isset($evidence['probability_percent']) ? number_format((float) $evidence['probability_percent'], 1) . '%' : 'Unavailable' }} · {{ ucfirst($evidence['risk_level'] ?? 'unknown') }}</dd></div>
+                                        <div><dt>Verified records</dt><dd>{{ (int) ($evidence['verified_risk_count'] ?? 0) }} risk · {{ (int) ($evidence['verified_hazard_count'] ?? 0) }} hazard</dd></div>
+                                        <div><dt>Fire history</dt><dd>{{ (int) ($evidence['historical_incident_count'] ?? 0) }} historical · {{ (int) ($evidence['current_month_fire_incidents'] ?? 0) }} this month</dd></div>
+                                        <div><dt>Local findings</dt><dd>{{ (int) ($evidence['matched_finding_count'] ?? 0) }} matched · pressure {{ number_format((float) ($evidence['risk_area_pressure_signal'] ?? 0), 2) }}</dd></div>
+                                    </dl>
+                                    <p class="modal-evidence-focus"><strong>Local focus:</strong> {{ ucfirst($evidence['leading_condition'] ?? 'fire-prevention readiness') }} · {{ $evidence['leading_location'] ?? 'Barangay-wide priority areas' }}</p>
+                                </section>
+                            @endif
 
                             <section class="modal-section">
                                 <div class="modal-section__head"><h4><i class="fa-solid fa-shoe-prints"></i> Checklist steps</h4><span>{{ $progress['pending'] }} pending</span></div>

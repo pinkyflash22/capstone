@@ -1669,33 +1669,7 @@ function setAnonymousReportButtonsLoading(isLoading) {
 }
 
 function showLandingToast(message, isError = false, timeoutMs = 3600) {
-    const toast = document.querySelector('[data-landing-toast]');
-    const toastMessage = document.querySelector('[data-landing-toast-message]');
-    const toastIcon = document.querySelector('[data-landing-toast-icon]');
-
-    if (!toast || !toastMessage) {
-        if (isError) {
-            console.error(message);
-        } else {
-            console.info(message);
-        }
-        return;
-    }
-
-    window.clearTimeout(showLandingToast.hideTimer);
-    toastMessage.textContent = message;
-    toast.classList.toggle('is-error', isError);
-    toast.classList.add('is-visible');
-
-    if (toastIcon) {
-        toastIcon.className = isError
-            ? 'fa-solid fa-triangle-exclamation'
-            : 'fa-solid fa-circle-check';
-    }
-
-    showLandingToast.hideTimer = window.setTimeout(() => {
-        toast.classList.remove('is-visible');
-    }, timeoutMs);
+    window.PyroNotify?.notify(message, isError ? 'error' : 'success', { duration: timeoutMs });
 }
 
 function formatEmergencyCoordinates(coords) {

@@ -581,50 +581,7 @@ createPostElement(post) {
     }
 
     showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        
-        const icons = {
-            success: 'fa-regular fa-circle-check',
-            warning: 'fa-solid fa-triangle-exclamation',
-            error: 'fa-solid fa-circle-exclamation',
-            info: 'fa-regular fa-bell'
-        };
-        
-        const colors = {
-            success: '#10b981',
-            warning: '#f59e0b',
-            error: '#ef4444',
-            info: '#3b82f6'
-        };
-
-        notification.innerHTML = `
-            <i class="${icons[type] || icons.info}"></i>
-            <span>${message}</span>
-        `;
-
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${colors[type] || colors.info};
-            color: white;
-            padding: 12px 24px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: slideIn 0.3s ease;
-        `;
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
+        window.PyroNotify?.notify(message, type);
     }
 
     getTimeAgo(date) {

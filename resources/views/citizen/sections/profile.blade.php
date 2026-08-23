@@ -1937,17 +1937,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showProfileToast(message, isError = false) {
-        if (!toast) return;
-
-        toast.textContent = message;
-        toast.style.background = isError ? 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)' : '';
-        toast.classList.add('show');
-
-        window.clearTimeout(window.citizenProfileToastTimer);
-        window.citizenProfileToastTimer = window.setTimeout(() => {
-            toast.classList.remove('show');
-            if (!isError) toast.style.background = '';
-        }, 2800);
+        window.PyroNotify?.notify(message, isError ? 'error' : 'success', 2800);
     }
 
     function setMessage(node, message = '', isError = false) {

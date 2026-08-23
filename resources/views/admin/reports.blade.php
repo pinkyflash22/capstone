@@ -815,12 +815,6 @@
         </div>
     </main>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast">
-        <i class="fa-solid fa-circle-check"></i>
-        <span id="toastMessage"></span>
-    </div>
-
     <script>
         // Pass PHP variables to JavaScript
         window.reportsData = {
@@ -838,14 +832,7 @@
 
         // Function to show toast notification
         function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
-            toastMessage.textContent = message;
-            toast.className = `toast ${type}`;
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+            window.PyroNotify?.notify(message, type);
         }
 
         // Function to generate report based on filters

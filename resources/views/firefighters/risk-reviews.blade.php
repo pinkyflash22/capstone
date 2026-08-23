@@ -1505,28 +1505,6 @@
     $statusMessage = session('status');
 @endphp
 
-@if ($statusMessage)
-    <div
-        id="ffReviewToast"
-        class="ff-review-toast"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        data-toast-message="{{ $statusMessage }}"
-    >
-        <div class="ff-review-toast__icon" aria-hidden="true">
-            <i class="fa-solid fa-circle-check"></i>
-        </div>
-        <div class="ff-review-toast__body">
-            <div class="ff-review-toast__title">Review updated</div>
-            <div class="ff-review-toast__message">{{ $statusMessage }}</div>
-        </div>
-        <button type="button" class="ff-review-toast__close" data-dismiss-review-toast aria-label="Close notification">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-    </div>
-@endif
-
 <div class="dashboard-shell firefighter-shell ff-page-shell">
     @include('firefighters.partials.shell-sidebar', ['active' => 'risk-reviews'])
 
@@ -2056,7 +2034,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const dynamicRoot = () => document.querySelector('[data-review-dynamic-root]');
         const filterForm = () => document.querySelector('[data-review-filter-form]');
-        const reviewToast = () => document.getElementById('ffReviewToast');
 
         const closeModal = (modal) => {
             if (!modal) {
@@ -2280,27 +2257,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
-        const bindToast = () => {
-            const toast = reviewToast();
-            if (!toast || toast.dataset.toastBound === 'true') {
-                return;
-            }
-
-            toast.dataset.toastBound = 'true';
-
-            const hideToast = () => {
-                toast.classList.remove('is-visible');
-            };
-
-            toast.querySelector('[data-dismiss-review-toast]')?.addEventListener('click', hideToast);
-
-            window.setTimeout(() => {
-                toast.classList.add('is-visible');
-            }, 120);
-
-            window.setTimeout(hideToast, 4200);
-        };
-
         const setDynamicLoading = (isLoading) => {
             const root = dynamicRoot();
             if (!root) {
@@ -2462,7 +2418,6 @@ document.addEventListener('DOMContentLoaded', function () {
             bindReviewSteppers();
             bindReviewFieldValidation();
             bindReviewFormValidation();
-            bindToast();
             bindFilterControls();
             bindPaginationLinks();
         };

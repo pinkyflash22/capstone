@@ -49,11 +49,6 @@
         </div>
     </section>
 
-    <div class="landing-toast" data-landing-toast role="status" aria-live="polite" aria-atomic="true">
-        <i class="fa-solid fa-circle-info" data-landing-toast-icon></i>
-        <span data-landing-toast-message>Ready.</span>
-    </div>
-
     <div id="emergencyCallConfirm" class="emergency-call-confirm" aria-hidden="true">
         <div class="emergency-call-confirm__backdrop" data-emergency-call-cancel></div>
         <section class="emergency-call-confirm__card" role="dialog" aria-modal="true" aria-labelledby="emergencyCallConfirmTitle">

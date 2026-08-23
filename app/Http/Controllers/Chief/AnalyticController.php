@@ -1244,8 +1244,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 ->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))
                 ->pluck('barangay_id')
                 ->filter()
-                ->take(3)
                 ->map(fn ($id) => (int) $id)
+                ->unique()
                 ->values();
         }
 
@@ -1263,8 +1263,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             ->where('risk_areas.station_id', $stationId)
             ->whereIn('barangay_halls.barangay_id', $focusBarangayIds->all())
             ->where(function ($query) {
-                $query->whereNull('risk_areas.review_status')
-                    ->orWhereNotIn('risk_areas.review_status', ['rejected']);
+                $query->where('risk_areas.review_status', 'approved')
+                    ->orWhere('risk_areas.status', 'verified');
+            })
+            ->where(function ($query) {
+                $query->whereNull('risk_areas.review_type')
+                    ->orWhere('risk_areas.review_type', '!=', 'delete');
             })
             ->select(
                 'risk_areas.risk_area_id',
@@ -1301,8 +1305,14 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 END
             ")
             ->orderByDesc('risk_areas.created_at')
-            ->limit(12)
             ->get();
+
+        // Keep the prompt compact without allowing the busiest barangay to
+        // consume the evidence allowance for every other covered barangay.
+        $records = $records
+            ->groupBy('barangay_id')
+            ->flatMap(fn ($barangayRecords) => $barangayRecords->take(5))
+            ->values();
 
         $focusFindings = $records->map(function ($record) {
             $typeLabel = $record->entry_type === 'hazard'
@@ -3092,7 +3102,7 @@ private function trimAiPrompt(string $prompt): string
     ): array {
         $prediction = collect($rawData['barangay_predictions'] ?? [])
             ->first(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $barangayId) ?? [];
-        $finding = collect(data_get($rawData, 'recommendation_context.focus_findings', []))
+        $barangayFindings = collect(data_get($rawData, 'recommendation_context.focus_findings', []))
             ->filter(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $barangayId)
             ->sortBy(function ($item) {
                 return match (strtolower((string) ($item['assessment_level'] ?? ''))) {
@@ -3102,21 +3112,59 @@ private function trimAiPrompt(string $prompt): string
                     default => 3,
                 };
             })
-            ->first() ?? [];
+            ->values();
+        $finding = $barangayFindings->first() ?? [];
 
         $barangayName = trim((string) ($prediction['barangay_name'] ?? $finding['barangay_name'] ?? "Barangay {$barangayId}"));
+        $predictionInput = is_array($prediction['input'] ?? null) ? $prediction['input'] : [];
         $probability = is_numeric($prediction['probability_percent'] ?? null)
             ? round((float) $prediction['probability_percent'], 1)
             : null;
         $riskLevel = strtolower((string) ($prediction['risk_level'] ?? $finding['assessment_level'] ?? 'medium'));
         $priority = $this->barangayActionPlanPriority($riskLevel, $probability);
-        $condition = trim((string) ($finding['condition_label'] ?? $finding['type_label'] ?? 'fire-risk conditions'));
-        $location = trim((string) ($finding['street_or_sitio'] ?? 'priority areas'));
-        $title = Str::limit("Inspect {$condition} in {$location}, {$barangayName}", 180, '');
+        $verifiedRiskCount = max(0, (int) ($predictionInput['verified_risk_count'] ?? 0));
+        $verifiedHazardCount = max(0, (int) ($predictionInput['verified_hazard_count'] ?? 0));
+        $historicalIncidentCount = max(0, (int) ($predictionInput['incident_count'] ?? 0));
+        $currentMonthFireCount = max(0, (int) ($predictionInput['current_month_fire_incidents'] ?? 0));
+        $condition = trim((string) ($finding['condition_label'] ?? $finding['type_label'] ?? ''));
+        if ($condition === '') {
+            $condition = match (true) {
+                $verifiedHazardCount > 0 => 'verified hazard conditions',
+                $verifiedRiskCount > 0 => 'verified fire-risk conditions',
+                $historicalIncidentCount > 0 || $currentMonthFireCount > 0 => 'repeat fire history',
+                default => 'fire-prevention readiness',
+            };
+        }
+        $location = trim((string) ($finding['street_or_sitio'] ?? 'barangay-wide priority areas'));
+        $actionVerb = $barangayFindings->isNotEmpty() ? 'Inspect' : 'Review';
+        $title = Str::limit("{$actionVerb} {$condition} in {$location}, {$barangayName}", 180, '');
+
+        $evidenceSummary = [
+            'barangay_id' => $barangayId,
+            'barangay_name' => $barangayName,
+            'probability_percent' => $probability,
+            'risk_level' => $riskLevel,
+            'priority_level' => $priority,
+            'verified_risk_count' => $verifiedRiskCount,
+            'verified_hazard_count' => $verifiedHazardCount,
+            'matched_finding_count' => $barangayFindings->count(),
+            'historical_incident_count' => $historicalIncidentCount,
+            'current_month_fire_incidents' => $currentMonthFireCount,
+            'risk_area_pressure_signal' => round((float) ($predictionInput['risk_area_pressure_signal'] ?? 0), 2),
+            'leading_condition' => $condition,
+            'leading_location' => $location,
+            'source_risk_area_ids' => $barangayFindings
+                ->pluck('risk_area_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values()
+                ->all(),
+        ];
 
         $context = [
             "{$barangayName} is assessed at " . strtoupper($riskLevel) . ' fire risk' . ($probability !== null ? " ({$probability}% probability)." : '.'),
             ! empty($finding['summary']) ? 'Local focus: ' . trim((string) $finding['summary']) . '.' : null,
+            "Evidence used: {$verifiedRiskCount} verified risk(s), {$verifiedHazardCount} verified hazard(s), {$historicalIncidentCount} historical incident record(s), and {$currentMonthFireCount} completed fire(s) this month.",
         ];
         $driver = collect($prediction['drivers'] ?? [])->first();
         $driverSummary = is_array($driver) ? ($driver['summary'] ?? null) : $driver;
@@ -3132,7 +3180,7 @@ private function trimAiPrompt(string $prompt): string
             default => 45,
         };
         $items = [
-            "Validate the {$condition} finding in {$location}, {$barangayName}.",
+            "Validate the {$condition} evidence in {$location}, {$barangayName}.",
             "Assign a barangay focal person and response team for {$barangayName}.",
             "Apply and document the required control for {$condition}.",
             "Verify completion with dated field evidence and update the {$barangayName} risk record.",
@@ -3151,6 +3199,7 @@ private function trimAiPrompt(string $prompt): string
             'target_days' => $targetDays,
             'checklist_items' => $items,
             'success_indicator' => "The {$condition} finding in {$barangayName} is verified, controlled, and supported by field evidence.",
+            'evidence_summary' => $evidenceSummary,
         ]);
 
         return [$localizedPlan, $localizedRecommendation];

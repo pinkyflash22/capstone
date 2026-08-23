@@ -16,9 +16,6 @@ const responderCacheKey = 'pyrosense:nearestResponder';
 const responderCacheMaxAgeMs = 60 * 1000;
 const responderCacheMaxDistanceMeters = 150;
 const reverseGeocodeCacheKey = 'pyrosense:mobileHubReverseGeocode';
-let hubToastTimer = null;
-let hubToastActionHandler = null;
-
 if (reportButton) {
     reportButton.addEventListener('click', submitMobileHubIncidentReport);
 }
@@ -81,52 +78,14 @@ function openDashboard() {
 }
 
 function showHubToast(message, type = 'success', options = {}) {
-    let toast = document.getElementById('mobileHubToast');
-
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'mobileHubToast';
-        toast.className = 'mobile-hub-toast';
-        toast.setAttribute('role', 'status');
-        toast.setAttribute('aria-live', 'polite');
-        document.body.appendChild(toast);
-    }
-
-    window.clearTimeout(hubToastTimer);
-    hubToastActionHandler = null;
-
     const actionLabel = typeof options.actionLabel === 'string' ? options.actionLabel.trim() : '';
     const onAction = typeof options.onAction === 'function' ? options.onAction : null;
-
-    const messageNode = document.createElement('span');
-    messageNode.className = 'mobile-hub-toast__message';
-    messageNode.textContent = message;
-
-    const inner = document.createElement('div');
-    inner.className = 'mobile-hub-toast__inner';
-    inner.appendChild(messageNode);
-
-    if (actionLabel && onAction) {
-        const actionButton = document.createElement('button');
-        actionButton.type = 'button';
-        actionButton.className = 'mobile-hub-toast__action';
-        actionButton.textContent = actionLabel;
-        actionButton.addEventListener('click', () => {
-            toast.classList.remove('is-visible');
-            hubToastActionHandler = null;
-            onAction();
-        });
-        inner.appendChild(actionButton);
-        hubToastActionHandler = onAction;
-    }
-
-    toast.replaceChildren(inner);
-    toast.className = `mobile-hub-toast is-visible ${type === 'error' ? 'is-error' : 'is-success'}`;
-
-    hubToastTimer = window.setTimeout(() => {
-        toast.classList.remove('is-visible');
-        hubToastActionHandler = null;
-    }, 3200);
+    window.PyroNotify?.notify(message, {
+        type: type === 'error' ? 'error' : 'success',
+        duration: 3200,
+        actionLabel,
+        onAction,
+    });
 }
 
 function clearHubStatus() {

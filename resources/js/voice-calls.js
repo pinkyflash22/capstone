@@ -91,24 +91,8 @@ async function ensureCitizenVoiceSession() {
     return voiceSessionBootstrapPromise;
 }
 
-function ensureToastStack() {
-    let stack = document.querySelector('[data-pyro-voice-toast-stack]');
-    if (!stack) {
-        stack = document.createElement('div');
-        stack.className = 'pyro-voice-toast-stack';
-        stack.dataset.pyroVoiceToastStack = 'true';
-        document.body.appendChild(stack);
-    }
-    return stack;
-}
-
 function toast(message, type = 'info') {
-    const stack = ensureToastStack();
-    const item = document.createElement('div');
-    item.className = `pyro-voice-toast pyro-voice-toast--${type}`;
-    item.textContent = message;
-    stack.appendChild(item);
-    setTimeout(() => item.remove(), 4200);
+    window.PyroNotify?.notify(message, { type, duration: 4200 });
 }
 
 function setCallerTriggerState(trigger, state = 'idle') {
