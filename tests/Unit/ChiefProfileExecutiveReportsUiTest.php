@@ -19,6 +19,9 @@ class ChiefProfileExecutiveReportsUiTest extends TestCase
         $this->assertStringContainsString('Recent account activity', $view);
         $this->assertStringContainsString('Station assignment', $view);
         $this->assertStringContainsString('chiefProfileForm', $view);
+        $this->assertStringContainsString('class="lector-top-bar"', $view);
+        $this->assertStringContainsString('id="userDropdownMenu"', $view);
+        $this->assertStringContainsString('chief-theme-shell', $view);
     }
 
     #[Test]
@@ -35,5 +38,8 @@ class ChiefProfileExecutiveReportsUiTest extends TestCase
         $this->assertStringNotContainsString('window.investigationData', $view);
         $this->assertStringNotContainsString('Mock investigation data', $view);
         $this->assertStringNotContainsString('localStorage', $view);
+        $this->assertStringContainsString('class="lector-top-bar"', $view);
+        $this->assertStringContainsString('id="userDropdownMenu"', $view);
+        $this->assertStringContainsString('chief-theme-shell', $view);
     }
 }
