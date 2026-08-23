@@ -3348,29 +3348,16 @@ if (navigator.geolocation) {
             document.dispatchEvent(new Event("locationReady"));
         },
         function(error) {
-            console.error('[CitizenLocation] initial GPS error, using fallback location', error);
-            // Fallback to default location
+            console.error('[CitizenLocation] initial GPS error; nearby alerts remain disabled', error);
+            // Keep a neutral map center without treating it as the citizen's location.
             const defaultLat = 15.8222;
             const defaultLng = 120.3297;
-            updateUserLocation(window.currentUserId, defaultLat, defaultLng);
-            window.userCoords.currentLatitude = defaultLat;
-            window.userCoords.currentLongitude = defaultLng;
-            window.userCoords.ready = true;
-            console.log('[CitizenLocation] fallback userCoords updated', window.userCoords);
-            if (window.refreshCitizenMapData) {
-                window.refreshCitizenMapData();
-            }
-            if (window.refreshCitizenOverviewData) {
-                window.refreshCitizenOverviewData();
-            }
-            if (typeof window.currentLoc === 'function') {
-                console.log('[CitizenLocation] fallback rendering marker via currentLoc');
-                window.currentLoc(defaultLat, defaultLng);
-            } else {
-                console.warn('[CitizenLocation] fallback currentLoc not ready, queueing marker render');
-                window.__pendingCitizenLocation = { lat: defaultLat, lng: defaultLng };
-            }
-            updateCitizenResolvedLocation(defaultLat, defaultLng);
+            window.userCoords.currentLatitude = null;
+            window.userCoords.currentLongitude = null;
+            window.userCoords.ready = false;
+            window.usermap?.setView?.([defaultLat, defaultLng], 13);
+            window.loadMarkers?.();
+            window.showCitizenToast?.('Allow location access to receive nearby fire alerts.', true, 5000);
         },
         { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -3381,33 +3368,14 @@ if (navigator.geolocation) {
     }, 2000);
     
 } else {
-    console.warn("Geolocation not supported");
+    console.warn("Geolocation not supported; nearby alerts remain disabled");
     const defaultLat = 15.8222;
     const defaultLng = 120.3297;
-    console.log('[CitizenLocation] geolocation unsupported, using fallback location', {
-        userId: window.currentUserId,
-        lat: defaultLat,
-        lng: defaultLng,
-    });
-    updateUserLocation(window.currentUserId, defaultLat, defaultLng);
-    window.userCoords.currentLatitude = defaultLat;
-    window.userCoords.currentLongitude = defaultLng;
-    window.userCoords.ready = true;
-    console.log('[CitizenLocation] unsupported fallback userCoords updated', window.userCoords);
-    if (window.refreshCitizenMapData) {
-        window.refreshCitizenMapData();
-    }
-    if (window.refreshCitizenOverviewData) {
-        window.refreshCitizenOverviewData();
-    }
-    updateCitizenResolvedLocation(defaultLat, defaultLng);
-    if (typeof window.currentLoc === 'function') {
-        console.log('[CitizenLocation] unsupported fallback rendering marker via currentLoc');
-        window.currentLoc(defaultLat, defaultLng);
-    } else {
-        console.warn('[CitizenLocation] unsupported fallback currentLoc not ready, queueing marker render');
-        window.__pendingCitizenLocation = { lat: defaultLat, lng: defaultLng };
-    }
+    window.userCoords.currentLatitude = null;
+    window.userCoords.currentLongitude = null;
+    window.userCoords.ready = false;
+    window.usermap?.setView?.([defaultLat, defaultLng], 13);
+    window.loadMarkers?.();
      
             
 }
@@ -5408,8 +5376,46 @@ window.showCitizenToast = function(message, isError = false, duration = 2800) {
     }, duration);
 };
 
-const CITIZEN_NEARBY_ALERT_SEEN_KEY = 'pyrosense:citizen-nearby-alerts:v1';
+const CITIZEN_NEARBY_INCIDENT_RADIUS_METERS = 3000;
+const CITIZEN_NEARBY_ALERT_SEEN_KEY = 'pyrosense:citizen-nearby-alerts:v2';
 const CITIZEN_NEARBY_ALERT_SEEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function filterCitizenNearbyIncidents(incidents = []) {
+    const latitude = Number(window.userCoords?.currentLatitude);
+    const longitude = Number(window.userCoords?.currentLongitude);
+    if (!window.userCoords?.ready || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return [];
+    }
+
+    const distanceMeters = (targetLat, targetLng) => {
+        const earthRadius = 6371000;
+        const dLat = (targetLat - latitude) * Math.PI / 180;
+        const dLng = (targetLng - longitude) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(latitude * Math.PI / 180) * Math.cos(targetLat * Math.PI / 180)
+            * Math.sin(dLng / 2) ** 2;
+
+        return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    return (Array.isArray(incidents) ? incidents : []).filter((incident) => {
+        const status = String(incident?.incident_status || incident?.status || '').trim().toLowerCase();
+        if (!['reported', 'responding', 'en-route', 'en route', 'on scene', 'on-scene'].includes(status)) {
+            return false;
+        }
+
+        const incidentLat = Number(incident?.lat ?? incident?.marker?.lat);
+        const incidentLng = Number(incident?.lng ?? incident?.marker?.lng);
+        if (!Number.isFinite(incidentLat) || !Number.isFinite(incidentLng)) {
+            return false;
+        }
+
+        const distance = distanceMeters(incidentLat, incidentLng);
+        incident.distance_meters = Math.round(distance);
+
+        return distance <= CITIZEN_NEARBY_INCIDENT_RADIUS_METERS;
+    });
+}
 
 function readCitizenSeenNearbyAlerts() {
     try {
@@ -5593,18 +5599,19 @@ window.renderCitizenWeeklyActivity = function(activityData = null) {
 
 window.applyCitizenOverviewData = function(data = {}, options = {}) {
     const summary = data.summary || {};
-    const nearbyIncidents = Array.isArray(data.nearby_incidents) ? data.nearby_incidents : [];
+    const nearbyIncidents = filterCitizenNearbyIncidents(data.nearby_incidents);
     const userIncidents = Array.isArray(data.user_incidents) ? data.user_incidents : [];
     const userReports = Array.isArray(data.user_reports) ? data.user_reports : userIncidents;
     const riskMapReports = Array.isArray(data.risk_map_reports) ? data.risk_map_reports : [];
-    const activeAlerts = Number(summary.active_alerts || 0);
-    window.incidentsData = Array.isArray(data.incidents) ? data.incidents : [];
+    const activeAlerts = nearbyIncidents.length;
+    window.incidentsData = [...userIncidents, ...nearbyIncidents]
+        .filter((incident, index, records) => records.findIndex((candidate) => String(candidate.incident_id) === String(incident.incident_id)) === index);
 
     let mapAlertEntries = [];
     if (typeof window.syncIncidentAlertFeed === 'function') {
         mapAlertEntries = window.syncIncidentAlertFeed('citizen-nearby-incidents', nearbyIncidents, {
             titlePrefix: options.fromCache ? 'Cached Emergency Alert' : 'Nearby Emergency Alert',
-            maxDistanceMeters: 500
+            maxDistanceMeters: CITIZEN_NEARBY_INCIDENT_RADIUS_METERS
         }) || [];
     }
 
@@ -5663,7 +5670,7 @@ window.applyCitizenOverviewData = function(data = {}, options = {}) {
 
     if (typeof window.updateCitizenOverviewCharts === 'function') {
         window.updateCitizenOverviewCharts({
-            incidents: Array.isArray(data.incidents) ? data.incidents : [],
+            incidents: window.incidentsData,
             user_reports: userReports,
         });
     }
@@ -5760,7 +5767,7 @@ window.applyCitizenOverviewData = function(data = {}, options = {}) {
 window.persistCitizenOverviewOfflineData = function(data = {}) {
     window.pyroPwa?.storeDataset?.('citizen-overview', data);
     window.pyroPwa?.storeDataset?.('citizen-alerts', Array.isArray(data.nearby_incidents) ? data.nearby_incidents : []);
-    window.pyroPwa?.storeDataset?.('citizen-incidents', Array.isArray(data.incidents) ? data.incidents : []);
+    window.pyroPwa?.storeDataset?.('citizen-incidents', Array.isArray(window.incidentsData) ? window.incidentsData : []);
     window.pyroPwa?.storeDataset?.('citizen-user-reports', Array.isArray(data.user_reports) ? data.user_reports : []);
     window.pyroPwa?.storeDataset?.('citizen-risk-map-reports', Array.isArray(data.risk_map_reports) ? data.risk_map_reports : []);
     window.pyroPwa?.updatePageSnapshot?.({
@@ -5818,7 +5825,7 @@ window.refreshCitizenOverviewData = async function() {
         if (typeof window.syncIncidentAlertFeed === 'function') {
             window.syncIncidentAlertFeed('citizen-nearby-incidents', nearbyIncidents, {
                 titlePrefix: 'Nearby Emergency Alert',
-                maxDistanceMeters: 500
+                maxDistanceMeters: CITIZEN_NEARBY_INCIDENT_RADIUS_METERS
             });
         }
 

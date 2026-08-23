@@ -1543,6 +1543,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         let deferredAnnouncementInit = false;
+        let deferredStationInit = false;
 
         scripts.forEach(function (scriptTag) {
             const replacement = document.createElement('script');
@@ -1557,6 +1558,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (loadedExternalScripts.has(resolvedSrc)) {
                     scriptTag.remove();
                     deferredAnnouncementInit = deferredAnnouncementInit || routeKey === 'announcements';
+                    deferredStationInit = deferredStationInit || routeKey === 'station';
                     return;
                 }
 
@@ -1566,6 +1568,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (routeKey === 'announcements') {
                     replacement.addEventListener('load', function () {
                         window.initializeAnnouncementSystem?.();
+                    }, { once: true });
+                }
+
+                if (routeKey === 'station') {
+                    replacement.addEventListener('load', function () {
+                        window.initFirefighterMyStationPage?.();
                     }, { once: true });
                 }
             } else {
@@ -1580,6 +1588,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (deferredAnnouncementInit && typeof window.initializeAnnouncementSystem === 'function') {
             window.initializeAnnouncementSystem();
+        }
+
+        if (deferredStationInit && typeof window.initFirefighterMyStationPage === 'function') {
+            window.initFirefighterMyStationPage();
         }
     }
 

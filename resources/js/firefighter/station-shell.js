@@ -16,6 +16,7 @@ function bootFirefighterMyStationPage() {
     const reportStore = { spot: {}, progress: {}, final: {} };
     const referenceCache = { spot: null, progress: null, final: null };
     const requestControllers = new Map();
+    let activeCrewMemberTrigger = null;
     const MAX_PROOF_UPLOAD_BYTES = 25 * 1024 * 1024;
     const MAX_PROOF_UPLOAD_FILES = 20;
     const ALLOWED_PROOF_IMAGE_TYPES = ['image/jpeg', 'image/png'];
@@ -61,6 +62,76 @@ function bootFirefighterMyStationPage() {
         const div = document.createElement('div');
         div.textContent = String(value);
         return div.innerHTML;
+    }
+
+    function closeCrewMemberModal({ restoreFocus = true } = {}) {
+        const modal = document.getElementById('crewMemberDetailModal');
+        if (!modal) return;
+
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('crew-member-modal-open');
+
+        if (restoreFocus) {
+            activeCrewMemberTrigger?.focus?.({ preventScroll: true });
+        }
+        activeCrewMemberTrigger = null;
+    }
+
+    function openCrewMemberModal(card) {
+        const modal = document.getElementById('crewMemberDetailModal');
+        if (!modal || !card) return;
+
+        const data = card.dataset;
+        const setText = (selector, value, fallback) => {
+            const node = modal.querySelector(selector);
+            if (node) node.textContent = String(value || fallback);
+        };
+
+        setText('[data-crew-modal-name]', data.memberName, 'Firefighter');
+        setText('[data-crew-modal-position]', data.memberPosition, 'Response Crew');
+        setText('[data-crew-modal-rank]', data.memberRank, 'Not recorded');
+        setText('[data-crew-modal-role]', data.memberRole, 'Firefighter');
+        setText('[data-crew-modal-status]', data.memberStatus, 'Available');
+        setText('[data-crew-modal-contact]', data.memberContact, 'Not provided');
+
+        const photo = modal.querySelector('[data-crew-modal-photo]');
+        if (photo) {
+            photo.replaceChildren();
+            if (data.memberImage) {
+                const image = document.createElement('img');
+                image.src = data.memberImage;
+                image.alt = `${data.memberName || 'Firefighter'} profile`;
+                image.addEventListener('error', () => {
+                    const fallback = document.createElement('span');
+                    fallback.textContent = data.memberInitials || 'FF';
+                    photo.replaceChildren(fallback);
+                }, { once: true });
+                photo.appendChild(image);
+            } else {
+                const fallback = document.createElement('span');
+                fallback.textContent = data.memberInitials || 'FF';
+                photo.appendChild(fallback);
+            }
+        }
+
+        const emailLink = modal.querySelector('[data-crew-modal-email]');
+        if (emailLink) {
+            const email = String(data.memberEmail || '').trim();
+            emailLink.hidden = !email;
+            emailLink.removeAttribute('href');
+            if (email) {
+                emailLink.href = `mailto:${email}`;
+                const label = emailLink.querySelector('span');
+                if (label) label.textContent = email;
+            }
+        }
+
+        activeCrewMemberTrigger = card;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('crew-member-modal-open');
+        modal.querySelector('[data-crew-member-close]')?.focus?.({ preventScroll: true });
     }
 
     function formatDateTime(value) {
@@ -2030,6 +2101,17 @@ function bootFirefighterMyStationPage() {
     }
 
     const documentClickHandler = async (event) => {
+        const crewMemberCard = event.target.closest('[data-crew-member-card]');
+        if (crewMemberCard) {
+            openCrewMemberModal(crewMemberCard);
+            return;
+        }
+
+        if (event.target.closest('[data-crew-member-close]')) {
+            closeCrewMemberModal();
+            return;
+        }
+
         const retryButton = event.target.closest('[data-station-retry]');
         if (retryButton) {
             const handler = retryButton.getAttribute('data-station-retry');
@@ -2077,6 +2159,12 @@ function bootFirefighterMyStationPage() {
     };
 
     document.addEventListener('click', documentClickHandler);
+    const documentKeydownHandler = (event) => {
+        if (event.key === 'Escape' && document.getElementById('crewMemberDetailModal')?.classList.contains('is-open')) {
+            closeCrewMemberModal();
+        }
+    };
+    document.addEventListener('keydown', documentKeydownHandler);
 
     reportTabs?.addEventListener('click', (event) => {
         const tab = event.target.closest('.report-tab');
@@ -2112,6 +2200,7 @@ function bootFirefighterMyStationPage() {
 
     window.__ffCurrentPageCleanup = function () {
         cleanupRequests();
+        closeCrewMemberModal({ restoreFocus: false });
         closeReportPicker();
         unbindMobileReportPickers();
         closeManageModal();
@@ -2121,6 +2210,7 @@ function bootFirefighterMyStationPage() {
         });
         updateModalOpenState();
         document.removeEventListener('click', documentClickHandler);
+        document.removeEventListener('keydown', documentKeydownHandler);
     };
 }
 

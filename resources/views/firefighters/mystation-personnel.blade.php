@@ -133,18 +133,76 @@
                     <div>No crew members assigned yet.</div>
                 </div>
             @else
-                <div class="crew-list">
+                <div class="crew-list crew-card-row" aria-label="Current response team members">
                     @foreach($crewMembers as $member)
-                        <div class="crew-item">
-                            <div class="crew-avatar">{{ strtoupper(substr($member->name, 0, 1)) }}</div>
-                            <div>
-                                <div class="crew-name">{{ $member->name }}</div>
-                                <div class="crew-role">{{ $member->role_label }}{{ $member->role_name ? ' | ' . ucfirst($member->role_name) : '' }}</div>
-                            </div>
-                        </div>
+                        @php
+                            $memberNameParts = preg_split('/\s+/', trim($member->name)) ?: [];
+                            $memberInitials = collect($memberNameParts)
+                                ->filter()
+                                ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
+                                ->take(2)
+                                ->join('') ?: 'FF';
+                            $memberPosition = $member->role_label ?: 'Response Crew';
+                            $memberStatus = ucwords(str_replace('-', ' ', strtolower($member->status ?: 'available')));
+                        @endphp
+                        <button
+                            type="button"
+                            class="crew-member-card"
+                            data-crew-member-card
+                            data-member-name="{{ $member->name }}"
+                            data-member-position="{{ $memberPosition }}"
+                            data-member-role="{{ ucfirst($member->role_name ?: 'firefighter') }}"
+                            data-member-rank="{{ $member->rank }}"
+                            data-member-status="{{ $memberStatus }}"
+                            data-member-email="{{ $member->email }}"
+                            data-member-contact="{{ $member->contact_number }}"
+                            data-member-image="{{ $member->profile_image_url }}"
+                            data-member-initials="{{ $memberInitials }}"
+                            aria-haspopup="dialog"
+                            aria-controls="crewMemberDetailModal"
+                        >
+                            <span class="crew-member-photo" aria-hidden="true">
+                                @if($member->profile_image_url)
+                                    <img src="{{ $member->profile_image_url }}" alt="" loading="lazy">
+                                @else
+                                    <span>{{ $memberInitials }}</span>
+                                @endif
+                            </span>
+                            <span class="crew-member-copy">
+                                <strong class="crew-name">{{ $member->name }}</strong>
+                                <span class="crew-role">{{ $memberPosition }}</span>
+                            </span>
+                            <span class="crew-member-open" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+                        </button>
                     @endforeach
                 </div>
             @endif
         </div>
     </section>
 </section>
+
+<div class="crew-member-modal" id="crewMemberDetailModal" aria-hidden="true">
+    <button type="button" class="crew-member-modal__backdrop" data-crew-member-close aria-label="Close firefighter details"></button>
+    <section class="crew-member-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="crewMemberDetailName">
+        <button type="button" class="crew-member-modal__close" data-crew-member-close aria-label="Close firefighter details">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="crew-member-modal__identity">
+            <div class="crew-member-modal__photo" data-crew-modal-photo></div>
+            <div>
+                <span class="crew-member-modal__eyebrow">Response crew</span>
+                <h3 id="crewMemberDetailName" data-crew-modal-name>Firefighter</h3>
+                <p data-crew-modal-position>Position</p>
+            </div>
+        </div>
+        <dl class="crew-member-modal__details">
+            <div><dt>Rank</dt><dd data-crew-modal-rank>Not recorded</dd></div>
+            <div><dt>Role</dt><dd data-crew-modal-role>Firefighter</dd></div>
+            <div><dt>Status</dt><dd data-crew-modal-status>Available</dd></div>
+            <div><dt>Contact</dt><dd data-crew-modal-contact>Not provided</dd></div>
+        </dl>
+        <a class="crew-member-modal__email" data-crew-modal-email hidden>
+            <i class="fa-solid fa-envelope"></i><span></span>
+        </a>
+    </section>
+</div>

@@ -100,6 +100,8 @@ class PredictedRiskAreaService
                 $area['geometry_precision'] = 'supporting_evidence_positions';
                 $area['evidence_points'] = $forecastEvidence->all();
                 $area['metrics']['support_points'] = $forecastEvidence->count();
+                $area['heat_basis'] = 'saved_analysis_result';
+                $area['location_basis'] = 'historical_fires_and_approved_field_evidence';
 
                 $seen[$dedupeKey] = true;
                 $areas->push($area);

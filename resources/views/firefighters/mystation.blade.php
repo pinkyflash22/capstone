@@ -164,12 +164,8 @@
                     </div>
                 </div>
             </div>
-            <script>
-                window.initFirefighterMyStationPage?.();
-            </script>
         </div>
     </main>
-    </div>
 
     <div class="report-modal" id="spotReportModal" role="dialog" aria-modal="true" aria-labelledby="spotReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
@@ -610,6 +606,7 @@
     </script>
 
     @vite('resources/js/firefighter/station-shell.js')
+    </div>
     @include('partials.pwa-body')
 </body>
 </html>

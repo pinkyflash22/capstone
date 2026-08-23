@@ -3314,6 +3314,11 @@ body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon.i
   background: radial-gradient(circle, #ea580c 0%, rgba(245, 158, 11, 0.78) 42%, rgba(250, 204, 21, 0) 100%);
 }
 
+body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon.is-risk-low {
+  border-color: transparent;
+  background: radial-gradient(circle, #16a34a 0%, rgba(132, 204, 22, 0.72) 42%, rgba(250, 204, 21, 0) 100%);
+}
+
 body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__icon.is-risk-high {
   border-color: transparent;
   background: radial-gradient(circle, #b91c1c 0%, rgba(239, 68, 68, 0.8) 42%, rgba(250, 204, 21, 0) 100%);
@@ -3325,6 +3330,39 @@ body.chief-dashboard-page .chief-dashboard-map-card .ff-clean-map-legend__label 
   font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
+}
+
+.ff-risk-heat-control {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ff-risk-heat-control__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #334155;
+  font-size: 11px;
+}
+
+.ff-risk-heat-control__head output {
+  color: #b45309;
+  font-weight: 900;
+}
+
+.ff-risk-heat-control input[type="range"] {
+  width: 100%;
+  accent-color: #d97706;
+}
+
+.ff-risk-heat-control small {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 body.chief-dashboard-page .chief-dashboard-map-card .chief-map-legend,

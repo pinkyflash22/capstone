@@ -94,6 +94,15 @@ let shapeFeatureGroup = null;
 let fireRiskAreaLayerGroup = null;
 let currentRiskAnalysisLayerGroup = null;
 let nextMonthForecastLayerGroup = null;
+const RISK_HEAT_BLEND_STORAGE_KEY = 'pyrosense_risk_heat_blend_meters';
+let riskHeatBlendMeters = (() => {
+    try {
+        const saved = Number(window.localStorage?.getItem(RISK_HEAT_BLEND_STORAGE_KEY));
+        return Number.isFinite(saved) ? Math.min(200, Math.max(50, saved)) : 100;
+    } catch (error) {
+        return 100;
+    }
+})();
 let boundaryEditorContext = null;
 
 // Notification system
@@ -2165,6 +2174,31 @@ function createLegendItemHtml({ iconClass = null, iconHtml = null, imagePath = n
     `;
 }
 
+function redrawRiskHeatLayers() {
+    [currentRiskAnalysisLayerGroup, nextMonthForecastLayerGroup].forEach((group) => {
+        group?.eachLayer?.((layer) => layer?._reset?.());
+    });
+}
+
+function bindChiefRiskHeatBlendControl(container) {
+    const input = container?.querySelector('[data-risk-heat-blend]');
+    const output = container?.querySelector('[data-risk-heat-blend-output]');
+    if (!input || !output) return;
+
+    input.value = String(riskHeatBlendMeters);
+    output.textContent = `${riskHeatBlendMeters} m`;
+    input.addEventListener('input', () => {
+        riskHeatBlendMeters = Math.min(200, Math.max(50, Number(input.value) || 100));
+        output.textContent = `${riskHeatBlendMeters} m`;
+        try {
+            window.localStorage?.setItem(RISK_HEAT_BLEND_STORAGE_KEY, String(riskHeatBlendMeters));
+        } catch (error) {
+            console.warn('Unable to remember heat blend distance:', error);
+        }
+        redrawRiskHeatLayers();
+    });
+}
+
 function createFirefighterMapLegend() {
     if (window.activeMapInstanceKey !== 'firefighterDashboard') {
         return;
@@ -2188,12 +2222,16 @@ function createFirefighterMapLegend() {
             ${createLegendItemHtml({ iconClass: 'fa-location-arrow', bgColor: '#2563eb', label: 'Navigation Arrow' })}
             ${createLegendItemHtml({ iconClass: 'fa-truck-fast', bgColor: '#b42318', label: 'Dispatched Apparatus' })}
             <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-low"></span>
+                <span class="ff-clean-map-legend__label">Low Analysis Heat</span>
+            </div>
+            <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
-                <span class="ff-clean-map-legend__label">Medium Risk Heat</span>
+                <span class="ff-clean-map-legend__label">Medium Analysis Heat</span>
             </div>
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
-                <span class="ff-clean-map-legend__label">High Risk Heat</span>
+                <span class="ff-clean-map-legend__label">High Analysis Heat</span>
             </div>
         </div>
     `;
@@ -2216,15 +2254,25 @@ function createChiefMapLegend() {
             ${createLegendItemHtml({ iconClass: 'fa-school', bgColor: '#eab308', label: 'School' })}
             ${createLegendItemHtml({ iconClass: 'fa-location-dot', bgColor: '#64748b', label: 'Other Marker' })}
             <div class="ff-clean-map-legend__item">
+                <span class="ff-clean-map-legend__icon is-square is-risk-low"></span>
+                <span class="ff-clean-map-legend__label">Low Analysis Heat</span>
+            </div>
+            <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-medium"></span>
-                <span class="ff-clean-map-legend__label">Medium Risk Heat</span>
+                <span class="ff-clean-map-legend__label">Medium Analysis Heat</span>
             </div>
             <div class="ff-clean-map-legend__item">
                 <span class="ff-clean-map-legend__icon is-square is-risk-high"></span>
-                <span class="ff-clean-map-legend__label">High Risk Heat</span>
+                <span class="ff-clean-map-legend__label">High Analysis Heat</span>
             </div>
         </div>
+        <div class="ff-risk-heat-control">
+            <div class="ff-risk-heat-control__head"><strong>Heat blending distance</strong><output data-risk-heat-blend-output>${riskHeatBlendMeters} m</output></div>
+            <input type="range" min="50" max="200" step="25" value="${riskHeatBlendMeters}" data-risk-heat-blend aria-label="Analysis heat blending distance in meters">
+            <small>Nearby evidence blends when zoomed out and separates as you zoom in.</small>
+        </div>
     `;
+    bindChiefRiskHeatBlendControl(legendContainer);
 }
 
 function updateRouteInfoCard() {
@@ -10917,6 +10965,36 @@ function fireRiskHeatWeight(point = {}, area = {}) {
         ? Math.min(0.92, 0.48 + (Math.log2(incidentCount) * 0.12))
         : 0;
 
+    // Saved analysis heat uses the analyzed barangay probability/risk score for
+    // its primary intensity. Local evidence can only weight an existing saved
+    // analysis area; it can never create an independent report heatmap.
+    if (area.source_type === 'saved_ai_forecast') {
+        const analyzedScore = Number(area.probability_percent ?? area.risk_score);
+        const analysisWeight = Number.isFinite(analyzedScore)
+            ? Math.min(1, Math.max(0.25, analyzedScore / 100))
+            : areaBaseline;
+        const pressureCount = Object.values(point.pressure_flags || {}).filter(Boolean).length;
+        const pressureWeight = pressureCount > 0 ? Math.min(0.96, 0.42 + (pressureCount * 0.09)) : 0;
+        const households = Math.max(0, Number(point.estimated_affected_households) || 0);
+        const householdWeight = households > 0 ? Math.min(0.88, 0.34 + (Math.log2(households + 1) * 0.08)) : 0;
+        const casualties = Math.max(0, Number(point.injured_count) || 0) + (Math.max(0, Number(point.death_count) || 0) * 2);
+        const lossWeight = casualties > 0 || Number(point.estimated_damage) > 0
+            ? Math.min(0.94, 0.48 + (casualties * 0.08) + (Math.log10(Math.max(1, Number(point.estimated_damage) || 1)) * 0.04))
+            : 0;
+        const localSeverity = Math.max(
+            0.35,
+            assessmentWeight,
+            scoreWeight,
+            incidentWeight,
+            pressureWeight,
+            householdWeight,
+            lossWeight
+        );
+        const localMultiplier = 0.72 + (localSeverity * 0.38);
+
+        return Math.min(1, Math.max(0.18, analysisWeight * localMultiplier));
+    }
+
     return Math.min(1, Math.max(0.25, areaBaseline, assessmentWeight, scoreWeight, incidentWeight));
 }
 
@@ -10931,6 +11009,34 @@ function fireRiskHeatPoints(area = {}) {
             riskLevel: String(area.risk_level || 'medium').toLowerCase()
         }))
         .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+}
+
+function fireRiskLocalFactorLabels(point = {}) {
+    const pressureLabels = {
+        blocked_hydrant: 'Blocked hydrant',
+        combustible_materials_present: 'Combustible materials',
+        informal_settlement: 'Dense informal settlement',
+        cooking_fire_prone_activity: 'Fire-prone cooking activity',
+        poor_waste_disposal: 'Poor waste disposal',
+        previous_fire_prone_location: 'Known previous fire-prone location',
+        poor_access: 'Difficult emergency access'
+    };
+    const labels = [];
+    const assessment = String(point.assessment_level || '').trim();
+    if (assessment) labels.push(`${assessment.replaceAll('_', ' ')} field assessment`);
+    if (point.source_type === 'historical_incident') {
+        labels.push(`${Math.max(1, Number(point.incident_count) || 1)} recorded fire occurrence(s)`);
+    }
+    Object.entries(point.pressure_flags || {}).forEach(([key, active]) => {
+        if (active && pressureLabels[key]) labels.push(pressureLabels[key]);
+    });
+    const households = Math.max(0, Number(point.estimated_affected_households) || 0);
+    if (households > 0) labels.push(`${households} potentially affected household(s)`);
+    const casualties = Math.max(0, Number(point.injured_count) || 0) + Math.max(0, Number(point.death_count) || 0);
+    if (casualties > 0) labels.push(`${casualties} historical casualty record(s)`);
+    if (Number(point.estimated_damage) > 0) labels.push('Recorded historical property damage');
+
+    return labels.slice(0, 6);
 }
 
 function createFireRiskHeatLayer(points = []) {
@@ -10982,7 +11088,11 @@ function createFireRiskHeatLayer(points = []) {
             context.clearRect(0, 0, size.x, size.y);
 
             const zoom = this._map.getZoom();
-            const radius = Math.max(24, Math.min(58, 26 + ((zoom - 11) * 6)));
+            const centerLatitude = Number(this._map.getCenter()?.lat) || 0;
+            const metersPerPixel = (156543.03392 * Math.cos(centerLatitude * Math.PI / 180)) / (2 ** zoom);
+            const zoomSeparationFactor = 0.72 ** Math.max(0, zoom - 14);
+            const effectiveBlendMeters = riskHeatBlendMeters * zoomSeparationFactor;
+            const radius = Math.max(6, Math.min(78, effectiveBlendMeters / Math.max(0.1, metersPerPixel)));
             validPoints.forEach((point) => {
                 const pixel = this._map.latLngToContainerPoint([point.lat, point.lng]);
                 if (pixel.x < -radius || pixel.y < -radius || pixel.x > size.x + radius || pixel.y > size.y + radius) {
@@ -11119,6 +11229,16 @@ function buildFireRiskAreaPopup(area = {}) {
                 }).join('')}
             </ul>
         </div>` : '';
+    const selectedPoint = area.selected_evidence_point || null;
+    const localIntensity = selectedPoint ? Math.round(fireRiskHeatWeight(selectedPoint, area) * 100) : null;
+    const localFactors = selectedPoint ? fireRiskLocalFactorLabels(selectedPoint) : [];
+    const localHotspotDetails = selectedPoint ? `
+        <div style="margin-top:12px;padding:10px;border:1px solid #fed7aa;border-radius:10px;background:#fff7ed;font-size:12px;color:#7c2d12;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><strong>Local hotspot intensity</strong><strong>${localIntensity}%</strong></div>
+            <div style="height:6px;margin-top:7px;overflow:hidden;border-radius:999px;background:#ffedd5;"><span style="display:block;width:${localIntensity}%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#84cc16,#f59e0b,#dc2626);"></span></div>
+            <div style="margin-top:7px;color:#9a3412;">Analysis probability weighted by this location's recorded conditions.</div>
+            ${localFactors.length ? `<ul style="margin:7px 0 0 18px;padding:0;line-height:1.45;">${localFactors.map((factor) => `<li>${escapeHtml(factor)}</li>`).join('')}</ul>` : ''}
+        </div>` : '';
 
     return `
         <div class="fire-risk-area-popup">
@@ -11130,6 +11250,7 @@ function buildFireRiskAreaPopup(area = {}) {
                 ${level} FIRE RISK · ${score}
             </div>
             ${metricGrid}
+            ${localHotspotDetails}
             ${evidenceList}
             <div style="margin-top:12px;font-size:12px;color:#334155;">
                 <strong>Why highlighted</strong>
@@ -11208,8 +11329,8 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
 
         const isIncident = point.source_type === 'historical_incident';
         const label = isIncident
-            ? `Historical fire incident${point.incident_date ? ` · ${point.incident_date}` : ''}`
-            : `${point.entry_type === 'hazard' ? 'Verified hazard' : 'Verified risk'}${point.marker_title ? ` · ${point.marker_title}` : ''}`;
+            ? `Analysis evidence · Historical fire${point.incident_date ? ` · ${point.incident_date}` : ''}`
+            : `Analysis evidence · ${point.entry_type === 'hazard' ? 'Approved hazard location' : 'Approved risk location'}${point.marker_title ? ` · ${point.marker_title}` : ''}`;
         L.circleMarker([lat, lng], {
             radius: 14,
             color: 'transparent',
@@ -11220,7 +11341,7 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
             pane: 'overlayPane'
         })
             .bindTooltip(escapeHtml(label), { direction: 'top', sticky: true })
-            .bindPopup(buildFireRiskAreaPopup(area), {
+            .bindPopup(buildFireRiskAreaPopup({ ...area, selected_evidence_point: point }), {
                 maxWidth: 320,
                 className: 'fire-risk-area-popup-shell'
             })
@@ -11915,7 +12036,9 @@ function initAfterMapReady() {
     drawnItems = new L.FeatureGroup();
     window.map.addLayer(drawnItems);
     shapeFeatureGroup = L.featureGroup().addTo(window.map);
-    fireRiskAreaLayerGroup = L.featureGroup().addTo(window.map);
+    // Kept as a detached compatibility group for older callers. Reported
+    // risk/hazard evidence is displayed by riskHazardFeatureGroup as markers.
+    fireRiskAreaLayerGroup = L.featureGroup();
     currentRiskAnalysisLayerGroup = L.featureGroup().addTo(window.map);
     nextMonthForecastLayerGroup = L.featureGroup().addTo(window.map);
     
@@ -11969,7 +12092,6 @@ function initAfterMapReady() {
             "Fire Hydrants": hydrantFeatureGroup,
             "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
-            "Verified Risk Evidence": fireRiskAreaLayerGroup,
             "Current Risk Analysis": currentRiskAnalysisLayerGroup,
             "Next-Month Forecast": nextMonthForecastLayerGroup,
             "Water Reference": waterReference,
@@ -11991,7 +12113,6 @@ function initAfterMapReady() {
                 "Fire Hydrants": hydrantFeatureGroup,
                 "Risk & Hazard Reports": riskHazardFeatureGroup,
                 "Other Markers": otherFeatureGroup,
-                "Verified Risk Evidence": fireRiskAreaLayerGroup,
                 "Current Risk Analysis": currentRiskAnalysisLayerGroup,
                 "Next-Month Forecast": nextMonthForecastLayerGroup,
                 "Water Reference": waterReference,
@@ -12003,7 +12124,6 @@ function initAfterMapReady() {
             "Hydrants": hydrantFeatureGroup,
             "Risk & Hazard Reports": riskHazardFeatureGroup,
             "Other Markers": otherFeatureGroup,
-            "Verified Risk Evidence": fireRiskAreaLayerGroup,
             "Current Risk Analysis": currentRiskAnalysisLayerGroup,
             "Next-Month Forecast": nextMonthForecastLayerGroup,
             "Shapes": shapeFeatureGroup

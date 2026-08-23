@@ -1769,7 +1769,7 @@ function shouldDisplayIncidentMarker(usermark, incident) {
 
     const userLocation = getCitizenReferenceLocation();
     if (!userLocation) {
-        return true;
+        return false;
     }
 
     const markerLat = parseFloat(usermark.lat);
@@ -1884,6 +1884,7 @@ function startCitizenRouteDiscovery() {
 
 function refreshCitizenMapData() {
     syncCitizenRouteDisplay();
+    return refreshCitizenMarkersIfChanged(true);
 }
 
 async function refreshCitizenMarkersIfChanged(forceReload = false) {
@@ -1912,7 +1913,14 @@ async function refreshCitizenMarkersIfChanged(forceReload = false) {
             return false;
         }
 
-        const markersResponse = await fetchCitizenLiveResponseOnce('citizen-markers', '/map/markers/feed', {
+        const markerFeedParams = new URLSearchParams();
+        const citizenLocation = getCitizenReferenceLocation();
+        if (citizenLocation) {
+            markerFeedParams.set('lat', String(citizenLocation.lat));
+            markerFeedParams.set('lng', String(citizenLocation.lng));
+        }
+        const markerFeedUrl = `/map/markers/feed${markerFeedParams.size ? `?${markerFeedParams.toString()}` : ''}`;
+        const markersResponse = await fetchCitizenLiveResponseOnce('citizen-markers', markerFeedUrl, {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken

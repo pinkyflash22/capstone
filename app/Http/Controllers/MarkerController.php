@@ -3,13 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Marker;
-
-use App\Models\Status;
 use App\Models\Multimedia;
+use App\Models\Status;
+use App\Services\BoundaryMatcherService;
 use App\Support\MarkerFeedBuilder;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
-use App\Services\BoundaryMatcherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class MarkerController extends Controller
 {
+    private const CITIZEN_NEARBY_INCIDENT_RADIUS_METERS = 3000;
+
     private const MARKER_CATEGORIES = ['fire', 'station', 'hydrant', 'school', 'barangay', 'bridge', 'risk', 'hazard'];
+
     private const MARKER_STATUSES = ['active', 'inactive', 'completed'];
 
     private function mapCategoryNameToEnum(?string $value): ?string
@@ -149,15 +151,77 @@ class MarkerController extends Controller
         return $this->publicDisplayName($chiefOfficer?->user);
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        $viewer = Auth::user();
+        $markers = MarkerFeedBuilder::buildForViewer($viewer);
+        $role = strtolower(trim((string) ($viewer?->role?->role ?? '')));
+
+        if ($role === 'citizen') {
+            $validated = $request->validate([
+                'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lng'],
+                'lng' => ['nullable', 'numeric', 'between:-180,180', 'required_with:lat'],
+            ]);
+            $latitude = isset($validated['lat']) ? (float) $validated['lat'] : null;
+            $longitude = isset($validated['lng']) ? (float) $validated['lng'] : null;
+            $ownIncidentMarkerIds = \App\Models\Incident::query()
+                ->where('reported_by', $viewer->user_id)
+                ->whereNotNull('marker_id')
+                ->pluck('marker_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $markers = $markers->filter(function (array $marker) use ($latitude, $longitude, $ownIncidentMarkerIds) {
+                $category = strtolower(trim((string) ($marker['category'] ?? '')));
+                $isIncidentMarker = $category === 'fire' || ! empty($marker['incident_public']);
+                if (! $isIncidentMarker) {
+                    return true;
+                }
+
+                if (in_array((int) ($marker['marker_id'] ?? 0), $ownIncidentMarkerIds, true)) {
+                    return true;
+                }
+
+                if ($latitude === null || $longitude === null) {
+                    return false;
+                }
+
+                $status = strtolower(trim((string) ($marker['incident_public']['status'] ?? '')));
+                if (! in_array($status, ['reported', 'responding', 'en-route', 'en route', 'on scene', 'on-scene'], true)) {
+                    return false;
+                }
+
+                $markerLat = filter_var($marker['lat'] ?? null, FILTER_VALIDATE_FLOAT);
+                $markerLng = filter_var($marker['lng'] ?? null, FILTER_VALIDATE_FLOAT);
+                if ($markerLat === false || $markerLng === false) {
+                    return false;
+                }
+
+                return $this->calculateDistanceMeters(
+                    $latitude,
+                    $longitude,
+                    (float) $markerLat,
+                    (float) $markerLng
+                ) <= self::CITIZEN_NEARBY_INCIDENT_RADIUS_METERS;
+            })->values();
+        }
+
         return response()->json([
             'success' => true,
-            'data' => MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all(),
+            'data' => $markers->values()->all(),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
-   
+    private function calculateDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
 
     public function store(Request $request)
     {
@@ -190,7 +254,7 @@ class MarkerController extends Controller
             'lng' => $validated['lng'],
             'status' => $resolvedStatus,
             'category' => $resolvedCategory,
-            'image' => $validated['image'] ?? null
+            'image' => $validated['image'] ?? null,
         ]);
 
         $data->refresh();
@@ -212,22 +276,21 @@ class MarkerController extends Controller
         ], 201);
     }
 
- 
     public function getCount(Request $request)
     {
         try {
             $count = Marker::count();
-            
+
             return response()->json([
                 'success' => true,
                 'count' => $count,
-                'total' => $count
+                'total' => $count,
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -246,56 +309,56 @@ class MarkerController extends Controller
         ]);
     }
 
-public function update(Request $request, $markerId)
-{
-    try {
-        $marker = Marker::findOrFail($markerId);
-        
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'category' => ['nullable', Rule::in(self::MARKER_CATEGORIES)],
-            'status' => ['nullable', Rule::in(self::MARKER_STATUSES)],
-            
-        ]);
+    public function update(Request $request, $markerId)
+    {
+        try {
+            $marker = Marker::findOrFail($markerId);
 
-        $updateData = [
-            'title' => $validated['title'],
-            'description' => $validated['description'] ?? null,
-        ];
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'category' => ['nullable', Rule::in(self::MARKER_CATEGORIES)],
+                'status' => ['nullable', Rule::in(self::MARKER_STATUSES)],
 
-        $resolvedCategory = $this->resolveCategory(
-            $validated['category'] ?? null,
-         
-        );
-        if ($resolvedCategory) {
-            $updateData['category'] = $resolvedCategory;
-        }
+            ]);
 
-        if (array_key_exists('status', $validated) || array_key_exists('status_id', $validated)) {
-            $updateData['status'] = $this->resolveStatus(
-                $validated['status'] ?? null,
-             
+            $updateData = [
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+            ];
+
+            $resolvedCategory = $this->resolveCategory(
+                $validated['category'] ?? null,
+
             );
-        }
+            if ($resolvedCategory) {
+                $updateData['category'] = $resolvedCategory;
+            }
 
-        $marker->update($updateData);
-        
-        // Refresh the marker to get updated data
-        $marker->refresh();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Marker updated successfully',
-            'data' => $marker
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error updating marker: ' . $e->getMessage()
-        ], 500);
+            if (array_key_exists('status', $validated) || array_key_exists('status_id', $validated)) {
+                $updateData['status'] = $this->resolveStatus(
+                    $validated['status'] ?? null,
+
+                );
+            }
+
+            $marker->update($updateData);
+
+            // Refresh the marker to get updated data
+            $marker->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Marker updated successfully',
+                'data' => $marker,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating marker: '.$e->getMessage(),
+            ], 500);
+        }
     }
-}
 
     public function updateLocation(Request $request, int $markerId, BoundaryMatcherService $boundaryMatcherService)
     {
@@ -340,46 +403,47 @@ public function update(Request $request, $markerId)
     {
         try {
             \Log::info('Attempting to delete marker', ['marker_id' => $id]);
-            
+
             $marker = Marker::find($id);
-            
-            if (!$marker) {
+
+            if (! $marker) {
                 \Log::warning('Marker not found', ['id' => $id]);
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Marker not found'
+                    'message' => 'Marker not found',
                 ], 404);
             }
-            
+
             \Log::info('Found marker', [
                 'marker_id' => $marker->marker_id,
-                'title' => $marker->title
+                'title' => $marker->title,
             ]);
-            
+
             // Check for related records
             $stationCount = $marker->stations()->count();
             $hydrantCount = $marker->hydrants()->count();
             $incidentCount = $marker->incidents()->count();
-            
+
             \Log::info('Related records count', [
                 'stations' => $stationCount,
                 'hydrants' => $hydrantCount,
-                'incidents' => $incidentCount
+                'incidents' => $incidentCount,
             ]);
-            
+
             // Delete related records
             if ($stationCount > 0) {
                 $marker->stations()->delete();
             }
-            
+
             if ($hydrantCount > 0) {
                 $marker->hydrants()->delete();
             }
-            
+
             if ($incidentCount > 0) {
                 $marker->incidents()->delete();
             }
-            
+
             // Delete multimedia if exists
             if ($marker->multimedia) {
                 try {
@@ -389,41 +453,43 @@ public function update(Request $request, $markerId)
                     \Log::error('Error deleting multimedia', ['error' => $e->getMessage()]);
                 }
             }
-            
+
             // Delete the marker
             $deleted = $marker->delete();
-            
+
             if ($deleted) {
                 if (auth()->check() && $incidentCount > 0) {
                     UserActivityLogger::log('deleted incident report', auth()->id(), request());
                 }
 
                 \Log::info('Marker deleted successfully');
+
                 return response()->json([
                     'success' => true,
-                    'message' => 'Marker deleted successfully.'
+                    'message' => 'Marker deleted successfully.',
                 ], 200);
             } else {
                 \Log::error('Marker deletion failed - delete() returned false');
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Marker could not be deleted.'
+                    'message' => 'Marker could not be deleted.',
                 ], 500);
             }
-            
+
         } catch (\Exception $e) {
             \Log::error('Exception in marker deletion', [
                 'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting marker: ' . $e->getMessage()
+                'message' => 'Error deleting marker: '.$e->getMessage(),
             ], 500);
         }
     }
-    
+
     /**
      * Update marker status (soft delete or mark as inactive)
      */
@@ -432,51 +498,52 @@ public function update(Request $request, $markerId)
         try {
             $validated = $request->validate([
                 'status' => ['nullable', Rule::in(self::MARKER_STATUSES)],
-                'status_id' => 'nullable|exists:statuses,status_id'
+                'status_id' => 'nullable|exists:statuses,status_id',
             ]);
-            
+
             $marker = Marker::find($markerId);
-            
-            if (!$marker) {
+
+            if (! $marker) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Marker not found'
+                    'message' => 'Marker not found',
                 ], 404);
             }
-            
+
             $marker->status = $this->resolveStatus(
                 $validated['status'] ?? null,
                 $validated['status_id'] ?? null
             );
             $marker->save();
-            
+
             \Log::info('Marker status updated', [
                 'marker_id' => $markerId,
-                'new_status' => $marker->status
+                'new_status' => $marker->status,
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Marker status updated successfully',
-                'data' => $marker
+                'data' => $marker,
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('Error updating marker status', [
                 'marker_id' => $markerId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating marker status: ' . $e->getMessage()
+                'message' => 'Error updating marker status: '.$e->getMessage(),
             ], 500);
         }
     }
-    
+
     public function getMapData()
     {
         $markers = Marker::with('category', 'status')->get();
+
         return response()->json($markers);
     }
 }

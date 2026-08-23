@@ -612,7 +612,7 @@ class FirefighterController extends Controller
         $membersById = StationOfficer::query()
             ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
             ->with([
-                'user:user_id,first_name,last_name,role_id',
+                'user:user_id,first_name,last_name,email,contact_number,image,role_id',
                 'user.role:role_id,role',
             ])
             ->whereIn('station_officer_id', $teamOfficerIds)
@@ -637,6 +637,11 @@ class FirefighterController extends Controller
                     'name' => trim(($member->user->first_name ?? '') . ' ' . ($member->user->last_name ?? '')) ?: ('Officer #' . $memberOfficerId),
                     'role_label' => $label,
                     'role_name' => $member->user->role?->role,
+                    'rank' => $member->rank ?: 'Rank not set',
+                    'status' => $member->status ?: 'available',
+                    'email' => $member->user->email,
+                    'contact_number' => $member->user->contact_number,
+                    'profile_image_url' => $member->user->profile_image_url,
                 ];
             })
             ->filter()

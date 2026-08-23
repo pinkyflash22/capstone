@@ -397,6 +397,11 @@ body {
   background: radial-gradient(circle, #ea580c 0%, rgba(245, 158, 11, 0.78) 42%, rgba(250, 204, 21, 0) 100%);
 }
 
+.ff-clean-map-legend__icon.is-risk-low {
+  border-color: transparent;
+  background: radial-gradient(circle, #16a34a 0%, rgba(132, 204, 22, 0.72) 42%, rgba(250, 204, 21, 0) 100%);
+}
+
 .ff-clean-map-legend__icon.is-risk-high {
   border-color: transparent;
   background: radial-gradient(circle, #b91c1c 0%, rgba(239, 68, 68, 0.8) 42%, rgba(250, 204, 21, 0) 100%);

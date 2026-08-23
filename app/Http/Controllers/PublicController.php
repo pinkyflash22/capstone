@@ -2,43 +2,41 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Marker;
-use App\Models\Incident;
-
-use App\Models\StationOfficer;
-use App\Models\Station;
-use App\Models\FsicRequest;
-use App\Models\InspectionChecklist;
-use App\Models\FsicApproval;
-use App\Models\FsicInspection;
-use App\Models\Province;
 use App\Models\Barangay;
 use App\Models\BarangayHall;
-use App\Models\RiskArea;
-use App\Models\RiskAreaPhoto;
-use App\Models\User;
 use App\Models\City;
 use App\Models\CommunityActivityRequest;
+use App\Models\FsicRequest;
 use App\Models\FullAddress;
+use App\Models\Incident;
+use App\Models\Marker;
+use App\Models\Province;
+use App\Models\RiskArea;
+use App\Models\RiskAreaPhoto;
+use App\Models\Station;
+use App\Models\StationOfficer;
+use App\Models\User;
 use App\Services\BoundaryMatcherService;
-use App\Support\BarangayNotificationService;
 use App\Support\MediaPath;
-use App\Support\UserActivityLogger;
 use App\Support\RiskAreaFollowUpDispatcher;
-use App\Http\Controllers\RiskAreaReviewController;
+use App\Support\UserActivityLogger;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class PublicController extends Controller
 {
+    private const CITIZEN_NEARBY_INCIDENT_RADIUS_METERS = 3000;
+
     private const RISK_HAZARD_REPORTS_DIRECTORY = 'riskhazard';
+
     private const RISK_HAZARD_REPORTS_MAX_FILES = 3;
+
     private const RISK_HAZARD_REPORTS_MAX_TOTAL_BYTES = 5242880;
 
     private const CITIZEN_DASHBOARD_SECTIONS = [
@@ -88,7 +86,7 @@ class PublicController extends Controller
         $currentWeekCounts = array_fill(0, 7, 0);
 
         foreach ($incidents as $incident) {
-            if (!$incident->created_at) {
+            if (! $incident->created_at) {
                 continue;
             }
 
@@ -111,7 +109,7 @@ class PublicController extends Controller
             'total' => $currentWeekTotal,
             'max' => max(max($currentWeekCounts), 1),
             'change' => $currentWeekTotal - $previousWeekTotal,
-            'period_label' => $startOfWeek->format('M d') . ' - ' . $endOfWeek->format('M d'),
+            'period_label' => $startOfWeek->format('M d').' - '.$endOfWeek->format('M d'),
         ];
     }
 
@@ -183,7 +181,8 @@ class PublicController extends Controller
         return [
             ...$dispatch,
             'incident_id' => $incident->incident_id,
-            'status'=> $status,
+            'reported_by' => $incident->reported_by,
+            'status' => $status,
             'incident_status' => $status,
             'incident_status_id' => $this->resolveCitizenIncidentStatusId($incident),
             'incident_type' => $this->resolveCitizenIncidentTypeName($incident),
@@ -227,7 +226,7 @@ class PublicController extends Controller
                 'name' => $photo->photo_name,
                 'caption' => $photo->caption,
             ])
-            ->filter(fn ($photo) => !empty($photo['url']))
+            ->filter(fn ($photo) => ! empty($photo['url']))
             ->values();
 
         return [
@@ -410,8 +409,7 @@ class PublicController extends Controller
         ?float $longitude = null,
         $preloadedIncidents = null,
         $preloadedUserIncidents = null
-    ): array
-    {
+    ): array {
         $incidents = $preloadedIncidents instanceof \Illuminate\Support\Collection
             ? $preloadedIncidents
             : Incident::with(['marker', 'station', 'barangay.city'])
@@ -457,7 +455,7 @@ class PublicController extends Controller
         if ($latitude !== null && $longitude !== null) {
             $nearbyIncidents = $incidents
                 ->filter(function ($incident) use ($latitude, $longitude) {
-                    if (!$incident->marker || $incident->marker->lat === null || $incident->marker->lng === null) {
+                    if (! $incident->marker || $incident->marker->lat === null || $incident->marker->lng === null) {
                         return false;
                     }
 
@@ -470,7 +468,7 @@ class PublicController extends Controller
 
                     $incident->computed_distance_meters = $distance;
 
-                    return $distance <= 3000;
+                    return $distance <= self::CITIZEN_NEARBY_INCIDENT_RADIUS_METERS;
                 })
                 ->sortBy([
                     ['computed_distance_meters', 'asc'],
@@ -481,8 +479,17 @@ class PublicController extends Controller
 
         $activeNearbyIncidents = $nearbyIncidents->filter(function ($incident) {
             $status = strtolower(trim($incident->status ?? ''));
+
             return in_array($status, ['reported', 'responding', 'on scene'], true);
         })->values();
+
+        // A citizen can always see their own reports. Reports from other
+        // citizens are exposed only while active and inside the nearby radius.
+        $visibleIncidents = $userIncidents
+            ->concat($activeNearbyIncidents)
+            ->unique(fn ($incident) => (int) $incident->incident_id)
+            ->sortByDesc('created_at')
+            ->values();
 
         return [
             'summary' => [
@@ -493,7 +500,7 @@ class PublicController extends Controller
                 'risk_percentage' => $riskPercentage,
                 'risk_level' => $riskLevel,
             ],
-            'incidents' => $incidents->map(fn ($incident) => $this->serializeCitizenIncident($incident))->values(),
+            'incidents' => $visibleIncidents->map(fn ($incident) => $this->serializeCitizenIncident($incident))->values(),
             'user_incidents' => $userIncidents->map(fn ($incident) => $this->serializeCitizenIncident($incident))->values(),
             'user_reports' => $userIncidents
                 ->map(fn ($incident) => $this->serializeCitizenIncident($incident))
@@ -511,26 +518,24 @@ class PublicController extends Controller
         ];
     }
 
-    private function buildCitizenInitialMarkers()
+    private function buildCitizenInitialMarkers(User $viewer)
     {
-        return Cache::remember('citizen:dashboard:initial-markers:v1', now()->addSeconds(45), function () {
-            return Marker::query()
-                ->select([
-                    'marker_id',
-                    'title',
-                    'description',
-                    'lat',
-                    'lng',
-                    'category',
-                    'status',
-                    'image',
-                    'created_at',
-                    'updated_at',
-                ])
-                ->whereNotNull('lat')
-                ->whereNotNull('lng')
-                ->get();
-        });
+        $ownIncidentMarkerIds = Incident::query()
+            ->where('reported_by', $viewer->user_id)
+            ->whereNotNull('marker_id')
+            ->pluck('marker_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return \App\Support\MarkerFeedBuilder::buildForViewer($viewer)
+            ->filter(function (array $marker) use ($ownIncidentMarkerIds) {
+                $category = strtolower(trim((string) ($marker['category'] ?? '')));
+                $isIncidentMarker = $category === 'fire' || ! empty($marker['incident_public']);
+
+                return ! $isIncidentMarker
+                    || in_array((int) ($marker['marker_id'] ?? 0), $ownIncidentMarkerIds, true);
+            })
+            ->values();
     }
 
     private function buildCitizenAddressOptions(?int $selectedCityId): array
@@ -572,7 +577,7 @@ class PublicController extends Controller
         return [$provinces, $cities];
     }
 
-    //note dapat kapag mag papass sa isang view kung lahat ng data kailangan mo, idaan mo nalang sa isang controller
+    // note dapat kapag mag papass sa isang view kung lahat ng data kailangan mo, idaan mo nalang sa isang controller
     public function index(?string $section = null)
     {
         $accountId = Auth::user()->user_id;
@@ -588,7 +593,7 @@ class PublicController extends Controller
         $userReports = $myReports->count();
         $countReport = $userReports;
         $userinfo = collect([$citizenUser]);
-        $usermarker = $this->buildCitizenInitialMarkers();
+        $usermarker = $this->buildCitizenInitialMarkers($citizenUser);
         [$provinces, $cities] = $this->buildCitizenAddressOptions($citizenUser->address?->barangay?->city_id);
 
         $allStationOfficer = StationOfficer::query()
@@ -601,6 +606,7 @@ class PublicController extends Controller
         });
 
         $dashboardData = $this->buildCitizenDashboardData($accountId, null, null, $incidents, $myReports);
+        $incidents = $myReports;
         $riskPercentage = $dashboardData['summary']['risk_percentage'];
         $riskLevel = $dashboardData['summary']['risk_level'];
         $activeAlerts = $dashboardData['summary']['active_alerts'];
@@ -618,13 +624,12 @@ class PublicController extends Controller
                 ->get()
             : collect();
 
-
-        //request
+        // request
         $fsicApplications = collect();
         $fsicRequests = FsicRequest::query()->where('user_id', $accountId)->latest()->get();
 
-        return view('citizen.dashboard', compact('usermarker','myReports','countReport','stations','fsicApplications','fsicRequests',
-        'provinces','cities','citizenUser','allStationOfficer', 'accountId','incidents','userReports','userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports', 'citizenCommunityActivityRequests'));
+        return view('citizen.dashboard', compact('usermarker', 'myReports', 'countReport', 'stations', 'fsicApplications', 'fsicRequests',
+            'provinces', 'cities', 'citizenUser', 'allStationOfficer', 'accountId', 'incidents', 'userReports', 'userinfo', 'riskPercentage', 'riskLevel', 'activeAlerts', 'totalAlerts', 'nearbyIncidents', 'initialSection', 'overviewReportCount', 'citizenCombinedReports', 'riskMapReports', 'citizenCommunityActivityRequests'));
         // return view('citizen.dashboard', compact('usermarker'));
 
     }
@@ -632,8 +637,8 @@ class PublicController extends Controller
     public function dashboardData(Request $request)
     {
         $validated = $request->validate([
-            'lat' => ['nullable', 'numeric'],
-            'lng' => ['nullable', 'numeric'],
+            'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lng'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180', 'required_with:lat'],
         ]);
 
         $accountId = Auth::user()?->user_id;
@@ -653,7 +658,7 @@ class PublicController extends Controller
         abort_unless($user && strtolower($user->role->role ?? '') === 'citizen', 403);
 
         return view('citizen.mobile-hub', [
-            'displayName' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Citizen',
+            'displayName' => trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'Citizen',
         ]);
     }
 
@@ -675,7 +680,7 @@ class PublicController extends Controller
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'user_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'user_lng' => ['nullable', 'numeric', 'between:-180,180'],
-            'photos' => ['nullable', 'array', 'max:' . self::RISK_HAZARD_REPORTS_MAX_FILES],
+            'photos' => ['nullable', 'array', 'max:'.self::RISK_HAZARD_REPORTS_MAX_FILES],
             'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp'],
         ]);
 
@@ -735,19 +740,19 @@ class PublicController extends Controller
             $reviewNotes = $template['review_notes'];
 
             if ($citizenDetail) {
-                $remarks .= ' Citizen detail: ' . $citizenDetail . '.';
-                $reviewNotes .= ' Citizen detail: ' . $citizenDetail . '.';
+                $remarks .= ' Citizen detail: '.$citizenDetail.'.';
+                $reviewNotes .= ' Citizen detail: '.$citizenDetail.'.';
             }
 
             if ($citizenNotes !== '') {
-                $remarks .= ' Citizen note: ' . $citizenNotes;
-                $reviewNotes .= ' Citizen note: ' . $citizenNotes;
+                $remarks .= ' Citizen note: '.$citizenNotes;
+                $reviewNotes .= ' Citizen note: '.$citizenNotes;
             }
 
             $marker = Marker::create([
                 'title' => $template['title'],
                 'description' => $citizenNotes !== ''
-                    ? $template['location_description'] . ' Citizen note: ' . $citizenNotes
+                    ? $template['location_description'].' Citizen note: '.$citizenNotes
                     : $template['location_description'],
                 'lat' => $targetLat,
                 'lng' => $targetLng,
@@ -801,7 +806,7 @@ class PublicController extends Controller
         Cache::forget('map:markers:index:v3_public');
         RiskAreaReviewController::flushRiskReviewCache();
         RiskAreaFollowUpDispatcher::dispatchFor($riskArea);
-        UserActivityLogger::log('submitted citizen ' . $validated['report_kind'] . ' report', $user->user_id, $request);
+        UserActivityLogger::log('submitted citizen '.$validated['report_kind'].' report', $user->user_id, $request);
 
         return response()->json([
             'success' => true,
@@ -929,7 +934,7 @@ class PublicController extends Controller
         }
 
         if ($request->hasFile('profile_image')) {
-            if ($user->image && !str_starts_with((string) $user->image, 'http://') && !str_starts_with((string) $user->image, 'https://')) {
+            if ($user->image && ! str_starts_with((string) $user->image, 'http://') && ! str_starts_with((string) $user->image, 'https://')) {
                 MediaPath::delete($user->image);
             }
 
@@ -952,8 +957,8 @@ class PublicController extends Controller
                     'last_name' => $user->last_name,
                     'email' => $user->email,
                     'contact_number' => $user->contact_number,
-                    'full_name' => trim($user->first_name . ' ' . $user->last_name),
-                    'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1) . substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
+                    'full_name' => trim($user->first_name.' '.$user->last_name),
+                    'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1).substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
                     'role' => $user->role->role ?? 'Citizen',
                     'street' => $user->address?->street,
                     'barangay' => $user->address?->barangay?->barangay_name,
@@ -985,7 +990,7 @@ class PublicController extends Controller
             'profile_image.max' => 'Profile photo must not exceed 5 MB.',
         ]);
 
-        if ($user->image && !str_starts_with((string) $user->image, 'http://') && !str_starts_with((string) $user->image, 'https://')) {
+        if ($user->image && ! str_starts_with((string) $user->image, 'http://') && ! str_starts_with((string) $user->image, 'https://')) {
             MediaPath::delete($user->image);
         }
 
@@ -1004,8 +1009,8 @@ class PublicController extends Controller
                 'last_name' => $user->last_name,
                 'email' => $user->email,
                 'contact_number' => $user->contact_number,
-                'full_name' => trim($user->first_name . ' ' . $user->last_name),
-                'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1) . substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
+                'full_name' => trim($user->first_name.' '.$user->last_name),
+                'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1).substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
                 'role' => $user->role->role ?? 'Citizen',
                 'street' => $user->address?->street,
                 'barangay' => $user->address?->barangay?->barangay_name,
@@ -1101,8 +1106,8 @@ class PublicController extends Controller
         ]);
     }
 
-
-    public function homepage(){
+    public function homepage()
+    {
         $anonymousUserId = null;
         $totalStations = 0;
         $totalHydrants = 0;
@@ -1122,10 +1127,10 @@ class PublicController extends Controller
 
         return view('dashboard', compact('anonymousUserId', 'totalStations', 'totalHydrants'));
     }
-        //     public function dashboard()
-        // {
-        //     $accountId = Auth::user()->account->account_id;
+    //     public function dashboard()
+    // {
+    //     $accountId = Auth::user()->account->account_id;
 
-        //     return view('citizen.dashboard', compact('accountId'));
-        // }
+    //     return view('citizen.dashboard', compact('accountId'));
+    // }
 }

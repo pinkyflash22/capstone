@@ -8,8 +8,6 @@ use Illuminate\Http\Request;
 
 class FireRiskAreaOverlayController extends Controller
 {
-    protected const DEFAULT_PROXIMITY_METERS = 100;
-
     public function __construct(
         protected PredictedRiskAreaService $predictedRiskAreaService
     ) {
@@ -32,17 +30,11 @@ class FireRiskAreaOverlayController extends Controller
         }
 
         $stationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
-        $evidenceAreas = $this->predictedRiskAreaService
-            ->buildPredictedAreas($stationId, self::DEFAULT_PROXIMITY_METERS)
-            ->map(function (array $area) {
-                $area['overlay_type'] = 'verified_evidence';
-                $area['geometry_type'] = 'heatmap';
-                $area['geometry_precision'] = 'original_evidence_points';
-                return $area;
-            });
-        $forecastAreas = $this->predictedRiskAreaService->buildForecastAreas($stationId);
-        $areas = $evidenceAreas
-            ->concat($forecastAreas)
+        // Heat overlays must represent a saved analysis result. Approved risk/hazard
+        // reports remain marker icons; they are used only as geographic evidence
+        // positions for an analysis and are never emitted as an independent heatmap.
+        $analysisAreas = $this->predictedRiskAreaService->buildForecastAreas($stationId);
+        $areas = $analysisAreas
             ->filter(fn (array $area) => $levels->contains($area['risk_level']))
             ->values()
             ->all();
@@ -52,10 +44,9 @@ class FireRiskAreaOverlayController extends Controller
             'meta' => [
                 'levels' => $levels->all(),
                 'count' => count($areas),
-                'source' => 'verified_evidence_and_saved_barangay_forecasts',
-                'cluster_proximity_meters' => self::DEFAULT_PROXIMITY_METERS,
-                'forecast_count' => $forecastAreas->count(),
-                'evidence_count' => $evidenceAreas->count(),
+                'source' => 'saved_current_analysis_and_forecast_results',
+                'analysis_count' => $analysisAreas->count(),
+                'evidence_heatmaps' => 0,
             ],
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
