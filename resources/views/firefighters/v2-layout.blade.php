@@ -95,6 +95,7 @@
             </div>
         </main>
     </div>
+    @include('firefighters.partials.logout-confirmation')
     @yield('scripts')
 </body>
 </html>

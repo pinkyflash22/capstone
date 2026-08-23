@@ -602,7 +602,7 @@ function renderCallCard(call, active = false) {
                 <span class="pyro-voice-badge">${escapeHtml(state)}</span>
             </div>
             <div class="pyro-voice-call-card__location">
-                <span class="pyro-voice-call-card__location-icon" aria-hidden="true">⌖</span>
+                <span class="pyro-voice-call-card__location-icon" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
                 <span>${escapeHtml(locationText)}</span>
             </div>
             ${(active || callbackWaiting) ? `
@@ -629,18 +629,18 @@ function renderCallCard(call, active = false) {
                     <button type="button" class="pyro-voice-btn ${onHold ? 'is-active' : ''}" data-pyro-voice-hold>
                         <i class="fa-solid ${onHold ? 'fa-play' : 'fa-pause'}"></i> ${onHold ? 'Resume' : 'Hold'}
                     </button>
-                    <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-end>End</button>
+                    <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-end><i class="fa-solid fa-phone-slash" aria-hidden="true"></i> End</button>
                 ` : `
-                    <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-accept ${call.can_accept ? '' : 'disabled'}>Accept</button>
-                    <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-reject>Reject</button>
+                    <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-accept ${call.can_accept ? '' : 'disabled'}><i class="fa-solid fa-phone" aria-hidden="true"></i> Accept</button>
+                    <button type="button" class="pyro-voice-btn pyro-voice-btn--danger" data-pyro-voice-reject><i class="fa-solid fa-phone-slash" aria-hidden="true"></i> Reject</button>
                 `}
             </div>
             <div class="pyro-voice-actions pyro-voice-actions--triage">
                 <button type="button" class="pyro-voice-btn pyro-voice-btn--success" data-pyro-voice-create-incident ${hasIncident || call.is_flagged_prank || !location.has_location ? 'disabled' : ''}>
-                    ${hasIncident ? 'Incident created' : 'Create Incident from Call'}
+                    <i class="fa-solid fa-fire-extinguisher" aria-hidden="true"></i> ${hasIncident ? 'Incident created' : 'Create Incident from Call'}
                 </button>
-                <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}>View caller location</button>
-                <button type="button" class="pyro-voice-btn pyro-voice-btn--warning" data-pyro-voice-flag ${call.is_flagged_prank || hasIncident ? 'disabled' : ''}>Flag as prank call</button>
+                <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}><i class="fa-solid fa-location-dot" aria-hidden="true"></i> View caller location</button>
+                <button type="button" class="pyro-voice-btn pyro-voice-btn--warning" data-pyro-voice-flag ${call.is_flagged_prank || hasIncident ? 'disabled' : ''}><i class="fa-solid fa-flag" aria-hidden="true"></i> Flag as prank call</button>
             </div>
         </article>
     `;
@@ -671,14 +671,14 @@ function renderMissedCallCard(call) {
                 <span class="pyro-voice-badge">Missed</span>
             </div>
             <div class="pyro-voice-call-card__location">
-                <span class="pyro-voice-call-card__location-icon" aria-hidden="true">⌖</span>
+                <span class="pyro-voice-call-card__location-icon" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
                 <span>${escapeHtml(locationText)}</span>
             </div>
             <div class="pyro-voice-actions pyro-voice-actions--triage">
                 <button type="button" class="pyro-voice-btn pyro-voice-btn--success" data-pyro-voice-create-incident ${hasIncident || call.is_flagged_prank || !location.has_location ? 'disabled' : ''}>
-                    ${hasIncident ? 'Incident created' : 'Create Incident from Missed Call'}
+                    <i class="fa-solid fa-fire-extinguisher" aria-hidden="true"></i> ${hasIncident ? 'Incident created' : 'Create Incident from Missed Call'}
                 </button>
-                <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}>View caller location</button>
+                <button type="button" class="pyro-voice-btn" data-pyro-voice-view-location ${location.has_location ? '' : 'disabled'}><i class="fa-solid fa-location-dot" aria-hidden="true"></i> View caller location</button>
                 <button type="button" class="pyro-voice-btn pyro-voice-btn--primary" data-pyro-voice-callback ${call.can_callback ? '' : 'disabled'}>
                     <i class="fa-solid fa-phone"></i> Call citizen back
                 </button>
@@ -1108,6 +1108,16 @@ async function handleIncomingClick(event) {
     }
 }
 
+function replaceVoiceControlIcon(button, iconClass) {
+    if (!button) return;
+    const currentIcon = button.querySelector('i, .inline-fa-icon');
+    const icon = document.createElement('i');
+    icon.className = `fa-solid ${iconClass}`;
+    icon.setAttribute('aria-hidden', 'true');
+    currentIcon?.replaceWith(icon);
+    window.replaceFirefighterFaIcons?.(button);
+}
+
 function renderCallerDock(call) {
     const dock = ensureCallerDock();
     const status = call.status === 'ringing'
@@ -1132,10 +1142,10 @@ function renderCallerDock(call) {
     muteButton.disabled = call.status !== 'answered' || !localAudioTrack;
     muteButton.classList.toggle('is-active', isMuted);
     muteButton.querySelector('span').textContent = isMuted ? 'Muted' : 'Mute';
-    muteButton.querySelector('i').className = isMuted ? 'fa-solid fa-microphone-slash' : 'fa-solid fa-microphone';
+    replaceVoiceControlIcon(muteButton, isMuted ? 'fa-microphone-slash' : 'fa-microphone');
     speakerButton.classList.toggle('is-active', isSpeakerEnabled);
     speakerButton.querySelector('span').textContent = isSpeakerEnabled ? 'Speaker' : 'Silent';
-    speakerButton.querySelector('i').className = isSpeakerEnabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+    replaceVoiceControlIcon(speakerButton, isSpeakerEnabled ? 'fa-volume-high' : 'fa-volume-xmark');
 }
 
 function callerStatusText(call) {

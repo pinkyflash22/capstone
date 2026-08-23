@@ -20,7 +20,7 @@
 </div>
 
 <form class="coop-mitigation-form" data-mitigation-update data-mitigation-id="{{ $action->getKey() }}" action="{{ route('firefighter.barangay-cooperation.mitigations.update', $action->getKey()) }}">
-    <div class="coop-mitigation-form__head"><div><h3>Field implementation update</h3><p>Update progress without changing the command-issued plan.</p></div><span><i class="fa-solid fa-shield-halved"></i> BFP verification</span></div>
+    <div class="coop-mitigation-form__head"><div><h3>Field implementation update</h3><p>Update progress without changing the command-issued plan.</p></div><span><i class="fa-solid fa-shield"></i> BFP verification</span></div>
     <div class="coop-mitigation-fields">
         <label><span>Implementation status</span><select name="status" required><option value="in_progress" @selected($action->status === 'in_progress' || in_array($action->status, ['planned','approved'], true))>In progress</option><option value="blocked" @selected($action->status === 'blocked')>Blocked</option><option value="completed" @selected($action->status === 'completed')>Completed</option></select></label>
         <label><span>Effectiveness</span><select name="effectiveness"><option value="pending_evaluation" @selected(($action->effectiveness ?: 'pending_evaluation') === 'pending_evaluation')>Pending evaluation</option><option value="effective" @selected($action->effectiveness === 'effective')>Effective</option><option value="partially_effective" @selected($action->effectiveness === 'partially_effective')>Partially effective</option><option value="ineffective" @selected($action->effectiveness === 'ineffective')>Ineffective</option></select></label>

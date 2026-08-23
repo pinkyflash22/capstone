@@ -1413,7 +1413,7 @@
                                 <span>My Logs</span>
                             </a>
                             <div class="h-px bg-slate-100 my-2"></div>
-                            <form method="POST" action="{{ route('logout') }}">
+                            <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
                                 @csrf
                                 <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
                                     <i class="fas fa-sign-out-alt"></i>

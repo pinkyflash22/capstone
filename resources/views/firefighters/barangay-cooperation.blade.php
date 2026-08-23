@@ -26,22 +26,22 @@
         .coop-summary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
         .coop-stat { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 15px 16px; border: 1px solid rgba(226,232,240,.92); border-radius: 19px; background: rgba(255,255,255,.94); box-shadow: 0 12px 28px rgba(15,23,42,.045); }
         .coop-stat__icon { display: grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border-radius: 13px; color: #c2410c; background: #fff7ed; }
+        .coop-stat > div { min-width: 0; }
         .coop-stat small, .coop-stat strong { display: block; }
-        .coop-stat small { color: #94a3b8; font-size: .62rem; font-weight: 900; letter-spacing: .075em; text-transform: uppercase; }
+        .coop-stat small { color: #94a3b8; font-size: .62rem; line-height: 1.25; font-weight: 900; letter-spacing: .06em; overflow-wrap: anywhere; text-transform: uppercase; }
         .coop-stat strong { margin-top: 2px; color: #172033; font-size: 1.32rem; line-height: 1; font-weight: 900; }
 
-        .coop-toolbar { display: grid; grid-template-columns: minmax(240px,1fr) minmax(180px,.36fr); gap: 10px; padding: 12px; border: 1px solid #e8edf3; border-radius: 20px; background: rgba(255,255,255,.94); }
-        .coop-search { position: relative; }
-        .coop-search i { position: absolute; top: 50%; left: 13px; color: #94a3b8; transform: translateY(-50%); }
-        .coop-search input, .coop-toolbar select { width: 100%; height: 42px; border: 1px solid #dbe3ec; border-radius: 12px; background: #f8fafc; color: #334155; font-size: .8rem; outline: none; }
-        .coop-search input { padding: 0 13px 0 38px; }
-        .coop-toolbar select { padding: 0 34px 0 12px; }
-        .coop-search input:focus, .coop-toolbar select:focus { border-color: rgba(198,61,38,.42); box-shadow: 0 0 0 3px rgba(198,61,38,.08); }
-
-        .coop-coverage { display: flex; gap: 8px; overflow-x: auto; padding: 1px 1px 5px; scrollbar-width: thin; }
-        .coop-coverage button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; flex: 0 0 auto; padding: 0 13px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; color: #64748b; font-size: .72rem; font-weight: 800; cursor: pointer; }
-        .coop-coverage button.active { border-color: transparent; background: linear-gradient(135deg, #c63d26, #d18a16); color: #fff; box-shadow: 0 8px 18px rgba(198,61,38,.18); }
-        .coop-coverage button span { opacity: .78; font-size: .6rem; text-transform: uppercase; }
+        .coop-toolbar { display: grid; grid-template-columns: minmax(260px,1fr) repeat(2,minmax(190px,.42fr)); gap: 10px; padding: 12px; border: 1px solid #e8edf3; border-radius: 20px; background: rgba(255,255,255,.94); }
+        .coop-control { display: grid; gap: 6px; min-width: 0; }
+        .coop-control__label { color: #64748b; font-size: .62rem; font-weight: 900; letter-spacing: .055em; text-transform: uppercase; }
+        .coop-control__field { position: relative; display: block; min-width: 0; }
+        .coop-control__icon, .coop-control__chevron { position: absolute; z-index: 1; top: 50%; color: #94a3b8; pointer-events: none; transform: translateY(-50%); }
+        .coop-control__icon { left: 13px; }
+        .coop-control__chevron { right: 12px; font-size: .72rem; }
+        .coop-control input, .coop-control select { width: 100%; min-width: 0; height: 42px; border: 1px solid #dbe3ec; border-radius: 12px; background: #f8fafc; color: #334155; font-size: .78rem; line-height: 1.2; outline: none; }
+        .coop-control input { padding: 0 13px 0 38px; }
+        .coop-control select { appearance: none; padding: 0 34px 0 38px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .coop-control input:focus, .coop-control select:focus { border-color: rgba(198,61,38,.42); box-shadow: 0 0 0 3px rgba(198,61,38,.08); }
 
         .coop-workspace { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(330px,.72fr); gap: 16px; align-items: start; }
         .coop-panel { min-width: 0; border: 1px solid rgba(226,232,240,.95); border-radius: 23px; background: rgba(255,255,255,.96); box-shadow: 0 16px 34px rgba(15,23,42,.05); }
@@ -51,6 +51,7 @@
         .coop-count { display: inline-flex; min-width: 30px; height: 28px; align-items: center; justify-content: center; padding: 0 9px; border-radius: 9px; background: #fff7ed; color: #b45309; font-size: .7rem; font-weight: 900; }
         .coop-list { display: grid; gap: 10px; padding: 13px; }
         .coop-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; padding: 15px; border: 1px solid #e8edf3; border-radius: 17px; background: #fff; transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+        .coop-card > div { min-width: 0; }
         .coop-card:hover { border-color: rgba(198,61,38,.24); transform: translateY(-1px); box-shadow: 0 12px 26px rgba(15,23,42,.055); }
         .coop-card[hidden] { display: none; }
         .coop-card__top { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; }
@@ -59,15 +60,18 @@
         .coop-chip.priority-medium { background: #fff7ed; color: #b45309; }
         .coop-chip.status-submitted, .coop-chip.status-completed { background: #ecfdf5; color: #047857; }
         .coop-chip.status-in_progress { background: #eff6ff; color: #1d4ed8; }
-        .coop-card h3 { margin: 0; color: #1e293b; font-size: .88rem; line-height: 1.35; font-weight: 850; }
+        .coop-card h3 { margin: 0; color: #1e293b; font-size: .88rem; line-height: 1.35; font-weight: 850; overflow-wrap: anywhere; }
         .coop-card__meta { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 8px; color: #64748b; font-size: .68rem; }
-        .coop-card__meta span { display: inline-flex; align-items: center; gap: 5px; }
+        .coop-card__meta span { display: inline-flex; align-items: flex-start; min-width: 0; gap: 5px; overflow-wrap: anywhere; }
+        .coop-card__meta i, .coop-card__meta .inline-fa-icon { flex: 0 0 auto; margin-top: .12em; }
         .coop-progress { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; margin-top: 11px; }
         .coop-progress__track { height: 7px; overflow: hidden; border-radius: 999px; background: #edf2f7; }
         .coop-progress__track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c63d26, #d18a16); }
         .coop-progress strong { color: #475569; font-size: .65rem; }
-        .coop-open { align-self: center; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(198,61,38,.18); border-radius: 11px; background: #fff7ed; color: #b45309; cursor: pointer; }
+        .coop-open { align-self: center; display: inline-flex; min-width: 72px; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid rgba(198,61,38,.18); border-radius: 11px; background: #fff7ed; color: #b45309; font-size: .66rem; font-weight: 900; white-space: nowrap; cursor: pointer; }
         .coop-empty { padding: 34px 20px; text-align: center; color: #94a3b8; }
+        .coop-empty[hidden] { display: none; }
+        .coop-empty--filtered { margin: 2px; border: 1px dashed #dbe3ec; border-radius: 14px; background: #f8fafc; }
         .coop-empty i { display: block; margin-bottom: 10px; color: #cbd5e1; font-size: 1.6rem; }
         .coop-empty strong { display: block; color: #64748b; font-size: .82rem; }
         .coop-empty span { display: block; margin-top: 4px; font-size: .7rem; }
@@ -138,7 +142,7 @@
         .coop-toast { position: fixed; z-index: var(--ff-layer-notice,6000); right: 18px; bottom: 22px; max-width: min(360px,calc(100vw - 32px)); padding: 11px 14px; border-radius: 12px; background: #14532d; color: #fff; font-size: .75rem; font-weight: 800; box-shadow: 0 18px 40px rgba(15,23,42,.2); }
         .coop-toast.error { background: #991b1b; }
 
-        @media (max-width: 1080px) { .coop-workspace { grid-template-columns: 1fr; } .coop-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+        @media (max-width: 1080px) { .coop-workspace { grid-template-columns: 1fr; } .coop-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } .coop-toolbar { grid-template-columns: repeat(2,minmax(0,1fr)); } .coop-control--search { grid-column: 1/-1; } }
         @media (max-width: 767px) {
             [data-ff-page-root="cooperation"] .main-content { padding: 14px 12px calc(106px + env(safe-area-inset-bottom,0px)); }
             .coop-shell { gap: 12px; }
@@ -151,10 +155,13 @@
             .coop-stat small { font-size: .52rem; }
             .coop-stat strong { font-size: 1.08rem; }
             .coop-toolbar { grid-template-columns: 1fr; padding: 9px; border-radius: 16px; }
+            .coop-control--search { grid-column: auto; }
             .coop-panel { border-radius: 19px; }
             .coop-panel__head { padding: 15px 14px 11px; }
             .coop-list { padding: 10px; }
             .coop-card { padding: 13px; border-radius: 14px; }
+            .coop-open { min-width: 38px; width: 38px; padding: 0; }
+            .coop-open span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
             .coop-card__meta { display: grid; gap: 5px; }
             .coop-modal { align-items: end; padding: 0; }
             .coop-modal__card { width: 100%; max-height: calc(92dvh - env(safe-area-inset-top,0px)); border-radius: 22px 22px 0 0; }
@@ -163,6 +170,8 @@
             .coop-detail.wide { grid-column: auto; }
             .coop-step__controls { grid-template-columns: 1fr; }
             .coop-step button { width: 100%; }
+            .coop-timeline__head { align-items: flex-start; flex-direction: column; }
+            .coop-timeline__head time { white-space: normal; }
             .coop-mitigation-fields { grid-template-columns: 1fr; }
             .coop-mitigation-fields label.wide { grid-column: auto; }
             .coop-mitigation-form__head, .coop-mitigation-form__footer { align-items: stretch; flex-direction: column; }
@@ -193,26 +202,26 @@
                         ['Connected Barangays', $summary['barangays'], 'fa-map-location-dot', 'barangays'],
                         ['Active Checklists', $summary['checklists'], 'fa-list-check', 'checklists'],
                         ['Pending Steps', $summary['open_steps'], 'fa-hourglass-half', 'openSteps'],
-                        ['Open Mitigations', $summary['open_mitigations'], 'fa-shield-halved', 'mitigations'],
+                        ['Open Mitigations', $summary['open_mitigations'], 'fa-shield', 'mitigations'],
                     ] as [$label, $value, $icon, $key])
                         <article class="coop-stat"><span class="coop-stat__icon"><i class="fa-solid {{ $icon }}"></i></span><div><small>{{ $label }}</small><strong data-summary-value="{{ $key }}">{{ $value }}</strong></div></article>
                     @endforeach
                 </section>
 
                 <section class="coop-toolbar" aria-label="Plan filters">
-                    <label class="coop-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="coopSearch" placeholder="Search barangay, checklist, or mitigation" autocomplete="off"></label>
-                    <select id="coopStatusFilter" aria-label="Filter by status"><option value="all">All statuses</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="submitted">Completed checklist</option><option value="planned">Planned mitigation</option><option value="blocked">Blocked</option><option value="completed">Completed mitigation</option></select>
+                    <label class="coop-control coop-control--search" for="coopSearch">
+                        <span class="coop-control__label">Search plans</span>
+                        <span class="coop-control__field"><i class="fa-solid fa-magnifying-glass coop-control__icon" aria-hidden="true"></i><input type="search" id="coopSearch" placeholder="Barangay, checklist, or mitigation" autocomplete="off"></span>
+                    </label>
+                    <label class="coop-control" for="coopBarangayFilter">
+                        <span class="coop-control__label">Barangay coverage</span>
+                        <span class="coop-control__field"><i class="fa-solid fa-map-location-dot coop-control__icon" aria-hidden="true"></i><select id="coopBarangayFilter"><option value="all">All connected barangays ({{ $coverage->count() }})</option>@if($mitigations->contains(fn ($action) => in_array($action->scope_type, ['stationwide', 'citywide'], true) || ($action->aiActionPlanChecklist && ! $action->aiActionPlanChecklist->barangay_id && (int) $action->aiActionPlanChecklist->station_id === (int) $stationOfficer->station_id)))<option value="station">Stationwide and citywide plans</option>@endif @foreach($coverage as $link)<option value="{{ $link->barangay_id }}">{{ $link->barangay?->barangay_name ?? 'Barangay' }} — {{ ucfirst($link->coverage_type) }}</option>@endforeach</select><i class="fa-solid fa-chevron-down coop-control__chevron" aria-hidden="true"></i></span>
+                    </label>
+                    <label class="coop-control" for="coopStatusFilter">
+                        <span class="coop-control__label">Plan status</span>
+                        <span class="coop-control__field"><i class="fa-solid fa-list coop-control__icon" aria-hidden="true"></i><select id="coopStatusFilter"><option value="all">All statuses</option><option value="pending">Pending checklist</option><option value="in_progress">In-progress checklist</option><option value="submitted">Completed checklist</option><option value="planned">Planned mitigation</option><option value="blocked">Blocked mitigation</option><option value="completed">Completed mitigation</option></select><i class="fa-solid fa-chevron-down coop-control__chevron" aria-hidden="true"></i></span>
+                    </label>
                 </section>
-
-                <nav class="coop-coverage" aria-label="Connected barangays">
-                    <button type="button" class="active" data-barangay-filter="all"><i class="fa-solid fa-layer-group"></i> All connected <span>{{ $coverage->count() }}</span></button>
-                    @if($mitigations->contains(fn ($action) => in_array($action->scope_type, ['stationwide', 'citywide'], true) || ($action->aiActionPlanChecklist && ! $action->aiActionPlanChecklist->barangay_id && (int) $action->aiActionPlanChecklist->station_id === (int) $stationOfficer->station_id)))
-                        <button type="button" data-barangay-filter="station"><i class="fa-solid fa-city"></i> Stationwide / citywide <span>plan</span></button>
-                    @endif
-                    @foreach($coverage as $link)
-                        <button type="button" data-barangay-filter="{{ $link->barangay_id }}"><i class="fa-solid fa-location-dot"></i> {{ $link->barangay?->barangay_name ?? 'Barangay' }} <span>{{ $link->coverage_type }}</span></button>
-                    @endforeach
-                </nav>
 
                 <div class="coop-workspace">
                     <section class="coop-panel">
@@ -222,7 +231,7 @@
                                 @php $progress = $checklist->checklist_progress; @endphp
                                 <article class="coop-card" data-coop-record data-kind="checklist" data-barangay="{{ $checklist->barangay_id }}" data-status="{{ $checklist->status }}" data-search="{{ strtolower(($checklist->barangay?->barangay_name ?? '').' '.$checklist->plan_title.' '.$checklist->plan_description) }}" data-checklist-card="{{ $checklist->getKey() }}">
                                     <div><div class="coop-card__top"><span class="coop-chip">{{ $checklist->barangay?->barangay_name ?? 'Barangay' }}</span><span class="coop-chip priority-{{ $checklist->priority_level }}">{{ $checklist->priority_level }}</span><span class="coop-chip status-{{ $checklist->status }}" data-checklist-status>{{ str_replace('_',' ',$checklist->status) }}</span></div><h3>{{ $checklist->plan_title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $checklist->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-list-check"></i><b data-progress-count>{{ $progress['followed'] }}/{{ $progress['total'] }}</b> followed</span></div><div class="coop-progress"><div class="coop-progress__track"><span data-progress-bar style="width:{{ $progress['percent'] }}%"></span></div><strong data-progress-percent>{{ $progress['percent'] }}%</strong></div></div>
-                                    <button type="button" class="coop-open" data-open-coop-detail="checklist-{{ $checklist->getKey() }}" aria-label="Open {{ $checklist->plan_title }}"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+                                    <button type="button" class="coop-open" data-open-coop-detail="checklist-{{ $checklist->getKey() }}" aria-label="View {{ $checklist->plan_title }}"><i class="fa-solid fa-eye" aria-hidden="true"></i><span>View</span></button>
                                 </article>
 
                                 <template id="checklist-{{ $checklist->getKey() }}">
@@ -233,7 +242,7 @@
                                             <form class="coop-step" data-checklist-step data-item-id="{{ $step->getKey() }}" data-checklist-id="{{ $checklist->getKey() }}" data-saved-status="{{ $step->status }}" action="{{ route('firefighter.barangay-cooperation.checklists.items.update', [$checklist->getKey(), $step->getKey()]) }}">
                                                 <div class="coop-step__title"><span class="coop-step__number">{{ $step->item_order }}</span><span>{{ $step->item_text }}</span></div>
                                                 <div class="coop-step__controls"><select name="status" aria-label="Checklist status"><option value="pending" @selected($step->status === 'pending')>Pending</option><option value="followed" @selected($step->status === 'followed')>Followed</option><option value="not_followed" @selected($step->status === 'not_followed')>Not followed</option></select><input name="review_notes" value="{{ $step->review_notes }}" maxlength="1000" placeholder="Visit note (optional)" aria-label="Visit note"><button type="submit">Save step</button></div>
-                                                <label class="coop-proof-picker"><span><i class="fa-regular fa-images"></i> Visit proof photos</span><input type="file" name="visit_photos[]" accept="image/jpeg,image/png,image/webp" multiple data-visit-proof-input><small>Optional · up to 5 JPG, PNG, or WebP photos · 15 MB combined</small><div class="coop-proof-preview" data-visit-proof-preview></div></label>
+                                                <label class="coop-proof-picker"><span><i class="fa-regular fa-image"></i> Visit proof photos</span><input type="file" name="visit_photos[]" accept="image/jpeg,image/png,image/webp" multiple data-visit-proof-input><small>Optional · up to 5 JPG, PNG, or WebP photos · 15 MB combined</small><div class="coop-proof-preview" data-visit-proof-preview></div></label>
                                                 <div class="coop-step__review" data-step-review>@if($step->reviewed_at)Last verified {{ $step->reviewed_at->format('M d, Y h:i A') }} by {{ $step->reviewer?->full_name ?? 'authorized user' }}@elseNot yet verified during a visit.@endif</div>
                                             </form>
                                         @endforeach
@@ -251,7 +260,7 @@
                                         @forelse($timeline as $entry)
                                             @if($entry->kind === 'visit')
                                                 @php $visit = $entry->record; @endphp
-                                                <article class="coop-timeline__item"><div class="coop-timeline__head"><strong>{{ $visit->firefighter?->full_name ?? 'BFP firefighter' }} · Step {{ $visit->item?->item_order ?? 'update' }}</strong><time>{{ $visit->visited_at?->format('M d, Y h:i A') }}</time></div><p>Marked as {{ str_replace('_',' ',$visit->verified_status) }}{{ $visit->visit_notes ? ' · '.$visit->visit_notes : '' }}</p><span class="coop-signoff {{ $visit->signoff_status }}"><i class="fa-solid fa-signature"></i>{{ str_replace('_',' ',$visit->signoff_status) }}</span>@if($visit->signatory)<p>Signed by {{ $visit->signatory->full_name }}{{ $visit->signoff_notes ? ' · '.$visit->signoff_notes : '' }}</p>@endif @if($visit->photos->isNotEmpty())<div class="coop-visit-photos">@foreach($visit->photos as $photo)<a href="{{ $photo->url }}" target="_blank" rel="noopener"><img src="{{ $photo->url }}" alt="{{ $photo->file_name }}"></a>@endforeach</div>@endif</article>
+                                                <article class="coop-timeline__item"><div class="coop-timeline__head"><strong>{{ $visit->firefighter?->full_name ?? 'BFP firefighter' }} · Step {{ $visit->item?->item_order ?? 'update' }}</strong><time>{{ $visit->visited_at?->format('M d, Y h:i A') }}</time></div><p>Marked as {{ str_replace('_',' ',$visit->verified_status) }}{{ $visit->visit_notes ? ' · '.$visit->visit_notes : '' }}</p><span class="coop-signoff {{ $visit->signoff_status }}"><i class="fa-solid fa-pen-to-square"></i>{{ str_replace('_',' ',$visit->signoff_status) }}</span>@if($visit->signatory)<p>Signed by {{ $visit->signatory->full_name }}{{ $visit->signoff_notes ? ' · '.$visit->signoff_notes : '' }}</p>@endif @if($visit->photos->isNotEmpty())<div class="coop-visit-photos">@foreach($visit->photos as $photo)<a href="{{ $photo->url }}" target="_blank" rel="noopener"><img src="{{ $photo->url }}" alt="{{ $photo->file_name }}"></a>@endforeach</div>@endif</article>
                                             @else
                                                 @php $activity = $entry->record; @endphp
                                                 <article class="coop-timeline__item"><div class="coop-timeline__head"><strong>{{ $activity->user?->full_name ?? 'Authorized user' }}</strong><time>{{ $activity->created_at?->format('M d, Y h:i A') }}</time></div><p>{{ ucwords(str_replace('_',' ',$activity->event_type)) }}{{ $activity->notes ? ' · '.$activity->notes : '' }}</p></article>
@@ -264,6 +273,9 @@
                             @empty
                                 <div class="coop-empty"><i class="fa-solid fa-list-check"></i><strong>No published checklist yet</strong><span>Confirmed plans for connected barangays will appear here.</span></div>
                             @endforelse
+                            @if($checklists->isNotEmpty())
+                                <div class="coop-empty coop-empty--filtered" data-filter-empty="checklist" role="status" aria-live="polite" hidden><i class="fa-solid fa-magnifying-glass"></i><strong>No matching checklists</strong><span>Try another barangay, status, or search term.</span></div>
+                            @endif
                         </div>
                     </section>
 
@@ -277,11 +289,14 @@
                                     $cardStatus = $action->completion_approval_status === 'pending' ? 'pending_approval' : $action->status;
                                     $coverageLabel = $isCityWide ? 'Citywide' : ($isStationWide ? 'Stationwide' : ($action->barangay?->barangay_name ?? 'Barangay'));
                                 @endphp
-                                <article class="coop-card" data-coop-record data-kind="mitigation" data-mitigation-card="{{ $action->getKey() }}" data-barangay="{{ ($isStationWide || $isCityWide) ? 'station' : $action->barangay_id }}" data-status="{{ $cardStatus }}" data-search="{{ strtolower(($isCityWide ? 'citywide ' : ($isStationWide ? 'stationwide ' : ($action->barangay?->barangay_name ?? ''))).' '.$action->title.' '.$action->description) }}"><div><div class="coop-card__top"><span class="coop-chip">{{ $coverageLabel }}</span><span class="coop-chip priority-{{ $action->priority_level }}">{{ $action->priority_level }}</span><span class="coop-chip status-{{ $cardStatus }}" data-mitigation-status>{{ str_replace('_',' ',$cardStatus) }}</span></div><h3>{{ $action->title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-user-group"></i>{{ $action->responsibleTeam?->team_name ?? $action->responsibleUser?->full_name ?? 'Station-barangay partners' }}</span></div></div><button type="button" class="coop-open" data-open-coop-detail="mitigation-{{ $action->getKey() }}" aria-label="Open {{ $action->title }}"><i class="fa-solid fa-eye"></i></button></article>
+                                <article class="coop-card" data-coop-record data-kind="mitigation" data-mitigation-card="{{ $action->getKey() }}" data-barangay="{{ ($isStationWide || $isCityWide) ? 'station' : $action->barangay_id }}" data-status="{{ $cardStatus }}" data-search="{{ strtolower(($isCityWide ? 'citywide ' : ($isStationWide ? 'stationwide ' : ($action->barangay?->barangay_name ?? ''))).' '.$action->title.' '.$action->description) }}"><div><div class="coop-card__top"><span class="coop-chip">{{ $coverageLabel }}</span><span class="coop-chip priority-{{ $action->priority_level }}">{{ $action->priority_level }}</span><span class="coop-chip status-{{ $cardStatus }}" data-mitigation-status>{{ str_replace('_',' ',$cardStatus) }}</span></div><h3>{{ $action->title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-users"></i>{{ $action->responsibleTeam?->team_name ?? $action->responsibleUser?->full_name ?? 'Station-barangay partners' }}</span></div></div><button type="button" class="coop-open" data-open-coop-detail="mitigation-{{ $action->getKey() }}" aria-label="View {{ $action->title }}"><i class="fa-solid fa-eye" aria-hidden="true"></i><span>View</span></button></article>
                                 <template id="mitigation-{{ $action->getKey() }}">@include('firefighters.partials.mitigation-cooperation-detail', ['action' => $action, 'stationOfficer' => $stationOfficer])</template>
                             @empty
-                                <div class="coop-empty"><i class="fa-solid fa-shield-halved"></i><strong>No mitigation plan found</strong><span>Plans issued for station coverage will appear here.</span></div>
+                                <div class="coop-empty"><i class="fa-solid fa-shield"></i><strong>No mitigation plan found</strong><span>Plans issued for station coverage will appear here.</span></div>
                             @endforelse
+                            @if($mitigations->isNotEmpty())
+                                <div class="coop-empty coop-empty--filtered" data-filter-empty="mitigation" role="status" aria-live="polite" hidden><i class="fa-solid fa-magnifying-glass"></i><strong>No matching mitigation plans</strong><span>Try another barangay, status, or search term.</span></div>
+                            @endif
                         </div>
                     </aside>
                 </div>
@@ -298,8 +313,9 @@
                 if (!workspace || !modal || !modalBody || workspace.dataset.bound === 'true') return;
                 workspace.dataset.bound = 'true';
                 const search = document.getElementById('coopSearch');
+                const barangay = document.getElementById('coopBarangayFilter');
                 const status = document.getElementById('coopStatusFilter');
-                let selectedBarangay = 'all';
+                let selectedBarangay = barangay?.value || 'all';
                 let lastFocused = null;
 
                 const toast = (message, type = 'success') => {
@@ -332,7 +348,7 @@
                     copy.textContent = `Marked as ${String(visit.status || '').replaceAll('_', ' ')}${visit.notes ? ` · ${visit.notes}` : ''}`;
                     const signoff = document.createElement('span');
                     signoff.className = `coop-signoff ${visit.signoff_status || 'pending'}`;
-                    signoff.innerHTML = '<i class="fa-solid fa-signature"></i>';
+                    signoff.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
                     signoff.append(document.createTextNode(String(visit.signoff_status || 'pending').replaceAll('_', ' ')));
                     item.append(head, copy, signoff);
                     if (Array.isArray(visit.photos) && visit.photos.length) {
@@ -368,14 +384,15 @@
                         });
                         const count = workspace.querySelector(`[data-visible-count="${kind}"]`);
                         if (count) count.textContent = String(visible);
+                        const emptyState = workspace.querySelector(`[data-filter-empty="${kind}"]`);
+                        if (emptyState) emptyState.hidden = visible > 0;
                     });
                 };
 
-                workspace.querySelectorAll('[data-barangay-filter]').forEach((button) => button.addEventListener('click', () => {
-                    workspace.querySelectorAll('[data-barangay-filter]').forEach((item) => item.classList.toggle('active', item === button));
-                    selectedBarangay = button.dataset.barangayFilter || 'all';
+                barangay?.addEventListener('change', () => {
+                    selectedBarangay = barangay.value || 'all';
                     filterRecords();
-                }));
+                });
                 search?.addEventListener('input', filterRecords);
                 status?.addEventListener('change', filterRecords);
 

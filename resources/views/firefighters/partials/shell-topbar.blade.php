@@ -20,6 +20,14 @@
             <span>On Duty</span>
         </div>
 
+        <button type="button" class="ff-topbar-call" data-pyro-voice-call aria-label="Call the assigned BFP station" title="Call BFP station">
+            <span class="ff-topbar-call__icon"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></span>
+            <span class="ff-topbar-call__copy">
+                <strong>Call station</strong>
+                <small>Agora voice call</small>
+            </span>
+        </button>
+
         <div class="user-dropdown">
             <button id="ffUserDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="ffUserDropdownMenu">
                 <div class="ff-topbar-profile-avatar" data-firefighter-avatar-frame>
@@ -50,7 +58,7 @@
                         <span>My Logs</span>
                     </a>
                     <div class="h-px bg-slate-100 my-2"></div>
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
                         @csrf
                         <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
                             <i class="fas fa-sign-out-alt"></i>

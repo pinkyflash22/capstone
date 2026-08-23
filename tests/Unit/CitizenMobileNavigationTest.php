@@ -8,7 +8,7 @@ use Tests\TestCase;
 class CitizenMobileNavigationTest extends TestCase
 {
     #[Test]
-    public function mobile_dock_uses_clear_icons_and_moves_notifications_into_the_long_press_menu(): void
+    public function mobile_dock_keeps_only_risk_reporting_in_the_long_press_menu(): void
     {
         $view = file_get_contents(resource_path('views/citizen/dashboard.blade.php'));
 
@@ -16,18 +16,35 @@ class CitizenMobileNavigationTest extends TestCase
         $this->assertStringContainsString('citizen-mobile-dock__label">Map', $view);
         $this->assertStringContainsString('citizen-mobile-dock__label">Call', $view);
         $this->assertStringContainsString('citizen-mobile-dock__label">Updates', $view);
-        $this->assertStringContainsString('citizen-mobile-dock__label">Settings', $view);
-        $this->assertStringContainsString('citizen-mobile-dock__burst-label">Notifications', $view);
+        $this->assertStringContainsString('citizen-mobile-dock__label">Menu', $view);
 
-        $dockStart = strpos($view, '<nav class="citizen-mobile-dock');
-        $dockEnd = strpos($view, '</nav>', $dockStart);
-        $dock = substr($view, $dockStart, $dockEnd - $dockStart);
-        $notificationPosition = strpos($dock, 'data-citizen-alerts-open');
-        $burstPosition = strpos($dock, 'data-citizen-nav-burst');
+        $burstStart = strpos($view, 'data-citizen-nav-burst');
+        $burstEnd = strpos($view, '</div>', $burstStart);
+        $burst = substr($view, $burstStart, $burstEnd - $burstStart);
 
-        $this->assertNotFalse($notificationPosition);
-        $this->assertNotFalse($burstPosition);
-        $this->assertGreaterThan($burstPosition, $notificationPosition);
+        $this->assertNotFalse($burstStart);
+        $this->assertStringContainsString('data-citizen-risk-hazard-open', $burst);
+        $this->assertSame(1, substr_count($burst, 'citizen-mobile-dock__burst-item'));
+        $this->assertStringNotContainsString('data-citizen-alerts-open', $burst);
+        $this->assertStringNotContainsString('data-citizen-insights-open', $burst);
+    }
+
+    #[Test]
+    public function moved_navigation_is_available_in_the_mobile_menu_with_trailing_chevrons(): void
+    {
+        $view = file_get_contents(resource_path('views/citizen/dashboard.blade.php'));
+        $menuStart = strpos($view, 'data-citizen-settings-panel');
+        $menuEnd = strpos($view, 'data-citizen-map-layers-panel', $menuStart);
+        $menu = substr($view, $menuStart, $menuEnd - $menuStart);
+
+        $this->assertStringContainsString('data-citizen-switch-section="fsic"', $menu);
+        $this->assertStringContainsString('data-citizen-switch-section="alerts"', $menu);
+        $this->assertStringContainsString('data-citizen-switch-section="contacts"', $menu);
+        $this->assertStringContainsString('data-citizen-insights-open', $menu);
+        $this->assertStringContainsString('data-citizen-alerts-open', $menu);
+        $this->assertStringContainsString('data-citizen-switch-section="profile"', $menu);
+        $this->assertStringContainsString('data-citizen-open-logs', $menu);
+        $this->assertGreaterThanOrEqual(7, substr_count($menu, 'citizen-mobile-panel__action-trailing'));
     }
 
     #[Test]

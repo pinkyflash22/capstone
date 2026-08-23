@@ -10,7 +10,7 @@
             <i class="fa-solid fa-arrow-left"></i>
             <span>Current Module</span>
         </a>
-        <form method="POST" action="{{ route('logout') }}">
+        <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
             @csrf
             <button type="submit" class="ff2-button ff2-button--primary">
                 <i class="fa-solid fa-right-from-bracket"></i>

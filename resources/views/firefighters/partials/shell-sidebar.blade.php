@@ -19,7 +19,6 @@
         [
             'title' => 'Communications',
             'items' => [
-                ['type' => 'voice', 'label' => 'Call BFP', 'icon' => 'fas fa-phone-volume', 'active' => []],
                 ['type' => 'link', 'label' => 'Announcements', 'icon' => 'fas fa-bullhorn', 'route' => 'firefighter.announcements', 'active' => ['announcements']],
                 ['type' => 'link', 'label' => 'My Schedule', 'icon' => 'fas fa-calendar', 'route' => 'firefighter.schedule', 'active' => ['schedule']],
             ],
@@ -821,12 +820,7 @@
                     $isActive = !empty($item['active']) && in_array($currentActive, $item['active'], true);
                 @endphp
 
-                @if (($item['type'] ?? 'link') === 'voice')
-                    <button type="button" class="nav-item w-full text-left" data-pyro-voice-call aria-label="Call the assigned BFP station">
-                        <i class="{{ $item['icon'] }}" aria-hidden="true"></i>
-                        <span>{{ $item['label'] }}</span>
-                    </button>
-                @elseif (($item['type'] ?? 'link') === 'button')
+                @if (($item['type'] ?? 'link') === 'button')
                     <button type="button" class="nav-item w-full text-left {{ $isActive ? 'active' : '' }}" onclick="{{ $item['onclick'] }}">
                         <i class="{{ $item['icon'] }}" aria-hidden="true"></i>
                         <span>{{ $item['label'] }}</span>
@@ -917,13 +911,6 @@
             </button>
         </div>
         <div class="ff-mobile-panel__list">
-            <button type="button" class="ff-mobile-panel__action ff-mobile-panel__action--button" data-pyro-voice-call>
-                <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">phone_in_talk</span></span>
-                <span class="ff-mobile-panel__copy">
-                    <strong>Call BFP</strong>
-                    <small>Start a secure Agora voice call with your assigned station.</small>
-                </span>
-            </button>
             <a href="{{ route('firefighter.incidents') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="incidents">
                 <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">local_fire_department</span></span>
                 <span class="ff-mobile-panel__copy">
@@ -943,6 +930,13 @@
                 <span class="ff-mobile-panel__copy">
                     <strong>Checklist</strong>
                     <small>Review connected barangay plans and verify checklist steps during visits.</small>
+                </span>
+            </a>
+            <a href="{{ route('firefighter.my-station') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="station">
+                <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">apartment</span></span>
+                <span class="ff-mobile-panel__copy">
+                    <strong>My Station</strong>
+                    <small>Open station personnel, equipment, and investigation reports.</small>
                 </span>
             </a>
             <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="announcements">
@@ -990,7 +984,7 @@
                     <small>View recent activity and submitted firefighter actions.</small>
                 </span>
             </button>
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
                 @csrf
                 <button type="submit" class="ff-mobile-panel__action ff-mobile-panel__action--button ff-mobile-panel__action--danger">
                     <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">logout</span></span>

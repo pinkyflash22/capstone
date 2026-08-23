@@ -9,6 +9,7 @@ use App\Models\StationOfficer;
 use App\Models\Incident;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserLog;
 use App\Models\Station;
 use App\Models\Team;
 use App\Models\Province;
@@ -1502,7 +1503,28 @@ class StationAdminController extends Controller
             ->orderBy('city_name')
             ->get();
 
-        return view('chief.profile', compact('user', 'cities'));
+        $stationOfficer = StationOfficer::query()
+            ->with(['station.address.barangay.city'])
+            ->where('user_id', $user->user_id)
+            ->first();
+
+        $activityLogs = UserLog::query()
+            ->where('user_id', $user->user_id)
+            ->latest('created_at')
+            ->paginate(8, ['id', 'action', 'ip_address', 'user_agent', 'created_at'], 'activity_page')
+            ->withQueryString();
+
+        $profileStats = [
+            'activity_count' => UserLog::where('user_id', $user->user_id)->count(),
+            'station_personnel' => $stationOfficer?->station_id
+                ? StationOfficer::where('station_id', $stationOfficer->station_id)->count()
+                : 0,
+            'station_name' => $stationOfficer?->station?->station_name ?? 'No station assigned',
+            'rank' => $stationOfficer?->rank ?: 'Station Commander',
+            'duty_status' => $stationOfficer?->status ?: 'Not set',
+        ];
+
+        return view('chief.profile', compact('user', 'cities', 'stationOfficer', 'activityLogs', 'profileStats'));
     }
 
     public function updateProfile(Request $request)
@@ -1669,33 +1691,136 @@ class StationAdminController extends Controller
     // }
     //for reports
 
-    public function reports()
+    public function reports(Request $request)
     {
         $accountId = Auth::user()->user_id;
-        $thisperson = StationOfficer::where('user_id',$accountId)->with(['station.address.barangay.city'])->first();
-        $stationId = $thisperson->station_id;
+        $thisperson = StationOfficer::where('user_id', $accountId)->with(['station.address.barangay.city'])->first();
+        abort_unless($thisperson?->station_id, 403, 'No station is linked to this commander account.');
+        $stationId = (int) $thisperson->station_id;
 
-        $mapmarker = Marker::with('stations')->get();
         $stationOfficerIds = StationOfficer::where('station_id', $stationId)
             ->pluck('station_officer_id')
             ->filter()
             ->values();
-        $stationTeamIds = $this->getTeamIdsForStation($stationId);
 
-        $incidents = Incident::with(['marker', 'team', 'reporter'])
-            ->whereIn('team_id', $stationTeamIds)
-            ->get();
-        $alerts = Incident::with('marker')->get();
-        $stations = Station::where('station_id', $stationId)->with(['marker', 'users', 'address.barangay.city'])->get();
-        $provinces = Province::orderBy('province_name')->get();
-        $stationperson = StationOfficer::where('station_id',$stationId)->with('station','station.users')->get();
-        // Get all users with role 'chief'
-        $chiefRole = Role::where('role', 'chief')->first();
-        $chiefs = $chiefRole ? User::where('role_id', $chiefRole->role_id)->get() : collect();
-        $reportPayload = $this->buildExecutiveReportPayload($stationOfficerIds->all(), $stationId);
+        $reportType = in_array($request->string('type')->toString(), ['spot', 'progress', 'final'], true)
+            ? $request->string('type')->toString()
+            : 'spot';
+        $search = trim($request->string('search')->toString());
+        $status = trim($request->string('status')->toString());
+        $dateFrom = $request->date('date_from')?->toDateString();
+        $dateTo = $request->date('date_to')?->toDateString();
+        $sort = in_array($request->string('sort')->toString(), ['newest', 'oldest', 'damage_high', 'damage_low'], true)
+            ? $request->string('sort')->toString()
+            : 'newest';
+        $perPage = in_array($request->integer('per_page'), [10, 15, 25], true)
+            ? $request->integer('per_page')
+            : 10;
+
+        $reportQuery = match ($reportType) {
+            'progress' => ProgressInvestigationReport::query()
+                ->with([
+                    'spotInvestigation.incident.marker',
+                    'investigator.user',
+                    'investigator.station',
+                    'fireOrigin',
+                    'finalInvestigation',
+                ])
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($search, function ($query, $value) {
+                    $query->where(function ($searchQuery) use ($value) {
+                        $searchQuery->where('fire_cause', 'like', "%{$value}%")
+                            ->orWhere('responsible_arson', 'like', "%{$value}%")
+                            ->orWhereHas('spotInvestigation.incident.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', "%{$value}%"))
+                            ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                                $userQuery->where('first_name', 'like', "%{$value}%")
+                                    ->orWhere('last_name', 'like', "%{$value}%");
+                            });
+                    });
+                })
+                ->when($status === 'conducting', fn ($query) => $query->whereDoesntHave('finalInvestigation'))
+                ->when($status === 'finalized', fn ($query) => $query->whereHas('finalInvestigation')),
+            'final' => FinalInvestigationReport::query()
+                ->with([
+                    'progressInvestigation.spotInvestigation.incident.marker',
+                    'investigator.user',
+                    'investigator.station',
+                    'progressInvestigation.investigator.user',
+                ])
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($search, function ($query, $value) {
+                    $query->where(function ($searchQuery) use ($value) {
+                        $searchQuery->where('exact_address', 'like', "%{$value}%")
+                            ->orWhere('cause_of_fire', 'like', "%{$value}%")
+                            ->orWhereHas('progressInvestigation.spotInvestigation.incident.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', "%{$value}%"))
+                            ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                                $userQuery->where('first_name', 'like', "%{$value}%")
+                                    ->orWhere('last_name', 'like', "%{$value}%");
+                            });
+                    });
+                }),
+            default => SpotInvestigationReport::query()
+                ->with([
+                    'incident.marker',
+                    'investigator.user',
+                    'investigator.station',
+                    'progressInvestigation',
+                ])
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($search, function ($query, $value) {
+                    $query->where(function ($searchQuery) use ($value) {
+                        $searchQuery->where('owner', 'like', "%{$value}%")
+                            ->orWhere('occupancy', 'like', "%{$value}%")
+                            ->orWhereHas('incident.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', "%{$value}%"))
+                            ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                                $userQuery->where('first_name', 'like', "%{$value}%")
+                                    ->orWhere('last_name', 'like', "%{$value}%");
+                            });
+                    });
+                })
+                ->when(in_array($status, ['residential', 'commercial', 'industrial'], true), fn ($query) => $query->whereRaw('LOWER(occupancy) = ?', [$status]))
+                ->when($status === 'filed', fn ($query) => $query->whereDoesntHave('progressInvestigation'))
+                ->when($status === 'progressed', fn ($query) => $query->whereHas('progressInvestigation')),
+        };
+
+        $reportQuery
+            ->when($dateFrom, fn ($query, $value) => $query->whereDate('created_at', '>=', $value))
+            ->when($dateTo, fn ($query, $value) => $query->whereDate('created_at', '<=', $value));
+
+        if (in_array($sort, ['damage_high', 'damage_low'], true) && in_array($reportType, ['spot', 'final'], true)) {
+            $damageColumn = $reportType === 'spot' ? 'estimated_damage' : 'total_damage';
+            $reportQuery->orderBy($damageColumn, $sort === 'damage_high' ? 'desc' : 'asc');
+        } else {
+            $reportQuery->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc');
+        }
+
+        $reportRows = $reportQuery
+            ->paginate($perPage, ['*'], 'reports_page')
+            ->withQueryString();
+        $reportRows->setCollection(
+            $reportRows->getCollection()->map(fn ($report) => $this->serializeExecutiveReportRecord($report, $reportType, $stationId))
+        );
+
+        $reportCounts = [
+            'spot' => SpotInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'progress' => ProgressInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'final' => FinalInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'estimated_damage' => (float) SpotInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->sum('estimated_damage'),
+        ];
         $stationProfile = $this->buildExecutiveStationProfile($thisperson);
 
-        return view('chief.reports', compact('mapmarker', 'incidents', 'alerts', 'stations', 'chiefs', 'provinces','stationperson', 'reportPayload', 'stationProfile'));
+        return view('chief.reports', compact(
+            'reportRows',
+            'reportType',
+            'reportCounts',
+            'stationProfile',
+            'search',
+            'status',
+            'dateFrom',
+            'dateTo',
+            'sort',
+            'perPage',
+        ));
 
     }
 
@@ -2537,6 +2662,72 @@ class StationAdminController extends Controller
             'spot' => $spotReports,
             'progress' => $progressReports,
             'final' => $finalReports,
+        ];
+    }
+
+    private function serializeExecutiveReportRecord($report, string $reportType, int $stationId): array
+    {
+        if ($reportType === 'progress') {
+            $incident = $report->spotInvestigation?->incident;
+
+            return [
+                'id' => $report->progress_investigation_report_id,
+                'type' => 'progress',
+                'incident_id' => $incident?->incident_id,
+                'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
+                'investigator' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
+                'station_id' => $stationId,
+                'station_name' => $report->investigator?->station?->station_name,
+                'status' => $report->finalInvestigation ? 'finalized' : 'conducting',
+                'fire_origin' => $report->fireOrigin?->origin ?: 'Not recorded',
+                'fire_cause' => $report->fire_cause ?: 'Under investigation',
+                'responsible_arson' => $report->responsible_arson ?: 'Not recorded',
+                'created_at' => $report->created_at,
+                'completed_at' => $report->report_completed_at,
+            ];
+        }
+
+        if ($reportType === 'final') {
+            $incident = $report->progressInvestigation?->spotInvestigation?->incident;
+            $investigator = $report->investigator?->user ?: $report->progressInvestigation?->investigator?->user;
+
+            return [
+                'id' => $report->final_investigation_report_id,
+                'type' => 'final',
+                'incident_id' => $incident?->incident_id,
+                'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
+                'investigator' => trim(($investigator?->first_name ?? '') . ' ' . ($investigator?->last_name ?? '')) ?: 'Unassigned investigator',
+                'station_id' => $stationId,
+                'station_name' => $report->investigator?->station?->station_name,
+                'status' => 'completed',
+                'total_damage' => (float) ($report->total_damage ?? 0),
+                'exact_address' => $report->exact_address ?: 'Not recorded',
+                'cause_of_fire' => $report->cause_of_fire ?: 'Not recorded',
+                'created_at' => $report->created_at,
+                'completed_at' => $report->report_completed_at,
+            ];
+        }
+
+        $incident = $report->incident;
+
+        return [
+            'id' => $report->spot_investigation_report_id,
+            'type' => 'spot',
+            'incident_id' => $incident?->incident_id,
+            'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
+            'investigator' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
+            'station_id' => $stationId,
+            'station_name' => $report->investigator?->station?->station_name,
+            'status' => $report->progressInvestigation ? 'progressed' : 'filed',
+            'owner' => $report->owner ?: 'Not recorded',
+            'occupancy' => $report->occupancy ?: 'Not recorded',
+            'estimated_damage' => (float) ($report->estimated_damage ?? 0),
+            'estimated_area' => (float) ($report->estimated_area ?? 0),
+            'casualties' => (int) ($report->dead ?? 0) + (int) ($report->injured ?? 0),
+            'fire_started' => $report->fire_started,
+            'fire_out' => $report->fire_out,
+            'created_at' => $report->created_at,
+            'completed_at' => $report->report_completed_at,
         ];
     }
 

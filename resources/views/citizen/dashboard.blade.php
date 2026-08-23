@@ -247,6 +247,34 @@
             font-weight: 700;
         }
 
+        .citizen-mobile-panel__action-copy {
+            flex: 1;
+            min-width: 0;
+            text-align: left;
+        }
+
+        .citizen-mobile-panel__action-trailing {
+            margin-left: auto;
+            color: #94a3b8;
+            flex: 0 0 auto;
+            font-size: 21px;
+        }
+
+        .citizen-mobile-panel__menu-label {
+            margin: 0.2rem 0.3rem -0.25rem;
+            color: #94a3b8;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .citizen-mobile-panel__menu-divider {
+            height: 1px;
+            margin: 0.2rem 0;
+            background: rgba(226, 232, 240, 0.9);
+        }
+
         .citizen-mobile-panel__action-copy small {
             display: block;
             margin-top: 0.12rem;
@@ -1496,14 +1524,14 @@
                 position: absolute;
                 left: 50%;
                 bottom: 76px;
-                width: min(calc(100vw - 32px), 300px);
-                min-height: 132px;
+                width: min(calc(100vw - 48px), 190px);
+                min-height: 76px;
                 display: grid;
-                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-template-columns: minmax(0, 1fr);
                 align-items: center;
                 justify-content: center;
                 gap: 7px;
-                padding: 10px;
+                padding: 9px;
                 border-radius: 24px;
                 background: rgba(255, 253, 248, 0.96);
                 border: 1px solid rgba(198, 61, 38, 0.12);
@@ -1530,7 +1558,7 @@
             .citizen-mobile-dock__burst-item {
                 position: relative;
                 width: 100%;
-                height: 52px;
+                height: 58px;
                 display: inline-flex;
                 align-items: center;
                 flex-direction: column;
@@ -1563,12 +1591,6 @@
                 pointer-events: auto;
             }
 
-            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(2) { transition-delay: 24ms; }
-            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(3) { transition-delay: 48ms; }
-            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(4) { transition-delay: 72ms; }
-            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(5) { transition-delay: 96ms; }
-            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(6) { transition-delay: 120ms; }
-
             .citizen-mobile-dock__burst-item.active {
                 background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
                 color: #ffffff;
@@ -1594,7 +1616,7 @@
                 display: block;
                 width: 100%;
                 overflow: hidden;
-                font-size: 8px;
+                font-size: 9px;
                 font-weight: 800;
                 line-height: 1.05;
                 text-align: center;
@@ -2236,50 +2258,13 @@
 
                 <div class="citizen-mobile-dock__center-wrap" data-citizen-nav-center>
                     <div class="citizen-mobile-dock__burst" data-citizen-nav-burst>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="fsic" data-citizen-switch-section="fsic" aria-label="Requests">
-                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M3.5 7.5h6l2 2h9v8.5a2 2 0 0 1-2 2h-15z"></path>
-                                <path d="M3.5 7.5V5.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                            <span class="citizen-mobile-dock__burst-label">Requests</span>
-                        </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" data-citizen-switch-section="alerts" aria-label="Areas of Concern">
-                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 3 22 20H2z"></path>
-                                <path d="M12 9v5"></path>
-                                <path d="M12 17h.01"></path>
-                            </svg>
-                            <span class="citizen-mobile-dock__burst-label">Concerns</span>
-                        </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" data-citizen-switch-section="contacts" aria-label="Emergency Contacts">
-                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3A19.2 19.2 0 0 1 5.4 13 19.6 19.6 0 0 1 2.4 4.5 2 2 0 0 1 4.4 2.3h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L8.1 10a15.5 15.5 0 0 0 5.9 5.9l1.2-1.2a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 2 2.3z"></path>
-                            </svg>
-                            <span class="citizen-mobile-dock__burst-label">Contacts</span>
-                        </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
                             <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 13h3l10 5V6L7 11H4z"></path>
                                 <path d="M7 13v5"></path>
                                 <path d="M18 9.5a3 3 0 0 1 0 5"></path>
                             </svg>
-                            <span class="citizen-mobile-dock__burst-label">Report Risk</span>
-                        </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-insights-open aria-label="Charts and Cards">
-                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 20h16"></path>
-                                <path d="M7 16V9"></path>
-                                <path d="M12 16V5"></path>
-                                <path d="M17 16v-6"></path>
-                            </svg>
-                            <span class="citizen-mobile-dock__burst-label">Insights</span>
-                        </button>
-                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-alerts-open aria-label="Notifications">
-                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
-                                <path d="M10 21h4"></path>
-                            </svg>
-                            <span class="citizen-mobile-dock__burst-label">Notifications</span>
+                            <span class="citizen-mobile-dock__burst-label">Report Risk / Hazard</span>
                         </button>
                     </div>
 
@@ -2301,12 +2286,12 @@
                         <span class="citizen-mobile-dock__label">Updates</span>
                     </button>
 
-                    <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
+                    <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Open citizen menu">
                         <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
                             <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2.1 2.1 0 0 1-3 3l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21a2.1 2.1 0 0 1-4.2 0v-.1a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1a2.1 2.1 0 0 1-3-3l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2a2.1 2.1 0 0 1 0-4.2h.1a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1a2.1 2.1 0 0 1 3-3l.1.1a1.8 1.8 0 0 0 2 .4 1.8 1.8 0 0 0 1.1-1.7V2a2.1 2.1 0 0 1 4.2 0v.1a1.8 1.8 0 0 0 1.1 1.7 1.8 1.8 0 0 0 2-.4l.1-.1a2.1 2.1 0 0 1 3 3l-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.1a2.1 2.1 0 0 1 0 4.2h-.1a1.8 1.8 0 0 0-1.7 1.3z"></path>
                         </svg>
-                        <span class="citizen-mobile-dock__label">Settings</span>
+                        <span class="citizen-mobile-dock__label">Menu</span>
                     </button>
                 </div>
             </div>
@@ -2319,19 +2304,63 @@
             <div class="citizen-mobile-panel__header">
                 <div>
                     <p class="citizen-mobile-panel__eyebrow">Citizen Portal</p>
-                    <h2 class="citizen-mobile-panel__title">Settings</h2>
+                    <h2 class="citizen-mobile-panel__title">Menu</h2>
                 </div>
-                <button type="button" class="citizen-mobile-panel__close" data-citizen-panel-close aria-label="Close settings">
+                <button type="button" class="citizen-mobile-panel__close" data-citizen-panel-close aria-label="Close menu">
                     <span class="material-symbols-rounded" aria-hidden="true">close</span>
                 </button>
             </div>
             <div class="citizen-mobile-panel__menu">
+                <p class="citizen-mobile-panel__menu-label">Explore</p>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-switch-section="fsic" data-citizen-panel-close>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">folder_open</span>
+                    <span class="citizen-mobile-panel__action-copy">
+                        <strong>Requests</strong>
+                        <small>Applications and community requests</small>
+                    </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-switch-section="alerts" data-citizen-panel-close>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">warning</span>
+                    <span class="citizen-mobile-panel__action-copy">
+                        <strong>Areas of Concern</strong>
+                        <small>Nearby incidents, risks, and hazards</small>
+                    </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-switch-section="contacts" data-citizen-panel-close>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">contact_phone</span>
+                    <span class="citizen-mobile-panel__action-copy">
+                        <strong>Emergency Contacts</strong>
+                        <small>View station and emergency numbers</small>
+                    </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-insights-open>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">monitoring</span>
+                    <span class="citizen-mobile-panel__action-copy">
+                        <strong>Insights</strong>
+                        <small>Open charts and safety summaries</small>
+                    </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="citizen-mobile-panel__action" data-citizen-alerts-open>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">notifications</span>
+                    <span class="citizen-mobile-panel__action-copy">
+                        <strong>Notifications</strong>
+                        <small>Review your latest alerts</small>
+                    </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </button>
+                <div class="citizen-mobile-panel__menu-divider" aria-hidden="true"></div>
+                <p class="citizen-mobile-panel__menu-label">Account</p>
                 <button type="button" class="citizen-mobile-panel__action" data-citizen-switch-section="profile" data-citizen-panel-close>
                     <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">person</span>
                     <span class="citizen-mobile-panel__action-copy">
                         <strong>Profile</strong>
                         <small>Manage your citizen account</small>
                     </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
                 </button>
                 <button type="button" class="citizen-mobile-panel__action" data-citizen-open-logs>
                     <span class="material-symbols-rounded citizen-mobile-panel__action-icon" aria-hidden="true">history</span>
@@ -2339,6 +2368,7 @@
                         <strong>My Logs</strong>
                         <small>View your recent activity</small>
                     </span>
+                    <span class="material-symbols-rounded citizen-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
                 </button>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
@@ -2602,6 +2632,7 @@
                 if (trigger.matches('[data-citizen-alerts-open]')) {
                     showMobileNavSnackbar('Loading alerts...');
                     closeMobileBurst();
+                    closeSettingsPanel();
                     (window.switchSection || fallbackSwitchSection)('overview');
                     window.setTimeout(openAlertsPanelWhenReady, 20);
                     return;
@@ -2610,6 +2641,7 @@
                 if (trigger.matches('[data-citizen-insights-open]')) {
                     showMobileNavSnackbar('Loading charts...');
                     closeMobileBurst();
+                    closeSettingsPanel();
                     if (typeof window.openCitizenInsightsPanel === 'function') {
                         window.openCitizenInsightsPanel();
                     } else {

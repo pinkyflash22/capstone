@@ -194,17 +194,22 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const logoutForms = Array.from(document.querySelectorAll('form[action="{{ route('logout') }}"]'));
+    (function () {
+        if (window.__firefighterLogoutConfirmationBound) {
+            return;
+        }
+
         const logoutModal = document.getElementById('firefighterLogoutConfirmModal');
         const logoutConfirmBtn = document.getElementById('firefighterLogoutConfirmBtn');
         const logoutCancelBtn = document.getElementById('firefighterLogoutCancelBtn');
         const logoutCloseBtn = document.getElementById('firefighterLogoutConfirmClose');
         let pendingLogoutForm = null;
 
-        if (!logoutForms.length || !logoutModal || !logoutConfirmBtn) {
+        if (!logoutModal || !logoutConfirmBtn) {
             return;
         }
+
+        window.__firefighterLogoutConfirmationBound = true;
 
         function openLogoutModal(form) {
             pendingLogoutForm = form;
@@ -215,6 +220,9 @@
             logoutModal.classList.add('active');
             logoutModal.setAttribute('aria-hidden', 'false');
             document.body.classList.add('menu-open');
+            window.requestAnimationFrame(function () {
+                logoutCancelBtn?.focus();
+            });
         }
 
         function closeLogoutModal() {
@@ -224,16 +232,29 @@
             document.body.classList.remove('menu-open');
         }
 
-        logoutForms.forEach(function (form) {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                openLogoutModal(form);
-            });
-        });
+        // The firefighter shell swaps page content without a full reload. Delegation
+        // keeps confirmation working for logout forms inserted by that navigation.
+        document.addEventListener('submit', function (event) {
+            const form = event.target instanceof HTMLFormElement
+                ? event.target
+                : event.target?.closest?.('form');
+
+            if (!form?.matches('[data-firefighter-logout-form]')) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openLogoutModal(form);
+        }, true);
 
         logoutConfirmBtn.addEventListener('click', function () {
             if (pendingLogoutForm) {
-                pendingLogoutForm.submit();
+                const form = pendingLogoutForm;
+                pendingLogoutForm = null;
+                logoutConfirmBtn.disabled = true;
+                logoutConfirmBtn.textContent = 'Logging out...';
+                HTMLFormElement.prototype.submit.call(form);
             }
         });
 
@@ -251,5 +272,5 @@
                 closeLogoutModal();
             }
         });
-    });
+    })();
 </script>

@@ -347,7 +347,7 @@
                 </div>
                 <div class="ff3-topbar__actions">
                     <span class="ff3-status">On Duty</span>
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
                         @csrf
                         <button type="submit" class="ff3-button ff3-button--primary">
                             <i class="fa-solid fa-right-from-bracket"></i>
@@ -362,6 +362,8 @@
             </section>
         </main>
     </div>
+
+    @include('firefighters.partials.logout-confirmation')
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
