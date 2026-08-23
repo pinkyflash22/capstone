@@ -7,6 +7,7 @@ use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistActivity;
 use App\Models\ChecklistStepVisit;
 use App\Models\MitigationAction;
+use App\Models\MitigationActionActivity;
 use App\Models\StationBarangayCoverage;
 use App\Models\StationOfficer;
 use App\Support\BarangayNotificationService;
@@ -26,6 +27,7 @@ class BarangayCooperationController extends Controller
     {
         [$stationOfficer, $coverage] = $this->stationCoverage($request);
         $barangayIds = $coverage->pluck('barangay_id')->map(fn ($id) => (int) $id);
+        $cityIds = $coverage->pluck('barangay.city_id')->filter()->map(fn ($id) => (int) $id)->unique();
 
         $checklists = AiActionPlanChecklist::query()
             ->with([
@@ -52,12 +54,25 @@ class BarangayCooperationController extends Controller
                 'barangay:barangay_id,barangay_name',
                 'creator:user_id,first_name,middle_name,last_name',
                 'responsibleUser:user_id,first_name,middle_name,last_name',
-                'responsibleTeam:team_id',
-                'aiActionPlanChecklist:ai_action_plan_checklist_id,plan_title',
+                'responsibleTeam:team_id,team_name',
+                'aiActionPlanChecklist:ai_action_plan_checklist_id,station_id,barangay_id,plan_title',
                 'checklist:barangay_prediction_checklist_id,title',
                 'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
+                'activities.actor:user_id,first_name,middle_name,last_name',
             ])
-            ->whereIn('barangay_id', $barangayIds)
+            ->where(function ($query) use ($barangayIds, $cityIds, $stationOfficer) {
+                $query->whereIn('barangay_id', $barangayIds)
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery
+                        ->where('scope_type', 'stationwide')
+                        ->where('owner_station_id', $stationOfficer->station_id))
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery
+                        ->where('scope_type', 'citywide')
+                        ->whereIn('scope_city_id', $cityIds))
+                    ->orWhereHas('aiActionPlanChecklist', fn ($planQuery) => $planQuery
+                        ->whereNull('barangay_id')
+                        ->where('station_id', $stationOfficer->station_id));
+            })
+            ->whereIn('status', ['planned', 'approved', 'in_progress', 'blocked', 'completed'])
             ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'planned' THEN 2 WHEN 'blocked' THEN 3 WHEN 'completed' THEN 4 ELSE 5 END")
             ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderBy('target_date')
@@ -210,6 +225,98 @@ class BarangayCooperationController extends Controller
                         'url' => $photo->url,
                     ])->values(),
                 ],
+            ],
+        ]);
+    }
+
+    public function updateMitigation(Request $request, int $mitigationActionId): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['in_progress', 'blocked', 'completed'])],
+            'implementation_notes' => ['required', 'string', 'max:3000'],
+            'completion_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->input('status') === 'completed')],
+            'outcome_result' => ['nullable', 'string', 'max:3000'],
+            'effectiveness' => ['nullable', Rule::in(['pending_evaluation', 'effective', 'partially_effective', 'ineffective'])],
+            'follow_up_required' => ['nullable', 'boolean'],
+            'follow_up_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->boolean('follow_up_required'))],
+        ]);
+        [$stationOfficer, $coverage] = $this->stationCoverage($request);
+        $barangayIds = $coverage->pluck('barangay_id')->map(fn ($id) => (int) $id);
+        $cityIds = $coverage->pluck('barangay.city_id')->filter()->map(fn ($id) => (int) $id)->unique();
+
+        $action = MitigationAction::query()
+            ->with(['barangay:barangay_id,barangay_name', 'aiActionPlanChecklist:ai_action_plan_checklist_id,station_id,barangay_id,plan_title'])
+            ->where(function ($query) use ($barangayIds, $cityIds, $stationOfficer) {
+                $query->whereIn('barangay_id', $barangayIds)
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery
+                        ->where('scope_type', 'stationwide')
+                        ->where('owner_station_id', $stationOfficer->station_id))
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery
+                        ->where('scope_type', 'citywide')
+                        ->whereIn('scope_city_id', $cityIds))
+                    ->orWhereHas('aiActionPlanChecklist', fn ($planQuery) => $planQuery
+                        ->whereNull('barangay_id')
+                        ->where('station_id', $stationOfficer->station_id));
+            })
+            ->whereIn('status', ['planned', 'approved', 'in_progress', 'blocked', 'completed'])
+            ->findOrFail($mitigationActionId);
+        $oldStatus = $action->status;
+
+        DB::transaction(function () use ($action, $validated, $request, $oldStatus): void {
+            $completionRequested = $validated['status'] === 'completed';
+            $status = $completionRequested ? 'in_progress' : $validated['status'];
+            $action->update([
+                'status' => $status,
+                'implementation_notes' => $validated['implementation_notes'],
+                'completion_notes' => $validated['completion_notes'] ?? null,
+                'outcome_result' => $validated['outcome_result'] ?? null,
+                'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+                'completed_at' => null,
+                'completion_approval_status' => $completionRequested ? 'pending' : null,
+                'completion_requested_by' => $completionRequested ? Auth::id() : null,
+                'completion_requested_at' => $completionRequested ? now() : null,
+                'completion_decided_by' => null,
+                'completion_decided_at' => null,
+                'completion_decision_notes' => null,
+                'reviewed_by' => Auth::id(),
+                'reviewed_at' => now(),
+                'is_manually_edited' => true,
+            ]);
+
+            MitigationActionActivity::create([
+                'mitigation_action_id' => $action->getKey(),
+                'actor_user_id' => Auth::id(),
+                'event_type' => $completionRequested ? 'completion_requested' : 'progress_updated',
+                'old_status' => $oldStatus,
+                'new_status' => $status,
+                'notes' => $validated['implementation_notes'],
+                'metadata' => ['effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation'],
+            ]);
+
+            UserActivityLogger::log('updated covered barangay mitigation progress', Auth::id(), $request);
+        });
+
+        $action = $action->fresh(['barangay']);
+        BarangayNotificationService::notifyMitigationProgressUpdated($action, Auth::user(), $oldStatus);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Mitigation progress updated.',
+            'data' => [
+                'id' => $action->getKey(),
+                'status' => $action->status,
+                'display_status' => $action->completion_approval_status === 'pending' ? 'pending_approval' : $action->status,
+                'completion_approval_status' => $action->completion_approval_status,
+                'implementation_notes' => $action->implementation_notes,
+                'completion_notes' => $action->completion_notes,
+                'outcome_result' => $action->outcome_result,
+                'effectiveness' => $action->effectiveness,
+                'follow_up_required' => (bool) $action->follow_up_required,
+                'follow_up_notes' => $action->follow_up_notes,
+                'reviewed_by' => Auth::user()?->full_name,
+                'reviewed_at' => $action->reviewed_at?->toIso8601String(),
             ],
         ]);
     }

@@ -458,8 +458,10 @@
 
             initializePagination();
             const requestedChecklist = new URLSearchParams(window.location.search).get('checklist');
-            if (requestedChecklist) {
-                container.querySelector(`[data-checklist-detail="${CSS.escape(requestedChecklist)}"]`)?.click();
+            const requestedMitigation = new URLSearchParams(window.location.search).get('mitigation');
+            const requestedRecord = requestedChecklist || (requestedMitigation ? `mitigation-${requestedMitigation}` : null);
+            if (requestedRecord) {
+                container.querySelector(`[data-checklist-detail="${CSS.escape(requestedRecord)}"]`)?.click();
             }
             window.setInterval(refreshChecklistContent, 30000);
         });

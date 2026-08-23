@@ -8,6 +8,7 @@ use App\Models\BarangayHall;
 use App\Models\BarangayPredictionChecklist;
 use App\Models\Incident;
 use App\Models\RiskArea;
+use App\Models\MitigationAction;
 use App\Models\User;
 use App\Models\ChecklistStepVisit;
 use App\Notifications\BarangayPortalNotification;
@@ -102,6 +103,34 @@ class BarangayNotificationService
                 'barangay_id' => $checklist->barangay_id,
                 'verified_status' => $visit->verified_status,
                 'signoff_status' => $visit->signoff_status,
+            ]
+        ));
+    }
+
+    public static function notifyMitigationProgressUpdated(MitigationAction $action, User $firefighter, ?string $oldStatus = null): void
+    {
+        $users = static::resolveBarangayUsers((int) $action->barangay_id);
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        $actor = $firefighter->full_name ?: 'A BFP firefighter';
+        $previousStatus = str_replace('_', ' ', (string) $oldStatus);
+        $currentStatus = $action->completion_approval_status === 'pending'
+            ? 'pending chief approval'
+            : str_replace('_', ' ', $action->status);
+
+        NotificationFacade::send($users, new BarangayPortalNotification(
+            'mitigation-update',
+            'BFP mitigation progress updated',
+            $actor . ' updated "' . $action->title . '" from ' . $previousStatus . ' to ' . $currentStatus . '.',
+            route('barangay.checklists', ['mitigation' => $action->getKey()]),
+            'bi bi-shield-check',
+            [
+                'mitigation_action_id' => $action->getKey(),
+                'barangay_id' => $action->barangay_id,
+                'old_status' => $oldStatus,
+                'status' => $action->status,
             ]
         ));
     }

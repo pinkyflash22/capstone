@@ -17,7 +17,7 @@ class FirefighterBarangayCooperationAuthorizationTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['notifications', 'checklist_step_visit_photos', 'checklist_step_visits', 'ai_action_plan_checklist_items', 'ai_action_plan_checklists', 'barangay_halls', 'barangay_officers', 'station_barangay_coverage', 'station_officers', 'stations', 'full_addresses', 'users', 'roles', 'barangays', 'cities'] as $table) {
+        foreach (['notifications', 'mitigation_action_activities', 'mitigation_actions', 'checklist_step_visit_photos', 'checklist_step_visits', 'ai_action_plan_checklist_items', 'ai_action_plan_checklists', 'barangay_halls', 'barangay_officers', 'station_barangay_coverage', 'station_officers', 'stations', 'full_addresses', 'users', 'roles', 'barangays', 'cities'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -31,8 +31,10 @@ class FirefighterBarangayCooperationAuthorizationTest extends TestCase
         Schema::create('station_barangay_coverage', function (Blueprint $table) { $table->id('station_barangay_coverage_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('barangay_id'); $table->string('coverage_type')->default('primary'); $table->string('source')->nullable(); $table->boolean('is_active')->default(true); $table->timestamps(); });
         Schema::create('barangay_officers', function (Blueprint $table) { $table->id('barangay_officer_id'); $table->unsignedBigInteger('barangay_id'); $table->unsignedBigInteger('user_id'); $table->string('position'); $table->string('status')->default('active'); $table->timestamps(); });
         Schema::create('barangay_halls', function (Blueprint $table) { $table->id('barangay_hall_id'); $table->unsignedBigInteger('barangay_id'); $table->unsignedBigInteger('captain_user_id')->nullable(); $table->string('hall_name')->nullable(); $table->timestamps(); });
-        Schema::create('ai_action_plan_checklists', function (Blueprint $table) { $table->id('ai_action_plan_checklist_id'); $table->unsignedBigInteger('barangay_id'); $table->string('status'); $table->boolean('is_superseded')->default(false); $table->timestamps(); });
+        Schema::create('ai_action_plan_checklists', function (Blueprint $table) { $table->id('ai_action_plan_checklist_id'); $table->unsignedBigInteger('station_id')->nullable(); $table->unsignedBigInteger('barangay_id')->nullable(); $table->string('plan_title')->nullable(); $table->string('status'); $table->boolean('is_superseded')->default(false); $table->timestamps(); });
         Schema::create('ai_action_plan_checklist_items', function (Blueprint $table) { $table->id('ai_action_plan_checklist_item_id'); $table->unsignedBigInteger('ai_action_plan_checklist_id'); $table->unsignedInteger('item_order'); $table->text('item_text'); $table->string('status')->default('pending'); $table->unsignedBigInteger('reviewed_by')->nullable(); $table->timestamp('reviewed_at')->nullable(); $table->text('review_notes')->nullable(); $table->timestamps(); });
+        Schema::create('mitigation_actions', function (Blueprint $table) { $table->id('mitigation_action_id'); $table->unsignedBigInteger('barangay_id')->nullable(); $table->string('scope_type')->default('barangay'); $table->unsignedBigInteger('scope_city_id')->nullable(); $table->unsignedBigInteger('owner_station_id')->nullable(); $table->unsignedBigInteger('ai_action_plan_checklist_id')->nullable(); $table->string('title'); $table->string('priority_level')->default('medium'); $table->string('status')->default('planned'); $table->text('implementation_notes')->nullable(); $table->text('completion_notes')->nullable(); $table->text('outcome_result')->nullable(); $table->string('effectiveness')->nullable(); $table->boolean('follow_up_required')->default(false); $table->text('follow_up_notes')->nullable(); $table->timestamp('completed_at')->nullable(); $table->string('completion_approval_status')->nullable(); $table->unsignedBigInteger('completion_requested_by')->nullable(); $table->timestamp('completion_requested_at')->nullable(); $table->unsignedBigInteger('completion_decided_by')->nullable(); $table->timestamp('completion_decided_at')->nullable(); $table->text('completion_decision_notes')->nullable(); $table->unsignedBigInteger('reviewed_by')->nullable(); $table->timestamp('reviewed_at')->nullable(); $table->boolean('is_manually_edited')->default(false); $table->boolean('is_superseded')->default(false); $table->timestamps(); });
+        Schema::create('mitigation_action_activities', function (Blueprint $table) { $table->id('mitigation_action_activity_id'); $table->unsignedBigInteger('mitigation_action_id'); $table->unsignedBigInteger('actor_user_id')->nullable(); $table->string('event_type'); $table->string('old_status')->nullable(); $table->string('new_status')->nullable(); $table->text('notes')->nullable(); $table->json('metadata')->nullable(); $table->timestamps(); });
         Schema::create('checklist_step_visits', function (Blueprint $table) { $table->id('checklist_step_visit_id'); $table->unsignedBigInteger('ai_action_plan_checklist_id'); $table->unsignedBigInteger('ai_action_plan_checklist_item_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('barangay_id'); $table->unsignedBigInteger('firefighter_user_id'); $table->string('verified_status'); $table->text('visit_notes')->nullable(); $table->timestamp('visited_at'); $table->string('signoff_status')->default('pending'); $table->unsignedBigInteger('barangay_signed_off_by')->nullable(); $table->timestamp('signed_off_at')->nullable(); $table->text('signoff_notes')->nullable(); $table->timestamps(); });
         Schema::create('checklist_step_visit_photos', function (Blueprint $table) { $table->id('checklist_step_visit_photo_id'); $table->unsignedBigInteger('checklist_step_visit_id'); $table->string('file_path'); $table->string('file_name'); $table->string('mime_type'); $table->unsignedBigInteger('file_size')->default(0); $table->unsignedInteger('sort_order')->default(0); $table->timestamps(); });
         Schema::create('notifications', function (Blueprint $table) { $table->uuid('id')->primary(); $table->string('type'); $table->string('notifiable_type'); $table->unsignedBigInteger('notifiable_id'); $table->text('data'); $table->timestamp('read_at')->nullable(); $table->timestamps(); });
@@ -52,12 +54,19 @@ class FirefighterBarangayCooperationAuthorizationTest extends TestCase
         DB::table('station_barangay_coverage')->insert(['station_id' => 5, 'barangay_id' => 10, 'coverage_type' => 'primary', 'is_active' => true]);
         DB::table('barangay_officers')->insert(['barangay_officer_id' => 8, 'barangay_id' => 10, 'user_id' => 2, 'position' => 'officer']);
         DB::table('ai_action_plan_checklists')->insert([
-            ['ai_action_plan_checklist_id' => 100, 'barangay_id' => 10, 'status' => 'confirmed'],
-            ['ai_action_plan_checklist_id' => 200, 'barangay_id' => 20, 'status' => 'confirmed'],
+            ['ai_action_plan_checklist_id' => 100, 'station_id' => 5, 'barangay_id' => 10, 'plan_title' => 'Covered Plan', 'status' => 'confirmed'],
+            ['ai_action_plan_checklist_id' => 200, 'station_id' => 9, 'barangay_id' => 20, 'plan_title' => 'Outside Plan', 'status' => 'confirmed'],
+            ['ai_action_plan_checklist_id' => 300, 'station_id' => 5, 'barangay_id' => null, 'plan_title' => 'Stationwide Plan', 'status' => 'confirmed'],
         ]);
         DB::table('ai_action_plan_checklist_items')->insert([
             ['ai_action_plan_checklist_item_id' => 101, 'ai_action_plan_checklist_id' => 100, 'item_order' => 1, 'item_text' => 'Verify covered hydrant access'],
             ['ai_action_plan_checklist_item_id' => 201, 'ai_action_plan_checklist_id' => 200, 'item_order' => 1, 'item_text' => 'Outside station step'],
+        ]);
+        DB::table('mitigation_actions')->insert([
+            ['mitigation_action_id' => 301, 'barangay_id' => 10, 'scope_type' => 'barangay', 'scope_city_id' => 1, 'owner_station_id' => 5, 'ai_action_plan_checklist_id' => 100, 'title' => 'Covered hydrant readiness', 'status' => 'planned'],
+            ['mitigation_action_id' => 302, 'barangay_id' => 20, 'scope_type' => 'barangay', 'scope_city_id' => 1, 'owner_station_id' => 9, 'ai_action_plan_checklist_id' => 200, 'title' => 'Outside action', 'status' => 'planned'],
+            ['mitigation_action_id' => 303, 'barangay_id' => 20, 'scope_type' => 'stationwide', 'scope_city_id' => 1, 'owner_station_id' => 5, 'ai_action_plan_checklist_id' => 300, 'title' => 'Stationwide readiness action', 'status' => 'approved'],
+            ['mitigation_action_id' => 304, 'barangay_id' => 20, 'scope_type' => 'citywide', 'scope_city_id' => 1, 'owner_station_id' => 9, 'ai_action_plan_checklist_id' => 200, 'title' => 'Shared city readiness action', 'status' => 'planned'],
         ]);
 
         Role::flushDefinitionCache();
@@ -118,6 +127,77 @@ class FirefighterBarangayCooperationAuthorizationTest extends TestCase
             'ai_action_plan_checklist_item_id' => 201,
             'status' => 'pending',
         ]);
+    }
+
+    public function test_firefighter_can_update_operational_progress_for_a_covered_mitigation(): void
+    {
+        $this->actingAs(User::findOrFail(1))
+            ->patchJson('/firefighter/barangay-cooperation/mitigations/301', [
+                'status' => 'completed',
+                'implementation_notes' => 'Hydrant access was cleared and verified.',
+                'completion_notes' => 'Barangay and BFP completed the walkthrough.',
+                'outcome_result' => 'Access is now unobstructed.',
+                'effectiveness' => 'effective',
+                'follow_up_required' => false,
+                'title' => 'Attempted command-plan change',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress')
+            ->assertJsonPath('data.display_status', 'pending_approval');
+
+        $this->assertDatabaseHas('mitigation_actions', [
+            'mitigation_action_id' => 301,
+            'title' => 'Covered hydrant readiness',
+            'status' => 'in_progress',
+            'completion_approval_status' => 'pending',
+            'reviewed_by' => 1,
+            'is_manually_edited' => true,
+        ]);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('mitigation_action_activities', ['mitigation_action_id' => 301, 'event_type' => 'completion_requested']);
+    }
+
+    public function test_firefighter_cannot_update_a_mitigation_outside_station_scope(): void
+    {
+        $this->actingAs(User::findOrFail(1))
+            ->patchJson('/firefighter/barangay-cooperation/mitigations/302', [
+                'status' => 'in_progress',
+                'implementation_notes' => 'Should not be accepted.',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('mitigation_actions', ['mitigation_action_id' => 302, 'status' => 'planned']);
+    }
+
+    public function test_firefighter_can_update_an_explicit_stationwide_plan(): void
+    {
+        $this->actingAs(User::findOrFail(1))
+            ->patchJson('/firefighter/barangay-cooperation/mitigations/303', [
+                'status' => 'blocked',
+                'implementation_notes' => 'Waiting for city engineering clearance.',
+                'follow_up_required' => true,
+                'follow_up_notes' => 'Coordinate a joint inspection next week.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'blocked');
+
+        $this->assertDatabaseHas('mitigation_actions', [
+            'mitigation_action_id' => 303,
+            'status' => 'blocked',
+            'reviewed_by' => 1,
+        ]);
+    }
+
+    public function test_firefighter_can_update_a_citywide_plan_shared_with_their_station_city(): void
+    {
+        $this->actingAs(User::findOrFail(1))
+            ->patchJson('/firefighter/barangay-cooperation/mitigations/304', [
+                'status' => 'in_progress',
+                'implementation_notes' => 'Station completed its part of the shared city inspection.',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('mitigation_actions', ['mitigation_action_id' => 304, 'status' => 'in_progress', 'reviewed_by' => 1]);
     }
 
     public function test_barangay_officer_cannot_sign_off_a_visit_for_another_barangay(): void

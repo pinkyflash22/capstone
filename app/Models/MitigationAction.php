@@ -14,6 +14,9 @@ class MitigationAction extends Model
 
     protected $fillable = [
         'barangay_id',
+        'scope_type',
+        'scope_city_id',
+        'owner_station_id',
         'risk_area_id',
         'barangay_prediction_checklist_id',
         'ai_action_plan_checklist_id',
@@ -26,6 +29,12 @@ class MitigationAction extends Model
         'source_type',
         'target_date',
         'completed_at',
+        'completion_approval_status',
+        'completion_requested_by',
+        'completion_requested_at',
+        'completion_decided_by',
+        'completion_decided_at',
+        'completion_decision_notes',
         'description',
         'remarks',
         'implementation_notes',
@@ -51,6 +60,8 @@ class MitigationAction extends Model
         return [
             'target_date' => 'date',
             'completed_at' => 'datetime',
+            'completion_requested_at' => 'datetime',
+            'completion_decided_at' => 'datetime',
             'approved_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'follow_up_required' => 'boolean',
@@ -117,5 +128,10 @@ class MitigationAction extends Model
     public function attachments()
     {
         return $this->hasMany(MitigationActionAttachment::class, 'mitigation_action_id', 'mitigation_action_id');
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(MitigationActionActivity::class, 'mitigation_action_id', 'mitigation_action_id')->latest('created_at');
     }
 }

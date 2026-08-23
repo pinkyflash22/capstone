@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>PyroSense · Barangay Cooperation</title>
+    <title>PyroSense · Checklist</title>
 
     @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -119,6 +119,22 @@
         .coop-visit-photos { display: grid; grid-template-columns: repeat(auto-fill,minmax(76px,1fr)); gap: 6px; margin-top: 8px; }
         .coop-visit-photos a { overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; }
         .coop-visit-photos img { display: block; width: 100%; height: 62px; object-fit: cover; }
+        .coop-mitigation-form { display: grid; gap: 12px; margin-top: 16px; padding: 14px; border: 1px solid rgba(198,61,38,.14); border-radius: 15px; background: #fffaf5; }
+        .coop-mitigation-form__head, .coop-mitigation-form__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .coop-mitigation-form__head h3 { margin: 0; color: #172033; font-size: .82rem; font-weight: 900; }
+        .coop-mitigation-form__head p { margin: 3px 0 0; color: #94a3b8; font-size: .61rem; }
+        .coop-mitigation-form__head > span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; background: #fff; color: #b45309; font-size: .56rem; font-weight: 900; text-transform: uppercase; }
+        .coop-mitigation-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+        .coop-mitigation-fields label { display: grid; gap: 5px; min-width: 0; }
+        .coop-mitigation-fields label.wide { grid-column: 1/-1; }
+        .coop-mitigation-fields label > span { color: #64748b; font-size: .6rem; font-weight: 850; }
+        .coop-mitigation-fields select, .coop-mitigation-fields textarea { width: 100%; min-width: 0; border: 1px solid #dbe3ec; border-radius: 9px; background: #fff; color: #334155; font-size: .68rem; outline: none; }
+        .coop-mitigation-fields select { height: 37px; padding: 0 9px; }
+        .coop-mitigation-fields textarea { min-height: 76px; padding: 9px; resize: vertical; line-height: 1.45; }
+        .coop-mitigation-fields select:focus, .coop-mitigation-fields textarea:focus { border-color: rgba(198,61,38,.42); box-shadow: 0 0 0 3px rgba(198,61,38,.07); }
+        .coop-mitigation-form__footer small { color: #94a3b8; font-size: .57rem; line-height: 1.4; }
+        .coop-mitigation-form__footer button { min-height: 37px; flex: 0 0 auto; padding: 0 13px; border: 0; border-radius: 9px; background: linear-gradient(135deg,#c63d26,#d18a16); color: #fff; font-size: .66rem; font-weight: 900; }
+        .coop-mitigation-form__footer button:disabled { opacity: .6; cursor: wait; }
         .coop-toast { position: fixed; z-index: var(--ff-layer-notice,6000); right: 18px; bottom: 22px; max-width: min(360px,calc(100vw - 32px)); padding: 11px 14px; border-radius: 12px; background: #14532d; color: #fff; font-size: .75rem; font-weight: 800; box-shadow: 0 18px 40px rgba(15,23,42,.2); }
         .coop-toast.error { background: #991b1b; }
 
@@ -147,6 +163,10 @@
             .coop-detail.wide { grid-column: auto; }
             .coop-step__controls { grid-template-columns: 1fr; }
             .coop-step button { width: 100%; }
+            .coop-mitigation-fields { grid-template-columns: 1fr; }
+            .coop-mitigation-fields label.wide { grid-column: auto; }
+            .coop-mitigation-form__head, .coop-mitigation-form__footer { align-items: stretch; flex-direction: column; }
+            .coop-mitigation-form__footer button { width: 100%; }
             .coop-toast { right: 12px; bottom: calc(98px + env(safe-area-inset-bottom,0px)); }
         }
     </style>
@@ -156,7 +176,7 @@
 
     <div data-ff-page-root="cooperation">
         <main class="main-content">
-            @include('firefighters.partials.shell-topbar', ['title' => 'Barangay Cooperation', 'subtitle' => 'Station plans, site visits, and checklist verification'])
+            @include('firefighters.partials.shell-topbar', ['title' => 'Checklist', 'subtitle' => 'Barangay plans, mitigation progress, and field verification'])
 
             <div class="coop-shell" id="barangayCooperationWorkspace">
                 <section class="coop-hero">
@@ -186,6 +206,9 @@
 
                 <nav class="coop-coverage" aria-label="Connected barangays">
                     <button type="button" class="active" data-barangay-filter="all"><i class="fa-solid fa-layer-group"></i> All connected <span>{{ $coverage->count() }}</span></button>
+                    @if($mitigations->contains(fn ($action) => in_array($action->scope_type, ['stationwide', 'citywide'], true) || ($action->aiActionPlanChecklist && ! $action->aiActionPlanChecklist->barangay_id && (int) $action->aiActionPlanChecklist->station_id === (int) $stationOfficer->station_id)))
+                        <button type="button" data-barangay-filter="station"><i class="fa-solid fa-city"></i> Stationwide / citywide <span>plan</span></button>
+                    @endif
                     @foreach($coverage as $link)
                         <button type="button" data-barangay-filter="{{ $link->barangay_id }}"><i class="fa-solid fa-location-dot"></i> {{ $link->barangay?->barangay_name ?? 'Barangay' }} <span>{{ $link->coverage_type }}</span></button>
                     @endforeach
@@ -248,8 +271,14 @@
                         <header class="coop-panel__head"><div><h2>BFP mitigation plans</h2><p>Station-issued actions for connected barangays.</p></div><span class="coop-count" data-visible-count="mitigation">{{ $mitigations->count() }}</span></header>
                         <div class="coop-list" data-coop-list="mitigation">
                             @forelse($mitigations as $action)
-                                <article class="coop-card" data-coop-record data-kind="mitigation" data-barangay="{{ $action->barangay_id }}" data-status="{{ $action->status }}" data-search="{{ strtolower(($action->barangay?->barangay_name ?? '').' '.$action->title.' '.$action->description) }}"><div><div class="coop-card__top"><span class="coop-chip">{{ $action->barangay?->barangay_name ?? 'Barangay' }}</span><span class="coop-chip priority-{{ $action->priority_level }}">{{ $action->priority_level }}</span><span class="coop-chip status-{{ $action->status }}">{{ str_replace('_',' ',$action->status) }}</span></div><h3>{{ $action->title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-user-group"></i>{{ $action->responsibleTeam?->team_name ?? $action->responsibleUser?->full_name ?? 'Station–barangay partners' }}</span></div></div><button type="button" class="coop-open" data-open-coop-detail="mitigation-{{ $action->getKey() }}" aria-label="Open {{ $action->title }}"><i class="fa-solid fa-eye"></i></button></article>
-                                <template id="mitigation-{{ $action->getKey() }}"><div class="coop-detail-grid"><div class="coop-detail wide"><span>Mitigation</span><strong>{{ $action->title }}</strong></div><div class="coop-detail wide"><span>Implementation guidance</span><strong>{{ $action->description ?: 'No description recorded.' }}</strong></div><div class="coop-detail"><span>Barangay</span><strong>{{ $action->barangay?->barangay_name ?? 'Not assigned' }}</strong></div><div class="coop-detail"><span>Status</span><strong>{{ strtoupper(str_replace('_',' ',$action->status)) }}</strong></div><div class="coop-detail"><span>Priority</span><strong>{{ strtoupper($action->priority_level) }}</strong></div><div class="coop-detail"><span>Target</span><strong>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</strong></div><div class="coop-detail wide"><span>Responsible partner</span><strong>{{ $action->responsibleTeam?->team_name ?? $action->responsibleUser?->full_name ?? 'Station–barangay cooperation' }}</strong></div><div class="coop-detail wide"><span>Linked plan</span><strong>{{ $action->aiActionPlanChecklist?->plan_title ?? $action->checklist?->title ?? 'Direct BFP mitigation' }}</strong></div><div class="coop-detail wide"><span>Implementation notes</span><strong>{{ $action->implementation_notes ?: $action->remarks ?: 'No implementation note recorded.' }}</strong></div><div class="coop-detail"><span>Attachments</span><strong>{{ $action->attachments->count() }} file(s)</strong></div><div class="coop-detail"><span>Issued by</span><strong>{{ $action->creator?->full_name ?? 'Station command' }}</strong></div></div></template>
+                                @php
+                                    $isStationWide = $action->scope_type === 'stationwide' || ($action->aiActionPlanChecklist && ! $action->aiActionPlanChecklist->barangay_id && (int) $action->aiActionPlanChecklist->station_id === (int) $stationOfficer->station_id);
+                                    $isCityWide = $action->scope_type === 'citywide';
+                                    $cardStatus = $action->completion_approval_status === 'pending' ? 'pending_approval' : $action->status;
+                                    $coverageLabel = $isCityWide ? 'Citywide' : ($isStationWide ? 'Stationwide' : ($action->barangay?->barangay_name ?? 'Barangay'));
+                                @endphp
+                                <article class="coop-card" data-coop-record data-kind="mitigation" data-mitigation-card="{{ $action->getKey() }}" data-barangay="{{ ($isStationWide || $isCityWide) ? 'station' : $action->barangay_id }}" data-status="{{ $cardStatus }}" data-search="{{ strtolower(($isCityWide ? 'citywide ' : ($isStationWide ? 'stationwide ' : ($action->barangay?->barangay_name ?? ''))).' '.$action->title.' '.$action->description) }}"><div><div class="coop-card__top"><span class="coop-chip">{{ $coverageLabel }}</span><span class="coop-chip priority-{{ $action->priority_level }}">{{ $action->priority_level }}</span><span class="coop-chip status-{{ $cardStatus }}" data-mitigation-status>{{ str_replace('_',' ',$cardStatus) }}</span></div><h3>{{ $action->title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-user-group"></i>{{ $action->responsibleTeam?->team_name ?? $action->responsibleUser?->full_name ?? 'Station-barangay partners' }}</span></div></div><button type="button" class="coop-open" data-open-coop-detail="mitigation-{{ $action->getKey() }}" aria-label="Open {{ $action->title }}"><i class="fa-solid fa-eye"></i></button></article>
+                                <template id="mitigation-{{ $action->getKey() }}">@include('firefighters.partials.mitigation-cooperation-detail', ['action' => $action, 'stationOfficer' => $stationOfficer])</template>
                             @empty
                                 <div class="coop-empty"><i class="fa-solid fa-shield-halved"></i><strong>No mitigation plan found</strong><span>Plans issued for station coverage will appear here.</span></div>
                             @endforelse
@@ -409,6 +438,78 @@
                 });
 
                 modalBody.addEventListener('submit', async (event) => {
+                    const mitigationForm = event.target.closest('[data-mitigation-update]');
+                    if (mitigationForm) {
+                        event.preventDefault();
+                        const statusValue = mitigationForm.querySelector('[name="status"]')?.value || '';
+                        const completionNotes = mitigationForm.querySelector('[name="completion_notes"]')?.value?.trim() || '';
+                        const followUpRequired = mitigationForm.querySelector('[name="follow_up_required"]')?.value === '1';
+                        const followUpNotes = mitigationForm.querySelector('[name="follow_up_notes"]')?.value?.trim() || '';
+                        if (statusValue === 'completed' && !completionNotes) {
+                            toast('Completion notes are required when a mitigation is completed.', 'error');
+                            mitigationForm.querySelector('[name="completion_notes"]')?.focus();
+                            return;
+                        }
+                        if (followUpRequired && !followUpNotes) {
+                            toast('Add follow-up notes when follow-up is required.', 'error');
+                            mitigationForm.querySelector('[name="follow_up_notes"]')?.focus();
+                            return;
+                        }
+                        const button = mitigationForm.querySelector('button[type="submit"]');
+                        const oldStatus = workspace.querySelector(`[data-mitigation-card="${mitigationForm.dataset.mitigationId}"]`)?.dataset.status || '';
+                        button.disabled = true;
+                        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+                        try {
+                            const formData = new FormData(mitigationForm);
+                            const payload = Object.fromEntries(formData.entries());
+                            payload.follow_up_required = followUpRequired;
+                            const response = await fetch(mitigationForm.action, { method: 'PATCH', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify(payload) });
+                            const result = await response.json();
+                            if (!response.ok || result.success === false) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to update mitigation progress.');
+
+                            const card = workspace.querySelector(`[data-mitigation-card="${mitigationForm.dataset.mitigationId}"]`);
+                            if (card) {
+                                card.dataset.status = result.data.display_status;
+                                const chip = card.querySelector('[data-mitigation-status]');
+                                if (chip) { chip.className = `coop-chip status-${result.data.display_status}`; chip.textContent = result.data.display_status.replaceAll('_', ' '); }
+                            }
+                            const template = document.getElementById(`mitigation-${mitigationForm.dataset.mitigationId}`);
+                            const sourceForm = template?.content.querySelector('[data-mitigation-update]');
+                            if (sourceForm) {
+                                ['status', 'implementation_notes', 'completion_notes', 'outcome_result', 'effectiveness', 'follow_up_notes'].forEach((name) => {
+                                    const source = sourceForm.querySelector(`[name="${name}"]`);
+                                    const current = mitigationForm.querySelector(`[name="${name}"]`);
+                                    if (!source || !current) return;
+                                    source.value = current.value;
+                                    if (source.tagName === 'TEXTAREA') source.textContent = current.value;
+                                    if (source.tagName === 'SELECT') source.querySelectorAll('option').forEach((option) => option.toggleAttribute('selected', option.value === current.value));
+                                });
+                                const sourceFollowUp = sourceForm.querySelector('[name="follow_up_required"]');
+                                sourceFollowUp.value = followUpRequired ? '1' : '0';
+                                sourceFollowUp.querySelectorAll('option').forEach((option) => option.toggleAttribute('selected', option.value === sourceFollowUp.value));
+                                const sourceStatus = template.content.querySelector('[data-mitigation-detail-status]');
+                                if (sourceStatus) sourceStatus.textContent = result.data.display_status.replaceAll('_', ' ').toUpperCase();
+                            }
+                            const detailStatus = modalBody.querySelector('[data-mitigation-detail-status]');
+                            if (detailStatus) detailStatus.textContent = result.data.display_status.replaceAll('_', ' ').toUpperCase();
+                            if (oldStatus !== 'completed' && result.data.status === 'completed') {
+                                const summary = workspace.querySelector('[data-summary-value="mitigations"]');
+                                if (summary) summary.textContent = String(Math.max(0, Number(summary.textContent || 0) - 1));
+                            } else if (oldStatus === 'completed' && result.data.status !== 'completed') {
+                                const summary = workspace.querySelector('[data-summary-value="mitigations"]');
+                                if (summary) summary.textContent = String(Number(summary.textContent || 0) + 1);
+                            }
+                            filterRecords();
+                            toast(result.message || 'Mitigation progress updated.');
+                        } catch (error) {
+                            toast(error.message || 'Unable to update mitigation progress.', 'error');
+                        } finally {
+                            button.disabled = false;
+                            button.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save progress';
+                        }
+                        return;
+                    }
+
                     const form = event.target.closest('[data-checklist-step]');
                     if (!form) return;
                     event.preventDefault();

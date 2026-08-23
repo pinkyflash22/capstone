@@ -12,6 +12,14 @@
 
 <div class="mitigation-form-section"><i class="fa-solid fa-clipboard-list"></i> Plan details <small>What action is needed?</small></div>
 <div class="mitigation-field">
+    <label for="stationMitigationScope">Coverage Scope</label>
+    <select id="stationMitigationScope" name="scope_type" required>
+        <option value="barangay" @selected(old('scope_type', $draft['scope_type'] ?? 'barangay') === 'barangay')>Selected barangay</option>
+        <option value="stationwide" @selected(old('scope_type', $draft['scope_type'] ?? '') === 'stationwide')>All barangays covered by this station</option>
+        <option value="citywide" @selected(old('scope_type', $draft['scope_type'] ?? '') === 'citywide')>All stations in the selected barangay's city</option>
+    </select>
+</div>
+<div class="mitigation-field">
     <label for="stationMitigationBarangay">Barangay</label>
     <select id="stationMitigationBarangay" name="barangay_id" required>
         <option value="">Select barangay</option>

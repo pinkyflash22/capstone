@@ -396,6 +396,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
         Route::put('/mitigations/{mitigationActionId}', [StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
+        Route::post('/mitigations/{mitigationActionId}/completion-review', [StationAdminController::class, 'reviewMitigationCompletion'])->name('mitigations.completion-review');
         Route::delete('/mitigations/{mitigationActionId}', [StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/risk-reviews', [RiskAreaReviewController::class, 'chiefIndex'])->name('risk-reviews.index');
         Route::post('/risk-reviews', [RiskAreaReviewController::class, 'chiefStore'])->name('risk-reviews.store');
@@ -594,6 +595,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::patch('/risk-reviews/{riskAreaId}', [RiskAreaReviewController::class, 'firefighterReview'])->name('risk-reviews.review');
         Route::get('/barangay-cooperation', [App\Http\Controllers\Firefighter\BarangayCooperationController::class, 'index'])->name('barangay-cooperation.index');
         Route::patch('/barangay-cooperation/checklists/{checklistId}/items/{itemId}', [App\Http\Controllers\Firefighter\BarangayCooperationController::class, 'updateChecklistItem'])->name('barangay-cooperation.checklists.items.update');
+        Route::patch('/barangay-cooperation/mitigations/{mitigationActionId}', [App\Http\Controllers\Firefighter\BarangayCooperationController::class, 'updateMitigation'])->name('barangay-cooperation.mitigations.update');
 
         
 

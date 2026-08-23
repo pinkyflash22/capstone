@@ -371,6 +371,7 @@
                                             $draftPayload = [
                                                 'id' => $action->mitigation_action_id,
                                                 'barangay_id' => $action->barangay_id,
+                                                'scope_type' => $action->scope_type,
                                                 'title' => $action->title,
                                                 'category' => $action->category,
                                                 'category_label' => $categoryLabel,
@@ -696,6 +697,8 @@
                                                     $payload = [
                                                         'id' => $action->mitigation_action_id,
                                                         'barangay_id' => $action->barangay_id,
+                                                        'scope_type' => $action->scope_type,
+                                                        'scope_label' => $action->scope_type === 'citywide' ? 'Citywide' : ($action->scope_type === 'stationwide' ? 'Stationwide' : 'Barangay'),
                                                         'title' => $action->title,
                                                         'category' => $action->category,
                                                         'category_label' => $categoryLabel,
@@ -759,10 +762,10 @@
                                                         </div>
                                                     </td>
                                                     <td data-label="Location">
-                                                        <div class="title" style="font-size:.86rem;">{{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</div>
+                                                        <div class="title" style="font-size:.86rem;">{{ $action->scope_type === 'citywide' ? (($action->barangay?->city?->city_name ?? 'City') . ' · Citywide') : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay')) }}</div>
                                                         <div class="note">{{ $action->riskArea?->marker?->title ?? 'No linked location marker' }}</div>
                                                     </td>
-                                                    <td data-label="Priority / Stage"><div class="chip-row"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span></div></td>
+                                                    <td data-label="Priority / Stage"><div class="chip-row"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span>@if($action->completion_approval_status === 'pending')<span class="chip overdue"><i class="fa-solid fa-user-check"></i> Completion review</span>@endif</div></td>
                                                     <td data-label="Owner / Target">
                                                         <div class="title" style="font-size:.82rem;">{{ $action->responsibleUser?->full_name ?? 'Unassigned person' }}</div>
                                                         <div class="note"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div>
@@ -779,6 +782,10 @@
                                                         <div class="row-actions">
                                                             <button type="button" class="row-btn view" title="View details" aria-label="View details" data-open-details-modal data-payload='@json($payload)'><i class="fa-solid fa-eye"></i></button>
                                                             <button type="button" class="row-btn edit" title="Edit action" aria-label="Edit action" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i></button>
+                                                            @if($action->completion_approval_status === 'pending')
+                                                                <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="approved"><button type="submit" class="row-btn view" title="Approve completion" aria-label="Approve completion"><i class="fa-solid fa-check"></i></button></form>
+                                                                <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="rejected"><button type="submit" class="row-btn delete" title="Return for further work" aria-label="Return for further work"><i class="fa-solid fa-rotate-left"></i></button></form>
+                                                            @endif
                                                             <button type="button" class="row-btn delete" title="Delete action" aria-label="Delete action" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i></button>
                                                         </div>
                                                     </td>
@@ -1003,7 +1010,7 @@
 
             const renderDetails = (payload) => {
                 detailsTitle.textContent = payload.title || 'Mitigation Details';
-                detailsSubtitle.textContent = `${payload.barangay_label || 'Unknown barangay'}${payload.location_label ? ' · ' + payload.location_label : ''}`;
+                detailsSubtitle.textContent = `${payload.scope_label || 'Barangay'} · ${payload.barangay_label || 'Unknown barangay'}${payload.location_label ? ' · ' + payload.location_label : ''}`;
 
                 const followUpText = payload.follow_up_required ? 'Yes' : 'No';
 
@@ -1120,6 +1127,7 @@
                         if (field) field.value = value ?? fallback;
                     };
                     set('barangay_id', payload.barangay_id);
+                    set('scope_type', payload.scope_type, 'barangay');
                     set('title', payload.title);
                     set('category', payload.category, 'other');
                     set('priority_level', payload.priority_level, 'medium');

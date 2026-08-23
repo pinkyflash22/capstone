@@ -481,6 +481,7 @@ class StationAdminController extends Controller
     {
         return [
             'barangay_id' => ['required', 'integer'],
+            'scope_type' => ['required', Rule::in(['barangay', 'stationwide', 'citywide'])],
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', Rule::in(array_keys($this->mitigationCategoryOptions()))],
             'priority_level' => ['required', Rule::in(array_keys($this->mitigationPriorityOptions()))],
@@ -695,6 +696,9 @@ class StationAdminController extends Controller
 
     protected function resolveManagedMitigationAction(int $mitigationActionId, array $allowedBarangayIds): MitigationAction
     {
+        $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
+        $cityIds = DB::table('barangays')->whereIn('barangay_id', $allowedBarangayIds)->pluck('city_id')->filter()->all();
+
         return MitigationAction::query()
             ->with([
                 'barangay.city',
@@ -708,8 +712,13 @@ class StationAdminController extends Controller
                 'responsibleTeam',
                 'responsibleUser',
                 'approver',
+                'activities.actor',
             ])
-            ->whereIn('barangay_id', $allowedBarangayIds)
+            ->where(function ($query) use ($allowedBarangayIds, $stationId, $cityIds) {
+                $query->whereIn('barangay_id', $allowedBarangayIds)
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery->where('scope_type', 'stationwide')->where('owner_station_id', $stationId))
+                    ->orWhere(fn ($scopeQuery) => $scopeQuery->where('scope_type', 'citywide')->whereIn('scope_city_id', $cityIds));
+            })
             ->findOrFail($mitigationActionId);
     }
 
@@ -1697,6 +1706,7 @@ class StationAdminController extends Controller
             $stationOfficer = $this->getAuthenticatedStationOfficer();
             $stationId = $stationOfficer?->station_id;
             $barangayIds = $managedBarangays->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+            $cityIds = $managedBarangays->pluck('city_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
             $draftActionPlanChecklistId = request()->integer('draft_ai_action_plan_checklist_id');
             $filters = [
                 'barangay_id' => request()->integer('barangay_id') ?: null,
@@ -1723,6 +1733,9 @@ class StationAdminController extends Controller
                 ->select([
                     'mitigation_action_id',
                     'barangay_id',
+                    'scope_type',
+                    'scope_city_id',
+                    'owner_station_id',
                     'risk_area_id',
                     'barangay_prediction_checklist_id',
                     'ai_action_plan_checklist_id',
@@ -1735,6 +1748,12 @@ class StationAdminController extends Controller
                     'source_type',
                     'target_date',
                     'completed_at',
+                    'completion_approval_status',
+                    'completion_requested_by',
+                    'completion_requested_at',
+                    'completion_decided_by',
+                    'completion_decided_at',
+                    'completion_decision_notes',
                     'description',
                     'remarks',
                     'implementation_notes',
@@ -1768,10 +1787,15 @@ class StationAdminController extends Controller
                     'responsibleTeam:team_id',
                     'responsibleUser:user_id,first_name,middle_name,last_name',
                     'approver:user_id,first_name,middle_name,last_name',
+                    'activities.actor:user_id,first_name,middle_name,last_name',
                 ])
-                ->when(! empty($barangayIds), fn ($query) => $query->whereIn('barangay_id', $barangayIds));
+                ->where(function ($query) use ($barangayIds, $cityIds, $stationId) {
+                    $query->whereIn('barangay_id', $barangayIds)
+                        ->orWhere(fn ($scopeQuery) => $scopeQuery->where('scope_type', 'stationwide')->where('owner_station_id', $stationId))
+                        ->orWhere(fn ($scopeQuery) => $scopeQuery->where('scope_type', 'citywide')->whereIn('scope_city_id', $cityIds));
+                });
 
-            if (empty($barangayIds)) {
+            if (empty($barangayIds) && empty($cityIds) && ! $stationId) {
                 $mitigationBaseQuery->whereRaw('1 = 0');
             }
 
@@ -2219,9 +2243,13 @@ class StationAdminController extends Controller
         $status = $validated['status'];
         $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
-        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $request) {
+        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $request, $stationId) {
+            $scopeCityId = DB::table('barangays')->where('barangay_id', $linkedIds['barangay_id'])->value('city_id');
             $action = MitigationAction::create([
                 'barangay_id' => $linkedIds['barangay_id'],
+                'scope_type' => $validated['scope_type'],
+                'scope_city_id' => $scopeCityId,
+                'owner_station_id' => $stationId,
                 'risk_area_id' => $linkedIds['risk_area_id'],
                 'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
                 'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
@@ -2247,6 +2275,13 @@ class StationAdminController extends Controller
                 'approved_at' => in_array($status, ['approved', 'in_progress', 'completed'], true) ? now() : null,
             ]);
 
+            $action->activities()->create([
+                'actor_user_id' => Auth::id(),
+                'event_type' => 'created',
+                'new_status' => $status,
+                'notes' => 'Mitigation action created by station command.',
+            ]);
+
             $this->storeMitigationAttachments($action, $request);
             $this->syncLinkedActionPlanAfterMitigation($action);
             UserActivityLogger::log('created station mitigation action', Auth::user()?->user_id, $request);
@@ -2270,12 +2305,17 @@ class StationAdminController extends Controller
         $status = $validated['status'];
         $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
-        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $action, $request) {
+        DB::transaction(function () use ($validated, $linkedIds, $assignmentIds, $status, $sourceType, $action, $request, $stationId) {
+            $oldStatus = $action->status;
+            $scopeCityId = DB::table('barangays')->where('barangay_id', $linkedIds['barangay_id'])->value('city_id');
             $approvalTriggered = in_array($status, ['approved', 'in_progress', 'completed'], true)
                 && ! $action->approved_at;
 
             $action->update([
                 'barangay_id' => $linkedIds['barangay_id'],
+                'scope_type' => $validated['scope_type'],
+                'scope_city_id' => $scopeCityId,
+                'owner_station_id' => $action->owner_station_id ?: $stationId,
                 'risk_area_id' => $linkedIds['risk_area_id'],
                 'barangay_prediction_checklist_id' => $linkedIds['barangay_prediction_checklist_id'],
                 'ai_action_plan_checklist_id' => $linkedIds['ai_action_plan_checklist_id'],
@@ -2306,6 +2346,14 @@ class StationAdminController extends Controller
                 'requires_revision_review' => false,
             ]);
 
+            $action->activities()->create([
+                'actor_user_id' => Auth::id(),
+                'event_type' => 'command_updated',
+                'old_status' => $oldStatus,
+                'new_status' => $status,
+                'notes' => $validated['remarks'] ?? null,
+            ]);
+
             $this->storeMitigationAttachments($action, $request);
             $this->syncLinkedActionPlanAfterMitigation($action->fresh());
             UserActivityLogger::log('updated station mitigation action', Auth::user()?->user_id, $request);
@@ -2313,6 +2361,47 @@ class StationAdminController extends Controller
 
         return redirect()->route('station-admin.mitigations')
             ->with('success', 'Mitigation action updated successfully.');
+    }
+
+    public function reviewMitigationCompletion(Request $request, int $mitigationActionId)
+    {
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['approved', 'rejected'])],
+            'decision_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
+        $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
+
+        abort_unless($action->completion_approval_status === 'pending', 409, 'This completion request is no longer pending.');
+
+        DB::transaction(function () use ($action, $validated, $request): void {
+            $approved = $validated['decision'] === 'approved';
+            $oldStatus = $action->status;
+            $action->update([
+                'status' => $approved ? 'completed' : 'in_progress',
+                'completed_at' => $approved ? now() : null,
+                'completion_approval_status' => $validated['decision'],
+                'completion_decided_by' => Auth::id(),
+                'completion_decided_at' => now(),
+                'completion_decision_notes' => $validated['decision_notes'] ?? null,
+                'reviewed_by' => Auth::id(),
+                'reviewed_at' => now(),
+            ]);
+            $action->activities()->create([
+                'actor_user_id' => Auth::id(),
+                'event_type' => $approved ? 'completion_approved' : 'completion_rejected',
+                'old_status' => $oldStatus,
+                'new_status' => $action->status,
+                'notes' => $validated['decision_notes'] ?? null,
+            ]);
+            UserActivityLogger::log($approved ? 'approved mitigation completion' : 'rejected mitigation completion', Auth::id(), $request);
+        });
+
+        BarangayNotificationService::notifyMitigationProgressUpdated($action->fresh(), Auth::user(), 'pending approval');
+
+        return redirect()->route('station-admin.mitigations')
+            ->with('success', $validated['decision'] === 'approved' ? 'Mitigation completion approved.' : 'Completion request returned for further work.');
     }
 
     public function destroyMitigation(Request $request, int $mitigationActionId)
