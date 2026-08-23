@@ -1,13 +1,13 @@
 <?php
 
-use App\Models\HistoricalFireIncident;
-use App\Models\Incident;
 use App\Jobs\SyncBarangayBoundaryJob;
+use App\Models\Incident;
+use App\Services\DutyRosterRecurrenceService;
+use App\Services\DutyRosterService;
+use App\Services\IncidentAutoAssignmentService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Services\StationBarangayCoverageService;
-use App\Services\DutyRosterService;
-use App\Services\DutyRosterRecurrenceService;
-use App\Services\IncidentAutoAssignmentService;
+use App\Support\PythonRuntime;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -64,6 +64,7 @@ Artisan::command('boundaries:sync-covered {--station=} {--limit=} {--force}', fu
 
     if ($candidates->isEmpty()) {
         $this->info('No covered barangay boundaries need synchronization.');
+
         return 0;
     }
 
@@ -92,7 +93,8 @@ Artisan::command('boundaries:sync-covered {--station=} {--limit=} {--force}', fu
     }
 
     $verb = config('queue.default') === 'sync' ? 'processed' : 'queued';
-    $this->info(ucfirst($verb) . " {$queued} barangay boundary job(s); {$failed} failed.");
+    $this->info(ucfirst($verb)." {$queued} barangay boundary job(s); {$failed} failed.");
+
     return $failed === 0 ? 0 : 1;
 })->purpose('Queue Geoapify polygon synchronization for covered barangays that lack boundaries.');
 
@@ -109,8 +111,11 @@ Artisan::command('duty-roster:sync {--station=}', function (DutyRosterService $s
     $stationId = $station !== null && $station !== '' ? (int) $station : null;
     $generated = $recurrence->generate($stationId);
     $summary = $service->sync($stationId);
-    if ($generated > 0) $this->info("Generated {$generated} recurring shift occurrence(s).");
+    if ($generated > 0) {
+        $this->info("Generated {$generated} recurring shift occurrence(s).");
+    }
     $this->info("Checked {$summary['checked']} roster-managed team(s): {$summary['activated']} active, {$summary['off_duty']} off duty, {$summary['deferred']} deferred while responding.");
+
     return 0;
 })->purpose('Activate scheduled duty rosters and apply shift handoffs.');
 
@@ -248,6 +253,7 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
 
         if ($explicitCoverage->isNotEmpty()) {
             $barangayCoverageByStation[(int) $stationId] = $explicitCoverage;
+
             continue;
         }
 
@@ -352,7 +358,7 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
 
         foreach ($barangays as $barangay) {
             try {
-                $snapshotDate = Carbon::createFromFormat('F Y', trim((string) $row->month) . ' ' . (int) $row->year)->endOfMonth();
+                $snapshotDate = Carbon::createFromFormat('F Y', trim((string) $row->month).' '.(int) $row->year)->endOfMonth();
             } catch (\Throwable $e) {
                 $snapshotDate = Carbon::create((int) $row->year, 12, 31)->endOfDay();
             }
@@ -716,7 +722,7 @@ Artisan::command('ai:train-barangay-model {--dataset=capstone-ai/station_baranga
 
     if ($this->option('generate-demo')) {
         $this->info('Generating demo station + barangay monthly dataset...');
-        $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+        $pythonBinary = PythonRuntime::resolve((string) config('services.ai_prediction.python_binary', 'python3'));
         $generateProcess = Process::path(base_path())
             ->run([$pythonBinary, 'capstone-ai/generate_station_barangay_monthly_json.py']);
 
@@ -738,7 +744,7 @@ Artisan::command('ai:train-barangay-model {--dataset=capstone-ai/station_baranga
     }
 
     $this->info("Training barangay model using {$datasetPath}...");
-    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $pythonBinary = PythonRuntime::resolve((string) config('services.ai_prediction.python_binary', 'python3'));
     $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
     $trainProcess = Process::path(base_path())
         ->run([$pythonBinary, $trainingScript, $datasetPath]);
@@ -784,13 +790,15 @@ Artisan::command('ai:train-forecast-model {--dataset=capstone-ai/station_baranga
     }
 
     $this->info("Training forecast model using {$datasetPath}...");
-    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $pythonBinary = PythonRuntime::resolve((string) config('services.ai_prediction.python_binary', 'python3'));
     $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
     $pythonEnvironment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
     if (PHP_OS_FAMILY === 'Windows') {
         foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
             $value = getenv($name);
-            if (is_string($value) && $value !== '') $pythonEnvironment[$name] = $value;
+            if (is_string($value) && $value !== '') {
+                $pythonEnvironment[$name] = $value;
+            }
         }
     }
     $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
@@ -833,13 +841,15 @@ Artisan::command('ai:predict-barangay-risk {payload?} {--file=capstone-ai/sample
         ? 'Building AI-ready prediction payload...'
         : 'Running barangay risk prediction...');
 
-    $pythonBinary = (string) config('services.ai_prediction.python_binary', 'python3');
+    $pythonBinary = PythonRuntime::resolve((string) config('services.ai_prediction.python_binary', 'python3'));
     $pythonPath = trim((string) config('services.ai_prediction.python_path', ''));
     $pythonEnvironment = $pythonPath !== '' ? ['PYTHONPATH' => $pythonPath] : [];
     if (PHP_OS_FAMILY === 'Windows') {
         foreach (['SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'] as $name) {
             $value = getenv($name);
-            if (is_string($value) && $value !== '') $pythonEnvironment[$name] = $value;
+            if (is_string($value) && $value !== '') {
+                $pythonEnvironment[$name] = $value;
+            }
         }
     }
     $predictProcess = Process::path(base_path())

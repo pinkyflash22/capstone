@@ -62,44 +62,44 @@
   ],
   "global_feature_importance": [
     {
-      "feature": "barangay_pressure_signal",
-      "importance": 0.1334
+      "feature": "road_accessibility",
+      "importance": 0.1262
     },
     {
-      "feature": "condition_label",
-      "importance": 0.0935
+      "feature": "building_density_level",
+      "importance": 0.1003
     },
     {
-      "feature": "high_assessment_count",
-      "importance": 0.066
+      "feature": "verified_risk_count",
+      "importance": 0.0892
     },
     {
-      "feature": "hazard_category_electrical_hazard",
-      "importance": 0.0641
+      "feature": "population_density_level",
+      "importance": 0.0847
     },
     {
       "feature": "risk_area_pressure_signal",
-      "importance": 0.0562
+      "importance": 0.0765
     },
     {
-      "feature": "average_humidity",
-      "importance": 0.0509
+      "feature": "condition_label",
+      "importance": 0.0715
     },
     {
-      "feature": "weather_condition",
-      "importance": 0.0498
+      "feature": "affected_households",
+      "importance": 0.068
     },
     {
-      "feature": "verified_hazard_count",
-      "importance": 0.049
+      "feature": "barangay_pressure_signal",
+      "importance": 0.0502
     },
     {
-      "feature": "wind_signal",
-      "importance": 0.0461
+      "feature": "peak_hours",
+      "importance": 0.0389
     },
     {
       "feature": "verified_risk_area_count",
-      "importance": 0.0426
+      "importance": 0.0357
     }
   ],
   "reference_profile": {
@@ -161,43 +161,43 @@
     "train_rows": 720,
     "test_rows": 240,
     "accuracy": 0.9792,
-    "roc_auc": 0.9974,
-    "precision": 1.0,
-    "recall": 0.7826,
-    "f1_score": 0.878,
-    "brier_score": 0.0141,
-    "cross_val_roc_auc_mean": 0.9919,
+    "roc_auc": 0.9942,
+    "precision": 0.913,
+    "recall": 0.875,
+    "f1_score": 0.8936,
+    "brier_score": 0.0158,
+    "cross_val_roc_auc_mean": 0.9915,
     "cross_val_roc_auc_scores": [
-      0.9891,
-      1.0,
-      1.0,
-      0.9948,
-      0.9757
+      0.965,
+      0.9988,
+      0.9988,
+      0.9951,
+      1.0
     ],
     "classification_report": {
       "0": {
-        "precision": 0.9774774774774775,
-        "recall": 1.0,
-        "f1-score": 0.9886104783599089,
-        "support": 217.0
+        "precision": 0.9861751152073732,
+        "recall": 0.9907407407407407,
+        "f1-score": 0.9884526558891455,
+        "support": 216.0
       },
       "1": {
-        "precision": 1.0,
-        "recall": 0.782608695652174,
-        "f1-score": 0.8780487804878049,
-        "support": 23.0
+        "precision": 0.9130434782608695,
+        "recall": 0.875,
+        "f1-score": 0.8936170212765957,
+        "support": 24.0
       },
       "accuracy": 0.9791666666666666,
       "macro avg": {
-        "precision": 0.9887387387387387,
-        "recall": 0.8913043478260869,
-        "f1-score": 0.9333296294238569,
+        "precision": 0.9496092967341214,
+        "recall": 0.9328703703703703,
+        "f1-score": 0.9410348385828706,
         "support": 240.0
       },
       "weighted avg": {
-        "precision": 0.9796358858858859,
+        "precision": 0.9788619515127229,
         "recall": 0.9791666666666666,
-        "f1-score": 0.9780149823138322,
+        "f1-score": 0.9789690924278905,
         "support": 240.0
       }
     },
@@ -206,48 +206,60 @@
         "target_column": "incident_count",
         "train_rows": 720,
         "test_rows": 240,
-        "mae": 0.0088,
-        "rmse": 0.0646,
-        "r2_score": 0.8704
+        "mae": 0.0186,
+        "rmse": 0.1441,
+        "r2_score": 0.787
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
         "train_rows": 720,
         "test_rows": 240,
-        "mae": 1157.6528,
-        "rmse": 15947.1444,
-        "r2_score": -411.9666
+        "mae": 2525.0286,
+        "rmse": 26600.3144,
+        "r2_score": -1148.0068
       }
     }
   },
   "calibration": {
     "method": "sigmoid_cv",
-    "expected_calibration_error": 0.0211,
-    "mean_predicted_probability": 0.0941,
-    "observed_positive_rate": 0.0958,
+    "expected_calibration_error": 0.0128,
+    "mean_predicted_probability": 0.1002,
+    "observed_positive_rate": 0.1,
     "bins": [
       {
         "range": "(-0.001, 0.1]",
-        "count": 219,
-        "mean_probability": 0.0197,
-        "observed_rate": 0.0091
-      },
-      {
-        "range": "(0.2, 0.3]",
-        "count": 1,
-        "mean_probability": 0.2881,
-        "observed_rate": 1.0
+        "count": 216,
+        "mean_probability": 0.0134,
+        "observed_rate": 0.0139
       },
       {
         "range": "(0.3, 0.4]",
-        "count": 2,
-        "mean_probability": 0.3093,
+        "count": 1,
+        "mean_probability": 0.3903,
+        "observed_rate": 0.0
+      },
+      {
+        "range": "(0.5, 0.6]",
+        "count": 1,
+        "mean_probability": 0.5277,
+        "observed_rate": 0.0
+      },
+      {
+        "range": "(0.6, 0.7]",
+        "count": 1,
+        "mean_probability": 0.6354,
+        "observed_rate": 0.0
+      },
+      {
+        "range": "(0.7, 0.8]",
+        "count": 1,
+        "mean_probability": 0.7173,
         "observed_rate": 1.0
       },
       {
         "range": "(0.9, 1.0]",
-        "count": 18,
-        "mean_probability": 0.9636,
+        "count": 20,
+        "mean_probability": 0.944,
         "observed_rate": 1.0
       }
     ]
@@ -262,7 +274,7 @@
       "barangay_name"
     ]
   },
-  "trained_at": "2026-08-15T12:52:55.814025+00:00",
+  "trained_at": "2026-08-23T22:33:32.332134+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

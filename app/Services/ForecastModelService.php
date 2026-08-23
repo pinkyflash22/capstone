@@ -2,25 +2,36 @@
 
 namespace App\Services;
 
+use App\Support\PythonRuntime;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Arr;
 
 class ForecastModelService
 {
     private string $modelPath;
+
     private string $metadataPath;
+
     private string $datasetPath;
+
     private string $datasetOption;
+
     private string $trainingScriptPath;
+
     private string $evaluationScriptPath;
+
     private string $evaluationCachePath;
+
     private string $pythonBinary;
+
     private array $lastTrainingReport = [];
+
+    private ?bool $readinessResult = null;
 
     public function __construct()
     {
@@ -31,13 +42,17 @@ class ForecastModelService
         $this->trainingScriptPath = $this->resolvePath((string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py'));
         $this->evaluationScriptPath = $this->resolvePath((string) config('services.ai_prediction.evaluation_script', 'capstone-ai/evaluate_model.py'));
         $this->evaluationCachePath = $this->resolvePath((string) config('services.ai_prediction.evaluation_cache_path', 'capstone-ai/fire_model_evaluation.json'));
-        $this->pythonBinary = $this->resolvePythonBinary(
+        $this->pythonBinary = PythonRuntime::resolve(
             (string) config('services.ai_prediction.python_binary', 'python')
         );
     }
 
     public function ensureReady(): bool
     {
+        if ($this->readinessResult !== null) {
+            return $this->readinessResult;
+        }
+
         if (! $this->needsRetraining()) {
             $this->lastTrainingReport = [
                 'success' => true,
@@ -46,23 +61,35 @@ class ForecastModelService
                 'diagnostics' => $this->readinessDiagnostics(),
             ];
 
-            return true;
+            return $this->readinessResult = true;
         }
 
-        return $this->retrain(exportDataset: true)['success'] === true;
-    }
+        $hadUsableModel = File::exists($this->modelPath) && File::exists($this->metadataPath);
+        $trainingReport = $this->retrain(exportDataset: true);
 
-    private function resolvePythonBinary(string $configuredBinary): string
-    {
-        if (PHP_OS_FAMILY === 'Windows' && strtolower(trim($configuredBinary)) === 'python') {
-            $bundledPython = 'C:/Program Files/Python314/python.exe';
-
-            if (File::exists($bundledPython)) {
-                return $bundledPython;
-            }
+        if (($trainingReport['success'] ?? false) === true) {
+            return $this->readinessResult = true;
         }
 
-        return $configuredBinary;
+        // A refresh failure must not take forecasting offline when a previously
+        // trained model is still readable. The request can safely use that model
+        // while the failed retraining attempt remains visible in diagnostics.
+        if ($hadUsableModel) {
+            Log::warning('Forecast model refresh failed; continuing with the last valid model.', [
+                'training_report' => $trainingReport,
+            ]);
+
+            $this->lastTrainingReport = array_merge($trainingReport, [
+                'success' => true,
+                'status' => 'stale_model_fallback',
+                'message' => 'Model refresh failed, so the last valid trained model is being used.',
+                'refresh_failure' => $trainingReport,
+            ]);
+
+            return $this->readinessResult = true;
+        }
+
+        return $this->readinessResult = false;
     }
 
     private function pythonEnvironment(): array
@@ -189,7 +216,7 @@ class ForecastModelService
         try {
             $decoded = $this->readMetadataPayload();
         } catch (\Throwable $e) {
-            Log::warning('Unable to read forecast model metadata: ' . $e->getMessage());
+            Log::warning('Unable to read forecast model metadata: '.$e->getMessage());
 
             return [
                 'model_ready' => File::exists($this->modelPath),
@@ -265,6 +292,7 @@ class ForecastModelService
             'evaluation_script' => File::exists($this->evaluationScriptPath),
             'evaluation_cache_file' => File::exists($this->evaluationCachePath),
             'python_configured' => filled($this->pythonBinary),
+            'python_binary' => $this->pythonBinary,
             'needs_retraining' => $this->needsRetraining(),
         ];
 
@@ -276,7 +304,6 @@ class ForecastModelService
                 'training_script' => $this->trainingScriptPath,
                 'evaluation_script' => $this->evaluationScriptPath,
                 'evaluation_cache' => $this->evaluationCachePath,
-                'python_binary' => $this->pythonBinary,
             ];
         }
 
@@ -337,11 +364,14 @@ class ForecastModelService
                 ]);
 
             if ($process->failed()) {
-                Log::warning('Forecast model evaluation artifact generation failed.', [
-                    'error' => $process->errorOutput(),
-                    'output' => $process->output(),
-                    'evaluation_script' => $this->evaluationScriptPath,
-                ]);
+                Log::warning('Forecast model evaluation artifact generation failed.', array_merge(
+                    PythonRuntime::failureContext($process, $this->pythonBinary),
+                    [
+                        'evaluation_script' => $this->evaluationScriptPath,
+                        'dataset' => $this->datasetPath,
+                        'evaluation_cache' => $this->evaluationCachePath,
+                    ]
+                ));
 
                 return $fallback;
             }

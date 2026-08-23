@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Chief;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiActionPlanChecklist;
-use App\Models\AiActionPlanChecklistItem;
 use App\Models\AiActionPlanChecklistActivity;
+use App\Models\AiActionPlanChecklistItem;
 use App\Models\AiRecommendationSuggestion;
 use App\Models\Analysis;
+use App\Models\Incident;
 use App\Models\MitigationAction;
 use App\Models\StationOfficer;
 use App\Models\Team;
-use App\Models\Incident;
 use App\Models\User;
 use App\Services\BarangayPredictionService;
 use App\Services\ForecastModelService;
@@ -20,38 +20,40 @@ use App\Support\BarangayNotificationService;
 use App\Support\ForecastIncidentCalibration;
 use App\Support\PeakHourEstimator;
 use App\Support\UserActivityLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class AnalyticController extends Controller
 {
-  
     private $apiKey;
+
     private ?string $lastAiModelUsed = null;
+
     private array $unavailableAiModels = [];
+
     private BarangayPredictionService $barangayPredictionService;
+
     private ForecastModelService $forecastModelService;
+
     private PredictionFeedbackSignalService $predictionFeedbackSignalService;
-    
+
     public function __construct(
         ForecastModelService $forecastModelService,
         BarangayPredictionService $barangayPredictionService,
         PredictionFeedbackSignalService $predictionFeedbackSignalService
-    )
-    {
+    ) {
         $this->forecastModelService = $forecastModelService;
         $this->barangayPredictionService = $barangayPredictionService;
         $this->predictionFeedbackSignalService = $predictionFeedbackSignalService;
         $this->apiKey = (string) config('services.openrouter.api_key', '');
-        
-        if (!$this->apiKey) {
+
+        if (! $this->apiKey) {
             Log::warning('OpenRouter API key not found in .env file');
         } else {
             Log::info('OpenRouter API key loaded successfully');
@@ -143,7 +145,7 @@ class AnalyticController extends Controller
             ->pluck('user')
             ->filter()
             ->unique('user_id')
-            ->sortBy(fn ($user) => strtolower(trim(($user->last_name ?? '') . ' ' . ($user->first_name ?? ''))))
+            ->sortBy(fn ($user) => strtolower(trim(($user->last_name ?? '').' '.($user->first_name ?? ''))))
             ->values();
 
         $viewData = [
@@ -165,7 +167,7 @@ class AnalyticController extends Controller
 
         return view('chief.course-checklists', $viewData);
     }
-    
+
     /**
      * Get stations/locations for the analytics dropdown
      */
@@ -173,22 +175,22 @@ class AnalyticController extends Controller
     {
         try {
             Log::info('Fetching stations for analytics');
-            
+
             $user = Auth::user();
-            
-            if (!$user) {
+
+            if (! $user) {
                 return response()->json([
                     'success' => false,
                     'data' => [['id' => 'all', 'name' => 'All Locations']],
-                    'message' => 'User not authenticated'
+                    'message' => 'User not authenticated',
                 ]);
             }
-            
+
             $locations = collect();
-            
+
             // Get user's station
             $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-            
+
             if ($stationOfficer && $stationOfficer->station_id) {
                 $station = DB::table('stations')->where('station_id', $stationOfficer->station_id)->first();
                 if ($station) {
@@ -201,14 +203,14 @@ class AnalyticController extends Controller
                         ->values()
                         ->all();
 
-                    $locations->push((object)[
-                        'id' => (string)$station->station_id,
+                    $locations->push((object) [
+                        'id' => (string) $station->station_id,
                         'name' => $station->station_name,
                         'barangays' => $barangays,
                     ]);
                 }
             }
-            
+
             if ($locations->isEmpty()) {
                 // Fallback: get all stations
                 $stations = DB::table('stations')->get();
@@ -222,38 +224,38 @@ class AnalyticController extends Controller
                         ->values()
                         ->all();
 
-                    $locations->push((object)[
-                        'id' => (string)$station->station_id,
+                    $locations->push((object) [
+                        'id' => (string) $station->station_id,
                         'name' => $station->station_name,
                         'barangays' => $barangays,
                     ]);
                 }
             }
-            
+
             if ($locations->isEmpty()) {
-                $locations->push((object)[
+                $locations->push((object) [
                     'id' => 'all',
-                    'name' => 'All Locations'
+                    'name' => 'All Locations',
                 ]);
             }
-            
+
             return response()->json([
                 'success' => true,
-                'data' => $locations
+                'data' => $locations,
             ]);
-            
+
         } catch (\Exception $e) {
-            Log::error('Error fetching stations: ' . $e->getMessage());
+            Log::error('Error fetching stations: '.$e->getMessage());
             Log::error($e->getTraceAsString());
-            
+
             return response()->json([
                 'success' => false,
                 'data' => [['id' => 'all', 'name' => 'All Locations']],
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ]);
         }
     }
-    
+
     /**
      * AI-powered predictive analysis based on REAL database data
      */
@@ -264,42 +266,42 @@ class AnalyticController extends Controller
             @ini_set('max_execution_time', '300');
 
             Log::info('AI Analysis request received', $request->all());
-            
+
             $locationId = $request->input('location_id', 'all');
             $selectedBarangayId = $this->normalizeSelectedBarangayId($request->input('barangay_id'));
-            $days = (int)$request->input('days', 30);
+            $days = (int) $request->input('days', 30);
             $predictionScope = $request->input('prediction_scope', 'current_month');
             $historicalWindow = $request->input('historical_window', '3');
             $analysisKind = $request->input('analysis_kind', $predictionScope === 'next_month' ? 'forecast' : 'actual_analysis');
-            
+
             // Fetch REAL data from database
             $analysisData = $this->fetchRealTimeData($locationId, $days, $predictionScope, $selectedBarangayId, $historicalWindow);
             $analysisData['analysis_kind'] = $analysisKind;
             $analysisData['replace_existing'] = $request->boolean('replace_existing');
-            
-        $predictionAiResponse = null;
-        $recommendationAiResponse = null;
-        $predictionAiModel = null;
-        $recommendationAiModel = null;
-        $aiFailureMessage = null;
-        try {
-            $predictionAiResponse = $this->callAIApi(
-                $this->buildAIPredictionPrompt($analysisData),
-                'You are a fire risk forecasting analyst. Predict likely monthly fire activity, possible fire count, probable peak hours, and operational outlook using the provided station data.'
-            );
-            $predictionAiModel = $this->lastAiModelUsed;
-            $recommendationAiResponse = $this->callAIApi(
-                $this->buildAIRecommendationPrompt($analysisData),
-                'You are a fire station operations strategist. Produce concrete, station-ready recommendations based on the provided incident, staffing, equipment, and weather context.'
-            );
-            $recommendationAiModel = $this->lastAiModelUsed;
-            Log::info('AI prediction response received', ['response' => substr($predictionAiResponse, 0, 300)]);
-            Log::info('AI recommendation response received', ['response' => substr($recommendationAiResponse, 0, 300)]);
-        } catch (\Exception $aiError) {
-            $aiFailureMessage = $aiError->getMessage();
-            Log::warning('AI API failed: ' . $aiError->getMessage());
-        }
-            
+
+            $predictionAiResponse = null;
+            $recommendationAiResponse = null;
+            $predictionAiModel = null;
+            $recommendationAiModel = null;
+            $aiFailureMessage = null;
+            try {
+                $predictionAiResponse = $this->callAIApi(
+                    $this->buildAIPredictionPrompt($analysisData),
+                    'You are a fire risk forecasting analyst. Predict likely monthly fire activity, possible fire count, probable peak hours, and operational outlook using the provided station data.'
+                );
+                $predictionAiModel = $this->lastAiModelUsed;
+                $recommendationAiResponse = $this->callAIApi(
+                    $this->buildAIRecommendationPrompt($analysisData),
+                    'You are a fire station operations strategist. Produce concrete, station-ready recommendations based on the provided incident, staffing, equipment, and weather context.'
+                );
+                $recommendationAiModel = $this->lastAiModelUsed;
+                Log::info('AI prediction response received', ['response' => substr($predictionAiResponse, 0, 300)]);
+                Log::info('AI recommendation response received', ['response' => substr($recommendationAiResponse, 0, 300)]);
+            } catch (\Exception $aiError) {
+                $aiFailureMessage = $aiError->getMessage();
+                Log::warning('AI API failed: '.$aiError->getMessage());
+            }
+
             // If AI succeeded, parse it; otherwise use data-driven analysis
             if ($predictionAiResponse && $recommendationAiResponse) {
                 $structuredAnalysis = $this->structureAIAnalysisSeparated($predictionAiResponse, $recommendationAiResponse, $analysisData);
@@ -327,7 +329,7 @@ class AnalyticController extends Controller
                 $selectedBarangayId
             );
             $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
-            
+
             $structuredAnalysis['checklist_debug'] = [
                 'attempted' => false,
                 'analysis_id' => null,
@@ -405,7 +407,7 @@ class AnalyticController extends Controller
                     $this->updateStoredAnalysisArtifacts($analysisId, $structuredAnalysis, $analysisData);
                 }
             } catch (\Exception $storeError) {
-                Log::warning('Failed to store analysis/checklists: ' . $storeError->getMessage(), [
+                Log::warning('Failed to store analysis/checklists: '.$storeError->getMessage(), [
                     'exception' => $storeError,
                 ]);
                 $structuredAnalysis['checklist_debug'] = array_merge(
@@ -444,20 +446,20 @@ class AnalyticController extends Controller
                     'message' => 'Analysis completed but could not be saved. Please retry after resolving the server error.',
                 ], 500);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $structuredAnalysis,
-                'location_name' => $analysisData['location_name']
+                'location_name' => $analysisData['location_name'],
             ]);
-            
+
         } catch (\Exception $e) {
-            Log::error('AI Analysis error: ' . $e->getMessage());
+            Log::error('AI Analysis error: '.$e->getMessage());
             Log::error($e->getTraceAsString());
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Analysis failed: ' . $e->getMessage()
+                'message' => 'Analysis failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -468,29 +470,21 @@ class AnalyticController extends Controller
             if (! $this->forecastModelService->ensureReady()) {
                 $report = $this->forecastModelService->lastTrainingReport();
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Forecast model is not ready yet.',
-                    'details' => $report['message'] ?? 'The model could not be prepared automatically.',
-                    'diagnostics' => $report['diagnostics'] ?? [],
-                    'code' => $report['status'] ?? 'forecast_model_unavailable',
-                ], 503);
+                Log::warning('Forecast model is unavailable; continuing with database-driven analysis.', [
+                    'forecast_report' => $report,
+                ]);
+            } else {
+                $this->barangayPredictionService->assertRuntimeReady();
             }
-
-            $this->barangayPredictionService->assertRuntimeReady();
         } catch (\Throwable $e) {
-            Log::warning('Prediction API runtime check failed.', [
+            // runAIPredictiveAnalysis already provides a deterministic fallback
+            // from scoped incidents, risks, weather, personnel, and equipment.
+            // A Python/runtime problem should degrade the model signal, not fail
+            // the complete command analysis request.
+            Log::warning('Prediction runtime unavailable; continuing with database-driven analysis.', [
                 'message' => $e->getMessage(),
                 'forecast_report' => $this->forecastModelService->lastTrainingReport(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Prediction service is not ready on this server.',
-                'details' => 'Check the configured Python runtime, model files, and training logs.',
-                'diagnostics' => $this->forecastModelService->readinessDiagnostics(),
-                'code' => 'prediction_runtime_unavailable',
-            ], 503);
         }
 
         return $this->runAIPredictiveAnalysis($request);
@@ -540,59 +534,59 @@ class AnalyticController extends Controller
             ], 500);
         }
     }
-    
+
     /**
      * Fetch REAL data from your database tables
      */
     // private function fetchRealTimeData($locationId, $days)
     // {
     //     $startDate = Carbon::now()->subDays($days);
-        
+
     //     // Get user's station
     //     $user = Auth::user();
-        
+
     //     if (!$user) {
     //         throw new \Exception('User not authenticated');
     //     }
-        
+
     //     $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-        
+
     //     if (!$stationOfficer) {
     //         throw new \Exception('No station assigned to this user');
     //     }
-        
+
     //     $stationId = $stationOfficer->station_id;
-        
+
     //     // Get station name
     //     $station = DB::table('stations')->where('station_id', $stationId)->first();
     //     $locationName = $station ? $station->station_name : 'My Station';
-        
+
     //     // Get all personnel in this station
     //     $allPersons = StationOfficer::where('station_id', $stationId)->get();
     //     $userIds = $allPersons->pluck('user_id')->toArray();
-        
+
     //     // Get team IDs for this station
     //     $teamIds = Team::whereIn('team_leader', $userIds)->pluck('id')->toArray();
-        
+
     //     // Get incidents for this station's teams
     //     $incidents = collect();
-        
+
     //     if (!empty($teamIds)) {
     //         $incidents = Incident::whereIn('incident_status_id', [1, 2])
     //             ->whereIn('team_id', $teamIds)
     //             ->where('created_at', '>=', $startDate)
     //             ->get();
     //     }
-        
+
     //     Log::info('Found ' . $incidents->count() . ' incidents for station ' . $stationId);
-        
+
     //     // Calculate statistics
     //     $totalIncidents = $incidents->count();
-        
+
     //     // Incidents by type
     //     $incidentsByType = [];
     //     $fireIncidents = 0;
-        
+
     //     foreach ($incidents as $incident) {
     //         $type = $incident->incident_type ?? 'unknown';
     //         $incidentsByType[$type] = ($incidentsByType[$type] ?? 0) + 1;
@@ -600,11 +594,11 @@ class AnalyticController extends Controller
     //             $fireIncidents++;
     //         }
     //     }
-        
+
     //     // Hourly distribution
     //     $hourlyData = array_fill(0, 24, 0);
     //     $dailyData = array_fill(0, 7, 0);
-        
+
     //     foreach ($incidents as $incident) {
     //         $incidentDate = $incident->created_at ?? null;
     //         if ($incidentDate) {
@@ -617,19 +611,19 @@ class AnalyticController extends Controller
     //             } catch (\Exception $e) {}
     //         }
     //     }
-        
+
     //     // Find peak hour
     //     $peakHour = array_search(max($hourlyData), $hourlyData);
     //     if ($peakHour === false || max($hourlyData) === 0) {
     //         $peakHour = null;
     //     }
-        
+
     //     // Calculate average response time
     //     $avgResponseTime = null;
     //     $completedIncidents = $incidents->filter(function($inc) {
     //         return isset($inc->dateEnded) && isset($inc->alarmdatetime);
     //     });
-        
+
     //     if ($completedIncidents->count() > 0) {
     //         $totalMinutes = 0;
     //         foreach ($completedIncidents as $inc) {
@@ -641,15 +635,15 @@ class AnalyticController extends Controller
     //         }
     //         $avgResponseTime = round($totalMinutes / $completedIncidents->count(), 1);
     //     }
-        
+
     //     // Get personnel data
     //     $totalPersonnel = $allPersons->count();
     //     $availablePersonnel = $allPersons->where('status', 'available')->count();
-        
+
     //     // Get equipment data
     //     $totalEquipment = 0;
     //     $availableEquipment = 0;
-        
+
     //     try {
     //         $totalEquipment = DB::table('equipments')->count();
     //         $availableEquipment = DB::table('equipments')
@@ -660,13 +654,13 @@ class AnalyticController extends Controller
     //         $totalEquipment = 20;
     //         $availableEquipment = 12;
     //     }
-        
+
     //     // Calculate risk score
     //     $riskScore = $this->calculateRiskScore($incidents, $fireIncidents, $days);
-        
+
     //     // Identify risk factors
     //     $riskFactors = $this->identifyRiskFactors($incidents, $incidentsByType, $peakHour, $avgResponseTime);
-        
+
     //     return [
     //         'location_name' => $locationName,
     //         'location_id' => $locationId,
@@ -689,246 +683,248 @@ class AnalyticController extends Controller
     //     ];
     // }
     /**
- * Fetch REAL data from your database tables
- */
-private function fetchRealTimeData($locationId, $days, $predictionScope = 'current_month', ?int $selectedBarangayId = null, $historicalWindow = '3', bool $generatePredictions = true)
-{
-    $startDate = Carbon::now()->subDays($days);
-    
-    // Get user's station
-    $user = Auth::user();
-    
-    if (!$user) {
-        throw new \Exception('User not authenticated');
-    }
-    
-    $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-    
-    if (!$stationOfficer) {
-        throw new \Exception('No station assigned to this user');
-    }
-    
-    $stationId = $stationOfficer->station_id;
-    
-    // Get station name
-    $station = DB::table('stations')->where('station_id', $stationId)->first();
-    $locationName = $station ? $station->station_name : 'My Station';
-    $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName) ?? [];
-    
-    // Resolve teams through the station link first, then through assigned officers for legacy rows.
-    $allPersons = StationOfficer::where('station_id', $stationId)->get();
-    $officerIds = $allPersons->pluck('station_officer_id')->filter()->all();
-    $userIds = $allPersons->pluck('user_id')->filter()->all();
-    $teamOfficerColumns = [
-        'commander_driver', 'pumper', 'team_leader',
-        'firefighter_officer_1', 'firefighter_officer_2', 'firefighter_officer_3', 'rescue_radio',
-    ];
-    $teamIds = Team::query()
-        ->where('station_id', $stationId)
-        ->orWhere(function ($query) use ($teamOfficerColumns, $officerIds, $userIds) {
-            foreach ($teamOfficerColumns as $column) {
-                if (! empty($officerIds)) {
-                    $query->orWhereIn($column, $officerIds);
-                }
-                if (! empty($userIds)) {
-                    $query->orWhereIn($column, $userIds);
-                }
-            }
-        })
-        ->pluck('team_id')
-        ->unique()
-        ->values()
-        ->all();
-    
-    Log::info('Team IDs found: ' . json_encode($teamIds));
-    
-    // Include incidents directly assigned to the station as well as legacy team-assigned incidents.
-    try {
-        $incidentDateExpression = Schema::hasColumn('incidents', 'occurred_at')
-            ? 'COALESCE(occurred_at, created_at)'
-            : 'created_at';
-        $incidents = Incident::query()
-            ->whereRaw("{$incidentDateExpression} >= ?", [$startDate])
-            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
-            ->where(function ($query) use ($stationId, $teamIds) {
-                $query->where('station_id', $stationId);
-                if (! empty($teamIds)) {
-                    $query->orWhereIn('team_id', $teamIds);
+     * Fetch REAL data from your database tables
+     */
+    private function fetchRealTimeData($locationId, $days, $predictionScope = 'current_month', ?int $selectedBarangayId = null, $historicalWindow = '3', bool $generatePredictions = true)
+    {
+        $startDate = Carbon::now()->subDays($days);
+
+        // Get user's station
+        $user = Auth::user();
+
+        if (! $user) {
+            throw new \Exception('User not authenticated');
+        }
+
+        $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
+
+        if (! $stationOfficer) {
+            throw new \Exception('No station assigned to this user');
+        }
+
+        $stationId = $stationOfficer->station_id;
+
+        // Get station name
+        $station = DB::table('stations')->where('station_id', $stationId)->first();
+        $locationName = $station ? $station->station_name : 'My Station';
+        $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName) ?? [];
+
+        // Resolve teams through the station link first, then through assigned officers for legacy rows.
+        $allPersons = StationOfficer::where('station_id', $stationId)->get();
+        $officerIds = $allPersons->pluck('station_officer_id')->filter()->all();
+        $userIds = $allPersons->pluck('user_id')->filter()->all();
+        $teamOfficerColumns = [
+            'commander_driver', 'pumper', 'team_leader',
+            'firefighter_officer_1', 'firefighter_officer_2', 'firefighter_officer_3', 'rescue_radio',
+        ];
+        $teamIds = Team::query()
+            ->where('station_id', $stationId)
+            ->orWhere(function ($query) use ($teamOfficerColumns, $officerIds, $userIds) {
+                foreach ($teamOfficerColumns as $column) {
+                    if (! empty($officerIds)) {
+                        $query->orWhereIn($column, $officerIds);
+                    }
+                    if (! empty($userIds)) {
+                        $query->orWhereIn($column, $userIds);
+                    }
                 }
             })
-            ->get();
-    } catch (\Exception $e) {
-        Log::warning('Error fetching station-scoped incidents: ' . $e->getMessage());
-        $incidents = collect();
-    }
+            ->pluck('team_id')
+            ->unique()
+            ->values()
+            ->all();
 
-    if ($selectedBarangayId) {
-        $incidents = $incidents
-            ->filter(fn ($incident) => (int) ($incident->barangay_id ?? 0) === (int) $selectedBarangayId)
-            ->values();
-    }
-    
-    Log::info('Found ' . $incidents->count() . ' incidents for station ' . $stationId);
-    
-    // Calculate statistics
-    $totalIncidents = $incidents->count();
-    
-    // Incidents by type
-    $incidentsByType = [];
-    $fireIncidents = 0;
-    
-    $hasIncidentTypeColumn = Schema::hasColumn('incidents', 'incident_type_id');
-    foreach ($incidents as $incident) {
-        $type = $hasIncidentTypeColumn ? ($incident->incident_type_id ?? '0') : 'fire';
-        $incidentsByType[$type] = ($incidentsByType[$type] ?? 0) + 1;
-        if (! $hasIncidentTypeColumn || $type == '1') {
+        Log::info('Team IDs found: '.json_encode($teamIds));
 
-            $fireIncidents++;
+        // Include incidents directly assigned to the station as well as legacy team-assigned incidents.
+        try {
+            $incidentDateExpression = Schema::hasColumn('incidents', 'occurred_at')
+                ? 'COALESCE(occurred_at, created_at)'
+                : 'created_at';
+            $incidents = Incident::query()
+                ->whereRaw("{$incidentDateExpression} >= ?", [$startDate])
+                ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
+                ->where(function ($query) use ($stationId, $teamIds) {
+                    $query->where('station_id', $stationId);
+                    if (! empty($teamIds)) {
+                        $query->orWhereIn('team_id', $teamIds);
+                    }
+                })
+                ->get();
+        } catch (\Exception $e) {
+            Log::warning('Error fetching station-scoped incidents: '.$e->getMessage());
+            $incidents = collect();
         }
-    }
-    
-    // Hourly distribution
-    $hourlyData = array_fill(0, 24, 0);
-    $dailyData = array_fill(0, 7, 0);
-    
-    foreach ($incidents as $incident) {
-        $incidentDate = $incident->occurred_at ?: ($incident->created_at ?? null);
-        if ($incidentDate) {
-            try {
-                $date = Carbon::parse($incidentDate);
-                $hour = (int)$date->format('H');
-                $dayOfWeek = $date->dayOfWeek;
-                $hourlyData[$hour]++;
-                $dailyData[$dayOfWeek]++;
-            } catch (\Exception $e) {}
-        }
-    }
-    
-    // Find peak hour
-    $peakHour = array_search(max($hourlyData), $hourlyData);
-    if ($peakHour === false || max($hourlyData) === 0) {
-        $peakHour = null;
-    }
-    
-    // Calculate average response time
-    $avgResponseTime = null;
-    $completedIncidents = $incidents->filter(function($inc) {
-        return isset($inc->dateEnded) && isset($inc->alarmdatetime);
-    });
-    
-    if ($completedIncidents->count() > 0) {
-        $totalMinutes = 0;
-        foreach ($completedIncidents as $inc) {
-            try {
-                $alarm = Carbon::parse($inc->alarmdatetime);
-                $ended = Carbon::parse($inc->dateEnded);
-                $totalMinutes += $alarm->diffInMinutes($ended);
-            } catch (\Exception $e) {}
-        }
-        $avgResponseTime = round($totalMinutes / $completedIncidents->count(), 1);
-    }
-    
-    // Get personnel data
-    $totalPersonnel = $allPersons->count();
-    $availablePersonnel = $allPersons->where('status', 'available')->count();
-    
-    // Get equipment data only for this station
-    $totalEquipment = 0;
-    $availableEquipment = 0;
-    
-    try {
-        $equipmentAssignments = DB::table('equipments_to_stations')
-            ->where('station_id', $stationId)
-            ->get();
 
-        $totalEquipment = (int) $equipmentAssignments->sum(function ($assignment) {
-            return (int) ($assignment->available_quantity ?? 0)
-                + (int) ($assignment->damaged_quantity ?? 0)
-                + (int) ($assignment->maintenance_quantity ?? 0);
+        if ($selectedBarangayId) {
+            $incidents = $incidents
+                ->filter(fn ($incident) => (int) ($incident->barangay_id ?? 0) === (int) $selectedBarangayId)
+                ->values();
+        }
+
+        Log::info('Found '.$incidents->count().' incidents for station '.$stationId);
+
+        // Calculate statistics
+        $totalIncidents = $incidents->count();
+
+        // Incidents by type
+        $incidentsByType = [];
+        $fireIncidents = 0;
+
+        $hasIncidentTypeColumn = Schema::hasColumn('incidents', 'incident_type_id');
+        foreach ($incidents as $incident) {
+            $type = $hasIncidentTypeColumn ? ($incident->incident_type_id ?? '0') : 'fire';
+            $incidentsByType[$type] = ($incidentsByType[$type] ?? 0) + 1;
+            if (! $hasIncidentTypeColumn || $type == '1') {
+
+                $fireIncidents++;
+            }
+        }
+
+        // Hourly distribution
+        $hourlyData = array_fill(0, 24, 0);
+        $dailyData = array_fill(0, 7, 0);
+
+        foreach ($incidents as $incident) {
+            $incidentDate = $incident->occurred_at ?: ($incident->created_at ?? null);
+            if ($incidentDate) {
+                try {
+                    $date = Carbon::parse($incidentDate);
+                    $hour = (int) $date->format('H');
+                    $dayOfWeek = $date->dayOfWeek;
+                    $hourlyData[$hour]++;
+                    $dailyData[$dayOfWeek]++;
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
+        // Find peak hour
+        $peakHour = array_search(max($hourlyData), $hourlyData);
+        if ($peakHour === false || max($hourlyData) === 0) {
+            $peakHour = null;
+        }
+
+        // Calculate average response time
+        $avgResponseTime = null;
+        $completedIncidents = $incidents->filter(function ($inc) {
+            return isset($inc->dateEnded) && isset($inc->alarmdatetime);
         });
 
-        $availableEquipment = (int) $equipmentAssignments->sum('available_quantity');
-    } catch (\Exception $e) {
-        Log::warning('Error fetching station equipment stats: ' . $e->getMessage());
+        if ($completedIncidents->count() > 0) {
+            $totalMinutes = 0;
+            foreach ($completedIncidents as $inc) {
+                try {
+                    $alarm = Carbon::parse($inc->alarmdatetime);
+                    $ended = Carbon::parse($inc->dateEnded);
+                    $totalMinutes += $alarm->diffInMinutes($ended);
+                } catch (\Exception $e) {
+                }
+            }
+            $avgResponseTime = round($totalMinutes / $completedIncidents->count(), 1);
+        }
+
+        // Get personnel data
+        $totalPersonnel = $allPersons->count();
+        $availablePersonnel = $allPersons->where('status', 'available')->count();
+
+        // Get equipment data only for this station
         $totalEquipment = 0;
         $availableEquipment = 0;
-    }
-    
-    $predictionContext = $this->buildPredictionContext($stationId, $teamIds, $predictionScope);
-    $barangayPredictions = $generatePredictions
-        ? $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext)
-        : [];
-    $barangayPredictions = $generatePredictions
-        ? $this->attachBarangayHistoricalBaselines($stationId, $barangayPredictions, $predictionContext)
-        : [];
-    $modelPrediction = $generatePredictions
-        ? $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions)
-        : null;
-    $selectedBarangayPrediction = null;
 
-    if ($selectedBarangayId) {
-        $selectedBarangayPrediction = collect($barangayPredictions)
-            ->first(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $selectedBarangayId);
+        try {
+            $equipmentAssignments = DB::table('equipments_to_stations')
+                ->where('station_id', $stationId)
+                ->get();
 
-        if ($selectedBarangayPrediction) {
-            $barangayPredictions = [$selectedBarangayPrediction];
-            $locationName = ($station ? $station->station_name : 'My Station') . ' · ' . ($selectedBarangayPrediction['barangay_name'] ?? 'Selected barangay');
+            $totalEquipment = (int) $equipmentAssignments->sum(function ($assignment) {
+                return (int) ($assignment->available_quantity ?? 0)
+                    + (int) ($assignment->damaged_quantity ?? 0)
+                    + (int) ($assignment->maintenance_quantity ?? 0);
+            });
+
+            $availableEquipment = (int) $equipmentAssignments->sum('available_quantity');
+        } catch (\Exception $e) {
+            Log::warning('Error fetching station equipment stats: '.$e->getMessage());
+            $totalEquipment = 0;
+            $availableEquipment = 0;
         }
+
+        $predictionContext = $this->buildPredictionContext($stationId, $teamIds, $predictionScope);
+        $barangayPredictions = $generatePredictions
+            ? $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext)
+            : [];
+        $barangayPredictions = $generatePredictions
+            ? $this->attachBarangayHistoricalBaselines($stationId, $barangayPredictions, $predictionContext)
+            : [];
+        $modelPrediction = $generatePredictions
+            ? $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions)
+            : null;
+        $selectedBarangayPrediction = null;
+
+        if ($selectedBarangayId) {
+            $selectedBarangayPrediction = collect($barangayPredictions)
+                ->first(fn ($item) => (int) ($item['barangay_id'] ?? 0) === $selectedBarangayId);
+
+            if ($selectedBarangayPrediction) {
+                $barangayPredictions = [$selectedBarangayPrediction];
+                $locationName = ($station ? $station->station_name : 'My Station').' · '.($selectedBarangayPrediction['barangay_name'] ?? 'Selected barangay');
+            }
+        }
+
+        $effectiveBarangayId = $selectedBarangayPrediction['barangay_id'] ?? $selectedBarangayId;
+        $mitigationContext = $this->buildMitigationContext($stationId, $effectiveBarangayId);
+        $recommendationContext = $this->buildRecommendationContext($stationId, $selectedBarangayPrediction, $barangayPredictions);
+        $chartContext = $this->buildAnalyticsChartContext(
+            $stationId,
+            $teamIds,
+            $predictionContext,
+            $modelPrediction,
+            $selectedBarangayPrediction,
+            $barangayPredictions,
+            $effectiveBarangayId,
+            $historicalWindow
+        );
+
+        // Calculate risk score
+        $riskScore = $this->calculateRiskScore($incidents, $fireIncidents, $days);
+        $riskScore = $this->applyMitigationToRiskScore($riskScore, $mitigationContext);
+
+        // Identify risk factors
+        $riskFactors = $this->identifyRiskFactors($incidents, $incidentsByType, $peakHour, $avgResponseTime);
+
+        return [
+            'location_name' => $locationName,
+            'location_id' => $locationId,
+            'station_id' => $stationId,
+            'barangay_id' => $selectedBarangayPrediction['barangay_id'] ?? $selectedBarangayId,
+            'selected_barangay_prediction' => $selectedBarangayPrediction,
+            'days_analyzed' => $days,
+            'total_incidents' => $totalIncidents,
+            'fire_incidents' => $fireIncidents,
+            'incidents_by_type' => $incidentsByType,
+            'hourly_data' => $hourlyData,
+            'daily_data' => $dailyData,
+            'peak_hour' => $peakHour,
+            'avg_response_time' => $avgResponseTime,
+            'total_personnel' => $totalPersonnel,
+            'available_personnel' => $availablePersonnel,
+            'total_equipment' => $totalEquipment,
+            'available_equipment' => $availableEquipment,
+            'risk_score' => $riskScore['score'],
+            'risk_level' => $riskScore['level'],
+            'risk_factors' => $riskFactors,
+            'weather_context' => $weatherContext,
+            'prediction_scope' => $predictionScope,
+            'historical_window' => (string) $historicalWindow,
+            'prediction_context' => $predictionContext,
+            'model_prediction' => $modelPrediction,
+            'barangay_predictions' => $barangayPredictions,
+            'mitigation_context' => $mitigationContext,
+            'recommendation_context' => $recommendationContext,
+            'chart_context' => $chartContext,
+        ];
     }
-
-    $effectiveBarangayId = $selectedBarangayPrediction['barangay_id'] ?? $selectedBarangayId;
-    $mitigationContext = $this->buildMitigationContext($stationId, $effectiveBarangayId);
-    $recommendationContext = $this->buildRecommendationContext($stationId, $selectedBarangayPrediction, $barangayPredictions);
-    $chartContext = $this->buildAnalyticsChartContext(
-        $stationId,
-        $teamIds,
-        $predictionContext,
-        $modelPrediction,
-        $selectedBarangayPrediction,
-        $barangayPredictions,
-        $effectiveBarangayId,
-        $historicalWindow
-    );
-
-    // Calculate risk score
-    $riskScore = $this->calculateRiskScore($incidents, $fireIncidents, $days);
-    $riskScore = $this->applyMitigationToRiskScore($riskScore, $mitigationContext);
-    
-    // Identify risk factors
-    $riskFactors = $this->identifyRiskFactors($incidents, $incidentsByType, $peakHour, $avgResponseTime);
-    
-    return [
-        'location_name' => $locationName,
-        'location_id' => $locationId,
-        'station_id' => $stationId,
-        'barangay_id' => $selectedBarangayPrediction['barangay_id'] ?? $selectedBarangayId,
-        'selected_barangay_prediction' => $selectedBarangayPrediction,
-        'days_analyzed' => $days,
-        'total_incidents' => $totalIncidents,
-        'fire_incidents' => $fireIncidents,
-        'incidents_by_type' => $incidentsByType,
-        'hourly_data' => $hourlyData,
-        'daily_data' => $dailyData,
-        'peak_hour' => $peakHour,
-        'avg_response_time' => $avgResponseTime,
-        'total_personnel' => $totalPersonnel,
-        'available_personnel' => $availablePersonnel,
-        'total_equipment' => $totalEquipment,
-        'available_equipment' => $availableEquipment,
-        'risk_score' => $riskScore['score'],
-        'risk_level' => $riskScore['level'],
-        'risk_factors' => $riskFactors,
-        'weather_context' => $weatherContext,
-        'prediction_scope' => $predictionScope,
-        'historical_window' => (string) $historicalWindow,
-        'prediction_context' => $predictionContext,
-        'model_prediction' => $modelPrediction,
-        'barangay_predictions' => $barangayPredictions,
-        'mitigation_context' => $mitigationContext,
-        'recommendation_context' => $recommendationContext,
-        'chart_context' => $chartContext,
-    ];
-}
 
     private function buildMitigationContext(int $stationId, ?int $selectedBarangayId = null): array
     {
@@ -1019,10 +1015,10 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'avg_completion_days' => $avgCompletionDays > 0 ? $avgCompletionDays : null,
             'risk_reduction_percent' => $riskReductionPercent,
             'summary' => $totalWeight > 0
-                ? "{$checklists->count()} mitigation checklist(s) tracked, with " . round($checklistCompletionRatio * 100, 1) . "% weighted completion."
+                ? "{$checklists->count()} mitigation checklist(s) tracked, with ".round($checklistCompletionRatio * 100, 1).'% weighted completion.'
                 : 'No confirmed mitigation checklist actions yet.',
             'effectiveness_summary' => $mitigationTotal > 0
-                ? "{$completedMitigations} of {$mitigationTotal} mitigation action(s) are completed" . ($avgCompletionDays > 0 ? " with an average completion time of {$avgCompletionDays} day(s)." : '.')
+                ? "{$completedMitigations} of {$mitigationTotal} mitigation action(s) are completed".($avgCompletionDays > 0 ? " with an average completion time of {$avgCompletionDays} day(s)." : '.')
                 : 'No mitigation action records are linked to the current station coverage yet.',
             'feedback_summary' => $feedbackSummary,
         ];
@@ -1167,12 +1163,14 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         if (! empty($actualVsPredictedLabels) && ! empty($residualLabels)) {
             $metadata['learning_performance'] = $learning;
+
             return $metadata;
         }
 
         $operationalFallback = $this->buildOperationalPredictionEvaluationSeries($stationId, $selectedBarangayId);
         if ($operationalFallback === null) {
             $metadata['learning_performance'] = $learning;
+
             return $metadata;
         }
 
@@ -1190,7 +1188,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         }
 
         $learning['partial'] = true;
-        $learning['warning'] = trim($existingWarning . ' ' . $fallbackWarning);
+        $learning['warning'] = trim($existingWarning.' '.$fallbackWarning);
 
         $metadata['learning_performance'] = $learning;
 
@@ -1237,7 +1235,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     {
         $focusBarangayIds = collect();
 
-        if (!empty($selectedBarangayPrediction['barangay_id'])) {
+        if (! empty($selectedBarangayPrediction['barangay_id'])) {
             $focusBarangayIds->push((int) $selectedBarangayPrediction['barangay_id']);
         } else {
             $focusBarangayIds = collect($barangayPredictions)
@@ -1326,7 +1324,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 $record->population_density_level ? "population density: {$record->population_density_level}" : null,
                 $record->building_density_level ? "building density: {$record->building_density_level}" : null,
                 $record->blocked_hydrant ? 'blocked hydrant nearby' : null,
-                !$record->near_hydrant ? 'no nearby hydrant' : null,
+                ! $record->near_hydrant ? 'no nearby hydrant' : null,
                 $record->informal_settlement ? 'informal settlement exposure' : null,
                 $record->cooking_fire_prone_activity ? 'cooking/fire-prone activity present' : null,
                 $record->combustible_materials_present ? 'combustible materials present' : null,
@@ -1344,13 +1342,13 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 'condition_label' => $record->condition_label,
                 'assessment_level' => $record->assessment_level,
                 'street_or_sitio' => $record->street_or_sitio,
-                'summary' => trim($record->barangay_name . ': ' . ucfirst($typeLabel) . ($detailParts->isNotEmpty() ? ' — ' . $detailParts->implode(', ') : '')),
+                'summary' => trim($record->barangay_name.': '.ucfirst($typeLabel).($detailParts->isNotEmpty() ? ' — '.$detailParts->implode(', ') : '')),
                 'notes' => collect([$record->assessment_description, $record->remarks])->filter()->implode(' '),
             ];
         })->values()->all();
 
-        $summary = !empty($focusFindings)
-            ? 'Localized field findings available for ' . collect($focusFindings)->pluck('barangay_name')->unique()->implode(', ') . '.'
+        $summary = ! empty($focusFindings)
+            ? 'Localized field findings available for '.collect($focusFindings)->pluck('barangay_name')->unique()->implode(', ').'.'
             : null;
 
         return [
@@ -1468,8 +1466,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     array_map(fn ($summary) => ['summary' => $summary], $driverSummaries),
                     [[
                         'summary' => "Incident count calibrated from a raw barangay sum of {$predictedIncidentCount} to {$calibratedIncidentCount}, using observed pace and a "
-                            . number_format((float) $incidentCalibration['historical_same_month_average'], 2)
-                            . ' same-month historical average.',
+                            .number_format((float) $incidentCalibration['historical_same_month_average'], 2)
+                            .' same-month historical average.',
                     ]]
                 ),
                 'watch_items' => $watchItems,
@@ -1491,7 +1489,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                 'output' => $decoded,
             ];
         } catch (\Throwable $e) {
-            Log::warning('Unable to build model prediction data: ' . $e->getMessage());
+            Log::warning('Unable to build model prediction data: '.$e->getMessage());
+
             return null;
         }
     }
@@ -1584,9 +1583,10 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $prediction['incident_count_summary'] = $isCurrentMonth
             ? "{$normalized['observed_fire_incidents_to_date']} fire incident(s) have already been observed in {$targetLabel}. The calibrated planning range is {$rangeLabel} total incident(s), with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate."
             : "The calibrated planning range is {$rangeLabel} fire incident(s) for {$targetLabel}, with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate. The forecast month has not started, so there are no observed incidents in that window yet.";
-        $prediction['summary'] = $prediction['incident_count_summary'] . " Risk outlook: {$outlook}. Review probability, confidence, and the listed drivers together before operational decisions.";
+        $prediction['summary'] = $prediction['incident_count_summary']." Risk outlook: {$outlook}. Review probability, confidence, and the listed drivers together before operational decisions.";
 
         $analysis['predictions'] = $prediction;
+
         return $analysis;
     }
 
@@ -1595,7 +1595,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         try {
             $modelReady = $this->forecastModelService->ensureReady();
 
-            $targetMonth = !empty($predictionContext['target_month_label'])
+            $targetMonth = ! empty($predictionContext['target_month_label'])
                 ? Carbon::createFromFormat('F Y', $predictionContext['target_month_label'])->startOfMonth()
                 : Carbon::now()->startOfMonth();
 
@@ -1621,7 +1621,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     max(1, $barangays->count())
                 );
 
-                if (!$payload) {
+                if (! $payload) {
                     continue;
                 }
 
@@ -1681,7 +1681,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
             return $forecasts;
         } catch (\Throwable $e) {
-            Log::warning('Unable to build barangay prediction data: ' . $e->getMessage());
+            Log::warning('Unable to build barangay prediction data: '.$e->getMessage());
+
             return [];
         }
     }
@@ -1723,8 +1724,8 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             'predicted_fire_incidents' => $predictedIncidents,
             'drivers' => [
                 ['summary' => "{$incidentCount} historical incident(s) contribute to the barangay baseline."],
-                ['summary' => (int) ($payload['current_month_fire_incidents'] ?? 0) . ' completed fire incident(s) this month contribute to recent fire momentum.'],
-                ['summary' => (int) ($payload['station_current_month_fire_incidents'] ?? 0) . ' station-wide completed fire incident(s) influence the common monthly baseline.'],
+                ['summary' => (int) ($payload['current_month_fire_incidents'] ?? 0).' completed fire incident(s) this month contribute to recent fire momentum.'],
+                ['summary' => (int) ($payload['station_current_month_fire_incidents'] ?? 0).' station-wide completed fire incident(s) influence the common monthly baseline.'],
                 ['summary' => 'Verified risk-area pressure and current weather signals were included.'],
                 ['summary' => 'Completed mitigation and checklist readiness reduce the fallback score.'],
             ],
@@ -1800,7 +1801,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             ->where('stations.station_id', $stationId)
             ->select('barangays.barangay_id', 'barangays.barangay_name', 'cities.city_name', 'cities.city_id')
             ->get()
-            ->filter(fn ($row) => !empty($row->barangay_id));
+            ->filter(fn ($row) => ! empty($row->barangay_id));
 
         $barangays = $barangays->merge($stationAddressBarangays);
 
@@ -1896,7 +1897,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         $sameMonthRows = $historicalRows->filter(function ($row) use ($targetMonth) {
             try {
-                return !empty($row->incident_date) && Carbon::parse($row->incident_date)->month === $targetMonth->month;
+                return ! empty($row->incident_date) && Carbon::parse($row->incident_date)->month === $targetMonth->month;
             } catch (\Throwable $e) {
                 return false;
             }
@@ -1933,8 +1934,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         array $recentFireSignal = [],
         array $stationRecentFireSignal = [],
         int $coveredBarangayCount = 1
-    ): ?array
-    {
+    ): ?array {
         $barangayIncidents = DB::table('historical_fire_incidents')
             ->where('barangay_id', $barangay->barangay_id)
             ->whereYear('incident_date', '>=', $targetMonth->copy()->subYears(3)->year)
@@ -2283,6 +2283,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         return (string) array_key_first($counts);
     }
+
     /**
      * Calculate risk score based on actual incident data
      */
@@ -2290,12 +2291,12 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
     {
         $incidentRate = $days > 0 ? ($incidents->count() / $days) : 0;
         $fireRate = $days > 0 ? ($fireIncidents / $days) : 0;
-        
+
         $score = 0;
         $score += min(30, $incidentRate * 5);
         $score += min(30, $fireRate * 10);
         $score += min(20, ($fireIncidents / max(1, $incidents->count())) * 20);
-        
+
         // Check for recent spike
         $recentIncidents = 0;
         foreach ($incidents as $incident) {
@@ -2305,55 +2306,60 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
                     if (Carbon::parse($incidentDate)->diffInDays(now()) <= 7) {
                         $recentIncidents++;
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
         }
-        
+
         if ($recentIncidents > $incidentRate * 7 * 1.5) {
             $score += 20;
         }
-        
+
         $score = min(100, round($score));
-        
+
         $level = 'Low';
-        if ($score >= 70) $level = 'Critical';
-        elseif ($score >= 50) $level = 'High';
-        elseif ($score >= 30) $level = 'Medium';
-        
+        if ($score >= 70) {
+            $level = 'Critical';
+        } elseif ($score >= 50) {
+            $level = 'High';
+        } elseif ($score >= 30) {
+            $level = 'Medium';
+        }
+
         return ['score' => $score, 'level' => $level];
     }
-    
+
     /**
      * Identify risk factors from data patterns
      */
     private function identifyRiskFactors($incidents, $incidentsByType, $peakHour, $avgResponseTime)
     {
         $factors = [];
-        
+
         $fireCount = $incidentsByType['fire'] ?? 0;
         if ($fireCount > 5) {
             $factors[] = "High frequency of fire incidents ({$fireCount} in period)";
         }
-        
+
         if ($avgResponseTime && $avgResponseTime > 15) {
             $factors[] = "Elevated response time ({$avgResponseTime} minutes) exceeds target";
         }
-        
+
         if ($peakHour !== null) {
             $factors[] = "Incident concentration around {$peakHour}:00 hours";
         }
-        
+
         if ($incidents->count() > 20) {
             $factors[] = "High incident volume ({$incidents->count()} incidents) requiring resource review";
         }
-        
+
         if (empty($factors)) {
-            $factors[] = "Incident patterns within normal operational parameters";
+            $factors[] = 'Incident patterns within normal operational parameters';
         }
-        
+
         return $factors;
     }
-    
+
     /**
      * Build AI prompt with real data
      */
@@ -2363,86 +2369,86 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $prompt .= "LOCATION: {$data['location_name']}\n";
         $prompt .= "PERIOD: Last {$data['days_analyzed']} days\n\n";
         $prompt .= "INCIDENTS: {$data['total_incidents']} total, {$data['fire_incidents']} fire incidents\n";
-        
-        if (!empty($data['incidents_by_type'])) {
+
+        if (! empty($data['incidents_by_type'])) {
             $prompt .= "\nBY TYPE:\n";
             foreach ($data['incidents_by_type'] as $type => $count) {
                 $prompt .= "- {$type}: {$count}\n";
             }
         }
-        
+
         $prompt .= "\nPATTERNS:\n";
-        $prompt .= "- Peak Hour: " . ($data['peak_hour'] ? $data['peak_hour'] . ':00' : 'No clear pattern') . "\n";
-        $prompt .= "- Response Time: " . ($data['avg_response_time'] ? $data['avg_response_time'] . ' minutes' : 'N/A') . "\n";
+        $prompt .= '- Peak Hour: '.($data['peak_hour'] ? $data['peak_hour'].':00' : 'No clear pattern')."\n";
+        $prompt .= '- Response Time: '.($data['avg_response_time'] ? $data['avg_response_time'].' minutes' : 'N/A')."\n";
         $prompt .= "- Risk Score: {$data['risk_score']}/100 ({$data['risk_level']})\n";
         $prompt .= "- Total Personnel: {$data['total_personnel']}\n";
         $prompt .= "- Available Personnel: {$data['available_personnel']}\n";
         $prompt .= "- Total Equipment: {$data['total_equipment']}\n";
         $prompt .= "- Available Equipment: {$data['available_equipment']}\n\n";
 
-        if (!empty($data['prediction_context'])) {
+        if (! empty($data['prediction_context'])) {
             $predictionContext = $data['prediction_context'];
             $prompt .= "MONTHLY PREDICTION TARGET:\n";
-            $prompt .= "- Scope: " . ($predictionContext['scope_label'] ?? $data['prediction_scope']) . "\n";
-            $prompt .= "- Target Month: " . ($predictionContext['target_month_label'] ?? 'Current Month') . "\n";
-            $prompt .= "- Calendar Window: " . ($predictionContext['target_period_label'] ?? 'N/A') . "\n";
-            $prompt .= "- Current Month Incidents Counted: " . ($predictionContext['current_month_total_incidents'] ?? 0) . "\n";
-            $prompt .= "- Current Month Fire Incidents: " . ($predictionContext['current_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Previous Full Month Incidents: " . ($predictionContext['previous_month_total_incidents'] ?? 0) . "\n";
-            $prompt .= "- Previous Full Month Fire Incidents: " . ($predictionContext['previous_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Observed Peak Hours This Month: " . implode(', ', $predictionContext['likely_peak_hours'] ?? ['None']) . "\n";
-            $prompt .= "- Current Month Hourly Incident Distribution: " . json_encode($predictionContext['current_month_hourly_data'] ?? []) . "\n\n";
+            $prompt .= '- Scope: '.($predictionContext['scope_label'] ?? $data['prediction_scope'])."\n";
+            $prompt .= '- Target Month: '.($predictionContext['target_month_label'] ?? 'Current Month')."\n";
+            $prompt .= '- Calendar Window: '.($predictionContext['target_period_label'] ?? 'N/A')."\n";
+            $prompt .= '- Current Month Incidents Counted: '.($predictionContext['current_month_total_incidents'] ?? 0)."\n";
+            $prompt .= '- Current Month Fire Incidents: '.($predictionContext['current_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Previous Full Month Incidents: '.($predictionContext['previous_month_total_incidents'] ?? 0)."\n";
+            $prompt .= '- Previous Full Month Fire Incidents: '.($predictionContext['previous_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Observed Peak Hours This Month: '.implode(', ', $predictionContext['likely_peak_hours'] ?? ['None'])."\n";
+            $prompt .= '- Current Month Hourly Incident Distribution: '.json_encode($predictionContext['current_month_hourly_data'] ?? [])."\n\n";
         }
 
-        if (!empty($data['weather_context'])) {
+        if (! empty($data['weather_context'])) {
             $weather = $data['weather_context'];
             $prompt .= "WEATHER CONTEXT FOR THIS MONTH:\n";
-            $prompt .= "- Query Location: " . ($weather['query_location'] ?? $data['location_name']) . "\n";
-            $prompt .= "- Coverage Window: " . ($weather['coverage'] ?? 'Current month') . "\n";
-            $prompt .= "- Average Temperature: " . (($weather['avg_temp_c'] ?? null) !== null ? $weather['avg_temp_c'] . "°C" : 'N/A') . "\n";
-            $prompt .= "- Average Humidity: " . (($weather['avg_humidity'] ?? null) !== null ? $weather['avg_humidity'] . "%" : 'N/A') . "\n";
-            $prompt .= "- Average Wind: " . (($weather['avg_wind_kph'] ?? null) !== null ? $weather['avg_wind_kph'] . " kph" : 'N/A') . "\n";
-            $prompt .= "- Rainy Days in Sample: " . ($weather['rainy_days'] ?? 0) . "\n";
-            $prompt .= "- Hot Days in Sample: " . ($weather['hot_days'] ?? 0) . "\n";
-            $prompt .= "- Dominant Condition: " . ($weather['dominant_condition'] ?? 'N/A') . "\n";
-            $prompt .= "- Fire Weather Risk: " . ($weather['weather_risk_label'] ?? 'N/A') . "\n";
-            $prompt .= "- Weather Summary: " . ($weather['summary'] ?? 'N/A') . "\n\n";
+            $prompt .= '- Query Location: '.($weather['query_location'] ?? $data['location_name'])."\n";
+            $prompt .= '- Coverage Window: '.($weather['coverage'] ?? 'Current month')."\n";
+            $prompt .= '- Average Temperature: '.(($weather['avg_temp_c'] ?? null) !== null ? $weather['avg_temp_c'].'°C' : 'N/A')."\n";
+            $prompt .= '- Average Humidity: '.(($weather['avg_humidity'] ?? null) !== null ? $weather['avg_humidity'].'%' : 'N/A')."\n";
+            $prompt .= '- Average Wind: '.(($weather['avg_wind_kph'] ?? null) !== null ? $weather['avg_wind_kph'].' kph' : 'N/A')."\n";
+            $prompt .= '- Rainy Days in Sample: '.($weather['rainy_days'] ?? 0)."\n";
+            $prompt .= '- Hot Days in Sample: '.($weather['hot_days'] ?? 0)."\n";
+            $prompt .= '- Dominant Condition: '.($weather['dominant_condition'] ?? 'N/A')."\n";
+            $prompt .= '- Fire Weather Risk: '.($weather['weather_risk_label'] ?? 'N/A')."\n";
+            $prompt .= '- Weather Summary: '.($weather['summary'] ?? 'N/A')."\n\n";
         }
 
-        if (!empty($data['mitigation_context'])) {
+        if (! empty($data['mitigation_context'])) {
             $mitigation = $data['mitigation_context'];
             $prompt .= "MITIGATION STATUS:\n";
-            $prompt .= "- " . ($mitigation['summary'] ?? 'No mitigation summary available') . "\n";
-            $prompt .= "- Estimated risk reduction from confirmed actions: " . ($mitigation['risk_reduction_percent'] ?? 0) . "%\n\n";
+            $prompt .= '- '.($mitigation['summary'] ?? 'No mitigation summary available')."\n";
+            $prompt .= '- Estimated risk reduction from confirmed actions: '.($mitigation['risk_reduction_percent'] ?? 0)."%\n\n";
         }
 
-        if (!empty($data['selected_barangay_prediction'])) {
+        if (! empty($data['selected_barangay_prediction'])) {
             $selectedInput = $data['selected_barangay_prediction']['input'] ?? [];
             $prompt .= "SELECTED BARANGAY FOCUS:\n";
-            $prompt .= "- Barangay: " . ($data['selected_barangay_prediction']['barangay_name'] ?? 'Selected barangay') . "\n";
-            $prompt .= "- Barangay risk probability: " . ($data['selected_barangay_prediction']['probability_percent'] ?? 0) . "%\n";
-            $prompt .= "- Barangay risk level: " . strtoupper($data['selected_barangay_prediction']['risk_level'] ?? 'unknown') . "\n";
-            $prompt .= "- Completed fires this month: " . ($selectedInput['current_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Completed fires in the previous month: " . ($selectedInput['previous_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Completed fires in the latest 7 days: " . ($selectedInput['recent_7_day_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Recent fire momentum signal: " . ($selectedInput['recent_fire_momentum_signal'] ?? 0) . "\n\n";
-            $prompt .= "- Station-wide completed fires this month: " . ($selectedInput['station_current_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Station-wide recent fire momentum: " . ($selectedInput['station_recent_fire_momentum_signal'] ?? 0) . "\n\n";
+            $prompt .= '- Barangay: '.($data['selected_barangay_prediction']['barangay_name'] ?? 'Selected barangay')."\n";
+            $prompt .= '- Barangay risk probability: '.($data['selected_barangay_prediction']['probability_percent'] ?? 0)."%\n";
+            $prompt .= '- Barangay risk level: '.strtoupper($data['selected_barangay_prediction']['risk_level'] ?? 'unknown')."\n";
+            $prompt .= '- Completed fires this month: '.($selectedInput['current_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Completed fires in the previous month: '.($selectedInput['previous_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Completed fires in the latest 7 days: '.($selectedInput['recent_7_day_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Recent fire momentum signal: '.($selectedInput['recent_fire_momentum_signal'] ?? 0)."\n\n";
+            $prompt .= '- Station-wide completed fires this month: '.($selectedInput['station_current_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Station-wide recent fire momentum: '.($selectedInput['station_recent_fire_momentum_signal'] ?? 0)."\n\n";
         }
 
-        if (!empty($data['barangay_predictions'])) {
+        if (! empty($data['barangay_predictions'])) {
             $prompt .= "BARANGAY-LEVEL HOTSPOT FORECASTS:\n";
             foreach (array_slice($data['barangay_predictions'], 0, 5) as $barangayForecast) {
                 $barangayInput = $barangayForecast['input'] ?? [];
-                $prompt .= "- " . ($barangayForecast['barangay_name'] ?? 'Unknown barangay')
-                    . ': ' . strtoupper($barangayForecast['risk_level'] ?? 'unknown')
-                    . ' risk at ' . ($barangayForecast['probability_percent'] ?? 0) . "% probability"
-                    . ' | Current-month completed fires: ' . ($barangayInput['current_month_fire_incidents'] ?? 0)
-                    . ' | 7-day local fires: ' . ($barangayInput['recent_7_day_fire_incidents'] ?? 0)
-                    . ' | Station fires this month: ' . ($barangayInput['station_current_month_fire_incidents'] ?? 0);
+                $prompt .= '- '.($barangayForecast['barangay_name'] ?? 'Unknown barangay')
+                    .': '.strtoupper($barangayForecast['risk_level'] ?? 'unknown')
+                    .' risk at '.($barangayForecast['probability_percent'] ?? 0).'% probability'
+                    .' | Current-month completed fires: '.($barangayInput['current_month_fire_incidents'] ?? 0)
+                    .' | 7-day local fires: '.($barangayInput['recent_7_day_fire_incidents'] ?? 0)
+                    .' | Station fires this month: '.($barangayInput['station_current_month_fire_incidents'] ?? 0);
 
-                if (!empty($barangayForecast['drivers'][0]['summary'])) {
-                    $prompt .= " | Driver: " . $barangayForecast['drivers'][0]['summary'];
+                if (! empty($barangayForecast['drivers'][0]['summary'])) {
+                    $prompt .= ' | Driver: '.$barangayForecast['drivers'][0]['summary'];
                 }
 
                 $prompt .= "\n";
@@ -2450,26 +2456,26 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
             $prompt .= "\n";
         }
 
-        if (!empty($data['model_prediction']['output'])) {
+        if (! empty($data['model_prediction']['output'])) {
             $modelPrediction = $data['model_prediction']['output'];
             $prompt .= "ML MODEL SIGNALS:\n";
-            $prompt .= "- Model Target: " . ($modelPrediction['target'] ?? 'N/A') . "\n";
-            $prompt .= "- Probability: " . (($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'] . "%" : 'N/A') . "\n";
-            $prompt .= "- Risk Level: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
-            $prompt .= "- Confidence Band: " . strtoupper($modelPrediction['confidence_band'] ?? 'unknown') . "\n";
-            $prompt .= "- Observed Incidents To Date: " . ($modelPrediction['observed_fire_incidents_to_date'] ?? 0) . "\n";
-            $prompt .= "- Predicted Additional Incidents: " . ($modelPrediction['predicted_additional_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
-            $prompt .= "- Expected Month-End Total: " . ($modelPrediction['expected_month_total_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
-            $prompt .= "- Predicted Damage Exposure: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
-            $prompt .= "- Watch Items: " . implode(', ', $modelPrediction['watch_items'] ?? ['None']) . "\n";
+            $prompt .= '- Model Target: '.($modelPrediction['target'] ?? 'N/A')."\n";
+            $prompt .= '- Probability: '.(($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'].'%' : 'N/A')."\n";
+            $prompt .= '- Risk Level: '.strtoupper($modelPrediction['risk_level'] ?? 'unknown')."\n";
+            $prompt .= '- Confidence Band: '.strtoupper($modelPrediction['confidence_band'] ?? 'unknown')."\n";
+            $prompt .= '- Observed Incidents To Date: '.($modelPrediction['observed_fire_incidents_to_date'] ?? 0)."\n";
+            $prompt .= '- Predicted Additional Incidents: '.($modelPrediction['predicted_additional_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
+            $prompt .= '- Expected Month-End Total: '.($modelPrediction['expected_month_total_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
+            $prompt .= '- Predicted Damage Exposure: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
+            $prompt .= '- Watch Items: '.implode(', ', $modelPrediction['watch_items'] ?? ['None'])."\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
-                if (!empty($driver['summary'])) {
+                if (! empty($driver['summary'])) {
                     $prompt .= "- Driver: {$driver['summary']}\n";
                 }
             }
             $prompt .= "\nUse these model signals as grounded evidence. For a current-month analysis, never describe the forecast as fewer than incidents already observed. Clearly distinguish observed-to-date, predicted additional, and expected month-end total.\n\n";
         }
-        
+
         $prompt .= "Only provide prediction content. Do not give action recommendations.\n";
         $prompt .= "Provide your answer using these exact sections:\n";
         $prompt .= "PREDICTION:\n";
@@ -2480,7 +2486,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $prompt .= "DRIVERS:\n";
         $prompt .= "- bullet point\n";
         $prompt .= "ANALYSIS SUMMARY:\n";
-        
+
         return $prompt;
     }
 
@@ -2492,68 +2498,68 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $prompt .= "TOTAL INCIDENTS: {$data['total_incidents']}\n";
         $prompt .= "FIRE INCIDENTS: {$data['fire_incidents']}\n";
         $prompt .= "RISK SCORE: {$data['risk_score']}/100 ({$data['risk_level']})\n";
-        $prompt .= "PEAK HOUR: " . ($data['peak_hour'] ? $data['peak_hour'] . ':00' : 'No clear pattern') . "\n";
-        $prompt .= "AVG RESPONSE TIME: " . ($data['avg_response_time'] ? $data['avg_response_time'] . ' minutes' : 'N/A') . "\n";
+        $prompt .= 'PEAK HOUR: '.($data['peak_hour'] ? $data['peak_hour'].':00' : 'No clear pattern')."\n";
+        $prompt .= 'AVG RESPONSE TIME: '.($data['avg_response_time'] ? $data['avg_response_time'].' minutes' : 'N/A')."\n";
         $prompt .= "AVAILABLE PERSONNEL: {$data['available_personnel']} / {$data['total_personnel']}\n";
         $prompt .= "AVAILABLE EQUIPMENT: {$data['available_equipment']} / {$data['total_equipment']}\n";
 
-        if (!empty($data['prediction_context'])) {
+        if (! empty($data['prediction_context'])) {
             $prompt .= "MONTHLY CONTEXT:\n";
-            $prompt .= "- Current month fire incidents: " . ($data['prediction_context']['current_month_fire_incidents'] ?? 0) . "\n";
-            $prompt .= "- Likely peak hours: " . implode(', ', $data['prediction_context']['likely_peak_hours'] ?? ['None']) . "\n";
-            $prompt .= "- Target month: " . ($data['prediction_context']['target_month_label'] ?? 'Current Month') . "\n";
+            $prompt .= '- Current month fire incidents: '.($data['prediction_context']['current_month_fire_incidents'] ?? 0)."\n";
+            $prompt .= '- Likely peak hours: '.implode(', ', $data['prediction_context']['likely_peak_hours'] ?? ['None'])."\n";
+            $prompt .= '- Target month: '.($data['prediction_context']['target_month_label'] ?? 'Current Month')."\n";
         }
 
-        if (!empty($data['weather_context'])) {
-            $prompt .= "WEATHER SUMMARY: " . ($data['weather_context']['summary'] ?? 'N/A') . "\n";
+        if (! empty($data['weather_context'])) {
+            $prompt .= 'WEATHER SUMMARY: '.($data['weather_context']['summary'] ?? 'N/A')."\n";
         }
 
-        if (!empty($data['mitigation_context'])) {
-            $prompt .= "MITIGATION SUMMARY: " . ($data['mitigation_context']['summary'] ?? 'N/A') . "\n";
-            $prompt .= "MITIGATION RISK REDUCTION: " . ($data['mitigation_context']['risk_reduction_percent'] ?? 0) . "%\n";
+        if (! empty($data['mitigation_context'])) {
+            $prompt .= 'MITIGATION SUMMARY: '.($data['mitigation_context']['summary'] ?? 'N/A')."\n";
+            $prompt .= 'MITIGATION RISK REDUCTION: '.($data['mitigation_context']['risk_reduction_percent'] ?? 0)."%\n";
         }
 
-        if (!empty($data['recommendation_context']['focus_findings'])) {
+        if (! empty($data['recommendation_context']['focus_findings'])) {
             $prompt .= "LOCALIZED FIELD FINDINGS:\n";
             foreach (array_slice($data['recommendation_context']['focus_findings'], 0, 8) as $finding) {
-                $prompt .= "- " . ($finding['summary'] ?? 'Localized finding') . "\n";
-                if (!empty($finding['notes'])) {
-                    $prompt .= "  Notes: " . $finding['notes'] . "\n";
+                $prompt .= '- '.($finding['summary'] ?? 'Localized finding')."\n";
+                if (! empty($finding['notes'])) {
+                    $prompt .= '  Notes: '.$finding['notes']."\n";
                 }
             }
         }
 
-        if (!empty($data['selected_barangay_prediction'])) {
+        if (! empty($data['selected_barangay_prediction'])) {
             $selectedBarangay = $data['selected_barangay_prediction'];
             $prompt .= "SELECTED BARANGAY PRIORITY:\n";
-            $prompt .= "- Barangay: " . ($selectedBarangay['barangay_name'] ?? 'Selected barangay') . "\n";
-            $prompt .= "- Probability: " . ($selectedBarangay['probability_percent'] ?? 0) . "%\n";
-            $prompt .= "- Risk level: " . strtoupper($selectedBarangay['risk_level'] ?? 'unknown') . "\n";
-            if (!empty($selectedBarangay['drivers'][0]['summary'])) {
-                $prompt .= "- Leading driver: " . $selectedBarangay['drivers'][0]['summary'] . "\n";
+            $prompt .= '- Barangay: '.($selectedBarangay['barangay_name'] ?? 'Selected barangay')."\n";
+            $prompt .= '- Probability: '.($selectedBarangay['probability_percent'] ?? 0)."%\n";
+            $prompt .= '- Risk level: '.strtoupper($selectedBarangay['risk_level'] ?? 'unknown')."\n";
+            if (! empty($selectedBarangay['drivers'][0]['summary'])) {
+                $prompt .= '- Leading driver: '.$selectedBarangay['drivers'][0]['summary']."\n";
             }
         }
 
-        if (!empty($data['barangay_predictions'])) {
+        if (! empty($data['barangay_predictions'])) {
             $prompt .= "TOP BARANGAY HOTSPOTS:\n";
             foreach (array_slice($data['barangay_predictions'], 0, 5) as $barangayForecast) {
-                $prompt .= "- " . ($barangayForecast['barangay_name'] ?? 'Unknown barangay')
-                    . " | probability: " . ($barangayForecast['probability_percent'] ?? 0) . "%"
-                    . " | risk: " . strtoupper($barangayForecast['risk_level'] ?? 'unknown') . "\n";
+                $prompt .= '- '.($barangayForecast['barangay_name'] ?? 'Unknown barangay')
+                    .' | probability: '.($barangayForecast['probability_percent'] ?? 0).'%'
+                    .' | risk: '.strtoupper($barangayForecast['risk_level'] ?? 'unknown')."\n";
             }
         }
 
-        if (!empty($data['model_prediction']['output'])) {
+        if (! empty($data['model_prediction']['output'])) {
             $modelPrediction = $data['model_prediction']['output'];
             $prompt .= "ML MODEL RISK BRIEF:\n";
-            $prompt .= "- Risk level: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
-            $prompt .= "- Probability: " . (($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'] . "%" : 'N/A') . "\n";
-            $prompt .= "- Confidence: " . strtoupper($modelPrediction['confidence_band'] ?? 'unknown') . "\n";
-            $prompt .= "- Predicted incidents: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
-            $prompt .= "- Predicted damage: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
-            $prompt .= "- Watch items: " . implode(', ', $modelPrediction['watch_items'] ?? ['None']) . "\n";
+            $prompt .= '- Risk level: '.strtoupper($modelPrediction['risk_level'] ?? 'unknown')."\n";
+            $prompt .= '- Probability: '.(($modelPrediction['probability_percent'] ?? null) !== null ? $modelPrediction['probability_percent'].'%' : 'N/A')."\n";
+            $prompt .= '- Confidence: '.strtoupper($modelPrediction['confidence_band'] ?? 'unknown')."\n";
+            $prompt .= '- Predicted incidents: '.($modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
+            $prompt .= '- Predicted damage: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
+            $prompt .= '- Watch items: '.implode(', ', $modelPrediction['watch_items'] ?? ['None'])."\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
-                if (!empty($driver['summary'])) {
+                if (! empty($driver['summary'])) {
                     $prompt .= "- Evidence: {$driver['summary']}\n";
                 }
             }
@@ -2583,20 +2589,20 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
         $prompt = "You are the BFP implementation planner. Convert the fire-risk analysis into a checklist-style action plan that BFP can monitor and confirm.\n\n";
         $prompt .= "STATION: {$data['location_name']}\n";
         $prompt .= "RISK LEVEL: {$analysis['risk_level']}\n";
-        $prompt .= "CONFIDENCE SCORE: " . ($analysis['confidence_score'] ?? 'N/A') . "\n";
+        $prompt .= 'CONFIDENCE SCORE: '.($analysis['confidence_score'] ?? 'N/A')."\n";
 
-        if (!empty($analysis['predictions']['summary'])) {
+        if (! empty($analysis['predictions']['summary'])) {
             $prompt .= "PREDICTION SUMMARY: {$analysis['predictions']['summary']}\n";
         }
 
-        if (!empty($data['model_prediction']['output'])) {
+        if (! empty($data['model_prediction']['output'])) {
             $modelPrediction = $data['model_prediction']['output'];
-            $prompt .= "MODEL PROBABILITY: " . ($modelPrediction['probability_percent'] ?? 'N/A') . "%\n";
-            $prompt .= "MODEL RISK LEVEL: " . strtoupper($modelPrediction['risk_level'] ?? 'unknown') . "\n";
-            $prompt .= "MODEL PREDICTED INCIDENT COUNT: " . ($modelPrediction['predicted_incident_count'] ?? 'N/A') . "\n";
-            $prompt .= "MODEL PREDICTED DAMAGE: " . (isset($modelPrediction['predicted_estimated_damage']) ? 'PHP ' . number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A') . "\n";
+            $prompt .= 'MODEL PROBABILITY: '.($modelPrediction['probability_percent'] ?? 'N/A')."%\n";
+            $prompt .= 'MODEL RISK LEVEL: '.strtoupper($modelPrediction['risk_level'] ?? 'unknown')."\n";
+            $prompt .= 'MODEL PREDICTED INCIDENT COUNT: '.($modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
+            $prompt .= 'MODEL PREDICTED DAMAGE: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
-                if (!empty($driver['summary'])) {
+                if (! empty($driver['summary'])) {
                     $prompt .= "MODEL DRIVER: {$driver['summary']}\n";
                 }
             }
@@ -2604,7 +2610,7 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         $prompt .= "\nRECOMMENDATIONS TO CONVERT INTO A CHECKLIST:\n";
         foreach (array_slice($analysis['recommendations'] ?? [], 0, 10) as $index => $recommendation) {
-            $prompt .= ($index + 1) . ". {$recommendation['title']} | {$recommendation['priority']}\n";
+            $prompt .= ($index + 1).". {$recommendation['title']} | {$recommendation['priority']}\n";
             $prompt .= "Description: {$recommendation['description']}\n";
         }
 
@@ -2625,111 +2631,115 @@ private function fetchRealTimeData($locationId, $days, $predictionScope = 'curre
 
         return $prompt;
     }
-    
+
     /**
      * Call AI API
      */
-   /**
- * Call AI API
- */
-private function callAIApi($prompt, $systemPrompt = 'You are a fire safety expert. Provide concise analysis with clear bullet points.')
-{
-    if (!$this->apiKey) {
-        Log::error('No API key available for AI call');
-        throw new \Exception('No API key configured');
-    }
-    
-    Log::info('Calling OpenRouter API.');
-
-    $errors = [];
-    $connectTimeout = max(3, (int) config('services.openrouter.connect_timeout', 8));
-    $timeout = max($connectTimeout + 2, (int) config('services.openrouter.timeout', 20));
-    $maxTokens = max(150, (int) config('services.openrouter.max_tokens', 450));
-    $prompt = $this->trimAiPrompt($prompt);
-
-    foreach ($this->getOpenRouterModelCandidates() as $model) {
-        if (isset($this->unavailableAiModels[$model])) {
-            continue;
+    /**
+     * Call AI API
+     */
+    private function callAIApi($prompt, $systemPrompt = 'You are a fire safety expert. Provide concise analysis with clear bullet points.')
+    {
+        if (! $this->apiKey) {
+            Log::error('No API key available for AI call');
+            throw new \Exception('No API key configured');
         }
 
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-                'HTTP-Referer' => url('/'),
-                'X-Title' => 'PyroSense Analytics'
-            ])->connectTimeout($connectTimeout)->timeout($timeout)->post('https://openrouter.ai/api/v1/chat/completions', [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $prompt]
-                ],
-                'temperature' => 0.2,
-                'max_tokens' => $maxTokens
-            ]);
-        } catch (\Throwable $e) {
-            $this->unavailableAiModels[$model] = true;
-            $errors[] = "{$model}: {$e->getMessage()}";
-            Log::warning('OpenRouter API request threw an exception for model ' . $model, [
-                'message' => $e->getMessage(),
-                'timeout' => $timeout,
-                'connect_timeout' => $connectTimeout,
-            ]);
-            continue;
+        Log::info('Calling OpenRouter API.');
+
+        $errors = [];
+        $connectTimeout = max(3, (int) config('services.openrouter.connect_timeout', 8));
+        $timeout = max($connectTimeout + 2, (int) config('services.openrouter.timeout', 20));
+        $maxTokens = max(150, (int) config('services.openrouter.max_tokens', 450));
+        $prompt = $this->trimAiPrompt($prompt);
+
+        foreach ($this->getOpenRouterModelCandidates() as $model) {
+            if (isset($this->unavailableAiModels[$model])) {
+                continue;
+            }
+
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'HTTP-Referer' => url('/'),
+                    'X-Title' => 'PyroSense Analytics',
+                ])->connectTimeout($connectTimeout)->timeout($timeout)->post('https://openrouter.ai/api/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'temperature' => 0.2,
+                    'max_tokens' => $maxTokens,
+                ]);
+            } catch (\Throwable $e) {
+                $this->unavailableAiModels[$model] = true;
+                $errors[] = "{$model}: {$e->getMessage()}";
+                Log::warning('OpenRouter API request threw an exception for model '.$model, [
+                    'message' => $e->getMessage(),
+                    'timeout' => $timeout,
+                    'connect_timeout' => $connectTimeout,
+                ]);
+
+                continue;
+            }
+
+            if (! $response->successful()) {
+                $this->unavailableAiModels[$model] = true;
+                $errorBody = $response->body();
+                $errors[] = "{$model}: HTTP {$response->status()}";
+                Log::warning('OpenRouter API call failed for model '.$model.': '.$response->status().' - '.$errorBody);
+
+                continue;
+            }
+
+            $json = $response->json();
+            $content = $json['choices'][0]['message']['content'] ?? '';
+
+            if (empty($content)) {
+                $this->unavailableAiModels[$model] = true;
+                $errors[] = "{$model}: empty response";
+                Log::warning('OpenRouter API returned empty content for model '.$model);
+
+                continue;
+            }
+
+            $this->lastAiModelUsed = $model;
+            Log::info('AI API call successful with model '.$model.', response length: '.strlen($content));
+
+            return $content;
         }
 
-        if (!$response->successful()) {
-            $this->unavailableAiModels[$model] = true;
-            $errorBody = $response->body();
-            $errors[] = "{$model}: HTTP {$response->status()}";
-            Log::warning('OpenRouter API call failed for model ' . $model . ': ' . $response->status() . ' - ' . $errorBody);
-            continue;
-        }
-
-        $json = $response->json();
-        $content = $json['choices'][0]['message']['content'] ?? '';
-
-        if (empty($content)) {
-            $this->unavailableAiModels[$model] = true;
-            $errors[] = "{$model}: empty response";
-            Log::warning('OpenRouter API returned empty content for model ' . $model);
-            continue;
-        }
-
-        $this->lastAiModelUsed = $model;
-        Log::info('AI API call successful with model ' . $model . ', response length: ' . strlen($content));
-        return $content;
-    }
-
-    Log::error('OpenRouter API call failed for all configured models: ' . implode(' | ', $errors));
-    throw new \Exception('AI call failed for all configured models');
-}
-
-private function getOpenRouterModelCandidates(): array
-{
-    $configuredModel = config('services.openrouter.model', 'deepseek/deepseek-r1-distill-llama-70b');
-    $fallbackModels = config('services.openrouter.fallback_models', []);
-
-    return array_values(array_unique(array_filter([
-        $configuredModel,
-        ...$fallbackModels,
-    ])));
-}
-
-private function trimAiPrompt(string $prompt): string
-{
-    $maxLength = 12000;
-    if (mb_strlen($prompt) <= $maxLength) {
-        return $prompt;
+        Log::error('OpenRouter API call failed for all configured models: '.implode(' | ', $errors));
+        throw new \Exception('AI call failed for all configured models');
     }
 
-    $headLength = 8000;
-    $tailLength = 3500;
+    private function getOpenRouterModelCandidates(): array
+    {
+        $configuredModel = config('services.openrouter.model', 'deepseek/deepseek-r1-distill-llama-70b');
+        $fallbackModels = config('services.openrouter.fallback_models', []);
 
-    return mb_substr($prompt, 0, $headLength)
-        . "\n\n[Prompt shortened to reduce API latency while preserving key analytics context.]\n\n"
-        . mb_substr($prompt, -$tailLength);
-}
+        return array_values(array_unique(array_filter([
+            $configuredModel,
+            ...$fallbackModels,
+        ])));
+    }
+
+    private function trimAiPrompt(string $prompt): string
+    {
+        $maxLength = 12000;
+        if (mb_strlen($prompt) <= $maxLength) {
+            return $prompt;
+        }
+
+        $headLength = 8000;
+        $tailLength = 3500;
+
+        return mb_substr($prompt, 0, $headLength)
+            ."\n\n[Prompt shortened to reduce API latency while preserving key analytics context.]\n\n"
+            .mb_substr($prompt, -$tailLength);
+    }
 
     private function generateAndStoreActionPlanChecklists(int $analysisId, array $analysis, array $rawData): array
     {
@@ -2765,9 +2775,9 @@ private function trimAiPrompt(string $prompt): string
                     'You are a fire safety compliance planner. Return JSON only, with concrete checklist items that BFP can review and confirm.'
                 );
                 $plans = $this->parseActionPlanChecklistResponse($aiResponse);
-                $aiGenerated = !empty($plans);
+                $aiGenerated = ! empty($plans);
             } catch (\Throwable $e) {
-                Log::warning('Action-plan checklist AI generation failed: ' . $e->getMessage(), [
+                Log::warning('Action-plan checklist AI generation failed: '.$e->getMessage(), [
                     'analysis_id' => $analysisId,
                     'exception' => $e,
                 ]);
@@ -2931,7 +2941,7 @@ private function trimAiPrompt(string $prompt): string
             )
             ->count();
 
-        if (!empty($plans) && ($persistedChecklistRows === 0 || $persistedChecklistItems === 0)) {
+        if (! empty($plans) && ($persistedChecklistRows === 0 || $persistedChecklistItems === 0)) {
             throw new \RuntimeException('Checklist rows were generated in memory but were not fully persisted.');
         }
 
@@ -3084,7 +3094,8 @@ private function trimAiPrompt(string $prompt): string
 
         if (! empty($contextParts)) {
             $contextText = implode(' ', $contextParts);
-            return trim($base !== '' ? ($base . ' ' . $contextText) : $contextText);
+
+            return trim($base !== '' ? ($base.' '.$contextText) : $contextText);
         }
 
         return $base !== '' ? $base : null;
@@ -3162,14 +3173,14 @@ private function trimAiPrompt(string $prompt): string
         ];
 
         $context = [
-            "{$barangayName} is assessed at " . strtoupper($riskLevel) . ' fire risk' . ($probability !== null ? " ({$probability}% probability)." : '.'),
-            ! empty($finding['summary']) ? 'Local focus: ' . trim((string) $finding['summary']) . '.' : null,
+            "{$barangayName} is assessed at ".strtoupper($riskLevel).' fire risk'.($probability !== null ? " ({$probability}% probability)." : '.'),
+            ! empty($finding['summary']) ? 'Local focus: '.trim((string) $finding['summary']).'.' : null,
             "Evidence used: {$verifiedRiskCount} verified risk(s), {$verifiedHazardCount} verified hazard(s), {$historicalIncidentCount} historical incident record(s), and {$currentMonthFireCount} completed fire(s) this month.",
         ];
         $driver = collect($prediction['drivers'] ?? [])->first();
         $driverSummary = is_array($driver) ? ($driver['summary'] ?? null) : $driver;
         if (filled($driverSummary)) {
-            $context[] = 'Leading signal: ' . trim((string) $driverSummary) . '.';
+            $context[] = 'Leading signal: '.trim((string) $driverSummary).'.';
         }
         $description = implode(' ', array_filter($context));
 
@@ -3389,6 +3400,7 @@ private function trimAiPrompt(string $prompt): string
             $payload = $this->buildMitigationDraftPayloadFromChecklist($savedPlan);
             if (! $payload) {
                 $skipped++;
+
                 continue;
             }
 
@@ -3448,19 +3460,19 @@ private function trimAiPrompt(string $prompt): string
         $firstSuggestion = $checklist->suggestions->sortByDesc('created_at')->first();
         $steps = collect($firstSuggestion?->steps ?: $checklist->checklist_items ?: [])
             ->filter()
-            ->map(fn ($step) => '- ' . trim((string) $step))
+            ->map(fn ($step) => '- '.trim((string) $step))
             ->values()
             ->all();
         $resources = collect($firstSuggestion?->resources_needed ?: [])
             ->filter()
-            ->map(fn ($resource) => '- ' . trim((string) $resource))
+            ->map(fn ($resource) => '- '.trim((string) $resource))
             ->values()
             ->all();
 
         $descriptionParts = array_filter([
             $checklist->plan_description ?: $checklist->source_description,
-            ! empty($steps) ? "Suggested steps:\n" . implode("\n", $steps) : null,
-            ! empty($resources) ? "Resources needed:\n" . implode("\n", $resources) : null,
+            ! empty($steps) ? "Suggested steps:\n".implode("\n", $steps) : null,
+            ! empty($resources) ? "Resources needed:\n".implode("\n", $resources) : null,
             $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
         ]);
 
@@ -3480,7 +3492,7 @@ private function trimAiPrompt(string $prompt): string
             'completed_at' => null,
             'description' => implode("\n\n", $descriptionParts),
             'remarks' => $firstSuggestion?->estimated_timeline
-                ? 'Auto-generated from AI action-plan checklist. Review before approval. Timeline suggestion: ' . $firstSuggestion->estimated_timeline
+                ? 'Auto-generated from AI action-plan checklist. Review before approval. Timeline suggestion: '.$firstSuggestion->estimated_timeline
                 : 'Auto-generated from AI action-plan checklist. Review before approval.',
             'implementation_notes' => null,
             'completion_notes' => null,
@@ -3569,11 +3581,12 @@ private function trimAiPrompt(string $prompt): string
         $cleaned = preg_replace('/\s*```$/', '', $cleaned) ?? $cleaned;
 
         $decoded = json_decode($cleaned, true);
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             return [];
         }
 
         $plans = $decoded['plans'] ?? null;
+
         return is_array($plans) ? $plans : [];
     }
 
@@ -3631,8 +3644,9 @@ private function trimAiPrompt(string $prompt): string
         foreach ($recommendations as $index => $recommendation) {
             $existingPlan = $plans[$index] ?? null;
 
-            if (is_array($existingPlan) && !empty($existingPlan['plan_title'])) {
+            if (is_array($existingPlan) && ! empty($existingPlan['plan_title'])) {
                 $normalizedPlans[] = $existingPlan;
+
                 continue;
             }
 
@@ -3722,7 +3736,7 @@ private function trimAiPrompt(string $prompt): string
             'recommendations' => $this->buildPersistableRecommendations($analysis['recommendations'] ?? []),
             'predictions' => $analysis['predictions'] ?? null,
             'sector' => $rawData['location_name'] ?? $analysisRow->sector,
-            'period' => 'Last ' . max(1, (int) ($rawData['days_analyzed'] ?? 30)) . ' days',
+            'period' => 'Last '.max(1, (int) ($rawData['days_analyzed'] ?? 30)).' days',
             'risk_level' => $analysis['risk_level'] ?? $analysisRow->risk_level,
             'confidence_data' => isset($analysis['confidence_score']) ? (string) $analysis['confidence_score'] : $analysisRow->confidence_data,
             'incident_count' => (int) ($rawData['total_incidents'] ?? $analysisRow->incident_count ?? 0),
@@ -3748,11 +3762,11 @@ private function trimAiPrompt(string $prompt): string
             })
             ->all();
 
-        if (!empty($rows)) {
+        if (! empty($rows)) {
             AiActionPlanChecklistItem::query()->insert($rows);
         }
     }
-    
+
     /**
      * Structure AI analysis into usable format with proper priority sorting
      */
@@ -3762,48 +3776,50 @@ private function trimAiPrompt(string $prompt): string
         $lines = explode("\n", $aiContent);
         $predictions = $this->extractPredictionData($aiContent, $data);
         $confidenceContext = $this->calculateAnalysisConfidence($data, true);
-        
+
         // Parse AI response for recommendations
         foreach ($lines as $line) {
             $line = trim($line);
-            
+
             // Look for numbered or bullet points
-            if (preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) || 
+            if (preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) ||
                 preg_match('/^[•\-*]\s+(.+)/', $line, $matches)) {
-                
+
                 $content = isset($matches[2]) ? $matches[2] : $matches[1];
-                
+
                 // Determine priority based on content keywords
                 $priority = $this->determinePriority($content, $data);
-                
+
                 $recommendations[] = [
                     'title' => substr($content, 0, 80),
                     'description' => $content,
-                    'priority' => $priority
+                    'priority' => $priority,
                 ];
             }
         }
-        
+
         // Sort recommendations by priority
-        usort($recommendations, function($a, $b) {
+        usort($recommendations, function ($a, $b) {
             $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
             $priorityA = strtolower($a['priority']);
             $priorityB = strtolower($b['priority']);
+
             return ($priorityOrder[$priorityA] ?? 3) - ($priorityOrder[$priorityB] ?? 3);
         });
-        
+
         // If no recommendations parsed, generate data-driven ones
         if (empty($recommendations)) {
             Log::warning('No recommendations parsed from AI, using data-driven');
             $recommendations = $this->generateDataDrivenRecommendations($data);
-            usort($recommendations, function($a, $b) {
+            usort($recommendations, function ($a, $b) {
                 $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
                 $priorityA = strtolower($a['priority']);
                 $priorityB = strtolower($b['priority']);
+
                 return ($priorityOrder[$priorityA] ?? 3) - ($priorityOrder[$priorityB] ?? 3);
             });
         }
-        
+
         return [
             'risk_score' => $data['risk_score'],
             'risk_level' => $data['risk_level'],
@@ -3827,34 +3843,38 @@ private function trimAiPrompt(string $prompt): string
             'prediction_context' => $data['prediction_context'] ?? null,
             'predictions' => $predictions,
             'recommendations' => array_slice($recommendations, 0, 6),
-            'ai_explanation' => substr($aiContent, 0, 500)
+            'ai_explanation' => substr($aiContent, 0, 500),
         ];
     }
-    
+
     /**
      * Determine priority based on content
      */
     private function determinePriority($text, $data)
     {
         $textLower = strtolower($text);
-        
-        if (strpos($textLower, 'critical') !== false || 
+
+        if (strpos($textLower, 'critical') !== false ||
             strpos($textLower, 'emergency') !== false ||
             strpos($textLower, 'immediate') !== false) {
             return 'Critical';
         }
-        
-        if (strpos($textLower, 'high') !== false || 
+
+        if (strpos($textLower, 'high') !== false ||
             strpos($textLower, 'urgent') !== false) {
             return 'High';
         }
-        
-        if ($data['risk_score'] >= 70) return 'High';
-        if ($data['risk_score'] >= 50) return 'Medium';
-        
+
+        if ($data['risk_score'] >= 70) {
+            return 'High';
+        }
+        if ($data['risk_score'] >= 50) {
+            return 'Medium';
+        }
+
         return 'Low';
     }
-    
+
     /**
      * Generate data-driven recommendations
      */
@@ -3890,6 +3910,7 @@ private function trimAiPrompt(string $prompt): string
                     'description' => "Verify and correct {$condition}{$location} in {$barangayName}, with emphasis on unsafe wiring runs, overloaded taps, and exposed connections documented in field findings.",
                     'priority' => $priority,
                 ];
+
                 continue;
             }
 
@@ -3899,6 +3920,7 @@ private function trimAiPrompt(string $prompt): string
                     'description' => "Inspect {$condition}{$location} in {$barangayName}, confirm regulator and hose safety, and remove fire-prone cooking setups near homes or heat sources.",
                     'priority' => $priority,
                 ];
+
                 continue;
             }
 
@@ -3908,6 +3930,7 @@ private function trimAiPrompt(string $prompt): string
                     'description' => "Resolve {$condition}{$location} in {$barangayName}, especially blocked or unavailable hydrant access that can slow suppression during the forecast window.",
                     'priority' => 'High',
                 ];
+
                 continue;
             }
 
@@ -3917,6 +3940,7 @@ private function trimAiPrompt(string $prompt): string
                     'description' => "Prioritize {$condition}{$location} in {$barangayName} and check housing spacing, exit access, and combustible building conditions affecting fire spread.",
                     'priority' => $priority,
                 ];
+
                 continue;
             }
 
@@ -3926,67 +3950,67 @@ private function trimAiPrompt(string $prompt): string
                 'priority' => $priority,
             ];
         }
-        
+
         if ($data['peak_hour']) {
             $peakHourLabel = sprintf('%02d:00', (int) $data['peak_hour']);
             $peakPatrolTarget = $topFindingPlace ?: ($forecastFocusBarangay ?: 'the highest-risk coverage area');
             $recommendations[] = [
                 'title' => "Increase patrol visibility in {$peakPatrolTarget}",
                 'description' => "Deploy added patrol or standby presence around {$peakHourLabel} in {$peakPatrolTarget}, when current incident timing data shows the strongest likelihood of fire activity.",
-                'priority' => 'Medium'
+                'priority' => 'Medium',
             ];
         }
-        
+
         if ($data['fire_incidents'] > 5) {
             $inspectionTarget = $topFindingPlace ?: ($forecastFocusBarangay ?: 'priority barangays under station coverage');
             $inspectionType = $topFindingType ?: 'fire-risk';
             $recommendations[] = [
                 'title' => "Conduct {$inspectionType} inspections in {$inspectionTarget}",
                 'description' => "Schedule focused inspection work in {$inspectionTarget} after {$data['fire_incidents']} recorded fire incidents, with attention to the conditions most often linked to current hotspot forecasts.",
-                'priority' => 'High'
+                'priority' => 'High',
             ];
         }
-        
+
         if ($data['avg_response_time'] && $data['avg_response_time'] > 15) {
             $routeTarget = $topFindingPlace ?: ($forecastFocusBarangay ?: 'the station coverage area');
             $recommendations[] = [
                 'title' => "Optimize access routes toward {$routeTarget}",
                 'description' => "Review responder approach routes toward {$routeTarget} to reduce the current {$data['avg_response_time']}-minute average response time and identify road or access bottlenecks affecting dispatch speed.",
-                'priority' => 'High'
+                'priority' => 'High',
             ];
         }
-        
+
         if ($data['available_personnel'] < $data['total_personnel'] * 0.6) {
             $recommendations[] = [
                 'title' => 'Address personnel availability',
                 'description' => "Only {$data['available_personnel']} of {$data['total_personnel']} personnel available",
-                'priority' => 'Critical'
+                'priority' => 'Critical',
             ];
         }
-        
+
         if ($topFindingCondition || $forecastFocusBarangay) {
             $awarenessTarget = $topFindingPlace ?: ($forecastFocusBarangay ?: 'priority hotspot barangays');
             $awarenessCondition = $topFindingCondition ?: ($topFindingType ?: 'documented fire-risk conditions');
             $recommendations[] = [
                 'title' => "Brief households on {$awarenessCondition} in {$awarenessTarget}",
                 'description' => "Launch a focused prevention briefing in {$awarenessTarget} that explains the exact local fire driver now contributing to the forecast, especially {$awarenessCondition}, instead of using a general awareness campaign.",
-                'priority' => 'Medium'
+                'priority' => 'Medium',
             ];
         }
 
-        if (!empty($data['prediction_context']['likely_peak_hours']) || ($data['avg_response_time'] && $data['avg_response_time'] > 15)) {
+        if (! empty($data['prediction_context']['likely_peak_hours']) || ($data['avg_response_time'] && $data['avg_response_time'] > 15)) {
             $protocolTarget = $forecastFocusBarangay ?: 'priority forecast areas';
             $peakHours = implode(', ', array_slice($data['prediction_context']['likely_peak_hours'] ?? [], 0, 3));
             $protocolSuffix = $peakHours !== '' ? " during likely peak windows ({$peakHours})" : '';
             $recommendations[] = [
                 'title' => "Update dispatch protocol for {$protocolTarget}",
                 'description' => "Refine SOPs, dispatch notes, and pre-arrival guidance for {$protocolTarget}{$protocolSuffix}, using the latest forecast drivers and response performance data.",
-                'priority' => 'Low'
+                'priority' => 'Low',
             ];
         }
-        
+
         $recommendations = collect($recommendations)
-            ->unique(fn ($item) => strtolower(($item['title'] ?? '') . '|' . ($item['description'] ?? '')))
+            ->unique(fn ($item) => strtolower(($item['title'] ?? '').'|'.($item['description'] ?? '')))
             ->values()
             ->all();
 
@@ -3995,7 +4019,7 @@ private function trimAiPrompt(string $prompt): string
 
     private function formatRecommendationFindingPlace($finding): ?string
     {
-        if (!$finding) {
+        if (! $finding) {
             return null;
         }
 
@@ -4011,7 +4035,7 @@ private function trimAiPrompt(string $prompt): string
 
     private function formatRecommendationFindingCondition($finding): ?string
     {
-        if (!$finding) {
+        if (! $finding) {
             return null;
         }
 
@@ -4024,7 +4048,7 @@ private function trimAiPrompt(string $prompt): string
 
     private function formatRecommendationFindingType($finding): ?string
     {
-        if (!$finding) {
+        if (! $finding) {
             return null;
         }
 
@@ -4036,7 +4060,7 @@ private function trimAiPrompt(string $prompt): string
 
         return $type ? Str::lower((string) $type) : null;
     }
-    
+
     /**
      * Generate fallback analysis
      */
@@ -4045,11 +4069,11 @@ private function trimAiPrompt(string $prompt): string
         $recommendations = $this->generateDataDrivenRecommendations($data);
         $predictions = $this->generateDataDrivenPrediction($data);
         $confidenceContext = $this->calculateAnalysisConfidence($data, false);
-        
-        $explanation = "Based on {$data['total_incidents']} incidents over {$data['days_analyzed']} days, " .
-                      "risk level is {$data['risk_level']} with {$data['fire_incidents']} fire incidents. " .
-                      "Peak time: " . ($data['peak_hour'] ? $data['peak_hour'] . ':00' : 'not determined');
-        
+
+        $explanation = "Based on {$data['total_incidents']} incidents over {$data['days_analyzed']} days, ".
+                      "risk level is {$data['risk_level']} with {$data['fire_incidents']} fire incidents. ".
+                      'Peak time: '.($data['peak_hour'] ? $data['peak_hour'].':00' : 'not determined');
+
         return [
             'risk_score' => $data['risk_score'],
             'risk_level' => $data['risk_level'],
@@ -4078,7 +4102,7 @@ private function trimAiPrompt(string $prompt): string
             'predictions' => $predictions,
             'recommendations' => $recommendations,
             'ai_explanation' => $explanation,
-            'ai_source' => false
+            'ai_source' => false,
         ];
     }
 
@@ -4088,19 +4112,21 @@ private function trimAiPrompt(string $prompt): string
         $predictions = $this->extractPredictionData($predictionAiContent, $data);
         $confidenceContext = $this->calculateAnalysisConfidence($data, true);
 
-        usort($recommendations, function($a, $b) {
+        usort($recommendations, function ($a, $b) {
             $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
             $priorityA = strtolower($a['priority']);
             $priorityB = strtolower($b['priority']);
+
             return ($priorityOrder[$priorityA] ?? 3) - ($priorityOrder[$priorityB] ?? 3);
         });
 
         if (empty($recommendations)) {
             $recommendations = $this->generateDataDrivenRecommendations($data);
-            usort($recommendations, function($a, $b) {
+            usort($recommendations, function ($a, $b) {
                 $priorityOrder = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
                 $priorityA = strtolower($a['priority']);
                 $priorityB = strtolower($b['priority']);
+
                 return ($priorityOrder[$priorityA] ?? 3) - ($priorityOrder[$priorityB] ?? 3);
             });
         }
@@ -4132,7 +4158,7 @@ private function trimAiPrompt(string $prompt): string
             'chart_context' => $data['chart_context'] ?? null,
             'predictions' => $predictions,
             'recommendations' => array_slice($recommendations, 0, 6),
-            'ai_explanation' => substr($predictionAiContent, 0, 300) . "\n\n" . substr($recommendationAiContent, 0, 300)
+            'ai_explanation' => substr($predictionAiContent, 0, 300)."\n\n".substr($recommendationAiContent, 0, 300),
         ];
     }
 
@@ -4162,7 +4188,7 @@ private function trimAiPrompt(string $prompt): string
         $coverageRatio = min(1, $predictions->count() / $expectedBarangays);
         $coveragePoints = (int) round($coverageRatio * 12);
         $score += $coveragePoints;
-        $factors[] = $predictions->count() . "/{$expectedBarangays} barangay forecast(s) available (+{$coveragePoints})";
+        $factors[] = $predictions->count()."/{$expectedBarangays} barangay forecast(s) available (+{$coveragePoints})";
 
         $trainedPredictionCount = $predictions->where('prediction_source', 'trained_model')->count();
         if ($trainedPredictionCount > 0) {
@@ -4234,6 +4260,7 @@ private function trimAiPrompt(string $prompt): string
                     'description' => '',
                     'priority' => ucfirst(strtolower($matches[2])),
                 ];
+
                 continue;
             }
 
@@ -4241,10 +4268,11 @@ private function trimAiPrompt(string $prompt): string
                 if ($currentRecommendation) {
                     $currentRecommendation['description'] = trim($matches[1]);
                 }
+
                 continue;
             }
 
-            if ((preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) || preg_match('/^[•\-*]\s+(.+)/', $line, $matches)) && !$currentRecommendation) {
+            if ((preg_match('/^(\d+)[\.\)]\s+(.+)/', $line, $matches) || preg_match('/^[•\-*]\s+(.+)/', $line, $matches)) && ! $currentRecommendation) {
                 $content = isset($matches[2]) ? $matches[2] : $matches[1];
                 $recommendations[] = [
                     'title' => substr($content, 0, 80),
@@ -4261,10 +4289,10 @@ private function trimAiPrompt(string $prompt): string
         }
 
         return array_values(array_filter($recommendations, function ($recommendation) {
-            return !empty($recommendation['title']) && !empty($recommendation['description']);
+            return ! empty($recommendation['title']) && ! empty($recommendation['description']);
         }));
     }
-    
+
     /**
      * Store analysis in database
      */
@@ -4273,18 +4301,19 @@ private function trimAiPrompt(string $prompt): string
         try {
             // Get station ID from raw data
             $stationId = $rawData['station_id'] ?? null;
-            
-            if (!$stationId) {
+
+            if (! $stationId) {
                 Log::warning('No station ID found in raw data, skipping storage');
+
                 return null;
             }
-            
+
             // Get incident count from raw data
             $incidentCount = $rawData['total_incidents'] ?? 0;
-            
+
             // Prepare sector name
             $sectorName = $rawData['location_name'];
-            
+
             $normalizedBarangayId = $this->scopeBarangayIdFromRawData($rawData);
 
             // Prepare analysis_data JSON
@@ -4319,11 +4348,11 @@ private function trimAiPrompt(string $prompt): string
                 ],
                 'ai_analysis' => $analysis['ai_explanation'] ?? null,
                 'generated_at' => now()->toISOString(),
-                'ai_source' => $analysis['ai_source'] ?? false
+                'ai_source' => $analysis['ai_source'] ?? false,
             ];
 
             $analysisDataJson = json_encode($analysisPayload);
-            
+
             // Prepare recommendations JSON
             $recommendationsJson = json_encode($this->buildPersistableRecommendations($analysis['recommendations'] ?? []));
 
@@ -4389,7 +4418,7 @@ private function trimAiPrompt(string $prompt): string
                 $payload['created_at'] = now();
                 $analysisId = DB::table('analysis')->insertGetId($payload, 'analysis_id');
             }
-            
+
             Log::info('Analysis stored successfully', [
                 'analysis_id' => $analysisId,
                 'station_id' => $stationId,
@@ -4399,16 +4428,17 @@ private function trimAiPrompt(string $prompt): string
                 'overwrote_existing_scope' => (bool) $existingAnalysis,
                 'revision_number' => $nextRevision,
             ]);
-            
+
             return $analysisId;
-            
+
         } catch (\Exception $e) {
-            Log::error('Failed to store analysis: ' . $e->getMessage());
+            Log::error('Failed to store analysis: '.$e->getMessage());
+
             // Don't throw, just log
             return null;
         }
     }
-    
+
     /**
      * Get historical analyses from database
      */
@@ -4417,14 +4447,14 @@ private function trimAiPrompt(string $prompt): string
         try {
             $user = Auth::user();
             $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-            
-            if (!$stationOfficer) {
+
+            if (! $stationOfficer) {
                 return response()->json([
                     'success' => true,
-                    'data' => []
+                    'data' => [],
                 ]);
             }
-            
+
             $requestedScope = $this->scopeSignatureFromRequest($request);
 
             $analyses = Analysis::query()
@@ -4471,18 +4501,19 @@ private function trimAiPrompt(string $prompt): string
 
                 return $analysis;
             })->values();
-            
+
             return response()->json([
                 'success' => true,
-                'data' => $analyses
+                'data' => $analyses,
             ]);
-            
+
         } catch (\Exception $e) {
-            Log::error('Error fetching historical analyses: ' . $e->getMessage());
+            Log::error('Error fetching historical analyses: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'data' => [],
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ]);
         }
     }
@@ -4493,7 +4524,7 @@ private function trimAiPrompt(string $prompt): string
             $user = Auth::user();
             $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
 
-            if (!$stationOfficer) {
+            if (! $stationOfficer) {
                 return response()->json([
                     'success' => true,
                     'data' => null,
@@ -4508,17 +4539,17 @@ private function trimAiPrompt(string $prompt): string
                 ->get();
 
             $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($requestedScope, $stationOfficer) {
-                    $candidateData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
-                    $candidateRaw = $candidateData['raw_data'] ?? [];
-                    $candidate = $this->scopeSignatureFromRawData($candidateRaw);
+                $candidateData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+                $candidateRaw = $candidateData['raw_data'] ?? [];
+                $candidate = $this->scopeSignatureFromRawData($candidateRaw);
 
-                    return (int) ($analysis->station_id ?? 0) === (int) $stationOfficer->station_id
-                        && $candidate['prediction_scope'] === $requestedScope['prediction_scope']
-                        && $candidate['barangay_id'] === $requestedScope['barangay_id']
-                        && $candidate['target_month_label'] === $requestedScope['target_month_label'];
-                });
+                return (int) ($analysis->station_id ?? 0) === (int) $stationOfficer->station_id
+                    && $candidate['prediction_scope'] === $requestedScope['prediction_scope']
+                    && $candidate['barangay_id'] === $requestedScope['barangay_id']
+                    && $candidate['target_month_label'] === $requestedScope['target_month_label'];
+            });
 
-            if (!$latestAnalysis) {
+            if (! $latestAnalysis) {
                 return response()->json([
                     'success' => true,
                     'data' => null,
@@ -4536,14 +4567,14 @@ private function trimAiPrompt(string $prompt): string
                 $predictionLabel = $predictionContext['target_period_label'] ?? null;
                 $barangayPredictions = $rawData['barangay_predictions'] ?? [];
 
-                if (!is_array($barangayPredictions)) {
+                if (! is_array($barangayPredictions)) {
                     continue;
                 }
 
                 foreach ($barangayPredictions as $prediction) {
                     $barangayId = (int) ($prediction['barangay_id'] ?? 0);
 
-                    if (!$barangayId || isset($latestPerBarangay[$barangayId])) {
+                    if (! $barangayId || isset($latestPerBarangay[$barangayId])) {
                         continue;
                     }
 
@@ -4644,7 +4675,7 @@ private function trimAiPrompt(string $prompt): string
                 'location_name' => $locationName,
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error fetching latest analysis snapshot: ' . $e->getMessage());
+            Log::error('Error fetching latest analysis snapshot: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -4683,7 +4714,7 @@ private function trimAiPrompt(string $prompt): string
                 'data' => collect([$current])->concat($history)->values(),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Unable to load analysis revision history: ' . $e->getMessage());
+            Log::error('Unable to load analysis revision history: '.$e->getMessage());
 
             return response()->json(['success' => false, 'message' => $e->getMessage()], 404);
         }
@@ -4769,9 +4800,9 @@ private function trimAiPrompt(string $prompt): string
                 'data' => ['analysis_id' => $restored->analysis_id, 'analysis_revision' => $nextRevision],
             ]);
         } catch (\Throwable $e) {
-            Log::error('Analysis revision rollback failed: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('Analysis revision rollback failed: '.$e->getMessage(), ['exception' => $e]);
 
-            return response()->json(['success' => false, 'message' => 'Revision rollback failed: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Revision rollback failed: '.$e->getMessage()], 500);
         }
     }
 
@@ -4895,7 +4926,7 @@ private function trimAiPrompt(string $prompt): string
                     $payload['linked_mitigation_url'] = $payload['linked_mitigation_id']
                         ? route('station-admin.mitigations', [
                             'mitigation_action_id' => $payload['linked_mitigation_id'],
-                        ]) . '#mitigation-row-' . $payload['linked_mitigation_id']
+                        ]).'#mitigation-row-'.$payload['linked_mitigation_id']
                         : null;
                     $payload['mitigation_draft_url'] = $payload['linked_mitigation_id']
                         ? null
@@ -4909,14 +4940,14 @@ private function trimAiPrompt(string $prompt): string
                         'mitigation' => 'Mitigation Action Plan',
                     ];
                     $payload['effectiveness_hint'] = $payload['linked_mitigation_count'] > 0
-                        ? $payload['linked_mitigation_count'] . ' mitigation action(s) already linked to this checklist.'
+                        ? $payload['linked_mitigation_count'].' mitigation action(s) already linked to this checklist.'
                         : 'No mitigation action linked yet. Convert this checklist into an operational mitigation draft next.';
 
                     return $payload;
                 })->values(),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error fetching action plan checklists: ' . $e->getMessage());
+            Log::error('Error fetching action plan checklists: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -4948,7 +4979,7 @@ private function trimAiPrompt(string $prompt): string
                 'data' => $query->get(),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error fetching recommendation suggestions: ' . $e->getMessage());
+            Log::error('Error fetching recommendation suggestions: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -4988,7 +5019,7 @@ private function trimAiPrompt(string $prompt): string
                 'data' => $checklist->fresh(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer']),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error confirming action plan checklist: ' . $e->getMessage());
+            Log::error('Error confirming action plan checklist: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -5017,7 +5048,7 @@ private function trimAiPrompt(string $prompt): string
                 ->where('ai_action_plan_checklist_item_id', $validated['item_id'])
                 ->first();
 
-            if (!$item) {
+            if (! $item) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Checklist item not found.',
@@ -5068,7 +5099,7 @@ private function trimAiPrompt(string $prompt): string
                 'data' => $checklist->fresh(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer']),
             ]);
         } catch (\Throwable $e) {
-            Log::error('Error updating checklist item review: ' . $e->getMessage());
+            Log::error('Error updating checklist item review: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -5103,7 +5134,7 @@ private function trimAiPrompt(string $prompt): string
         }
 
         $fallback = collect([[
-            'id' => 'created-' . $checklist->ai_action_plan_checklist_id,
+            'id' => 'created-'.$checklist->ai_action_plan_checklist_id,
             'event_type' => 'created',
             'label' => 'Checklist created',
             'actor' => 'AI forecast workflow',
@@ -5112,19 +5143,19 @@ private function trimAiPrompt(string $prompt): string
             'notes' => $checklist->source_title,
             'created_at' => optional($checklist->created_at)?->toIso8601String(),
         ]])->concat($checklist->items->filter->reviewed_at->map(fn ($item) => [
-            'id' => 'item-' . $item->ai_action_plan_checklist_item_id,
+            'id' => 'item-'.$item->ai_action_plan_checklist_item_id,
             'event_type' => 'step_reviewed',
-            'label' => 'Step ' . $item->item_order . ' marked ' . str_replace('_', ' ', $item->status),
-            'actor' => trim(($item->reviewer?->first_name ?? '') . ' ' . ($item->reviewer?->last_name ?? '')) ?: 'Station reviewer',
+            'label' => 'Step '.$item->item_order.' marked '.str_replace('_', ' ', $item->status),
+            'actor' => trim(($item->reviewer?->first_name ?? '').' '.($item->reviewer?->last_name ?? '')) ?: 'Station reviewer',
             'old_value' => null,
             'new_value' => $item->status,
             'notes' => $item->review_notes ?: $item->item_text,
             'created_at' => optional($item->reviewed_at)?->toIso8601String(),
         ]))->when($checklist->confirmed_at, fn ($events) => $events->push([
-            'id' => 'review-' . $checklist->ai_action_plan_checklist_id,
+            'id' => 'review-'.$checklist->ai_action_plan_checklist_id,
             'event_type' => 'status_changed',
-            'label' => 'Checklist marked ' . str_replace('_', ' ', $checklist->status),
-            'actor' => trim(($checklist->confirmer?->first_name ?? '') . ' ' . ($checklist->confirmer?->last_name ?? '')) ?: 'Station reviewer',
+            'label' => 'Checklist marked '.str_replace('_', ' ', $checklist->status),
+            'actor' => trim(($checklist->confirmer?->first_name ?? '').' '.($checklist->confirmer?->last_name ?? '')) ?: 'Station reviewer',
             'old_value' => null,
             'new_value' => $checklist->status,
             'notes' => $checklist->confirmation_notes,
@@ -5132,6 +5163,7 @@ private function trimAiPrompt(string $prompt): string
         ]))->sortByDesc('created_at')->values();
 
         $page = max(1, $request->integer('page', 1));
+
         return response()->json([
             'success' => true,
             'data' => $fallback->forPage($page, $perPage)->values(),
@@ -5182,6 +5214,7 @@ private function trimAiPrompt(string $prompt): string
         });
 
         UserActivityLogger::log('bulk updated AI checklists', Auth::id(), $request);
+
         return response()->json(['success' => true, 'updated' => $checklists->count()]);
     }
 
@@ -5197,7 +5230,9 @@ private function trimAiPrompt(string $prompt): string
 
     private function recordChecklistActivity(AiActionPlanChecklist $checklist, string $eventType, ?string $oldValue, ?string $newValue, ?string $notes = null, ?int $itemId = null, array $metadata = []): void
     {
-        if (! Schema::hasTable('ai_action_plan_checklist_activities')) return;
+        if (! Schema::hasTable('ai_action_plan_checklist_activities')) {
+            return;
+        }
 
         if (! AiActionPlanChecklistActivity::where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)->exists()) {
             AiActionPlanChecklistActivity::create([
@@ -5256,181 +5291,182 @@ private function trimAiPrompt(string $prompt): string
             'assignment_changed' => 'Checklist assignment changed',
         ];
         if ($event->event_type === 'step_reviewed' && data_get($event->metadata, 'item_order')) {
-            $labels['step_reviewed'] = 'Step ' . data_get($event->metadata, 'item_order') . ' reviewed';
+            $labels['step_reviewed'] = 'Step '.data_get($event->metadata, 'item_order').' reviewed';
         }
 
         return [
             'id' => $event->ai_action_plan_checklist_activity_id,
             'event_type' => $event->event_type,
             'label' => $labels[$event->event_type] ?? ucfirst(str_replace('_', ' ', $event->event_type)),
-            'actor' => trim(($event->user?->first_name ?? '') . ' ' . ($event->user?->last_name ?? '')) ?: 'System',
+            'actor' => trim(($event->user?->first_name ?? '').' '.($event->user?->last_name ?? '')) ?: 'System',
             'old_value' => $event->old_value,
             'new_value' => $event->new_value,
             'notes' => $event->notes,
             'created_at' => optional($event->created_at)?->toIso8601String(),
         ];
     }
-    
+
     /**
      * Get a specific analysis by ID
      */
     public function getAnalysis($id)
     {
         try {
-              $analysis = DB::table('analysis')
-                  ->where('analysis_id', $id)
-                  ->first();
-            
-            if (!$analysis) {
+            $analysis = DB::table('analysis')
+                ->where('analysis_id', $id)
+                ->first();
+
+            if (! $analysis) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Analysis not found'
+                    'message' => 'Analysis not found',
                 ], 404);
             }
-            
-              // Decode JSON fields
-              $analysis->analysis_data = json_decode($analysis->analysis_data, true);
-              $analysis->recommendations = json_decode($analysis->recommendations, true);
-              $analysis->predictions = json_decode($analysis->predictions, true);
-              $analysis->confidence_score = is_numeric($analysis->confidence_data)
-                  ? (int) $analysis->confidence_data
-                  : $analysis->confidence_data;
-            
+
+            // Decode JSON fields
+            $analysis->analysis_data = json_decode($analysis->analysis_data, true);
+            $analysis->recommendations = json_decode($analysis->recommendations, true);
+            $analysis->predictions = json_decode($analysis->predictions, true);
+            $analysis->confidence_score = is_numeric($analysis->confidence_data)
+                ? (int) $analysis->confidence_data
+                : $analysis->confidence_data;
+
             return response()->json([
                 'success' => true,
-                'data' => $analysis
+                'data' => $analysis,
             ]);
-            
+
         } catch (\Exception $e) {
-            Log::error('Error fetching analysis: ' . $e->getMessage());
+            Log::error('Error fetching analysis: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
- * Explore a recommendation in detail using AI
- */
-// public function exploreRecommendation(Request $request)
-// {
-//     try {
-//         $recommendationTitle = $request->input('recommendation_title');
-//         $recommendationDescription = $request->input('recommendation_description');
-//         $priority = $request->input('priority', 'Medium');
-        
-//         Log::info('Explore recommendation called', [
-//             'title' => $recommendationTitle,
-//             'priority' => $priority
-//         ]);
-        
-//         $prompt = "You are a fire safety implementation expert. Provide a detailed implementation plan for this recommendation:\n\n";
-//         $prompt .= "RECOMMENDATION: {$recommendationTitle}\n";
-//         $prompt .= "DESCRIPTION: {$recommendationDescription}\n";
-//         $prompt .= "PRIORITY: {$priority}\n\n";
-//         $prompt .= "Please provide:\n";
-//         $prompt .= "1. 5-7 specific actionable steps to implement this recommendation (numbered list)\n";
-//         $prompt .= "2. Resources needed (as a bullet list)\n";
-//         $prompt .= "3. Estimated timeline for implementation\n\n";
-        
-//         try {
-//             $response = Http::withHeaders([
-//                 'Authorization' => 'Bearer ' . $this->apiKey,
-//                 'Content-Type' => 'application/json',
-//             ])->timeout(60)->post('https://openrouter.ai/api/v1/chat/completions', [
-//                 'model' => 'openai/gpt-3.5-turbo',
-//                 'messages' => [
-//                     ['role' => 'system', 'content' => 'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'],
-//                     ['role' => 'user', 'content' => $prompt]
-//                 ],
-//                 'temperature' => 0.5,
-//                 'max_tokens' => 1000
-//             ]);
-            
-//             if ($response->successful()) {
-//                 $json = $response->json();
-//                 $content = $json['choices'][0]['message']['content'] ?? '';
-                
-//                 // Parse the response
-//                 $parsedData = $this->parseExploreResponse($content);
-                
-//                 return response()->json([
-//                     'success' => true,
-//                     'data' => $parsedData
-//                 ]);
-//             } else {
-//                 throw new \Exception('AI API call failed: ' . $response->status());
-//             }
-            
-//         } catch (\Exception $aiError) {
-//             Log::warning('AI API failed for explore, using fallback: ' . $aiError->getMessage());
-            
-//             // Return fallback data
-//             return response()->json([
-//                 'success' => true,
-//                 'data' => $this->getFallbackExploreData($recommendationTitle, $priority)
-//             ]);
-//         }
-        
-//     } catch (\Exception $e) {
-//         Log::error('Explore recommendation error: ' . $e->getMessage());
-        
-//         return response()->json([
-//             'success' => true,
-//             'data' => $this->getFallbackExploreData($request->input('recommendation_title', 'this recommendation'), $request->input('priority', 'Medium'))
-//         ]);
-//     }
-// }
-/**
- * Explore a recommendation in detail using AI
- */
+     * Explore a recommendation in detail using AI
+     */
+    // public function exploreRecommendation(Request $request)
+    // {
+    //     try {
+    //         $recommendationTitle = $request->input('recommendation_title');
+    //         $recommendationDescription = $request->input('recommendation_description');
+    //         $priority = $request->input('priority', 'Medium');
+
+    //         Log::info('Explore recommendation called', [
+    //             'title' => $recommendationTitle,
+    //             'priority' => $priority
+    //         ]);
+
+    //         $prompt = "You are a fire safety implementation expert. Provide a detailed implementation plan for this recommendation:\n\n";
+    //         $prompt .= "RECOMMENDATION: {$recommendationTitle}\n";
+    //         $prompt .= "DESCRIPTION: {$recommendationDescription}\n";
+    //         $prompt .= "PRIORITY: {$priority}\n\n";
+    //         $prompt .= "Please provide:\n";
+    //         $prompt .= "1. 5-7 specific actionable steps to implement this recommendation (numbered list)\n";
+    //         $prompt .= "2. Resources needed (as a bullet list)\n";
+    //         $prompt .= "3. Estimated timeline for implementation\n\n";
+
+    //         try {
+    //             $response = Http::withHeaders([
+    //                 'Authorization' => 'Bearer ' . $this->apiKey,
+    //                 'Content-Type' => 'application/json',
+    //             ])->timeout(60)->post('https://openrouter.ai/api/v1/chat/completions', [
+    //                 'model' => 'openai/gpt-3.5-turbo',
+    //                 'messages' => [
+    //                     ['role' => 'system', 'content' => 'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'],
+    //                     ['role' => 'user', 'content' => $prompt]
+    //                 ],
+    //                 'temperature' => 0.5,
+    //                 'max_tokens' => 1000
+    //             ]);
+
+    //             if ($response->successful()) {
+    //                 $json = $response->json();
+    //                 $content = $json['choices'][0]['message']['content'] ?? '';
+
+    //                 // Parse the response
+    //                 $parsedData = $this->parseExploreResponse($content);
+
+    //                 return response()->json([
+    //                     'success' => true,
+    //                     'data' => $parsedData
+    //                 ]);
+    //             } else {
+    //                 throw new \Exception('AI API call failed: ' . $response->status());
+    //             }
+
+    //         } catch (\Exception $aiError) {
+    //             Log::warning('AI API failed for explore, using fallback: ' . $aiError->getMessage());
+
+    //             // Return fallback data
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'data' => $this->getFallbackExploreData($recommendationTitle, $priority)
+    //             ]);
+    //         }
+
+    //     } catch (\Exception $e) {
+    //         Log::error('Explore recommendation error: ' . $e->getMessage());
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $this->getFallbackExploreData($request->input('recommendation_title', 'this recommendation'), $request->input('priority', 'Medium'))
+    //         ]);
+    //     }
+    // }
+    /**
+     * Explore a recommendation in detail using AI
+     */
     public function exploreRecommendation(Request $request)
-{
-    $recommendationTitle = $this->normalizeRecommendationTitle($request->input('recommendation_title'));
-    $recommendationDescription = $request->input('recommendation_description');
-    $priority = $request->input('priority', 'Medium') ?: 'Medium';
-    $analysisId = $request->input('analysis_id');
-    $actionPlanChecklistId = $request->input('action_plan_checklist_id');
+    {
+        $recommendationTitle = $this->normalizeRecommendationTitle($request->input('recommendation_title'));
+        $recommendationDescription = $request->input('recommendation_description');
+        $priority = $request->input('priority', 'Medium') ?: 'Medium';
+        $analysisId = $request->input('analysis_id');
+        $actionPlanChecklistId = $request->input('action_plan_checklist_id');
 
-    try {
-        Log::info('=== EXPLORE RECOMMENDATION START ===');
-        Log::info('Title: ' . $recommendationTitle);
-        
-        if (!$this->apiKey) {
-            Log::error('No API key available for explore');
-            throw new \Exception('API key not configured');
-        }
-        
-        $analysis = $analysisId ? Analysis::query()->find($analysisId) : null;
-        $actionPlanChecklist = $actionPlanChecklistId
-            ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
-            : null;
+        try {
+            Log::info('=== EXPLORE RECOMMENDATION START ===');
+            Log::info('Title: '.$recommendationTitle);
 
-        $existingSuggestion = $this->findExistingRecommendationSuggestion(
-            $analysis,
-            $actionPlanChecklist,
-            $recommendationTitle,
-            $recommendationDescription,
-            $priority
-        );
+            if (! $this->apiKey) {
+                Log::error('No API key available for explore');
+                throw new \Exception('API key not configured');
+            }
 
-        if ($existingSuggestion) {
-            return response()->json([
-                'success' => true,
-                'data' => $this->formatStoredRecommendationSuggestion($existingSuggestion),
-                'source' => 'saved_suggestion',
-                'model_used' => null,
-                'saved_suggestion_id' => $existingSuggestion->ai_recommendation_suggestion_id,
-                'note' => 'Showing the previously generated implementation plan for this recommendation.',
+            $analysis = $analysisId ? Analysis::query()->find($analysisId) : null;
+            $actionPlanChecklist = $actionPlanChecklistId
+                ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
+                : null;
+
+            $existingSuggestion = $this->findExistingRecommendationSuggestion(
+                $analysis,
+                $actionPlanChecklist,
+                $recommendationTitle,
+                $recommendationDescription,
+                $priority
+            );
+
+            if ($existingSuggestion) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $this->formatStoredRecommendationSuggestion($existingSuggestion),
+                    'source' => 'saved_suggestion',
+                    'model_used' => null,
+                    'saved_suggestion_id' => $existingSuggestion->ai_recommendation_suggestion_id,
+                    'note' => 'Showing the previously generated implementation plan for this recommendation.',
+                ]);
+            }
+
+            $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
+                'recommendation_title' => $recommendationTitle,
+                'recommendation_description' => $recommendationDescription,
+                'priority' => $priority,
             ]);
-        }
-
-        $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
-            'recommendation_title' => $recommendationTitle,
-            'recommendation_description' => $recommendationDescription,
-            'priority' => $priority,
-        ]);
 
             $contextualFallback = $this->getFallbackExploreData(
                 $recommendationTitle,
@@ -5444,91 +5480,91 @@ private function trimAiPrompt(string $prompt): string
             $prompt .= "DESCRIPTION: {$recommendationDescription}\n";
             $prompt .= "PRIORITY: {$priority}\n\n";
             $prompt .= "GROUNDING CONTEXT:\n";
-            $prompt .= json_encode($contextPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n";
-        $prompt .= "Answer these three planning questions clearly: How will it be done, who will do it, and when will it be done.\n\n";
-        $prompt .= "Provide EXACTLY this format:\n\n";
-        $prompt .= "HOW: [Short execution approach tied to the actual area and condition]\n";
-        $prompt .= "WHO: [Specific responsible team or person]\n";
-        $prompt .= "WHEN: [Specific schedule or timing]\n\n";
-        $prompt .= "STEPS:\n";
-        $prompt .= "1. [First actionable step]\n";
-        $prompt .= "2. [Second actionable step]\n";
-        $prompt .= "3. [Third actionable step]\n";
-        $prompt .= "4. [Fourth actionable step]\n";
-        $prompt .= "5. [Fifth actionable step]\n\n";
-        $prompt .= "RESOURCES NEEDED:\n";
-        $prompt .= "- [Resource 1]\n";
-        $prompt .= "- [Resource 2]\n";
-        $prompt .= "- [Resource 3]\n\n";
-        $prompt .= "TIMELINE: [Estimated timeline]";
-        
-        Log::info('Calling AI API for explore, prompt length: ' . strlen($prompt));
-        $content = $this->callAIApi(
-            $prompt,
-            'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'
-        );
-        $exploreAiModel = $this->lastAiModelUsed;
-        Log::info('AI Response received, length: ' . strlen($content));
-        
-        $parsedData = $this->parseExploreResponse($content, $contextualFallback);
-        $savedSuggestion = $this->storeRecommendationSuggestion(
-            $analysis,
-            $actionPlanChecklist,
-            $recommendationTitle,
-            $recommendationDescription,
-            $priority,
-            $contextPayload,
-            $parsedData,
-            $content
-        );
-        
-        return response()->json([
-            'success' => true,
-            'data' => $parsedData,
-            'source' => 'ai_api',
-            'model_used' => $exploreAiModel,
-            'saved_suggestion_id' => $savedSuggestion?->ai_recommendation_suggestion_id,
-        ]);
-        
-    } catch (\Exception $e) {
-        Log::error('AI API failed, using fallback: ' . $e->getMessage());
+            $prompt .= json_encode($contextPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n\n";
+            $prompt .= "Answer these three planning questions clearly: How will it be done, who will do it, and when will it be done.\n\n";
+            $prompt .= "Provide EXACTLY this format:\n\n";
+            $prompt .= "HOW: [Short execution approach tied to the actual area and condition]\n";
+            $prompt .= "WHO: [Specific responsible team or person]\n";
+            $prompt .= "WHEN: [Specific schedule or timing]\n\n";
+            $prompt .= "STEPS:\n";
+            $prompt .= "1. [First actionable step]\n";
+            $prompt .= "2. [Second actionable step]\n";
+            $prompt .= "3. [Third actionable step]\n";
+            $prompt .= "4. [Fourth actionable step]\n";
+            $prompt .= "5. [Fifth actionable step]\n\n";
+            $prompt .= "RESOURCES NEEDED:\n";
+            $prompt .= "- [Resource 1]\n";
+            $prompt .= "- [Resource 2]\n";
+            $prompt .= "- [Resource 3]\n\n";
+            $prompt .= 'TIMELINE: [Estimated timeline]';
 
-        $analysis = $analysisId ? Analysis::query()->find($analysisId) : null;
-        $actionPlanChecklist = $actionPlanChecklistId
-            ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
-            : null;
-        $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
-            'recommendation_title' => $recommendationTitle,
-            'recommendation_description' => $recommendationDescription,
-            'priority' => $priority,
-        ]);
-          $fallbackData = $this->getFallbackExploreData(
-              $recommendationTitle,
-              $priority,
-              $recommendationDescription,
-              $contextPayload
-          );
-        $savedSuggestion = $this->storeRecommendationSuggestion(
-            $analysis,
-            $actionPlanChecklist,
-            $recommendationTitle,
-            $recommendationDescription,
-            $priority,
-            $contextPayload,
-            $fallbackData,
-            'fallback_response'
-        );
+            Log::info('Calling AI API for explore, prompt length: '.strlen($prompt));
+            $content = $this->callAIApi(
+                $prompt,
+                'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'
+            );
+            $exploreAiModel = $this->lastAiModelUsed;
+            Log::info('AI Response received, length: '.strlen($content));
 
-        return response()->json([
-            'success' => true,
-            'data' => $fallbackData,
-            'source' => 'fallback',
-            'model_used' => null,
-            'note' => 'AI service temporarily unavailable, using standard recommendations',
-            'saved_suggestion_id' => $savedSuggestion?->ai_recommendation_suggestion_id,
-        ]);
+            $parsedData = $this->parseExploreResponse($content, $contextualFallback);
+            $savedSuggestion = $this->storeRecommendationSuggestion(
+                $analysis,
+                $actionPlanChecklist,
+                $recommendationTitle,
+                $recommendationDescription,
+                $priority,
+                $contextPayload,
+                $parsedData,
+                $content
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $parsedData,
+                'source' => 'ai_api',
+                'model_used' => $exploreAiModel,
+                'saved_suggestion_id' => $savedSuggestion?->ai_recommendation_suggestion_id,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('AI API failed, using fallback: '.$e->getMessage());
+
+            $analysis = $analysisId ? Analysis::query()->find($analysisId) : null;
+            $actionPlanChecklist = $actionPlanChecklistId
+                ? AiActionPlanChecklist::query()->find($actionPlanChecklistId)
+                : null;
+            $contextPayload = $this->buildExploreRecommendationContext($analysis, $actionPlanChecklist, [
+                'recommendation_title' => $recommendationTitle,
+                'recommendation_description' => $recommendationDescription,
+                'priority' => $priority,
+            ]);
+            $fallbackData = $this->getFallbackExploreData(
+                $recommendationTitle,
+                $priority,
+                $recommendationDescription,
+                $contextPayload
+            );
+            $savedSuggestion = $this->storeRecommendationSuggestion(
+                $analysis,
+                $actionPlanChecklist,
+                $recommendationTitle,
+                $recommendationDescription,
+                $priority,
+                $contextPayload,
+                $fallbackData,
+                'fallback_response'
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $fallbackData,
+                'source' => 'fallback',
+                'model_used' => null,
+                'note' => 'AI service temporarily unavailable, using standard recommendations',
+                'saved_suggestion_id' => $savedSuggestion?->ai_recommendation_suggestion_id,
+            ]);
+        }
     }
-}
 
     private function normalizeRecommendationTitle($title): string
     {
@@ -5597,7 +5633,8 @@ private function trimAiPrompt(string $prompt): string
                 'is_ai_generated' => $isAiGenerated,
             ]);
         } catch (\Throwable $e) {
-            Log::warning('Failed to store AI recommendation suggestion: ' . $e->getMessage());
+            Log::warning('Failed to store AI recommendation suggestion: '.$e->getMessage());
+
             return null;
         }
     }
@@ -5649,7 +5686,7 @@ private function trimAiPrompt(string $prompt): string
     {
         $apiKey = env('WEATHER_API_KEY', '1432615e15a14140963113518261203');
 
-        if (!$apiKey || !$station) {
+        if (! $apiKey || ! $station) {
             return null;
         }
 
@@ -5665,11 +5702,12 @@ private function trimAiPrompt(string $prompt): string
                 'alerts' => 'no',
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::warning('Weather forecast request failed for analytics', [
                     'status' => $response->status(),
                     'location' => $locationQuery,
                 ]);
+
                 return null;
             }
 
@@ -5678,13 +5716,13 @@ private function trimAiPrompt(string $prompt): string
             $current = $payload['current'] ?? [];
 
             $dayCount = count($forecastDaysData);
-            $avgTemp = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn($day) => $day['day']['avgtemp_c'] ?? null), 1) : ($current['temp_c'] ?? null);
-            $avgHumidity = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn($day) => $day['day']['avghumidity'] ?? null)) : ($current['humidity'] ?? null);
-            $avgWind = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn($day) => $day['day']['maxwind_kph'] ?? null), 1) : ($current['wind_kph'] ?? null);
-            $rainyDays = collect($forecastDaysData)->filter(fn($day) => ($day['day']['daily_chance_of_rain'] ?? 0) >= 50 || ($day['day']['totalprecip_mm'] ?? 0) > 0)->count();
-            $hotDays = collect($forecastDaysData)->filter(fn($day) => ($day['day']['maxtemp_c'] ?? 0) >= 32)->count();
+            $avgTemp = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['avgtemp_c'] ?? null), 1) : ($current['temp_c'] ?? null);
+            $avgHumidity = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['avghumidity'] ?? null)) : ($current['humidity'] ?? null);
+            $avgWind = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['maxwind_kph'] ?? null), 1) : ($current['wind_kph'] ?? null);
+            $rainyDays = collect($forecastDaysData)->filter(fn ($day) => ($day['day']['daily_chance_of_rain'] ?? 0) >= 50 || ($day['day']['totalprecip_mm'] ?? 0) > 0)->count();
+            $hotDays = collect($forecastDaysData)->filter(fn ($day) => ($day['day']['maxtemp_c'] ?? 0) >= 32)->count();
             $dominantCondition = collect($forecastDaysData)
-                ->map(fn($day) => $day['day']['condition']['text'] ?? null)
+                ->map(fn ($day) => $day['day']['condition']['text'] ?? null)
                 ->filter()
                 ->countBy()
                 ->sortDesc()
@@ -5692,10 +5730,18 @@ private function trimAiPrompt(string $prompt): string
                 ->first() ?? ($current['condition']['text'] ?? 'Unknown');
 
             $weatherRiskScore = 0;
-            if (($avgTemp ?? 0) >= 31) $weatherRiskScore += 2;
-            if (($avgHumidity ?? 100) <= 55) $weatherRiskScore += 2;
-            if (($avgWind ?? 0) >= 20) $weatherRiskScore += 1;
-            if ($rainyDays === 0 && $dayCount > 0) $weatherRiskScore += 1;
+            if (($avgTemp ?? 0) >= 31) {
+                $weatherRiskScore += 2;
+            }
+            if (($avgHumidity ?? 100) <= 55) {
+                $weatherRiskScore += 2;
+            }
+            if (($avgWind ?? 0) >= 20) {
+                $weatherRiskScore += 1;
+            }
+            if ($rainyDays === 0 && $dayCount > 0) {
+                $weatherRiskScore += 1;
+            }
 
             $weatherRiskLabel = 'Low';
             if ($weatherRiskScore >= 5) {
@@ -5706,7 +5752,7 @@ private function trimAiPrompt(string $prompt): string
 
             return [
                 'query_location' => $locationQuery,
-                'coverage' => 'Current month context using available ' . max($dayCount, 1) . '-day weather sample',
+                'coverage' => 'Current month context using available '.max($dayCount, 1).'-day weather sample',
                 'avg_temp_c' => $avgTemp,
                 'avg_humidity' => $avgHumidity,
                 'avg_wind_kph' => $avgWind,
@@ -5718,7 +5764,8 @@ private function trimAiPrompt(string $prompt): string
                 'summary' => $this->buildWeatherSummary($avgTemp, $avgHumidity, $avgWind, $rainyDays, $hotDays, $dominantCondition, $weatherRiskLabel),
             ];
         } catch (\Throwable $e) {
-            Log::warning('Failed to fetch weather context for analytics: ' . $e->getMessage());
+            Log::warning('Failed to fetch weather context for analytics: '.$e->getMessage());
+
             return null;
         }
     }
@@ -5726,7 +5773,7 @@ private function trimAiPrompt(string $prompt): string
     private function resolveWeatherLocationQuery($station, $fallbackLocationName)
     {
         $cityName = null;
-        if (!empty($station->address_id)) {
+        if (! empty($station->address_id)) {
             $address = DB::table('full_addresses')
                 ->leftJoin('barangays', 'full_addresses.barangay_id', '=', 'barangays.barangay_id')
                 ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
@@ -5738,17 +5785,17 @@ private function trimAiPrompt(string $prompt): string
         }
 
         if ($cityName) {
-            return $cityName . ', Pangasinan, Philippines';
+            return $cityName.', Pangasinan, Philippines';
         }
 
-        if (!empty($station->marker_id)) {
+        if (! empty($station->marker_id)) {
             $markerTitle = DB::table('markers')->where('marker_id', $station->marker_id)->value('title');
             if ($markerTitle) {
-                return $markerTitle . ', Philippines';
+                return $markerTitle.', Philippines';
             }
         }
 
-        return $fallbackLocationName . ', Philippines';
+        return $fallbackLocationName.', Philippines';
     }
 
     private function buildWeatherSummary($avgTemp, $avgHumidity, $avgWind, $rainyDays, $hotDays, $dominantCondition, $weatherRiskLabel)
@@ -5769,7 +5816,7 @@ private function trimAiPrompt(string $prompt): string
         $parts[] = "{$hotDays} hot day(s)";
         $parts[] = "dominant condition: {$dominantCondition}";
 
-        return ucfirst(implode(', ', $parts)) . ". Weather fire-risk outlook is {$weatherRiskLabel}.";
+        return ucfirst(implode(', ', $parts)).". Weather fire-risk outlook is {$weatherRiskLabel}.";
     }
 
     private function extractPredictionData($aiContent, $data)
@@ -5792,6 +5839,7 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '') {
                     $prediction['summary'] = $value;
                 }
+
                 continue;
             }
 
@@ -5801,6 +5849,7 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '') {
                     $prediction['forecast_window'] = $value;
                 }
+
                 continue;
             }
 
@@ -5810,6 +5859,7 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '' && preg_match('/\d+/', $value, $matches)) {
                     $prediction['predicted_fire_incidents'] = (int) $matches[0];
                 }
+
                 continue;
             }
 
@@ -5819,6 +5869,7 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '') {
                     $prediction['likely_peak_hours'] = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $value))));
                 }
+
                 continue;
             }
 
@@ -5828,6 +5879,7 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '') {
                     $prediction['outlook'] = $value;
                 }
+
                 continue;
             }
 
@@ -5837,11 +5889,13 @@ private function trimAiPrompt(string $prompt): string
                 if ($value !== '') {
                     $drivers[] = $value;
                 }
+
                 continue;
             }
 
             if (preg_match('/^RECOMMENDATIONS\s*:/i', $trimmed) || preg_match('/^ANALYSIS SUMMARY\s*:/i', $trimmed)) {
                 $currentSection = null;
+
                 continue;
             }
 
@@ -5860,7 +5914,7 @@ private function trimAiPrompt(string $prompt): string
             }
         }
 
-        if (!empty($drivers)) {
+        if (! empty($drivers)) {
             $prediction['drivers'] = array_values(array_unique(array_filter($drivers)));
         }
 
@@ -5891,20 +5945,20 @@ private function trimAiPrompt(string $prompt): string
             }
         }
 
-        if (!empty($weather['summary'])) {
+        if (! empty($weather['summary'])) {
             $drivers[] = $weather['summary'];
         }
 
-        if (!empty($predictionContext['likely_peak_hours'])) {
-            $drivers[] = 'observed monthly peak hours: ' . implode(', ', $predictionContext['likely_peak_hours']);
+        if (! empty($predictionContext['likely_peak_hours'])) {
+            $drivers[] = 'observed monthly peak hours: '.implode(', ', $predictionContext['likely_peak_hours']);
         }
 
-        if (!empty($data['mitigation_context']['summary'])) {
+        if (! empty($data['mitigation_context']['summary'])) {
             $drivers[] = $data['mitigation_context']['summary'];
         }
 
         $outlook = $data['risk_level'] ?? 'Medium';
-        if (!empty($modelPrediction['risk_level'])) {
+        if (! empty($modelPrediction['risk_level'])) {
             $outlook = ucfirst($modelPrediction['risk_level']);
         }
         if (($weather['weather_risk_label'] ?? null) === 'High' && ($data['risk_score'] ?? 0) >= 50) {
@@ -5924,7 +5978,7 @@ private function trimAiPrompt(string $prompt): string
             && ! isset($predictionContext['peak_hour_evidence'])
             && isset($data['peak_hour'])
             && $data['peak_hour'] !== null) {
-            $likelyPeakHours = [str_pad((string) $data['peak_hour'], 2, '0', STR_PAD_LEFT) . ':00'];
+            $likelyPeakHours = [str_pad((string) $data['peak_hour'], 2, '0', STR_PAD_LEFT).':00'];
         }
 
         $forecastWindow = $predictionContext['target_period_label'] ?? 'Current month';
@@ -5941,18 +5995,18 @@ private function trimAiPrompt(string $prompt): string
             }
 
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
-                if (!empty($driver['summary'])) {
+                if (! empty($driver['summary'])) {
                     $drivers[] = $driver['summary'];
                 }
             }
         }
 
-        if (!empty($data['mitigation_context']['risk_reduction_percent'])) {
+        if (! empty($data['mitigation_context']['risk_reduction_percent'])) {
             $summary .= " Confirmed mitigation actions are currently reducing the projected risk context by about {$data['mitigation_context']['risk_reduction_percent']}%.";
         }
 
-        if (!is_null($predictedDamage)) {
-            $summary .= " Estimated possible damage exposure for the forecast window is around PHP " . number_format($predictedDamage, 2) . '.';
+        if (! is_null($predictedDamage)) {
+            $summary .= ' Estimated possible damage exposure for the forecast window is around PHP '.number_format($predictedDamage, 2).'.';
         }
 
         return [
@@ -6021,7 +6075,7 @@ private function trimAiPrompt(string $prompt): string
             'scope' => $predictionScope,
             'scope_label' => $predictionScope === 'next_month' ? 'Predict Next Month' : 'Predict Current Month',
             'target_month_label' => $targetMonthStart->format('F Y'),
-            'target_period_label' => $targetMonthStart->format('M j') . ' - ' . $targetMonthEnd->format('M j, Y'),
+            'target_period_label' => $targetMonthStart->format('M j').' - '.$targetMonthEnd->format('M j, Y'),
             'current_month_total_incidents' => $currentMonthIncidents->count(),
             'current_month_fire_incidents' => $this->countFireIncidents($currentMonthIncidents),
             'previous_month_total_incidents' => $previousMonthIncidents->count(),
@@ -6145,7 +6199,7 @@ private function trimAiPrompt(string $prompt): string
             $predictedProbability = (float) $modelPrediction['output']['probability_percent'];
         } else {
             $topHotspot = collect($barangayPredictions)->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))->first();
-            if (!empty($topHotspot['probability_percent'])) {
+            if (! empty($topHotspot['probability_percent'])) {
                 $predictedProbability = (float) $topHotspot['probability_percent'];
             }
         }
@@ -6166,7 +6220,7 @@ private function trimAiPrompt(string $prompt): string
             $deltaPercent = round((($currentTotal - $previousTotal) / $previousTotal) * 100, 1);
             $insights[] = $deltaPercent >= 0
                 ? "Current seven-day incident volume is {$deltaPercent}% higher than the previous seven-day period."
-                : "Current seven-day incident volume is " . abs($deltaPercent) . "% lower than the previous seven-day period.";
+                : 'Current seven-day incident volume is '.abs($deltaPercent).'% lower than the previous seven-day period.';
         }
 
         if ($predictedProbability !== null) {
@@ -6176,12 +6230,12 @@ private function trimAiPrompt(string $prompt): string
         $highestRiskBarangay = collect($barangayPredictions)
             ->sortByDesc(fn ($item) => (float) ($item['probability_percent'] ?? 0))
             ->first();
-        if (!empty($highestRiskBarangay['barangay_name'])) {
+        if (! empty($highestRiskBarangay['barangay_name'])) {
             $insights[] = "{$highestRiskBarangay['barangay_name']} shows the highest forecast probability in the current station coverage.";
         }
 
-        if (!empty($predictedPeakHours)) {
-            $insights[] = 'Peak incident probability is concentrated around ' . implode(', ', array_slice($predictedPeakHours, 0, 3)) . '.';
+        if (! empty($predictedPeakHours)) {
+            $insights[] = 'Peak incident probability is concentrated around '.implode(', ', array_slice($predictedPeakHours, 0, 3)).'.';
         }
 
         $patternContext = $this->buildHistoricalPatternContext(
@@ -6196,7 +6250,7 @@ private function trimAiPrompt(string $prompt): string
         );
 
         $predictedHourlySeries = array_fill(0, 24, null);
-        if ($predictedProbability !== null && !empty($predictedPeakHours)) {
+        if ($predictedProbability !== null && ! empty($predictedPeakHours)) {
             foreach ($predictedPeakHours as $label) {
                 $hour = (int) explode(':', (string) $label)[0];
                 if ($hour >= 0 && $hour <= 23) {
@@ -6206,7 +6260,7 @@ private function trimAiPrompt(string $prompt): string
         }
 
         $hourlyLabels = collect(range(0, 23))
-            ->map(fn ($hour) => str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':00')
+            ->map(fn ($hour) => str_pad((string) $hour, 2, '0', STR_PAD_LEFT).':00')
             ->all();
 
         return [
@@ -6237,7 +6291,7 @@ private function trimAiPrompt(string $prompt): string
             'insights' => $insights,
             'recent_trend' => [
                 'label' => 'Recent Trend',
-                'period_label' => $currentStart->format('M j') . ' - ' . $currentEnd->format('M j, Y'),
+                'period_label' => $currentStart->format('M j').' - '.$currentEnd->format('M j, Y'),
             ],
             'historical_trend' => $patternContext['historical_trend'],
             'seasonal_pattern' => $patternContext['seasonal_pattern'],
@@ -6427,7 +6481,7 @@ private function trimAiPrompt(string $prompt): string
             'historical_average' => $historicalAverageDaily,
             'historical_years' => $historicalDailySeries->all(),
             'current_label' => $isCurrentMonthTarget
-                ? $targetMonthStart->format('M') . ' 1-' . $periodDayLimit . ', ' . $targetMonthStart->year
+                ? $targetMonthStart->format('M').' 1-'.$periodDayLimit.', '.$targetMonthStart->year
                 : $targetMonthStart->format('F Y'),
             'missing' => [
                 'current_actual' => empty(array_filter($currentDailySeries)),
@@ -6517,7 +6571,7 @@ private function trimAiPrompt(string $prompt): string
             ];
         })->values();
         $weatherComparisonRows->push([
-            'label' => $isCurrentMonthTarget ? $targetMonthStart->year . ' current actual' : $targetMonthStart->year . ' selected month',
+            'label' => $isCurrentMonthTarget ? $targetMonthStart->year.' current actual' : $targetMonthStart->year.' selected month',
             'incident_count' => (int) collect($currentRows)->sum(fn ($row) => (int) ($row->incident_count ?? 1)),
             'temperature_2m' => $this->averageWeatherField($currentRows, 'temperature_2m', 'temperature'),
             'relative_humidity_2m' => $this->averageWeatherField($currentRows, 'relative_humidity_2m', 'humidity'),
@@ -6592,7 +6646,7 @@ private function trimAiPrompt(string $prompt): string
         ]);
 
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
-        if (!$stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
+        if (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
             abort(403, 'You are not authorized to preview archive weather for this station.');
         }
 
@@ -6603,7 +6657,7 @@ private function trimAiPrompt(string $prompt): string
         $barangayScope = $this->resolveStationBarangays($stationId)
             ->first(fn ($row) => (int) ($row->barangay_id ?? 0) === $barangayId);
 
-        if (!$barangayScope) {
+        if (! $barangayScope) {
             return response()->json([
                 'success' => false,
                 'message' => 'The selected barangay is outside the current station scope.',
@@ -6613,7 +6667,7 @@ private function trimAiPrompt(string $prompt): string
         $coordinateRow = $this->resolveBarangayArchiveLocation($barangayId);
 
         if (
-            !$coordinateRow
+            ! $coordinateRow
             || $coordinateRow->lat === null
             || $coordinateRow->lng === null
         ) {
@@ -6737,7 +6791,7 @@ private function trimAiPrompt(string $prompt): string
         ]);
 
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
-        if (!$stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
+        if (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
             abort(403, 'You are not authorized to save archive weather for this station.');
         }
 
@@ -6748,7 +6802,7 @@ private function trimAiPrompt(string $prompt): string
         $coordinateRow = $this->resolveBarangayArchiveLocation($barangayId);
 
         if (
-            !$coordinateRow
+            ! $coordinateRow
             || $coordinateRow->lat === null
             || $coordinateRow->lng === null
         ) {
@@ -6797,7 +6851,7 @@ private function trimAiPrompt(string $prompt): string
                         'wind_speed_10m' => $row['wind_speed_10m'],
                         'wind_gusts' => $row['wind_gusts_10m'],
                         'wind_gusts_10m' => $row['wind_gusts_10m'],
-                        'weather_condition' => $row['weather_code'] !== null ? 'weather_code:' . $row['weather_code'] : null,
+                        'weather_condition' => $row['weather_code'] !== null ? 'weather_code:'.$row['weather_code'] : null,
                         'updated_at' => now(),
                     ], $availableColumns);
 
@@ -6808,6 +6862,7 @@ private function trimAiPrompt(string $prompt): string
 
                     if ($monthUpdateCount > 0) {
                         $updatedRows += $monthUpdateCount;
+
                         continue;
                     }
 
@@ -6843,7 +6898,7 @@ private function trimAiPrompt(string $prompt): string
                             'wind_direction_10m' => null,
                             'weather_code' => $row['weather_code'],
                             'vapour_pressure_deficit' => $row['vapour_pressure_deficit'],
-                            'weather_condition' => $row['weather_code'] !== null ? 'weather_code:' . $row['weather_code'] : null,
+                            'weather_condition' => $row['weather_code'] !== null ? 'weather_code:'.$row['weather_code'] : null,
                             'is_verified' => false,
                             'notes' => 'Synthetic monthly weather baseline row created from Open-Meteo archive for months without incident rows.',
                             'created_at' => now(),
@@ -6913,7 +6968,7 @@ private function trimAiPrompt(string $prompt): string
                 ->values()
                 ->all();
 
-            if (!empty($barangayIds)) {
+            if (! empty($barangayIds)) {
                 $historicalQuery->whereIn('barangay_id', $barangayIds);
             }
         }
@@ -6950,7 +7005,7 @@ private function trimAiPrompt(string $prompt): string
             ->values()
             ->all();
 
-        if (!in_array($barangayId, $barangayIds, true)) {
+        if (! in_array($barangayId, $barangayIds, true)) {
             return [];
         }
 
@@ -7106,7 +7161,7 @@ private function trimAiPrompt(string $prompt): string
                 'timezone' => 'auto',
             ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new \RuntimeException(sprintf(
                 'Open-Meteo archive request failed for %d with HTTP %d.',
                 $year,
@@ -7119,7 +7174,7 @@ private function trimAiPrompt(string $prompt): string
 
     private function buildOpenMeteoArchiveUrl(float $latitude, float $longitude, string $startDate, string $endDate): string
     {
-        return 'https://archive-api.open-meteo.com/v1/archive?' . http_build_query([
+        return 'https://archive-api.open-meteo.com/v1/archive?'.http_build_query([
             'latitude' => $latitude,
             'longitude' => $longitude,
             'start_date' => $startDate,
@@ -7142,7 +7197,7 @@ private function trimAiPrompt(string $prompt): string
                 continue;
             }
 
-            if (!isset($months[$month])) {
+            if (! isset($months[$month])) {
                 $months[$month] = [
                     'temperature_2m' => [],
                     'relative_humidity_2m' => [],
@@ -7305,7 +7360,7 @@ private function trimAiPrompt(string $prompt): string
                 ->values()
                 ->all();
 
-            if (!empty($barangayIds)) {
+            if (! empty($barangayIds)) {
                 $query->whereIn('barangay_id', $barangayIds);
             }
         }
@@ -7364,6 +7419,7 @@ private function trimAiPrompt(string $prompt): string
         return (int) collect($rows)->sum(function ($row) use ($month, $day) {
             try {
                 $date = Carbon::parse($row->incident_date);
+
                 return $date->month === $month && $date->day === $day ? (int) ($row->incident_count ?? 1) : 0;
             } catch (\Throwable $e) {
                 return 0;
@@ -7394,6 +7450,7 @@ private function trimAiPrompt(string $prompt): string
 
                 if (empty($barangayIds)) {
                     $query->whereRaw('1 = 0');
+
                     return;
                 }
 
@@ -7414,6 +7471,7 @@ private function trimAiPrompt(string $prompt): string
         return collect(range(1, 12))
             ->map(function ($monthNumber) use ($monthlyBuckets) {
                 $values = $monthlyBuckets[$monthNumber];
+
                 return count($values) ? round(array_sum($values) / count($values), 2) : null;
             })
             ->all();
@@ -7473,6 +7531,7 @@ private function trimAiPrompt(string $prompt): string
 
                 if (empty($barangayIds)) {
                     $query->whereRaw('1 = 0');
+
                     return;
                 }
 
@@ -7542,7 +7601,7 @@ private function trimAiPrompt(string $prompt): string
         $counts = array_fill(0, 24, 0);
         foreach ($rows as $row) {
             try {
-                if ($useIncidentTime && !empty($row->incident_time)) {
+                if ($useIncidentTime && ! empty($row->incident_time)) {
                     $hour = (int) explode(':', (string) $row->incident_time)[0];
                 } else {
                     $source = $row->incident_date ?? $row->created_at ?? null;
@@ -7570,7 +7629,7 @@ private function trimAiPrompt(string $prompt): string
 
         return collect($barangayPredictions)->map(function (array $prediction) use ($targetMonthStart, $comparisonYears) {
             $barangayId = (int) ($prediction['barangay_id'] ?? 0);
-            if (!$barangayId) {
+            if (! $barangayId) {
                 return $prediction;
             }
 
@@ -7613,8 +7672,11 @@ private function trimAiPrompt(string $prompt): string
             ->values()
             ->map(function (Analysis $analysis) use ($selectedBarangayId) {
                 $point = $this->buildScopedMlTrendPoint($analysis, $selectedBarangayId);
-                if (! $point) return null;
+                if (! $point) {
+                    return null;
+                }
                 $point['date'] = optional($analysis->created_at)?->toDateString();
+
                 return $point;
             })
             ->filter()
@@ -7627,7 +7689,9 @@ private function trimAiPrompt(string $prompt): string
                 ->orWhereIn('firefighter_officer_3', $officerIds)->orWhereIn('rescue_radio', $officerIds);
         })->pluck('team_id')->all();
         $actuals = Incident::query()->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
-            ->where(function ($query) use ($stationId, $teamIds) { $query->where('station_id', $stationId)->orWhereIn('team_id', $teamIds); })
+            ->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId)->orWhereIn('team_id', $teamIds);
+            })
             ->when($selectedBarangayId, fn ($query) => $query->where('barangay_id', $selectedBarangayId))
             ->get(['created_at', 'occurred_at']);
         $latestSavedPoint = $savedPoints->sortBy('date')->last();
@@ -7638,6 +7702,7 @@ private function trimAiPrompt(string $prompt): string
             $date = $monthStart->copy()->addDays($dayOffset);
             $saved = $savedPoints->get($date->toDateString());
             $displayPoint = $saved ?: ($dayOffset === $daysFromMonthStart ? $latestSavedPoint : null);
+
             return [
                 'label' => $date->format('M d'),
                 'incident_count' => $actuals->filter(fn ($incident) => optional($incident->occurred_at ?: $incident->created_at)?->isSameDay($date))->count(),
@@ -7654,8 +7719,8 @@ private function trimAiPrompt(string $prompt): string
                 $actuals,
                 $selectedBarangayId
             ),
-            'latest_risk' => !empty($series) ? ($series[count($series) - 1]['risk_level'] ?? 'No data') : 'No data',
-            'latest_confidence' => !empty($series) ? (int) ($series[count($series) - 1]['confidence'] ?? 0) : 0,
+            'latest_risk' => ! empty($series) ? ($series[count($series) - 1]['risk_level'] ?? 'No data') : 'No data',
+            'latest_confidence' => ! empty($series) ? (int) ($series[count($series) - 1]['confidence'] ?? 0) : 0,
             'run_count' => $savedPoints->count(),
             'missing' => [
                 'series' => empty($series),
@@ -7947,6 +8012,7 @@ private function trimAiPrompt(string $prompt): string
 
                     if (empty($barangayIds)) {
                         $query->whereRaw('1 = 0');
+
                         return;
                     }
 
@@ -8056,7 +8122,7 @@ private function trimAiPrompt(string $prompt): string
 
     private function monthNameToNumber(?string $monthName): ?int
     {
-        if (!$monthName) {
+        if (! $monthName) {
             return null;
         }
 
@@ -8107,6 +8173,7 @@ private function trimAiPrompt(string $prompt): string
 
         if (is_numeric($value)) {
             $limit = (int) $value;
+
             return $limit > 0 ? $limit : 3;
         }
 
@@ -8119,11 +8186,12 @@ private function trimAiPrompt(string $prompt): string
 
         if ($value === 'all' || $value === 'all_available') {
             return $yearCount > 0
-                ? "All available history ({$yearCount} year" . ($yearCount === 1 ? '' : 's') . ')'
+                ? "All available history ({$yearCount} year".($yearCount === 1 ? '' : 's').')'
                 : 'All available history';
         }
 
         $limit = $this->normalizeHistoricalWindowLimit($historicalWindow) ?? $yearCount;
+
         return "{$limit}-year window";
     }
 
@@ -8160,439 +8228,446 @@ private function trimAiPrompt(string $prompt): string
             ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
             ->get();
     }
-// public function exploreRecommendation(Request $request)
-// {
-//     try {
-//         $recommendationTitle = $request->input('recommendation_title');
-//         $recommendationDescription = $request->input('recommendation_description');
-//         $priority = $request->input('priority', 'Medium');
-        
-//         // Log that we're starting
-//         Log::info('=== EXPLORE RECOMMENDATION START ===');
-//         Log::info('Title: ' . $recommendationTitle);
-        
-//         // Build prompt for AI
-//         $prompt = "You are a fire safety implementation expert. Provide a detailed implementation plan for this recommendation.\n\n";
-//         $prompt .= "RECOMMENDATION: {$recommendationTitle}\n";
-//         $prompt .= "DESCRIPTION: {$recommendationDescription}\n";
-//         $prompt .= "PRIORITY: {$priority}\n\n";
-//         $prompt .= "Provide EXACTLY this format:\n\n";
-//         $prompt .= "STEPS:\n";
-//         $prompt .= "1. [First actionable step]\n";
-//         $prompt .= "2. [Second actionable step]\n";
-//         $prompt .= "3. [Third actionable step]\n";
-//         $prompt .= "4. [Fourth actionable step]\n";
-//         $prompt .= "5. [Fifth actionable step]\n\n";
-//         $prompt .= "RESOURCES NEEDED:\n";
-//         $prompt .= "- [Resource 1]\n";
-//         $prompt .= "- [Resource 2]\n";
-//         $prompt .= "- [Resource 3]\n\n";
-//         $prompt .= "TIMELINE: [Estimated timeline]";
-        
-//         // Log that we're about to call AI
-//         Log::info('Calling AI API with prompt length: ' . strlen($prompt));
-        
-//         // Call AI API
-//         $response = Http::withHeaders([
-//             'Authorization' => 'Bearer ' . $this->apiKey,
-//             'Content-Type' => 'application/json',
-//         ])->timeout(60)->post('https://openrouter.ai/api/v1/chat/completions', [
-//             'model' => 'openai/gpt-3.5-turbo',
-//             'messages' => [
-//                 ['role' => 'system', 'content' => 'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'],
-//                 ['role' => 'user', 'content' => $prompt]
-//             ],
-//             'temperature' => 0.5,
-//             'max_tokens' => 800
-//         ]);
-        
-//         // Log the response status
-//         Log::info('AI API Response Status: ' . $response->status());
-        
-//         if ($response->successful()) {
-//             $json = $response->json();
-//             $content = $json['choices'][0]['message']['content'] ?? '';
-            
-//             // Log that we got AI response
-//             Log::info('AI Response received, length: ' . strlen($content));
-//             Log::info('AI Response preview: ' . substr($content, 0, 200));
-            
-//             $parsedData = $this->parseExploreResponse($content);
-            
-//             // Log if we're using AI or fallback
-//             Log::info('Returning AI-generated response');
-            
-//             return response()->json([
-//                 'success' => true,
-//                 'data' => $parsedData,
-//                 'source' => 'ai_api'  // Add this to indicate source
-//             ]);
-//         } else {
-//             Log::error('AI API returned error: ' . $response->status());
-//             throw new \Exception('AI API call failed: ' . $response->status());
-//         }
-        
-//     } catch (\Exception $e) {
-//         Log::error('AI API failed, using fallback: ' . $e->getMessage());
-        
-//         // ONLY HERE does it use fallback (controller-generated)
-//         return response()->json([
-//             'success' => true,
-//             'data' => $this->getFallbackExploreData(
-//                 $request->input('recommendation_title', 'this recommendation'), 
-//                 $request->input('priority', 'Medium')
-//             ),
-//             'source' => 'fallback',  // Indicates fallback was used
-//             'note' => 'AI service temporarily unavailable, using standard recommendations'
-//         ]);
-//     }
-// }
-/**
- * Parse the AI response into structured data
- */
-private function parseExploreResponse($content, ?array $contextualFallback = null)
-  {
-      $steps = [];
-      $resources = [];
-      $timeline = "Implementation timeline varies based on resources and complexity";
-      $how = null;
-      $who = null;
-      $when = null;
-    
-    $lines = explode("\n", $content);
-    $currentSection = null;
-    
-    foreach ($lines as $line) {
-        $line = trim($line);
-        
-        if (preg_match('/^how\s*:/i', $line)) {
-            $currentSection = 'how';
-            $value = trim((string) preg_replace('/^how\s*:/i', '', $line));
-            if ($value !== '') {
-                $how = $value;
-            }
-            continue;
-        } elseif (preg_match('/^who\s*:/i', $line)) {
-            $currentSection = 'who';
-            $value = trim((string) preg_replace('/^who\s*:/i', '', $line));
-            if ($value !== '') {
-                $who = $value;
-            }
-            continue;
-        } elseif (preg_match('/^when\s*:/i', $line)) {
-            $currentSection = 'when';
-            $value = trim((string) preg_replace('/^when\s*:/i', '', $line));
-            if ($value !== '') {
-                $when = $value;
-            }
-            continue;
-        }
+    // public function exploreRecommendation(Request $request)
+    // {
+    //     try {
+    //         $recommendationTitle = $request->input('recommendation_title');
+    //         $recommendationDescription = $request->input('recommendation_description');
+    //         $priority = $request->input('priority', 'Medium');
 
-        // Detect sections
-        if (preg_match('/steps?/i', $line) && strpos($line, '1.') !== false) {
-            $currentSection = 'steps';
-        } elseif (preg_match('/resources?/i', $line) && (strpos($line, '•') !== false || strpos($line, '-') !== false)) {
-            $currentSection = 'resources';
-        } elseif (preg_match('/timeline/i', $line)) {
-            $currentSection = 'timeline';
-            continue;
-        }
+    //         // Log that we're starting
+    //         Log::info('=== EXPLORE RECOMMENDATION START ===');
+    //         Log::info('Title: ' . $recommendationTitle);
 
-        if ($currentSection === 'how' && $how === null && $line !== '') {
-            $how = $line;
-            continue;
-        } elseif ($currentSection === 'who' && $who === null && $line !== '') {
-            $who = $line;
-            continue;
-        } elseif ($currentSection === 'when' && $when === null && $line !== '') {
-            $when = $line;
-            continue;
-        }
-        
-        // Extract numbered steps
-        if (preg_match('/^\d+\.\s*(.+)/', $line, $matches)) {
-            $steps[] = $matches[1];
-        }
-        // Extract bullet points for resources
-        elseif (preg_match('/^[•\-*]\s*(.+)/', $line, $matches)) {
-            if ($currentSection === 'resources' || strpos($line, '•') !== false) {
-                $resources[] = $matches[1];
-            } elseif (empty($steps)) {
+    //         // Build prompt for AI
+    //         $prompt = "You are a fire safety implementation expert. Provide a detailed implementation plan for this recommendation.\n\n";
+    //         $prompt .= "RECOMMENDATION: {$recommendationTitle}\n";
+    //         $prompt .= "DESCRIPTION: {$recommendationDescription}\n";
+    //         $prompt .= "PRIORITY: {$priority}\n\n";
+    //         $prompt .= "Provide EXACTLY this format:\n\n";
+    //         $prompt .= "STEPS:\n";
+    //         $prompt .= "1. [First actionable step]\n";
+    //         $prompt .= "2. [Second actionable step]\n";
+    //         $prompt .= "3. [Third actionable step]\n";
+    //         $prompt .= "4. [Fourth actionable step]\n";
+    //         $prompt .= "5. [Fifth actionable step]\n\n";
+    //         $prompt .= "RESOURCES NEEDED:\n";
+    //         $prompt .= "- [Resource 1]\n";
+    //         $prompt .= "- [Resource 2]\n";
+    //         $prompt .= "- [Resource 3]\n\n";
+    //         $prompt .= "TIMELINE: [Estimated timeline]";
+
+    //         // Log that we're about to call AI
+    //         Log::info('Calling AI API with prompt length: ' . strlen($prompt));
+
+    //         // Call AI API
+    //         $response = Http::withHeaders([
+    //             'Authorization' => 'Bearer ' . $this->apiKey,
+    //             'Content-Type' => 'application/json',
+    //         ])->timeout(60)->post('https://openrouter.ai/api/v1/chat/completions', [
+    //             'model' => 'openai/gpt-3.5-turbo',
+    //             'messages' => [
+    //                 ['role' => 'system', 'content' => 'You are a fire safety implementation expert. Provide detailed, actionable implementation plans.'],
+    //                 ['role' => 'user', 'content' => $prompt]
+    //             ],
+    //             'temperature' => 0.5,
+    //             'max_tokens' => 800
+    //         ]);
+
+    //         // Log the response status
+    //         Log::info('AI API Response Status: ' . $response->status());
+
+    //         if ($response->successful()) {
+    //             $json = $response->json();
+    //             $content = $json['choices'][0]['message']['content'] ?? '';
+
+    //             // Log that we got AI response
+    //             Log::info('AI Response received, length: ' . strlen($content));
+    //             Log::info('AI Response preview: ' . substr($content, 0, 200));
+
+    //             $parsedData = $this->parseExploreResponse($content);
+
+    //             // Log if we're using AI or fallback
+    //             Log::info('Returning AI-generated response');
+
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'data' => $parsedData,
+    //                 'source' => 'ai_api'  // Add this to indicate source
+    //             ]);
+    //         } else {
+    //             Log::error('AI API returned error: ' . $response->status());
+    //             throw new \Exception('AI API call failed: ' . $response->status());
+    //         }
+
+    //     } catch (\Exception $e) {
+    //         Log::error('AI API failed, using fallback: ' . $e->getMessage());
+
+    //         // ONLY HERE does it use fallback (controller-generated)
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $this->getFallbackExploreData(
+    //                 $request->input('recommendation_title', 'this recommendation'),
+    //                 $request->input('priority', 'Medium')
+    //             ),
+    //             'source' => 'fallback',  // Indicates fallback was used
+    //             'note' => 'AI service temporarily unavailable, using standard recommendations'
+    //         ]);
+    //     }
+    // }
+    /**
+     * Parse the AI response into structured data
+     */
+    private function parseExploreResponse($content, ?array $contextualFallback = null)
+    {
+        $steps = [];
+        $resources = [];
+        $timeline = 'Implementation timeline varies based on resources and complexity';
+        $how = null;
+        $who = null;
+        $when = null;
+
+        $lines = explode("\n", $content);
+        $currentSection = null;
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if (preg_match('/^how\s*:/i', $line)) {
+                $currentSection = 'how';
+                $value = trim((string) preg_replace('/^how\s*:/i', '', $line));
+                if ($value !== '') {
+                    $how = $value;
+                }
+
+                continue;
+            } elseif (preg_match('/^who\s*:/i', $line)) {
+                $currentSection = 'who';
+                $value = trim((string) preg_replace('/^who\s*:/i', '', $line));
+                if ($value !== '') {
+                    $who = $value;
+                }
+
+                continue;
+            } elseif (preg_match('/^when\s*:/i', $line)) {
+                $currentSection = 'when';
+                $value = trim((string) preg_replace('/^when\s*:/i', '', $line));
+                if ($value !== '') {
+                    $when = $value;
+                }
+
+                continue;
+            }
+
+            // Detect sections
+            if (preg_match('/steps?/i', $line) && strpos($line, '1.') !== false) {
+                $currentSection = 'steps';
+            } elseif (preg_match('/resources?/i', $line) && (strpos($line, '•') !== false || strpos($line, '-') !== false)) {
+                $currentSection = 'resources';
+            } elseif (preg_match('/timeline/i', $line)) {
+                $currentSection = 'timeline';
+
+                continue;
+            }
+
+            if ($currentSection === 'how' && $how === null && $line !== '') {
+                $how = $line;
+
+                continue;
+            } elseif ($currentSection === 'who' && $who === null && $line !== '') {
+                $who = $line;
+
+                continue;
+            } elseif ($currentSection === 'when' && $when === null && $line !== '') {
+                $when = $line;
+
+                continue;
+            }
+
+            // Extract numbered steps
+            if (preg_match('/^\d+\.\s*(.+)/', $line, $matches)) {
                 $steps[] = $matches[1];
             }
+            // Extract bullet points for resources
+            elseif (preg_match('/^[•\-*]\s*(.+)/', $line, $matches)) {
+                if ($currentSection === 'resources' || strpos($line, '•') !== false) {
+                    $resources[] = $matches[1];
+                } elseif (empty($steps)) {
+                    $steps[] = $matches[1];
+                }
+            }
+            // Extract timeline
+            elseif ($currentSection === 'timeline' && ! empty($line) && strlen($line) > 10 && strpos($line, '•') === false && strpos($line, '1.') === false) {
+                $timeline = $line;
+            }
         }
-        // Extract timeline
-        elseif ($currentSection === 'timeline' && !empty($line) && strlen($line) > 10 && strpos($line, '•') === false && strpos($line, '1.') === false) {
-            $timeline = $line;
+
+        // Ensure we have at least some steps
+        if (empty($steps)) {
+            $steps = $contextualFallback['steps'] ?? [
+                'Conduct a thorough assessment of current practices',
+                'Develop a detailed action plan with specific timelines and responsibilities',
+                'Allocate necessary resources and personnel for implementation',
+                'Train staff on new procedures',
+                'Implement the recommendation in phases',
+                'Monitor progress and adjust strategies as needed',
+                'Review and document outcomes for future reference',
+            ];
         }
+
+        if (empty($resources)) {
+            $resources = $contextualFallback['resources_needed'] ?? [
+                'Dedicated personnel for implementation',
+                'Training materials and sessions',
+                'Monitoring and evaluation tools',
+                'Budget allocation for necessary equipment',
+            ];
+        }
+
+        if (
+            $timeline === 'Implementation timeline varies based on resources and complexity'
+            && ! empty($contextualFallback['estimated_timeline'])
+        ) {
+            $timeline = $contextualFallback['estimated_timeline'];
+        }
+
+        if ($how === null && ! empty($contextualFallback['how'])) {
+            $how = $contextualFallback['how'];
+        }
+
+        if ($who === null && ! empty($contextualFallback['who'])) {
+            $who = $contextualFallback['who'];
+        }
+
+        if ($when === null) {
+            $when = $contextualFallback['when'] ?? $timeline;
+        }
+
+        return [
+            'steps' => array_slice($steps, 0, 7),
+            'resources_needed' => array_slice($resources, 0, 5),
+            'estimated_timeline' => $timeline,
+            'how' => $how,
+            'who' => $who,
+            'when' => $when,
+        ];
     }
-    
-    // Ensure we have at least some steps
-      if (empty($steps)) {
-          $steps = $contextualFallback['steps'] ?? [
-              "Conduct a thorough assessment of current practices",
-              "Develop a detailed action plan with specific timelines and responsibilities",
-              "Allocate necessary resources and personnel for implementation",
-              "Train staff on new procedures",
-              "Implement the recommendation in phases",
-              "Monitor progress and adjust strategies as needed",
-              "Review and document outcomes for future reference"
-          ];
-      }
-      
-      if (empty($resources)) {
-          $resources = $contextualFallback['resources_needed'] ?? [
-              "Dedicated personnel for implementation",
-              "Training materials and sessions",
-              "Monitoring and evaluation tools",
-              "Budget allocation for necessary equipment"
-          ];
-      }
 
-      if (
-          $timeline === "Implementation timeline varies based on resources and complexity"
-          && !empty($contextualFallback['estimated_timeline'])
-      ) {
-          $timeline = $contextualFallback['estimated_timeline'];
-      }
+    /**
+     * Get fallback data when AI is unavailable
+     */
+    private function getFallbackExploreData($recommendationTitle, $priority, ?string $recommendationDescription = null, array $contextPayload = [])
+    {
+        $recommendationTitle = $this->normalizeRecommendationTitle($recommendationTitle);
+        $priority = $priority ?: 'Medium';
+        $priorityLevel = strtolower((string) $priority);
+        $urgencyText = $priorityLevel === 'critical' ? 'Immediate' : ($priorityLevel === 'high' ? 'Urgent' : 'Standard');
+        $profile = $this->buildRecommendationActionProfile($recommendationTitle, $recommendationDescription, $contextPayload);
 
-      if ($how === null && !empty($contextualFallback['how'])) {
-          $how = $contextualFallback['how'];
-      }
+        return [
+            'steps' => $profile['steps'],
+            'resources_needed' => $profile['resources_needed'],
+            'estimated_timeline' => $profile['estimated_timeline'] ?? (
+                $priorityLevel === 'critical'
+                    ? '1-2 weeks for initial implementation, with daily monitoring'
+                    : ($priorityLevel === 'high'
+                        ? '2-4 weeks for full implementation, with weekly reviews'
+                        : '1-3 months for complete implementation, with monthly progress reviews')
+            ),
+            'how' => $profile['how'] ?? ("Use a field-based implementation workflow focused on {$recommendationTitle}, then validate the correction on site before closing the action."),
+            'who' => $profile['who'] ?? 'Assigned station lead, field responders, and barangay coordination personnel',
+            'when' => $profile['when'] ?? ($priorityLevel === 'critical'
+                ? 'Start within 24 hours and monitor daily until stabilized'
+                : ($priorityLevel === 'high'
+                    ? 'Start this week and complete follow-up within 2-4 weeks'
+                    : 'Schedule within the current operational cycle and review weekly')),
+            'explanation' => $profile['explanation'] ?? null,
+            'context_summary' => $profile['context_summary'] ?? null,
+        ];
+    }
 
-      if ($who === null && !empty($contextualFallback['who'])) {
-          $who = $contextualFallback['who'];
-      }
+    private function buildRecommendationActionProfile(string $recommendationTitle, ?string $recommendationDescription = null, array $contextPayload = []): array
+    {
+        $combined = trim($recommendationTitle.'. '.($recommendationDescription ?? ''));
+        $normalized = Str::lower($combined);
+        $priorityLevel = Str::lower((string) ($contextPayload['recommendation']['priority'] ?? 'medium'));
+        $urgencyText = $priorityLevel === 'critical' ? 'Immediate' : ($priorityLevel === 'high' ? 'Urgent' : 'Standard');
+        $barangay = $this->extractContextBarangayName($contextPayload, $combined);
+        $place = $this->extractContextPlaceLabel($contextPayload, $combined, $barangay);
+        $analysisSummary = $contextPayload['prediction_summary'] ?? null;
+        $locationPhrase = $place ?: ($barangay ?: 'the priority area');
+        $resources = [
+            'Assigned inspection or response lead',
+            'Photo and field validation checklist',
+            'Monitoring log for follow-up actions',
+        ];
+        $timeline = '2-4 weeks with weekly field validation and command review';
+        $explanation = "Fallback implementation plan localized for {$locationPhrase}.";
 
-      if ($when === null) {
-          $when = $contextualFallback['when'] ?? $timeline;
-      }
-      
-      return [
-          'steps' => array_slice($steps, 0, 7),
-          'resources_needed' => array_slice($resources, 0, 5),
-          'estimated_timeline' => $timeline,
-          'how' => $how,
-          'who' => $who,
-          'when' => $when
-      ];
-  }
+        if (Str::contains($normalized, ['wiring', 'electrical', 'octopus', 'exposed wire', 'overloaded outlet', 'improper splicing'])) {
+            return [
+                'steps' => [
+                    "Verify the exact electrical hazard reported in {$locationPhrase}, including unsafe taps, exposed conductors, or overloaded outlets mentioned in the recommendation.",
+                    "Inspect nearby homes or structures around {$locationPhrase} for similar wiring patterns and document which connections need immediate correction.",
+                    'Coordinate with the barangay and property occupants to remove temporary illegal connections, replace damaged extension lines, and isolate hazardous circuits.',
+                    "Issue a correction notice for all unsafe electrical setups found in {$locationPhrase} and set a short compliance deadline for rewiring or repair.",
+                    "Revisit {$locationPhrase} after corrective work and confirm that hazardous electrical conditions were removed before closing the action.",
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'Licensed electrician or electrical safety partner',
+                    'Insulated inspection tools and PPE',
+                ]),
+                'estimated_timeline' => $priorityLevel === 'critical'
+                    ? '24-72 hours for high-risk electrical correction, then 1 week validation'
+                    : '1-2 weeks for inspection, correction, and validation',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-/**
- * Get fallback data when AI is unavailable
- */
-private function getFallbackExploreData($recommendationTitle, $priority, ?string $recommendationDescription = null, array $contextPayload = [])
-  {
-      $recommendationTitle = $this->normalizeRecommendationTitle($recommendationTitle);
-      $priority = $priority ?: 'Medium';
-      $priorityLevel = strtolower((string) $priority);
-      $urgencyText = $priorityLevel === 'critical' ? 'Immediate' : ($priorityLevel === 'high' ? 'Urgent' : 'Standard');
-      $profile = $this->buildRecommendationActionProfile($recommendationTitle, $recommendationDescription, $contextPayload);
+        if (Str::contains($normalized, ['lpg', 'gas', 'leaking gas', 'cooking', 'stove', 'regulator', 'hose'])) {
+            return [
+                'steps' => [
+                    "Inspect the reported LPG or cooking setup in {$locationPhrase} and verify hose condition, regulator fit, tank placement, and ventilation around the cooking area.",
+                    'Remove or isolate any leaking, expired, or improperly positioned LPG tanks found during the site visit.',
+                    "Require occupants or operators in {$locationPhrase} to correct unsafe cooking layouts, especially tanks near heat sources or enclosed storage.",
+                    "Conduct a short barangay safety briefing for households or vendors around {$locationPhrase} on safe LPG handling and unattended cooking prevention.",
+                    'Reinspect the site and confirm that the gas-related fire hazard has been corrected before marking the action complete.',
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'LPG leak detection or soap-test materials',
+                    'Replacement regulators or hoses coordination list',
+                ]),
+                'estimated_timeline' => '3-10 days for correction and reinspection',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-      return [
-          'steps' => $profile['steps'],
-          'resources_needed' => $profile['resources_needed'],
-          'estimated_timeline' => $profile['estimated_timeline'] ?? (
-              $priorityLevel === 'critical'
-                  ? "1-2 weeks for initial implementation, with daily monitoring"
-                  : ($priorityLevel === 'high'
-                      ? "2-4 weeks for full implementation, with weekly reviews"
-                      : "1-3 months for complete implementation, with monthly progress reviews")
-          ),
-          'how' => $profile['how'] ?? ("Use a field-based implementation workflow focused on {$recommendationTitle}, then validate the correction on site before closing the action."),
-          'who' => $profile['who'] ?? 'Assigned station lead, field responders, and barangay coordination personnel',
-          'when' => $profile['when'] ?? ($priorityLevel === 'critical'
-              ? 'Start within 24 hours and monitor daily until stabilized'
-              : ($priorityLevel === 'high'
-                  ? 'Start this week and complete follow-up within 2-4 weeks'
-                  : 'Schedule within the current operational cycle and review weekly')),
-          'explanation' => $profile['explanation'] ?? null,
-          'context_summary' => $profile['context_summary'] ?? null,
-      ];
-  }
+        if (Str::contains($normalized, ['hydrant', 'water access', 'response capability'])) {
+            return [
+                'steps' => [
+                    "Confirm the exact hydrant or water-access issue affecting {$locationPhrase}, including blockage, inoperability, missing fittings, or access obstruction.",
+                    "Map the nearest alternative water source and measure how the current issue can delay suppression response in {$locationPhrase}.",
+                    'Coordinate with the barangay and utility or maintenance personnel to clear obstructions and restore usable hydrant access immediately.',
+                    'Test hydrant operability after corrective work and document pressure, accessibility, and hose connection readiness.',
+                    "Update responders assigned to {$locationPhrase} with the corrected hydrant status and any temporary alternate water source plan.",
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'Hydrant testing tools or maintenance crew',
+                    'Water source access map for the affected area',
+                ]),
+                'estimated_timeline' => '1-2 weeks for restoration and operability confirmation',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-  private function buildRecommendationActionProfile(string $recommendationTitle, ?string $recommendationDescription = null, array $contextPayload = []): array
-  {
-      $combined = trim($recommendationTitle . '. ' . ($recommendationDescription ?? ''));
-      $normalized = Str::lower($combined);
-      $priorityLevel = Str::lower((string) ($contextPayload['recommendation']['priority'] ?? 'medium'));
-      $urgencyText = $priorityLevel === 'critical' ? 'Immediate' : ($priorityLevel === 'high' ? 'Urgent' : 'Standard');
-      $barangay = $this->extractContextBarangayName($contextPayload, $combined);
-      $place = $this->extractContextPlaceLabel($contextPayload, $combined, $barangay);
-      $analysisSummary = $contextPayload['prediction_summary'] ?? null;
-      $locationPhrase = $place ?: ($barangay ?: 'the priority area');
-      $resources = [
-          'Assigned inspection or response lead',
-          'Photo and field validation checklist',
-          'Monitoring log for follow-up actions',
-      ];
-      $timeline = '2-4 weeks with weekly field validation and command review';
-      $explanation = "Fallback implementation plan localized for {$locationPhrase}.";
+        if (Str::contains($normalized, ['route', 'response time', 'access road', 'narrow road', 'response protocol'])) {
+            return [
+                'steps' => [
+                    "Review the actual responder approach path toward {$locationPhrase} and identify choke points, narrow access, turning limits, or delays affecting dispatch.",
+                    'Run a route validation with station personnel using the current road condition and compare it with the forecasted response concern in the recommendation.',
+                    'Coordinate with barangay officials to clear obstructions, regulate roadside parking, or establish a temporary emergency access lane where needed.',
+                    "Update dispatch notes, route instructions, and station response guidance for incidents occurring around {$locationPhrase}.",
+                    'Conduct a follow-up travel-time check to confirm whether the route adjustment reduced expected delay.',
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'Updated route map and dispatch notes',
+                    'Coordination with barangay traffic or road clearing personnel',
+                ]),
+                'estimated_timeline' => '1-3 weeks for route validation, clearing, and retesting',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-      if (Str::contains($normalized, ['wiring', 'electrical', 'octopus', 'exposed wire', 'overloaded outlet', 'improper splicing'])) {
-          return [
-              'steps' => [
-                  "Verify the exact electrical hazard reported in {$locationPhrase}, including unsafe taps, exposed conductors, or overloaded outlets mentioned in the recommendation.",
-                  "Inspect nearby homes or structures around {$locationPhrase} for similar wiring patterns and document which connections need immediate correction.",
-                  "Coordinate with the barangay and property occupants to remove temporary illegal connections, replace damaged extension lines, and isolate hazardous circuits.",
-                  "Issue a correction notice for all unsafe electrical setups found in {$locationPhrase} and set a short compliance deadline for rewiring or repair.",
-                  "Revisit {$locationPhrase} after corrective work and confirm that hazardous electrical conditions were removed before closing the action.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'Licensed electrician or electrical safety partner',
-                  'Insulated inspection tools and PPE',
-              ]),
-              'estimated_timeline' => $priorityLevel === 'critical'
-                  ? '24-72 hours for high-risk electrical correction, then 1 week validation'
-                  : '1-2 weeks for inspection, correction, and validation',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+        if (Str::contains($normalized, ['awareness', 'prevention briefing', 'campaign'])) {
+            return [
+                'steps' => [
+                    "Use the current hotspot forecast and field findings to define the exact households, puroks, or sitios in {$locationPhrase} that should receive the first prevention briefing.",
+                    "Prepare a short awareness module focused on the documented fire drivers in {$locationPhrase}, not just general fire safety reminders.",
+                    'Coordinate with barangay officials and local volunteers to schedule a targeted house-to-house or clustered briefing in the priority area.',
+                    'Record attendance, recurring resident concerns, and any additional hazards discovered during the awareness activity for follow-up validation.',
+                    "After the campaign, compare the documented hazards and resident feedback in {$locationPhrase} to decide whether inspection or mitigation actions should be escalated.",
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'Printed awareness materials tailored to the reported hazard drivers',
+                    'Barangay coordination list for household outreach',
+                ]),
+                'estimated_timeline' => '1-2 weeks for preparation, rollout, and post-activity validation',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-      if (Str::contains($normalized, ['lpg', 'gas', 'leaking gas', 'cooking', 'stove', 'regulator', 'hose'])) {
-          return [
-              'steps' => [
-                  "Inspect the reported LPG or cooking setup in {$locationPhrase} and verify hose condition, regulator fit, tank placement, and ventilation around the cooking area.",
-                  "Remove or isolate any leaking, expired, or improperly positioned LPG tanks found during the site visit.",
-                  "Require occupants or operators in {$locationPhrase} to correct unsafe cooking layouts, especially tanks near heat sources or enclosed storage.",
-                  "Conduct a short barangay safety briefing for households or vendors around {$locationPhrase} on safe LPG handling and unattended cooking prevention.",
-                  "Reinspect the site and confirm that the gas-related fire hazard has been corrected before marking the action complete.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'LPG leak detection or soap-test materials',
-                  'Replacement regulators or hoses coordination list',
-              ]),
-              'estimated_timeline' => '3-10 days for correction and reinspection',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+        if (Str::contains($normalized, ['housing', 'structural', 'occupancy', 'combustible', 'informal settlement', 'waste'])) {
+            return [
+                'steps' => [
+                    "Inspect {$locationPhrase} and document the exact structural or exposure condition driving the recommendation, including spacing, combustibility, occupancy pressure, or waste buildup.",
+                    "Mark the most exposed homes or structures in {$locationPhrase} and identify which ones require immediate risk reduction or barangay coordination.",
+                    'Coordinate corrective action such as clearing combustible buildup, improving exit access, or addressing unsafe clustering patterns in the affected area.',
+                    "Issue a follow-up inspection note for the households or structures with the highest spread potential in {$locationPhrase}.",
+                    'Reassess the area after corrective action and update the hazard record with before-and-after findings for command review.',
+                ],
+                'resources_needed' => array_merge($resources, [
+                    'Area sketch or household clustering map',
+                    'Barangay enforcement or clean-up coordination support',
+                ]),
+                'estimated_timeline' => '2-4 weeks for inspection, correction, and reassessment',
+                'explanation' => $explanation,
+                'context_summary' => $analysisSummary,
+            ];
+        }
 
-      if (Str::contains($normalized, ['hydrant', 'water access', 'response capability'])) {
-          return [
-              'steps' => [
-                  "Confirm the exact hydrant or water-access issue affecting {$locationPhrase}, including blockage, inoperability, missing fittings, or access obstruction.",
-                  "Map the nearest alternative water source and measure how the current issue can delay suppression response in {$locationPhrase}.",
-                  "Coordinate with the barangay and utility or maintenance personnel to clear obstructions and restore usable hydrant access immediately.",
-                  "Test hydrant operability after corrective work and document pressure, accessibility, and hose connection readiness.",
-                  "Update responders assigned to {$locationPhrase} with the corrected hydrant status and any temporary alternate water source plan.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'Hydrant testing tools or maintenance crew',
-                  'Water source access map for the affected area',
-              ]),
-              'estimated_timeline' => '1-2 weeks for restoration and operability confirmation',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+        return [
+            'steps' => [
+                "Validate the specific condition described in '{$recommendationTitle}' within {$locationPhrase} and confirm whether the finding is still active.",
+                "Break down the recommendation into a field action list covering inspection, correction, coordination, and final validation for {$locationPhrase}.",
+                'Assign responsible responders or partner units who will handle the corrective action and document progress with dated updates.',
+                "Implement the highest-impact control first in {$locationPhrase}, then continue with secondary corrective actions based on the confirmed field findings.",
+                "Close the action only after the original risk or hazard driver in {$locationPhrase} has been rechecked and documented as reduced or resolved.",
+            ],
+            'resources_needed' => array_merge($resources, [
+                'Coordination lead for barangay follow-up',
+            ]),
+            'estimated_timeline' => $urgencyText === 'Immediate'
+                ? '3-7 days with rapid validation and follow-up'
+                : '2-4 weeks depending on field corrections required',
+            'explanation' => $explanation,
+            'context_summary' => $analysisSummary,
+        ];
+    }
 
-      if (Str::contains($normalized, ['route', 'response time', 'access road', 'narrow road', 'response protocol'])) {
-          return [
-              'steps' => [
-                  "Review the actual responder approach path toward {$locationPhrase} and identify choke points, narrow access, turning limits, or delays affecting dispatch.",
-                  "Run a route validation with station personnel using the current road condition and compare it with the forecasted response concern in the recommendation.",
-                  "Coordinate with barangay officials to clear obstructions, regulate roadside parking, or establish a temporary emergency access lane where needed.",
-                  "Update dispatch notes, route instructions, and station response guidance for incidents occurring around {$locationPhrase}.",
-                  "Conduct a follow-up travel-time check to confirm whether the route adjustment reduced expected delay.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'Updated route map and dispatch notes',
-                  'Coordination with barangay traffic or road clearing personnel',
-              ]),
-              'estimated_timeline' => '1-3 weeks for route validation, clearing, and retesting',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+    private function extractContextBarangayName(array $contextPayload, string $combinedText): ?string
+    {
+        if (! empty($contextPayload['recommendation']['barangay_name'])) {
+            return $contextPayload['recommendation']['barangay_name'];
+        }
 
-      if (Str::contains($normalized, ['awareness', 'prevention briefing', 'campaign'])) {
-          return [
-              'steps' => [
-                  "Use the current hotspot forecast and field findings to define the exact households, puroks, or sitios in {$locationPhrase} that should receive the first prevention briefing.",
-                  "Prepare a short awareness module focused on the documented fire drivers in {$locationPhrase}, not just general fire safety reminders.",
-                  "Coordinate with barangay officials and local volunteers to schedule a targeted house-to-house or clustered briefing in the priority area.",
-                  "Record attendance, recurring resident concerns, and any additional hazards discovered during the awareness activity for follow-up validation.",
-                  "After the campaign, compare the documented hazards and resident feedback in {$locationPhrase} to decide whether inspection or mitigation actions should be escalated.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'Printed awareness materials tailored to the reported hazard drivers',
-                  'Barangay coordination list for household outreach',
-              ]),
-              'estimated_timeline' => '1-2 weeks for preparation, rollout, and post-activity validation',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+        if (! empty($contextPayload['action_plan_checklist']['barangay_name'])) {
+            return $contextPayload['action_plan_checklist']['barangay_name'];
+        }
 
-      if (Str::contains($normalized, ['housing', 'structural', 'occupancy', 'combustible', 'informal settlement', 'waste'])) {
-          return [
-              'steps' => [
-                  "Inspect {$locationPhrase} and document the exact structural or exposure condition driving the recommendation, including spacing, combustibility, occupancy pressure, or waste buildup.",
-                  "Mark the most exposed homes or structures in {$locationPhrase} and identify which ones require immediate risk reduction or barangay coordination.",
-                  "Coordinate corrective action such as clearing combustible buildup, improving exit access, or addressing unsafe clustering patterns in the affected area.",
-                  "Issue a follow-up inspection note for the households or structures with the highest spread potential in {$locationPhrase}.",
-                  "Reassess the area after corrective action and update the hazard record with before-and-after findings for command review.",
-              ],
-              'resources_needed' => array_merge($resources, [
-                  'Area sketch or household clustering map',
-                  'Barangay enforcement or clean-up coordination support',
-              ]),
-              'estimated_timeline' => '2-4 weeks for inspection, correction, and reassessment',
-              'explanation' => $explanation,
-              'context_summary' => $analysisSummary,
-          ];
-      }
+        if (preg_match('/barangay\s+([A-Za-z0-9\s-]+)/i', $combinedText, $matches)) {
+            return trim($matches[1]);
+        }
 
-      return [
-          'steps' => [
-              "Validate the specific condition described in '{$recommendationTitle}' within {$locationPhrase} and confirm whether the finding is still active.",
-              "Break down the recommendation into a field action list covering inspection, correction, coordination, and final validation for {$locationPhrase}.",
-              "Assign responsible responders or partner units who will handle the corrective action and document progress with dated updates.",
-              "Implement the highest-impact control first in {$locationPhrase}, then continue with secondary corrective actions based on the confirmed field findings.",
-              "Close the action only after the original risk or hazard driver in {$locationPhrase} has been rechecked and documented as reduced or resolved.",
-          ],
-          'resources_needed' => array_merge($resources, [
-              'Coordination lead for barangay follow-up',
-          ]),
-          'estimated_timeline' => $urgencyText === 'Immediate'
-              ? '3-7 days with rapid validation and follow-up'
-              : '2-4 weeks depending on field corrections required',
-          'explanation' => $explanation,
-          'context_summary' => $analysisSummary,
-      ];
-  }
+        return null;
+    }
 
-  private function extractContextBarangayName(array $contextPayload, string $combinedText): ?string
-  {
-      if (!empty($contextPayload['recommendation']['barangay_name'])) {
-          return $contextPayload['recommendation']['barangay_name'];
-      }
+    private function extractContextPlaceLabel(array $contextPayload, string $combinedText, ?string $barangay): ?string
+    {
+        if (preg_match('/\b(?:in|at)\s+([^.,]+(?:,\s*[^.,]+)?)/i', $combinedText, $matches)) {
+            return trim($matches[1]);
+        }
 
-      if (!empty($contextPayload['action_plan_checklist']['barangay_name'])) {
-          return $contextPayload['action_plan_checklist']['barangay_name'];
-      }
+        if (! empty($contextPayload['recommendation']['street_or_sitio'])) {
+            return $barangay
+                ? trim($contextPayload['recommendation']['street_or_sitio'].', '.$barangay)
+                : trim($contextPayload['recommendation']['street_or_sitio']);
+        }
 
-      if (preg_match('/barangay\s+([A-Za-z0-9\s-]+)/i', $combinedText, $matches)) {
-          return trim($matches[1]);
-      }
-
-      return null;
-  }
-
-  private function extractContextPlaceLabel(array $contextPayload, string $combinedText, ?string $barangay): ?string
-  {
-      if (preg_match('/\b(?:in|at)\s+([^.,]+(?:,\s*[^.,]+)?)/i', $combinedText, $matches)) {
-          return trim($matches[1]);
-      }
-
-      if (!empty($contextPayload['recommendation']['street_or_sitio'])) {
-          return $barangay
-              ? trim($contextPayload['recommendation']['street_or_sitio'] . ', ' . $barangay)
-              : trim($contextPayload['recommendation']['street_or_sitio']);
-      }
-
-      return $barangay;
-  }
+        return $barangay;
+    }
 }

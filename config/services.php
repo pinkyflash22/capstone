@@ -1,6 +1,6 @@
 <?php
 
-$configuredAiPythonBinary = (string) env('AI_PYTHON_BINARY', 'python');
+$configuredAiPythonBinary = (string) env('AI_PYTHON_BINARY', PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3');
 $aiPythonBinary = PHP_OS_FAMILY === 'Windows'
     && strtolower(trim($configuredAiPythonBinary)) === 'python'
     && is_file('C:/Program Files/Python314/python.exe')
@@ -20,7 +20,7 @@ return [
     | a conventional file to locate the various service credentials.
     |
     */
-    
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

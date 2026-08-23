@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PythonRuntime;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -9,6 +10,15 @@ use RuntimeException;
 
 class BarangayPredictionService
 {
+    private string $pythonBinary;
+
+    public function __construct()
+    {
+        $this->pythonBinary = PythonRuntime::resolve(
+            (string) config('services.ai_prediction.python_binary', PHP_OS_FAMILY === 'Windows' ? 'python' : 'python3')
+        );
+    }
+
     public function assertRuntimeReady(): void
     {
         $scriptPath = $this->resolveScriptPath();
@@ -30,8 +40,10 @@ class BarangayPredictionService
             ->run([$this->pythonBinary(), '--version']);
 
         if ($versionCheck->failed()) {
+            $failure = PythonRuntime::failureContext($versionCheck, $this->pythonBinary);
             throw new RuntimeException(
-                "Python runtime is unavailable. Set AI_PYTHON_BINARY in your environment to a valid Python executable."
+                'Python runtime is unavailable. Set AI_PYTHON_BINARY to a valid executable. '
+                .$failure['failure_summary']
             );
         }
     }
@@ -57,13 +69,13 @@ class BarangayPredictionService
             ->run([$this->pythonBinary(), $scriptPath]);
 
         if ($process->failed()) {
-            Log::warning('Python barangay prediction process failed', [
-                'error' => $process->errorOutput(),
-                'output' => $process->output(),
-                'payload_count' => count($payloads),
-                'python_binary' => $this->pythonBinary(),
-                'script_path' => $scriptPath,
-            ]);
+            Log::warning('Python barangay prediction process failed', array_merge(
+                PythonRuntime::failureContext($process, $this->pythonBinary),
+                [
+                    'payload_count' => count($payloads),
+                    'script_path' => $scriptPath,
+                ]
+            ));
 
             return [];
         }
@@ -84,17 +96,7 @@ class BarangayPredictionService
 
     private function pythonBinary(): string
     {
-        $configuredBinary = (string) config('services.ai_prediction.python_binary', 'python');
-
-        if (PHP_OS_FAMILY === 'Windows' && strtolower(trim($configuredBinary)) === 'python') {
-            $bundledPython = 'C:/Program Files/Python314/python.exe';
-
-            if (File::exists($bundledPython)) {
-                return $bundledPython;
-            }
-        }
-
-        return $configuredBinary;
+        return $this->pythonBinary;
     }
 
     private function pythonEnvironment(): array
