@@ -1345,6 +1345,7 @@
                 min-height: 44px;
                 display: inline-flex;
                 align-items: center;
+                flex-direction: column;
                 justify-content: center;
                 justify-self: center;
                 color: rgba(214, 227, 230, 0.5);
@@ -1405,6 +1406,33 @@
                 flex-shrink: 0;
             }
 
+            .citizen-mobile-dock__label {
+                display: block;
+                max-width: 52px;
+                margin-top: 2px;
+                overflow: hidden;
+                color: currentColor;
+                font-size: 8px;
+                font-weight: 750;
+                line-height: 1;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .citizen-mobile-dock__item--call {
+                color: #fecaca;
+            }
+
+            .citizen-mobile-dock__item--call::before {
+                content: '';
+                position: absolute;
+                inset: 4px;
+                z-index: -1;
+                border-radius: 999px;
+                background: rgba(220, 38, 38, 0.18);
+                box-shadow: inset 0 0 0 1px rgba(254, 202, 202, 0.12);
+            }
+
             .citizen-mobile-dock__center-wrap {
                 position: absolute;
                 left: 50%;
@@ -1438,6 +1466,7 @@
                 z-index: 3;
                 pointer-events: auto;
                 transform: translateX(-50%);
+                flex-direction: row;
             }
 
             .citizen-mobile-dock__item--center::before,
@@ -1468,13 +1497,14 @@
                 left: 50%;
                 bottom: 76px;
                 width: min(calc(100vw - 32px), 300px);
-                min-height: 56px;
-                display: flex;
+                min-height: 132px;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
                 align-items: center;
                 justify-content: center;
-                gap: clamp(7px, 2vw, 11px);
-                padding: 7px;
-                border-radius: 999px;
+                gap: 7px;
+                padding: 10px;
+                border-radius: 24px;
                 background: rgba(255, 253, 248, 0.96);
                 border: 1px solid rgba(198, 61, 38, 0.12);
                 box-shadow: 0 20px 44px rgba(88, 43, 20, 0.2);
@@ -1499,13 +1529,14 @@
 
             .citizen-mobile-dock__burst-item {
                 position: relative;
-                width: 44px;
-                height: 44px;
-                flex: 0 0 44px;
+                width: 100%;
+                height: 52px;
                 display: inline-flex;
                 align-items: center;
+                flex-direction: column;
                 justify-content: center;
-                border-radius: 999px;
+                gap: 3px;
+                border-radius: 15px;
                 background: #fff7ed;
                 color: #c63d26;
                 border: 1px solid rgba(198, 61, 38, 0.12);
@@ -1521,7 +1552,7 @@
                 content: '';
                 position: absolute;
                 inset: 6px;
-                border-radius: inherit;
+                border-radius: 11px;
                 border: 1px solid rgba(16, 185, 129, 0.12);
                 pointer-events: none;
             }
@@ -1536,6 +1567,7 @@
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(3) { transition-delay: 48ms; }
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(4) { transition-delay: 72ms; }
             .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(5) { transition-delay: 96ms; }
+            .citizen-mobile-dock__center-wrap.is-open .citizen-mobile-dock__burst-item:nth-child(6) { transition-delay: 120ms; }
 
             .citizen-mobile-dock__burst-item.active {
                 background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
@@ -1556,6 +1588,34 @@
                 stroke-linecap: round;
                 stroke-linejoin: round;
                 flex-shrink: 0;
+            }
+
+            .citizen-mobile-dock__burst-label {
+                display: block;
+                width: 100%;
+                overflow: hidden;
+                font-size: 8px;
+                font-weight: 800;
+                line-height: 1.05;
+                text-align: center;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            #citizenSosBtn {
+                display: none;
+            }
+
+            #citizenSosMenu:not(.hidden) {
+                position: fixed;
+                top: auto;
+                right: 14px;
+                bottom: calc(var(--mobile-bottom-nav-h) + var(--safe-bottom) + 12px);
+                left: 14px;
+                z-index: 245;
+                width: auto;
+                max-width: 420px;
+                margin: 0 auto;
             }
 
             .citizen-mobile-welcome-toast {
@@ -1859,7 +1919,18 @@
             }
         }
     </style>
-    @include('partials.voice-call-config')
+    @include('partials.voice-call-config', [
+        'pyroVoiceFallbackStations' => $stations
+            ->filter(fn ($station) => filled($station->contact_number))
+            ->sortByDesc(fn ($station) => (int) ($station->address?->barangay?->barangay_id ?? 0) === (int) ($citizenUser->address?->barangay?->barangay_id ?? -1))
+            ->map(fn ($station) => [
+            'id' => (int) $station->station_id,
+            'name' => $station->station_name,
+            'phone' => $station->contact_number,
+            'lat' => $station->marker?->lat,
+            'lng' => $station->marker?->lng,
+            ])->values(),
+    ])
     @vite(['resources/css/app.css', 'resources/css/citizen/dashboard.css', 'resources/js/user.js'])
     @vite(['resources/js/map.js'])
 
@@ -2146,19 +2217,20 @@
         <div class="citizen-mobile-dock__shell">
             <div class="citizen-mobile-dock__track">
                 <div class="citizen-mobile-dock__group citizen-mobile-dock__group--left">
-                    <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" data-citizen-switch-section="overview" aria-label="Overview">
+                    <button type="button" class="citizen-mobile-dock__item active" data-citizen-dock-item="overview" data-citizen-switch-section="overview" aria-label="Map overview">
                         <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="m3 10.8 9-7 9 7"></path>
-                            <path d="M5.5 9.5V20h13V9.5"></path>
-                            <path d="M9.5 20v-6h5v6"></path>
+                            <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
+                            <path d="M9 3v15"></path>
+                            <path d="M15 6v15"></path>
                         </svg>
+                        <span class="citizen-mobile-dock__label">Map</span>
                     </button>
 
-                    <button type="button" class="citizen-mobile-dock__item" aria-label="Notifications" data-citizen-alerts-open>
+                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--call" aria-label="Emergency calling options" data-citizen-sos-open>
                         <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
-                            <path d="M10 21h4"></path>
+                            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3A19.2 19.2 0 0 1 5.4 13 19.6 19.6 0 0 1 2.4 4.5 2 2 0 0 1 4.4 2.3h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L8.1 10a15.5 15.5 0 0 0 5.9 5.9l1.2-1.2a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 2 2.3z"></path>
                         </svg>
+                        <span class="citizen-mobile-dock__label">Call</span>
                     </button>
                 </div>
 
@@ -2169,6 +2241,7 @@
                                 <path d="M3.5 7.5h6l2 2h9v8.5a2 2 0 0 1-2 2h-15z"></path>
                                 <path d="M3.5 7.5V5.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v2"></path>
                             </svg>
+                            <span class="citizen-mobile-dock__burst-label">Requests</span>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="alerts" data-citizen-switch-section="alerts" aria-label="Areas of Concern">
                             <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2176,11 +2249,13 @@
                                 <path d="M12 9v5"></path>
                                 <path d="M12 17h.01"></path>
                             </svg>
+                            <span class="citizen-mobile-dock__burst-label">Concerns</span>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-dock-item="contacts" data-citizen-switch-section="contacts" aria-label="Emergency Contacts">
                             <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3A19.2 19.2 0 0 1 5.4 13 19.6 19.6 0 0 1 2.4 4.5 2 2 0 0 1 4.4 2.3h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L8.1 10a15.5 15.5 0 0 0 5.9 5.9l1.2-1.2a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 2 2.3z"></path>
                             </svg>
+                            <span class="citizen-mobile-dock__burst-label">Contacts</span>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-risk-hazard-open aria-label="Report risk or hazard">
                             <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2188,6 +2263,7 @@
                                 <path d="M7 13v5"></path>
                                 <path d="M18 9.5a3 3 0 0 1 0 5"></path>
                             </svg>
+                            <span class="citizen-mobile-dock__burst-label">Report Risk</span>
                         </button>
                         <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-insights-open aria-label="Charts and Cards">
                             <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2196,6 +2272,14 @@
                                 <path d="M12 16V5"></path>
                                 <path d="M17 16v-6"></path>
                             </svg>
+                            <span class="citizen-mobile-dock__burst-label">Insights</span>
+                        </button>
+                        <button type="button" class="citizen-mobile-dock__burst-item" data-citizen-alerts-open aria-label="Notifications">
+                            <svg class="citizen-mobile-dock__burst-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                                <path d="M10 21h4"></path>
+                            </svg>
+                            <span class="citizen-mobile-dock__burst-label">Notifications</span>
                         </button>
                     </div>
 
@@ -2214,6 +2298,7 @@
                             <path d="M7 13v5"></path>
                             <path d="M18 9.5a3 3 0 0 1 0 5"></path>
                         </svg>
+                        <span class="citizen-mobile-dock__label">Updates</span>
                     </button>
 
                     <button type="button" class="citizen-mobile-dock__item" data-citizen-settings-open aria-label="Settings">
@@ -2221,6 +2306,7 @@
                             <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
                             <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2.1 2.1 0 0 1-3 3l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21a2.1 2.1 0 0 1-4.2 0v-.1a1.8 1.8 0 0 0-1.1-1.7 1.8 1.8 0 0 0-2 .4l-.1.1a2.1 2.1 0 0 1-3-3l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2a2.1 2.1 0 0 1 0-4.2h.1a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1a2.1 2.1 0 0 1 3-3l.1.1a1.8 1.8 0 0 0 2 .4 1.8 1.8 0 0 0 1.1-1.7V2a2.1 2.1 0 0 1 4.2 0v.1a1.8 1.8 0 0 0 1.1 1.7 1.8 1.8 0 0 0 2-.4l.1-.1a2.1 2.1 0 0 1 3 3l-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.1a2.1 2.1 0 0 1 0 4.2h-.1a1.8 1.8 0 0 0-1.7 1.3z"></path>
                         </svg>
+                        <span class="citizen-mobile-dock__label">Settings</span>
                     </button>
                 </div>
             </div>
@@ -2618,6 +2704,7 @@
                                             </span>
                                             <span class="mobile-hub-btn__copy">
                                                 <strong class="block text-sm font-bold">Call BFP</strong>
+                                                <small class="block mt-0.5 text-xs font-medium text-amber-700">Agora first, station phone if unavailable</small>
                                             </span>
                                         </span>
                                     </button>
@@ -2628,6 +2715,7 @@
                                             </span>
                                             <span>
                                                 <strong class="block text-sm font-bold">Call 911</strong>
+                                                <small class="block mt-0.5 text-xs font-medium text-rose-700">Open the emergency telephone line</small>
                                             </span>
                                         </span>
                                     </a>
@@ -3806,6 +3894,7 @@ if (navigator.geolocation) {
         // User Dropdown Toggle
         const citizenSosBtn = document.getElementById('citizenSosBtn');
         const citizenSosMenu = document.getElementById('citizenSosMenu');
+        const citizenSosOpenButtons = document.querySelectorAll('[data-citizen-sos-open]');
         const userDropdownBtn = document.getElementById('userDropdownBtn');
         const userDropdownMenu = document.getElementById('userDropdownMenu');
         const myLogsModal = document.getElementById('myLogsModal');
@@ -3843,6 +3932,21 @@ if (navigator.geolocation) {
             }
 
             openCitizenSosMenu();
+        });
+
+        citizenSosOpenButtons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                citizenMobileDock?.classList.remove('is-open');
+
+                const isOpen = citizenSosMenu && !citizenSosMenu.classList.contains('hidden');
+                if (isOpen) {
+                    closeCitizenSosMenu();
+                } else {
+                    openCitizenSosMenu();
+                }
+            });
         });
 
         if (userDropdownBtn) {

@@ -2,6 +2,7 @@
     $pyroVoiceUser = auth()->user();
     $pyroVoiceRole = strtolower((string) ($pyroVoiceUser?->role?->role ?? ''));
     $pyroVoiceStationId = $pyroVoiceStationId ?? null;
+    $pyroVoiceFallbackStations = collect($pyroVoiceFallbackStations ?? [])->values();
 
     if (! $pyroVoiceStationId && in_array($pyroVoiceRole, ['station admin', 'chief', 'chief station admin'], true)) {
         $pyroVoiceStationId = \App\Models\StationOfficer::query()
@@ -16,6 +17,7 @@
         role: @json($pyroVoiceRole),
         userId: @json($pyroVoiceUser?->user_id),
         stationId: @json($pyroVoiceStationId ? (int) $pyroVoiceStationId : null),
+        fallbackStations: @json($pyroVoiceFallbackStations),
         pollIntervalMs: @json((int) config('services.voice_calls.poll_interval_ms', 2000)),
         routes: {
             store: @json(route('voice-calls.store')),

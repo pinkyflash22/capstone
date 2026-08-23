@@ -207,7 +207,7 @@ class CommunityActivityRequestController extends Controller
 
     private function createRequest(Request $request, $user, ?Barangay $barangay, string $submittedFrom): void
     {
-        $validated = $request->validate([
+        $rules = [
             'request_type' => ['required', Rule::in(['orientation', 'seminar', 'drill', 'inspection', 'community_meeting', 'other'])],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:2000'],
@@ -216,7 +216,11 @@ class CommunityActivityRequestController extends Controller
             'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:60'],
-        ]);
+        ];
+
+        $validated = $submittedFrom === 'citizen'
+            ? $request->validateWithBag('communityRequest', $rules)
+            : $request->validate($rules);
 
         $stationId = $this->resolveStationIdForBarangay($barangay?->barangay_id);
 

@@ -1,8 +1,8 @@
 <div id="section-announcements" class="content-section announcements-page">
     <div class="citizen-announcements-shell">
-        @if($errors->any())
+        @if($errors->communityRequest->any())
             <div class="citizen-request-card" style="border-color:rgba(239,68,68,0.18);background:#fff7ed;color:#9a3412;">
-                {{ $errors->first() }}
+                {{ $errors->communityRequest->first() }}
             </div>
         @endif
 
@@ -62,68 +62,52 @@
             </div>
         </section>
 
-        <section class="citizen-request-shell">
-            <article class="citizen-request-card">
-                <div class="citizen-request-head">
-                    <div>
-                        <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-people-roof"></i> Community request</span>
-                        <h2 class="citizen-request-title">Request an orientation, seminar, or community activity</h2>
-                        <p class="citizen-request-copy">Citizens can ask the assigned station for fire safety orientations, seminars, drills, or similar preparedness activities.</p>
+        <div class="citizen-announcements-workspace">
+            <section class="citizen-announcements-stream" aria-label="Announcement posts">
+                <div class="citizen-announcements-toolbar">
+                    <div class="citizen-announcements-search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="citizenAnnouncementsSearch" placeholder="Search by poster name or content">
+                    </div>
+                    <div class="citizen-announcements-filter-control" aria-label="Sort announcements">
+                        <button type="button" class="citizen-announcements-filter-button" data-announcement-filter-toggle="sort" aria-label="Sort announcements" aria-expanded="false">
+                            <i class="fa-solid fa-arrow-down-wide-short citizen-announcements-filter-icon" aria-hidden="true"></i>
+                        </button>
+                        <select id="citizenAnnouncementsSort" class="citizen-announcements-sort">
+                            <option value="newest">Newest first</option>
+                            <option value="oldest">Oldest first</option>
+                            <option value="author">Author A-Z</option>
+                            <option value="important">Important first</option>
+                        </select>
+                        <div class="citizen-announcements-filter-menu" data-announcement-filter-menu="sort" hidden>
+                            <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="newest">Newest first</button>
+                            <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="oldest">Oldest first</button>
+                            <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="author">Author A-Z</button>
+                            <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="important">Important first</button>
+                        </div>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form">
-                    @csrf
-                    <div class="citizen-request-grid">
-                        <label>
-                            <span>Request type</span>
-                            <select name="request_type">
-                                <option value="orientation">Orientation</option>
-                                <option value="seminar">Seminar</option>
-                                <option value="drill">Drill</option>
-                                <option value="inspection">Inspection</option>
-                                <option value="community_meeting">Community meeting</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Preferred date</span>
-                            <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="2026-08-10">
-                        </label>
-                        <label>
-                            <span>Start time</span>
-                            <input type="time" name="preferred_start_time" value="{{ old('preferred_start_time') }}">
-                        </label>
-                        <label>
-                            <span>End time</span>
-                            <input type="time" name="preferred_end_time" value="{{ old('preferred_end_time') }}">
-                        </label>
-                    </div>
-                    <label>
-                        <span>Title</span>
-                        <input type="text" name="title" value="{{ old('title') }}" placeholder="Example: Fire safety seminar for our neighborhood">
-                    </label>
-                    <label>
-                        <span>Reason for request</span>
-                        <textarea name="description" rows="4" placeholder="Describe the audience, concern, and what support is needed.">{{ old('description') }}</textarea>
-                    </label>
-                    <label>
-                        <span>Contact number</span>
-                        <input type="text" name="contact_number" value="{{ old('contact_number', auth()->user()->contact_number) }}" placeholder="Optional contact number">
-                    </label>
-                    <button type="submit" class="citizen-request-submit">
-                        <i class="fa-solid fa-paper-plane"></i>
-                        Send request to station
-                    </button>
-                </form>
-            </article>
 
-            <article class="citizen-request-card">
+                <div id="citizenAnnouncementsFeed" class="citizen-announcements-feed">
+                    <div class="citizen-announcements-empty loading">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <p>Loading announcements...</p>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="citizen-request-card citizen-request-card--sidebar" aria-label="My community requests">
                 <div class="citizen-request-head">
                     <div>
                         <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-list-check"></i> My requests</span>
-                        <h2 class="citizen-request-title">Recent community activity requests</h2>
+                        <h2 class="citizen-request-title">Community activity requests</h2>
+                        <p class="citizen-request-copy">Track your requests or ask the station for an orientation, seminar, drill, or preparedness activity.</p>
                     </div>
                 </div>
+                <button type="button" class="citizen-request-submit citizen-request-open" data-community-request-open>
+                    <i class="fa-solid fa-plus"></i>
+                    New community request
+                </button>
                 <div class="citizen-request-list">
                     @forelse(($citizenCommunityActivityRequests ?? collect()) as $requestItem)
                         <div class="citizen-request-item">
@@ -150,41 +134,73 @@
                         </div>
                     @endforelse
                 </div>
-            </article>
-        </section>
-
-        <div class="citizen-announcements-toolbar">
-            <div class="citizen-announcements-search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="citizenAnnouncementsSearch" placeholder="Search by poster name or content">
-            </div>
-            <div class="citizen-announcements-filter-control" aria-label="Sort announcements">
-                <button type="button" class="citizen-announcements-filter-button" data-announcement-filter-toggle="sort" aria-label="Sort announcements" aria-expanded="false">
-                    <i class="fa-solid fa-arrow-down-wide-short citizen-announcements-filter-icon" aria-hidden="true"></i>
-                </button>
-                <select id="citizenAnnouncementsSort" class="citizen-announcements-sort">
-                    <option value="newest">Newest first</option>
-                    <option value="oldest">Oldest first</option>
-                    <option value="author">Author A-Z</option>
-                    <option value="important">Important first</option>
-                </select>
-                <div class="citizen-announcements-filter-menu" data-announcement-filter-menu="sort" hidden>
-                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="newest">Newest first</button>
-                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="oldest">Oldest first</button>
-                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="author">Author A-Z</button>
-                    <button type="button" class="citizen-announcements-filter-option" data-announcement-filter-target="citizenAnnouncementsSort" data-announcement-filter-value="important">Important first</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="citizenAnnouncementsFeed" class="citizen-announcements-feed">
-            <div class="citizen-announcements-empty loading">
-                <i class="fa-solid fa-spinner fa-spin"></i>
-                <p>Loading announcements...</p>
-            </div>
+            </aside>
         </div>
         <div class="citizen-announcements-mobile-bottom-space" aria-hidden="true"></div>
     </div>
+</div>
+
+<div class="citizen-request-modal" id="citizenCommunityRequestModal" aria-hidden="true" @if(!$errors->communityRequest->any()) hidden @endif>
+    <button type="button" class="citizen-request-modal__backdrop" data-community-request-close aria-label="Close community request form"></button>
+    <section class="citizen-request-modal__panel" role="dialog" aria-modal="true" aria-labelledby="citizenCommunityRequestTitle">
+        <header class="citizen-request-modal__header">
+            <div>
+                <span class="citizen-announcements-eyebrow"><i class="fa-solid fa-people-roof"></i> Community request</span>
+                <h2 class="citizen-request-title" id="citizenCommunityRequestTitle">Request a community activity</h2>
+                <p class="citizen-request-copy">Send an orientation, seminar, drill, inspection, or community meeting request to your assigned station.</p>
+            </div>
+            <button type="button" class="citizen-request-modal__close" data-community-request-close aria-label="Close community request form">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </header>
+        @if($errors->communityRequest->any())
+            <div class="citizen-request-modal__error" role="alert">{{ $errors->communityRequest->first() }}</div>
+        @endif
+        <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form">
+            @csrf
+            <div class="citizen-request-grid">
+                <label>
+                    <span>Request type</span>
+                    <select name="request_type">
+                        @foreach(['orientation' => 'Orientation', 'seminar' => 'Seminar', 'drill' => 'Drill', 'inspection' => 'Inspection', 'community_meeting' => 'Community meeting', 'other' => 'Other'] as $value => $label)
+                            <option value="{{ $value }}" @selected(old('request_type', 'orientation') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>
+                    <span>Preferred date</span>
+                    <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ now()->toDateString() }}">
+                </label>
+                <label>
+                    <span>Start time</span>
+                    <input type="time" name="preferred_start_time" value="{{ old('preferred_start_time') }}">
+                </label>
+                <label>
+                    <span>End time</span>
+                    <input type="time" name="preferred_end_time" value="{{ old('preferred_end_time') }}">
+                </label>
+            </div>
+            <label>
+                <span>Title</span>
+                <input type="text" name="title" value="{{ old('title') }}" placeholder="Example: Fire safety seminar for our neighborhood" required maxlength="255">
+            </label>
+            <label>
+                <span>Reason for request</span>
+                <textarea name="description" rows="4" placeholder="Describe the audience, concern, and support needed." required maxlength="2000">{{ old('description') }}</textarea>
+            </label>
+            <label>
+                <span>Contact number</span>
+                <input type="text" name="contact_number" value="{{ old('contact_number', auth()->user()->contact_number) }}" placeholder="Optional contact number" maxlength="60">
+            </label>
+            <div class="citizen-request-modal__actions">
+                <button type="button" class="citizen-request-modal__cancel" data-community-request-close>Cancel</button>
+                <button type="submit" class="citizen-request-submit">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    Send request to station
+                </button>
+            </div>
+        </form>
+    </section>
 </div>
 
 <div class="citizen-media-drawer" id="citizenAnnouncementMediaDrawer">
@@ -305,10 +321,16 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.85rem;
     }
-    .citizen-request-shell {
+    .citizen-announcements-workspace {
         display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 0.9rem;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+        align-items: start;
+        gap: 1rem;
+    }
+    .citizen-announcements-stream {
+        min-width: 0;
+        display: grid;
+        gap: 1rem;
     }
     .citizen-request-card {
         border: 1px solid rgba(120, 53, 15, 0.11);
@@ -319,6 +341,27 @@
     }
     .citizen-request-head {
         margin-bottom: 0.9rem;
+    }
+    .citizen-request-card--sidebar {
+        position: sticky;
+        top: 1rem;
+        display: grid;
+        gap: 0.9rem;
+        max-height: calc(100vh - 2rem);
+        overflow: hidden;
+    }
+    .citizen-request-card--sidebar .citizen-request-head {
+        margin-bottom: 0;
+    }
+    .citizen-request-card--sidebar .citizen-request-list {
+        max-height: min(560px, calc(100vh - 250px));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 0.2rem;
+        scrollbar-width: thin;
+    }
+    .citizen-request-open {
+        width: 100%;
     }
     .citizen-request-title {
         margin: 0.7rem 0 0;
@@ -338,7 +381,7 @@
     }
     .citizen-request-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.75rem;
     }
     .citizen-request-form label {
@@ -410,6 +453,80 @@
         color: #475569;
         font-size: 0.84rem;
         line-height: 1.55;
+    }
+    .citizen-request-modal[hidden] {
+        display: none;
+    }
+    .citizen-request-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 520;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+    }
+    .citizen-request-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        border: 0;
+        background: rgba(15, 23, 42, 0.58);
+        backdrop-filter: blur(7px);
+    }
+    .citizen-request-modal__panel {
+        position: relative;
+        width: min(720px, 100%);
+        max-height: min(90dvh, 820px);
+        overflow-y: auto;
+        border: 1px solid rgba(198, 61, 38, 0.14);
+        border-radius: 1.75rem;
+        background: #fffdfa;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+        padding: 1.25rem;
+    }
+    .citizen-request-modal__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .citizen-request-modal__close {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border: 0;
+        border-radius: 999px;
+        background: #fff1ea;
+        color: var(--ann-red);
+        cursor: pointer;
+    }
+    .citizen-request-modal__error {
+        margin-bottom: 0.9rem;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: 1rem;
+        background: #fff1f2;
+        color: #9f1239;
+        padding: 0.8rem 0.9rem;
+        font-size: 0.86rem;
+        font-weight: 700;
+    }
+    .citizen-request-modal__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.7rem;
+    }
+    .citizen-request-modal__cancel {
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 1rem;
+        background: #fff;
+        color: #475569;
+        padding: 0.9rem 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    body.citizen-request-modal-open {
+        overflow: hidden;
     }
     .citizen-announcements-stat {
         position: relative;
@@ -956,9 +1073,31 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.55rem;
         }
-        .citizen-request-shell,
+        .citizen-announcements-workspace,
         .citizen-request-grid {
             grid-template-columns: 1fr;
+        }
+        .citizen-request-card--sidebar {
+            position: static;
+            order: -1;
+            max-height: none;
+        }
+        .citizen-request-card--sidebar .citizen-request-list {
+            max-height: 360px;
+        }
+        .citizen-request-modal {
+            align-items: end;
+            padding: 0;
+        }
+        .citizen-request-modal__panel {
+            width: 100%;
+            max-height: 92dvh;
+            border-radius: 1.5rem 1.5rem 0 0;
+            padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+        }
+        .citizen-request-modal__actions {
+            display: grid;
+            grid-template-columns: 1fr 1.35fr;
         }
         .citizen-announcements-stat {
             min-height: 8.25rem;
@@ -1165,6 +1304,39 @@ document.addEventListener('DOMContentLoaded', function () {
     const importantCountNode = document.getElementById('citizenAnnouncementsImportantCount');
     const likeCountNode = document.getElementById('citizenAnnouncementsLikeCount');
     const commentCountNode = document.getElementById('citizenAnnouncementsCommentCount');
+    const requestModal = document.getElementById('citizenCommunityRequestModal');
+    const requestOpenButtons = document.querySelectorAll('[data-community-request-open]');
+    const requestCloseButtons = requestModal?.querySelectorAll('[data-community-request-close]') || [];
+    let requestModalTrigger = null;
+
+    const openRequestModal = (trigger = null) => {
+        if (!requestModal) return;
+        requestModalTrigger = trigger || document.activeElement;
+        requestModal.hidden = false;
+        requestModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('citizen-request-modal-open');
+        window.requestAnimationFrame(() => {
+            requestModal.querySelector('select, input, textarea, button')?.focus({ preventScroll: true });
+        });
+    };
+
+    const closeRequestModal = () => {
+        if (!requestModal) return;
+        if (requestModal.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        requestModal.hidden = true;
+        requestModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('citizen-request-modal-open');
+        requestModalTrigger?.focus?.({ preventScroll: true });
+    };
+
+    requestOpenButtons.forEach((button) => button.addEventListener('click', () => openRequestModal(button)));
+    requestCloseButtons.forEach((button) => button.addEventListener('click', closeRequestModal));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && requestModal && !requestModal.hidden) closeRequestModal();
+    });
+    if (requestModal && !requestModal.hidden) openRequestModal();
 
     if (!feed || !searchInput || !sortSelect || !refreshButton) {
         return;

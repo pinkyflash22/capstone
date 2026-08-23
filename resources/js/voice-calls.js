@@ -42,6 +42,7 @@ let agoraSdkPromise = null;
 let pendingNotificationCallId = null;
 
 const routes = voiceConfig.routes || {};
+const fallbackStations = Array.isArray(voiceConfig.fallbackStations) ? voiceConfig.fallbackStations : [];
 const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
 const AGORA_JOIN_TIMEOUT_MS = 15000;
 const REQUEST_TIMEOUT_MS = 12000;
@@ -61,6 +62,49 @@ async function loadAgoraRtc() {
 
 function routeFor(name, callId = '') {
     return String(routes[name] || '').replace('__CALL__', callId);
+}
+
+function emergencyFallbackStation() {
+    const callable = fallbackStations.filter((station) => String(station?.phone || '').replace(/\D+/g, ''));
+    if (!callable.length) return null;
+
+    const location = currentCallerLocationPayload();
+    const latitude = Number(location.caller_latitude);
+    const longitude = Number(location.caller_longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return callable[0];
+
+    const radians = (degrees) => degrees * (Math.PI / 180);
+    const distance = (station) => {
+        const stationLat = Number(station?.lat);
+        const stationLng = Number(station?.lng);
+        if (!Number.isFinite(stationLat) || !Number.isFinite(stationLng)) return Number.POSITIVE_INFINITY;
+        const latDelta = radians(stationLat - latitude);
+        const lngDelta = radians(stationLng - longitude);
+        const value = Math.sin(latDelta / 2) ** 2
+            + Math.cos(radians(latitude)) * Math.cos(radians(stationLat)) * Math.sin(lngDelta / 2) ** 2;
+        return 6371000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+    };
+
+    return callable.reduce((nearest, station) => distance(station) < distance(nearest) ? station : nearest, callable[0]);
+}
+
+function openEmergencyTelephoneFallback(reason = '') {
+    const station = emergencyFallbackStation();
+    const stationPhone = String(station?.phone || '').replace(/[^\d+]/g, '');
+    if (stationPhone) {
+        toast(`${reason ? `${reason} ` : ''}Opening ${station.name || 'the nearest station'} telephone line.`, 'warning');
+        window.location.assign(`tel:${stationPhone}`);
+        return true;
+    }
+
+    if (['citizen', 'anonymous'].includes(role)) {
+        toast(`${reason ? `${reason} ` : ''}No station telephone is available. Opening 911.`, 'warning');
+        window.location.assign('tel:911');
+        return true;
+    }
+
+    toast('Internet calling is unavailable. Contact your station dispatcher.', 'error');
+    return false;
 }
 
 async function ensureCitizenVoiceSession() {
@@ -1108,8 +1152,12 @@ function callerStatusText(call) {
 }
 
 async function triggerCitizenCall(trigger, event = null) {
-    if (!voiceConfig.configured || !routes.store) return;
     event?.preventDefault?.();
+
+    if (!voiceConfig.configured || !routes.store || !navigator.onLine) {
+        openEmergencyTelephoneFallback(!navigator.onLine ? 'No internet connection.' : 'Internet calling is unavailable.');
+        return;
+    }
 
     activeCallerTrigger = trigger;
     setCallerTriggerState(trigger, 'calling');
@@ -1146,6 +1194,7 @@ async function triggerCitizenCall(trigger, event = null) {
         window.dispatchEvent(new CustomEvent('pyro:voice-call-failed', {
             detail: { error, trigger },
         }));
+        openEmergencyTelephoneFallback('Agora calling could not connect.');
     }
 }
 
@@ -1696,12 +1745,15 @@ function requestNotificationPermissionOnGesture() {
 function initVoiceCalls() {
     if (!voiceConfig.configured) {
         console.warn('PyroSense voice calls are disabled because AGORA_APP_ID is missing.');
-        return;
     }
 
-    document.querySelectorAll('[data-pyro-voice-call]').forEach((button) => {
-        button.addEventListener('click', startCitizenCall);
-    });
+    if (isCaller) {
+        document.querySelectorAll('[data-pyro-voice-call]').forEach((button) => {
+            button.addEventListener('click', startCitizenCall);
+        });
+    }
+
+    if (!voiceConfig.configured) return;
 
     if (isResponder) {
         ensureIncomingPanel();
