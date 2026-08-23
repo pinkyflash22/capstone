@@ -30,6 +30,10 @@ public function index()
             foreach ($posts as $post) {
                 $post->liked_by_user = $post->isLikedBy(auth()->user());
                 $post->can_manage = $post->user_id === auth()->user()->user_id;
+
+                foreach ($post->comments as $comment) {
+                    $comment->can_manage = (int) $comment->user_id === (int) auth()->user()->user_id;
+                }
             }
         }
 
@@ -376,50 +380,121 @@ public function index()
 
     public function comment(Request $request, $postId)
     {
-        $request->validate([
+        $validated = $request->validate([
             'content' => 'required|string|max:1000'
         ]);
 
-        DB::beginTransaction();
-
         try {
-            $comment = Comment::create([
-                'post_id' => $postId,
-                'user_id' => auth()->user()->user_id,
-                'content' => $request->content
-            ]);
+            $comment = DB::transaction(function () use ($postId, $validated) {
+                $post = Post::query()->lockForUpdate()->findOrFail($postId);
+                $comment = $post->comments()->create([
+                    'user_id' => auth()->user()->user_id,
+                    'content' => trim($validated['content']),
+                ]);
+                $post->update(['comments_count' => $post->comments()->count()]);
 
-            Post::where('id', $postId)->increment('comments_count');
+                return $comment;
+            });
 
-            DB::commit();
             Post::flushDashboardRecentPostsCache();
-            UserActivityLogger::log('commented post', auth()->user()?->user_id, $request);
+            $this->logCommentActivity('commented post', $request);
 
             $comment->load('user');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Comment added successfully',
-                'data' => [
-                    'id' => $comment->id,
-                    'content' => $comment->content,
-                    'user' => [
-                        'first_name' => $comment->user->first_name,
-                        'last_name' => $comment->user->last_name,
-                        'avatar' => strtoupper(substr($comment->user->first_name ?? 'U', 0, 1) . substr($comment->user->last_name ?? 'S', 0, 1)),
-                    ],
-                    'time_ago' => $comment->time_ago
-                ]
+                'data' => $this->commentPayload($comment, true),
             ], 201);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-
+        } catch (\Throwable $e) {
+            report($e);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to add comment',
-                'error' => $e->getMessage()
+                'message' => 'Failed to add comment. Please try again.',
             ], 500);
+        }
+    }
+
+    public function updateComment(Request $request, $postId, $commentId)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:1000',
+        ]);
+
+        $comment = $this->ownedComment($postId, $commentId);
+        $comment->update(['content' => trim($validated['content'])]);
+        $comment->load('user');
+
+        Post::flushDashboardRecentPostsCache();
+        $this->logCommentActivity('edited comment', $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment updated successfully',
+            'data' => $this->commentPayload($comment, true),
+        ]);
+    }
+
+    public function destroyComment(Request $request, $postId, $commentId)
+    {
+        $commentsCount = DB::transaction(function () use ($postId, $commentId) {
+            $post = Post::query()->lockForUpdate()->findOrFail($postId);
+            $comment = $this->ownedComment($post->id, $commentId);
+            $comment->delete();
+            $commentsCount = $post->comments()->count();
+            $post->update(['comments_count' => $commentsCount]);
+
+            return $commentsCount;
+        });
+
+        Post::flushDashboardRecentPostsCache();
+        $this->logCommentActivity('deleted comment', $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment deleted successfully',
+            'comments_count' => $commentsCount,
+        ]);
+    }
+
+    private function ownedComment($postId, $commentId): Comment
+    {
+        $comment = Comment::query()
+            ->where('post_id', $postId)
+            ->whereKey($commentId)
+            ->firstOrFail();
+
+        abort_unless((int) $comment->user_id === (int) auth()->user()->user_id, 403, 'You can only manage your own comments.');
+
+        return $comment;
+    }
+
+    private function commentPayload(Comment $comment, bool $canManage): array
+    {
+        return [
+            'id' => $comment->getKey(),
+            'comment_id' => $comment->getKey(),
+            'content' => $comment->content,
+            'user_id' => $comment->user_id,
+            'user' => [
+                'first_name' => $comment->user?->first_name,
+                'last_name' => $comment->user?->last_name,
+                'avatar' => strtoupper(substr($comment->user?->first_name ?? 'U', 0, 1) . substr($comment->user?->last_name ?? 'S', 0, 1)),
+                'profile_thumbnail_url' => $comment->user?->profile_thumbnail_url,
+                'profile_image_url' => $comment->user?->profile_image_url,
+            ],
+            'time_ago' => $comment->time_ago,
+            'can_manage' => $canManage,
+        ];
+    }
+
+    private function logCommentActivity(string $action, Request $request): void
+    {
+        try {
+            UserActivityLogger::log($action, auth()->user()?->user_id, $request);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

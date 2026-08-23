@@ -57,6 +57,7 @@ protected $primaryKey = 'user_id';
         'is_verified',
         'password',
         'image',
+        'profile_thumbnail',
         'google_id',
     ];
 
@@ -72,6 +73,7 @@ protected $primaryKey = 'user_id';
 
     protected $appends = [
         'profile_image_url',
+        'profile_thumbnail_url',
     ];
 
     /**
@@ -214,6 +216,11 @@ protected $primaryKey = 'user_id';
     public function getProfileImageUrlAttribute(): ?string
     {
         return MediaPath::url($this->image);
+    }
+
+    public function getProfileThumbnailUrlAttribute(): ?string
+    {
+        return MediaPath::url($this->profile_thumbnail ?: $this->image);
     }
     public function stations()
 {

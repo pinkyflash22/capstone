@@ -263,6 +263,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/citizen/api/announcements', [App\Http\Controllers\staff\PostController::class, 'getPosts'])->name('citizen.announcements.feed');
         Route::post('/citizen/api/announcements/{post}/like', [App\Http\Controllers\staff\PostController::class, 'like'])->name('citizen.announcements.like');
         Route::post('/citizen/api/announcements/{post}/comment', [App\Http\Controllers\staff\PostController::class, 'comment'])->name('citizen.announcements.comment');
+        Route::put('/citizen/api/announcements/{post}/comment/{comment}', [App\Http\Controllers\staff\PostController::class, 'updateComment'])->name('citizen.announcements.comment.update');
+        Route::delete('/citizen/api/announcements/{post}/comment/{comment}', [App\Http\Controllers\staff\PostController::class, 'destroyComment'])->name('citizen.announcements.comment.destroy');
     });
         // Analytics page
     // Route::get('/admin/analytics', [AnalyticsController::class, 'index'])->name('admin.analytics');

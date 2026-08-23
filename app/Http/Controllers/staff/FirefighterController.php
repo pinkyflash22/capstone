@@ -26,6 +26,7 @@ use App\Services\DutyRosterRecurrenceService;
 use App\Services\IncidentResourceDispatchService;
 use App\Services\IncidentResponderSnapshotService;
 use App\Support\MediaPath;
+use App\Services\ProfileImageService;
 use App\Support\MarkerFeedBuilder;
 use Illuminate\Support\Facades\Auth;
 
@@ -1782,7 +1783,7 @@ public function updateMyProfile(Request $request)
         ->with('success', 'Profile updated.');
 }
 
-public function updateMyProfilePhoto(Request $request)
+public function updateMyProfilePhoto(Request $request, ProfileImageService $profileImages)
 {
     $user = User::where('user_id', Auth::user()->user_id)->firstOrFail();
 
@@ -1790,16 +1791,7 @@ public function updateMyProfilePhoto(Request $request)
         'profile_image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
     ]);
 
-    if (filled($user->image) && !str_starts_with((string) $user->image, 'http')) {
-        MediaPath::delete($user->image);
-    }
-
-    $storedPath = $validated['profile_image']->store('profile', 'supabase');
-    $path = MediaPath::storeForDisk($storedPath, 'supabase');
-
-    $user->update([
-        'image' => $path,
-    ]);
+    $user = $profileImages->replace($user, $validated['profile_image']);
 
     UserActivityLogger::log('updated firefighter profile photo', Auth::user()?->user_id, $request);
 
@@ -1811,7 +1803,8 @@ public function updateMyProfilePhoto(Request $request)
             'last_name' => $user->last_name,
             'name' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'Firefighter',
             'initials' => strtoupper(substr($user->first_name ?? 'F', 0, 1) . substr($user->last_name ?? 'R', 0, 1)),
-            'image_url' => MediaPath::url($path),
+            'image_url' => $user->profile_image_url,
+            'thumbnail_url' => $user->profile_thumbnail_url,
         ],
     ]);
 }

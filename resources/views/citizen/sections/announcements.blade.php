@@ -657,12 +657,23 @@
         height: 48px;
         flex-shrink: 0;
         border-radius: 999px;
+        position: relative;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
         color: #fff;
         background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+    }
+    .citizen-announcement-avatar img,
+    .citizen-media-drawer-avatar img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
     }
     .citizen-announcement-name {
         color: #172033;
@@ -805,11 +816,26 @@
     .citizen-announcement-comment-submit {
         border: 0;
         border-radius: 999px;
-        padding: 0.8rem 1rem;
+        width: 44px;
+        height: 44px;
+        padding: 0;
         background: #ea580c;
         color: #fff;
         font-weight: 700;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .citizen-announcement-comment-submit:hover {
+        background: #c2410c;
+        transform: translateY(-1px);
+    }
+    .citizen-announcement-comment-submit:focus-visible,
+    .citizen-announcement-comment-control:focus-visible {
+        outline: 3px solid rgba(234, 88, 12, 0.22);
+        outline-offset: 2px;
     }
     .citizen-announcements-mobile-bottom-space {
         display: none;
@@ -827,6 +853,8 @@
         height: 34px;
         flex-shrink: 0;
         border-radius: 999px;
+        position: relative;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -834,6 +862,15 @@
         font-weight: 800;
         font-size: 0.75rem;
         background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+    }
+    .citizen-announcement-comment-avatar img,
+    .citizen-media-drawer-comment-avatar img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
     }
     .citizen-announcement-comment-body {
         flex: 1;
@@ -858,6 +895,52 @@
         margin-top: 0.35rem;
         color: #94a3b8;
         font-size: 0.76rem;
+    }
+    .citizen-announcement-comment-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+    .citizen-announcement-comment-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+    }
+    .citizen-announcement-comment-control {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .citizen-announcement-comment-control:hover {
+        background: #f1f5f9;
+        color: #c2410c;
+    }
+    .citizen-announcement-comment-control.delete:hover {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+    .citizen-announcement-comment-editor {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 0.45rem;
+    }
+    .citizen-announcement-comment-edit-input {
+        min-width: 0;
+        border: 1px solid #fdba74;
+        border-radius: 0.8rem;
+        padding: 0.65rem 0.75rem;
+        color: #172033;
+        outline: none;
     }
     .citizen-announcement-comment-empty {
         color: #94a3b8;
@@ -933,6 +1016,8 @@
         height: 44px;
         flex-shrink: 0;
         border-radius: 50%;
+        position: relative;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -999,6 +1084,8 @@
         height: 34px;
         flex-shrink: 0;
         border-radius: 50%;
+        position: relative;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1268,14 +1355,14 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 0.55rem;
         }
-        .citizen-announcement-action,
-        .citizen-announcement-comment-submit {
+        .citizen-announcement-action {
             justify-content: center;
             padding: 0.68rem 0.75rem;
             font-size: 0.8rem;
         }
         .citizen-announcement-comment-form {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.5rem;
         }
         .citizen-announcement-comment-input {
             border-radius: 1rem;
@@ -1347,6 +1434,8 @@ document.addEventListener('DOMContentLoaded', function () {
         filteredPosts: [],
         loading: false,
         activeMediaPostId: null,
+        openCommentPostIds: new Set(),
+        editingCommentKey: null,
     };
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -1370,6 +1459,21 @@ document.addEventListener('DOMContentLoaded', function () {
             .slice(0, 2)
             .map(part => part.charAt(0).toUpperCase())
             .join('') || 'PS';
+    }
+
+    function renderPosterAvatar(user = {}, className = 'citizen-announcement-avatar') {
+        const name = getFullName(user);
+        const initials = escapeHtml(getInitials(user));
+        const imageUrl = String(user.profile_thumbnail_url || user.profile_image_url || '').trim();
+        const image = imageUrl
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)} profile picture" loading="lazy" onerror="this.remove()">`
+            : '';
+
+        return `<div class="${className}" aria-label="${escapeHtml(name)}">${initials}${image}</div>`;
+    }
+
+    function renderCommenterAvatar(user = {}, className = 'citizen-announcement-comment-avatar') {
+        return renderPosterAvatar(user, className);
     }
 
     function getRole(user = {}) {
@@ -1430,16 +1534,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return `
             <div class="citizen-announcement-comment-list">
-                ${comments.map((comment) => `
+                ${comments.map((comment) => {
+                    const commentId = Number(comment.id ?? comment.comment_id);
+                    const commentKey = `${post.id}:${commentId}`;
+                    const isEditing = announcementState.editingCommentKey === commentKey;
+                    const controls = comment.can_manage ? `
+                        <div class="citizen-announcement-comment-controls" aria-label="Comment actions">
+                            <button type="button" class="citizen-announcement-comment-control" title="Edit comment" aria-label="Edit comment" onclick="window.citizenAnnouncementSystem?.beginEditComment(${post.id}, ${commentId})">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button type="button" class="citizen-announcement-comment-control delete" title="Delete comment" aria-label="Delete comment" onclick="window.citizenAnnouncementSystem?.deleteComment(${post.id}, ${commentId})">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
+                    ` : '';
+
+                    return `
                     <div class="citizen-announcement-comment">
-                        <div class="citizen-announcement-comment-avatar">${escapeHtml(getInitials(comment.user))}</div>
+                        ${renderCommenterAvatar(comment.user)}
                         <div class="citizen-announcement-comment-body">
                             <div class="citizen-announcement-comment-author">${escapeHtml(getFullName(comment.user))}</div>
-                            <div class="citizen-announcement-comment-text">${escapeHtml(comment.content || '')}</div>
-                            <div class="citizen-announcement-comment-time">${escapeHtml(comment.time_ago || 'just now')}</div>
+                            ${isEditing ? `
+                                <div class="citizen-announcement-comment-editor">
+                                    <input type="text" id="citizenAnnouncementCommentEdit-${post.id}-${commentId}" class="citizen-announcement-comment-edit-input" maxlength="1000" value="${escapeHtml(comment.content || '')}" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); window.citizenAnnouncementSystem?.saveComment(${post.id}, ${commentId}); }">
+                                    <button type="button" class="citizen-announcement-comment-control" title="Save comment" aria-label="Save comment" onclick="window.citizenAnnouncementSystem?.saveComment(${post.id}, ${commentId})"><i class="fa-solid fa-check"></i></button>
+                                    <button type="button" class="citizen-announcement-comment-control" title="Cancel editing" aria-label="Cancel editing" onclick="window.citizenAnnouncementSystem?.cancelEditComment()"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            ` : `<div class="citizen-announcement-comment-text">${escapeHtml(comment.content || '')}</div>`}
+                            <div class="citizen-announcement-comment-meta">
+                                <div class="citizen-announcement-comment-time">${escapeHtml(comment.time_ago || 'just now')}</div>
+                                ${isEditing ? '' : controls}
+                            </div>
                         </div>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
         `;
     }
@@ -1519,7 +1647,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <article class="citizen-announcement-card">
                     <div class="citizen-announcement-head">
                         <div class="citizen-announcement-author">
-                            <div class="citizen-announcement-avatar">${escapeHtml(getInitials(post.user))}</div>
+                            ${renderPosterAvatar(post.user)}
                             <div>
                                 <div class="citizen-announcement-name">${escapeHtml(authorName)}</div>
                                 <div class="citizen-announcement-role">${escapeHtml(authorRole)}</div>
@@ -1547,11 +1675,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 Comment
                             </button>
                         </div>
-                        <div class="citizen-announcement-comments" id="citizenAnnouncementComments-${post.id}">
+                        <div class="citizen-announcement-comments ${announcementState.openCommentPostIds.has(Number(post.id)) ? 'active' : ''}" id="citizenAnnouncementComments-${post.id}">
                             <div class="citizen-announcement-comment-form">
-                                <input type="text" id="citizenAnnouncementCommentInput-${post.id}" class="citizen-announcement-comment-input" maxlength="1000" placeholder="Write a comment...">
-                                <button type="button" class="citizen-announcement-comment-submit" onclick="window.citizenAnnouncementSystem?.addComment(${post.id})">
-                                    Post
+                                <input type="text" id="citizenAnnouncementCommentInput-${post.id}" class="citizen-announcement-comment-input" maxlength="1000" placeholder="Write a comment..." onkeydown="if(event.key === 'Enter'){ event.preventDefault(); window.citizenAnnouncementSystem?.addComment(${post.id}); }">
+                                <button type="button" class="citizen-announcement-comment-submit" title="Send comment" aria-label="Send comment" onclick="window.citizenAnnouncementSystem?.addComment(${post.id})">
+                                    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
                                 </button>
                             </div>
                             ${renderComments(post)}
@@ -1567,6 +1695,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById(`citizenAnnouncementComments-${postId}`);
         if (!container) return;
         container.classList.toggle('active');
+        if (container.classList.contains('active')) {
+            announcementState.openCommentPostIds.add(Number(postId));
+        } else {
+            announcementState.openCommentPostIds.delete(Number(postId));
+        }
         if (container.classList.contains('active')) {
             document.getElementById(`citizenAnnouncementCommentInput-${postId}`)?.focus();
         }
@@ -1592,7 +1725,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         head.innerHTML = `
             <div class="citizen-media-drawer-author">
-                <div class="citizen-media-drawer-avatar">${escapeHtml(getInitials(post.user))}</div>
+                ${renderPosterAvatar(post.user, 'citizen-media-drawer-avatar')}
                 <div>
                     <div class="citizen-media-drawer-name">${escapeHtml(getFullName(post.user))}</div>
                     <div class="citizen-media-drawer-meta">${escapeHtml(getRole(post.user))} | ${escapeHtml(post.time_ago || 'Recently')}</div>
@@ -1606,7 +1739,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="citizen-media-drawer-comments">
                     ${(post.comments || []).map((comment) => `
                         <div class="citizen-media-drawer-comment">
-                            <div class="citizen-media-drawer-comment-avatar">${escapeHtml(getInitials(comment.user))}</div>
+                            ${renderCommenterAvatar(comment.user, 'citizen-media-drawer-comment-avatar')}
                             <div class="citizen-media-drawer-comment-body">
                                 <div class="citizen-media-drawer-comment-author">${escapeHtml(getFullName(comment.user))}</div>
                                 <div class="citizen-media-drawer-comment-text">${escapeHtml(comment.content || '')}</div>
@@ -1721,16 +1854,99 @@ document.addEventListener('DOMContentLoaded', function () {
             if (post) {
                 post.comments = Array.isArray(post.comments) ? post.comments : [];
                 post.comments.push(result.data);
-                post.comments_count = Number(post.comments_count || 0) + 1;
+                post.comments_count = post.comments.length;
                 input.value = '';
+                announcementState.openCommentPostIds.add(Number(postId));
                 applyFilters();
-                setTimeout(() => {
-                    document.getElementById(`citizenAnnouncementComments-${postId}`)?.classList.add('active');
-                }, 0);
             }
         } catch (error) {
             console.error('Citizen announcement comment failed:', error);
             window.showCitizenToast?.(error.message || 'Failed to add comment.', true, 3200);
+        }
+    }
+
+    function beginEditComment(postId, commentId) {
+        announcementState.openCommentPostIds.add(Number(postId));
+        announcementState.editingCommentKey = `${postId}:${commentId}`;
+        applyFilters();
+        requestAnimationFrame(() => {
+            const input = document.getElementById(`citizenAnnouncementCommentEdit-${postId}-${commentId}`);
+            input?.focus();
+            input?.select();
+        });
+    }
+
+    function cancelEditComment() {
+        announcementState.editingCommentKey = null;
+        applyFilters();
+    }
+
+    async function saveComment(postId, commentId) {
+        const input = document.getElementById(`citizenAnnouncementCommentEdit-${postId}-${commentId}`);
+        const content = input?.value.trim();
+        if (!input || !content) {
+            window.showCitizenToast?.('A comment cannot be empty.', true, 2800);
+            return;
+        }
+
+        input.disabled = true;
+        try {
+            const response = await fetch(`/citizen/api/announcements/${postId}/comment/${commentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ content })
+            });
+            const result = await response.json();
+            if (!response.ok || result.success === false) {
+                throw new Error(result.message || 'Failed to update comment.');
+            }
+
+            const post = announcementState.posts.find((item) => Number(item.id) === Number(postId));
+            const index = post?.comments?.findIndex((comment) => Number(comment.id ?? comment.comment_id) === Number(commentId)) ?? -1;
+            if (post && index >= 0) post.comments[index] = result.data;
+            announcementState.editingCommentKey = null;
+            applyFilters();
+            window.showCitizenToast?.('Comment updated.', false, 2200);
+        } catch (error) {
+            input.disabled = false;
+            console.error('Citizen comment update failed:', error);
+            window.showCitizenToast?.(error.message || 'Failed to update comment.', true, 3200);
+        }
+    }
+
+    async function deleteComment(postId, commentId) {
+        if (!window.confirm('Delete this comment?')) return;
+
+        try {
+            const response = await fetch(`/citizen/api/announcements/${postId}/comment/${commentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                }
+            });
+            const result = await response.json();
+            if (!response.ok || result.success === false) {
+                throw new Error(result.message || 'Failed to delete comment.');
+            }
+
+            const post = announcementState.posts.find((item) => Number(item.id) === Number(postId));
+            if (post) {
+                post.comments = (post.comments || []).filter((comment) => Number(comment.id ?? comment.comment_id) !== Number(commentId));
+                post.comments_count = Number(result.comments_count ?? post.comments.length);
+            }
+            if (announcementState.editingCommentKey === `${postId}:${commentId}`) {
+                announcementState.editingCommentKey = null;
+            }
+            applyFilters();
+            window.showCitizenToast?.('Comment deleted.', false, 2200);
+        } catch (error) {
+            console.error('Citizen comment deletion failed:', error);
+            window.showCitizenToast?.(error.message || 'Failed to delete comment.', true, 3200);
         }
     }
 
@@ -1839,6 +2055,10 @@ document.addEventListener('DOMContentLoaded', function () {
         likePost,
         toggleComments,
         addComment,
+        beginEditComment,
+        cancelEditComment,
+        saveComment,
+        deleteComment,
         loadAnnouncements,
         openMediaDrawer,
         closeMediaDrawer,

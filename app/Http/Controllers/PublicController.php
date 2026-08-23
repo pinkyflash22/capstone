@@ -18,6 +18,7 @@ use App\Models\StationOfficer;
 use App\Models\User;
 use App\Services\BoundaryMatcherService;
 use App\Support\MediaPath;
+use App\Services\ProfileImageService;
 use App\Support\RiskAreaFollowUpDispatcher;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
@@ -876,7 +877,7 @@ class PublicController extends Controller
         return 1;
     }
 
-    public function updateProfile(Request $request)
+    public function updateProfile(Request $request, ProfileImageService $profileImages)
     {
         $user = User::with('address')->findOrFail(Auth::id());
 
@@ -934,12 +935,7 @@ class PublicController extends Controller
         }
 
         if ($request->hasFile('profile_image')) {
-            if ($user->image && ! str_starts_with((string) $user->image, 'http://') && ! str_starts_with((string) $user->image, 'https://')) {
-                MediaPath::delete($user->image);
-            }
-
-            $storedPath = $request->file('profile_image')->store('profile', 'supabase');
-            $user->image = MediaPath::storeForDisk($storedPath, 'supabase');
+            $user = $profileImages->replace($user, $request->file('profile_image'));
         }
 
         $user->save();
@@ -977,7 +973,7 @@ class PublicController extends Controller
             ->with('open_section', 'profile');
     }
 
-    public function updateProfilePhoto(Request $request)
+    public function updateProfilePhoto(Request $request, ProfileImageService $profileImages)
     {
         $user = User::with(['role', 'address.barangay.city'])->findOrFail(Auth::id());
 
@@ -990,13 +986,7 @@ class PublicController extends Controller
             'profile_image.max' => 'Profile photo must not exceed 5 MB.',
         ]);
 
-        if ($user->image && ! str_starts_with((string) $user->image, 'http://') && ! str_starts_with((string) $user->image, 'https://')) {
-            MediaPath::delete($user->image);
-        }
-
-        $storedPath = $validated['profile_image']->store('profile', 'supabase');
-        $user->image = MediaPath::storeForDisk($storedPath, 'supabase');
-        $user->save();
+        $user = $profileImages->replace($user, $validated['profile_image']);
 
         UserActivityLogger::log('updated profile photo', Auth::user()?->user_id, $request);
 
@@ -1018,7 +1008,8 @@ class PublicController extends Controller
                 'city' => $user->address?->barangay?->city?->city_name,
                 'city_id' => $user->address?->barangay?->city?->city_id,
                 'image' => $user->image,
-                'image_url' => MediaPath::url($user->image),
+                'image_url' => $user->profile_image_url,
+                'thumbnail_url' => $user->profile_thumbnail_url,
             ],
         ]);
     }
