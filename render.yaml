@@ -101,6 +101,11 @@ services:
         # keeps the production database aligned with the deployed code.
         value: "true"
 
+      - key: RUN_DAILY_WEATHER_WORKER
+        # Runs only the idempotent daily weather collector inside the existing
+        # web container, avoiding a separately billed Render Cron service.
+        value: "true"
+
       # OpenRouter
       - key: OPENROUTER_MODEL
         sync: false

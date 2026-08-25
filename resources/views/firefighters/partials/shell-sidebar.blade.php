@@ -26,7 +26,16 @@
     ];
     $firefighterInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'R', 0, 1));
     $firefighterImageUrl = \App\Support\MediaPath::url(auth()->user()->image ?? null);
-    $mobileDockIsOpsActive = in_array($currentActive, ['dashboard', 'incidents', 'risk-reviews', 'cooperation', 'station', 'equipment', 'fsic'], true);
+    $mobileDockIsOpsActive = $currentActive === 'dashboard';
+    $mobileMenuItems = [
+        ['label' => 'Incidents', 'description' => 'Review active incidents and field assignments.', 'route' => 'firefighter.incidents', 'active' => ['incidents'], 'key' => 'incidents', 'icon' => 'local_fire_department'],
+        ['label' => 'Risk Reviews', 'description' => 'Verify risk and hazard submissions for your station.', 'route' => 'firefighter.risk-reviews.index', 'active' => ['risk-reviews'], 'key' => 'risk-reviews', 'icon' => 'fact_check'],
+        ['label' => 'Checklist', 'description' => 'Review barangay plans and update assigned steps.', 'route' => 'firefighter.barangay-cooperation.index', 'active' => ['cooperation'], 'key' => 'cooperation', 'icon' => 'checklist'],
+        ['label' => 'My Station', 'description' => 'Open personnel, apparatus, and investigation reports.', 'route' => 'firefighter.my-station', 'active' => ['station'], 'key' => 'station', 'icon' => 'apartment'],
+        ['label' => 'Requests', 'description' => 'Manage equipment and service requests.', 'route' => 'firefighter.equipments', 'active' => ['equipment', 'fsic'], 'key' => 'equipment', 'icon' => 'assignment'],
+    ];
+    $mobileMenuIsActive = $currentActive === 'profile'
+        || collect($mobileMenuItems)->contains(fn (array $item) => in_array($currentActive, $item['active'], true));
 @endphp
 
 <style>
@@ -141,6 +150,21 @@
         gap: 12px;
     }
 
+    .ff-mobile-panel__section-label {
+        margin: 2px 4px -4px;
+        color: #9a3412;
+        font-size: 0.68rem;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .ff-mobile-panel__divider {
+        height: 1px;
+        margin: 4px 2px;
+        background: rgba(148, 163, 184, 0.22);
+    }
+
     .ff-mobile-panel__action {
         width: 100%;
         display: flex;
@@ -158,6 +182,11 @@
     .ff-mobile-panel__action--button {
         appearance: none;
         text-align: left;
+    }
+
+    .ff-mobile-panel__action.active {
+        border-color: rgba(198, 61, 38, 0.3);
+        background: rgba(255, 247, 237, 0.98);
     }
 
     .ff-mobile-panel__action-icon {
@@ -190,6 +219,15 @@
         font-size: 0.75rem;
         line-height: 1.35;
         color: #64748b;
+    }
+
+    .ff-mobile-panel__action-trailing {
+        width: 24px;
+        height: 24px;
+        margin-left: auto;
+        color: #94a3b8;
+        font-size: 20px;
+        flex-shrink: 0;
     }
 
     .ff-mobile-panel__action--danger {
@@ -542,6 +580,7 @@
             color: rgba(214, 227, 230, 0.5);
             display: inline-flex !important;
             align-items: center;
+            flex-direction: column;
             justify-content: center;
             justify-self: center;
             text-decoration: none;
@@ -627,6 +666,19 @@
             width: 20px;
             height: 20px;
             font-size: 20px;
+        }
+
+        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__label {
+            display: block;
+            max-width: 52px;
+            margin-top: 2px;
+            overflow: hidden;
+            color: currentColor;
+            font-size: 8px;
+            font-weight: 750;
+            line-height: 1;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__center {
@@ -876,9 +928,11 @@
             <div class="ff-mobile-dock__group ff-mobile-dock__group--left">
                 <a href="{{ route('firefighter.schedule') }}" class="ff-mobile-dock__item {{ $currentActive === 'schedule' ? 'active' : '' }}" aria-label="Schedule" data-ff-nav-link data-ff-nav-key="schedule">
                     <span class="ff-mobile-icon" aria-hidden="true">calendar_month</span>
+                    <span class="ff-mobile-dock__label">Schedule</span>
                 </a>
                 <button type="button" class="ff-mobile-dock__item" data-ff-open-notifications aria-label="Notifications">
                     <span class="ff-mobile-icon" aria-hidden="true">notifications</span>
+                    <span class="ff-mobile-dock__label">Alerts</span>
                 </button>
             </div>
             <button type="button" class="ff-mobile-dock__center {{ $mobileDockIsOpsActive ? 'active' : '' }}" data-ff-dashboard-fab aria-label="Dashboard">
@@ -887,9 +941,11 @@
             <div class="ff-mobile-dock__group ff-mobile-dock__group--right">
                 <a href="{{ route('firefighter.announcements') }}" class="ff-mobile-dock__item {{ $currentActive === 'announcements' ? 'active' : '' }}" aria-label="Announcements" data-ff-nav-link data-ff-nav-key="announcements">
                     <span class="ff-mobile-icon" aria-hidden="true">campaign</span>
+                    <span class="ff-mobile-dock__label">Updates</span>
                 </a>
-                <button type="button" class="ff-mobile-dock__item {{ $currentActive === 'profile' ? 'active' : '' }}" data-ff-open-settings aria-label="Settings">
-                    <span class="ff-mobile-icon" aria-hidden="true">settings</span>
+                <button type="button" class="ff-mobile-dock__item {{ $mobileMenuIsActive ? 'active' : '' }}" data-ff-open-settings aria-label="Open Responder Hub menu">
+                    <span class="ff-mobile-icon" aria-hidden="true">menu</span>
+                    <span class="ff-mobile-dock__label">Menu</span>
                 </button>
             </div>
         </div>
@@ -963,19 +1019,33 @@
         <div class="ff-mobile-panel__header">
             <div>
                 <p class="ff-mobile-panel__eyebrow">Responder Hub</p>
-                <h2 class="ff-mobile-panel__title">Settings</h2>
+                <h2 class="ff-mobile-panel__title">Menu</h2>
             </div>
-            <button type="button" class="ff-mobile-panel__close" data-ff-close-panel aria-label="Close settings">
+            <button type="button" class="ff-mobile-panel__close" data-ff-close-panel aria-label="Close menu">
                 <span class="ff-mobile-icon" aria-hidden="true">close</span>
             </button>
         </div>
         <div class="ff-mobile-panel__list">
+            <p class="ff-mobile-panel__section-label">Responder navigation</p>
+            @foreach ($mobileMenuItems as $item)
+                <a href="{{ route($item['route']) }}" class="ff-mobile-panel__action {{ count(array_intersect($item['active'], [$currentActive])) ? 'active' : '' }}" data-ff-nav-link data-ff-nav-key="{{ $item['key'] }}">
+                    <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">{{ $item['icon'] }}</span></span>
+                    <span class="ff-mobile-panel__copy">
+                        <strong>{{ $item['label'] }}</strong>
+                        <small>{{ $item['description'] }}</small>
+                    </span>
+                    <span class="ff-mobile-icon ff-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </a>
+            @endforeach
+            <div class="ff-mobile-panel__divider" aria-hidden="true"></div>
+            <p class="ff-mobile-panel__section-label">Account</p>
             <a href="{{ route('firefighter.my-profile') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="profile">
                 <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">person</span></span>
                 <span class="ff-mobile-panel__copy">
                     <strong>My Profile</strong>
                     <small>Update personal details and firefighter account info.</small>
                 </span>
+                <span class="ff-mobile-icon ff-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </a>
             <button type="button" class="ff-mobile-panel__action ff-mobile-panel__action--button" data-ff-open-logs>
                 <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">history</span></span>
@@ -983,6 +1053,7 @@
                     <strong>My Logs</strong>
                     <small>View recent activity and submitted firefighter actions.</small>
                 </span>
+                <span class="ff-mobile-icon ff-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </button>
             <form method="POST" action="{{ route('logout') }}" data-firefighter-logout-form>
                 @csrf

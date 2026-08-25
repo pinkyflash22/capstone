@@ -42,7 +42,7 @@ class PredictedRiskAreaService
 
             foreach ($predictions as $prediction) {
                 $barangayId = (int) $prediction['barangay_id'];
-                $dedupeKey = $overlayType . ':' . $barangayId;
+                $dedupeKey = $overlayType.':'.$barangayId;
                 if (isset($seen[$dedupeKey])) {
                     continue;
                 }
@@ -70,7 +70,7 @@ class PredictedRiskAreaService
                     'id' => "{$overlayType}-{$analysis->analysis_id}-{$barangayId}",
                     'overlay_type' => $overlayType,
                     'source_type' => 'saved_ai_forecast',
-                    'name' => ($prediction['barangay_name'] ?? $location->barangay_name) . ' fire-risk forecast',
+                    'name' => ($prediction['barangay_name'] ?? $location->barangay_name).' fire-risk forecast',
                     'barangay_id' => $barangayId,
                     'barangay_names' => [$prediction['barangay_name'] ?? $location->barangay_name],
                     'city_name' => $prediction['city_name'] ?? $location->city_name,
@@ -225,6 +225,7 @@ class PredictedRiskAreaService
             ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
             ->whereNotNull('markers.lat')
             ->whereNotNull('markers.lng')
+            ->where('historical_fire_incidents.incident_count', '>', 0)
             ->where(function ($query) {
                 $query->whereNull('historical_fire_incidents.is_verified')
                     ->orWhere('historical_fire_incidents.is_verified', true);
@@ -259,7 +260,7 @@ class PredictedRiskAreaService
                     'lat' => (float) $row->lat,
                     'lng' => (float) $row->lng,
                     'incident_date' => $row->incident_date,
-                    'incident_count' => max(1, (int) ($row->incident_count ?? 1)),
+                    'incident_count' => max(0, (int) ($row->incident_count ?? 0)),
                     'injured_count' => (int) ($row->injured_count ?? 0),
                     'death_count' => (int) ($row->death_count ?? 0),
                     'estimated_damage' => $row->estimated_damage !== null ? (float) $row->estimated_damage : 0.0,
@@ -296,6 +297,7 @@ class PredictedRiskAreaService
             ->get()
             ->map(function ($row) {
                 $row->geojson = $this->decodeJsonArray($row->geojson);
+
                 return $row;
             })
             ->sortByDesc(fn ($row) => [
@@ -318,6 +320,7 @@ class PredictedRiskAreaService
         }
 
         $decoded = json_decode($value, true);
+
         return is_array($decoded) ? $decoded : [];
     }
 
@@ -490,8 +493,8 @@ class PredictedRiskAreaService
             ->all();
 
         return [
-            'id' => 'predicted-zone-' . ($index + 1),
-            'name' => 'Predicted fire-risk zone near ' . $primaryBarangay,
+            'id' => 'predicted-zone-'.($index + 1),
+            'name' => 'Predicted fire-risk zone near '.$primaryBarangay,
             'city_name' => $cityNames->isNotEmpty() ? $cityNames->implode(', ') : 'Clustered nearby evidence',
             'barangay_id' => $primaryRiskPoint['barangay_id'] ?? null,
             'barangay_names' => $barangayNames->keys()->values()->all(),
@@ -504,7 +507,7 @@ class PredictedRiskAreaService
             'supporting_risk_count' => $riskPoints->count(),
             'risk_level' => $riskLevel,
             'risk_score' => $weightedScore,
-            'risk_label' => ucfirst($riskLevel) . ' predicted fire-risk zone',
+            'risk_label' => ucfirst($riskLevel).' predicted fire-risk zone',
             'drivers' => $this->clusterDrivers(
                 $highAssessments,
                 $moderateAssessments,

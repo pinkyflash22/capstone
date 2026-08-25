@@ -20,6 +20,7 @@
                 ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
                 ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
                 ['label' => 'Fire Risk Forecast', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
+                ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 17a4 4 0 1 1 1.2-7.8A5.5 5.5 0 0 1 18.8 11H19a3 3 0 0 1 0 6z"/><path d="M8 20l-1 2M13 20l-1 2M18 20l-1 2"/></svg>'],
                 ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'icon' => '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>'],
                 ['label' => 'Executive Reports', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>'],
                 ['label' => 'Activity Schedule', 'route' => 'station-admin.schedule', 'active' => 'schedule', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3v4"/><path d="M17 3v4"/><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M13 14h3"/><path d="M8 17h3"/></svg>'],
@@ -36,7 +37,7 @@
         ['label' => 'Activity Schedule', 'route' => 'station-admin.schedule', 'active' => 'schedule', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3v4"/><path d="M17 3v4"/><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M13 14h3"/><path d="M8 17h3"/></svg>', 'mobile_icon' => 'event'],
         ['label' => 'Notifications', 'active' => 'notifications', 'mobile_icon' => 'notifications'],
         ['label' => 'Fire Risk Forecast', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>', 'mobile_icon' => 'monitoring'],
-        ['label' => 'Settings', 'active' => 'settings', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3.75l1.12 2.26 2.5.37-1.81 1.77.43 2.5L12 9.47l-2.24 1.18.43-2.5-1.81-1.77 2.5-.37L12 3.75z"/><circle cx="12" cy="12" r="3.25"/><path d="M4.8 14.2l1.92.34.67 1.63-1.11 1.61 1.53 1.53 1.61-1.11 1.63.67.34 1.92h2.16l.34-1.92 1.63-.67 1.61 1.11 1.53-1.53-1.11-1.61.67-1.63 1.92-.34v-2.16l-1.92-.34-.67-1.63 1.11-1.61-1.53-1.53-1.61 1.11-1.63-.67-.34-1.92h-2.16l-.34 1.92-1.63.67-1.61-1.11-1.53 1.53 1.11 1.61-.67 1.63-1.92.34z"/></svg>', 'mobile_icon' => 'settings'],
+        ['label' => 'Menu', 'active' => 'menu', 'mobile_icon' => 'menu'],
     ];
     $mobileCenterItem = ['label' => 'Operations Room', 'route' => 'station-admin.dashboard', 'active' => 'dashboard', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>', 'mobile_icon' => 'dashboard'];
     $mobileCenterActions = [
@@ -49,7 +50,9 @@
         ['label' => 'Station Management', 'route' => 'station-admin.management', 'active' => 'management', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 20V5l7-2v17"/><path d="M12 20V9h7v11"/><path d="M8 8h1M8 11h1M8 14h1M15 12h1M15 15h1"/></svg>', 'mobile_icon' => 'apartment'],
         ['label' => 'Announcements', 'route' => 'station-admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>', 'mobile_icon' => 'campaign'],
         ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
+        ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
     ];
+    $mobileMenuIsActive = $active === 'profile' || in_array($active, array_column($mobileCenterActions, 'active'), true);
 @endphp
 
 @if ($active !== 'dashboard')
@@ -152,10 +155,12 @@
         <div class="chief-mobile-dock__track">
             <a href="{{ route($mobileDockItems[0]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[0]['mobile_icon'] }}</span>
+                <span class="chief-mobile-dock__label">Schedule</span>
             </a>
 
             <button type="button" class="chief-mobile-dock__item" aria-label="{{ $mobileDockItems[1]['label'] }}" data-chief-notifications-open>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
+                <span class="chief-mobile-dock__label">Alerts</span>
             </button>
 
             <div class="chief-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-chief-nav-center>
@@ -187,10 +192,12 @@
 
             <a href="{{ route($mobileDockItems[2]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[2]['mobile_icon'] }}</span>
+                <span class="chief-mobile-dock__label">Forecast</span>
             </a>
 
-            <button type="button" class="chief-mobile-dock__item {{ $active === 'profile' ? 'active' : '' }}" aria-label="{{ $mobileDockItems[3]['label'] }}" data-chief-settings-open>
+            <button type="button" class="chief-mobile-dock__item {{ $mobileMenuIsActive ? 'active' : '' }}" aria-label="Open Chief Command menu" data-chief-settings-open>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[3]['mobile_icon'] }}</span>
+                <span class="chief-mobile-dock__label">Menu</span>
             </button>
         </div>
     </div>
@@ -201,19 +208,33 @@
         <div class="chief-mobile-panel__header">
             <div>
                 <p class="chief-mobile-panel__eyebrow">Chief Command</p>
-                <h2 class="chief-mobile-panel__title">Settings</h2>
+                <h2 class="chief-mobile-panel__title">Menu</h2>
             </div>
-            <button type="button" class="chief-mobile-panel__close" data-chief-panel-close aria-label="Close settings">
+            <button type="button" class="chief-mobile-panel__close" data-chief-panel-close aria-label="Close menu">
                 <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">close</span>
             </button>
         </div>
         <div class="chief-mobile-panel__menu">
+            <p class="chief-mobile-panel__menu-label">Command navigation</p>
+            @foreach ($mobileCenterActions as $action)
+                <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
+                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                    <span class="chief-mobile-panel__action-copy">
+                        <strong>{{ $action['label'] }}</strong>
+                        <small>Open {{ strtolower($action['label']) }}</small>
+                    </span>
+                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </a>
+            @endforeach
+            <div class="chief-mobile-panel__menu-divider" aria-hidden="true"></div>
+            <p class="chief-mobile-panel__menu-label">Account</p>
             <button type="button" class="chief-mobile-panel__action" data-chief-open-logs>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">history</span>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Logs</strong>
                     <small>View your recent activity</small>
                 </span>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </button>
             <a href="{{ route('station-admin.profile') }}" class="chief-mobile-panel__action">
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">person</span>
@@ -221,6 +242,7 @@
                     <strong>Profile</strong>
                     <small>Manage your commander account</small>
                 </span>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

@@ -4,9 +4,11 @@ use App\Jobs\SyncBarangayBoundaryJob;
 use App\Models\Incident;
 use App\Services\DutyRosterRecurrenceService;
 use App\Services\DutyRosterService;
+use App\Services\DailyWeatherContextService;
 use App\Services\IncidentAutoAssignmentService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Services\StationBarangayCoverageService;
+use App\Support\HistoricalFireRecordSemantics;
 use App\Support\PythonRuntime;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
@@ -15,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 
 Artisan::command('coverage:sync-stations {--station=}', function (StationBarangayCoverageService $service) {
     $stationId = $this->option('station');
@@ -104,6 +107,44 @@ Schedule::command('coverage:sync-stations')
 
 Schedule::command('boundaries:sync-covered')
     ->dailyAt('02:00')
+    ->withoutOverlapping();
+
+Artisan::command('weather:collect-daily {--date=} {--station=} {--catch-up=0}', function (DailyWeatherContextService $service) {
+    $date = $this->option('date')
+        ? Carbon::parse((string) $this->option('date'), 'Asia/Manila')
+        : Carbon::now('Asia/Manila')->subDay();
+    $station = $this->option('station');
+    $stationId = $station !== null && $station !== '' ? (int) $station : null;
+
+    try {
+        $catchUpDays = max(0, min(31, (int) $this->option('catch-up')));
+        $summary = $catchUpDays > 0
+            ? $service->collectMissingRecentDays($catchUpDays, $stationId)
+            : $service->collectDate($date, $stationId);
+    } catch (\Throwable $exception) {
+        $this->error($exception->getMessage());
+
+        return 1;
+    }
+
+    $this->info(sprintf(
+        'Daily weather %s: checked %d barangay(s), saved %d, failed %d.',
+        $catchUpDays > 0 ? "last {$catchUpDays} completed day(s)" : $date->toDateString(),
+        $summary['checked'],
+        $summary['saved'],
+        $summary['failed']
+    ));
+
+    foreach ($summary['failures'] as $failure) {
+        $this->warn("Barangay {$failure['barangay_id']}: {$failure['message']}");
+    }
+
+    return $summary['failed'] === 0 ? 0 : 1;
+})->purpose('Save the previous completed day of weather for each actively covered barangay.');
+
+Schedule::command('weather:collect-daily')
+    ->dailyAt('00:30')
+    ->timezone('Asia/Manila')
     ->withoutOverlapping();
 
 Artisan::command('duty-roster:sync {--station=}', function (DutyRosterService $service, DutyRosterRecurrenceService $recurrence) {
@@ -346,6 +387,28 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
             ]);
         });
 
+    $allDailyWeather = Schema::hasTable('daily_weather_contexts')
+        ? DB::table('daily_weather_contexts')
+            ->select([
+                'barangay_id',
+                'observation_date',
+                'temperature_avg_c',
+                'humidity_avg_percent',
+                'wind_avg_kph',
+                'dominant_condition',
+            ])
+            ->get()
+            ->groupBy(function ($row) {
+                $date = Carbon::parse($row->observation_date);
+
+                return implode('|', [
+                    (int) $row->barangay_id,
+                    $date->year,
+                    strtolower($date->format('F')),
+                ]);
+            })
+        : collect();
+
     $records = [];
 
     foreach ($historicalRows as $row) {
@@ -370,21 +433,27 @@ Artisan::command('ml:export-station-barangay-dataset {--path=capstone-ai/station
             ]);
 
             $monthlyIncidents = $allHistoricalIncidents->get($incidentKey, collect());
-            $incidentCount = (int) $monthlyIncidents->sum(function ($incident) {
-                return max(1, (int) ($incident->incident_count ?? 1));
-            });
+            $monthlyDailyWeather = $allDailyWeather->get($incidentKey, collect());
+            $incidentCount = HistoricalFireRecordSemantics::incidentCount($monthlyIncidents);
             $estimatedDamage = (float) $monthlyIncidents->sum(function ($incident) {
                 return (float) ($incident->estimated_damage ?? 0);
             });
             $injuredCount = (int) $monthlyIncidents->sum('injured_count');
             $deathCount = (int) $monthlyIncidents->sum('death_count');
 
-            $temperatureAverage = $monthlyIncidents->avg('temperature');
-            $humidityAverage = $monthlyIncidents->avg('humidity');
-            $windAverage = $monthlyIncidents->avg('wind_speed');
+            $temperatureAverage = $monthlyDailyWeather->isNotEmpty()
+                ? $monthlyDailyWeather->avg('temperature_avg_c')
+                : $monthlyIncidents->avg('temperature');
+            $humidityAverage = $monthlyDailyWeather->isNotEmpty()
+                ? $monthlyDailyWeather->avg('humidity_avg_percent')
+                : $monthlyIncidents->avg('humidity');
+            $windAverage = $monthlyDailyWeather->isNotEmpty()
+                ? $monthlyDailyWeather->avg('wind_avg_kph')
+                : $monthlyIncidents->avg('wind_speed');
 
-            $weatherMode = $monthlyIncidents
-                ->pluck('weather_condition')
+            $weatherMode = ($monthlyDailyWeather->isNotEmpty()
+                ? $monthlyDailyWeather->pluck('dominant_condition')
+                : $monthlyIncidents->pluck('weather_condition'))
                 ->filter()
                 ->map(fn ($value) => trim((string) $value))
                 ->countBy()

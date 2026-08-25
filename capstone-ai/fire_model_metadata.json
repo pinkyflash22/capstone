@@ -62,44 +62,44 @@
   ],
   "global_feature_importance": [
     {
-      "feature": "road_accessibility",
-      "importance": 0.1262
-    },
-    {
-      "feature": "building_density_level",
-      "importance": 0.1003
-    },
-    {
-      "feature": "verified_risk_count",
-      "importance": 0.0892
-    },
-    {
-      "feature": "population_density_level",
-      "importance": 0.0847
-    },
-    {
-      "feature": "risk_area_pressure_signal",
-      "importance": 0.0765
+      "feature": "barangay_pressure_signal",
+      "importance": 0.1201
     },
     {
       "feature": "condition_label",
-      "importance": 0.0715
+      "importance": 0.1029
+    },
+    {
+      "feature": "population_density_level",
+      "importance": 0.072
+    },
+    {
+      "feature": "combustible_material_count",
+      "importance": 0.0653
+    },
+    {
+      "feature": "verified_risk_count",
+      "importance": 0.059
+    },
+    {
+      "feature": "road_accessibility",
+      "importance": 0.0542
+    },
+    {
+      "feature": "risk_area_pressure_signal",
+      "importance": 0.0536
     },
     {
       "feature": "affected_households",
-      "importance": 0.068
+      "importance": 0.0522
     },
     {
-      "feature": "barangay_pressure_signal",
-      "importance": 0.0502
+      "feature": "water_access_flag",
+      "importance": 0.0513
     },
     {
-      "feature": "peak_hours",
-      "importance": 0.0389
-    },
-    {
-      "feature": "verified_risk_area_count",
-      "importance": 0.0357
+      "feature": "building_density_level",
+      "importance": 0.0506
     }
   ],
   "reference_profile": {
@@ -160,44 +160,44 @@
   "metrics": {
     "train_rows": 720,
     "test_rows": 240,
-    "accuracy": 0.9792,
-    "roc_auc": 0.9942,
-    "precision": 0.913,
-    "recall": 0.875,
-    "f1_score": 0.8936,
-    "brier_score": 0.0158,
-    "cross_val_roc_auc_mean": 0.9915,
+    "accuracy": 0.975,
+    "roc_auc": 0.971,
+    "precision": 1.0,
+    "recall": 0.625,
+    "f1_score": 0.7692,
+    "brier_score": 0.0219,
+    "cross_val_roc_auc_mean": 0.9896,
     "cross_val_roc_auc_scores": [
-      0.965,
-      0.9988,
-      0.9988,
-      0.9951,
+      0.9781,
+      1.0,
+      0.9862,
+      0.9837,
       1.0
     ],
     "classification_report": {
       "0": {
-        "precision": 0.9861751152073732,
-        "recall": 0.9907407407407407,
-        "f1-score": 0.9884526558891455,
-        "support": 216.0
+        "precision": 0.9739130434782609,
+        "recall": 1.0,
+        "f1-score": 0.986784140969163,
+        "support": 224.0
       },
       "1": {
-        "precision": 0.9130434782608695,
-        "recall": 0.875,
-        "f1-score": 0.8936170212765957,
-        "support": 24.0
+        "precision": 1.0,
+        "recall": 0.625,
+        "f1-score": 0.7692307692307693,
+        "support": 16.0
       },
-      "accuracy": 0.9791666666666666,
+      "accuracy": 0.975,
       "macro avg": {
-        "precision": 0.9496092967341214,
-        "recall": 0.9328703703703703,
-        "f1-score": 0.9410348385828706,
+        "precision": 0.9869565217391305,
+        "recall": 0.8125,
+        "f1-score": 0.8780074550999661,
         "support": 240.0
       },
       "weighted avg": {
-        "precision": 0.9788619515127229,
-        "recall": 0.9791666666666666,
-        "f1-score": 0.9789690924278905,
+        "precision": 0.9756521739130436,
+        "recall": 0.975,
+        "f1-score": 0.9722805828532702,
         "support": 240.0
       }
     },
@@ -206,67 +206,55 @@
         "target_column": "incident_count",
         "train_rows": 720,
         "test_rows": 240,
-        "mae": 0.0186,
-        "rmse": 0.1441,
-        "r2_score": 0.787
+        "mae": 0.0151,
+        "rmse": 0.1967,
+        "r2_score": 0.4797
       },
       "predicted_estimated_damage": {
         "target_column": "estimated_damage",
         "train_rows": 720,
         "test_rows": 240,
-        "mae": 2525.0286,
-        "rmse": 26600.3144,
-        "r2_score": -1148.0068
+        "mae": 2530.3064,
+        "rmse": 26448.1931,
+        "r2_score": -1134.9025
       }
     }
   },
   "calibration": {
     "method": "sigmoid_cv",
-    "expected_calibration_error": 0.0128,
-    "mean_predicted_probability": 0.1002,
-    "observed_positive_rate": 0.1,
+    "expected_calibration_error": 0.0163,
+    "mean_predicted_probability": 0.0581,
+    "observed_positive_rate": 0.0667,
     "bins": [
       {
         "range": "(-0.001, 0.1]",
-        "count": 216,
-        "mean_probability": 0.0134,
-        "observed_rate": 0.0139
+        "count": 224,
+        "mean_probability": 0.0146,
+        "observed_rate": 0.0223
       },
       {
-        "range": "(0.3, 0.4]",
-        "count": 1,
-        "mean_probability": 0.3903,
+        "range": "(0.1, 0.2]",
+        "count": 5,
+        "mean_probability": 0.186,
         "observed_rate": 0.0
       },
       {
-        "range": "(0.5, 0.6]",
+        "range": "(0.2, 0.3]",
         "count": 1,
-        "mean_probability": 0.5277,
-        "observed_rate": 0.0
-      },
-      {
-        "range": "(0.6, 0.7]",
-        "count": 1,
-        "mean_probability": 0.6354,
-        "observed_rate": 0.0
-      },
-      {
-        "range": "(0.7, 0.8]",
-        "count": 1,
-        "mean_probability": 0.7173,
+        "mean_probability": 0.2992,
         "observed_rate": 1.0
       },
       {
         "range": "(0.9, 1.0]",
-        "count": 20,
-        "mean_probability": 0.944,
+        "count": 10,
+        "mean_probability": 0.9439,
         "observed_rate": 1.0
       }
     ]
   },
   "target_policy": {
     "risk_level": "high, or medium with corroborating evidence",
-    "incident_count_threshold": 3,
+    "incident_count_threshold": 7,
     "estimated_damage_threshold": 150000.0,
     "identity_features_excluded": [
       "station_id",
@@ -274,7 +262,7 @@
       "barangay_name"
     ]
   },
-  "trained_at": "2026-08-23T22:33:32.332134+00:00",
+  "trained_at": "2026-08-25T10:54:29.549231+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

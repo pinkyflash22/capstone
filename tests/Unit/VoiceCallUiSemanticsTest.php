@@ -28,7 +28,8 @@ class VoiceCallUiSemanticsTest extends TestCase
         $this->assertStringContainsString('data-pyro-voice-filter', $script);
         $this->assertStringContainsString('data-pyro-voice-sort', $script);
         $this->assertStringContainsString('filterAndSortResponderCalls', $script);
-        $this->assertStringContainsString("import('agora-rtc-sdk-ng')", $script);
+        $this->assertStringContainsString("import('agora-rtc-sdk-ng/esm')", $script);
+        $this->assertStringContainsString('.then(({ createClient, createMicrophoneAudioTrack })', $script);
         $this->assertStringNotContainsString("import AgoraRTC from 'agora-rtc-sdk-ng'", $script);
         $this->assertStringContainsString('data-pyro-voice-filter="active"', $script);
         $this->assertStringContainsString('data-pyro-voice-filter="missed"', $script);

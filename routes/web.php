@@ -440,6 +440,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         //     })->name('analytics');
         Route::post('/api/explore-recommendation', [App\Http\Controllers\Chief\AnalyticController::class, 'exploreRecommendation']);
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
+        Route::get('/weather-context', [App\Http\Controllers\Chief\WeatherContextController::class, 'index'])->name('weather-context.index');
+        Route::post('/weather-context/backfill', [App\Http\Controllers\Chief\WeatherContextController::class, 'backfill'])->name('weather-context.backfill');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);

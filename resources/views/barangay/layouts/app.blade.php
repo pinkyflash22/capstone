@@ -425,7 +425,21 @@
         .barangay-mobile-dock__item {
             width: 100%;
             min-height: 50px;
+            flex-direction: column;
             border-radius: 18px;
+        }
+
+        .barangay-mobile-dock__label {
+            display: block;
+            max-width: 54px;
+            margin-top: 2px;
+            overflow: hidden;
+            color: currentColor;
+            font-size: 8px;
+            font-weight: 750;
+            line-height: 1;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .barangay-mobile-dock__item.active {

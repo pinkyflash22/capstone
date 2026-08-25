@@ -21,6 +21,7 @@
         ['label' => 'Awareness Posts', 'route' => 'barangay.awareness', 'active' => 'awareness', 'mobile_icon' => 'campaign'],
         ['label' => 'Barangay Profile', 'route' => 'barangay.profile', 'active' => 'profile', 'mobile_icon' => 'person'],
     ];
+    $mobileMenuIsActive = in_array($active, array_column($mobileCenterActions, 'active'), true);
 @endphp
 
 <aside class="sidebar chief-shell-sidebar hidden md:flex" id="sidebar">
@@ -67,10 +68,12 @@
         <div class="barangay-mobile-dock__track">
             <a href="{{ route($mobileDockItems[0]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
                 <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[0]['mobile_icon'] }}</span>
+                <span class="barangay-mobile-dock__label">Map</span>
             </a>
 
             <a href="{{ route($mobileDockItems[1]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[1]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[1]['label'] }}">
                 <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
+                <span class="barangay-mobile-dock__label">Reports</span>
             </a>
 
             <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-barangay-nav-center>
@@ -99,10 +102,12 @@
 
             <a href="{{ route($mobileDockItems[2]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
                 <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[2]['mobile_icon'] }}</span>
+                <span class="barangay-mobile-dock__label">Risks</span>
             </a>
 
-            <button type="button" class="barangay-mobile-dock__item {{ $active === 'profile' ? 'active' : '' }}" aria-label="Settings" data-barangay-settings-open>
-                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">settings</span>
+            <button type="button" class="barangay-mobile-dock__item {{ $mobileMenuIsActive ? 'active' : '' }}" aria-label="Open Barangay Desk menu" data-barangay-settings-open>
+                <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">menu</span>
+                <span class="barangay-mobile-dock__label">Menu</span>
             </button>
         </div>
     </div>
@@ -114,19 +119,33 @@
         <div class="chief-mobile-panel__header">
             <div>
                 <p class="chief-mobile-panel__eyebrow">Barangay Desk</p>
-                <h2 class="chief-mobile-panel__title">Settings</h2>
+                <h2 class="chief-mobile-panel__title">Menu</h2>
             </div>
-            <button type="button" class="chief-mobile-panel__close" data-barangay-panel-close aria-label="Close settings">
+            <button type="button" class="chief-mobile-panel__close" data-barangay-panel-close aria-label="Close menu">
                 <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">close</span>
             </button>
         </div>
         <div class="chief-mobile-panel__menu">
+            <p class="chief-mobile-panel__menu-label">Barangay navigation</p>
+            @foreach (array_slice($mobileCenterActions, 0, 2) as $action)
+                <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
+                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                    <span class="chief-mobile-panel__action-copy">
+                        <strong>{{ $action['label'] }}</strong>
+                        <small>Open {{ strtolower($action['label']) }}</small>
+                    </span>
+                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                </a>
+            @endforeach
+            <div class="chief-mobile-panel__menu-divider" aria-hidden="true"></div>
+            <p class="chief-mobile-panel__menu-label">Account</p>
             <button type="button" class="chief-mobile-panel__action" data-barangay-open-logs>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">history</span>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Logs</strong>
                     <small>View the full activity modal</small>
                 </span>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </button>
             <a href="{{ route('barangay.profile') }}" class="chief-mobile-panel__action">
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">person</span>
@@ -134,13 +153,7 @@
                     <strong>Profile</strong>
                     <small>Manage your barangay account</small>
                 </span>
-            </a>
-            <a href="{{ route('barangay.dashboard') }}" class="chief-mobile-panel__action">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">dashboard</span>
-                <span class="chief-mobile-panel__action-copy">
-                    <strong>Dashboard</strong>
-                    <small>Return to the barangay overview</small>
-                </span>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

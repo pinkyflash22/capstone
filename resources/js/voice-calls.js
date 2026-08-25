@@ -49,8 +49,11 @@ const REQUEST_TIMEOUT_MS = 12000;
 
 async function loadAgoraRtc() {
     if (!agoraSdkPromise) {
-        agoraSdkPromise = import('agora-rtc-sdk-ng')
-            .then((module) => module.default || module)
+        agoraSdkPromise = import('agora-rtc-sdk-ng/esm')
+            .then(({ createClient, createMicrophoneAudioTrack }) => ({
+                createClient,
+                createMicrophoneAudioTrack,
+            }))
             .catch((error) => {
                 agoraSdkPromise = null;
                 throw error;

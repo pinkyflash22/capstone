@@ -585,6 +585,7 @@
 
         #exploreModal,
         #predictionDetailModal,
+        #analysisEvidenceModal,
         #recommendationRunModal,
         #barangayRankingModal {
             padding: 18px;
@@ -607,6 +608,155 @@
             width: min(92vw, 600px) !important;
             max-width: 600px !important;
             max-height: min(77vh, 580px) !important;
+        }
+        #analysisEvidenceModal .modal-content.analytics-forecast-modal {
+            width: min(94vw, 760px) !important;
+            max-width: 760px !important;
+            max-height: min(82vh, 720px) !important;
+        }
+        .analytics-section__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .analysis-evidence-trigger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 8px 14px;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .analysis-evidence-trigger:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: #ffedd5;
+            box-shadow: 0 8px 18px rgba(154, 52, 18, .12);
+        }
+        .analysis-evidence-trigger:disabled {
+            cursor: not-allowed;
+            opacity: .5;
+        }
+        .analysis-evidence {
+            display: grid;
+            gap: 16px;
+        }
+        .analysis-evidence__intro {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid #fed7aa;
+            background: linear-gradient(135deg, #fff7ed, #fff);
+        }
+        .analysis-evidence__eyebrow,
+        .analysis-evidence__section-title {
+            color: #9a3412;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .analysis-evidence__title {
+            margin-top: 4px;
+            color: #0f172a;
+            font-size: 17px;
+            font-weight: 850;
+        }
+        .analysis-evidence__copy {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 12.5px;
+            line-height: 1.55;
+        }
+        .analysis-evidence__grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 9px;
+        }
+        .analysis-evidence__metric {
+            padding: 11px;
+            border: 1px solid #e2e8f0;
+            border-radius: 13px;
+            background: #f8fafc;
+        }
+        .analysis-evidence__metric strong {
+            display: block;
+            color: #0f172a;
+            font-size: 18px;
+        }
+        .analysis-evidence__metric span {
+            display: block;
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 10.5px;
+            font-weight: 750;
+            line-height: 1.35;
+        }
+        .analysis-evidence__section {
+            display: grid;
+            gap: 9px;
+        }
+        .analysis-evidence__facts {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .analysis-evidence__fact {
+            padding: 10px 11px;
+            border-left: 3px solid #f59e0b;
+            border-radius: 9px;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .analysis-evidence__fact b { color: #0f172a; }
+        .analysis-evidence__table-wrap {
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+        }
+        .analysis-evidence__table {
+            width: 100%;
+            min-width: 720px;
+            border-collapse: collapse;
+            font-size: 11.5px;
+        }
+        .analysis-evidence__table th,
+        .analysis-evidence__table td {
+            padding: 9px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+        .analysis-evidence__table th {
+            background: #f8fafc;
+            color: #475569;
+            font-size: 10px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .analysis-evidence__table tr:last-child td { border-bottom: 0; }
+        .analysis-evidence__note {
+            padding: 11px 12px;
+            border-radius: 12px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-size: 11.5px;
+            line-height: 1.5;
         }
         #recommendationRunModal .modal-content.analytics-forecast-modal {
             width: min(92vw, 620px) !important;
@@ -797,7 +947,8 @@
 
         @media (max-width: 640px) {
             #exploreModal.modal.show,
-            #predictionDetailModal.modal.show {
+            #predictionDetailModal.modal.show,
+            #analysisEvidenceModal.modal.show {
                 align-items: flex-end;
                 justify-content: center;
                 padding: 0 12px max(8px, env(safe-area-inset-bottom));
@@ -810,6 +961,15 @@
                 border-radius: 20px 20px 14px 14px;
                 animation: analyticsSheetIn 0.24s ease;
             }
+            #analysisEvidenceModal .modal-content.analytics-forecast-modal {
+                width: min(100%, 390px) !important;
+                max-height: min(78svh, 610px) !important;
+            }
+            .analytics-section__actions,
+            .analysis-evidence-trigger { width: 100%; }
+            .analysis-evidence__intro { display: grid; }
+            .analysis-evidence__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .analysis-evidence__facts { grid-template-columns: 1fr; }
             .analytics-forecast-modal--details {
                 width: min(100%, 360px);
                 max-height: min(68svh, 500px);
@@ -2734,7 +2894,13 @@
                             <div class="analytics-section__title"><i class="fa-solid fa-bolt"></i> Prediction Summary</div>
                             <p class="analytics-section__copy">A compact command summary of probability, forecasted load, confidence, and hotspot signals derived from the latest analysis response.</p>
                         </div>
-                        <div id="predictionScopeLabel" class="analytics-empty-pill" style="display:none;">Prediction scope</div>
+                        <div class="analytics-section__actions">
+                            <div id="predictionScopeLabel" class="analytics-empty-pill" style="display:none;">Prediction scope</div>
+                            <button id="analysisEvidenceBtn" class="analysis-evidence-trigger" type="button" onclick="openAnalysisEvidenceModal()" disabled>
+                                <i class="fa-solid fa-database"></i>
+                                How was this calculated?
+                            </button>
+                        </div>
                     </div>
                     <div class="prediction-summary-grid">
                         <article class="prediction-card">
@@ -3363,6 +3529,21 @@
         </div>
     </div>
 
+    <div id="analysisEvidenceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="analysisEvidenceModalTitle" onclick="if (event.target === this) closeAnalysisEvidenceModal()">
+        <div class="modal-content analytics-forecast-modal">
+            <div class="modal-header">
+                <h3 id="analysisEvidenceModalTitle"><i class="fa-solid fa-database" style="color: #dc2626;"></i> Calculation Evidence</h3>
+                <button class="modal-close" type="button" onclick="closeAnalysisEvidenceModal()" aria-label="Close calculation evidence"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="analysisEvidenceModalBody">
+                <div class="text-center py-8 text-gray-500">Run or open an analysis to inspect its contributing data.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" type="button" onclick="closeAnalysisEvidenceModal()" style="padding: 8px 20px; background: #f1f5f9; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="recommendationRunModal" class="modal">
         <div class="modal-content analytics-forecast-modal analytics-run-modal">
             <div class="modal-header">
@@ -3767,6 +3948,11 @@
         document.getElementById('analyticsConfirmModal')?.addEventListener('click', (event) => {
             if (event.target.id === 'analyticsConfirmModal') {
                 closeAnalyticsConfirm(false);
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.getElementById('analysisEvidenceModal')?.classList.contains('show')) {
+                closeAnalysisEvidenceModal();
             }
         });
 
@@ -4743,6 +4929,7 @@
             }
 
             currentPredictionDetails = detail;
+            syncAnalysisEvidenceButton(detail);
             currentAnalysisId = normalizedId;
             currentRecommendations = Array.isArray(detail.recommendations) ? detail.recommendations : [];
             currentBarangayPredictions = Array.isArray(detail.barangay_predictions)
@@ -7191,6 +7378,161 @@
             document.getElementById('predictionDetailModal').classList.remove('show');
         }
 
+        function closeAnalysisEvidenceModal() {
+            document.getElementById('analysisEvidenceModal')?.classList.remove('show');
+        }
+
+        function getAnalysisEvidencePayload(detail = currentPredictionDetails) {
+            return detail?.evidence_provenance
+                || detail?.analysis_data?.raw_data?.evidence_provenance
+                || detail?.analysis_data?.analysis_summary?.evidence_provenance
+                || null;
+        }
+
+        function syncAnalysisEvidenceButton(detail = currentPredictionDetails) {
+            const button = document.getElementById('analysisEvidenceBtn');
+            if (!button) return;
+            button.disabled = !detail;
+            button.title = getAnalysisEvidencePayload(detail)
+                ? 'Inspect the records, weather, risks, hazards, readiness, and model drivers saved with this result.'
+                : 'This older run has limited evidence. Open it to see what is available.';
+        }
+
+        function evidenceValue(value, suffix = '') {
+            if (value === null || value === undefined || value === '') return 'Unavailable';
+            return `${escapeHtml(String(value))}${suffix}`;
+        }
+
+        function renderEvidenceMetric(value, label) {
+            return `
+                <div class="analysis-evidence__metric">
+                    <strong>${evidenceValue(value)}</strong>
+                    <span>${escapeHtml(label)}</span>
+                </div>
+            `;
+        }
+
+        function openAnalysisEvidenceModal() {
+            const modal = document.getElementById('analysisEvidenceModal');
+            const body = document.getElementById('analysisEvidenceModalBody');
+            const evidence = getAnalysisEvidencePayload();
+
+            if (!modal || !body) return;
+
+            if (!evidence) {
+                body.innerHTML = `
+                    <div class="analytics-empty-state">
+                        <div class="analytics-empty-state__title">Detailed evidence is unavailable for this older run.</div>
+                        <p class="analytics-empty-state__copy">Run the analysis again to save separate fire-history, weather-observation, risk, hazard, and mitigation contributions.</p>
+                    </div>
+                `;
+                modal.classList.add('show');
+                return;
+            }
+
+            const scope = evidence.scope || {};
+            const counts = evidence.counts || {};
+            const weather = evidence.weather || {};
+            const mitigation = evidence.mitigation || {};
+            const result = evidence.result || {};
+            const model = evidence.model || {};
+            const definitions = evidence.definitions || {};
+            const barangays = Array.isArray(evidence.barangays) ? evidence.barangays : [];
+            const sources = Object.entries(model.prediction_sources || {})
+                .map(([source, count]) => `${String(source).replaceAll('_', ' ')}: ${count}`)
+                .join(' · ') || 'No model source recorded';
+            const generatedAt = evidence.generated_at
+                ? formatRecommendationRunTimestamp(evidence.generated_at)
+                : 'Saved analysis run';
+            const drivers = Array.isArray(model.drivers) ? model.drivers : [];
+            const riskFactors = Array.isArray(evidence.risk_factors) ? evidence.risk_factors : [];
+
+            body.innerHTML = `
+                <div class="analysis-evidence">
+                    <section class="analysis-evidence__intro">
+                        <div>
+                            <div class="analysis-evidence__eyebrow">Saved evidence snapshot</div>
+                            <div class="analysis-evidence__title">${escapeHtml(scope.location || 'Selected station')}</div>
+                            <p class="analysis-evidence__copy">${escapeHtml(scope.target_period || 'Selected forecast period')} · ${escapeHtml(String(scope.days_analyzed || 0))} operational days · generated ${escapeHtml(generatedAt)}</p>
+                        </div>
+                        <span class="analytics-empty-pill">${escapeHtml(scope.prediction_scope === 'next_month' ? 'Next month' : 'Current month')}</span>
+                    </section>
+
+                    <section class="analysis-evidence__section">
+                        <div class="analysis-evidence__section-title">Records that contributed</div>
+                        <div class="analysis-evidence__grid">
+                            ${renderEvidenceMetric(counts.actual_fire_incidents_in_analysis_window ?? 0, 'Actual fires in selected analysis window')}
+                            ${renderEvidenceMetric(counts.historical_fire_baseline ?? 0, 'Historical fire baseline used by model')}
+                            ${renderEvidenceMetric(counts.weather_observation_rows ?? 0, 'Weather-only observation rows')}
+                            ${renderEvidenceMetric(counts.daily_weather_rows ?? 0, 'Dedicated daily weather rows')}
+                            ${renderEvidenceMetric(counts.observed_weather_days ?? 0, 'Completed weather days')}
+                            ${renderEvidenceMetric(counts.barangays_evaluated ?? barangays.length, 'Barangays evaluated')}
+                            ${renderEvidenceMetric(counts.verified_risks ?? 0, 'Verified risks')}
+                            ${renderEvidenceMetric(counts.verified_hazards ?? 0, 'Verified hazards')}
+                            ${renderEvidenceMetric(counts.high_risk_assessments ?? 0, 'High assessments')}
+                            ${renderEvidenceMetric(counts.observed_current_month_fires ?? 0, 'Observed fires this month')}
+                        </div>
+                    </section>
+
+                    <section class="analysis-evidence__section">
+                        <div class="analysis-evidence__section-title">Weather, readiness, and result</div>
+                        <div class="analysis-evidence__facts">
+                            <div class="analysis-evidence__fact"><b>Weather:</b> ${evidenceValue(weather.temperature_c, '°C')}, ${evidenceValue(weather.humidity_percent, '%')} humidity, ${evidenceValue(weather.wind_kph, ' km/h')} wind${weather.condition ? ` · ${escapeHtml(weather.condition)}` : ''}</div>
+                            <div class="analysis-evidence__fact"><b>Mitigation:</b> ${evidenceValue(mitigation.checklist_steps_followed ?? 0)} of ${evidenceValue(mitigation.checklist_steps_total ?? 0)} checklist steps followed; ${evidenceValue(mitigation.completed_actions ?? 0)} of ${evidenceValue(mitigation.total_actions ?? 0)} actions complete.</div>
+                            <div class="analysis-evidence__fact"><b>Risk adjustment:</b> ${evidenceValue(result.base_risk_score)} base score minus ${evidenceValue(mitigation.risk_reduction_points ?? 0)} mitigation points = ${evidenceValue(result.adjusted_risk_score)} (${escapeHtml(result.risk_level || 'unclassified')}).</div>
+                        </div>
+                    </section>
+
+                    <section class="analysis-evidence__section">
+                        <div class="analysis-evidence__section-title">Barangay evidence breakdown</div>
+                        ${barangays.length ? `
+                            <div class="analysis-evidence__table-wrap">
+                                <table class="analysis-evidence__table">
+                                    <thead><tr><th>Barangay</th><th>Historical fires</th><th>Weather rows</th><th>Risks / hazards</th><th>Water readiness</th><th>Forecast</th><th>Source</th></tr></thead>
+                                    <tbody>
+                                        ${barangays.map((row) => `
+                                            <tr>
+                                                <td><b>${escapeHtml(row.barangay_name || 'Unknown')}</b><br><span style="color:#64748b;">${evidenceValue(row.current_month_fires ?? 0)} current-month fire(s)</span></td>
+                                                <td>${evidenceValue(row.historical_fire_baseline ?? 0)}<br><span style="color:#64748b;">${evidenceValue(row.positive_historical_records ?? 0)} positive record(s)</span></td>
+                                                <td>${evidenceValue(row.weather_observation_rows ?? 0)}</td>
+                                                <td>${evidenceValue(row.verified_risks ?? 0)} / ${evidenceValue(row.verified_hazards ?? 0)}<br><span style="color:#64748b;">pressure ${evidenceValue(row.risk_pressure ?? 0)}</span></td>
+                                                <td>${row.near_hydrant ? 'Hydrant' : 'No hydrant flag'}<br><span style="color:#64748b;">${row.near_water_source ? 'Water source nearby' : 'No water-source flag'}</span></td>
+                                                <td><b>${evidenceValue(row.probability_percent, '%')}</b><br><span style="color:#64748b;">${escapeHtml(row.risk_level || 'unclassified')}</span></td>
+                                                <td>${escapeHtml(String(row.prediction_source || 'unknown').replaceAll('_', ' '))}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : '<div class="analysis-evidence__note">No barangay-level forecast inputs were stored for this run.</div>'}
+                    </section>
+
+                    <section class="analysis-evidence__section">
+                        <div class="analysis-evidence__section-title">Model source and leading drivers</div>
+                        <div class="analysis-evidence__note"><b>Prediction source:</b> ${escapeHtml(sources)}. The displayed probability is ${evidenceValue(result.forecast_probability_percent, '%')} with a planning midpoint of ${evidenceValue(result.forecast_incident_midpoint)} incident(s).</div>
+                        ${(drivers.length || riskFactors.length) ? `
+                            <div class="analysis-evidence__facts">
+                                ${[...drivers, ...riskFactors].slice(0, 6).map((driver) => `<div class="analysis-evidence__fact">${escapeHtml(String(driver))}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                    </section>
+
+                    <section class="analysis-evidence__section">
+                        <div class="analysis-evidence__section-title">Counting rules</div>
+                        <div class="analysis-evidence__note">
+                            <b>Historical fires:</b> ${escapeHtml(definitions.historical_fire_baseline || 'Only positive incident counts contribute to fire totals.')}<br>
+                            <b>Weather rows:</b> ${escapeHtml(definitions.weather_observation_rows || 'Weather-only rows are not counted as fire incidents.')}<br>
+                            <b>Daily weather:</b> ${escapeHtml(definitions.daily_weather_rows || 'Completed-day observations are stored separately from incidents.')}<br>
+                            <b>Risk reduction:</b> ${escapeHtml(definitions.mitigation_effect || 'Verified readiness may reduce severity or likelihood pressure.')}
+                        </div>
+                    </section>
+                </div>
+            `;
+
+            modal.classList.add('show');
+            replaceChiefAnalyticsFaIcons(modal);
+        }
+
         function getChiefAnalyticsMaterialSymbol(iconName) {
             const icons = {
                 'fa-arrow-right': 'arrow_forward',
@@ -7550,6 +7892,7 @@
             currentRecommendations = analysisData.recommendations || [];
             currentBarangayPredictions = Array.isArray(analysisData.barangay_predictions) ? analysisData.barangay_predictions : [];
             currentPredictionDetails = analysisData;
+            syncAnalysisEvidenceButton(analysisData);
             renderBarangayPredictionPanel(currentBarangayPredictions);
             const aiWarningMessage = analysisData.ai_warning || null;
             const aiWarningDetails = analysisData.ai_failure_message || analysisData.note || null;

@@ -33,4 +33,25 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     php artisan migrate --force
 fi
 
+# Render free web services do not run Laravel's scheduler, and a separate
+# Render Cron service has a monthly charge. Keep this weather-only worker
+# isolated from every other scheduled command. It catches up yesterday on
+# container start, then runs daily at 00:30 Asia/Manila while the web service
+# remains awake. The database write is idempotent for safe restarts/retries.
+if [ "${RUN_DAILY_WEATHER_WORKER:-true}" = "true" ]; then
+    (
+        php artisan weather:collect-daily --catch-up=7 || true
+        while true; do
+            WEATHER_NOW_EPOCH="$(date +%s)"
+            WEATHER_NEXT_EPOCH="$(TZ=Asia/Manila date -d 'tomorrow 00:30' +%s)"
+            WEATHER_DELAY="$((WEATHER_NEXT_EPOCH - WEATHER_NOW_EPOCH))"
+            if [ "$WEATHER_DELAY" -lt 60 ]; then
+                WEATHER_DELAY=60
+            fi
+            sleep "$WEATHER_DELAY"
+            php artisan weather:collect-daily || true
+        done
+    ) &
+fi
+
 apache2-foreground

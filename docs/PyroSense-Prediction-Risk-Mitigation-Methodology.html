@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>PyroSense Prediction, Risk, Mitigation, and Checklist Methodology</title>
+    <style>
+        @page { margin: 23mm 17mm 19mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #1f2937; font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10.2pt; line-height: 1.48; }
+        h1, h2, h3 { color: #7c2d12; page-break-after: avoid; }
+        h1 { margin: 0 0 10px; font-size: 25pt; line-height: 1.15; }
+        h2 { margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #fed7aa; font-size: 16pt; }
+        h3 { margin: 15px 0 5px; font-size: 12pt; }
+        p { margin: 5px 0 9px; }
+        ul, ol { margin: 5px 0 10px 22px; padding: 0; }
+        li { margin: 3px 0; }
+        table { width: 100%; margin: 9px 0 13px; border-collapse: collapse; font-size: 8.8pt; }
+        th { padding: 7px; border: 1px solid #fdba74; background: #fff7ed; color: #7c2d12; text-align: left; }
+        td { padding: 7px; border: 1px solid #e5e7eb; vertical-align: top; }
+        tr { page-break-inside: avoid; }
+        code, .formula { font-family: "DejaVu Sans Mono", monospace; }
+        .cover { min-height: 238mm; padding: 34mm 17mm 16mm; margin: -23mm -17mm -19mm; background: #fffaf5; page-break-after: always; }
+        .cover-kicker { color: #ea580c; font-size: 11pt; font-weight: bold; letter-spacing: 1.4px; text-transform: uppercase; }
+        .cover-subtitle { max-width: 150mm; margin-top: 12px; color: #4b5563; font-size: 14pt; }
+        .cover-meta { margin-top: 38px; padding: 14px 16px; border-left: 5px solid #ea580c; background: #ffffff; }
+        .badge { display: inline-block; margin: 4px 5px 0 0; padding: 4px 8px; border-radius: 12px; background: #ffedd5; color: #9a3412; font-size: 8.5pt; font-weight: bold; }
+        .callout { margin: 12px 0; padding: 11px 13px; border-left: 4px solid #f97316; background: #fff7ed; page-break-inside: avoid; }
+        .callout.blue { border-color: #0ea5e9; background: #f0f9ff; }
+        .callout.green { border-color: #16a34a; background: #f0fdf4; }
+        .callout.red { border-color: #dc2626; background: #fef2f2; }
+        .formula { margin: 8px 0 12px; padding: 10px 12px; border: 1px solid #fdba74; border-radius: 5px; background: #fffaf5; font-size: 8.5pt; line-height: 1.6; page-break-inside: avoid; }
+        .flow { width: 100%; margin: 13px 0 16px; text-align: center; }
+        .flow-box { display: inline-block; width: 29%; min-height: 48px; padding: 8px; border: 1px solid #fb923c; border-radius: 6px; background: #fff7ed; vertical-align: middle; font-size: 8.5pt; font-weight: bold; }
+        .arrow { display: inline-block; width: 5%; color: #ea580c; font-size: 15pt; vertical-align: middle; }
+        .small { font-size: 8.5pt; color: #4b5563; }
+        .muted { color: #6b7280; }
+        .page-break { page-break-before: always; }
+        .footer { position: fixed; right: 0; bottom: -12mm; left: 0; color: #9ca3af; font-size: 7.5pt; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="footer">PyroSense methodology review • Generated from the implementation in the capstone-project workspace • 25 August 2026</div>
+
+<section class="cover">
+    <div class="cover-kicker">PyroSense Technical Reading Guide</div>
+    <h1>How Fire-Risk Prediction Becomes Risk Areas, Mitigation Plans, and Checklists</h1>
+    <p class="cover-subtitle">A plain-language and formula-level explanation of how actual incidents, historical fire context, verified risk and hazard reports, weather, water access, hydrants, readiness, and completed prevention work contribute to the system’s results.</p>
+    <div>
+        <span class="badge">Prediction</span><span class="badge">Historical context</span><span class="badge">Weather</span><span class="badge">Risk heatmap</span><span class="badge">Mitigation</span><span class="badge">Checklist feedback</span>
+    </div>
+    <div class="cover-meta">
+        <strong>Prepared:</strong> 25 August 2026<br>
+        <strong>Basis:</strong> Current Laravel, Python model, database export, and map-rendering code<br>
+        <strong>Model snapshot:</strong> 960 barangay-month records; retrained 25 August 2026 after excluding weather-only rows from fire counts<br>
+        <strong>Intended reader:</strong> BFP chief/admin, firefighters, barangay officers, project evaluators, and developers
+    </div>
+    <div class="callout red" style="margin-top:28px;">
+        <strong>Essential interpretation:</strong> the percentage is the model’s probability that a barangay-month matches the system’s <em>high-risk outcome definition</em>. It is not a guarantee that a fire will occur, and it is not the physical probability of ignition at a specific building.
+    </div>
+</section>
+
+<h2>1. Executive answer</h2>
+<p>Yes, the current system combines real station and barangay data. It uses completed/closed actual incidents, the historical fire-incident table, verified risk and hazard assessments, recent fire momentum, monthly/seasonal context, available weather data, water and hydrant indicators, exposure and access conditions, and the recorded completion of checklists and mitigation actions.</p>
+<p>The trained model predicts a <strong>barangay-month risk probability</strong>. The station result then aggregates barangay probabilities, predicted incident counts, and damage estimates. Separately, an operational risk score summarizes recent station incidents. Recommendations are produced from these evidence sets and are converted into barangay-specific checklists and draft mitigation actions.</p>
+
+<div class="flow">
+    <div class="flow-box">Database evidence<br><span class="small">incidents, history, risks, hazards, weather, readiness</span></div>
+    <div class="arrow">→</div>
+    <div class="flow-box">Barangay-month model<br><span class="small">probability, risk band, counts, drivers</span></div>
+    <div class="arrow">→</div>
+    <div class="flow-box">Saved analysis<br><span class="small">risk heatmap + recommendations</span></div>
+</div>
+<div class="flow">
+    <div class="flow-box">Recommendations</div><div class="arrow">→</div>
+    <div class="flow-box">Barangay checklist</div><div class="arrow">→</div>
+    <div class="flow-box">Draft mitigation action</div>
+</div>
+<div class="flow">
+    <div class="flow-box">Reviewed and completed work</div><div class="arrow">→</div>
+    <div class="flow-box">Readiness / reduction signals</div><div class="arrow">→</div>
+    <div class="flow-box">Future analysis input</div>
+</div>
+
+<h2>2. The three “risk” results are different</h2>
+<table>
+    <thead><tr><th>Result</th><th>What it measures</th><th>Main output</th><th>Where it is used</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Barangay-month ML probability</strong></td><td>Whether the month resembles a high-risk barangay-month learned from the exported dataset.</td><td>0–100% probability; low/moderate/high; local drivers.</td><td>Barangay forecast, station aggregation, map heat, recommendations.</td></tr>
+    <tr><td><strong>Operational station risk score</strong></td><td>Recent completed/closed incidents in the selected day window, then reduced by recorded mitigation completion.</td><td>0–100 score; Low/Medium/High/Critical.</td><td>Analysis summary and operational context.</td></tr>
+    <tr><td><strong>Evidence heat intensity</strong></td><td>How strongly a saved analysis probability is displayed at real historical-fire and approved field-evidence coordinates.</td><td>Colored heat at actual evidence positions.</td><td>Risk-area overlay on the map.</td></tr>
+    </tbody>
+</table>
+<div class="callout blue"><strong>Do not compare these numbers as if they were the same scale.</strong> A 70 operational score, a 70% model probability, and 70% heat intensity describe related but different things.</div>
+
+<h2>3. Data that contributes to prediction</h2>
+<table>
+    <thead><tr><th>Evidence group</th><th>Current implementation</th><th>How it contributes</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Actual operational incidents</strong></td><td>Incidents assigned to the station or its teams. The core recent analysis and momentum logic includes statuses <code>completed</code> and <code>closed</code>.</td><td>Counts, hourly/daily pattern, recent momentum, current-vs-previous month, and observed-to-date floor.</td></tr>
+    <tr><td><strong>Historical fire incidents</strong></td><td>Barangay-linked records, generally using the last three years. Same calendar month is preferred when available.</td><td>Incident baseline, fire cause, peak time, historical temperature, count calibration, and map evidence.</td></tr>
+    <tr><td><strong>Verified risk and hazard reports</strong></td><td>Only approved/verified records that are not pending deletion; joined to the correct barangay.</td><td>Counts and categories, high assessments, exposure, access problems, pressure score, recommendation focus, and heatmap positions.</td></tr>
+    <tr><td><strong>Current fire momentum</strong></td><td>Current month, previous month, latest 7 days, and latest 30 days; also a station-wide signal shared across covered barangays.</td><td>Raises or lowers the engineered barangay pressure signal. The station signal is divided by the number of covered barangays.</td></tr>
+    <tr><td><strong>Weather and season</strong></td><td>Up to a 14-day forecast sample plus month-derived dry/wet season and historical monthly weather.</td><td>Temperature, humidity, wind, categorical condition, dry-season flag, and a separate weather-risk label.</td></tr>
+    <tr><td><strong>Water and hydrants</strong></td><td>Near-water, near-hydrant, near-water-source, and blocked-hydrant fields.</td><td>Water access can reduce engineered pressure; a blocked hydrant increases it. Individual fields are also ML features.</td></tr>
+    <tr><td><strong>Built and social environment</strong></td><td>Density, building density, population density, occupancy, materials, affected households, informal settlement, cooking activity, waste, and road accessibility.</td><td>Learned model features plus explicit field-pressure weights.</td></tr>
+    <tr><td><strong>Prevention readiness</strong></td><td>Confirmed weighted checklists, followed steps, completed/open/blocked mitigations, and completion time.</td><td>Reduces engineered pressure and operational risk; becomes feedback for later forecasts.</td></tr>
+    <tr><td><strong>Station readiness</strong></td><td>Personnel and equipment totals/availability.</td><td>Used in AI/data-driven narrative and recommendations. Low personnel availability can add to the fallback projected count; it is not a core feature in the trained barangay model.</td></tr>
+    </tbody>
+</table>
+
+<h2>4. Historical context versus actual context</h2>
+<h3>4.1 Historical barangay baseline</h3>
+<p>For each barangay, the payload reads historical fire records from the target year minus three years onward. It prefers records from the same calendar month; it also considers records from the latest 12 months. The current baseline count is:</p>
+<div class="formula">historical incident_count = max(sum of positive same-month incident_count values, sum of positive recent-12-month incident_count values)<br>
+Weather-only rows with zero or null incident_count contribute 0 fires.</div>
+<p>Historical risk level is labeled high at 8 or more records, medium at 4–7, and low below 4. Density is labeled high at 8 or more, medium at 3–7, and low below 3. These labels become context/features; the Random Forest still produces the final probability.</p>
+
+<h3>4.2 Actual recent fire momentum</h3>
+<div class="formula">recent_fire_momentum = 2.00 × fires_last_7_days<br>
+&nbsp;&nbsp;+ 0.65 × max(0, fires_last_30_days − fires_last_7_days)<br>
+&nbsp;&nbsp;+ 0.80 × fires_current_month<br>
+&nbsp;&nbsp;− 0.35 × fires_previous_month</div>
+<p>A high recent count raises the signal. Previous-month fires are subtracted slightly because the intent is to detect acceleration rather than repeatedly count old activity. Station-wide momentum is divided by the number of covered barangays before being added to each barangay, preventing the same full station total from being copied to every location.</p>
+
+<h3>4.3 Current-month results cannot fall below observed fires</h3>
+<p>If fires have already occurred this month, the displayed expected total is never allowed to be lower than the observed count. The result separates:</p>
+<ul>
+    <li><strong>Observed to date:</strong> already completed/closed fire records in the target month.</li>
+    <li><strong>Expected month total:</strong> calibrated midpoint, never below observed.</li>
+    <li><strong>Predicted additional fires:</strong> expected total minus observed.</li>
+</ul>
+
+<h2>5. Explicit engineered calculations</h2>
+<h3>5.1 Verified field-pressure score</h3>
+<div class="formula">risk_area_pressure =<br>
+0.8 × verified risk-area count<br>
++ 1.1 × verified hazard count<br>
++ 2.5 × high assessments<br>
++ 1.8 × blocked hydrants<br>
++ 1.6 × combustible-material findings<br>
++ 1.3 × informal-settlement findings<br>
++ 1.2 × fire-prone cooking findings<br>
++ 0.8 × poor-waste findings<br>
++ 1.6 × previous-fire-prone findings<br>
++ 1.4 × difficult-access findings<br>
++ min(affected households ÷ 25, 5)</div>
+<p>This makes a barangay with verified high-severity and response-obstruction evidence different from a barangay that has no such evidence.</p>
+
+<h3>5.2 Barangay pressure feature used by the model</h3>
+<div class="formula">barangay_pressure =<br>
+1.20 × historical incident_count<br>
++ 0.35 × average temperature<br>
++ 2.50 × high-density flag<br>
+− 0.75 × water-access flag<br>
++ 0.15 × wind speed<br>
+− 0.03 × humidity<br>
++ 0.90 × risk-area pressure<br>
++ 1.35 × local recent-fire momentum<br>
++ 0.35 × allocated station momentum<br>
++ 1.10 × high assessments<br>
++ 0.80 × blocked hydrants<br>
+− 0.60 × mitigation-readiness signal<br>
+− 1.50 × mitigation-completion ratio<br>
+− 1.00 × followed-checklist-item ratio</div>
+<p>This is an engineered input, not the final probability. The Random Forest combines it non-linearly with the other numeric and categorical features.</p>
+
+<h3>5.3 Operational station risk score</h3>
+<div class="formula">base score = min(30, 5 × all_incidents ÷ days)<br>
+&nbsp;&nbsp;+ min(30, 10 × fire_incidents ÷ days)<br>
+&nbsp;&nbsp;+ min(20, 20 × fire_incidents ÷ max(1, all_incidents))<br>
+&nbsp;&nbsp;+ 20 when the latest-7-day count is more than 1.5 × its expected pace<br>
+final base score = min(100, round(base score))</div>
+<p>Operational levels are Low below 30, Medium from 30, High from 50, and Critical from 70.</p>
+
+<h2>6. The trained prediction model</h2>
+<h3>6.1 What it learns</h3>
+<p>The main classifier is a 250-tree Random Forest with maximum depth 10, minimum leaf size 2, balanced class weights, one-hot encoding for categories, and sigmoid probability calibration when sufficient class examples exist. Station ID, barangay ID, and barangay name are deliberately excluded as identity features, so the model must use each barangay’s evidence rather than memorize its name.</p>
+<p>A training row is considered a positive high-risk barangay-month if any of these is true:</p>
+<ul>
+    <li>Saved risk level is high.</li>
+    <li>Risk level is medium and is supported by at least one incident, risk-area pressure of at least 1, or damage of at least PHP 50,000.</li>
+    <li>Incident count reaches the learned 75th-percentile threshold, with a minimum threshold of 3.</li>
+    <li>Estimated damage reaches the learned 75th-percentile threshold, with a minimum of PHP 150,000.</li>
+</ul>
+
+<h3>6.2 Risk bands and confidence</h3>
+<table>
+    <thead><tr><th>Probability</th><th>Barangay risk label</th><th>Meaning</th></tr></thead>
+    <tbody>
+    <tr><td>Below 35%</td><td>Low</td><td>The input is more similar to the model’s non-high-risk months.</td></tr>
+    <tr><td>35% to below 65%</td><td>Moderate</td><td>Watch level; evidence supports heightened attention but does not cross the high threshold.</td></tr>
+    <tr><td>65% and above</td><td>High</td><td>Classified as a high-risk barangay-month.</td></tr>
+    </tbody>
+</table>
+<p>The model confidence band is based on distance from 50%: at least 30 percentage points away is high confidence; at least 15 is medium; otherwise low. The application’s separate analysis-confidence score measures evidence coverage and model availability, not probability certainty.</p>
+
+<h3>6.3 Driver explanations</h3>
+<p>For leading globally important features, the prediction code replaces the barangay’s current value with the training-set reference value (median for numeric fields, mode for categories), runs the model again, and measures the probability difference. A change below 1.5 percentage points is omitted. Positive differences are reported as increasing risk; negative differences are reported as reducing risk.</p>
+<div class="formula">local driver contribution = probability(current barangay input) − probability(same input with one feature reset to baseline)</div>
+<p>This counterfactual explanation is more useful than saying every high number is automatically harmful: the direction is based on the fitted model for that specific input.</p>
+
+<h3>6.4 Incident-count forecast and calibration</h3>
+<p>A separate 250-tree Random Forest regressor estimates incident count. Station total probability is <code>55% × highest barangay probability + 45% × average barangay probability</code>. Raw barangay incident estimates are summed, then blended with current pace and the same calendar month in the previous three years.</p>
+<table>
+    <thead><tr><th>Situation</th><th>Model weight</th><th>Current pace</th><th>Same-month history</th></tr></thead>
+    <tbody>
+    <tr><td>Current month with observed fires</td><td>25%</td><td>55%</td><td>20%</td></tr>
+    <tr><td>Next-month run while current activity exists</td><td>30%</td><td>45%</td><td>25%</td></tr>
+    <tr><td>No observed fire but history exists</td><td>40%</td><td>0%</td><td>60%</td></tr>
+    <tr><td>No observed fire and no history</td><td>100%</td><td>0%</td><td>0%</td></tr>
+    </tbody>
+</table>
+<div class="formula">pace projection = observed_current_month ÷ elapsed_days × days_in_month<br>
+blended midpoint = model × Wm + pace × Wp + historical_average × Wh</div>
+<p>The midpoint is capped by a plausibility ceiling and a planning range is added. It is an estimate, not a dispatch commitment.</p>
+
+<h3>6.5 Current model evaluation snapshot</h3>
+<table>
+    <thead><tr><th>Metric</th><th>Value</th><th>Interpretation</th></tr></thead>
+    <tbody>
+    <tr><td>Records</td><td>960</td><td>720 training and 240 test rows.</td></tr>
+    <tr><td>Classification accuracy</td><td>97.50%</td><td>Strong held-out classification result for the cleaned exported dataset.</td></tr>
+    <tr><td>ROC AUC</td><td>0.9710</td><td>Strong class ranking on the held-out split.</td></tr>
+    <tr><td>Precision / recall / F1</td><td>1.000 / 0.625 / 0.7692</td><td>No false-positive high-risk classifications in the held-out split, but 37.5% of positive cases were missed.</td></tr>
+    <tr><td>Brier score / calibration error</td><td>0.0219 / 0.0163</td><td>Good probability calibration on this snapshot.</td></tr>
+    <tr><td>Incident-count R²</td><td>0.4797</td><td>Moderate explanatory performance; operational calibration remains necessary.</td></tr>
+    <tr><td>Damage R²</td><td>−1134.9025</td><td><strong>Unreliable.</strong> Damage estimates should not be used for financial or command decisions.</td></tr>
+    </tbody>
+</table>
+<div class="callout red"><strong>Metrics are not permanent guarantees.</strong> They describe the current export and split. Repeated monthly monitoring, out-of-time evaluation, and real-world outcome review are still required.</div>
+
+<h2>7. How mitigating and “negative-risk” factors work</h2>
+<h3>7.1 Water, hydrants, rainfall, and season</h3>
+<table>
+    <thead><tr><th>Factor</th><th>Can it reduce risk?</th><th>Current behavior</th></tr></thead>
+    <tbody>
+    <tr><td>Near water / water source</td><td>Yes, as a readiness indicator.</td><td>The explicit pressure formula subtracts 0.75 when water access is present. It is also a trained feature.</td></tr>
+    <tr><td>Near hydrant</td><td>Potentially.</td><td>It is a model input. The learned direction depends on the training data and the other local conditions.</td></tr>
+    <tr><td>Blocked hydrant</td><td>No; it increases concern.</td><td>Adds to the verified field-pressure score and engineered barangay pressure.</td></tr>
+    <tr><td>Higher humidity / rain</td><td>Potentially.</td><td>Humidity explicitly lowers engineered pressure. Rainy conditions can lower the weather-risk label and the learned weather relationship may lower probability.</td></tr>
+    <tr><td>Hot, dry, windy weather</td><td>Usually increases concern.</td><td>Temperature and wind add to engineered pressure; dry season is a separate feature. Weather-risk score adds points at ≥31°C, ≤55% humidity, ≥20 kph wind, and no rainy days.</td></tr>
+    <tr><td>Wet season</td><td>Potentially.</td><td>May lower learned risk relative to dry season, but it does not erase electrical, LPG, structural, access, or human-activity hazards.</td></tr>
+    </tbody>
+</table>
+<p>The application defines November through April as dry season and May through October as wet season.</p>
+<div class="callout"><strong>“Near water” does not automatically mean the area is ready.</strong> Readiness also depends on whether the source is accessible and usable, hydrants are unblocked, routes are passable, equipment and personnel are available, and prevention actions are verified. The model does not currently store hydrant flow rate, water volume, pressure test, travel time to water, or apparatus compatibility as one complete suppression-readiness index.</div>
+
+<h3>7.2 Completed prevention work reduces the modeled context</h3>
+<p>Checklist priorities are weighted: low 1, medium 2, high 3, critical 4.</p>
+<div class="formula">C = confirmed checklist priority weight ÷ total checklist priority weight<br>
+I = followed checklist items ÷ all checklist items<br>
+M = completed mitigation actions ÷ all mitigation actions<br>
+B = number of blocked mitigation actions</div>
+<div class="formula">mitigation_readiness = 8C + 6I + 9M − min(0.7B, 4)</div>
+<p>The operational station risk score uses a separate, transparent reduction:</p>
+<div class="formula">reduction percent = min(35, 18C + 12M + 5I)<br>
+reduction points = base operational score × reduction percent ÷ 100<br>
+adjusted operational score = max(0, round(base score − reduction points))</div>
+<p>Therefore a checklist existing in the database does not reduce risk by itself. It must be confirmed, its items must be marked followed, and/or linked mitigation actions must be completed. Blocked actions reduce readiness.</p>
+<div class="callout blue"><strong>This is an evidence-based proxy, not proof of causation.</strong> A 20% modeled reduction means the workflow formula recognizes completed controls; it does not guarantee that real-world fire occurrence or severity fell exactly 20%.</div>
+
+<h2>8. How recommendations become checklists and mitigation</h2>
+<ol>
+    <li>The system builds recommendations from the trained forecast, verified local findings, incident frequency, peak hours, response time, personnel availability, equipment, weather, and mitigation context.</li>
+    <li>If OpenRouter responses are available, the system parses the forecast and recommendations. If not, deterministic rules produce localized recommendations.</li>
+    <li>Recommendations are converted to action-plan checklists. Optional AI checklist generation is controlled by <code>AI_GENERATE_ACTION_PLAN_CHECKLISTS</code>; otherwise recommendation-backed fallback steps are used.</li>
+    <li>For an all-barangays analysis, each barangay receives a localized version based on its own probability, risk level, verified risks/hazards, historical incidents, current-month fires, leading condition, and leading location.</li>
+    <li>Each saved checklist starts as <code>pending</code>. A linked mitigation action is created as <code>draft</code>, with no responsible team/user assigned automatically.</li>
+    <li>BFP and authorized barangay/firefighter users review, assign, update, document, confirm, or complete the work.</li>
+    <li>Confirmed and completed results become mitigation/readiness features in later analysis.</li>
+</ol>
+
+<h3>8.1 Local priority rules</h3>
+<table>
+    <thead><tr><th>Checklist priority</th><th>Rule</th><th>Default target</th></tr></thead>
+    <tbody>
+    <tr><td>Critical</td><td>Critical risk label or probability ≥80%</td><td>7 days</td></tr>
+    <tr><td>High</td><td>High risk label or probability ≥60%</td><td>14 days</td></tr>
+    <tr><td>Medium</td><td>Moderate/medium label or probability ≥35%</td><td>30 days</td></tr>
+    <tr><td>Low</td><td>Below the above thresholds</td><td>45 days for localized station-wide plan</td></tr>
+    </tbody>
+</table>
+<p>Localized checklist steps validate the exact field evidence, assign a focal person/team, apply and document the control, and verify completion with dated field evidence. The mitigation category is inferred from the plan text—for example water supply, electrical safety, access routing, community prevention, response readiness, or high-risk-area monitoring.</p>
+
+<h2>9. How risk areas and the heatmap are produced</h2>
+<p>Approved risks/hazards remain marker icons. They do not create a heatmap by themselves. The heatmap is emitted only when there is a <strong>saved current analysis or next-month forecast</strong> for a barangay and the barangay has real evidence coordinates.</p>
+<ol>
+    <li>The overlay loads the latest saved analyses (up to 100 records) and keeps the newest result per barangay and analysis scope.</li>
+    <li>It obtains real coordinates from approved/verified risk/hazard markers and verified historical incidents.</li>
+    <li>If a forecasted barangay has no evidence coordinates, the system does not invent a hotspot at the barangay hall.</li>
+    <li>The saved barangay probability supplies the main heat strength; field severity, pressure flags, affected households, casualties, damage, and historical incident load modify local intensity.</li>
+    <li>Heat is drawn at the original evidence coordinates. The default visual blending distance is 100 m and the interface allows 50–200 m.</li>
+    <li>When zoomed out, nearby gradients visually merge. When zoomed in, the effective blend distance shrinks by <code>0.72^(zoom−14)</code>, revealing separate source locations.</li>
+</ol>
+<div class="formula">analysis heat weight = clamp(saved probability, 0.25, 1.00)<br>
+local multiplier = 0.72 + 0.38 × local severity<br>
+final point intensity = clamp(analysis heat weight × local multiplier, 0.18, 1.00)</div>
+<p>Local severity is the maximum of relevant field/historical weights, including assessment, stored risk score, historical incident load, pressure flags, household exposure, casualties, and damage. This display is an evidence-anchored visualization; it is not a continuous geospatial simulation of flame spread.</p>
+
+<h2>10. Fallback behavior</h2>
+<p>If Python or the trained model is unavailable, the full analysis no longer fails. It uses a deterministic barangay fallback:</p>
+<div class="formula">fallback probability score = 12<br>
++ 7 × historical incidents<br>
++ 1.8 × max(0, temperature − 27)<br>
++ 0.35 × max(0, 65 − humidity)<br>
++ 0.45 × wind<br>
++ 2.4 × risk pressure<br>
++ 2.2 × local momentum<br>
++ 0.55 × station momentum<br>
+− 3 × mitigation readiness<br>
+− 12 × mitigation completion ratio</div>
+<p>The fallback is clamped to 5–95%, with the same 35% and 65% risk bands. Its confidence is labeled <code>fallback</code>. This maintains operation but must not be presented as a trained-model result.</p>
+
+<h2>11. Important current limitations found in the implementation</h2>
+<ol>
+    <li><strong>Weather field mapping:</strong> the weather service returns <code>avg_humidity</code>, <code>avg_wind_kph</code>, and <code>dominant_condition</code>, while the barangay model payload currently looks for <code>humidity</code>, <code>wind_kph</code>, and <code>condition</code>. Average temperature is mapped correctly, and the full weather summary reaches AI/data-driven narratives, but humidity, wind, and categorical condition may fall back to historical/default values in the trained-model payload.</li>
+    <li><strong>Weather horizon:</strong> “monthly” weather is based on the available API forecast sample, capped at 14 days, not a complete meteorological forecast of every day in the month.</li>
+    <li><strong>Damage regression:</strong> the current negative R² means damage estimates are not decision-grade.</li>
+    <li><strong>Completed/closed incident bias:</strong> recent model momentum intentionally uses completed/closed incidents. Newly reported or actively responding incidents may not affect the forecast until their lifecycle reaches those states.</li>
+    <li><strong>Mitigation effectiveness:</strong> completion status is a workflow signal. It does not independently verify field quality unless users supply and review credible evidence.</li>
+    <li><strong>Shared historical table:</strong> monthly weather placeholders remain in <code>historical_fire_incidents</code> with zero incidents. The application now uses one shared positive-incident-count rule so those rows supply weather but do not become fires. Future counting code must continue using that rule.</li>
+</ol>
+
+<h2>12. Worked interpretation example</h2>
+<p>Suppose Barangay A has five historical fire records, two verified hazards, one high assessment, a blocked hydrant, combustible materials, 50 affected households, two fires in the latest seven days, hot/dry weather, and no completed mitigation. Its field pressure and recent momentum rise, water readiness is poor, and the model is likely to move upward relative to its baseline.</p>
+<p>Barangay B has similar historical activity but has accessible water, an unblocked hydrant, lower density, no high assessment, confirmed checklist work, followed steps, and completed mitigation. Water access and readiness reduce its engineered pressure. The Random Forest then evaluates those conditions together, so Barangay B should not automatically receive the same probability, title, priority, or checklist as Barangay A.</p>
+<p>If Barangay A’s saved probability is 72%, the map does not color the barangay hall. It places the analysis heat at Barangay A’s real historical fire and approved risk/hazard coordinates. A location with a blocked hydrant and high assessment appears stronger than a lower-severity evidence point, while both remain governed by the saved 72% barangay analysis.</p>
+
+<h2>13. Safe decision rules for users</h2>
+<ul>
+    <li>Use probability, confidence, incident range, drivers, and evidence locations together.</li>
+    <li>Do not treat low risk as zero risk; electrical, LPG, and human-activity fires can occur during wet or cool conditions.</li>
+    <li>Do not treat “near water” as verified suppression capability without inspection.</li>
+    <li>Confirm generated checklists before implementation; drafts are not completed controls.</li>
+    <li>Record proof, completion, blocked reasons, and follow-up results so future readiness signals are meaningful.</li>
+    <li>Use forecast counts for preparation and prioritization, not as guaranteed incident totals.</li>
+</ul>
+
+<h2>14. Implementation reference</h2>
+<table>
+    <thead><tr><th>Topic</th><th>Primary implementation</th></tr></thead>
+    <tbody>
+    <tr><td>Analysis orchestration, payload, risk score, weather, recommendations, checklists</td><td><code>app/Http/Controllers/Chief/AnalyticController.php</code></td></tr>
+    <tr><td>Barangay ML execution</td><td><code>app/Services/BarangayPredictionService.php</code></td></tr>
+    <tr><td>Checklist/mitigation feedback features</td><td><code>app/Services/PredictionFeedbackSignalService.php</code></td></tr>
+    <tr><td>Incident-count calibration</td><td><code>app/Support/ForecastIncidentCalibration.php</code></td></tr>
+    <tr><td>Training, labels, models, metrics</td><td><code>capstone-ai/train_model.py</code></td></tr>
+    <tr><td>Prediction, thresholds, local drivers</td><td><code>capstone-ai/predict_event.py</code></td></tr>
+    <tr><td>Saved-analysis geographic evidence</td><td><code>app/Services/PredictedRiskAreaService.php</code></td></tr>
+    <tr><td>Heat intensity and zoom blending</td><td><code>resources/js/map.js</code></td></tr>
+    <tr><td>Current trained metrics</td><td><code>capstone-ai/fire_model_metadata.json</code></td></tr>
+    </tbody>
+</table>
+
+<div class="callout green"><strong>Bottom line:</strong> PyroSense already supports a genuine evidence loop—local data produces a forecast, the forecast produces location-specific work, and verified completion influences later risk context. Its value depends on accurate barangay boundaries, verified coordinates, honest checklist status, reliable weather mapping, and regular model evaluation.</div>
+
+</body>
+</html>

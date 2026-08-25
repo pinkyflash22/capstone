@@ -14,10 +14,12 @@ use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\BarangayPredictionService;
+use App\Services\DailyWeatherContextService;
 use App\Services\ForecastModelService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Support\BarangayNotificationService;
 use App\Support\ForecastIncidentCalibration;
+use App\Support\HistoricalFireRecordSemantics;
 use App\Support\PeakHourEstimator;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
@@ -892,6 +894,21 @@ class AnalyticController extends Controller
 
         // Identify risk factors
         $riskFactors = $this->identifyRiskFactors($incidents, $incidentsByType, $peakHour, $avgResponseTime);
+        $evidenceProvenance = $this->buildAnalysisEvidenceProvenance(
+            $locationName,
+            $days,
+            (string) $historicalWindow,
+            $predictionScope,
+            $predictionContext,
+            $barangayPredictions,
+            $weatherContext,
+            $mitigationContext,
+            $riskFactors,
+            $totalIncidents,
+            $fireIncidents,
+            $riskScore,
+            $modelPrediction
+        );
 
         return [
             'location_name' => $locationName,
@@ -923,6 +940,134 @@ class AnalyticController extends Controller
             'mitigation_context' => $mitigationContext,
             'recommendation_context' => $recommendationContext,
             'chart_context' => $chartContext,
+            'evidence_provenance' => $evidenceProvenance,
+        ];
+    }
+
+    /**
+     * Build a read-only audit view from the exact inputs used by this run.
+     * This is stored inside analysis_data; it intentionally needs no new table.
+     */
+    private function buildAnalysisEvidenceProvenance(
+        string $locationName,
+        int $days,
+        string $historicalWindow,
+        string $predictionScope,
+        array $predictionContext,
+        array $barangayPredictions,
+        array $weatherContext,
+        array $mitigationContext,
+        array $riskFactors,
+        int $totalIncidents,
+        int $fireIncidents,
+        array $riskScore,
+        ?array $modelPrediction
+    ): array {
+        $barangays = collect($barangayPredictions)->map(function (array $prediction) {
+            $input = is_array($prediction['input'] ?? null) ? $prediction['input'] : [];
+            $drivers = collect($prediction['drivers'] ?? [])
+                ->map(fn ($driver) => is_array($driver) ? ($driver['summary'] ?? null) : $driver)
+                ->filter()
+                ->values()
+                ->all();
+
+            return [
+                'barangay_id' => $prediction['barangay_id'] ?? null,
+                'barangay_name' => $prediction['barangay_name'] ?? 'Unknown barangay',
+                'historical_fire_baseline' => (int) ($input['incident_count'] ?? 0),
+                'positive_historical_records' => (int) ($input['positive_historical_record_count'] ?? 0),
+                'weather_observation_rows' => (int) ($input['historical_weather_observation_count'] ?? 0),
+                'historical_source_rows' => (int) ($input['historical_source_row_count'] ?? 0),
+                'same_month_historical_fires' => (int) ($input['same_month_historical_fire_total'] ?? 0),
+                'recent_12_month_historical_fires' => (int) ($input['recent_12_month_historical_fire_total'] ?? 0),
+                'current_month_fires' => (int) ($input['current_month_fire_incidents'] ?? 0),
+                'verified_risks' => (int) ($input['verified_risk_count'] ?? 0),
+                'verified_hazards' => (int) ($input['verified_hazard_count'] ?? 0),
+                'high_assessments' => (int) ($input['high_assessment_count'] ?? 0),
+                'risk_pressure' => round((float) ($input['risk_area_pressure_signal'] ?? 0), 2),
+                'near_hydrant' => (bool) ($input['near_hydrant'] ?? false),
+                'near_water_source' => (bool) ($input['near_water_source'] ?? false),
+                'temperature_c' => isset($input['average_temperature']) ? round((float) $input['average_temperature'], 1) : null,
+                'humidity_percent' => isset($input['average_humidity']) ? round((float) $input['average_humidity'], 1) : null,
+                'wind_kph' => isset($input['average_wind_speed']) ? round((float) $input['average_wind_speed'], 1) : null,
+                'weather_condition' => $input['weather_condition'] ?? null,
+                'probability_percent' => isset($prediction['probability_percent']) ? round((float) $prediction['probability_percent'], 2) : null,
+                'risk_level' => $prediction['risk_level'] ?? null,
+                'prediction_source' => $prediction['prediction_source'] ?? 'unknown',
+                'drivers' => $drivers,
+            ];
+        })->values();
+
+        $modelOutput = is_array($modelPrediction['output'] ?? null) ? $modelPrediction['output'] : [];
+        $modelSources = $barangays->pluck('prediction_source')->filter()->countBy()->all();
+
+        return [
+            'version' => 1,
+            'generated_at' => now()->toISOString(),
+            'scope' => [
+                'location' => $locationName,
+                'days_analyzed' => $days,
+                'historical_window_years' => $historicalWindow === 'all' ? 'all available' : (int) $historicalWindow,
+                'prediction_scope' => $predictionScope,
+                'target_period' => $predictionContext['target_period_label'] ?? $predictionContext['target_month_label'] ?? null,
+            ],
+            'counts' => [
+                'actual_incidents_in_analysis_window' => $totalIncidents,
+                'actual_fire_incidents_in_analysis_window' => $fireIncidents,
+                'observed_current_month_fires' => (int) ($predictionContext['current_month_fire_incidents'] ?? 0),
+                'historical_fire_baseline' => (int) $barangays->sum('historical_fire_baseline'),
+                'positive_historical_records' => (int) $barangays->sum('positive_historical_records'),
+                'weather_observation_rows' => (int) $barangays->sum('weather_observation_rows'),
+                'daily_weather_rows' => (int) ($weatherContext['daily_observation_count'] ?? 0),
+                'observed_weather_days' => (int) ($weatherContext['observed_calendar_days'] ?? 0),
+                'historical_source_rows' => (int) $barangays->sum('historical_source_rows'),
+                'verified_risks' => (int) $barangays->sum('verified_risks'),
+                'verified_hazards' => (int) $barangays->sum('verified_hazards'),
+                'high_risk_assessments' => (int) $barangays->sum('high_assessments'),
+                'barangays_evaluated' => $barangays->count(),
+            ],
+            'weather' => [
+                'source' => $weatherContext['source'] ?? 'historical station observations',
+                'temperature_c' => $weatherContext['avg_temp_c'] ?? null,
+                'humidity_percent' => $weatherContext['avg_humidity'] ?? $weatherContext['humidity'] ?? null,
+                'wind_kph' => $weatherContext['avg_wind_kph'] ?? $weatherContext['wind_kph'] ?? null,
+                'condition' => $weatherContext['dominant_condition'] ?? $weatherContext['condition'] ?? null,
+                'summary' => $weatherContext['summary'] ?? null,
+            ],
+            'mitigation' => [
+                'checklists' => (int) ($mitigationContext['total_checklists'] ?? 0),
+                'checklist_completion_percent' => round(((float) ($mitigationContext['completion_ratio'] ?? 0)) * 100, 1),
+                'checklist_steps_followed' => (int) ($mitigationContext['item_followed'] ?? 0),
+                'checklist_steps_total' => (int) ($mitigationContext['item_total'] ?? 0),
+                'completed_actions' => (int) ($mitigationContext['completed_mitigations'] ?? 0),
+                'total_actions' => (int) ($mitigationContext['total_mitigation_actions'] ?? 0),
+                'risk_reduction_percent' => (float) ($mitigationContext['risk_reduction_percent'] ?? 0),
+                'risk_reduction_points' => (float) ($riskScore['mitigation_reduction_points'] ?? 0),
+            ],
+            'result' => [
+                'base_risk_score' => (float) ($riskScore['base_score'] ?? $riskScore['score'] ?? 0),
+                'adjusted_risk_score' => (float) ($riskScore['score'] ?? 0),
+                'risk_level' => $riskScore['level'] ?? null,
+                'forecast_probability_percent' => $modelOutput['probability_percent'] ?? null,
+                'forecast_incident_midpoint' => $modelOutput['predicted_incident_count'] ?? null,
+                'forecast_incident_range' => $modelOutput['incident_count_range'] ?? null,
+            ],
+            'model' => [
+                'prediction_sources' => $modelSources,
+                'target' => $modelOutput['target'] ?? null,
+                'confidence_band' => $modelOutput['confidence_band'] ?? null,
+                'drivers' => collect($modelOutput['drivers'] ?? [])
+                    ->map(fn ($driver) => is_array($driver) ? ($driver['summary'] ?? null) : $driver)
+                    ->filter()->values()->all(),
+            ],
+            'risk_factors' => array_values($riskFactors),
+            'barangays' => $barangays->all(),
+            'definitions' => [
+                'historical_fire_baseline' => 'For each barangay, the model uses the larger of the positive fire-occurrence total for the same calendar month in the prior three years or the most recent 12 months.',
+                'weather_observation_rows' => 'Historical rows with zero or null incident_count that contain weather measurements. They inform weather context and are not counted as fires.',
+                'daily_weather_rows' => 'Dedicated completed-day weather observations are stored separately from incidents and aggregated by barangay and calendar day.',
+                'mitigation_effect' => 'Completed checklists, followed steps, hydrant or water readiness, and completed actions reduce risk pressure; they do not erase the underlying evidence.',
+            ],
         ];
     }
 
@@ -1522,7 +1667,7 @@ class AnalyticController extends Controller
                 ->whereIn(DB::raw('EXTRACT(YEAR FROM incident_date)::int'), $comparisonYears->all())
                 ->get(['incident_date', 'incident_count'])
                 ->groupBy(fn ($row) => (int) Carbon::parse($row->incident_date)->year)
-                ->map(fn ($rows) => (int) $rows->sum(fn ($row) => max(0, (int) ($row->incident_count ?? 1))));
+                ->map(fn ($rows) => HistoricalFireRecordSemantics::incidentCount($rows));
         }
 
         $historicalTotals = $comparisonYears
@@ -1965,18 +2110,43 @@ class AnalyticController extends Controller
             }
         });
 
-        $incidentCount = (int) max($sameMonthIncidents->count(), $recentIncidents->count());
+        $incidentCount = max(
+            HistoricalFireRecordSemantics::incidentCount($sameMonthIncidents),
+            HistoricalFireRecordSemantics::incidentCount($recentIncidents)
+        );
+        $sameMonthHistoricalFireTotal = HistoricalFireRecordSemantics::incidentCount($sameMonthIncidents);
+        $recent12MonthHistoricalFireTotal = HistoricalFireRecordSemantics::incidentCount($recentIncidents);
+        $positiveHistoricalRecordCount = HistoricalFireRecordSemantics::incidentRows($barangayIncidents)->count();
+        $weatherObservationFields = [
+            'temperature', 'temperature_2m', 'humidity', 'relative_humidity_2m',
+            'precipitation', 'rain', 'wind_speed', 'wind_speed_10m', 'weather_condition',
+        ];
+        $historicalWeatherObservationCount = $barangayIncidents->filter(function ($row) use ($weatherObservationFields) {
+            if (HistoricalFireRecordSemantics::incidentCountForRow($row) > 0) {
+                return false;
+            }
+
+            foreach ($weatherObservationFields as $field) {
+                if (property_exists($row, $field) && $row->{$field} !== null && $row->{$field} !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        })->count();
         $averageTemperature = isset($weatherContext['avg_temp_c']) && $weatherContext['avg_temp_c'] !== null
             ? (float) $weatherContext['avg_temp_c']
             : ($sameMonthIncidents->avg('temperature') ?: $stationHistoricalRow->average_temperature);
-        $averageHumidity = isset($weatherContext['humidity']) && $weatherContext['humidity'] !== null
-            ? (float) $weatherContext['humidity']
+        $liveHumidity = $weatherContext['avg_humidity'] ?? $weatherContext['humidity'] ?? null;
+        $averageHumidity = $liveHumidity !== null
+            ? (float) $liveHumidity
             : ($sameMonthIncidents->avg('humidity') ?: null);
-        $averageWindSpeed = isset($weatherContext['wind_kph']) && $weatherContext['wind_kph'] !== null
-            ? (float) $weatherContext['wind_kph']
+        $liveWindSpeed = $weatherContext['avg_wind_kph'] ?? $weatherContext['wind_kph'] ?? null;
+        $averageWindSpeed = $liveWindSpeed !== null
+            ? (float) $liveWindSpeed
             : ($sameMonthIncidents->avg('wind_speed') ?: null);
-        $weatherCondition = $weatherContext['condition']
-            ?? $weatherContext['summary']
+        $weatherCondition = $weatherContext['dominant_condition']
+            ?? $weatherContext['condition']
             ?? ($sameMonthIncidents->pluck('weather_condition')->filter()->countBy()->sortDesc()->keys()->first() ?: 'unknown');
 
         $historicalRiskLevel = $incidentCount >= 8
@@ -2098,6 +2268,11 @@ class AnalyticController extends Controller
             'month' => $targetMonth->format('F'),
             'year' => (int) $targetMonth->year,
             'incident_count' => $incidentCount,
+            'same_month_historical_fire_total' => $sameMonthHistoricalFireTotal,
+            'recent_12_month_historical_fire_total' => $recent12MonthHistoricalFireTotal,
+            'positive_historical_record_count' => $positiveHistoricalRecordCount,
+            'historical_weather_observation_count' => $historicalWeatherObservationCount,
+            'historical_source_row_count' => $barangayIncidents->count(),
             'current_month_fire_incidents' => (int) ($recentFireSignal['current_month_fire_incidents'] ?? 0),
             'previous_month_fire_incidents' => (int) ($recentFireSignal['previous_month_fire_incidents'] ?? 0),
             'recent_7_day_fire_incidents' => (int) ($recentFireSignal['recent_7_day_fire_incidents'] ?? 0),
@@ -4099,6 +4274,7 @@ class AnalyticController extends Controller
             'prediction_scope' => $data['prediction_scope'] ?? 'current_month',
             'prediction_context' => $data['prediction_context'] ?? null,
             'chart_context' => $data['chart_context'] ?? null,
+            'evidence_provenance' => $data['evidence_provenance'] ?? null,
             'predictions' => $predictions,
             'recommendations' => $recommendations,
             'ai_explanation' => $explanation,
@@ -4156,6 +4332,7 @@ class AnalyticController extends Controller
             'prediction_scope' => $data['prediction_scope'] ?? 'current_month',
             'prediction_context' => $data['prediction_context'] ?? null,
             'chart_context' => $data['chart_context'] ?? null,
+            'evidence_provenance' => $data['evidence_provenance'] ?? null,
             'predictions' => $predictions,
             'recommendations' => array_slice($recommendations, 0, 6),
             'ai_explanation' => substr($predictionAiContent, 0, 300)."\n\n".substr($recommendationAiContent, 0, 300),
@@ -4344,6 +4521,7 @@ class AnalyticController extends Controller
                     'analysis_kind' => $rawData['analysis_kind'] ?? 'actual_analysis',
                     'historical_window' => $rawData['historical_window'] ?? '3',
                     'chart_context' => $rawData['chart_context'] ?? null,
+                    'evidence_provenance' => $rawData['evidence_provenance'] ?? null,
                     'checklist_debug' => $analysis['checklist_debug'] ?? null,
                 ],
                 'ai_analysis' => $analysis['ai_explanation'] ?? null,
@@ -4654,6 +4832,8 @@ class AnalyticController extends Controller
                 'prediction_scope' => $requestedScope['prediction_scope'],
                 'barangay_id' => $selectedBarangayId,
                 'chart_context' => $liveChartContext,
+                'evidence_provenance' => $rawData['evidence_provenance']
+                    ?? ($analysisSummary['evidence_provenance'] ?? null),
                 'checklist_debug' => $rawData['checklist_debug'] ?? ($analysisSummary['checklist_debug'] ?? null),
                 'recommendations' => is_array($latestAnalysis->recommendations) ? $latestAnalysis->recommendations : [],
                 'predictions' => is_array($latestAnalysis->predictions) ? $latestAnalysis->predictions : null,
@@ -5684,6 +5864,11 @@ class AnalyticController extends Controller
      */
     private function fetchMonthlyWeatherContext($station, $days, $fallbackLocationName)
     {
+        $storedDailyContext = $this->fetchStoredDailyWeatherContext($station, (int) $days, $fallbackLocationName);
+        if ($storedDailyContext !== null) {
+            return $storedDailyContext;
+        }
+
         $apiKey = env('WEATHER_API_KEY', '1432615e15a14140963113518261203');
 
         if (! $apiKey || ! $station) {
@@ -5765,6 +5950,79 @@ class AnalyticController extends Controller
             ];
         } catch (\Throwable $e) {
             Log::warning('Failed to fetch weather context for analytics: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    private function fetchStoredDailyWeatherContext($station, int $days, string $fallbackLocationName): ?array
+    {
+        if (! $station || ! Schema::hasTable('daily_weather_contexts')) {
+            return null;
+        }
+
+        try {
+            $endDate = Carbon::now('Asia/Manila')->subDay()->endOfDay();
+            $startDate = Carbon::now('Asia/Manila')->startOfMonth();
+            if ($days > 0) {
+                $startDate = $startDate->max($endDate->copy()->subDays(max(0, $days - 1))->startOfDay());
+            }
+
+            $rows = DB::table('daily_weather_contexts')
+                ->where('station_id', (int) $station->station_id)
+                ->whereBetween('observation_date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->orderBy('observation_date')
+                ->get();
+            $observedCalendarDays = $rows->pluck('observation_date')->unique()->count();
+
+            // A one- or two-day sample is too volatile for monthly context, so
+            // preserve the existing live forecast fallback until three completed days exist.
+            if ($observedCalendarDays < 3) {
+                return null;
+            }
+
+            $summary = app(DailyWeatherContextService::class)->summarizeStoredRows($rows);
+            if ($summary === null) {
+                return null;
+            }
+
+            $weatherRiskScore = 0;
+            if (($summary['avg_temp_c'] ?? 0) >= 31) {
+                $weatherRiskScore += 2;
+            }
+            if (($summary['avg_humidity'] ?? 100) <= 55) {
+                $weatherRiskScore += 2;
+            }
+            if (($summary['max_wind_kph'] ?? 0) >= 20) {
+                $weatherRiskScore += 1;
+            }
+            if (($summary['rainy_days'] ?? 0) === 0) {
+                $weatherRiskScore += 1;
+            }
+
+            $weatherRiskLabel = $weatherRiskScore >= 5
+                ? 'High'
+                : ($weatherRiskScore >= 3 ? 'Moderate' : 'Low');
+
+            return array_merge($summary, [
+                'query_location' => $this->resolveWeatherLocationQuery($station, $fallbackLocationName),
+                'weather_risk_score' => $weatherRiskScore,
+                'weather_risk_label' => $weatherRiskLabel,
+                'summary' => $this->buildWeatherSummary(
+                    $summary['avg_temp_c'],
+                    $summary['avg_humidity'],
+                    $summary['avg_wind_kph'],
+                    $summary['rainy_days'],
+                    $summary['hot_days'],
+                    $summary['dominant_condition'],
+                    $weatherRiskLabel
+                ),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Stored daily weather context could not be aggregated; retaining live forecast fallback.', [
+                'station_id' => $station->station_id ?? null,
+                'error' => $exception->getMessage(),
+            ]);
 
             return null;
         }
@@ -6132,6 +6390,7 @@ class AnalyticController extends Controller
         if (! empty($barangayIds) && Schema::hasTable('historical_fire_incidents')) {
             $historicalQuery = DB::table('historical_fire_incidents')
                 ->whereIn('barangay_id', $barangayIds)
+                ->where('incident_count', '>', 0)
                 ->whereNotNull('incident_time')
                 ->whereDate('incident_date', '>=', $targetMonth->copy()->subYears(3)->startOfYear());
 
@@ -6149,7 +6408,7 @@ class AnalyticController extends Controller
                     if ((bool) $row->is_verified) {
                         $weight *= 1.25;
                     }
-                    foreach (range(1, min(5, max(1, (int) ($row->incident_count ?? 1)))) as $_) {
+                    foreach (range(1, min(5, HistoricalFireRecordSemantics::incidentCountForRow($row))) as $_) {
                         $observations[] = ['hour' => $hour, 'weight' => $weight];
                     }
                 } catch (\Throwable $e) {
@@ -6496,7 +6755,7 @@ class AnalyticController extends Controller
             'current_actual' => $currentYearMonthlyActual,
             'historical_average' => $previousYearAveragesByMonth,
             'current_month_history' => $historicalPeriods
-                ->map(fn (array $period) => (int) collect($period['rows'])->sum(fn ($row) => (int) ($row->incident_count ?? 1)))
+                ->map(fn (array $period) => HistoricalFireRecordSemantics::incidentCount($period['rows']))
                 ->values()
                 ->all(),
             'comparison_years' => $historicalYears,
@@ -6561,7 +6820,7 @@ class AnalyticController extends Controller
         $weatherComparisonRows = $historicalPeriods->map(function (array $period) {
             return [
                 'label' => (string) $period['year'],
-                'incident_count' => (int) collect($period['rows'])->sum(fn ($row) => (int) ($row->incident_count ?? 1)),
+                'incident_count' => HistoricalFireRecordSemantics::incidentCount($period['rows']),
                 'temperature_2m' => $this->averageWeatherField($period['rows'], 'temperature_2m', 'temperature'),
                 'relative_humidity_2m' => $this->averageWeatherField($period['rows'], 'relative_humidity_2m', 'humidity'),
                 'wind_speed_10m' => $this->averageWeatherField($period['rows'], 'wind_speed_10m', 'wind_speed'),
@@ -6572,7 +6831,7 @@ class AnalyticController extends Controller
         })->values();
         $weatherComparisonRows->push([
             'label' => $isCurrentMonthTarget ? $targetMonthStart->year.' current actual' : $targetMonthStart->year.' selected month',
-            'incident_count' => (int) collect($currentRows)->sum(fn ($row) => (int) ($row->incident_count ?? 1)),
+            'incident_count' => HistoricalFireRecordSemantics::incidentCount($currentRows),
             'temperature_2m' => $this->averageWeatherField($currentRows, 'temperature_2m', 'temperature'),
             'relative_humidity_2m' => $this->averageWeatherField($currentRows, 'relative_humidity_2m', 'humidity'),
             'wind_speed_10m' => $this->averageWeatherField($currentRows, 'wind_speed_10m', 'wind_speed'),
@@ -6601,9 +6860,12 @@ class AnalyticController extends Controller
             ],
         ];
 
-        $historicalTotals = $historicalPeriods->map(fn (array $period) => (int) collect($period['rows'])->sum(fn ($row) => (int) ($row->incident_count ?? 1)))->values()->all();
+        $historicalTotals = $historicalPeriods
+            ->map(fn (array $period) => HistoricalFireRecordSemantics::incidentCount($period['rows']))
+            ->values()
+            ->all();
         $historicalBaselineTotal = count($historicalTotals) ? round(array_sum($historicalTotals) / count($historicalTotals), 2) : null;
-        $currentActualTotal = (int) collect($currentRows)->sum(fn ($row) => (int) ($row->incident_count ?? 1));
+        $currentActualTotal = HistoricalFireRecordSemantics::incidentCount($currentRows);
         $historicalVsForecastLabels = array_map(fn ($year) => (string) $year, $historicalYears);
         $historicalVsForecastLabels[] = '3-Year Baseline';
         $historicalVsForecastLabels[] = 'Current Actual';
@@ -7058,7 +7320,7 @@ class AnalyticController extends Controller
             $monthlyIncidentCounts = DB::table('historical_fire_incidents')
                 ->where('barangay_id', $barangayId)
                 ->whereYear('incident_date', $year)
-                ->selectRaw('CAST(EXTRACT(MONTH FROM incident_date) AS INTEGER) as month_value, SUM(COALESCE(incident_count, 1)) as total_incidents, COUNT(*) as matched_row_count')
+                ->selectRaw('CAST(EXTRACT(MONTH FROM incident_date) AS INTEGER) as month_value, SUM(COALESCE(incident_count, 0)) as total_incidents, COUNT(*) as matched_row_count')
                 ->groupByRaw('CAST(EXTRACT(MONTH FROM incident_date) AS INTEGER)')
                 ->get()
                 ->mapWithKeys(fn ($row) => [
@@ -7407,7 +7669,9 @@ class AnalyticController extends Controller
     {
         return (int) collect($rows)->sum(function ($row) use ($day) {
             try {
-                return Carbon::parse($row->incident_date)->isSameDay($day) ? (int) ($row->incident_count ?? 1) : 0;
+                return Carbon::parse($row->incident_date)->isSameDay($day)
+                    ? HistoricalFireRecordSemantics::incidentCountForRow($row)
+                    : 0;
             } catch (\Throwable $e) {
                 return 0;
             }
@@ -7420,7 +7684,9 @@ class AnalyticController extends Controller
             try {
                 $date = Carbon::parse($row->incident_date);
 
-                return $date->month === $month && $date->day === $day ? (int) ($row->incident_count ?? 1) : 0;
+                return $date->month === $month && $date->day === $day
+                    ? HistoricalFireRecordSemantics::incidentCountForRow($row)
+                    : 0;
             } catch (\Throwable $e) {
                 return 0;
             }
@@ -7543,7 +7809,7 @@ class AnalyticController extends Controller
         foreach ($rows as $row) {
             try {
                 $date = Carbon::parse($row->incident_date);
-                $seasonBuckets[$this->deriveSeasonFromMonth($date->month)][] = (int) ($row->incident_count ?? 1);
+                $seasonBuckets[$this->deriveSeasonFromMonth($date->month)][] = HistoricalFireRecordSemantics::incidentCountForRow($row);
             } catch (\Throwable $e) {
             }
         }
@@ -7588,7 +7854,7 @@ class AnalyticController extends Controller
                 $date = $useIncidentDateField
                     ? Carbon::parse($row->incident_date)
                     : Carbon::parse($row->incident_date ?? $row->created_at);
-                $counts[$date->dayOfWeek] += (int) ($row->incident_count ?? 1);
+                $counts[$date->dayOfWeek] += HistoricalFireRecordSemantics::incidentCountForRow($row);
             } catch (\Throwable $e) {
             }
         }
@@ -7609,7 +7875,7 @@ class AnalyticController extends Controller
                 }
 
                 if ($hour !== null && $hour >= 0 && $hour <= 23) {
-                    $counts[$hour] += (int) ($row->incident_count ?? 1);
+                    $counts[$hour] += HistoricalFireRecordSemantics::incidentCountForRow($row);
                 }
             } catch (\Throwable $e) {
             }
@@ -7647,7 +7913,7 @@ class AnalyticController extends Controller
                     } catch (\Throwable $e) {
                         return false;
                     }
-                })->sum(fn ($row) => (int) ($row->incident_count ?? 1));
+                })->sum(fn ($row) => HistoricalFireRecordSemantics::incidentCountForRow($row));
             }
 
             $baseline = count($yearlyTotals) ? round(array_sum($yearlyTotals) / count($yearlyTotals), 2) : null;
@@ -8066,7 +8332,7 @@ class AnalyticController extends Controller
                 return [
                     'period_start' => $periodStart,
                     'label' => $periodStart->format('M Y'),
-                    'incident_count' => (int) $periodRows->sum(fn ($row) => (int) ($row->incident_count ?? 1)),
+                    'incident_count' => HistoricalFireRecordSemantics::incidentCount($periodRows),
                     'temperature' => $this->averageNonNullValues($periodRows->pluck('temperature')->all()),
                     'humidity' => $this->averageNonNullValues($periodRows->pluck('humidity')->all()),
                     'wind_speed' => $this->averageNonNullValues($periodRows->pluck('wind_speed')->all()),
@@ -8096,7 +8362,7 @@ class AnalyticController extends Controller
                     'period_start' => $periodStart,
                     'label' => $periodStart->format('M Y'),
                     'month_number' => $monthNumber,
-                    'incident_count' => (int) $periodRows->sum(fn ($row) => (int) ($row->incident_count ?? 1)),
+                    'incident_count' => HistoricalFireRecordSemantics::incidentCount($periodRows),
                     'season' => $this->deriveSeasonFromMonth($monthNumber),
                     'temperature' => null,
                     'humidity' => null,
