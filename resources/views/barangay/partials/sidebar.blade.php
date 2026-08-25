@@ -76,25 +76,11 @@
                 <span class="barangay-mobile-dock__label">Reports</span>
             </a>
 
-            <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-barangay-nav-center>
-                <div class="barangay-mobile-dock__burst" data-barangay-nav-burst>
-                    <button type="button" class="barangay-mobile-dock__burst-item" data-pyro-voice-call aria-label="Call the assigned BFP station">
-                        <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">phone_in_talk</span>
-                        <span class="barangay-mobile-dock__burst-label">Call BFP</span>
-                    </button>
-                    @foreach ($mobileCenterActions as $action)
-                        <a href="{{ route($action['route']) }}" class="barangay-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
-                            <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
-                            <span class="barangay-mobile-dock__burst-label">{{ $action['label'] }}</span>
-                        </a>
-                    @endforeach
-                </div>
-
+            <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}">
                 <a
                     href="{{ route($mobileCenterItem['route']) }}"
                     class="barangay-mobile-dock__item barangay-mobile-dock__item--center {{ $active === $mobileCenterItem['active'] ? 'active' : '' }}"
                     aria-label="{{ $mobileCenterItem['label'] }}"
-                    data-barangay-nav-trigger
                 >
                     <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileCenterItem['mobile_icon'] }}</span>
                 </a>
@@ -127,6 +113,14 @@
         </div>
         <div class="chief-mobile-panel__menu">
             <p class="chief-mobile-panel__menu-label">Barangay navigation</p>
+            <button type="button" class="chief-mobile-panel__action" data-pyro-voice-call data-barangay-panel-close>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">phone_in_talk</span>
+                <span class="chief-mobile-panel__action-copy">
+                    <strong>Call BFP</strong>
+                    <small>Call your assigned fire station</small>
+                </span>
+                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+            </button>
             @foreach (array_slice($mobileCenterActions, 0, 2) as $action)
                 <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
                     <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
@@ -171,38 +165,9 @@
 @include('partials.user-activity-logger')
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const dock = document.querySelector('[data-barangay-nav-center]');
-        const trigger = document.querySelector('[data-barangay-nav-trigger]');
-        const burst = document.querySelector('[data-barangay-nav-burst]');
         const settingsPanel = document.querySelector('[data-barangay-settings-panel]');
         const settingsOpen = document.querySelector('[data-barangay-settings-open]');
         const logsOpen = document.querySelector('[data-barangay-open-logs]');
-
-        if (!dock || !trigger) {
-            return;
-        }
-
-        let holdTimer = null;
-        let holdActivated = false;
-        const holdDelay = 360;
-        let lastTouchMove = null;
-
-        const clearHoldTimer = () => {
-            if (holdTimer) {
-                window.clearTimeout(holdTimer);
-                holdTimer = null;
-            }
-        };
-
-        const openBurst = () => {
-            dock.classList.add('is-open');
-            holdActivated = true;
-        };
-
-        const closeBurst = () => {
-            dock.classList.remove('is-open');
-            holdActivated = false;
-        };
 
         const openPanel = (panel) => {
             if (!panel) {
@@ -212,7 +177,6 @@
             panel.classList.add('is-open');
             panel.setAttribute('aria-hidden', 'false');
             document.body.classList.add('menu-open');
-            closeBurst();
         };
 
         const closePanel = (panel) => {
@@ -224,56 +188,6 @@
             panel.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('menu-open');
         };
-
-        const startHold = () => {
-            clearHoldTimer();
-            holdTimer = window.setTimeout(openBurst, holdDelay);
-        };
-
-        const endHold = () => {
-            clearHoldTimer();
-        };
-
-        const handleTouchStart = (event) => {
-            lastTouchMove = null;
-            startHold();
-        };
-
-        const handleTouchMove = (event) => {
-            lastTouchMove = event.touches?.[0] ? {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY,
-            } : null;
-            endHold();
-        };
-
-        trigger.addEventListener('touchstart', handleTouchStart, { passive: true });
-        trigger.addEventListener('mousedown', startHold);
-        trigger.addEventListener('touchend', endHold);
-        trigger.addEventListener('touchcancel', endHold);
-        trigger.addEventListener('touchmove', handleTouchMove, { passive: true });
-        trigger.addEventListener('mouseleave', endHold);
-        trigger.addEventListener('mouseup', endHold);
-        trigger.addEventListener('contextmenu', (event) => event.preventDefault());
-
-        trigger.addEventListener('click', (event) => {
-            if (holdActivated) {
-                event.preventDefault();
-                closeBurst();
-            }
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!dock.contains(event.target)) {
-                closeBurst();
-            }
-        });
-
-        document.addEventListener('touchstart', (event) => {
-            if (!dock.contains(event.target) && !settingsPanel?.contains(event.target)) {
-                closeBurst();
-            }
-        }, { passive: true });
 
         settingsOpen?.addEventListener('click', () => {
             openPanel(settingsPanel);
@@ -292,19 +206,11 @@
 
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
-                closeBurst();
                 closePanel(settingsPanel);
             }
         });
 
-        dock.querySelectorAll('.barangay-mobile-dock__burst-item').forEach((item) => {
-            item.addEventListener('click', () => {
-                closeBurst();
-            });
-        });
-
         const closeTransientUi = () => {
-            closeBurst();
             closePanel(settingsPanel);
         };
 
@@ -317,8 +223,5 @@
             }
         });
 
-        burst?.addEventListener('touchmove', (event) => {
-            event.preventDefault();
-        }, { passive: false });
     });
 </script>

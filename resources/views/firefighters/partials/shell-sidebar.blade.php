@@ -736,69 +736,6 @@
             font-size: 24px;
         }
 
-        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__burst {
-            position: absolute;
-            left: 50%;
-            bottom: 86px;
-            transform: translateX(-50%);
-            width: min(calc(100vw - 28px), 308px);
-            min-height: 58px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.98);
-            border: 1px solid rgba(198, 61, 38, 0.12);
-            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14);
-            pointer-events: none;
-            z-index: 6;
-            opacity: 0;
-            transition: opacity 0.2s ease, transform 0.22s ease;
-        }
-
-        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__burst-item {
-            position: relative;
-            left: auto;
-            bottom: auto;
-            width: 48px;
-            height: 48px;
-            min-width: 48px;
-            min-height: 48px;
-            margin-left: 0;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.85);
-            background: rgba(255, 255, 255, 0.96);
-            color: #14532d;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 16px 28px rgba(15, 23, 42, 0.14);
-            opacity: 0;
-            transform: translateY(8px) scale(0.92);
-            transition: transform 0.22s ease, opacity 0.22s ease, background 0.2s ease, color 0.2s ease;
-            pointer-events: none;
-        }
-
-        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock__burst-item.active {
-            background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
-            color: #ffffff;
-            border-color: transparent;
-        }
-
-        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock.is-burst-open .ff-mobile-dock__burst {
-            pointer-events: auto;
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .mobile-bottom-nav.mobile-bottom-nav--firefighter-app .ff-mobile-dock.is-burst-open .ff-mobile-dock__burst-item {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateY(0) scale(1);
-        }
-
         .ff-route-skeleton__surface {
             border-radius: 0;
             box-shadow: none;
@@ -907,23 +844,6 @@
 
 <nav class="mobile-bottom-nav mobile-bottom-nav--firefighter-app block fixed bottom-0 left-0 right-0 z-[9999] md:hidden" aria-label="Mobile primary navigation">
     <div class="ff-mobile-dock" data-ff-mobile-dock>
-        <div class="ff-mobile-dock__burst" aria-hidden="true">
-            <a href="{{ route('firefighter.incidents') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'incidents' ? 'active' : '' }}" aria-label="Incidents" data-ff-nav-link data-ff-nav-key="incidents">
-                <span class="ff-mobile-icon" aria-hidden="true">local_fire_department</span>
-            </a>
-            <a href="{{ route('firefighter.risk-reviews.index') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'risk-reviews' ? 'active' : '' }}" aria-label="Risk Reviews" data-ff-nav-link data-ff-nav-key="risk-reviews">
-                <span class="ff-mobile-icon" aria-hidden="true">fact_check</span>
-            </a>
-            <a href="{{ route('firefighter.barangay-cooperation.index') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'cooperation' ? 'active' : '' }}" aria-label="Checklist" data-ff-nav-link data-ff-nav-key="cooperation">
-                <span class="ff-mobile-icon" aria-hidden="true">checklist</span>
-            </a>
-            <a href="{{ route('firefighter.my-station') }}" class="ff-mobile-dock__burst-item {{ $currentActive === 'station' ? 'active' : '' }}" aria-label="My Station" data-ff-nav-link data-ff-nav-key="station">
-                <span class="ff-mobile-icon" aria-hidden="true">apartment</span>
-            </a>
-            <a href="{{ route('firefighter.equipments') }}" class="ff-mobile-dock__burst-item {{ in_array($currentActive, ['equipment', 'fsic'], true) ? 'active' : '' }}" aria-label="Requests" data-ff-nav-link data-ff-nav-key="equipment">
-                <span class="ff-mobile-icon" aria-hidden="true">assignment</span>
-            </a>
-        </div>
         <div class="ff-mobile-dock__rail">
             <div class="ff-mobile-dock__group ff-mobile-dock__group--left">
                 <a href="{{ route('firefighter.schedule') }}" class="ff-mobile-dock__item {{ $currentActive === 'schedule' ? 'active' : '' }}" aria-label="Schedule" data-ff-nav-link data-ff-nav-key="schedule">
@@ -1301,7 +1221,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const dock = document.querySelector('[data-ff-mobile-dock]');
     const dashboardFab = document.querySelector('[data-ff-dashboard-fab]');
     const notificationsPanel = document.querySelector('[data-ff-notifications-panel]');
     const settingsPanel = document.querySelector('[data-ff-settings-panel]');
@@ -1311,7 +1230,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const openLogsButton = document.querySelector('[data-ff-open-logs]');
     const openInsightsButton = document.querySelector('[data-ff-open-insights]');
     const mainContent = document.querySelector('.main-content');
-    const isFirefighterDashboardScreen = Boolean(document.querySelector('[data-ff-page-root="dashboard"]'));
     const routeSkeletons = {
         incidents: document.querySelector('[data-ff-route-skeleton="incidents"]'),
         announcements: document.querySelector('[data-ff-route-skeleton="announcements"]'),
@@ -1333,9 +1251,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         })
     );
-    let holdTimer = null;
-    let holdTriggered = false;
-    let touchTapPending = false;
     const initialPageRoot = document.querySelector('[data-ff-page-root]');
 
     if (initialPageRoot && !window.history.state?.firefighterPartial) {
@@ -1357,10 +1272,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function resetTransientUi() {
         hideAllRouteSkeletons();
         closePanels();
-        closeBurstMenu();
-        clearHoldTimer();
-        holdTriggered = false;
-        touchTapPending = false;
         document.body.classList.remove('menu-open');
 
         document.getElementById(@json($sidebarId))?.classList.remove('open', 'active');
@@ -1669,7 +1580,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         showRouteSkeleton(activeRouteKey, activeRouteKey);
         closePanels();
-        closeBurstMenu();
         document.body.classList.remove('menu-open');
         document.getElementById(@json($sidebarId))?.classList.remove('open', 'active');
         document.getElementById(@json($backdropId))?.classList.add('hidden');
@@ -1769,31 +1679,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function openBurstMenu() {
-        if (!dock) return;
-        holdTriggered = true;
-        dock.classList.add('is-burst-open');
-    }
-
-    function closeBurstMenu() {
-        if (!dock) return;
-        dock.classList.remove('is-burst-open');
-    }
-
-    function clearHoldTimer() {
-        if (holdTimer) {
-            window.clearTimeout(holdTimer);
-            holdTimer = null;
-        }
-    }
-
     function goToFirefighterDashboard() {
         const dashboardHref = @json(route('firefighter.dashboard'));
         const dashboardPath = new URL(dashboardHref, window.location.origin).pathname;
 
         if (window.location.pathname === dashboardPath) {
             closePanels();
-            closeBurstMenu();
 
             if (typeof window.closeFirefighterInsightsPanel === 'function') {
                 window.closeFirefighterInsightsPanel();
@@ -1812,71 +1703,16 @@ document.addEventListener('DOMContentLoaded', function () {
     resetTransientUi();
 
     if (dashboardFab) {
-        const beginHold = function (event) {
-            if (window.innerWidth > 768) return;
-            if (isFirefighterDashboardScreen) {
-                holdTriggered = false;
-                touchTapPending = event.type === 'touchstart';
-                clearHoldTimer();
-                if (event.type === 'touchstart') {
-                    event.preventDefault();
-                }
-                return;
-            }
-            holdTriggered = false;
-            touchTapPending = event.type === 'touchstart';
-            clearHoldTimer();
-            holdTimer = window.setTimeout(function () {
-                openBurstMenu();
-            }, 360);
-            if (event.type === 'touchstart') {
-                event.preventDefault();
-            }
-        };
-
-        const endHold = function () {
-            clearHoldTimer();
-        };
-
-        dashboardFab.addEventListener('mousedown', beginHold);
-        dashboardFab.addEventListener('touchstart', beginHold, { passive: false });
-        dashboardFab.addEventListener('mouseup', endHold);
-        dashboardFab.addEventListener('mouseleave', endHold);
-        dashboardFab.addEventListener('touchend', function () {
-            endHold();
-            if (!holdTriggered && touchTapPending) {
-                touchTapPending = false;
-                goToFirefighterDashboard();
-                return;
-            }
-            holdTriggered = false;
-            touchTapPending = false;
-        });
-        dashboardFab.addEventListener('touchcancel', endHold);
-        dashboardFab.addEventListener('click', function (event) {
-            if (holdTriggered) {
-                event.preventDefault();
-                holdTriggered = false;
-                return;
-            }
-
-            if (touchTapPending) {
-                event.preventDefault();
-                touchTapPending = false;
-                return;
-            }
-
+        dashboardFab.addEventListener('click', function () {
             goToFirefighterDashboard();
         });
     }
 
     notificationsOpenButton?.addEventListener('click', function () {
-        closeBurstMenu();
         openPanel(notificationsPanel);
     });
 
     settingsOpenButton?.addEventListener('click', function () {
-        closeBurstMenu();
         openPanel(settingsPanel);
     });
 
@@ -1888,7 +1724,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     openInsightsButton?.addEventListener('click', function () {
-        closeBurstMenu();
         if (typeof window.openFirefighterInsightsPanel === 'function') {
             window.openFirefighterInsightsPanel();
         }
@@ -1931,16 +1766,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }, true);
 
-    document.addEventListener('click', function (event) {
-        if (dock && !dock.contains(event.target)) {
-            closeBurstMenu();
-        }
-    });
-
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             closePanels();
-            closeBurstMenu();
         }
     });
 

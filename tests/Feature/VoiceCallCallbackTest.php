@@ -85,12 +85,14 @@ class VoiceCallCallbackTest extends TestCase
         DB::table('roles')->insert([
             ['role_id' => 1, 'role' => 'station admin'],
             ['role_id' => 2, 'role' => 'citizen'],
+            ['role_id' => 3, 'role' => 'provincial admin'],
         ]);
         Role::flushDefinitionCache();
         DB::table('users')->insert([
             ['user_id' => 10, 'role_id' => 1, 'first_name' => 'Station', 'last_name' => 'Admin'],
             ['user_id' => 11, 'role_id' => 1, 'first_name' => 'Second', 'last_name' => 'Admin'],
             ['user_id' => 20, 'role_id' => 2, 'first_name' => 'Citizen', 'last_name' => 'Caller'],
+            ['user_id' => 30, 'role_id' => 3, 'first_name' => 'Provincial', 'last_name' => 'Admin'],
         ]);
         DB::table('stations')->insert([
             ['station_id' => 5, 'station_name' => 'Station Five'],
@@ -169,6 +171,33 @@ class VoiceCallCallbackTest extends TestCase
         $this->actingAs(User::findOrFail(10))->getJson('/voice-calls/incoming')->assertOk();
 
         $this->assertSame(11, (int) DB::table('voice_calls')->where('id', $waitingId)->value('assigned_admin_id'));
+    }
+
+    public function test_provincial_admin_can_monitor_calls_across_stations(): void
+    {
+        $first = $this->voiceCall(20, 5, 'ringing', 'inbound');
+        $second = $this->voiceCall(20, 6, 'ringing', 'inbound');
+
+        $response = $this->actingAs(User::findOrFail(30))->getJson('/voice-calls/incoming');
+
+        $response->assertOk();
+        $ids = collect($response->json('incoming_calls'))->pluck('id')->map(fn ($id) => (int) $id);
+        $this->assertTrue($ids->contains($first));
+        $this->assertTrue($ids->contains($second));
+    }
+
+    public function test_provincial_admin_callback_uses_the_original_calls_station(): void
+    {
+        $sourceId = $this->voiceCall(20, 6, 'missed', 'inbound');
+
+        $response = $this->actingAs(User::findOrFail(30))->postJson('/voice-calls/callbacks', [
+            'citizen_user_id' => 20,
+            'callback_of' => $sourceId,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('call.station.id', 6)
+            ->assertJsonPath('call.assigned_admin_id', 30);
     }
 
     private function voiceCall(int $callerId, int $stationId, string $status, string $direction): int

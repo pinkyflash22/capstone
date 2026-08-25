@@ -4618,3 +4618,78 @@ body.chief-dashboard-page.chief-notifications-open {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+@media (max-width: 768px) {
+  /* Chief-only compact action pair. These controls stay below modal layers. */
+  body.chief-dashboard-page .pyro-voice-launcher,
+  body.chief-legacy-layout .pyro-voice-launcher,
+  body.chief-dashboard-page .pyro-routing-launcher,
+  body.chief-legacy-layout .pyro-routing-launcher {
+    bottom: calc(var(--mobile-bottom-nav-h, 78px) + 16px) !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    z-index: 245 !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2) !important;
+  }
+
+  body.chief-dashboard-page .pyro-voice-launcher,
+  body.chief-legacy-layout .pyro-voice-launcher {
+    right: 14px !important;
+  }
+
+  body.chief-dashboard-page .pyro-routing-launcher,
+  body.chief-legacy-layout .pyro-routing-launcher {
+    right: 66px !important;
+  }
+
+  body.chief-dashboard-page .pyro-voice-launcher__icon,
+  body.chief-legacy-layout .pyro-voice-launcher__icon,
+  body.chief-dashboard-page .pyro-routing-launcher > i,
+  body.chief-legacy-layout .pyro-routing-launcher > i {
+    font-size: 17px !important;
+  }
+
+  body.chief-dashboard-page .pyro-voice-launcher__badge,
+  body.chief-legacy-layout .pyro-voice-launcher__badge,
+  body.chief-dashboard-page .pyro-routing-launcher > b,
+  body.chief-legacy-layout .pyro-routing-launcher > b {
+    top: -4px !important;
+    right: -4px !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    padding: 0 4px !important;
+    border-width: 2px !important;
+    line-height: 16px !important;
+  }
+
+  body.chief-dashboard-page.menu-open .pyro-voice-launcher,
+  body.chief-legacy-layout.menu-open .pyro-voice-launcher,
+  body.chief-dashboard-page.menu-open .pyro-routing-launcher,
+  body.chief-legacy-layout.menu-open .pyro-routing-launcher,
+  body.chief-dashboard-page.modal-open .pyro-voice-launcher,
+  body.chief-legacy-layout.modal-open .pyro-voice-launcher,
+  body.chief-dashboard-page.modal-open .pyro-routing-launcher,
+  body.chief-legacy-layout.modal-open .pyro-routing-launcher,
+  body.chief-dashboard-page.map-edit-modal-open .pyro-voice-launcher,
+  body.chief-legacy-layout.map-edit-modal-open .pyro-voice-launcher,
+  body.chief-dashboard-page.map-edit-modal-open .pyro-routing-launcher,
+  body.chief-legacy-layout.map-edit-modal-open .pyro-routing-launcher,
+  body.chief-dashboard-page.pyro-routing-panel-open .pyro-voice-launcher,
+  body.chief-legacy-layout.pyro-routing-panel-open .pyro-voice-launcher,
+  body.chief-dashboard-page.pyro-routing-panel-open .pyro-routing-launcher,
+  body.chief-legacy-layout.pyro-routing-panel-open .pyro-routing-launcher,
+  body.chief-dashboard-page.pyro-voice-panel-open .pyro-routing-launcher,
+  body.chief-legacy-layout.pyro-voice-panel-open .pyro-routing-launcher,
+  body.chief-dashboard-page:has(.chief-mobile-panel.is-open, .modal.show, .modal.active, .modal-overlay.show, .modal-overlay.active, dialog[open]) .pyro-voice-launcher,
+  body.chief-legacy-layout:has(.chief-mobile-panel.is-open, .modal.show, .modal.active, .modal-overlay.show, .modal-overlay.active, dialog[open]) .pyro-voice-launcher,
+  body.chief-dashboard-page:has(.chief-mobile-panel.is-open, .modal.show, .modal.active, .modal-overlay.show, .modal-overlay.active, dialog[open]) .pyro-routing-launcher,
+  body.chief-legacy-layout:has(.chief-mobile-panel.is-open, .modal.show, .modal.active, .modal-overlay.show, .modal-overlay.active, dialog[open]) .pyro-routing-launcher {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(10px) scale(0.92) !important;
+  }
+}

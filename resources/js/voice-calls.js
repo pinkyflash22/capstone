@@ -1,7 +1,7 @@
 const voiceConfig = window.PyroSenseVoiceCall || {};
 let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const role = String(voiceConfig.role || '').toLowerCase();
-const isResponder = ['station admin', 'chief', 'chief station admin'].includes(role);
+const isResponder = ['station admin', 'chief', 'chief station admin', 'provincial admin'].includes(role);
 const isCaller = ['citizen', 'anonymous', 'barangay', 'barangay captain', 'firefighter'].includes(role);
 const isMobileHubPage = document.body?.classList.contains('mobile-hub-page');
 

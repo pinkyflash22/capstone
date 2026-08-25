@@ -18,6 +18,7 @@
     </style>
 </head>
 <body>
+    @include('partials.voice-call-config')
     @include('partials.unified-notifications')
     <h1>Fire Risk Weather Monitor</h1>
     

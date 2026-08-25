@@ -21,6 +21,9 @@ class RoleMobileNavigationTest extends TestCase
         $this->assertStringContainsString('Responder navigation', $view);
         $this->assertStringContainsString('$mobileMenuItems as $item', $view);
         $this->assertStringContainsString('ff-mobile-panel__action-trailing', $view);
+        $this->assertStringNotContainsString('ff-mobile-dock__burst', $view);
+        $this->assertStringNotContainsString('openBurstMenu', $view);
+        $this->assertStringNotContainsString('holdTriggered', $view);
 
         foreach (['firefighter.incidents', 'firefighter.risk-reviews.index', 'firefighter.barangay-cooperation.index', 'firefighter.my-station', 'firefighter.equipments'] as $route) {
             $this->assertStringContainsString("'route' => '{$route}'", $view);
@@ -57,5 +60,9 @@ class RoleMobileNavigationTest extends TestCase
         $this->assertStringContainsString('Barangay navigation', $view);
         $this->assertStringContainsString('array_slice($mobileCenterActions, 0, 2)', $view);
         $this->assertStringContainsString('chief-mobile-panel__action-trailing', $view);
+        $this->assertStringContainsString('data-pyro-voice-call data-barangay-panel-close', $view);
+        $this->assertStringNotContainsString('barangay-mobile-dock__burst', $view);
+        $this->assertStringNotContainsString('data-barangay-nav-trigger', $view);
+        $this->assertStringNotContainsString('holdDelay', $view);
     }
 }

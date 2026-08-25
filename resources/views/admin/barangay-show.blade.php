@@ -34,6 +34,7 @@
     </style>
 </head>
 <body>
+    @include('partials.voice-call-config')
     @include('partials.unified-notifications')
     @php
         $isStationAdminRoute = request()->routeIs('station-admin.*');

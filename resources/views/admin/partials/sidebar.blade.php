@@ -1,4 +1,5 @@
 @include('partials.unified-notifications')
+@include('partials.voice-call-config')
 
 @php
     $active = $active ?? 'dashboard';

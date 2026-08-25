@@ -1,3 +1,4 @@
+@once
 @php
     $pyroVoiceUser = auth()->user();
     $pyroVoiceRole = strtolower((string) ($pyroVoiceUser?->role?->role ?? ''));
@@ -40,3 +41,4 @@
     };
 </script>
 @vite(['resources/css/voice-calls.css', 'resources/js/voice-calls.js'])
+@endonce

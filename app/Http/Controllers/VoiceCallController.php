@@ -273,14 +273,15 @@ class VoiceCallController extends Controller
             'callback_of' => ['nullable', 'integer', 'exists:voice_calls,id'],
         ]);
         $stationId = $this->adminStationId($user);
-        abort_unless($stationId, 422, 'Your account is not assigned to a station.');
+        $isProvincialAdmin = Str::lower((string) $user->role?->role) === 'provincial admin';
+        abort_unless($stationId || $isProvincialAdmin, 422, 'Your account is not assigned to a station.');
 
         $citizen = User::query()->with('role')->findOrFail((int) $data['citizen_user_id']);
         abort_unless(Str::lower((string) $citizen->role?->role) === 'citizen', 422, 'Only registered citizens can receive station callbacks.');
 
         $priorCall = VoiceCall::query()
             ->where('caller_id', $citizen->user_id)
-            ->where('station_id', $stationId)
+            ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
             ->where(function ($query) {
                 $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
             })
@@ -289,6 +290,9 @@ class VoiceCallController extends Controller
             ->latest('created_at')
             ->first();
         abort_unless($priorCall, 403, 'This citizen has not previously contacted your station.');
+
+        $stationId = $stationId ?: ($priorCall->station_id ? (int) $priorCall->station_id : null);
+        abort_unless($stationId, 422, 'The original call is not connected to a station.');
 
         $call = DB::transaction(function () use ($user, $citizen, $stationId, $priorCall) {
             $existing = VoiceCall::query()
@@ -939,7 +943,12 @@ class VoiceCallController extends Controller
 
     private function isStationResponder(User $user): bool
     {
-        return in_array(Str::lower((string) $user->role?->role), ['station admin', 'chief', 'chief station admin'], true);
+        return in_array(Str::lower((string) $user->role?->role), [
+            'station admin',
+            'chief',
+            'chief station admin',
+            'provincial admin',
+        ], true);
     }
 
     private function callRelations(): array

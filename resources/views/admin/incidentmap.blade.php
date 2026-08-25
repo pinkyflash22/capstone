@@ -109,6 +109,7 @@
 
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col lg:flex-row">
+    @include('partials.voice-call-config')
 
     <!-- SIDE NAVIGATION (mobile drawer & desktop fixed) -->
     <aside id="sidebar" class="fixed lg:sticky top-0 left-0 h-full w-72 bg-white shadow-xl lg:shadow-md z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">

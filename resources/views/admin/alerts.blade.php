@@ -1207,6 +1207,7 @@
     @vite(['resources/css/app.css', 'resources/js/map.js'])
 </head>
 <body>
+    @include('partials.voice-call-config')
     <!-- SIDE NAVIGATION -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
