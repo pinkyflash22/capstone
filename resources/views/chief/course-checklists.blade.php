@@ -27,6 +27,164 @@
         .bulk-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 24px 14px}.bulk-toolbar__count{margin-right:auto;display:inline-flex;align-items:center;gap:7px;color:#6d7889;font-size:10px;font-weight:800}.bulk-toolbar select{height:35px;min-width:145px;border:1px solid #ddd8d2;border-radius:10px;background:#fff;padding:0 10px;color:#475467;font-size:10px}.bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}.checklist-table input[type=checkbox]{width:15px;height:15px;accent-color:#d55327;cursor:pointer}.history-list{display:grid;gap:8px}.history-event{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;padding:9px;border:1px solid #ece7e1;border-radius:12px;background:#fdfcfb}.history-event__icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#c24824}.history-event strong,.history-event small{display:block}.history-event strong{font-size:11px}.history-event small{margin-top:3px;color:#7d8796;font-size:9.5px;line-height:1.4}.history-event time{color:#9098a5;font-size:9px;white-space:nowrap}.history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px}.history-pagination button{width:29px;height:29px;border:1px solid #ddd8d2;border-radius:9px;background:#fff;color:#647084;cursor:pointer}.history-pagination button:disabled{opacity:.4;cursor:not-allowed}
         @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}.modal-evidence-grid{grid-template-columns:1fr}}
     </style>
+    <style data-checklist-mobile-style>
+        @media (max-width: 767px), (display-mode: standalone) and (max-width: 1024px) {
+            body.chief-legacy-layout { background: #f7f8fa !important; }
+            .checklist-main { width: 100%; padding: 12px 10px calc(106px + env(safe-area-inset-bottom)); }
+            .checklist-container { width: 100%; max-width: none; }
+            .checklist-topbar { display: none !important; }
+
+            .forecast-hero {
+                display: block;
+                margin-bottom: 12px;
+                padding: 17px 16px;
+                border-radius: 18px;
+                background: linear-gradient(145deg, #fff, #fff8ef);
+                box-shadow: 0 6px 18px rgba(39, 46, 59, .05);
+            }
+            .forecast-hero h2 { margin: 6px 0; font-size: 21px; line-height: 1.16; }
+            .forecast-hero p { font-size: 11px; line-height: 1.55; }
+            .workflow-nav { width: 100%; margin-top: 14px; overflow: visible; }
+            .workflow-nav a { min-width: 0; flex: 1; padding: 9px 5px; font-size: 9px; }
+
+            .checklist-workspace { gap: 11px; }
+            .checklist-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .checklist-metric { min-width: 0; min-height: 66px; padding: 10px; border-radius: 15px; }
+            .checklist-metric small { font-size: 8px; }
+            .checklist-metric strong { font-size: 18px; }
+
+            .checklist-register {
+                overflow: visible;
+                border: 0;
+                border-radius: 0;
+                background: transparent;
+                box-shadow: none;
+            }
+            .checklist-register__head {
+                align-items: center;
+                margin-bottom: 10px;
+                padding: 16px;
+                border: 1px solid var(--line);
+                border-radius: 17px;
+                background: #fff;
+                box-shadow: 0 5px 16px rgba(39, 46, 59, .04);
+            }
+            .checklist-register__head h2 { margin-top: 5px; font-size: 17px; }
+            .checklist-result-count { padding: 7px 9px; font-size: 9px; }
+
+            .checklist-filters {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                margin-bottom: 10px;
+                padding: 12px;
+                border: 1px solid var(--line);
+                border-radius: 17px;
+                background: #fff;
+            }
+            .checklist-search,
+            .checklist-filters select[name="barangay_id"] { grid-column: 1 / -1; }
+            .checklist-filters > .icon-button { width: 100%; height: 40px; }
+
+            .bulk-toolbar {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                margin-bottom: 10px;
+                padding: 12px;
+                border: 1px solid var(--line);
+                border-radius: 17px;
+                background: #fff;
+            }
+            .bulk-toolbar__count { grid-column: 1 / -1; }
+            .bulk-toolbar button { grid-column: 1 / -1; width: 100%; }
+
+            .checklist-table-wrap { overflow: visible; border: 0; }
+            .checklist-table,
+            .checklist-table tbody { display: grid; width: 100%; gap: 11px; }
+            .checklist-table { min-width: 0; border: 0; }
+            .checklist-table thead { display: none; }
+            .checklist-table tbody tr {
+                position: relative;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px 10px;
+                width: 100%;
+                padding: 16px;
+                border: 1px solid var(--line);
+                border-radius: 18px;
+                background: #fff;
+                box-shadow: 0 7px 20px rgba(39, 46, 59, .055);
+            }
+            .checklist-table tbody tr:hover { background: #fff; }
+            .checklist-table tbody td {
+                display: grid;
+                min-width: 0;
+                width: auto;
+                gap: 5px;
+                padding: 0;
+                border: 0;
+                align-content: start;
+                justify-content: stretch;
+            }
+            .checklist-table tbody td::before {
+                display: block;
+                color: #8b95a5;
+                font-size: 8px;
+                font-weight: 850;
+                letter-spacing: .08em;
+                text-transform: uppercase;
+            }
+            .checklist-table td[data-label="Select"] {
+                position: absolute;
+                top: 17px;
+                right: 16px;
+                left: auto;
+                z-index: 1;
+                width: auto;
+            }
+            .checklist-table td[data-label="Select"]::before,
+            .checklist-table td[data-label="Action plan"]::before,
+            .checklist-table td[data-label="Actions"]::before { display: none; }
+            .checklist-table td[data-label="Action plan"] { grid-column: 1 / -1; padding-right: 30px; }
+            .checklist-table td[data-label="Actions"] { position: static; grid-column: 1 / -1; }
+            .plan-cell { max-width: none; align-items: flex-start; }
+            .plan-cell__icon { width: 38px; height: 38px; flex-basis: 38px; }
+            .plan-cell strong { white-space: normal; font-size: 13px; line-height: 1.4; }
+            .table-location,
+            .target-date { min-width: 0; white-space: normal; font-size: 10px; line-height: 1.4; }
+            .table-progress { width: 100%; }
+            .priority-pill,
+            .status-pill { width: max-content; max-width: 100%; }
+            .table-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+            .table-actions .icon-button { width: 100%; height: 42px; border-radius: 12px; }
+
+            .checklist-pagination {
+                margin-top: 10px;
+                padding: 12px;
+                border: 1px solid var(--line);
+                border-radius: 15px;
+                background: #fff;
+            }
+            .checklist-pagination nav > div:last-child { align-items: center; }
+            .checklist-pagination nav > div:last-child > div:first-child { display: none; }
+
+            .checklist-modal { z-index: 12000; align-items: end; padding: 0; }
+            .checklist-modal__card { width: 100%; max-height: 92dvh; border-radius: 22px 22px 0 0; }
+            .checklist-modal__head { padding: 15px 16px; }
+            .checklist-modal__body { padding: 14px; }
+            .checklist-modal__foot { padding: 11px 14px calc(11px + env(safe-area-inset-bottom)); }
+            .modal-plan-summary { grid-template-columns: 40px minmax(0, 1fr); gap: 10px; }
+            .modal-plan-summary__icon { width: 40px; height: 40px; border-radius: 12px; }
+            .modal-plan-summary h3 { font-size: 17px; overflow-wrap: anywhere; }
+            .modal-section { padding: 13px; border-radius: 15px; }
+            .modal-step { grid-template-columns: 28px minmax(0, 1fr); }
+            .modal-step__actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); }
+            .step-icon { width: 100%; height: 36px; }
+            .modal-review__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .modal-review__actions .action-button { justify-content: center; }
+            .toast-stack { right: 10px; bottom: calc(90px + env(safe-area-inset-bottom)); left: 10px; }
+            .toast { width: 100%; min-width: 0; max-width: none; }
+        }
+    </style>
 </head>
 <body class="chief-legacy-layout">
 <div class="checklist-shell">
@@ -65,10 +223,80 @@
     </div>
 </div>
 <script>
-    const checklistCsrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    let checklistCsrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const checklistPageUrl = @json(route('station-admin.course-checklists'));
+    const checklistEndpoints = {
+        history: @json(route('station-admin.action-plan-checklists.history', ['id' => '__CHECKLIST_ID__'])),
+        items: @json(route('station-admin.action-plan-checklists.items', ['id' => '__CHECKLIST_ID__'])),
+        confirm: @json(route('station-admin.action-plan-checklists.confirm', ['id' => '__CHECKLIST_ID__'])),
+        bulk: @json(route('station-admin.action-plan-checklists.bulk')),
+        refreshSession: @json(route('auth.session-refresh')),
+    };
     let checklistTrigger = null;
     let checklistSearchTimer = null;
+
+    function checklistEndpoint(type, checklistId = null) {
+        const endpoint = checklistEndpoints[type] || '';
+        return checklistId == null ? endpoint : endpoint.replace('__CHECKLIST_ID__', encodeURIComponent(String(checklistId)));
+    }
+
+    async function refreshChecklistSession() {
+        const response = await fetch(checklistEndpoints.refreshSession, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.csrf_token) return false;
+        checklistCsrf = result.csrf_token;
+        document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', checklistCsrf);
+        return true;
+    }
+
+    async function checklistFetch(url, options = {}, canRetrySession = true) {
+        const controller = new AbortController();
+        // Leave enough room for a checklist write to queue behind the global
+        // call inbox when the app is served by Laravel's single-worker dev server.
+        const timeout = window.setTimeout(() => controller.abort(), 60000);
+        const headers = new Headers(options.headers || {});
+        headers.set('X-Requested-With', 'XMLHttpRequest');
+        if ((options.method || 'GET').toUpperCase() !== 'GET' && checklistCsrf) {
+            headers.set('X-CSRF-TOKEN', checklistCsrf);
+        }
+
+        try {
+            const response = await fetch(new URL(url, window.location.href), {
+                ...options,
+                headers,
+                credentials: 'same-origin',
+                cache: 'no-store',
+                signal: controller.signal,
+            });
+
+            if (response.status === 419 && canRetrySession && await refreshChecklistSession()) {
+                return checklistFetch(url, options, false);
+            }
+
+            if (response.redirected && new URL(response.url).pathname.includes('/login')) {
+                throw new Error('Your session expired. Sign in again, then retry the checklist update.');
+            }
+
+            return response;
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error('The checklist request timed out. Check your connection and try again.');
+            }
+            if (!navigator.onLine) {
+                throw new Error('You are offline. Reconnect before updating the checklist.');
+            }
+            if (error instanceof TypeError) {
+                throw new Error('The checklist server could not be reached. Check your connection and try again.');
+            }
+            throw error;
+        } finally {
+            window.clearTimeout(timeout);
+        }
+    }
 
     function showChecklistToast(message, type = 'success') {
         window.PyroNotify?.notify(message, type);
@@ -99,7 +327,10 @@
         if (!container) return;
         container.innerHTML = '<div class="modal-empty"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading history...</span></div>';
         try {
-            const response = await fetch(`/station-admin/api/action-plan-checklists/${checklistId}/history?page=${page}&per_page=6`, {headers:{'Accept':'application/json'}});
+            const historyUrl = new URL(checklistEndpoint('history', checklistId), window.location.href);
+            historyUrl.searchParams.set('page', page);
+            historyUrl.searchParams.set('per_page', '6');
+            const response = await checklistFetch(historyUrl, {headers:{'Accept':'application/json'}});
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.success === false) throw new Error(result.message || 'History could not be loaded.');
             const events = Array.isArray(result.data) ? result.data : [];
@@ -146,7 +377,7 @@
         const workspace = document.getElementById('checklistWorkspace');
         workspace?.setAttribute('aria-busy', 'true');
         try {
-            const response = await fetch(requestUrl, { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+            const response = await checklistFetch(requestUrl, { headers: { 'Accept': 'text/html' } });
             if (!response.ok) throw new Error('Could not load checklist records.');
             const incoming = new DOMParser().parseFromString(await response.text(), 'text/html').getElementById('checklistWorkspace');
             if (!incoming) throw new Error('Checklist response was incomplete.');
@@ -165,7 +396,7 @@
         button.classList.add('is-loading');
         button.innerHTML = '<i class="fa-solid fa-spinner"></i>';
         try {
-            const response = await fetch(url, { method:'PATCH', headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':checklistCsrf}, body:JSON.stringify(payload) });
+            const response = await checklistFetch(url, { method:'PATCH', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(payload) });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.success === false) throw new Error(result.message || 'The checklist update failed.');
             closeChecklistModal();
@@ -193,7 +424,7 @@
         button.classList.add('is-loading');
         button.innerHTML = '<i class="fa-solid fa-spinner"></i><span>Applying</span>';
         try {
-            const response = await fetch('/station-admin/api/action-plan-checklists/bulk', {method:'PATCH',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':checklistCsrf},body:JSON.stringify(payload)});
+            const response = await checklistFetch(checklistEndpoints.bulk, {method:'PATCH',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload)});
             const result = await response.json().catch(() => ({}));
             if (!response.ok || result.success === false) throw new Error(result.message || 'Bulk update failed.');
             await loadChecklistWorkspace(window.location.href, {push:false});
@@ -219,11 +450,11 @@
         const bulk = event.target.closest('[data-apply-bulk]');
         if (bulk) { applyBulkChecklistUpdate(bulk); return; }
         const step = event.target.closest('[data-step-status]');
-        if (step) { patchChecklist(`/station-admin/api/action-plan-checklists/${step.dataset.checklistId}/items`, {item_id:Number(step.dataset.itemId),status:step.dataset.status}, step, step.dataset.checklistId); return; }
+        if (step) { patchChecklist(checklistEndpoint('items', step.dataset.checklistId), {item_id:Number(step.dataset.itemId),status:step.dataset.status}, step, step.dataset.checklistId); return; }
         const status = event.target.closest('[data-checklist-status]');
         if (status) {
             const notes = document.getElementById(`notes-${status.dataset.checklistId}`)?.value || '';
-            patchChecklist(`/station-admin/api/action-plan-checklists/${status.dataset.checklistId}/confirm`, {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
+            patchChecklist(checklistEndpoint('confirm', status.dataset.checklistId), {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
         }
     });
 

@@ -9,7 +9,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-    <title>PyroSense Â· Announcements</title>
+    <title>PyroSense - Announcements</title>
 
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
 
@@ -18,7 +18,6 @@
         $authInitials = strtoupper(substr(auth()->user()->first_name ?? 'C', 0, 1) . substr(auth()->user()->last_name ?? 'C', 0, 1));
         $authProfileImageUrl = \App\Support\MediaPath::url(auth()->user()?->image);
     @endphp
-    @vite(['resources/css/staff/announcements.css'])
 </head>
 <body class="chief-legacy-layout staff-announcements" data-staff-announcements="chief">
     @include('chief.partials.sidebar', ['active' => 'announcements'])
@@ -33,7 +32,7 @@
                     </button>
                     <div class="hidden lg:block">
                         <h1 class="text-xl font-bold text-slate-800">Announcements</h1>
-                        <p class="text-xs text-slate-500 font-medium">Station updates and command communications â€¢ {{ now()->format('l, F j') }}</p>
+                        <p class="text-xs text-slate-500 font-medium">Station updates and command communications &bull; {{ now()->format('l, F j') }}</p>
                     </div>
                 </div>
 
@@ -101,7 +100,7 @@
                             </div>
                             <div class="composer-meta">
                                 <div class="composer-name">{{ $authName }}</div>
-                                <div class="composer-role">Station Chief Â· Station feed</div>
+                                <div class="composer-role">Station Chief &middot; Station feed</div>
                             </div>
                         </div>
                         <button class="composer-clear" type="button" onclick="window.announcementSystem?.clearPost()">Clear</button>
@@ -118,17 +117,17 @@
 
                         <div class="post-attachments">
                             <label class="attachment-btn image" for="imageUpload" data-attachment-action="image" aria-label="Add photos">
-                                <i class="fa-regular fa-image"></i>
+                                <i class="fa-solid fa-image"></i>
                                 Photo
                                 <input type="file" id="imageUpload" accept="image/*" multiple hidden>
                             </label>
                             <label class="attachment-btn video" for="videoUpload" data-attachment-action="video" aria-label="Add video">
-                                <i class="fa-regular fa-video"></i>
+                                <i class="fa-solid fa-video"></i>
                                 Video
                                 <input type="file" id="videoUpload" accept="video/*" hidden>
                             </label>
                             <button class="attachment-btn poll" type="button" id="togglePollBuilder" data-attachment-action="poll" aria-pressed="false" aria-controls="pollBuilder">
-                                <i class="fa-regular fa-square-poll-vertical"></i>
+                                <i class="fa-solid fa-square-poll-vertical"></i>
                                 Poll
                             </button>
                         </div>
@@ -234,5 +233,3 @@
     @include('chief.partials.logout-confirmation')
 </body>
 </html>
-
-

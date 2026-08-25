@@ -200,6 +200,31 @@ class VoiceCallCallbackTest extends TestCase
             ->assertJsonPath('call.assigned_admin_id', 30);
     }
 
+    public function test_incoming_payload_computes_responder_capacity_once_for_many_calls(): void
+    {
+        foreach (range(1, 8) as $index) {
+            $this->voiceCall(20, 5, 'ringing', 'inbound');
+        }
+
+        $admin = User::findOrFail(10);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $response = $this->actingAs($admin)->getJson('/voice-calls/incoming');
+
+        $response->assertOk()->assertJsonCount(8, 'incoming_calls');
+        $voiceCallCountQueries = collect(DB::getQueryLog())->filter(function (array $query) {
+            $sql = strtolower($query['query']);
+
+            return str_contains($sql, 'count(*) as aggregate')
+                && str_contains($sql, 'voice_calls');
+        });
+
+        // One count updates responder workload and one determines whether the
+        // responder can accept more calls. It must not grow with card count.
+        $this->assertLessThanOrEqual(2, $voiceCallCountQueries->count());
+    }
+
     private function voiceCall(int $callerId, int $stationId, string $status, string $direction): int
     {
         return (int) DB::table('voice_calls')->insertGetId([

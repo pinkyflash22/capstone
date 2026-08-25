@@ -15,7 +15,6 @@
         $authInitials = strtoupper(substr(auth()->user()->first_name ?? 'F', 0, 1) . substr(auth()->user()->last_name ?? 'F', 0, 1));
         $authProfileImageUrl = \App\Support\MediaPath::url(auth()->user()?->image);
     @endphp
-    @vite(['resources/css/staff/announcements.css'])
     @include('partials.pwa-head')
 </head>
 <body class="firefighter-portal-shell staff-announcements" data-staff-announcements="firefighter">
@@ -54,7 +53,7 @@
                         </div>
                         <div class="composer-meta">
                             <div class="composer-name">{{ $authName }}</div>
-                            <div class="composer-role">Firefighter Â· Station feed</div>
+                            <div class="composer-role">Firefighter &middot; Station feed</div>
                         </div>
                     </div>
                     <button class="composer-clear" type="button" id="composerClearButton" onclick="window.announcementSystem?.clearPost()">
@@ -167,5 +166,3 @@
     @include('partials.pwa-body')
 </body>
 </html>
-
-

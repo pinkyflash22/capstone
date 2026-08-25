@@ -966,6 +966,104 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .request-launcher {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px 20px;
+            border: 1px solid rgba(226, 232, 240, .92);
+            border-radius: 22px;
+            background: #fff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .045);
+        }
+        .request-launcher__copy { display: flex; align-items: center; gap: 13px; min-width: 0; }
+        .request-launcher__icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 14px; background: #fff3e8; color: #c2410c; }
+        .request-launcher h2 { margin: 0; color: #0f172a; font-size: 1rem; font-weight: 900; }
+        .request-launcher p { margin: 3px 0 0; color: #64748b; font-size: .8rem; }
+        .request-launcher__actions { display: flex; align-items: center; gap: 9px; }
+        .request-count { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 9px; border-radius: 999px; background: #fff7ed; color: #c2410c; font-size: .75rem; font-weight: 900; }
+        body.schedule-modal-open { overflow: hidden; }
+        .schedule-layout { grid-template-columns: minmax(0, 1fr); }
+        .request-review-modal { z-index: 12000; }
+        .day-agenda-modal { z-index: 12050; }
+        #scheduleEventModal { z-index: 12100; }
+        .request-review-modal .schedule-modal-card { width: min(920px, 100%); }
+        .request-review-modal .request-review-card { padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+        .day-agenda-modal .schedule-modal-card { width: min(620px, 100%); }
+        .day-agenda-modal .agenda-body { padding: 16px 20px 22px; overflow-y: auto; }
+        .day-agenda-modal .selected-day-card { padding: 14px 16px; border-radius: 17px; }
+        .day-agenda-modal .selected-day-card h4 { font-size: 1.15rem; }
+
+        @media (max-width: 767px), (display-mode: standalone) and (max-width: 1024px) {
+            body { background: #f7f8fa; }
+            .main-content { width: 100%; margin-left: 0; padding: 10px 8px calc(104px + env(safe-area-inset-bottom)); }
+            .lector-top-bar { display: none !important; }
+            .schedule-shell { width: 100%; gap: 11px; }
+            .schedule-hero { display: block; padding: 17px 16px; border-radius: 18px; }
+            .schedule-hero h1 { font-size: 1.35rem; line-height: 1.15; }
+            .schedule-hero p { margin-top: 7px; font-size: .78rem; line-height: 1.45; }
+            .schedule-badges { display: none; }
+            .schedule-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 13px; }
+            .schedule-summary-card { min-width: 0; padding: 10px 11px; border-radius: 14px; }
+            .schedule-summary-card:last-child { grid-column: 1 / -1; }
+            .schedule-summary-label { font-size: .58rem; }
+            .schedule-summary-value { margin-top: 3px; font-size: 1rem; overflow-wrap: anywhere; }
+            .request-launcher { padding: 12px; border-radius: 17px; }
+            .request-launcher__icon { flex-basis: 38px; width: 38px; height: 38px; }
+            .request-launcher p { display: none; }
+            .request-launcher__actions .calendar-btn { min-width: 42px; width: 42px; padding: 0; font-size: 0; }
+            .request-launcher__actions .calendar-btn i { font-size: .85rem; }
+            .calendar-card { border-radius: 18px; }
+            .calendar-toolbar { flex-direction: row; align-items: center; padding: 13px 12px; }
+            .calendar-toolbar-title h2 { font-size: 1rem; }
+            .calendar-toolbar-title p { display: none; }
+            .calendar-toolbar-actions { flex-wrap: nowrap; gap: 5px; }
+            .calendar-btn { min-width: 34px; height: 34px; padding: 0 8px; border-radius: 10px; font-size: .68rem; }
+            .calendar-grid-wrap { padding: 8px 7px 10px; overflow: hidden; }
+            .calendar-weekdays, .calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+            .calendar-weekday { min-width: 0; padding: 5px 0; font-size: .56rem; letter-spacing: 0; }
+            .calendar-grid { margin-top: 3px; }
+            .calendar-day { min-width: 0; min-height: 54px; aspect-ratio: .86; gap: 3px; padding: 5px 4px; border-radius: 9px; overflow: hidden; box-shadow: none; }
+            .calendar-day:hover { transform: none; box-shadow: none; }
+            .calendar-day-number { font-size: .72rem; }
+            .calendar-day-tag { min-width: 17px; width: 17px; height: 17px; font-size: .55rem; }
+            .calendar-event-stack { flex: 1; justify-content: flex-end; gap: 2px; }
+            .calendar-event-pill { height: 5px; padding: 0; border: 0; border-radius: 999px; font-size: 0; overflow: hidden; }
+            .calendar-event-more { display: none; }
+            .calendar-day.muted { opacity: .32; }
+
+            .schedule-modal { align-items: flex-end; padding: 0; }
+            .schedule-modal-card { width: 100%; max-height: 92dvh; margin: 0; border-radius: 22px 22px 0 0; }
+            .schedule-modal-head { flex: 0 0 auto; padding: 14px 15px 12px; }
+            .schedule-modal-head h3 { font-size: 1rem; }
+            .schedule-modal-head p { margin-top: 3px; font-size: .72rem; line-height: 1.35; }
+            .schedule-modal-close { flex: 0 0 38px; width: 38px; height: 38px; }
+            .schedule-modal-body { min-height: 0; padding: 13px 14px calc(16px + env(safe-area-inset-bottom)); }
+            .schedule-form-grid, .request-review-grid, .request-form-grid { grid-template-columns: 1fr; gap: 10px; }
+            .schedule-form-field.full, .request-form-grid label[style] { grid-column: 1 !important; }
+            .schedule-form-field { gap: 5px; }
+            .schedule-form-field label { font-size: .72rem; }
+            .schedule-form-field input, .schedule-form-field select, .schedule-form-field textarea,
+            .request-form-grid input, .request-form-grid select, .request-reject-form textarea { min-height: 43px; padding: 10px 11px; border-radius: 11px; font-size: .82rem; }
+            .schedule-modal-actions { z-index: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px -2px 0; padding: 11px 2px calc(3px + env(safe-area-inset-bottom)); }
+            .schedule-modal-actions button { width: 100%; min-width: 0; padding: 0 9px; }
+            .schedule-delete-btn.show { grid-column: 1 / -1; margin: 0; }
+            .request-review-modal .schedule-modal-card { width: 100%; }
+            .request-review-modal .request-item { padding: 13px; border-radius: 15px; }
+            .request-item h4 { padding-right: 0; font-size: .92rem; }
+            .request-meta { gap: 5px; }
+            .request-pill { min-height: 27px; padding: 0 8px; font-size: .62rem; }
+            .request-actions { display: grid; grid-template-columns: 1fr; }
+            .request-btn { width: 100%; }
+            .day-agenda-modal .agenda-body { padding: 12px 14px calc(16px + env(safe-area-inset-bottom)); }
+            .agenda-event { padding: 13px; border-radius: 15px; }
+            .agenda-event p { font-size: .78rem; line-height: 1.4; }
+            .agenda-actions { display: grid; grid-template-columns: 1fr 1fr; }
+            .agenda-action-btn { min-height: 38px; border-radius: 11px; }
+            #scheduleToast { right: 10px; bottom: calc(92px + env(safe-area-inset-bottom)); left: 10px; }
+        }
     </style>
 </head>
 <body class="chief-legacy-layout">
@@ -1036,12 +1134,11 @@
 
             <section class="schedule-hero">
                 <div>
-                    <h1>Coordinate drills, inspections, and command activities in one view.</h1>
-                    <p>Use the monthly board to track station events at a glance. Every calendar box is clickable, so commanders can inspect day-level activity without leaving the schedule room.</p>
+                    <h1>Station Schedule</h1>
+                    <p>Tap a day to view its timeline or add an activity.</p>
                     <div class="schedule-badges">
-                        <span class="schedule-badge"><i class="fa-solid fa-calendar-check"></i> Live monthly command view</span>
-                        <span class="schedule-badge"><i class="fa-solid fa-hand-pointer"></i> Click any day cell for details</span>
-                        <span class="schedule-badge"><i class="fa-solid fa-layer-group"></i> Drill, inspection, community, logistics</span>
+                        <span class="schedule-badge"><i class="fa-solid fa-building-shield"></i> {{ $stationName ?: 'Station calendar' }}</span>
+                        <span class="schedule-badge"><i class="fa-solid fa-hand-pointer"></i> Select a day for its timeline</span>
                     </div>
                 </div>
 
@@ -1061,11 +1158,29 @@
                 </div>
             </section>
 
+            <section class="request-launcher" aria-label="Community activity requests">
+                <div class="request-launcher__copy">
+                    <span class="request-launcher__icon"><i class="fa-solid fa-inbox"></i></span>
+                    <div><h2>Activity Requests</h2><p>Review citizen and barangay schedule requests.</p></div>
+                </div>
+                <div class="request-launcher__actions">
+                    <span class="request-count">{{ ($pendingCommunityActivityRequests ?? collect())->count() }}</span>
+                    <button type="button" class="calendar-btn primary" id="openRequestReviewBtn"><i class="fa-solid fa-eye"></i><span> Review</span></button>
+                </div>
+            </section>
+
+            <div id="requestReviewModal" class="schedule-modal request-review-modal" aria-hidden="true">
+                <div class="schedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="requestReviewTitle">
+                    <div class="schedule-modal-head">
+                        <div><h3 id="requestReviewTitle">Activity Requests</h3><p>Approve a request into the station calendar or reject it with a note.</p></div>
+                        <button type="button" class="schedule-modal-close" id="requestReviewClose" aria-label="Close activity requests"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="schedule-modal-body">
             <section class="request-review-card">
                 <div class="calendar-toolbar" style="padding:0 0 18px;border-bottom:1px solid rgba(226,232,240,0.9);margin-bottom:18px;background:none;">
                     <div class="calendar-toolbar-title">
-                        <h2>Community Activity Requests</h2>
-                        <p>Review barangay and citizen requests here, then approve them into the official station schedule.</p>
+                        <h2>Pending</h2>
+                        <p>Confirm the date and time before approval.</p>
                     </div>
                     <div class="calendar-toolbar-actions">
                         <span class="schedule-badge"><i class="fa-solid fa-inbox"></i> {{ ($pendingCommunityActivityRequests ?? collect())->count() }} pending</span>
@@ -1105,7 +1220,7 @@
                                     </label>
                                     <label>
                                         <span>Schedule date</span>
-                                        <input type="date" name="event_date" value="{{ optional($requestItem->preferred_date)->toDateString() }}" min="2026-08-10">
+                                        <input type="date" name="event_date" value="{{ optional($requestItem->preferred_date)->toDateString() }}" min="{{ now('Asia/Manila')->toDateString() }}">
                                     </label>
                                     <label>
                                         <span>Activity type</span>
@@ -1174,13 +1289,16 @@
                     </div>
                 @endif
             </section>
+                    </div>
+                </div>
+            </div>
 
             <section class="schedule-layout">
                 <div class="calendar-card">
                     <div class="calendar-toolbar">
                         <div class="calendar-toolbar-title">
                             <h2 id="calendarMonthLabel">{{ now()->format('F Y') }}</h2>
-                            <p>Tap a day cell to inspect its assigned station activity load.</p>
+                            <p>Tap a day for its timeline.</p>
                         </div>
 
                         <div class="calendar-toolbar-actions">
@@ -1204,17 +1322,17 @@
                     </div>
                 </div>
 
-                <aside class="agenda-card">
-                    <div class="agenda-header">
-                        <h3>Day Agenda</h3>
-                        <p>Selected day details and the upcoming command queue.</p>
-                    </div>
-
-                    <div class="agenda-body">
+                <aside id="dayAgendaModal" class="schedule-modal day-agenda-modal" aria-hidden="true">
+                    <div class="schedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="selectedDayLabel">
+                        <div class="schedule-modal-head">
+                            <div><h3>Day Timeline</h3><p>Activities are ordered by start time.</p></div>
+                            <button type="button" class="schedule-modal-close" id="dayAgendaClose" aria-label="Close day timeline"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="agenda-body schedule-modal-body">
                         <div class="selected-day-card">
-                            <div class="eyebrow">Selected Day</div>
+                            <div class="eyebrow">Selected day</div>
                             <h4 id="selectedDayLabel">{{ now()->format('F d, Y') }}</h4>
-                            <p id="selectedDaySummary">Choose a date to inspect activities and assignments.</p>
+                            <p id="selectedDaySummary">No activities scheduled.</p>
                             <div class="mt-4">
                                 <button type="button" class="calendar-btn primary" id="selectedDayAddBtn">
                                     <i class="fa-solid fa-plus"></i> Add Schedule
@@ -1223,10 +1341,7 @@
                         </div>
 
                         <div id="selectedDayAgenda" class="agenda-list"></div>
-
-                        <div class="upcoming-card">
-                            <h4>Upcoming Activity Queue</h4>
-                            <div id="upcomingScheduleList"></div>
+                        <div id="upcomingScheduleList" hidden></div>
                         </div>
                     </div>
                 </aside>
@@ -1374,6 +1489,11 @@
             const selectedDayAgenda = document.getElementById('selectedDayAgenda');
             const upcomingScheduleList = document.getElementById('upcomingScheduleList');
             const selectedDayAddBtn = document.getElementById('selectedDayAddBtn');
+            const dayAgendaModal = document.getElementById('dayAgendaModal');
+            const dayAgendaClose = document.getElementById('dayAgendaClose');
+            const requestReviewModal = document.getElementById('requestReviewModal');
+            const openRequestReviewBtn = document.getElementById('openRequestReviewBtn');
+            const requestReviewClose = document.getElementById('requestReviewClose');
             const scheduleModal = document.getElementById('scheduleEventModal');
             const scheduleModalClose = document.getElementById('scheduleModalClose');
             const scheduleCancelBtn = document.getElementById('scheduleCancelBtn');
@@ -1695,6 +1815,22 @@
                 selectedDayAgenda.innerHTML = events.map(buildAgendaCard).join('');
             }
 
+            function setModalVisibility(modal, visible) {
+                if (!modal) return;
+                modal.classList.toggle('show', visible);
+                modal.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                document.body.classList.toggle('schedule-modal-open', Boolean(document.querySelector('.schedule-modal.show')));
+            }
+
+            function openDayAgendaModal() {
+                renderSelectedDay();
+                setModalVisibility(dayAgendaModal, true);
+            }
+
+            function closeDayAgendaModal() {
+                setModalVisibility(dayAgendaModal, false);
+            }
+
             function renderUpcoming() {
                 const upcoming = getUpcomingEvents();
 
@@ -1760,21 +1896,14 @@
                                     <div>${event.event}</div>
                                 </div>
                             `).join('')}
-                            <button type="button" class="calendar-day-add" data-add-date="${dateKey}">
-                                <i class="fa-solid fa-plus"></i> Add
-                            </button>
+                            ${events.length > 2 ? `<span class="calendar-event-more">+${events.length - 2} more</span>` : ''}
                         </div>
                     `;
 
                     cell.addEventListener('click', function () {
                         state.selectedDateKey = dateKey;
                         renderCalendar();
-                        renderSelectedDay();
-                    });
-
-                    cell.querySelector('[data-add-date]')?.addEventListener('click', function (event) {
-                        event.stopPropagation();
-                        openScheduleModal(dateKey);
+                        openDayAgendaModal();
                     });
 
                     grid.appendChild(cell);
@@ -1836,13 +1965,11 @@
                     scheduleStartTime.value = eventData.start_time;
                     refreshEndTimeOptions(dateKey, eventData.end_time || '');
                 }
-                scheduleModal.classList.add('show');
-                scheduleModal.setAttribute('aria-hidden', 'false');
+                setModalVisibility(scheduleModal, true);
             }
 
             function closeScheduleModal() {
-                scheduleModal.classList.remove('show');
-                scheduleModal.setAttribute('aria-hidden', 'true');
+                setModalVisibility(scheduleModal, false);
                 scheduleEventForm.reset();
                 scheduleEventId.value = '';
                 scheduleEventTitle.value = '';
@@ -1879,6 +2006,7 @@
             });
 
             selectedDayAddBtn?.addEventListener('click', function () {
+                closeDayAgendaModal();
                 openScheduleModal(state.selectedDateKey);
             });
 
@@ -1889,6 +2017,7 @@
                 if (editButton) {
                     const eventData = getEventById(editButton.dataset.eventEdit);
                     if (eventData) {
+                        closeDayAgendaModal();
                         openScheduleModal(eventData.event_date, eventData);
                     }
                 }
@@ -1900,6 +2029,19 @@
 
             scheduleModalClose?.addEventListener('click', closeScheduleModal);
             scheduleCancelBtn?.addEventListener('click', closeScheduleModal);
+            dayAgendaClose?.addEventListener('click', closeDayAgendaModal);
+            dayAgendaModal?.addEventListener('click', function (event) {
+                if (event.target === dayAgendaModal) closeDayAgendaModal();
+            });
+            openRequestReviewBtn?.addEventListener('click', function () {
+                setModalVisibility(requestReviewModal, true);
+            });
+            requestReviewClose?.addEventListener('click', function () {
+                setModalVisibility(requestReviewModal, false);
+            });
+            requestReviewModal?.addEventListener('click', function (event) {
+                if (event.target === requestReviewModal) setModalVisibility(requestReviewModal, false);
+            });
             scheduleEventDate?.addEventListener('change', function () {
                 refreshTimeSelectors(scheduleEventDate.value || state.selectedDateKey);
             });
@@ -1914,6 +2056,17 @@
             scheduleModal?.addEventListener('click', function (event) {
                 if (event.target === scheduleModal) {
                     closeScheduleModal();
+                }
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape') return;
+
+                if (scheduleModal?.classList.contains('show')) {
+                    closeScheduleModal();
+                } else if (dayAgendaModal?.classList.contains('show')) {
+                    closeDayAgendaModal();
+                } else if (requestReviewModal?.classList.contains('show')) {
+                    setModalVisibility(requestReviewModal, false);
                 }
             });
 

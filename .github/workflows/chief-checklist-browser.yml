@@ -1,0 +1,105 @@
+name: Chief checklist browser audit
+
+on:
+  pull_request:
+    paths:
+      - 'app/Http/Controllers/Chief/**'
+      - 'app/Http/Controllers/VoiceCallController.php'
+      - 'resources/views/chief/course-checklists.blade.php'
+      - 'resources/views/chief/partials/course-checklist-workspace.blade.php'
+      - 'routes/web.php'
+      - 'tests/Browser/run-announcement-visual-smoke.ps1'
+      - '.github/workflows/chief-checklist-browser.yml'
+  workflow_dispatch:
+
+jobs:
+  checklist-browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: pyrosense_browser
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d pyrosense_browser"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8010
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: pyrosense_browser
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql, gd, zip
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install application dependencies
+        run: |
+          composer install --no-interaction --prefer-dist
+          npm ci
+          npm run build
+
+      - name: Prepare browser database
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan migrate --force
+          php artisan db:seed --class=Database\\Seeders\\DatabaseSeeder --force
+          php artisan db:seed --class=Database\\Seeders\\BrowserChecklistSmokeSeeder --force
+
+      - name: Start Laravel
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8010 > storage/logs/checklist-browser-server.log 2>&1 &
+          for attempt in {1..40}; do
+            curl --fail --silent http://127.0.0.1:8010/login >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+
+      - name: Audit authenticated desktop and mobile checklist UI
+        shell: pwsh
+        run: |
+          ./tests/Browser/run-announcement-visual-smoke.ps1 `
+            -BaseUrl http://127.0.0.1:8010 `
+            -Email chief.sample@example.com `
+            -Password password123 `
+            -Role chief `
+            -AuditMode checklists `
+            -TargetPath /station-admin/course-checklists `
+            -OutputDirectory storage/app/testing/checklist-browser-ci `
+            -BrowserPath /usr/bin/google-chrome `
+            -DebugPort 9333 `
+            -Assert
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chief-checklist-browser-evidence
+          path: |
+            storage/app/testing/checklist-browser-ci
+            storage/logs/checklist-browser-server.log

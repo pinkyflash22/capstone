@@ -28,6 +28,9 @@ class VoiceCallController extends Controller
     private const ANONYMOUS_VOICE_USER_COOKIE = 'anonymous_voice_user_id';
     private const ANONYMOUS_VOICE_USER_COOKIE_MINUTES = 60 * 24 * 30;
 
+    private ?bool $voiceCallsStorageIsReady = null;
+    private ?bool $responderPresenceStorageIsReady = null;
+
     public function bootstrapAnonymousSession(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -125,11 +128,12 @@ class VoiceCallController extends Controller
         $this->releaseSessionLock($request);
 
         try {
-            $this->touchResponderPresence($user);
-            $this->distributeWaitingCalls($user);
+            $stationId = $this->adminStationId($user);
+            $this->touchResponderPresence($user, $stationId);
+            $this->distributeWaitingCalls($user, $stationId);
             $this->expireStaleCalls($request);
 
-            return response()->json($this->responderPayload($user));
+            return response()->json($this->responderPayload($user, $stationId));
         } catch (\Throwable $error) {
             report($error);
 
@@ -149,8 +153,9 @@ class VoiceCallController extends Controller
         $user = $request->user();
         abort_unless($this->isStationResponder($user), 403);
         $this->releaseSessionLock($request);
+        $stationId = $this->adminStationId($user);
 
-        return response()->stream(function () use ($user, $request) {
+        return response()->stream(function () use ($user, $request, $stationId) {
             $lastFingerprint = null;
 
             for ($iteration = 0; $iteration < 30; $iteration++) {
@@ -159,10 +164,10 @@ class VoiceCallController extends Controller
                 }
 
                 try {
-                    $this->touchResponderPresence($user);
-                    $this->distributeWaitingCalls($user);
+                    $this->touchResponderPresence($user, $stationId);
+                    $this->distributeWaitingCalls($user, $stationId);
                     $this->expireStaleCalls($request);
-                    $payload = $this->responderPayload($user);
+                    $payload = $this->responderPayload($user, $stationId);
                 } catch (\Throwable $error) {
                     report($error);
 
@@ -612,7 +617,7 @@ class VoiceCallController extends Controller
         ]);
     }
 
-    private function serializeCall(VoiceCall $call, ?User $viewer = null): array
+    private function serializeCall(VoiceCall $call, ?User $viewer = null, ?bool $responderHasCapacity = null): array
     {
         $createdAt = $call->created_at ?: now();
         $caller = $call->caller;
@@ -672,7 +677,7 @@ class VoiceCallController extends Controller
             'can_accept' => $viewer
                 && $this->isStationResponder($viewer)
                 && $call->direction !== VoiceCall::DIRECTION_OUTBOUND
-                && $this->occupiedResponderCallCount($viewer) < $this->maxConcurrentResponderCalls(),
+                && ($responderHasCapacity ?? ($this->occupiedResponderCallCount($viewer) < $this->maxConcurrentResponderCalls())),
             'can_callback' => $viewer
                 && $this->isStationResponder($viewer)
                 && ! $anonymousCaller
@@ -740,7 +745,6 @@ class VoiceCallController extends Controller
         }
 
         return VoiceCall::query()
-            ->with($this->callRelations())
             ->where('assigned_admin_id', $user->user_id)
             ->where('status', VoiceCall::STATUS_ANSWERED)
             ->whereNull('ended_at')
@@ -748,7 +752,7 @@ class VoiceCallController extends Controller
             ->get();
     }
 
-    private function responderPayload(User $user): array
+    private function responderPayload(User $user, ?int $stationId): array
     {
         if (! $this->voiceCallsStorageReady()) {
             return [
@@ -762,11 +766,9 @@ class VoiceCallController extends Controller
             ];
         }
 
-        $stationId = $this->adminStationId($user);
         $activeCalls = $this->activeCallsForAdmin($user);
 
         $incoming = VoiceCall::query()
-            ->with($this->callRelations())
             ->whereIn('status', [VoiceCall::STATUS_RINGING, VoiceCall::STATUS_QUEUED])
             ->where(function ($query) {
                 $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
@@ -782,7 +784,6 @@ class VoiceCallController extends Controller
             ->get();
 
         $outgoingCallbacks = VoiceCall::query()
-            ->with($this->callRelations())
             ->where('direction', VoiceCall::DIRECTION_OUTBOUND)
             ->where('assigned_admin_id', $user->user_id)
             ->where('status', VoiceCall::STATUS_RINGING)
@@ -791,7 +792,6 @@ class VoiceCallController extends Controller
             ->get();
 
         $missedCalls = VoiceCall::query()
-            ->with($this->callRelations())
             ->where('status', VoiceCall::STATUS_MISSED)
             ->when($stationId, fn ($query) => $query->where(function ($inner) use ($stationId) {
                 $inner->where('station_id', $stationId)->orWhereNull('station_id');
@@ -801,7 +801,6 @@ class VoiceCallController extends Controller
             ->get();
 
         $recentContacts = VoiceCall::query()
-            ->with($this->callRelations())
             ->whereIn('status', [VoiceCall::STATUS_ENDED, VoiceCall::STATUS_REJECTED])
             ->where(function ($query) {
                 $query->where('direction', VoiceCall::DIRECTION_INBOUND)->orWhereNull('direction');
@@ -813,14 +812,28 @@ class VoiceCallController extends Controller
             ->limit(8)
             ->get();
 
+        (new VoiceCall)->newCollection(
+            $activeCalls
+                ->concat($outgoingCallbacks)
+                ->concat($incoming)
+                ->concat($missedCalls)
+                ->concat($recentContacts)
+                ->unique('id')
+                ->values()
+                ->all()
+        )->loadMissing($this->payloadRelations());
+
+        $responderHasCapacity = $this->occupiedResponderCallCount($user) < $this->maxConcurrentResponderCalls();
+        $serialize = fn (VoiceCall $call) => $this->serializeCall($call, $user, $responderHasCapacity);
+
         return [
             'success' => true,
-            'active_call' => $activeCalls->first() ? $this->serializeCall($activeCalls->first(), $user) : null,
-            'active_calls' => $activeCalls->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
-            'outgoing_calls' => $outgoingCallbacks->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
-            'incoming_calls' => $incoming->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
-            'missed_calls' => $missedCalls->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
-            'recent_contacts' => $recentContacts->map(fn (VoiceCall $call) => $this->serializeCall($call, $user))->values(),
+            'active_call' => $activeCalls->first() ? $serialize($activeCalls->first()) : null,
+            'active_calls' => $activeCalls->map($serialize)->values(),
+            'outgoing_calls' => $outgoingCallbacks->map($serialize)->values(),
+            'incoming_calls' => $incoming->map($serialize)->values(),
+            'missed_calls' => $missedCalls->map($serialize)->values(),
+            'recent_contacts' => $recentContacts->map($serialize)->values(),
             'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
             'server_time' => now()->toIso8601String(),
         ];
@@ -953,7 +966,12 @@ class VoiceCallController extends Controller
 
     private function callRelations(): array
     {
-        return ['caller', 'assignedAdmin', 'initiatedBy', 'station', 'incident', 'createdIncident.marker', 'flaggedBy'];
+        return ['caller.role', 'assignedAdmin', 'initiatedBy', 'station', 'incident', 'createdIncident.marker', 'flaggedBy'];
+    }
+
+    private function payloadRelations(): array
+    {
+        return ['caller.role', 'station', 'createdIncident'];
     }
 
     private function maxConcurrentResponderCalls(): int
@@ -985,10 +1003,9 @@ class VoiceCallController extends Controller
         ]);
     }
 
-    private function touchResponderPresence(User $user): void
+    private function touchResponderPresence(User $user, ?int $stationId): void
     {
-        $stationId = $this->adminStationId($user);
-        if (! $stationId || ! Schema::hasTable('voice_responder_presence')) {
+        if (! $stationId || ! $this->responderPresenceStorageReady()) {
             return;
         }
 
@@ -1002,10 +1019,9 @@ class VoiceCallController extends Controller
         );
     }
 
-    private function distributeWaitingCalls(User $viewer): void
+    private function distributeWaitingCalls(User $viewer, ?int $stationId): void
     {
-        $stationId = $this->adminStationId($viewer);
-        if (! $stationId || ! Schema::hasTable('voice_responder_presence')) {
+        if (! $stationId || ! $this->responderPresenceStorageReady()) {
             return;
         }
 
@@ -1167,22 +1183,29 @@ class VoiceCallController extends Controller
 
     private function voiceCallsStorageReady(): bool
     {
+        if ($this->voiceCallsStorageIsReady !== null) {
+            return $this->voiceCallsStorageIsReady;
+        }
+
         try {
             if (! Schema::hasTable('voice_calls')) {
-                return false;
+                return $this->voiceCallsStorageIsReady = false;
             }
 
-            foreach (['status', 'answered_at', 'ended_at', 'flagged_at', 'assigned_admin_id', 'direction', 'initiated_by', 'held_at'] as $column) {
-                if (! Schema::hasColumn('voice_calls', $column)) {
-                    return false;
-                }
-            }
+            $required = ['status', 'answered_at', 'ended_at', 'flagged_at', 'assigned_admin_id', 'direction', 'initiated_by', 'held_at'];
+            $available = Schema::getColumnListing('voice_calls');
 
-            return true;
+            return $this->voiceCallsStorageIsReady = array_diff($required, $available) === [];
         } catch (\Throwable $error) {
             report($error);
 
-            return false;
+            return $this->voiceCallsStorageIsReady = false;
         }
+    }
+
+    private function responderPresenceStorageReady(): bool
+    {
+        return $this->responderPresenceStorageIsReady
+            ??= Schema::hasTable('voice_responder_presence');
     }
 }

@@ -53,6 +53,23 @@
         ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
         ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
     ];
+    $mobileIconClasses = [
+        'event' => 'fa-solid fa-calendar-days',
+        'notifications' => 'fa-solid fa-bell',
+        'monitoring' => 'fa-solid fa-chart-line',
+        'menu' => 'fa-solid fa-bars',
+        'dashboard' => 'fa-solid fa-table-cells-large',
+        'folder_open' => 'fa-solid fa-folder-open',
+        'fact_check' => 'fa-solid fa-clipboard-check',
+        'task_alt' => 'fa-solid fa-list-check',
+        'description' => 'fa-solid fa-file-lines',
+        'inventory_2' => 'fa-solid fa-boxes-stacked',
+        'location_city' => 'fa-solid fa-city',
+        'apartment' => 'fa-solid fa-building',
+        'campaign' => 'fa-solid fa-bullhorn',
+        'checklist' => 'fa-solid fa-list-check',
+        'cloud' => 'fa-solid fa-cloud',
+    ];
     $mobileMenuIsActive = $active === 'profile' || in_array($active, array_column($mobileCenterActions, 'active'), true);
 @endphp
 
@@ -155,12 +172,12 @@
     <div class="chief-mobile-dock__shell">
         <div class="chief-mobile-dock__track">
             <a href="{{ route($mobileDockItems[0]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[0]['mobile_icon'] }}</span>
+                <i class="{{ $mobileIconClasses[$mobileDockItems[0]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
                 <span class="chief-mobile-dock__label">Schedule</span>
             </a>
 
             <button type="button" class="chief-mobile-dock__item" aria-label="{{ $mobileDockItems[1]['label'] }}" data-chief-notifications-open>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
+                <i class="{{ $mobileIconClasses[$mobileDockItems[1]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
                 <span class="chief-mobile-dock__label">Alerts</span>
             </button>
 
@@ -169,12 +186,12 @@
                     @foreach ($mobileCenterActions as $action)
                         @if (!empty($action['route']))
                             <a href="{{ route($action['route']) }}" class="chief-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
-                                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                                <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true"></i>
                                 <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </a>
                         @else
                             <button type="button" class="chief-mobile-dock__burst-item" aria-label="{{ $action['label'] }}" data-chief-insights-open>
-                                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                                <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true"></i>
                                 <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </button>
                         @endif
@@ -187,17 +204,17 @@
                     aria-label="{{ $mobileCenterItem['label'] }}"
                     data-chief-nav-trigger
                 >
-                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileCenterItem['mobile_icon'] }}</span>
+                    <i class="{{ $mobileIconClasses[$mobileCenterItem['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
                 </a>
             </div>
 
             <a href="{{ route($mobileDockItems[2]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[2]['mobile_icon'] }}</span>
+                <i class="{{ $mobileIconClasses[$mobileDockItems[2]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
                 <span class="chief-mobile-dock__label">Forecast</span>
             </a>
 
             <button type="button" class="chief-mobile-dock__item {{ $mobileMenuIsActive ? 'active' : '' }}" aria-label="Open Chief Command menu" data-chief-settings-open>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[3]['mobile_icon'] }}</span>
+                <i class="{{ $mobileIconClasses[$mobileDockItems[3]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
                 <span class="chief-mobile-dock__label">Menu</span>
             </button>
         </div>
@@ -212,43 +229,43 @@
                 <h2 class="chief-mobile-panel__title">Menu</h2>
             </div>
             <button type="button" class="chief-mobile-panel__close" data-chief-panel-close aria-label="Close menu">
-                <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">close</span>
+                <i class="fa-solid fa-xmark chief-mobile-material-icon" aria-hidden="true"></i>
             </button>
         </div>
         <div class="chief-mobile-panel__menu">
             <p class="chief-mobile-panel__menu-label">Command navigation</p>
             @foreach ($mobileCenterActions as $action)
                 <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
-                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
+                    <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
                     <span class="chief-mobile-panel__action-copy">
                         <strong>{{ $action['label'] }}</strong>
                         <small>Open {{ strtolower($action['label']) }}</small>
                     </span>
-                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                    <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
                 </a>
             @endforeach
             <div class="chief-mobile-panel__menu-divider" aria-hidden="true"></div>
             <p class="chief-mobile-panel__menu-label">Account</p>
             <button type="button" class="chief-mobile-panel__action" data-chief-open-logs>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">history</span>
+                <i class="fa-solid fa-clock-rotate-left chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Logs</strong>
                     <small>View your recent activity</small>
                 </span>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
             </button>
             <a href="{{ route('station-admin.profile') }}" class="chief-mobile-panel__action">
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">person</span>
+                <i class="fa-solid fa-user chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Profile</strong>
                     <small>Manage your commander account</small>
                 </span>
-                <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
+                <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
             </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="chief-mobile-panel__action chief-mobile-panel__action--danger">
-                    <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">logout</span>
+                    <i class="fa-solid fa-right-from-bracket chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
                     <span class="chief-mobile-panel__action-copy">
                         <strong>Logout</strong>
                         <small>Sign out of Chief Command</small>
@@ -267,12 +284,12 @@
                 <h2 class="chief-mobile-panel__title">Notifications</h2>
             </div>
             <button type="button" class="chief-mobile-panel__close" data-chief-notifications-close aria-label="Close notifications">
-                <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">close</span>
+                <i class="fa-solid fa-xmark chief-mobile-material-icon" aria-hidden="true"></i>
             </button>
         </div>
         <div class="chief-mobile-panel__body" id="chiefMobileNotificationsContent">
             <div class="chief-mobile-panel__empty">
-                <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">notifications</span>
+                <i class="fa-solid fa-bell chief-mobile-material-icon" aria-hidden="true"></i>
                 <p>No mobile notifications yet.</p>
             </div>
         </div>
@@ -349,7 +366,7 @@
             if (!source) {
                 notificationsContent.innerHTML = `
                     <div class="chief-mobile-panel__empty">
-                        <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">notifications</span>
+                        <i class="fa-solid fa-bell chief-mobile-material-icon" aria-hidden="true"></i>
                         <p>Notifications are not available on this page.</p>
                     </div>
                 `;
