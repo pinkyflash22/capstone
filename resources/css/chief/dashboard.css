@@ -1885,6 +1885,12 @@ aside#sidebar.chief-shell-sidebar .chief-shell-nav-item i {
     flex-shrink: 0;
   }
 
+  svg.chief-mobile-material-icon {
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+  }
+
   .chief-mobile-dock__icon.chief-mobile-material-icon {
     font-size: 1.45rem;
     font-variation-settings:

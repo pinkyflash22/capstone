@@ -53,23 +53,38 @@
         ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
         ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
     ];
-    $mobileIconClasses = [
-        'event' => 'fa-solid fa-calendar-days',
-        'notifications' => 'fa-solid fa-bell',
-        'monitoring' => 'fa-solid fa-chart-line',
-        'menu' => 'fa-solid fa-bars',
-        'dashboard' => 'fa-solid fa-table-cells-large',
-        'folder_open' => 'fa-solid fa-folder-open',
-        'fact_check' => 'fa-solid fa-clipboard-check',
-        'task_alt' => 'fa-solid fa-list-check',
-        'description' => 'fa-solid fa-file-lines',
-        'inventory_2' => 'fa-solid fa-boxes-stacked',
-        'location_city' => 'fa-solid fa-city',
-        'apartment' => 'fa-solid fa-building',
-        'campaign' => 'fa-solid fa-bullhorn',
-        'checklist' => 'fa-solid fa-list-check',
-        'cloud' => 'fa-solid fa-cloud',
+    $mobileIconSvgs = [
+        'event' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></svg>',
+        'notifications' => '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>',
+        'monitoring' => '<svg viewBox="0 0 24 24"><path d="M4 19h16M5 15l4-4 4 2 6-7M16 6h3v3"/></svg>',
+        'menu' => '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+        'dashboard' => '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+        'folder_open' => '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3zM3 11h18"/></svg>',
+        'fact_check' => '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l1.5 1.5L12 8M14 9h3M8 15l1.5 1.5L12 14M14 15h3"/></svg>',
+        'task_alt' => '<svg viewBox="0 0 24 24"><path d="M4 6l2 2 4-4M12 6h8M4 13l2 2 4-4M12 13h8M4 20l2 2 4-4M12 20h8"/></svg>',
+        'description' => '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg>',
+        'inventory_2' => '<svg viewBox="0 0 24 24"><path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/></svg>',
+        'location_city' => '<svg viewBox="0 0 24 24"><path d="M3 21V8l7-4v17M10 21V11l5-3v13M15 21v-7h6v7M6 11h1M6 15h1M12 14h1M12 17h1M18 17h1"/></svg>',
+        'apartment' => '<svg viewBox="0 0 24 24"><path d="M5 21V3h10v18M15 9h4v12M8 7h2M8 11h2M8 15h2M8 19h2M17 13h1M17 17h1M3 21h18"/></svg>',
+        'campaign' => '<svg viewBox="0 0 24 24"><path d="M4 10v4h4l8 4V6l-8 4zM8 14l2 5M19 9a4 4 0 0 1 0 6"/></svg>',
+        'checklist' => '<svg viewBox="0 0 24 24"><path d="M4 6l2 2 3-3M11 7h9M4 13l2 2 3-3M11 14h9M4 20l2 2 3-3M11 21h9"/></svg>',
+        'cloud' => '<svg viewBox="0 0 24 24"><path d="M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 18.7 12H19a3 3 0 0 1 0 6z"/></svg>',
+        'close' => '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+        'chevron_right' => '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+        'history' => '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>',
+        'user' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+        'logout' => '<svg viewBox="0 0 24 24"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/></svg>',
+        'circle' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>',
     ];
+    $renderMobileIcon = static function (string $name, string $classes) use ($mobileIconSvgs): string {
+        $svg = $mobileIconSvgs[$name] ?? $mobileIconSvgs['circle'];
+
+        return str_replace(
+            '<svg ',
+            '<svg class="'.e($classes).'" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" ',
+            $svg
+        );
+    };
     $mobileMenuIsActive = $active === 'profile' || in_array($active, array_column($mobileCenterActions, 'active'), true);
 @endphp
 
@@ -172,12 +187,12 @@
     <div class="chief-mobile-dock__shell">
         <div class="chief-mobile-dock__track">
             <a href="{{ route($mobileDockItems[0]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[0]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[0]['label'] }}">
-                <i class="{{ $mobileIconClasses[$mobileDockItems[0]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon($mobileDockItems[0]['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
                 <span class="chief-mobile-dock__label">Schedule</span>
             </a>
 
             <button type="button" class="chief-mobile-dock__item" aria-label="{{ $mobileDockItems[1]['label'] }}" data-chief-notifications-open>
-                <i class="{{ $mobileIconClasses[$mobileDockItems[1]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon($mobileDockItems[1]['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
                 <span class="chief-mobile-dock__label">Alerts</span>
             </button>
 
@@ -186,12 +201,12 @@
                     @foreach ($mobileCenterActions as $action)
                         @if (!empty($action['route']))
                             <a href="{{ route($action['route']) }}" class="chief-mobile-dock__burst-item {{ $active === $action['active'] ? 'active' : '' }}" aria-label="{{ $action['label'] }}">
-                                <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true"></i>
+                                {!! $renderMobileIcon($action['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__burst-icon') !!}
                                 <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </a>
                         @else
                             <button type="button" class="chief-mobile-dock__burst-item" aria-label="{{ $action['label'] }}" data-chief-insights-open>
-                                <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-dock__burst-icon" aria-hidden="true"></i>
+                                {!! $renderMobileIcon($action['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__burst-icon') !!}
                                 <span class="chief-mobile-dock__burst-label">{{ $action['label'] }}</span>
                             </button>
                         @endif
@@ -204,17 +219,17 @@
                     aria-label="{{ $mobileCenterItem['label'] }}"
                     data-chief-nav-trigger
                 >
-                    <i class="{{ $mobileIconClasses[$mobileCenterItem['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
+                    {!! $renderMobileIcon($mobileCenterItem['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
                 </a>
             </div>
 
             <a href="{{ route($mobileDockItems[2]['route']) }}" class="chief-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
-                <i class="{{ $mobileIconClasses[$mobileDockItems[2]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon($mobileDockItems[2]['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
                 <span class="chief-mobile-dock__label">Forecast</span>
             </a>
 
             <button type="button" class="chief-mobile-dock__item {{ $mobileMenuIsActive ? 'active' : '' }}" aria-label="Open Chief Command menu" data-chief-settings-open>
-                <i class="{{ $mobileIconClasses[$mobileDockItems[3]['mobile_icon']] }} chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon($mobileDockItems[3]['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
                 <span class="chief-mobile-dock__label">Menu</span>
             </button>
         </div>
@@ -229,43 +244,43 @@
                 <h2 class="chief-mobile-panel__title">Menu</h2>
             </div>
             <button type="button" class="chief-mobile-panel__close" data-chief-panel-close aria-label="Close menu">
-                <i class="fa-solid fa-xmark chief-mobile-material-icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon('close', 'chief-mobile-material-icon') !!}
             </button>
         </div>
         <div class="chief-mobile-panel__menu">
             <p class="chief-mobile-panel__menu-label">Command navigation</p>
             @foreach ($mobileCenterActions as $action)
                 <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
-                    <i class="{{ $mobileIconClasses[$action['mobile_icon']] ?? 'fa-solid fa-circle' }} chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
+                    {!! $renderMobileIcon($action['mobile_icon'], 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
                     <span class="chief-mobile-panel__action-copy">
                         <strong>{{ $action['label'] }}</strong>
                         <small>Open {{ strtolower($action['label']) }}</small>
                     </span>
-                    <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
+                    {!! $renderMobileIcon('chevron_right', 'chief-mobile-material-icon chief-mobile-panel__action-trailing') !!}
                 </a>
             @endforeach
             <div class="chief-mobile-panel__menu-divider" aria-hidden="true"></div>
             <p class="chief-mobile-panel__menu-label">Account</p>
             <button type="button" class="chief-mobile-panel__action" data-chief-open-logs>
-                <i class="fa-solid fa-clock-rotate-left chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon('history', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Logs</strong>
                     <small>View your recent activity</small>
                 </span>
-                <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
+                {!! $renderMobileIcon('chevron_right', 'chief-mobile-material-icon chief-mobile-panel__action-trailing') !!}
             </button>
             <a href="{{ route('station-admin.profile') }}" class="chief-mobile-panel__action">
-                <i class="fa-solid fa-user chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon('user', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Profile</strong>
                     <small>Manage your commander account</small>
                 </span>
-                <i class="fa-solid fa-chevron-right chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true"></i>
+                {!! $renderMobileIcon('chevron_right', 'chief-mobile-material-icon chief-mobile-panel__action-trailing') !!}
             </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="chief-mobile-panel__action chief-mobile-panel__action--danger">
-                    <i class="fa-solid fa-right-from-bracket chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true"></i>
+                    {!! $renderMobileIcon('logout', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
                     <span class="chief-mobile-panel__action-copy">
                         <strong>Logout</strong>
                         <small>Sign out of Chief Command</small>
@@ -284,12 +299,12 @@
                 <h2 class="chief-mobile-panel__title">Notifications</h2>
             </div>
             <button type="button" class="chief-mobile-panel__close" data-chief-notifications-close aria-label="Close notifications">
-                <i class="fa-solid fa-xmark chief-mobile-material-icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon('close', 'chief-mobile-material-icon') !!}
             </button>
         </div>
         <div class="chief-mobile-panel__body" id="chiefMobileNotificationsContent">
             <div class="chief-mobile-panel__empty">
-                <i class="fa-solid fa-bell chief-mobile-material-icon" aria-hidden="true"></i>
+                {!! $renderMobileIcon('notifications', 'chief-mobile-material-icon') !!}
                 <p>No mobile notifications yet.</p>
             </div>
         </div>
@@ -306,6 +321,7 @@
         const notificationsOpen = document.querySelector('[data-chief-notifications-open]');
         const insightsOpenButtons = document.querySelectorAll('[data-chief-insights-open]');
         const notificationsContent = document.getElementById('chiefMobileNotificationsContent');
+        const notificationFallbackIcon = @json($renderMobileIcon('notifications', 'chief-mobile-material-icon'));
         const isMobileViewport = () => window.innerWidth <= 768;
 
         if (!dock || !trigger) {
@@ -366,7 +382,7 @@
             if (!source) {
                 notificationsContent.innerHTML = `
                     <div class="chief-mobile-panel__empty">
-                        <i class="fa-solid fa-bell chief-mobile-material-icon" aria-hidden="true"></i>
+                        ${notificationFallbackIcon}
                         <p>Notifications are not available on this page.</p>
                     </div>
                 `;

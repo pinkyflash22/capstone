@@ -197,8 +197,16 @@
         .risk-low { background: linear-gradient(135deg, #10b981, #059669); color: white; }
         .form-select { padding: 10px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 14px; width: 100%; }
 
-        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 1000; display: flex; align-items: center; justify-content: center; display: none; }
-        .loading-overlay.active { display: flex; }
+        .loading-overlay {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 1000;
+            display: none;
+            width: min(460px, calc(100vw - 48px));
+            pointer-events: none;
+        }
+        .loading-overlay.active { display: block; }
         .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #dc2626; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -1780,8 +1788,35 @@
             height: 100%;
             border-radius: inherit;
         }
+        .analytics-forecast-switch {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            padding: 6px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #f8fafc;
+        }
+        .analytics-forecast-switch__button {
+            min-height: 44px;
+            border: 0;
+            border-radius: 11px;
+            background: transparent;
+            color: #64748b;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 850;
+            cursor: pointer;
+            transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+        }
+        .analytics-forecast-switch__button.is-active {
+            background: #fff;
+            color: #c2410c;
+            box-shadow: 0 5px 16px rgba(15, 23, 42, .09);
+        }
         .analytics-loading-card {
-            width: min(92vw, 460px);
+            width: 100%;
             padding: 24px 22px;
             border-radius: 24px;
             background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,237,0.96));
@@ -1790,6 +1825,7 @@
             display: grid;
             gap: 14px;
             text-align: left;
+            pointer-events: auto;
         }
         .analytics-loading-card__eyebrow {
             display: inline-flex;
@@ -2281,12 +2317,18 @@
             .recommendation-run-title { font-size: 13px; }
             .recommendation-run-subtitle { font-size: 11px; }
             .recommendation-run-arrow { width: 30px; height: 30px; border-radius: 10px; }
-            .analytics-loading-card { width: min(94vw, 420px); padding: 20px 18px; border-radius: 20px; }
+            .loading-overlay {
+                right: 10px;
+                bottom: calc(var(--mobile-bottom-nav-h, 76px) + env(safe-area-inset-bottom, 0px) + 10px);
+                width: calc(100vw - 20px);
+            }
+            .analytics-loading-card { width: 100%; padding: 16px; border-radius: 18px; gap: 10px; }
             .analytics-loading-card__title { font-size: 1.12rem; }
             .analytics-loading-card__copy,
             .analytics-loading-card__step,
             .analytics-loading-card__meta { font-size: 12px; }
             .analytics-loading-card__percent { font-size: 1.2rem; }
+            .analytics-loading-card__steps { display: none; }
             .analytics-run-modal {
                 width: min(95vw, 440px) !important;
                 max-width: 440px !important;
@@ -2854,6 +2896,14 @@
                         <div class="analytics-control-field">
                             <label class="analytics-control-label" for="targetMonthDisplay">Target Month</label>
                             <input id="targetMonthDisplay" class="analytics-input" type="text" value="Current month forecast" readonly>
+                        </div>
+                        <div class="analytics-forecast-switch" role="tablist" aria-label="Saved forecast period">
+                            <button type="button" class="analytics-forecast-switch__button is-active" data-forecast-view-scope="current_month" role="tab" aria-selected="true">
+                                <i class="fa-solid fa-calendar-day"></i> Current Month
+                            </button>
+                            <button type="button" class="analytics-forecast-switch__button" data-forecast-view-scope="next_month" role="tab" aria-selected="false">
+                                <i class="fa-solid fa-calendar-plus"></i> Next Month
+                            </button>
                         </div>
                         <div class="analytics-actions">
                             <button id="analyzeBtn" class="analytics-btn analytics-btn--primary" type="button">
@@ -3687,6 +3737,16 @@
         let analyticsConfirmOpener = null;
         const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
         let analyticsScopeLoadingDepth = 0;
+        let activeForecastViewScope = 'current_month';
+
+        function setActiveForecastViewScope(scope = 'current_month') {
+            activeForecastViewScope = scope === 'next_month' ? 'next_month' : 'current_month';
+            document.querySelectorAll('[data-forecast-view-scope]').forEach((button) => {
+                const active = button.dataset.forecastViewScope === activeForecastViewScope;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+        }
 
         function isAnalyticsMobile() {
             return analyticsMobileQuery.matches;
@@ -4567,11 +4627,15 @@
             return response.json();
         }
 
-        async function loadLatestAnalysisSnapshot(predictionScope = 'current_month') {
+        async function loadLatestAnalysisSnapshot(predictionScope = 'current_month', notifyMissing = false) {
+            setActiveForecastViewScope(predictionScope);
             setScopedForecastLoading(true, 'Loading forecast scope...');
             try {
                 const result = await fetchScopedAnalysisSnapshot(predictionScope);
                 if (!result.success || !result.data) {
+                    if (notifyMissing) {
+                        showAnalyticsToast(`No saved ${predictionScope === 'next_month' ? 'next-month forecast' : 'current-month analysis'} exists for this selection yet.`, 'info');
+                    }
                     return;
                 }
 
@@ -6991,6 +7055,7 @@
                 setScopedForecastLoading(false);
             }
 
+            setActiveForecastViewScope(predictionScope);
             startAnalyticsLoading(predictionScope);
 
             try {
@@ -7892,6 +7957,7 @@
             currentRecommendations = analysisData.recommendations || [];
             currentBarangayPredictions = Array.isArray(analysisData.barangay_predictions) ? analysisData.barangay_predictions : [];
             currentPredictionDetails = analysisData;
+            setActiveForecastViewScope(analysisData.prediction_scope || 'current_month');
             syncAnalysisEvidenceButton(analysisData);
             renderBarangayPredictionPanel(currentBarangayPredictions);
             const aiWarningMessage = analysisData.ai_warning || null;
@@ -8099,27 +8165,33 @@
         });
 
         document.getElementById('retrainModelBtn')?.addEventListener('click', retrainForecastModel);
+        document.querySelectorAll('[data-forecast-view-scope]').forEach((button) => {
+            button.addEventListener('click', () => {
+                loadLatestAnalysisSnapshot(button.dataset.forecastViewScope || 'current_month', true)
+                    .catch((error) => showAnalyticsToast(error.message || 'Unable to load the saved forecast.', 'error'));
+            });
+        });
         document.getElementById('previewHistoricalWeatherBtn')?.addEventListener('click', previewHistoricalWeatherArchive);
         document.getElementById('saveHistoricalWeatherBtn')?.addEventListener('click', saveHistoricalWeatherArchive);
 
         document.getElementById('stationSelect')?.addEventListener('change', (e) => {
             populateBarangaySelectFromStation(e.target.value);
             updateRecommendationScopeLabel();
-            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
+            loadLatestAnalysisSnapshot(activeForecastViewScope).catch((error) => console.error('Scoped snapshot refresh error:', error));
             loadForecastNarrativeRuns().catch((error) => console.error('Forecast narrative refresh error:', error));
             loadRecommendationRunGroups().catch((error) => console.error('Recommendation run refresh error:', error));
         });
 
         document.getElementById('barangaySelect')?.addEventListener('change', () => {
             updateRecommendationScopeLabel();
-            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
+            loadLatestAnalysisSnapshot(activeForecastViewScope).catch((error) => console.error('Scoped snapshot refresh error:', error));
             loadForecastNarrativeRuns().catch((error) => console.error('Forecast narrative refresh error:', error));
             loadRecommendationRunGroups().catch((error) => console.error('Recommendation run refresh error:', error));
         });
 
         document.getElementById('historicalWindowSelect')?.addEventListener('change', () => {
             updateHistoricalWindowBadge();
-            loadLatestAnalysisSnapshot().catch((error) => console.error('Scoped snapshot refresh error:', error));
+            loadLatestAnalysisSnapshot(activeForecastViewScope).catch((error) => console.error('Scoped snapshot refresh error:', error));
         });
 
         document.addEventListener('DOMContentLoaded', () => {

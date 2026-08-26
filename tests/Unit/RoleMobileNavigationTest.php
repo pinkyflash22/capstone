@@ -44,7 +44,10 @@ class RoleMobileNavigationTest extends TestCase
         $this->assertStringContainsString('Command navigation', $view);
         $this->assertStringContainsString('$mobileCenterActions as $action', $view);
         $this->assertGreaterThanOrEqual(3, substr_count($view, 'chief-mobile-panel__action-trailing'));
-        $this->assertStringContainsString("'dashboard' => 'fa-solid fa-table-cells-large'", $view);
+        $this->assertStringContainsString("'dashboard' => '<svg", $view);
+        $this->assertStringContainsString('$renderMobileIcon', $view);
+        $this->assertStringContainsString('stroke="currentColor"', $view);
+        $this->assertStringNotContainsString('$mobileIconClasses', $view);
         $this->assertStringNotContainsString('material-symbols-rounded chief-mobile-material-icon', $view);
     }
 

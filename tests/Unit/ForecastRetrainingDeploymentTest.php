@@ -42,5 +42,7 @@ class ForecastRetrainingDeploymentTest extends TestCase
         $this->assertStringContainsString("\$report['failure_summary']", $job);
         $this->assertStringContainsString('trainingResult.details', $view);
         $this->assertStringContainsString('trainingResult.code', $view);
+        $this->assertStringContainsString("rtrim(\$request->getPathInfo(), '/')", $controller);
+        $this->assertStringNotContainsString("rtrim(\$request->url(), '/')", $controller);
     }
 }

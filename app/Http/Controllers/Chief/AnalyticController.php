@@ -514,7 +514,10 @@ class AnalyticController extends Controller
                 'progress' => 5,
                 'message' => 'Forecast retraining started in the background.',
                 'training_id' => $trainingId,
-                'status_url' => rtrim($request->url(), '/').'/'.$trainingId,
+                // Keep polling same-origin. Render terminates HTTPS at its proxy,
+                // so an absolute URL inferred by PHP can incorrectly use http
+                // and be blocked by the browser as a mixed-content fetch.
+                'status_url' => rtrim($request->getPathInfo(), '/').'/'.$trainingId,
             ], 202);
         } catch (\Throwable $e) {
             Log::error('Unable to queue forecast model retraining.', [
