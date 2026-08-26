@@ -282,17 +282,43 @@ function normalizeLocation(source) {
     if (!source || typeof source !== 'object') return null;
     const lat = finiteNumber(source.lat ?? source.latitude ?? source.currentLatitude);
     const lng = finiteNumber(source.lng ?? source.lon ?? source.longitude ?? source.currentLongitude);
-    if (lat === null || lng === null) return null;
+    const accuracy = finiteNumber(source.accuracy ?? source.radiusMeters ?? source.caller_accuracy);
+    const timestampValue = source.timestamp ?? source.capturedAt ?? source.lastUpdated;
+    const parsedTimestamp = timestampValue instanceof Date
+        ? timestampValue.getTime()
+        : (typeof timestampValue === 'string' ? new Date(timestampValue).getTime() : Number(timestampValue));
+    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
 
     return {
         caller_latitude: lat,
         caller_longitude: lng,
-        caller_accuracy: Math.round(finiteNumber(source.accuracy ?? source.radiusMeters) || 0) || null,
+        caller_accuracy: accuracy !== null && accuracy > 0 ? Math.round(accuracy) : null,
         caller_location_label: source.label || source.address || source.display || null,
+        _captured_at: Number.isFinite(parsedTimestamp) ? parsedTimestamp : null,
     };
 }
 
-function currentCallerLocationPayload() {
+function locationPayloadFields(location) {
+    if (!location) return {};
+    return {
+        caller_latitude: location.caller_latitude,
+        caller_longitude: location.caller_longitude,
+        caller_accuracy: location.caller_accuracy,
+        caller_location_label: location.caller_location_label,
+    };
+}
+
+function isReliableCallerLocation(location, maxAgeMs = 30000, maxAccuracyMeters = 150) {
+    return Boolean(location
+        && Number.isFinite(location._captured_at)
+        && Date.now() - location._captured_at >= 0
+        && Date.now() - location._captured_at <= maxAgeMs
+        && Number.isFinite(location.caller_accuracy)
+        && location.caller_accuracy > 0
+        && location.caller_accuracy <= maxAccuracyMeters);
+}
+
+function currentCallerLocationPayload(maxAgeMs = 30000, maxAccuracyMeters = 150) {
     const globals = [
         window.userCoords,
         window.PyroSenseCurrentLocation,
@@ -303,29 +329,94 @@ function currentCallerLocationPayload() {
 
     for (const source of globals) {
         const normalized = normalizeLocation(source);
-        if (normalized) return normalized;
+        if (isReliableCallerLocation(normalized, maxAgeMs, maxAccuracyMeters)) return locationPayloadFields(normalized);
     }
 
     for (const key of ['pyrosense:user-location', 'pyrosense:current-location', 'citizen:user-location', 'citizen:current-location']) {
         try {
             const normalized = normalizeLocation(JSON.parse(localStorage.getItem(key) || 'null'));
-            if (normalized) return normalized;
+            if (isReliableCallerLocation(normalized, maxAgeMs, maxAccuracyMeters)) return locationPayloadFields(normalized);
         } catch {}
     }
 
     try {
         const rawLastKnownCoords = JSON.parse(localStorage.getItem('pyrosense:lastKnownCoords') || 'null');
         const normalizedLastKnownCoords = normalizeLocation(rawLastKnownCoords);
-        if (normalizedLastKnownCoords) {
-            return normalizedLastKnownCoords;
+        if (isReliableCallerLocation(normalizedLastKnownCoords, maxAgeMs, maxAccuracyMeters)) {
+            return locationPayloadFields(normalizedLastKnownCoords);
         }
     } catch {}
 
     return {};
 }
 
+function getFreshCallerLocationPayload() {
+    const recentLocation = currentCallerLocationPayload(15000, 150);
+    if (recentLocation.caller_latitude !== undefined || !navigator.geolocation) {
+        return Promise.resolve(recentLocation);
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        let bestFix = null;
+        let watchId = null;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            clearTimeout(timeoutId);
+            resolve(bestFix ? locationPayloadFields(bestFix) : {});
+        };
+        const timeoutId = window.setTimeout(finish, 6000);
+
+        watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const normalized = normalizeLocation({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    timestamp: position.timestamp || Date.now(),
+                });
+                if (!isReliableCallerLocation(normalized, 30000, 150)) return;
+                if (!bestFix || normalized.caller_accuracy < bestFix.caller_accuracy) bestFix = normalized;
+                if (normalized.caller_accuracy <= 50) finish();
+            },
+            () => finish(),
+            { enableHighAccuracy: true, timeout: 5500, maximumAge: 0 }
+        );
+    }).then((location) => {
+        if (location.caller_latitude === undefined) return {};
+        const stored = {
+            lat: location.caller_latitude,
+            lng: location.caller_longitude,
+            accuracy: location.caller_accuracy,
+            timestamp: Date.now(),
+        };
+        try {
+            localStorage.setItem('pyrosense:lastKnownCoords', JSON.stringify(stored));
+        } catch {}
+        window.userCoords = {
+            ...(window.userCoords || {}),
+            currentLatitude: stored.lat,
+            currentLongitude: stored.lng,
+            accuracy: stored.accuracy,
+            timestamp: stored.timestamp,
+            ready: true,
+        };
+        return location;
+    });
+}
+
 function callLocation(call) {
     return call?.caller_location || {};
+}
+
+function callerLocationDisplay(location) {
+    if (!location?.has_location) return 'Location unavailable';
+    const accuracy = finiteNumber(location.accuracy);
+    return accuracy && accuracy > 0
+        ? `${location.display} (within ±${Math.round(accuracy)} m)`
+        : location.display;
 }
 
 function candidateMaps() {
@@ -354,11 +445,12 @@ function viewCallerLocation(call) {
             label: location.label || 'Caller location',
             description: call?.caller?.name ? `${call.caller.name} voice call` : 'Voice call origin',
             zoom: 16,
+            accuracy: location.accuracy,
         });
 
         if (focused) {
             window.dispatchEvent(new CustomEvent('pyro:voice-caller-location', { detail: { call, latLng } }));
-            toast('Caller location centered.');
+            toast(`Caller location centered${location.accuracy ? ` within ±${Math.round(Number(location.accuracy))} m` : ''}.`);
             return;
         }
     }
@@ -369,7 +461,7 @@ function viewCallerLocation(call) {
     }
 
     window.dispatchEvent(new CustomEvent('pyro:voice-caller-location', { detail: { call, latLng } }));
-    toast('Caller location centered.');
+    toast(`Caller location centered${location.accuracy ? ` within ±${Math.round(Number(location.accuracy))} m` : ''}.`);
 }
 
 function refreshIncidentMarkersFromVoice(payload) {
@@ -584,7 +676,7 @@ function ensureCallerDock() {
 function renderCallCard(call, active = false) {
     const callerName = call?.caller?.name || 'Anonymous caller';
     const location = callLocation(call);
-    const locationText = location.has_location ? location.display : 'Location unavailable';
+    const locationText = callerLocationDisplay(location);
     const session = responderSessions.get(Number(call.id)) || responderSessions.get(call.id);
     const muted = Boolean(session?.muted);
     const speakerEnabled = session?.speakerEnabled !== false;
@@ -661,7 +753,7 @@ function responderQualityLabel(session) {
 function renderMissedCallCard(call) {
     const callerName = call?.caller?.name || 'Anonymous caller';
     const location = callLocation(call);
-    const locationText = location.has_location ? location.display : 'Location unavailable';
+    const locationText = callerLocationDisplay(location);
     const hasIncident = Boolean(call.created_incident_id || call.incident_id);
     return `
         <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card pyro-voice-call-card--missed" data-call-id="${call.id}" tabindex="-1">
@@ -1175,7 +1267,10 @@ async function triggerCitizenCall(trigger, event = null) {
     activeCallerTrigger = trigger;
     setCallerTriggerState(trigger, 'calling');
     toast('Calling station...');
-    await primeCallerVoiceAccess();
+    const [, callerLocation] = await Promise.all([
+        primeCallerVoiceAccess(),
+        getFreshCallerLocationPayload(),
+    ]);
 
     try {
         await ensureCitizenVoiceSession();
@@ -1184,7 +1279,7 @@ async function triggerCitizenCall(trigger, event = null) {
             body: {
                 station_id: trigger.dataset.voiceStationId || null,
                 incident_id: trigger.dataset.voiceIncidentId || null,
-                ...currentCallerLocationPayload(),
+                ...callerLocation,
             },
         });
         activeCall = payload.call;

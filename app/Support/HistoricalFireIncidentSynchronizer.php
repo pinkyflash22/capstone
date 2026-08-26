@@ -8,6 +8,21 @@ use App\Models\Incident;
 
 class HistoricalFireIncidentSynchronizer
 {
+    public static function trySyncForIncidentId(?int $incidentId): bool
+    {
+        try {
+            self::syncForIncidentId($incidentId);
+
+            return true;
+        } catch (\Throwable $exception) {
+            // Investigation reports are the primary record. Derived historical
+            // analytics can be rebuilt later and must not invalidate that save.
+            report($exception);
+
+            return false;
+        }
+    }
+
     public static function syncForIncidentId(?int $incidentId): void
     {
         if (! $incidentId) {

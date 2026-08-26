@@ -8,6 +8,8 @@ use App\Services\InvestigationReportImageService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
@@ -102,6 +104,25 @@ class InvestigationReportProofImageTest extends TestCase
         $this->assertNull($service->cachedSubmissionResponse($request, 'spot:create'));
         $service->rememberSubmissionResponse($request, 'spot:create', $payload);
         $this->assertSame($payload, $service->cachedSubmissionResponse($request, 'spot:create'));
+    }
+
+    #[Test]
+    public function a_submission_still_succeeds_when_the_optional_response_cache_is_unavailable(): void
+    {
+        $request = Request::create('/upload', 'POST');
+        $request->headers->set('X-Upload-Request-ID', '12345678-1234-1234-1234-123456789012');
+        $request->setUserResolver(fn () => (object) ['user_id' => 17]);
+        $payload = ['success' => true, 'data' => ['id' => 91]];
+
+        Cache::shouldReceive('get')->once()->andThrow(new \RuntimeException('Cache unavailable'));
+        Cache::shouldReceive('put')->once()->andThrow(new \RuntimeException('Cache unavailable'));
+
+        $service = app(InvestigationReportImageService::class);
+
+        $this->assertNull($service->cachedSubmissionResponse($request, 'spot:create'));
+        $this->assertSame($payload, $service->rememberSubmissionResponse($request, 'spot:create', $payload));
+
+        Cache::swap(new Repository(new ArrayStore()));
     }
 
     #[Test]

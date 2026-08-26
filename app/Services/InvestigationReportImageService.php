@@ -16,7 +16,17 @@ class InvestigationReportImageService
     public function cachedSubmissionResponse(Request $request, string $operation): ?array
     {
         $key = $this->submissionCacheKey($request, $operation);
-        $cached = $key ? Cache::get($key) : null;
+        if (! $key) {
+            return null;
+        }
+
+        try {
+            $cached = Cache::get($key);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
 
         return is_array($cached) ? $cached : null;
     }
@@ -25,7 +35,13 @@ class InvestigationReportImageService
     {
         $key = $this->submissionCacheKey($request, $operation);
         if ($key) {
-            Cache::put($key, $payload, now()->addMinutes(15));
+            try {
+                Cache::put($key, $payload, now()->addMinutes(15));
+            } catch (\Throwable $exception) {
+                // The report is already persisted. A cache outage must not turn a
+                // successful submission into a misleading HTTP 500 response.
+                report($exception);
+            }
         }
 
         return $payload;
@@ -89,21 +105,40 @@ class InvestigationReportImageService
 
     public static function responsePayload(Model $report): array
     {
-        $report->loadMissing('proofImages');
         $payload = $report->toArray();
-        $payload['proof_images'] = self::serialize($report->proofImages);
+
+        try {
+            $report->loadMissing('proofImages');
+            $payload['proof_images'] = self::serialize($report->proofImages);
+        } catch (\Throwable $exception) {
+            // A report that was committed must still receive a success response
+            // when its optional proof-image preview cannot be prepared.
+            report($exception);
+            $payload['proof_images'] = [];
+        }
 
         return $payload;
     }
 
     public static function serialize(Collection $images): array
     {
-        return $images->map(fn (InvestigationReportImage $image) => [
-            'id' => $image->investigation_report_image_id,
-            'name' => $image->file_name,
-            'url' => MediaPath::url($image->file_path),
-            'size' => (int) $image->file_size,
-        ])->values()->all();
+        return $images->map(function (InvestigationReportImage $image): array {
+            try {
+                $url = MediaPath::url($image->file_path);
+            } catch (\Throwable $exception) {
+                // URL generation is presentation-only. Preserve the successful
+                // report submission and let a later reload resolve the preview.
+                report($exception);
+                $url = null;
+            }
+
+            return [
+                'id' => $image->investigation_report_image_id,
+                'name' => $image->file_name,
+                'url' => $url,
+                'size' => (int) $image->file_size,
+            ];
+        })->values()->all();
     }
 
     private function submissionCacheKey(Request $request, string $operation): ?string

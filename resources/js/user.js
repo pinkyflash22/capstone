@@ -1217,7 +1217,7 @@ function userRemoveAllTruckMarkers(exceptRouteId = null) {
 
         const iconUrl = layer?.options?.icon?.options?.iconUrl || '';
         const className = layer?.options?.icon?.options?.className || '';
-        const isTruckMarker = String(iconUrl).includes('/storage/defaults/firetruck.png') || String(className).includes('fire-truck-icon');
+        const isTruckMarker = String(iconUrl).includes('/truck.png') || String(className).includes('fire-truck-icon');
 
         if (!isTruckMarker) {
             return;
@@ -3958,6 +3958,7 @@ async function userDisplayAndStartRoute(routeId, route, destination, incidentId)
         isSimulating: route.status === 'moving',
         routeDestination: destination,
         incidentId: incidentId,
+        routeSource: route.route_source || 'real',
         routeLayer: null,
         traveledLayer: null,
         animatedVehicle: null,
@@ -3999,8 +4000,11 @@ async function userDisplayAndStartRoute(routeId, route, destination, incidentId)
         }).bindPopup(`Destination: ${destination?.title || 'Incident Location'}`).addTo(window.usermap));
     }
     
-    // Start simulation if route is moving or active
-    if (route.status === 'moving' && route.current_position_index > 0) {
+    // Demo routes animate for presentation. Live routes only move when the
+    // responder publishes a new GPS coordinate to the server.
+    if (String(route.route_source || 'real').toLowerCase() !== 'demo') {
+        userUpdateLiveTruckPosition(routeId, route);
+    } else if (route.status === 'moving' && route.current_position_index > 0) {
         console.log('Resuming moving route from position:', route.current_position_index);
         await userStartSimulationFromPosition(routeId, route.current_position_index);
     } else if (route.status === 'active' || route.status === 'moving') {
@@ -4307,12 +4311,46 @@ function userStopSimulationForRoute(routeId) {
 
 function userCreateFireTruckIcon() {
     return L.icon({
-        iconUrl: '/storage/defaults/firetruck.png',
+        iconUrl: '/truck.png',
         iconSize: [48, 48],
         iconAnchor: [24, 24],
         popupAnchor: [0, -24],
         className: 'fire-truck-icon'
     });
+}
+
+function userUpdateLiveTruckPosition(routeId, route = {}) {
+    routeId = normalizeUserRouteId(routeId);
+    const truck = userActiveTrucks.get(routeId);
+    if (!truck || !window.usermap) return false;
+
+    const lat = Number(route.current_lat ?? route.origin_lat);
+    const lng = Number(route.current_lng ?? route.origin_lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+
+    if (truck.animationFrame) {
+        cancelAnimationFrame(truck.animationFrame);
+        truck.animationFrame = null;
+    }
+
+    if (!truck.animatedVehicle) {
+        truck.animatedVehicle = userRegisterRouteLayer(routeId, L.marker([lat, lng], {
+            icon: userCreateFireTruckIcon(),
+            zIndexOffset: 1000,
+        }).addTo(window.usermap));
+        truck.animatedVehicle.bindPopup('Emergency vehicle - Live GPS');
+    } else {
+        const previous = truck.animatedVehicle.getLatLng();
+        truck.animatedVehicle.setLatLng([lat, lng]);
+        if (previous && (previous.lat !== lat || previous.lng !== lng)) {
+            const angle = Math.atan2(lng - previous.lng, lat - previous.lat) * 180 / Math.PI;
+            if (Number.isFinite(angle)) applyTruckHeading(truck.animatedVehicle, angle);
+        }
+    }
+
+    truck.currentPointIndex = Number(route.current_position_index || truck.currentPointIndex || 0);
+    truck.isSimulating = false;
+    return true;
 }
 
 function userCreateRouteInfoCard() {
@@ -4625,7 +4663,10 @@ function userStartRoutePollingForIncident(incidentId) {
 
                 if (userActiveTrucks.has(normalizedRouteId)) {
                     const existingTruck = userActiveTrucks.get(normalizedRouteId);
-                    if (primaryRoute.status === 'moving' && !existingTruck.isSimulating) {
+                    existingTruck.routeSource = primaryRoute.route_source || existingTruck.routeSource || 'real';
+                    if (String(existingTruck.routeSource).toLowerCase() !== 'demo') {
+                        userUpdateLiveTruckPosition(normalizedRouteId, primaryRoute);
+                    } else if (primaryRoute.status === 'moving' && !existingTruck.isSimulating) {
                         const dbIndex = primaryRoute.current_position_index || 0;
                         console.log(`Restarting stopped truck from DB position: ${dbIndex}`);
                         await userStartSimulationFromPosition(normalizedRouteId, dbIndex);

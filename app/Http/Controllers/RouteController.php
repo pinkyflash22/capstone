@@ -52,6 +52,7 @@ class RouteController extends Controller
             ]);
 
             $existingRoute = Route::where('incident_id', $validated['incident_id'])
+                ->where('route_source', $validated['route_source'] ?? 'real')
                 ->whereIn('status', ['active', 'moving'])
                 ->latest('route_id')
                 ->first();
@@ -66,7 +67,7 @@ class RouteController extends Controller
 
             $requestedTeamId = $requestedIncident?->team_id ?? $authenticatedTeam?->team_id;
 
-            if ($requestedTeamId) {
+            if ($requestedTeamId && ($validated['route_source'] ?? 'real') !== 'demo') {
                 $conflictingIncidentRoute = $this->findActiveConflictingIncidentRoute((int) $requestedTeamId, (int) $validated['incident_id']);
                 if ($conflictingIncidentRoute) {
                     return response()->json([
@@ -171,7 +172,7 @@ class RouteController extends Controller
                         'last_updated_at',
                     ])
                     ->with([
-                        'incident:incident_id,station_id,team_id',
+                        'incident:incident_id,station_id,team_id,incident_status_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->whereIn('status', ['active', 'moving'])
@@ -216,7 +217,7 @@ class RouteController extends Controller
                         'last_updated_at',
                     ])
                     ->with([
-                        'incident:incident_id,station_id,team_id',
+                        'incident:incident_id,station_id,team_id,incident_status_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->where('incident_id', $incidentId)
@@ -522,6 +523,7 @@ class RouteController extends Controller
             'remaining_points' => $route->getRemainingPoints(),
             'status' => $route->status,
             'route_source' => $route->route_source ?: 'real',
+            'incident_status_id' => $route->incident?->incident_status_id,
             'destination_title' => $route->destination_title,
             'destination_lat' => $route->destination_lat,
             'destination_lng' => $route->destination_lng,
@@ -656,6 +658,7 @@ class RouteController extends Controller
         return Route::query()
             ->select(['route_id', 'incident_id', 'status'])
             ->whereIn('status', ['active', 'moving'])
+            ->where('route_source', '!=', 'demo')
             ->where('incident_id', '!=', $requestedIncidentId)
             ->whereHas('incident', function ($query) use ($teamId) {
                 $query->where('team_id', $teamId);

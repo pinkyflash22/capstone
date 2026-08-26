@@ -61,6 +61,8 @@ function setOpen(open, card = currentCard) {
         const isOpen = Boolean(open && managedCard === card);
         managedCard.classList.toggle('is-pyro-routing-open', isOpen);
         managedCard.dataset.pyroRoutingOpen = isOpen ? 'true' : 'false';
+        managedCard.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        managedCard.setAttribute('aria-modal', isOpen ? 'true' : 'false');
     });
     launcher?.setAttribute('aria-expanded', open ? 'true' : 'false');
     launcher?.setAttribute('aria-label', open ? 'Close routing panel' : 'Open routing panel');
@@ -101,6 +103,14 @@ function registerCard(card) {
     const observer = new MutationObserver(() => syncAvailability(card));
     observer.observe(card, { attributes: true, attributeFilter: ['style'] });
     managedCards.set(card, { available: false, updatedAt: Date.now(), observer });
+
+    // Route cards are commonly created inside map/dashboard stacking contexts.
+    // Portaling them beside the backdrop keeps the mobile sheet above that
+    // backdrop and makes its controls reachable in installed PWAs.
+    if (card.parentElement !== document.body) {
+        document.body.appendChild(card);
+        card.dataset.pyroRoutingPortaled = 'true';
+    }
     syncAvailability(card);
 }
 
@@ -140,4 +150,3 @@ function init() {
 window.PyroRoutingPanel = { open: () => setOpen(true), close: () => setOpen(false), register: registerCard };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
 else init();
-

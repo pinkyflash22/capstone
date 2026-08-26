@@ -93,6 +93,12 @@ class VoiceCallController extends Controller
             'caller_location_label' => ['nullable', 'string', 'max:255'],
         ]);
 
+        // A wide or unknown browser fix is more harmful than no coordinate: it can
+        // direct responders to a confidently displayed but incorrect location.
+        $hasReliableLocation = isset($data['caller_latitude'], $data['caller_longitude'], $data['caller_accuracy'])
+            && (int) $data['caller_accuracy'] > 0
+            && (int) $data['caller_accuracy'] <= 150;
+
         $this->releaseSessionLock($request);
 
         $this->expireStaleCalls($request);
@@ -104,10 +110,10 @@ class VoiceCallController extends Controller
             'initiated_by' => $user->user_id,
             'station_id' => $this->resolveStationIdForCaller($user, $request),
             'incident_id' => $data['incident_id'] ?? null,
-            'caller_latitude' => $data['caller_latitude'] ?? null,
-            'caller_longitude' => $data['caller_longitude'] ?? null,
-            'caller_accuracy' => $data['caller_accuracy'] ?? null,
-            'caller_location_label' => $data['caller_location_label'] ?? null,
+            'caller_latitude' => $hasReliableLocation ? $data['caller_latitude'] : null,
+            'caller_longitude' => $hasReliableLocation ? $data['caller_longitude'] : null,
+            'caller_accuracy' => $hasReliableLocation ? $data['caller_accuracy'] : null,
+            'caller_location_label' => $hasReliableLocation ? ($data['caller_location_label'] ?? null) : null,
             'status' => VoiceCall::STATUS_RINGING,
             'queued_at' => now(),
         ])->load($this->callRelations());
@@ -654,6 +660,7 @@ class VoiceCallController extends Controller
                 'accuracy' => $call->caller_accuracy,
                 'label' => $call->caller_location_label,
                 'display' => $locationDisplay,
+                'captured_at' => $hasLocation ? $createdAt->toIso8601String() : null,
             ],
             'station' => [
                 'id' => $call->station?->station_id,

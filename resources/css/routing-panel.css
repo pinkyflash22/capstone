@@ -43,7 +43,15 @@
     background:rgba(255,255,255,.98) !important;
     box-shadow:0 24px 60px rgba(15,23,42,.22) !important;
     animation:pyro-routing-panel-in .18s ease-out;
+    isolation:isolate !important;
+    pointer-events:auto !important;
+    touch-action:pan-y;
+    filter:none !important;
+    -webkit-filter:none !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
 }
+body > .pyro-routing-panel.is-pyro-routing-open { z-index:var(--ff-layer-routing-panel, 2060) !important; }
 body.firefighter-dashboard-page #routeInfoCard.pyro-routing-panel.is-pyro-routing-open,
 body.chief-dashboard-page #routeInfoCard.pyro-routing-panel.is-pyro-routing-open {
     z-index:var(--ff-layer-routing-panel, 2060) !important;
@@ -64,7 +72,7 @@ body:has(.modal.show, .modal.active, dialog[open]) .pyro-routing-panel { display
     body.firefighter-dashboard-page .pyro-routing-launcher { right:14px;bottom:calc(164px + env(safe-area-inset-bottom, 0px)); }
     .pyro-routing-launcher span { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
     .pyro-routing-launcher b { position:absolute;top:-5px;right:-5px; }
-    .pyro-routing-backdrop:not([hidden]) { position:fixed;inset:0;z-index:var(--ff-layer-routing-backdrop, 2050);display:block;width:100%;height:100%;border:0;background:rgba(15,23,42,.44);backdrop-filter:blur(2px); }
-    .pyro-routing-panel.is-pyro-routing-open { inset:auto 0 0 !important;width:100% !important;max-height:min(72dvh, 650px) !important;padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px)) !important;border-width:1px 0 0 !important;border-radius:26px 26px 0 0 !important; }
+    .pyro-routing-backdrop:not([hidden]) { position:fixed;inset:0;z-index:var(--ff-layer-routing-backdrop, 2050);display:block;width:100%;height:100%;padding:0;border:0;background:rgba(15,23,42,.44);backdrop-filter:blur(2px);pointer-events:auto;touch-action:none; }
+    .pyro-routing-panel.is-pyro-routing-open { inset:auto 0 0 !important;width:100% !important;max-height:min(72vh, 650px) !important;max-height:min(72dvh, 650px) !important;padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px)) !important;border-width:1px 0 0 !important;border-radius:26px 26px 0 0 !important;overflow-y:auto !important;-webkit-overflow-scrolling:touch; }
     body.pyro-routing-panel-open { overflow:hidden; }
 }

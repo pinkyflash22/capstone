@@ -135,7 +135,7 @@ class SpotInvestigationReportController extends Controller
                 );
             }
         }
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $response->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $response->incident_id);
         UserActivityLogger::log('created spot report', auth()->user()?->user_id, $request);
         $payload = ['success'=>true, 'data'=>InvestigationReportImageService::responsePayload($response)];
 
@@ -205,7 +205,7 @@ class SpotInvestigationReportController extends Controller
                 );
             }
         }
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $spot->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $spot->incident_id);
         UserActivityLogger::log('updated spot report', auth()->user()?->user_id, $request);
         $payload = ['success'=>true, 'data' => InvestigationReportImageService::responsePayload($spot->fresh())];
 

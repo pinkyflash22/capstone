@@ -32,6 +32,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     let ffAssignedIncidentsInterval = null;
     let ffAutoAssignInterval = null;
     let apparatusLocationWatchId = null;
+    let lastAcceptedApparatusFix = null;
     let ffDashboardWidgetsRequest = null;
     let ffDashboardPostsRequest = null;
     const FF_FETCH_TIMEOUT_MS = 10000;
@@ -46,6 +47,63 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     const APPARATUS_TELEMETRY_QUEUE_KEY = `pyrosense_apparatus_telemetry_${window.currentUserId || 'guest'}`;
     let apparatusWakeLock = null;
     let apparatusTelemetryFlushInFlight = false;
+    const MAX_LIVE_GPS_ACCURACY_METERS = 150;
+    const MAX_LIVE_GPS_AGE_MS = 30000;
+
+    function distanceBetweenGpsFixes(first, second) {
+        const earthRadius = 6371000;
+        const toRadians = value => value * Math.PI / 180;
+        const latDelta = toRadians(second.lat - first.lat);
+        const lngDelta = toRadians(second.lng - first.lng);
+        const a = Math.sin(latDelta / 2) ** 2
+            + Math.cos(toRadians(first.lat)) * Math.cos(toRadians(second.lat)) * Math.sin(lngDelta / 2) ** 2;
+        return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function acceptedApparatusGpsFix(position) {
+        const latitude = Number(position?.coords?.latitude);
+        const longitude = Number(position?.coords?.longitude);
+        const accuracy = Number(position?.coords?.accuracy);
+        const timestamp = Number(position?.timestamp) || Date.now();
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+            || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180
+            || !Number.isFinite(accuracy) || accuracy <= 0 || accuracy > MAX_LIVE_GPS_ACCURACY_METERS
+            || Date.now() - timestamp > MAX_LIVE_GPS_AGE_MS) {
+            return null;
+        }
+
+        const candidate = { lat: latitude, lng: longitude, accuracy, timestamp };
+        if (lastAcceptedApparatusFix) {
+            const elapsedSeconds = Math.max(1, (timestamp - lastAcceptedApparatusFix.timestamp) / 1000);
+            const distanceMeters = distanceBetweenGpsFixes(lastAcceptedApparatusFix, candidate);
+            const plausibleDistance = Math.max(
+                120,
+                (elapsedSeconds * 55) + lastAcceptedApparatusFix.accuracy + candidate.accuracy
+            );
+            if (timestamp <= lastAcceptedApparatusFix.timestamp || distanceMeters > plausibleDistance) {
+                console.warn('Ignored an implausible apparatus GPS jump.', { distanceMeters, accuracy });
+                return null;
+            }
+        }
+
+        lastAcceptedApparatusFix = candidate;
+        return candidate;
+    }
+
+    function applyApparatusGpsPosition(position, { sendUserLocation = false, paintLocation = false } = {}) {
+        const fix = acceptedApparatusGpsFix(position);
+        if (!fix) return false;
+
+        updateUserLocation(window.currentUserId, fix.lat, fix.lng, {
+            accuracy: fix.accuracy,
+            timestamp: fix.timestamp,
+        });
+        if (sendUserLocation) sendUserLocationToServer(fix.lat, fix.lng);
+        if (paintLocation) paintCurrentUserLocation(fix.lat, fix.lng, fix.accuracy);
+        if (window.userMarker) window.userMarker.setLatLng([fix.lat, fix.lng]);
+        publishDriverApparatusLocation(position);
+        return true;
+    }
     function firefighterDashboardIsVisible() {
         return document.visibilityState === 'visible';
     }
@@ -82,11 +140,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         apparatusLocationWatchId = navigator.geolocation.watchPosition(
             position => {
                 if (!firefighterDashboardIsVisible() && !firefighterPwaIsStandalone()) return;
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                updateUserLocation(window.currentUserId, lat, lng);
-                if (window.userMarker) window.userMarker.setLatLng([lat, lng]);
-                publishDriverApparatusLocation(position);
+                applyApparatusGpsPosition(position);
             },
             error => console.warn('Live apparatus GPS watch unavailable:', error),
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
@@ -102,15 +156,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    updateUserLocation(window.currentUserId, lat, lng);
-                    sendUserLocationToServer(lat, lng);
-                    publishDriverApparatusLocation(position);
-
-                    if (window.userMarker) {
-                        window.userMarker.setLatLng([lat, lng]);
-                    }
+                    applyApparatusGpsPosition(position, { sendUserLocation: true });
                 },
                 function(error) {
                     console.error("Location update error:", error);
@@ -835,7 +881,10 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             statusText = 'REPORTED';
             actionButton = `
                 <button type="button" class="respond-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
-                    <i class="fas fa-truck-fast"></i><span>Respond</span>
+                    <i class="fas fa-location-crosshairs"></i><span>Respond Now <sup>Live GPS</sup></span>
+                </button>
+                <button type="button" class="demo-respond-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--muted" data-incident-id="${incident.incident_id}">
+                    <i class="fas fa-flask"></i><span>Respond Now <sup>Demo</sup></span>
                 </button>
             `;
         } else if (statusId == 2) {
@@ -990,6 +1039,15 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
             await markIncidentFalseAlarm(incidentId, currentStatus, btn);
+        });
+    });
+
+    document.querySelectorAll('.demo-respond-incident').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const incidentId = btn.dataset.incidentId;
+            if (typeof window.demoRespondToIncident === 'function') {
+                await window.demoRespondToIncident(incidentId);
+            }
         });
     });
 
@@ -1191,6 +1249,17 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         showToast('Cannot respond to this incident - invalid status', 'error');
         return;
     }
+
+    if (!navigator.geolocation || typeof window.resolveRouteOrigin !== 'function') {
+        showToast('Live GPS is required before starting an operational response.', 'error');
+        return;
+    }
+
+    const liveOrigin = await window.resolveRouteOrigin('real');
+    if (!liveOrigin?.ready) {
+        showToast('Allow precise location access, then press Respond Now again.', 'warning');
+        return;
+    }
     
     if (!confirm('Confirm responding to this incident? Your status will be updated to RESPONDING.')) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
@@ -1218,7 +1287,7 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
                 refreshFirefighterLiveMap()
             ]);
             if (typeof window.calculateRouteToIncident === 'function') {
-                await window.calculateRouteToIncident(incidentId);
+                await window.calculateRouteToIncident(incidentId, null, { source: 'real', response: true });
             }
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
@@ -1230,6 +1299,10 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         showToast('Failed to update incident status', 'error');
     }
 }
+
+window.respondToIncidentLive = (incidentId, currentStatusId = 1, triggerButton = null) => (
+    respondToIncident(incidentId, currentStatusId, triggerButton)
+);
 
 async function arriveAtIncident(incidentId, currentStatusId, triggerButton = null) {
     if (currentStatusId != 2) {
@@ -1682,7 +1755,7 @@ function showFalseAlarmConfirmationToast() {
         });
     }
     
-    function paintCurrentUserLocation(lat, lng) {
+    function paintCurrentUserLocation(lat, lng, accuracy = 50) {
         if (!window.map || typeof L === 'undefined') {
             return;
         }
@@ -1721,32 +1794,26 @@ function showFalseAlarmConfirmationToast() {
             color: '#3b82f6',
             fillColor: '#3b82f6',
             fillOpacity: 0.1,
-            radius: 50
+            radius: Math.max(10, Math.min(MAX_LIVE_GPS_ACCURACY_METERS, Number(accuracy) || 50))
         }).addTo(window.map);
     }
 
     function initializeFirefighterGeolocation() {
         if (!navigator.geolocation) {
             console.warn("Geolocation not supported");
-            updateUserLocation(window.currentUserId, 15.8222, 120.3297);
             return;
         }
 
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                updateUserLocation(window.currentUserId, lat, lng);
-                paintCurrentUserLocation(lat, lng);
-                sendUserLocationToServer(lat, lng);
-                publishDriverApparatusLocation(position);
-                document.dispatchEvent(new Event("locationReady"));
+                if (applyApparatusGpsPosition(position, { sendUserLocation: true, paintLocation: true })) {
+                    document.dispatchEvent(new Event("locationReady"));
+                }
             },
             function(error) {
                 console.error("Location error:", error);
-                updateUserLocation(window.currentUserId, 15.8222, 120.3297);
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
 

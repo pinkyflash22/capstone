@@ -655,13 +655,13 @@ function getTruckRealtimeLocation(truck) {
         return null;
     }
 
-    if (!truck || !Array.isArray(truck.routeTeamUserIds) || truck.routeTeamUserIds.length === 0) {
+    if (!truck) {
         return null;
     }
 
     const candidateLocations = [];
 
-    for (const userId of truck.routeTeamUserIds) {
+    for (const userId of (Array.isArray(truck.routeTeamUserIds) ? truck.routeTeamUserIds : [])) {
         const location = getUserLocation(userId);
         if (!location?.ready) {
             continue;
@@ -669,7 +669,11 @@ function getTruckRealtimeLocation(truck) {
 
         const lat = parseFloat(location.lat);
         const lng = parseFloat(location.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        const lastUpdatedAt = location.timestamp
+            ? Number(location.timestamp)
+            : new Date(location.lastUpdated || 0).getTime();
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(lastUpdatedAt)
+            || Date.now() - lastUpdatedAt > 90000) {
             continue;
         }
 
@@ -677,11 +681,25 @@ function getTruckRealtimeLocation(truck) {
             userId: Number(userId),
             lat,
             lng,
-            lastUpdated: location.lastUpdated || null
+            lastUpdated: location.lastUpdated || null,
+            timestamp: lastUpdatedAt,
         });
     }
 
     if (candidateLocations.length === 0) {
+        const currentUserBelongsToRoute = Number(truck.routePrimaryUserId || 0) === Number(window.currentUserId || 0)
+            || Number(truck.routeTeamId || 0) === Number(window.userTeamId || 0)
+            || (Array.isArray(truck.routeTeamUserIds) && truck.routeTeamUserIds.some((userId) => Number(userId) === Number(window.currentUserId || 0)));
+        const ownLocation = usableStoredGpsLocation(window.userCoords);
+
+        if (currentUserBelongsToRoute && ownLocation) {
+            const lat = Number(ownLocation.lat);
+            const lng = Number(ownLocation.lng);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                return { userId: Number(window.currentUserId), lat, lng, source: 'device' };
+            }
+        }
+
         return null;
     }
 
@@ -845,7 +863,7 @@ function updateTruckMarkerFromRealtimeLocation(routeId, location) {
             || truck.lastRealtimeLocationSignature !== nextSignature
         );
 
-    if (shouldSyncRoute) {
+    if (shouldSyncRoute && truck.persisted !== false) {
         truck.lastRealtimeRouteSyncAt = Date.now();
         truck.lastRealtimeLocationSignature = nextSignature;
         truck.routeStatusSyncInFlight = true;
@@ -861,9 +879,11 @@ function updateTruckMarkerFromRealtimeLocation(routeId, location) {
             });
     }
 
-    syncTruckArrivalStatus(routeId, location.lat, location.lng).catch((error) => {
-        console.error('Failed to sync realtime truck arrival status:', error);
-    });
+    if (truck.persisted !== false) {
+        syncTruckArrivalStatus(routeId, location.lat, location.lng).catch((error) => {
+            console.error('Failed to sync realtime truck arrival status:', error);
+        });
+    }
 
     updateRouteInfoCard();
     return true;
@@ -966,8 +986,21 @@ function isDemoRouteSource(routeSource) {
     return String(routeSource || '').toLowerCase() === 'demo';
 }
 
+function usableStoredGpsLocation(source, maxAgeMs = 30000, maxAccuracyMeters = 150) {
+    if (!source?.ready) return null;
+    const lat = Number(source.currentLatitude ?? source.lat);
+    const lng = Number(source.currentLongitude ?? source.lng);
+    const accuracy = Number(source.accuracy);
+    const timestamp = Number(source.timestamp ?? source.lastUpdated);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)
+        || accuracy <= 0 || accuracy > maxAccuracyMeters || !Number.isFinite(timestamp)
+        || Date.now() - timestamp > maxAgeMs) return null;
+    return { lat, lng, accuracy, timestamp };
+}
+
 async function getFreshRealRouteOrigin() {
-    if (window.userCoords?.ready) {
+    const storedFix = usableStoredGpsLocation(window.userCoords);
+    if (storedFix) {
         return buildRouteOrigin(window.userCoords.currentLatitude, window.userCoords.currentLongitude, {
             routeSource: 'real',
             routeSourceLabel: 'Live GPS'
@@ -983,19 +1016,21 @@ async function getFreshRealRouteOrigin() {
             (position) => {
                 const lat = Number(position.coords.latitude);
                 const lng = Number(position.coords.longitude);
-                updateUserLocation(window.currentUserId, lat, lng);
-                window.userCoords = {
-                    currentLatitude: lat,
-                    currentLongitude: lng,
-                    ready: true
-                };
+                const accuracy = Number(position.coords.accuracy);
+                const timestamp = Number(position.timestamp) || Date.now();
+                if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)
+                    || accuracy <= 0 || accuracy > 150 || Date.now() - timestamp > 30000) {
+                    resolve(null);
+                    return;
+                }
+                updateUserLocation(window.currentUserId, lat, lng, { accuracy, timestamp });
                 resolve(buildRouteOrigin(lat, lng, {
                     routeSource: 'real',
                     routeSourceLabel: 'Live GPS'
                 }));
             },
             () => resolve(null),
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     });
 }
@@ -1704,13 +1739,15 @@ async function openBoundarySaveModal({ defaultName = 'My Shape', context = null 
 window.userLocations = window.userLocations || {};
 
 // Function to update a user's location
-function updateUserLocation(userId, latitude, longitude) {
+function updateUserLocation(userId, latitude, longitude, metadata = {}) {
     if (!window.userLocations) window.userLocations = {};
     
     window.userLocations[userId] = {
         lat: latitude,
         lng: longitude,
-        lastUpdated: new Date(),
+        accuracy: Number.isFinite(Number(metadata.accuracy)) ? Number(metadata.accuracy) : null,
+        timestamp: Number(metadata.timestamp) || Date.now(),
+        lastUpdated: new Date(Number(metadata.timestamp) || Date.now()),
         ready: true
     };
     
@@ -1719,6 +1756,8 @@ function updateUserLocation(userId, latitude, longitude) {
         window.userCoords = {
             currentLatitude: latitude,
             currentLongitude: longitude,
+            accuracy: Number.isFinite(Number(metadata.accuracy)) ? Number(metadata.accuracy) : null,
+            timestamp: Number(metadata.timestamp) || Date.now(),
             ready: true
         };
     }
@@ -1808,7 +1847,9 @@ async function fetchAllFirefighterLocations() {
         if (data.success && data.locations) {
             data.locations.forEach(loc => {
                 if (loc.user_id && loc.latitude && loc.longitude) {
-                    updateUserLocation(loc.user_id, loc.latitude, loc.longitude);
+                    updateUserLocation(loc.user_id, loc.latitude, loc.longitude, {
+                        timestamp: new Date(loc.updated_at).getTime(),
+                    });
                 }
             });
             displayAllFirefighterLocations();
@@ -4642,6 +4683,15 @@ styleElement.textContent = `
         font-size: 9px;
         font-weight: 800;
         letter-spacing: 0.08em;
+        vertical-align: super;
+        line-height: 1;
+        text-transform: uppercase;
+        font-style: normal;
+    }
+
+    .responder-marker-popup-badge.live {
+        background: rgba(16, 185, 129, 0.18);
+        color: #047857;
     }
 
     .route-source-modal {
@@ -7208,7 +7258,11 @@ function generatePopupContent(coord, incidents) {
                 ${incidentStatus === 'reported' && canManageMarkers ? `
                 <button id="respond${marker.marker_id}" 
                     style="width: 100%; background: #dc2626; color: white; border: none; padding: ${primaryButtonPadding}; border-radius: 10px; font-size: ${primaryButtonFontSize}; font-weight: 600; cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: ${actionGap}; transition: all 0.2s;">
-                    <i class="fas fa-phone-alt"></i> RESPOND NOW
+                    <i class="fas fa-location-crosshairs"></i> RESPOND NOW <sup>LIVE GPS</sup>
+                </button>
+                <button type="button" onclick="window.demoRespondToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id})"
+                    style="width: 100%; background: #fff7ed; color: #9a3412; border: 1px dashed rgba(198, 61, 38, 0.35); padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 700; cursor: pointer; margin-bottom: 8px;">
+                    <i class="fas fa-truck-fast"></i> RESPOND NOW <sup>DEMO</sup>
                 </button>
                 ` : ''}
                 ${canManageMarkers ? `
@@ -7224,10 +7278,10 @@ function generatePopupContent(coord, incidents) {
 
                 <div style="display:flex; gap:${actionGap}; margin-bottom: 8px;">
                     <button class="btn btn-sm btn-outline mt-2" onclick="window.calculateRouteToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id})" style="flex:1; background: #10b981; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
-                        <i class="fa-solid fa-route"></i> Get Directions
+                        <i class="fa-solid fa-location-crosshairs"></i> Get Incident <sup>LIVE GPS</sup>
                     </button>
                     <button class="btn btn-sm btn-outline mt-2" onclick="window.calculateRouteToIncident(${incident?.incident_id ?? marker?.incident_id ?? 'null'}, ${marker.marker_id}, { source: 'demo' })" style="flex:1; background: #fff7ed; color: #9a3412; border: 1px dashed rgba(198, 61, 38, 0.35); padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 700; cursor: pointer;">
-                        <i class="fa-solid fa-flask"></i> Demo
+                        <i class="fa-solid fa-flask"></i> Demo Route <sup>DEMO</sup>
                     </button>
                 </div>
                 <button id="viewDetails${marker.marker_id}" style="width: 100%; background: #3b82f6; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
@@ -7456,6 +7510,7 @@ function getBlockingIncidentRouteForCurrentTeam(targetIncidentId = null) {
             : null;
 
         return truckTeamId === currentTeamId
+            && !isDemoRouteSource(truck?.routeSource)
             && truck?.isSimulating
             && truckIncidentId !== null
             && truckIncidentId !== resolvedIncidentId;
@@ -7804,7 +7859,11 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             actionMarkup += `
                 <button id="respond${marker.marker_id}" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" ${isIncidentRoutingBlocked ? 'type="button" disabled title="Your team is already navigating to another incident."' : ''}>
                     <i class="fas fa-phone-volume"></i>
-                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now'}
+                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now <sup class="responder-marker-popup-badge live">LIVE GPS</sup>'}
+                </button>
+                <button type="button" class="responder-marker-popup-btn demo" onclick="window.demoRespondToIncident(${targetIncidentId ?? 'null'}, ${marker.marker_id})">
+                    <i class="fas fa-truck-fast"></i>
+                    Respond Now <sup class="responder-marker-popup-badge">DEMO</sup>
                 </button>
             `;
         }
@@ -7827,7 +7886,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
                     : `onclick="window.calculateRouteToIncident(${targetIncidentId ?? 'null'}, ${marker.marker_id})"`}
             >
                 <i class="fas fa-route"></i>
-                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
+                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Incident <sup class="responder-marker-popup-badge live">LIVE GPS</sup>'}
             </button>
         `;
 
@@ -7841,7 +7900,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             >
                 <i class="fas fa-flask"></i>
                 Demo Route
-                <span class="responder-marker-popup-badge">DEMO</span>
+                <sup class="responder-marker-popup-badge">DEMO</sup>
             </button>
         `;
 
@@ -8126,7 +8185,11 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
             actions.push(`
                 <button type="button" class="responder-marker-popup-btn danger${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.respondCurrentMapDetail()" ${isIncidentRoutingBlocked ? 'disabled title="Your team is already navigating to another incident."' : ''}>
                     <i class="fas fa-phone-volume"></i>
-                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now'}
+                    ${isIncidentRoutingBlocked ? 'Team Busy' : 'Respond Now <sup class="responder-marker-popup-badge live">LIVE GPS</sup>'}
+                </button>
+                <button type="button" class="responder-marker-popup-btn demo" onclick="window.demoRespondToIncident(${incidentId}, ${marker.marker_id})">
+                    <i class="fas fa-truck-fast"></i>
+                    Respond Now <sup class="responder-marker-popup-badge">DEMO</sup>
                 </button>
             `);
         }
@@ -8143,7 +8206,7 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
         actions.push(`
             <button type="button" class="responder-marker-popup-btn secondary${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.routeCurrentMapDetail()" ${isIncidentRoutingBlocked ? 'disabled title="Finish or clear the active team route before navigating to another incident."' : ''}>
                 <i class="fas fa-route"></i>
-                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Directions'}
+                ${isIncidentRoutingBlocked ? 'Directions Locked' : 'Get Incident <sup class="responder-marker-popup-badge live">LIVE GPS</sup>'}
             </button>
         `);
 
@@ -8151,7 +8214,7 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
             <button type="button" class="responder-marker-popup-btn demo${isIncidentRoutingBlocked ? ' disabled' : ''}" onclick="window.routeCurrentMapDetail('demo')" ${isIncidentRoutingBlocked ? 'disabled title="Finish or clear the active team route before navigating to another incident."' : ''}>
                 <i class="fas fa-flask"></i>
                 Demo Route
-                <span class="responder-marker-popup-badge">DEMO</span>
+                <sup class="responder-marker-popup-badge">DEMO</sup>
             </button>
         `);
     } else if (isStationMarker(marker)) {
@@ -8388,7 +8451,7 @@ async function calculateRouteWithGeoapify(origin, destination) {
         window.routeDestination = routeDestination;
         window.activeRoute = route;
 
-        if (window.thisIncidents) {
+        if (window.thisIncidents && destination?.persistRoute !== false) {
             // SAVE TO DATABASE FOR ALL USERS TO SEE
             const savedRoute = await saveRouteToDatabase(route, destination, origin);
             console.log("displaying route data1: ", savedRoute);
@@ -8420,7 +8483,9 @@ async function calculateRouteWithGeoapify(origin, destination) {
             }
         } else {
             console.log('No incident_id for route persistence, displaying station route locally');
-            const displayed = displayGeoapifyRoute(route);
+            const displayed = destination?.persistRoute === false
+                ? await displayLocalLiveNavigation(route, destination)
+                : displayGeoapifyRoute(route);
             if (!displayed) {
                 throw new Error('Route could not be displayed.');
             }
@@ -8646,6 +8711,58 @@ function displayGeoapifyRoute(route) {
     }
     
     console.log('Route displayed successfully!');
+    return true;
+}
+
+async function displayLocalLiveNavigation(route, destination) {
+    const routeId = 'local-live-directions';
+    if (activeTrucks.has(routeId)) {
+        await stopSimulationForRoute(routeId, false, false);
+    }
+
+    const latlngs = extractRouteLatLngs(route);
+    if (!window.map || latlngs.length < 2) return false;
+
+    const renderGroup = L.layerGroup().addTo(window.map);
+    const truck = {
+        routeId,
+        simulationPoints: latlngs,
+        originalSimulationPoints: [...latlngs],
+        currentPointIndex: 0,
+        isSimulating: false,
+        routeDestination: { ...destination, routeSource: 'real' },
+        incidentId: destination?.incidentId || null,
+        incidentStatusId: Number(destination?.incidentStatusId || 1),
+        movementMode: 'directions',
+        routeSource: 'real',
+        routeTeamId: window.userTeamId || null,
+        routeTeamUserIds: window.currentUserId ? [window.currentUserId] : [],
+        routePrimaryUserId: window.currentUserId || null,
+        renderGroup,
+        routeLayer: null,
+        traveledLayer: null,
+        animatedVehicle: null,
+        animationFrame: null,
+        realTimeLocationWatch: null,
+        persisted: false,
+        usesRealtimeTracking: false,
+        rerouteInFlight: false,
+        lastRerouteAt: 0,
+    };
+
+    activeTrucks.set(routeId, truck);
+    truck.routeLayer = registerRouteLayer(routeId, renderGroup, L.polyline(latlngs, {
+        color: '#2563eb',
+        weight: 5,
+        opacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round',
+    }));
+
+    const bounds = truck.routeLayer.getBounds();
+    if (bounds.isValid()) window.map.fitBounds(bounds, { padding: [50, 50] });
+    updateRouteInfoFromGeoapify(route);
+    await startSimulationForRoute(routeId);
     return true;
 }
 
@@ -9091,6 +9208,7 @@ async function displayAndStartRoute(routeId, route, destination) {
         },
         incidentId: route.incident_id || null,
         incidentStatusId: Number(route.incident_status_id ?? destination?.incidentStatusId ?? 1),
+        movementMode: destination?.movementMode || (Number(route.incident_status_id ?? destination?.incidentStatusId ?? 1) >= 2 ? 'response' : 'directions'),
         routeSource: route.route_source || destination?.routeSource || 'real',
         routeStationId: route.route_station_id || null,
         routeTeamId: route.route_team_id || null,
@@ -9233,10 +9351,14 @@ async function startSimulationForRoute(routeId) {
     
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex]),
+        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex], truck.movementMode),
         zIndexOffset: 1000
     }));
-    bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
+    if (truck.persisted === false) {
+        truck.animatedVehicle.bindPopup('<strong>Live GPS directions</strong><br><small>This marker moves only when your device moves.</small>');
+    } else {
+        bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
+    }
     if (truck.simulationPoints[1]) {
         const nextPoint = truck.simulationPoints[1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -9248,22 +9370,22 @@ async function startSimulationForRoute(routeId) {
         opacity: 0.6
     }));
 
-    if (!isDemoRouteSource(truck.routeSource)) {
-        startRealTimeLocationUpdatesForTruck(routeId);
-    }
-
-    const realtimeLocation = getTruckRealtimeLocation(truck);
-    if (realtimeLocation) {
-        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
-        showToast('Live navigation tracking enabled', 'success');
+    if (isDemoRouteSource(truck.routeSource)) {
+        startSmoothAnimationForTruck(routeId);
+        showToast('Demo navigation started.', 'success');
         return;
     }
 
-    startSmoothAnimationForTruck(routeId);
+    startRealTimeLocationUpdatesForTruck(routeId);
+    const realtimeLocation = getTruckRealtimeLocation(truck);
+    if (realtimeLocation) {
+        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+    }
+
     showToast(
-        isDemoRouteSource(truck.routeSource)
-            ? 'Demo navigation started.'
-            : 'Navigation started.',
+        realtimeLocation
+            ? 'Live GPS navigation enabled. Movement follows this device.'
+            : 'Live GPS route ready. The marker will move when the assigned device moves.',
         'success'
     );
 }
@@ -9561,7 +9683,7 @@ async function stopSimulationForRoute(routeId, syncWithServer = true, showStoppe
     
     truck.isStoppingSimulation = true;
     truck.stopPromise = (async () => {
-        if (syncWithServer) {
+        if (syncWithServer && truck.persisted !== false) {
             try {
                 await updateRouteStatus(routeId, 'inactive');
 
@@ -9657,8 +9779,8 @@ function createDemoTruckIcon() {
     });
 }
 
-function createRouteMovementIcon(routeSource, color = '#2563eb') {
-    return isDemoRouteSource(routeSource)
+function createRouteMovementIcon(routeSource, color = '#2563eb', movementMode = 'directions') {
+    return isDemoRouteSource(routeSource) || movementMode === 'response'
         ? createDemoTruckIcon()
         : createNavigationArrowIcon(color);
 }
@@ -9681,10 +9803,6 @@ function applyTruckHeading(marker, angle) {
 
     const markerElement = marker.getElement();
     if (!markerElement) {
-        return;
-    }
-
-    if (markerElement.classList.contains('pyro-demo-route-truck-marker')) {
         return;
     }
 
@@ -9736,6 +9854,8 @@ function startRoutePolling() {
                         : (existingTruck.routeTeamUserIds || []);
                     existingTruck.routePrimaryUserId = routeData.route_primary_user_id || existingTruck.routePrimaryUserId || null;
                     existingTruck.routeSource = routeData.route_source || existingTruck.routeSource || 'real';
+                    existingTruck.incidentStatusId = Number(routeData.incident_status_id || existingTruck.incidentStatusId || 1);
+                    existingTruck.movementMode = existingTruck.incidentStatusId >= 2 ? 'response' : (existingTruck.movementMode || 'directions');
                     existingTruck.routeDestination = {
                         title: routeData.destination_title || existingTruck.routeDestination?.title || 'Destination',
                         lat: routeData.destination_lat ?? existingTruck.routeDestination?.lat ?? null,
@@ -9785,6 +9905,8 @@ function startRoutePolling() {
                         routeSource: routeData.route_source || 'real',
                     },
                     incidentId: routeData.incident_id || null,
+                    incidentStatusId: Number(routeData.incident_status_id || 1),
+                    movementMode: Number(routeData.incident_status_id || 1) >= 2 ? 'response' : 'directions',
                     routeSource: routeData.route_source || 'real',
                     routeStationId: routeData.route_station_id || null,
                     routeTeamId: routeData.route_team_id || null,
@@ -9943,10 +10065,14 @@ async function startSimulationFromPosition(routeId, startIndex) {
     console.log('Creating truck at position:', [startPoint[0], startPoint[1]]);
     const renderGroup = truck.renderGroup || getRouteStationLayer(truck);
     truck.animatedVehicle = registerRouteLayer(routeId, renderGroup, L.marker([startPoint[0], startPoint[1]], {
-        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex]),
+        icon: createRouteMovementIcon(truck.routeSource, truckColors[colorIndex], truck.movementMode),
         zIndexOffset: 1000
     }));
-    bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
+    if (truck.persisted === false) {
+        truck.animatedVehicle.bindPopup('<strong>Live GPS directions</strong><br><small>This marker moves only when your device moves.</small>');
+    } else {
+        bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
+    }
     if (truck.simulationPoints[startIndex + 1]) {
         const nextPoint = truck.simulationPoints[startIndex + 1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -9978,16 +10104,18 @@ async function startSimulationFromPosition(routeId, startIndex) {
         }));
     }
     
-    startRealTimeLocationUpdatesForTruck(routeId);
-    const realtimeLocation = getTruckRealtimeLocation(truck);
-    if (realtimeLocation) {
-        updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
-        console.log(`Realtime responder tracking resumed for truck ${routeId}`);
-        return;
+    if (isDemoRouteSource(truck.routeSource)) {
+        startSmoothAnimationForTruck(routeId);
+    } else {
+        startRealTimeLocationUpdatesForTruck(routeId);
+        const realtimeLocation = getTruckRealtimeLocation(truck);
+        if (realtimeLocation) {
+            updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
+            console.log(`Realtime responder tracking resumed for truck ${routeId}`);
+        } else {
+            console.log(`Live route ${routeId} is waiting for assigned-device GPS movement.`);
+        }
     }
-
-    // Start animation from current position
-    startSmoothAnimationForTruck(routeId);
     
     console.log(`Resumed truck ${routeId} from position ${startIndex} (${(startIndex/truck.simulationPoints.length*100).toFixed(1)}%)`);
 }
@@ -10164,15 +10292,32 @@ window.focusMapOnExternalLocation = function(lat, lng, options = {}) {
     const zoom = Number.isFinite(Number(options.zoom)) ? Number(options.zoom) : Math.max(window.map.getZoom?.() || 15, 16);
     const popupLabel = options.label || 'Selected location';
     const popupDescription = options.description || '';
+    const accuracy = Number(options.accuracy);
 
     try {
         window.map.setView([latitude, longitude], zoom, { animate: true });
+
+        if (window.pyroExternalLocationAccuracyCircle) {
+            window.map.removeLayer(window.pyroExternalLocationAccuracyCircle);
+            window.pyroExternalLocationAccuracyCircle = null;
+        }
+        if (Number.isFinite(accuracy) && accuracy > 0) {
+            window.pyroExternalLocationAccuracyCircle = L.circle([latitude, longitude], {
+                radius: accuracy,
+                color: '#2563eb',
+                weight: 2,
+                fillColor: '#60a5fa',
+                fillOpacity: 0.12,
+                interactive: false,
+            }).addTo(window.map);
+        }
 
         const content = `
             <div style="min-width: 170px;">
                 <div style="font-weight: 800; color: #0f172a;">${escapeHtml(String(popupLabel))}</div>
                 ${popupDescription ? `<div style="margin-top: 4px; font-size: 12px; color: #475569;">${escapeHtml(String(popupDescription))}</div>` : ''}
                 <div style="margin-top: 6px; font-size: 11px; color: #64748b;">${latitude.toFixed(6)}, ${longitude.toFixed(6)}</div>
+                ${Number.isFinite(accuracy) && accuracy > 0 ? `<div style="margin-top: 3px; font-size: 11px; color: #2563eb;">Accuracy radius: &plusmn;${Math.round(accuracy)} m</div>` : ''}
             </div>
         `;
 
@@ -10373,7 +10518,28 @@ async function saveMarker(lat, lng, title, description, categoryId) {
 }
 
 async function respondIncident(location) {
-    console.log("respondIncident called with location:", location);
+    const incident = findIncidentForMarker(location, location?.incident);
+    const incidentId = incident?.incident_id ?? location?.incident_id ?? null;
+
+    if (!incidentId) {
+        showToast('Incident details are not ready yet.', 'warning');
+        return;
+    }
+
+    if (typeof window.respondToIncidentLive === 'function') {
+        return window.respondToIncidentLive(incidentId, 1);
+    }
+
+    showToast('Live response controls are unavailable on this page.', 'error');
+}
+
+async function demoRespondToIncident(incidentId, markerId = null) {
+    showToast('Demo response only. Incident status and resources will not change.', 'info');
+    return calculateRouteToIncident(incidentId, markerId, {
+        source: 'demo',
+        response: true,
+        demoResponse: true,
+    });
 }
 
 // ============================================================================
@@ -12865,8 +13031,9 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
     
     const resolvedIncidentId = incident?.incident_id ?? markerRecord?.incident_id ?? null;
     const existingIncidentRoute = getBlockingIncidentRouteForCurrentTeam(resolvedIncidentId);
+    const preferredSource = options?.source || 'real';
 
-    if (existingIncidentRoute) {
+    if (existingIncidentRoute && !isDemoRouteSource(preferredSource)) {
         showToast('Your team is already responding to another ongoing incident.', 'warning');
         return;
     }
@@ -12877,11 +13044,12 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
         title: `${incidentType} - ${incident?.title || markerRecord?.title || 'Emergency'}`,
         incidentStatusId,
         incidentId: resolvedIncidentId,
-        routeSource: options?.source || 'real'
+        routeSource: options?.source || 'real',
+        movementMode: options?.response ? 'response' : 'directions',
+        persistRoute: Boolean(options?.response) || isDemoRouteSource(options?.source)
     };
     
     console.log('Calculating route to incident:', destination);
-    const preferredSource = options?.source || 'real';
     const origin = await resolveRouteOrigin(preferredSource, destination);
 
     if (!origin?.ready) {
@@ -13005,6 +13173,7 @@ window.routeCurrentMapDetail = routeCurrentMapDetail;
 // Make sure these are available globally
 window.calculateRouteToIncident = calculateRouteToIncident;
 window.calculateDemoRouteToIncident = (incidentId, markerId = null) => calculateRouteToIncident(incidentId, markerId, { source: 'demo' });
+window.demoRespondToIncident = demoRespondToIncident;
 window.calculateRouteToStation = calculateRouteToStation;
 window.calculateRouteWithGeoapify = calculateRouteWithGeoapify;
 window.displayAndStartRoute = displayAndStartRoute;

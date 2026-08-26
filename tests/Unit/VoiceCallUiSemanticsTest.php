@@ -8,6 +8,22 @@ use Tests\TestCase;
 class VoiceCallUiSemanticsTest extends TestCase
 {
     #[Test]
+    public function caller_coordinates_require_a_fresh_accurate_browser_fix(): void
+    {
+        $script = file_get_contents(resource_path('js/voice-calls.js'));
+        $controller = file_get_contents(app_path('Http/Controllers/VoiceCallController.php'));
+        $map = file_get_contents(resource_path('js/map.js'));
+
+        $this->assertStringContainsString('function getFreshCallerLocationPayload()', $script);
+        $this->assertStringContainsString('maximumAge: 0', $script);
+        $this->assertStringContainsString('isReliableCallerLocation(normalized, 30000, 150)', $script);
+        $this->assertStringContainsString('getFreshCallerLocationPayload()', $script);
+        $this->assertStringContainsString('(within ±${Math.round(accuracy)} m)', $script);
+        $this->assertStringContainsString('&& (int) $data[\'caller_accuracy\'] <= 150', $controller);
+        $this->assertStringContainsString('Accuracy radius:', $map);
+    }
+
+    #[Test]
     public function responder_call_center_is_an_opt_in_responsive_drawer(): void
     {
         $script = file_get_contents(resource_path('js/voice-calls.js'));

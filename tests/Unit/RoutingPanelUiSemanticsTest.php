@@ -21,6 +21,8 @@ class RoutingPanelUiSemanticsTest extends TestCase
         $this->assertStringContainsString('pyroRoutingClose', $script);
         $this->assertStringContainsString('#routeInfoCard, #userRouteInfoCard', $script);
         $this->assertStringContainsString('No emergency route is connected', $script);
+        $this->assertStringContainsString('document.body.appendChild(card)', $script);
+        $this->assertStringContainsString("managedCard.setAttribute('aria-modal', isOpen ? 'true' : 'false')", $script);
 
         $this->assertStringContainsString('.pyro-routing-launcher', $styles);
         $this->assertStringContainsString('.pyro-routing-panel.is-pyro-routing-open', $styles);
@@ -28,6 +30,9 @@ class RoutingPanelUiSemanticsTest extends TestCase
         $this->assertStringContainsString('max-height:min(72dvh, 650px)', $styles);
         $this->assertStringContainsString('body.pyro-routing-panel-open { overflow:hidden; }', $styles);
         $this->assertStringContainsString('body.firefighter-dashboard-page .pyro-routing-launcher { right:14px;bottom:calc(164px', $styles);
+        $this->assertStringContainsString('body > .pyro-routing-panel.is-pyro-routing-open', $styles);
+        $this->assertStringContainsString('pointer-events:auto !important', $styles);
+        $this->assertStringContainsString('-webkit-overflow-scrolling:touch', $styles);
 
         $this->assertStringContainsString("import './routing-panel.js';", $sharedMapScript);
         $this->assertStringContainsString("route.destination_title = destination?.title || 'Selected destination';", $sharedMapScript);

@@ -70,7 +70,7 @@ class FinalInvestigationReportController extends Controller
         $validated = $this->mergeDerivedDefaults($validated, $progressReport);
         $data = FinalInvestigationReport::create($validated);
         $imageService->store($request, $data, 'final');
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->progressInvestigation?->spotInvestigation?->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $data->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('created final report', auth()->user()?->user_id, $request);
 
         $payload = [
@@ -153,7 +153,7 @@ class FinalInvestigationReportController extends Controller
         $validated = $this->mergeDerivedDefaults($validated, $final->progressInvestigation);
         $final->update($validated);
         $imageService->store($request, $final, 'final');
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated final report', auth()->user()?->user_id, $request);
         $payload = [
             'success'=>true,

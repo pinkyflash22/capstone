@@ -68,7 +68,7 @@ class ProgressInvestigationReportController extends Controller
 
         $data = ProgressInvestigationReport::create($validated);
         $imageService->store($request, $data, 'progress');
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $data->spotInvestigation?->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $data->spotInvestigation?->incident_id);
         UserActivityLogger::log('created progress rpt', auth()->user()?->user_id, $request);
 
         $payload = [
@@ -150,7 +150,7 @@ class ProgressInvestigationReportController extends Controller
 
         $progress->update($validated);
         $imageService->store($request, $progress, 'progress');
-        HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
+        HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $progress->spotInvestigation?->incident_id);
         UserActivityLogger::log('updated progress rpt', auth()->user()?->user_id, $request);
         $payload = ['success'=>true, 'data' => InvestigationReportImageService::responsePayload($progress->fresh()->load('fireOrigin'))];
 
