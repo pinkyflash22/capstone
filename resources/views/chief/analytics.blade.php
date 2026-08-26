@@ -8006,7 +8006,8 @@
             }
 
             try {
-                const response = await fetch('/station-admin/api/retrain-forecast-model', {
+                const commandPrefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '/station-admin';
+                const response = await fetch(`${commandPrefix}/api/retrain-forecast-model`, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -8020,16 +8021,59 @@
                     const detailParts = [
                         result.message || 'Model retraining failed.',
                         result.details || '',
-                        result.diagnostics?.paths?.python_binary ? `Python: ${result.diagnostics.paths.python_binary}` : '',
+                        result.code ? `Code: ${result.code}.` : '',
+                        result.diagnostics?.python_binary ? `Python: ${result.diagnostics.python_binary}.` : '',
                         result.exception_message || '',
                     ].filter(Boolean);
                     throw new Error(detailParts.join(' '));
                 }
 
-                const trainedAt = result.model_metadata?.trained_at
-                    ? ` Trained at ${result.model_metadata.trained_at}.`
+                if (!result.status_url) {
+                    throw new Error('The server did not return a retraining status URL.');
+                }
+
+                let trainingResult = result;
+                let pollAttempts = 0;
+                while (!['completed', 'failed'].includes(trainingResult.status) && pollAttempts < 180) {
+                    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+                    const statusResponse = await fetch(trainingResult.status_url || result.status_url, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    trainingResult = await statusResponse.json().catch(() => ({}));
+                    if (!statusResponse.ok) {
+                        throw new Error(trainingResult.message || 'Unable to read retraining progress.');
+                    }
+
+                    const progress = Number.isFinite(Number(trainingResult.progress))
+                        ? Math.max(0, Math.min(100, Number(trainingResult.progress)))
+                        : 0;
+                    if (button) {
+                        button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(String(trainingResult.message || 'Retraining...'))} ${progress}%`;
+                        button.setAttribute('aria-label', `${trainingResult.message || 'Retraining'} ${progress}%`);
+                    }
+                    pollAttempts += 1;
+                }
+
+                if (trainingResult.status === 'failed' || !trainingResult.success) {
+                    const detailParts = [
+                        trainingResult.message || 'Model retraining failed.',
+                        trainingResult.details || '',
+                        trainingResult.code ? `Code: ${trainingResult.code}.` : '',
+                    ].filter(Boolean);
+                    throw new Error(detailParts.join(' '));
+                }
+
+                if (trainingResult.status !== 'completed') {
+                    throw new Error('Retraining is still running. You can safely return to this page and try again shortly.');
+                }
+
+                const trainedAt = trainingResult.model_metadata?.trained_at
+                    ? ` Trained at ${trainingResult.model_metadata.trained_at}.`
                     : '';
-                showAnalyticsToast(`${result.message || 'Forecast model retrained successfully.'}${trainedAt}`, 'success');
+                showAnalyticsToast(`${trainingResult.message || 'Forecast model retrained successfully.'}${trainedAt}`, 'success');
             } catch (error) {
                 showAnalyticsToast(error.message || 'Unable to retrain the forecast model.', 'error');
             } finally {
@@ -8037,6 +8081,7 @@
                     button.disabled = false;
                     button.style.opacity = '';
                     button.innerHTML = originalHtml;
+                    button.removeAttribute('aria-label');
                 }
             }
         }

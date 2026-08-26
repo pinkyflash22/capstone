@@ -99,6 +99,13 @@ return [
         'model_path' => env('AI_MODEL_PATH', 'capstone-ai/fire_model.pkl'),
         'metadata_path' => env('AI_MODEL_METADATA_PATH', 'capstone-ai/fire_model_metadata.json'),
         'evaluation_cache_path' => env('AI_MODEL_EVALUATION_CACHE_PATH', 'storage/app/ai/fire_model_evaluation.json'),
+        'training_timeout_seconds' => (int) env('AI_TRAINING_TIMEOUT_SECONDS', 240),
+        'training_queue_connection' => env('AI_TRAINING_QUEUE_CONNECTION', 'database'),
+        'training_queue' => env('AI_TRAINING_QUEUE', 'forecast-training'),
+        'training_status_cache_store' => env('AI_TRAINING_STATUS_CACHE_STORE', 'database'),
+        'artifact_persistence_enabled' => (bool) env('AI_ARTIFACT_PERSISTENCE_ENABLED', true),
+        'artifact_disk' => env('AI_ARTIFACT_DISK', env('FILESYSTEM_DISK', 'local')),
+        'artifact_prefix' => trim((string) env('AI_ARTIFACT_PREFIX', 'ai/forecast-model'), '/'),
     ],
 
 ];

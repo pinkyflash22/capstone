@@ -92,6 +92,36 @@ services:
       - key: AI_MODEL_PATH
         value: capstone-ai/fire_model.pkl
 
+      - key: AI_TRAINING_TIMEOUT_SECONDS
+        value: "240"
+
+      - key: AI_TRAINING_QUEUE_CONNECTION
+        value: database
+
+      - key: AI_TRAINING_QUEUE
+        value: forecast-training
+
+      - key: AI_TRAINING_STATUS_CACHE_STORE
+        value: database
+
+      - key: AI_ARTIFACT_PERSISTENCE_ENABLED
+        value: "true"
+
+      - key: AI_ARTIFACT_DISK
+        value: supabase
+
+      - key: AI_ARTIFACT_PREFIX
+        value: ai/forecast-model
+
+      - key: DB_QUEUE_RETRY_AFTER
+        value: "360"
+
+      - key: RUN_FORECAST_QUEUE_WORKER
+        value: "true"
+
+      - key: AI_QUEUE_WORKER_TIMEOUT
+        value: "300"
+
       - key: AI_MODEL_METADATA_PATH
         value: capstone-ai/fire_model_metadata.json
 

@@ -116,6 +116,50 @@ class ForecastModelService
                 return $this->recordTrainingReport(false, 'training_script_missing', 'Forecast training script is missing.');
             }
 
+            $unwritableDirectories = collect([
+                dirname($this->datasetPath),
+                dirname($this->modelPath),
+                dirname($this->metadataPath),
+            ])->unique()->filter(function (string $directory): bool {
+                File::ensureDirectoryExists($directory);
+
+                return ! is_writable($directory);
+            })->values()->all();
+
+            if ($unwritableDirectories !== []) {
+                return $this->recordTrainingReport(
+                    false,
+                    'training_directory_not_writable',
+                    'The server cannot write the forecast dataset or model files.',
+                    ['failure_summary' => 'Grant the web process write access to: '.implode(', ', $unwritableDirectories)]
+                );
+            }
+
+            try {
+                $runtimeProbe = Process::path(base_path())
+                    ->env($this->pythonEnvironment())
+                    ->timeout(15)
+                    ->run([$this->pythonBinary, '-c', 'import joblib, pandas, sklearn']);
+
+                if ($runtimeProbe->failed()) {
+                    $failure = PythonRuntime::failureContext($runtimeProbe, $this->pythonBinary);
+
+                    return $this->recordTrainingReport(
+                        false,
+                        'python_dependencies_missing',
+                        'The Python training dependencies are unavailable on this server.',
+                        $failure
+                    );
+                }
+            } catch (\Throwable $e) {
+                return $this->recordTrainingReport(
+                    false,
+                    'python_runtime_unavailable',
+                    'The configured Python runtime cannot be started.',
+                    ['failure_summary' => $e->getMessage()]
+                );
+            }
+
             if (! File::exists($this->datasetPath) && ! $exportDataset) {
                 return $this->recordTrainingReport(false, 'dataset_missing', 'Forecast dataset is missing.');
             }
@@ -136,8 +180,14 @@ class ForecastModelService
                         'diagnostics' => $this->readinessDiagnostics(includePaths: true),
                     ]);
 
-                    return $this->recordTrainingReport(false, 'training_failed', 'Forecast model training failed. Check server logs for command output.', [
+                    $failureSummary = $output !== ''
+                        ? mb_substr($output, -4000)
+                        : 'The training command exited without diagnostic output.';
+
+                    return $this->recordTrainingReport(false, 'training_failed', 'Forecast model training failed.', [
                         'exit_code' => $exitCode,
+                        'command_output' => $failureSummary,
+                        'failure_summary' => $failureSummary,
                     ]);
                 }
 
@@ -166,14 +216,31 @@ class ForecastModelService
             }
         };
 
+        $trainingTimeout = max(60, (int) config('services.ai_prediction.training_timeout_seconds', 240));
+
         try {
-            return Cache::lock('forecast-model-training', 180)->block(5, $runTraining);
+            $lock = Cache::lock('forecast-model-training', $trainingTimeout + 60);
+            $lockAcquired = $lock->get();
         } catch (\Throwable $e) {
             Log::warning('Forecast model lock unavailable, running training without lock.', [
                 'message' => $e->getMessage(),
             ]);
 
             return $runTraining();
+        }
+
+        if (! $lockAcquired) {
+            return $this->recordTrainingReport(
+                false,
+                'training_already_running',
+                'Another forecast model retraining job is already running.'
+            );
+        }
+
+        try {
+            return $runTraining();
+        } finally {
+            $lock->release();
         }
     }
 
@@ -282,6 +349,16 @@ class ForecastModelService
         ];
     }
 
+    public function artifactPaths(): array
+    {
+        return [
+            'model' => $this->modelPath,
+            'metadata' => $this->metadataPath,
+            'dataset' => $this->datasetPath,
+            'evaluation' => $this->evaluationCachePath,
+        ];
+    }
+
     public function readinessDiagnostics(bool $includePaths = false): array
     {
         $diagnostics = [
@@ -293,6 +370,11 @@ class ForecastModelService
             'evaluation_cache_file' => File::exists($this->evaluationCachePath),
             'python_configured' => filled($this->pythonBinary),
             'python_binary' => $this->pythonBinary,
+            'training_directories_writable' => collect([
+                dirname($this->datasetPath),
+                dirname($this->modelPath),
+                dirname($this->metadataPath),
+            ])->unique()->every(fn (string $directory) => is_dir($directory) && is_writable($directory)),
             'needs_retraining' => $this->needsRetraining(),
         ];
 

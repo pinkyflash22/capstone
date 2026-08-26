@@ -5,6 +5,7 @@ use App\Models\Incident;
 use App\Services\DutyRosterRecurrenceService;
 use App\Services\DutyRosterService;
 use App\Services\DailyWeatherContextService;
+use App\Services\ForecastArtifactStore;
 use App\Services\IncidentAutoAssignmentService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Services\StationBarangayCoverageService;
@@ -18,6 +19,24 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
+
+Artisan::command('ai:restore-forecast-artifacts', function (ForecastArtifactStore $artifactStore) {
+    $report = $artifactStore->restore();
+    $message = (string) ($report['message'] ?? 'Forecast artifact restoration finished.');
+
+    if ($report['success'] ?? false) {
+        $this->info($message);
+
+        return 0;
+    }
+
+    $this->warn($message);
+    if (! empty($report['failure_summary'])) {
+        $this->line((string) $report['failure_summary']);
+    }
+
+    return 1;
+})->purpose('Restore the latest trained forecast model from durable object storage');
 
 Artisan::command('coverage:sync-stations {--station=}', function (StationBarangayCoverageService $service) {
     $stationId = $this->option('station');
@@ -871,9 +890,19 @@ Artisan::command('ai:train-forecast-model {--dataset=capstone-ai/station_baranga
         }
     }
     $trainingScript = (string) config('services.ai_prediction.training_script', 'capstone-ai/train_model.py');
-    $trainProcess = Process::path(base_path())
-        ->env($pythonEnvironment)
-        ->run([$pythonBinary, $trainingScript, $datasetPath]);
+    $trainingTimeout = max(60, (int) config('services.ai_prediction.training_timeout_seconds', 240));
+
+    try {
+        $trainProcess = Process::path(base_path())
+            ->env($pythonEnvironment)
+            ->timeout($trainingTimeout)
+            ->run([$pythonBinary, $trainingScript, $datasetPath]);
+    } catch (\Throwable $error) {
+        $this->error('Forecast model training process could not finish.');
+        $this->line($error->getMessage());
+
+        return 1;
+    }
 
     if ($trainProcess->failed()) {
         $this->error('Forecast model training failed.');

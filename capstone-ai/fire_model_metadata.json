@@ -63,43 +63,43 @@
   "global_feature_importance": [
     {
       "feature": "barangay_pressure_signal",
-      "importance": 0.1201
+      "importance": 0.1187
     },
     {
       "feature": "condition_label",
-      "importance": 0.1029
+      "importance": 0.1028
     },
     {
       "feature": "population_density_level",
-      "importance": 0.072
+      "importance": 0.0784
     },
     {
       "feature": "combustible_material_count",
-      "importance": 0.0653
-    },
-    {
-      "feature": "verified_risk_count",
-      "importance": 0.059
-    },
-    {
-      "feature": "road_accessibility",
-      "importance": 0.0542
+      "importance": 0.0619
     },
     {
       "feature": "risk_area_pressure_signal",
-      "importance": 0.0536
+      "importance": 0.0575
+    },
+    {
+      "feature": "verified_risk_count",
+      "importance": 0.0567
+    },
+    {
+      "feature": "road_accessibility",
+      "importance": 0.0545
     },
     {
       "feature": "affected_households",
-      "importance": 0.0522
+      "importance": 0.0525
     },
     {
       "feature": "water_access_flag",
-      "importance": 0.0513
+      "importance": 0.0511
     },
     {
       "feature": "building_density_level",
-      "importance": 0.0506
+      "importance": 0.051
     }
   ],
   "reference_profile": {
@@ -161,7 +161,7 @@
     "train_rows": 720,
     "test_rows": 240,
     "accuracy": 0.975,
-    "roc_auc": 0.971,
+    "roc_auc": 0.9704,
     "precision": 1.0,
     "recall": 0.625,
     "f1_score": 0.7692,
@@ -222,8 +222,8 @@
   },
   "calibration": {
     "method": "sigmoid_cv",
-    "expected_calibration_error": 0.0163,
-    "mean_predicted_probability": 0.0581,
+    "expected_calibration_error": 0.0107,
+    "mean_predicted_probability": 0.058,
     "observed_positive_rate": 0.0667,
     "bins": [
       {
@@ -234,20 +234,20 @@
       },
       {
         "range": "(0.1, 0.2]",
-        "count": 5,
-        "mean_probability": 0.186,
+        "count": 1,
+        "mean_probability": 0.1444,
         "observed_rate": 0.0
       },
       {
         "range": "(0.2, 0.3]",
-        "count": 1,
-        "mean_probability": 0.2992,
-        "observed_rate": 1.0
+        "count": 5,
+        "mean_probability": 0.2204,
+        "observed_rate": 0.2
       },
       {
         "range": "(0.9, 1.0]",
         "count": 10,
-        "mean_probability": 0.9439,
+        "mean_probability": 0.9421,
         "observed_rate": 1.0
       }
     ]
@@ -262,7 +262,7 @@
       "barangay_name"
     ]
   },
-  "trained_at": "2026-08-25T10:54:29.549231+00:00",
+  "trained_at": "2026-08-26T03:34:52.484629+00:00",
   "notes": [
     "This is a JSON-first baseline designed for later API integration.",
     "Perfect or near-perfect demo metrics usually mean the dataset is still synthetic or too small.",

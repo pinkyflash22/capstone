@@ -33,6 +33,28 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     php artisan migrate --force
 fi
 
+# A retrained model is written to object storage because Render's container
+# filesystem is ephemeral. Restore the latest verified artifact set before the
+# web server starts; the repository model remains available if no backup exists.
+php artisan ai:restore-forecast-artifacts || true
+
+# Process only forecast-training jobs in this existing web service so Render's
+# paid background-worker service is not required. The database queue keeps the
+# HTTP request short and survives process restarts.
+if [ "${RUN_FORECAST_QUEUE_WORKER:-true}" = "true" ]; then
+    (
+        while true; do
+            php artisan queue:work "${AI_TRAINING_QUEUE_CONNECTION:-database}" \
+                --queue="${AI_TRAINING_QUEUE:-forecast-training}" \
+                --sleep=2 \
+                --tries=1 \
+                --timeout="${AI_QUEUE_WORKER_TIMEOUT:-300}" \
+                --max-jobs=100 || true
+            sleep 2
+        done
+    ) &
+fi
+
 # Render free web services do not run Laravel's scheduler, and a separate
 # Render Cron service has a monthly charge. Keep this weather-only worker
 # isolated from every other scheduled command. It catches up yesterday on

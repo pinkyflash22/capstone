@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Marker;
 use App\Models\StationOfficer;
 use App\Models\Incident;
-use App\Models\Role;
 use App\Models\User;
 use App\Models\UserLog;
 use App\Models\Station;
@@ -30,7 +29,6 @@ use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\CommunityActivityRequest;
 use App\Models\EventActivity;
-use App\Support\MarkerFeedBuilder;
 
 
 use Illuminate\Support\Facades\DB;
@@ -186,33 +184,36 @@ class StationAdminController extends Controller
         ];
     }
 
-    protected function buildDashboardMlTrendSeries($recentAnalyses, ?int $stationId, $teamIds)
+    protected function buildDashboardMlTrendSeries($recentAnalyses, ?int $stationId, $teamIds, $incidentPool = null)
     {
         $teamIds = collect($teamIds)->filter()->map(fn ($id) => (int) $id)->values();
-        $completedIncidents = Incident::query()
-            ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed'])
-            ->when($stationId, function ($query) use ($stationId, $teamIds) {
-                $query->where(function ($stationQuery) use ($stationId, $teamIds) {
-                    $stationQuery->where('station_id', $stationId);
-                    if ($teamIds->isNotEmpty()) {
-                        $stationQuery->orWhereIn('team_id', $teamIds->all());
-                    }
-                });
-            })
-            ->when(! $stationId && $teamIds->isNotEmpty(), fn ($query) => $query->whereIn('team_id', $teamIds->all()))
-            ->get(['created_at', 'occurred_at']);
+        $completedIncidents = $incidentPool !== null
+            ? collect($incidentPool)
+                ->filter(fn ($incident) => in_array(strtolower((string) $incident->status), ['closed', 'completed'], true))
+                ->filter(function ($incident) use ($stationId, $teamIds) {
+                    return ($stationId && (int) $incident->station_id === $stationId)
+                        || $teamIds->contains((int) $incident->team_id);
+                })
+            : Incident::query()
+                ->whereIn('status', ['Closed', 'Completed'])
+                ->when($stationId, function ($query) use ($stationId, $teamIds) {
+                    $query->where(function ($stationQuery) use ($stationId, $teamIds) {
+                        $stationQuery->where('station_id', $stationId);
+                        if ($teamIds->isNotEmpty()) {
+                            $stationQuery->orWhereIn('team_id', $teamIds->all());
+                        }
+                    });
+                })
+                ->when(! $stationId && $teamIds->isNotEmpty(), fn ($query) => $query->whereIn('team_id', $teamIds->all()))
+                ->get(['status', 'station_id', 'team_id', 'created_at', 'occurred_at']);
 
         $dailyAnalysisPoints = collect($recentAnalyses)
             ->sortBy('created_at')
             ->values()
             ->map(function ($analysis) {
-                $analysisData = is_array($analysis->analysis_data ?? null)
-                    ? $analysis->analysis_data
-                    : (json_decode((string) ($analysis->analysis_data ?? '{}'), true) ?: []);
                 $predictions = is_array($analysis->predictions ?? null)
                     ? $analysis->predictions
                     : (json_decode((string) ($analysis->predictions ?? '[]'), true) ?: []);
-                $rawData = data_get($analysisData, 'raw_data', []);
                 return [
                     'date' => Carbon::parse($analysis->created_at)->toDateString(),
                     'predicted_fire_incidents' => (int) (data_get($predictions, 'predicted_fire_incidents') ?? 0),
@@ -244,28 +245,24 @@ class StationAdminController extends Controller
     {
         $eligibleRoles = ['firefighter', 'chief', 'station admin'];
 
-        return Station::query()
-            ->with(['users.role'])
-            ->orderBy('station_name')
+        $rolePlaceholders = implode(',', array_fill(0, count($eligibleRoles), '?'));
+
+        return DB::table('stations')
+            ->leftJoin('station_officers', 'stations.station_id', '=', 'station_officers.station_id')
+            ->leftJoin('users', 'station_officers.user_id', '=', 'users.user_id')
+            ->leftJoin('roles', 'users.role_id', '=', 'roles.role_id')
+            ->select('stations.station_id', 'stations.station_name')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(roles.role) IN ({$rolePlaceholders}) THEN users.user_id END) AS total_personnel_count", $eligibleRoles)
+            ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(roles.role) = ? THEN users.user_id END) AS firefighter_count", ['firefighter'])
+            ->groupBy('stations.station_id', 'stations.station_name')
+            ->orderBy('stations.station_name')
             ->get()
-            ->map(function (Station $station) use ($eligibleRoles) {
-                $personnel = $station->users->filter(function ($user) use ($eligibleRoles) {
-                    $role = strtolower(trim($user->role->role ?? ''));
-
-                    return in_array($role, $eligibleRoles, true);
-                });
-
-                $firefighterCount = $personnel->filter(function ($user) {
-                    return strtolower(trim($user->role->role ?? '')) === 'firefighter';
-                })->count();
-
-                return [
-                    'station_id' => $station->station_id,
-                    'station_name' => $station->station_name,
-                    'firefighter_count' => $firefighterCount,
-                    'total_personnel_count' => $personnel->count(),
-                ];
-            });
+            ->map(fn ($station) => [
+                'station_id' => (int) $station->station_id,
+                'station_name' => $station->station_name,
+                'firefighter_count' => (int) $station->firefighter_count,
+                'total_personnel_count' => (int) $station->total_personnel_count,
+            ]);
     }
 
     protected function getAuthenticatedStationOfficer(): ?StationOfficer
@@ -288,6 +285,13 @@ class StationAdminController extends Controller
     protected function getTeamsForStation(?int $stationId)
     {
         $stationOfficerIds = $this->getStationOfficerIdsForStation($stationId);
+
+        return $this->getTeamsForStationOfficerIds($stationOfficerIds);
+    }
+
+    protected function getTeamsForStationOfficerIds($stationOfficerIds)
+    {
+        $stationOfficerIds = collect($stationOfficerIds)->filter()->values();
 
         if ($stationOfficerIds->isEmpty()) {
             return Team::query()->whereRaw('1 = 0');
@@ -1604,36 +1608,58 @@ class StationAdminController extends Controller
     {   
         $accountId = Auth::user()->user_id;
 
-        $mapmarker = MarkerFeedBuilder::buildForViewer(Auth::user())->values()->all();
-        $incidents = Incident::with(['marker', 'team', 'reporter'])
+        // The shared map immediately revalidates from /map/markers/feed. Avoid
+        // blocking the dashboard HTML on the much larger marker relationship graph.
+        $mapmarker = [];
+        $incidents = Incident::with(['marker:marker_id,category'])
             ->orderBy('created_at')
-            ->get();
+            ->get(['incident_id', 'status', 'marker_id', 'team_id', 'station_id', 'created_at', 'occurred_at']);
         $alerts = $incidents;
         $stations = Station::all();
-        $provinces = Province::orderBy('province_name')->get();
+        $provinces = Province::orderBy('province_name')->get(['province_id', 'province_name']);
         $thisperson = $this->getAuthenticatedStationOfficer();
-        $stationId = $thisperson->station_id;
-        $stationperson = StationOfficer::where('station_id',$stationId)->with('station','station.users')->get();
-        $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
-        $citizens = User::when($citizenRoleId, fn ($query) => $query->where('role_id', $citizenRoleId))
+        abort_unless($thisperson?->station_id, 403, 'No station is linked to this commander account.');
+        $stationId = (int) $thisperson->station_id;
+        $stationperson = StationOfficer::query()
+            ->where('station_id', $stationId)
+            ->with('station:station_id,station_name')
+            ->get(['station_officer_id', 'station_id', 'user_id', 'rank', 'status']);
+        $citizens = User::query()
+            ->whereHas('role', fn ($query) => $query->where('role', 'citizen'))
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get();
-        $barangayOfficers = BarangayOfficer::with(['user', 'barangay'])
+            ->get(['user_id', 'account_code', 'first_name', 'middle_name', 'last_name', 'contact_number']);
+        $barangayOfficers = BarangayOfficer::with([
+                'user:user_id,first_name,middle_name,last_name',
+                'barangay:barangay_id,barangay_name',
+            ])
             ->where('status', 'active')
             ->orderBy('position')
-            ->get();
-        $defaultTeam = $this->getFirstTeamForStation($stationId);
-        $teamIds = $this->getTeamIdsForStation($stationId);
+            ->get(['barangay_officer_id', 'barangay_id', 'user_id', 'position', 'status']);
         $stationOfficerIds = StationOfficer::where('station_id', $stationId)
             ->pluck('station_officer_id')
             ->filter()
             ->values();
+        $stationTeams = $this->getTeamsForStationOfficerIds($stationOfficerIds)
+            ->orderBy('team_id')
+            ->get();
+        $defaultTeam = $stationTeams->first();
+        $teamIds = $stationTeams->pluck('team_id')->filter()->values();
         $incidentTrendData = $this->buildIncidentTrendData($incidents);
         $stationReadiness = $this->buildStationReadinessData();
         $recentAnalyses = $stationId
             ? DB::table('analysis')
                 ->where('station_id', $stationId)
+                ->select([
+                    'analysis_id',
+                    'sector',
+                    'risk_level',
+                    'period',
+                    'incident_count',
+                    'confidence_data',
+                    'predictions',
+                    'created_at',
+                ])
                 ->orderByDesc('created_at')
                 ->limit(5)
                 ->get()
@@ -1642,12 +1668,11 @@ class StationAdminController extends Controller
                         ? (int) $analysis->confidence_data
                         : ($analysis->confidence_data ?? null);
                     $analysis->predictions = json_decode($analysis->predictions ?? 'null', true);
-                    $analysis->recommendations = json_decode($analysis->recommendations ?? '[]', true);
 
                     return $analysis;
                 })
             : collect();
-        $analysisTrendSeries = $this->buildDashboardMlTrendSeries($recentAnalyses, $stationId, $teamIds);
+        $analysisTrendSeries = $this->buildDashboardMlTrendSeries($recentAnalyses, $stationId, $teamIds, $incidents);
         $analysisTrendRunCount = $recentAnalyses->count();
         $dashboardStatsSeed = [
             'incident_total' => $teamIds->isNotEmpty()
@@ -2877,21 +2902,26 @@ public function storeFullAddress(Request $request)
     {
         $stationOfficer = $this->getAuthenticatedStationOfficer();
         $stationId = $stationOfficer?->station_id;
-        $teamIds = $this->getTeamIdsForStation($stationId);
-        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('station_officer_id')
+        $stationPersonnel = $stationId
+            ? StationOfficer::query()
+                ->where('station_id', $stationId)
+                ->get(['station_officer_id', 'status'])
+            : collect();
+        $stationOfficerIds = $stationPersonnel->pluck('station_officer_id')->filter()->values();
+        $teamIds = $this->getTeamsForStationOfficerIds($stationOfficerIds)
+            ->pluck('team_id')
             ->filter()
             ->values();
 
-        $incidentTotal = $teamIds->isNotEmpty()
-            ? Incident::whereIn('team_id', $teamIds)->count()
-            : 0;
-
-        $activeResponses = $teamIds->isNotEmpty()
-            ? Incident::whereIn('team_id', $teamIds)
-                ->whereIn('status', ['Responding', 'On Scene'])
-                ->count()
-            : 0;
+        $incidentSummary = $teamIds->isNotEmpty()
+            ? Incident::query()
+                ->whereIn('team_id', $teamIds)
+                ->selectRaw('COUNT(*) AS incident_total')
+                ->selectRaw("SUM(CASE WHEN status IN ('Responding', 'On Scene') THEN 1 ELSE 0 END) AS active_responses")
+                ->first()
+            : null;
+        $incidentTotal = (int) ($incidentSummary?->incident_total ?? 0);
+        $activeResponses = (int) ($incidentSummary?->active_responses ?? 0);
 
         $fsicClaims = $stationOfficerIds->isNotEmpty()
             ? FsicApproval::whereIn('approved_by', $stationOfficerIds)
@@ -2899,11 +2929,9 @@ public function storeFullAddress(Request $request)
                 ->count()
             : 0;
 
-        $crewOnline = $stationId
-            ? StationOfficer::where('station_id', $stationId)
-                ->whereIn('status', ['available', 'dispatched', 'on-scene'])
-                ->count()
-            : 0;
+        $crewOnline = $stationPersonnel
+            ->whereIn('status', ['available', 'dispatched', 'on-scene'])
+            ->count();
 
         return response()->json([
             'success' => true,

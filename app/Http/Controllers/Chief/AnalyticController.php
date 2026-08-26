@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Chief;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RetrainForecastModelJob;
 use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistActivity;
 use App\Models\AiActionPlanChecklistItem;
@@ -19,6 +20,7 @@ use App\Services\ForecastModelService;
 use App\Services\PredictionFeedbackSignalService;
 use App\Support\BarangayNotificationService;
 use App\Support\ForecastIncidentCalibration;
+use App\Support\ForecastTrainingStatus;
 use App\Support\HistoricalFireRecordSemantics;
 use App\Support\PeakHourEstimator;
 use App\Support\UserActivityLogger;
@@ -77,16 +79,25 @@ class AnalyticController extends Controller
             ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
             ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'));
 
-        $summary = [
-            'total' => (clone $baseQuery)->count(),
-            'open' => (clone $baseQuery)->whereIn('status', ['pending', 'in_progress'])->count(),
-            'submitted' => (clone $baseQuery)->where('status', 'submitted')->count(),
-            'confirmed' => (clone $baseQuery)->where('status', 'confirmed')->count(),
-            'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
-        ];
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw("COUNT(*) AS total")
+            ->selectRaw("SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) AS open")
+            ->selectRaw("SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) AS submitted")
+            ->selectRaw("SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed")
+            ->selectRaw("SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected")
+            ->first();
+        $summary = collect(['total', 'open', 'submitted', 'confirmed', 'rejected'])
+            ->mapWithKeys(fn (string $key) => [$key => (int) ($summaryRow?->{$key} ?? 0)])
+            ->all();
 
         $query = (clone $baseQuery)
-            ->with(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer', 'mitigationActions'])
+            ->with([
+                'barangay:barangay_id,barangay_name',
+                'assignee:user_id,first_name,last_name',
+                'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order,reviewed_by',
+                'items.reviewer:user_id,first_name,last_name',
+                'mitigationActions:mitigation_action_id,ai_action_plan_checklist_id',
+            ])
             ->withCount('mitigationActions');
 
         if ($request->filled('barangay_id')) {
@@ -127,28 +138,25 @@ class AnalyticController extends Controller
             ->paginate(max(5, min(25, $request->integer('per_page', 10))))
             ->withQueryString();
 
-        $barangays = AiActionPlanChecklist::query()
-            ->with('barangay')
-            ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
-            ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'))
+        $barangayIdsQuery = (clone $baseQuery)
             ->whereNotNull('barangay_id')
-            ->get()
-            ->pluck('barangay')
-            ->filter()
-            ->unique('barangay_id')
-            ->sortBy('barangay_name')
-            ->values();
+            ->select('barangay_id')
+            ->distinct();
+        $barangays = \App\Models\Barangay::query()
+            ->whereIn('barangay_id', $barangayIdsQuery)
+            ->orderBy('barangay_name')
+            ->get(['barangay_id', 'barangay_name']);
 
-        $assignees = StationOfficer::query()
-            ->with('user.role')
+        $assigneeIdsQuery = StationOfficer::query()
             ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
             ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'))
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('user_id')
-            ->sortBy(fn ($user) => strtolower(trim(($user->last_name ?? '').' '.($user->first_name ?? ''))))
-            ->values();
+            ->select('user_id')
+            ->distinct();
+        $assignees = User::query()
+            ->whereIn('user_id', $assigneeIdsQuery)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['user_id', 'first_name', 'last_name']);
 
         $viewData = [
             'checklists' => $checklists,
@@ -492,49 +500,46 @@ class AnalyticController extends Controller
         return $this->runAIPredictiveAnalysis($request);
     }
 
-    public function retrainForecastModel()
+    public function retrainForecastModel(Request $request)
     {
         try {
-            @set_time_limit(180);
-            @ini_set('max_execution_time', '180');
-
-            $report = $this->forecastModelService->retrain(exportDataset: true);
-
-            if (! ($report['success'] ?? false)) {
-                Log::warning('Manual forecast model retrain failed.', [
-                    'report' => $report,
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => $report['message'] ?? 'Model retraining failed. Check server logs for details.',
-                    'details' => $report['exception_message'] ?? null,
-                    'diagnostics' => $report['diagnostics'] ?? [],
-                    'code' => $report['status'] ?? 'training_failed',
-                ], 500);
-            }
-
-            $metadata = $this->forecastModelService->readMetadataSummary();
+            $trainingId = (string) Str::uuid();
+            $userId = (int) $request->user()->user_id;
+            ForecastTrainingStatus::put($trainingId, $userId, 'queued', 5, 'Forecast retraining is queued.');
+            RetrainForecastModelJob::dispatch($trainingId, $userId);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Forecast model retrained successfully.',
-                'model_metadata' => $metadata,
-            ]);
+                'status' => 'queued',
+                'progress' => 5,
+                'message' => 'Forecast retraining started in the background.',
+                'training_id' => $trainingId,
+                'status_url' => rtrim($request->url(), '/').'/'.$trainingId,
+            ], 202);
         } catch (\Throwable $e) {
-            Log::error('Manual forecast model retrain error.', [
+            Log::error('Unable to queue forecast model retraining.', [
                 'message' => $e->getMessage(),
-                'report' => $this->forecastModelService->lastTrainingReport(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to retrain the model on this server.',
-                'details' => 'Check the server logs for the training command output.',
-                'diagnostics' => $this->forecastModelService->readinessDiagnostics(),
-                'code' => 'training_exception',
+                'message' => 'Unable to queue forecast model retraining.',
+                'details' => $e->getMessage(),
+                'code' => 'queue_dispatch_failed',
             ], 500);
         }
+    }
+
+    public function forecastModelTrainingStatus(Request $request, string $trainingId)
+    {
+        abort_unless(Str::isUuid($trainingId), 404);
+
+        $status = ForecastTrainingStatus::get($trainingId);
+        abort_unless($status && (int) ($status['user_id'] ?? 0) === (int) $request->user()->user_id, 404);
+
+        unset($status['user_id']);
+
+        return response()->json(array_merge(['success' => ($status['status'] ?? null) !== 'failed'], $status));
     }
 
     /**

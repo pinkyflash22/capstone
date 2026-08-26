@@ -26,15 +26,43 @@ public function findex()
     }
 public function getPosts(Request $request)
     {
-        $posts = Post::with(['user.role', 'comments.user.role', 'likes'])
+        $currentUserId = (int) auth()->id();
+        $posts = Post::with([
+                'user:user_id,role_id,first_name,middle_name,last_name,image,profile_thumbnail',
+                'user.role:role_id,role',
+                'comments:comment_id,post_id,user_id,content,created_at,updated_at',
+                'comments.user:user_id,role_id,first_name,middle_name,last_name,image,profile_thumbnail',
+                'comments.user.role:role_id,role',
+            ])
             ->recent()
-            ->paginate(10);
+            ->simplePaginate(10);
 
-        if (auth()->check()) {
-            $currentStationId = $this->getCurrentUserStationId();
+        if ($currentUserId > 0) {
+            $postUserIds = $posts->getCollection()->pluck('user_id')
+                ->push($currentUserId)
+                ->filter()
+                ->unique()
+                ->values();
+            $stationIdsByUser = StationOfficer::query()
+                ->whereIn('user_id', $postUserIds)
+                ->pluck('station_id', 'user_id');
+            $currentStationId = $stationIdsByUser->get($currentUserId);
+            $likedPostIds = PostLike::query()
+                ->where('user_id', $currentUserId)
+                ->whereIn('post_id', $posts->getCollection()->pluck('id'))
+                ->pluck('post_id')
+                ->map(fn ($id) => (int) $id)
+                ->flip();
+
             foreach ($posts as $post) {
-                $post->liked_by_user = $post->isLikedBy(auth()->user());
-                $post->can_manage = $this->canManagePost($post, $currentStationId);
+                $posterStationId = $stationIdsByUser->get($post->user_id);
+                $post->liked_by_user = $likedPostIds->has((int) $post->id);
+                $post->can_manage = (int) $post->user_id === $currentUserId
+                    || ($currentStationId && (int) $posterStationId === (int) $currentStationId);
+
+                foreach ($post->comments as $comment) {
+                    $comment->can_manage = (int) $comment->user_id === $currentUserId;
+                }
             }
         }
 
