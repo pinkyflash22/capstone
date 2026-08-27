@@ -492,7 +492,7 @@ class FirefighterController extends Controller
 
         return Cache::remember($cacheKey, now()->addSeconds(45), function () use ($userId) {
             $user = User::query()
-                ->select(['user_id', 'first_name', 'last_name', 'email', 'contact_number', 'role_id', 'address_id'])
+                ->select(['user_id', 'first_name', 'last_name', 'email', 'contact_number', 'image', 'profile_thumbnail', 'role_id', 'address_id'])
                 ->with([
                     'role:role_id,role',
                     'address:address_id,street,barangay_id',
@@ -576,7 +576,7 @@ class FirefighterController extends Controller
         return StationOfficer::query()
             ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
             ->with([
-                'user:user_id,first_name,last_name,email,contact_number,role_id',
+                'user:user_id,first_name,last_name,email,contact_number,image,role_id,profile_thumbnail',
                 'user.role:role_id,role',
             ])
             ->where('station_id', $stationId)
@@ -613,7 +613,7 @@ class FirefighterController extends Controller
         $membersById = StationOfficer::query()
             ->select(['station_officer_id', 'station_id', 'user_id', 'rank', 'status'])
             ->with([
-                'user:user_id,first_name,last_name,email,contact_number,image,role_id',
+                'user:user_id,first_name,last_name,email,contact_number,image,role_id,profile_thumbnail',
                 'user.role:role_id,role',
             ])
             ->whereIn('station_officer_id', $teamOfficerIds)
@@ -671,7 +671,7 @@ class FirefighterController extends Controller
     protected function loadSpotReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return SpotInvestigationReport::query()
-            ->with(['incident.marker', 'investigator.user', 'progressInvestigation', 'notedBy.user', 'approvedBy.user', 'proofImages'])
+            ->with(['incident.marker', 'investigator.user.role', 'progressInvestigation', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -681,7 +681,7 @@ class FirefighterController extends Controller
     protected function loadProgressReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return ProgressInvestigationReport::query()
-            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'proofImages'])
+            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -691,7 +691,7 @@ class FirefighterController extends Controller
     protected function loadFinalReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return FinalInvestigationReport::query()
-            ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'notedBy.user', 'approvedBy.user', 'proofImages'])
+            ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)

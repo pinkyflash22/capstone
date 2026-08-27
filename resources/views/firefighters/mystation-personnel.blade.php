@@ -48,41 +48,37 @@
                             $role = ucfirst($officer->user->role->role ?? 'station officer');
                             $phone = $officer->user->contact_number ?? null;
                             $email = $officer->user->email ?? null;
-                            $phoneHref = $phone ? preg_replace('/\D+/', '', $phone) : null;
+                            $profileImage = $officer->user->profile_thumbnail_url ?: $officer->user->profile_image_url;
                         @endphp
-                        <details class="officer-card">
-                            <summary class="officer-summary">
-                                <span class="officer-avatar" aria-hidden="true">{{ $initials }}</span>
-                                <span class="officer-main">
-                                    <span class="officer-topline">
-                                        <span class="officer-name">{{ $officerName }}</span>
-                                        <span class="status-pill officer-status {{ $statusClass }}">{{ ucwords(str_replace('-', ' ', $status)) }}</span>
-                                    </span>
-                                    <span class="officer-meta">{{ $rank }} <span aria-hidden="true">&bull;</span> {{ $role }}</span>
-                                </span>
-                                <span class="officer-chevron" aria-hidden="true">
-                                    <i class="fa-solid fa-chevron-down"></i>
-                                </span>
-                            </summary>
-                            <div class="officer-details">
-                                @if($phone)
-                                    <a class="officer-contact" href="tel:{{ $phoneHref }}" aria-label="Call {{ $officerName }} at {{ $phone }}">
-                                        <i class="fa-solid fa-phone"></i>
-                                        <span>{{ $phone }}</span>
-                                    </a>
-                                @elseif($email)
-                                    <a class="officer-contact" href="mailto:{{ $email }}" aria-label="Email {{ $officerName }} at {{ $email }}">
-                                        <i class="fa-solid fa-envelope"></i>
-                                        <span>{{ $email }}</span>
-                                    </a>
-                                @else
-                                    <span class="officer-contact">
-                                        <i class="fa-solid fa-phone-slash"></i>
-                                        <span>No contact listed</span>
-                                    </span>
-                                @endif
-                            </div>
-                        </details>
+                        <button
+                            type="button"
+                            class="officer-card station-person-card"
+                            data-crew-member-card
+                            data-member-group="Station officer"
+                            data-member-name="{{ $officerName }}"
+                            data-member-position="{{ $rank }}"
+                            data-member-role="{{ $role }}"
+                            data-member-rank="{{ $rank }}"
+                            data-member-status="{{ ucwords(str_replace('-', ' ', $status)) }}"
+                            data-member-email="{{ $email }}"
+                            data-member-contact="{{ $phone }}"
+                            data-member-image="{{ $profileImage }}"
+                            data-member-initials="{{ $initials }}"
+                            aria-haspopup="dialog"
+                            aria-controls="crewMemberDetailModal"
+                        >
+                            <span class="officer-avatar" aria-hidden="true">
+                                @if($profileImage)<img src="{{ $profileImage }}" alt="" loading="lazy">@else<span>{{ $initials }}</span>@endif
+                            </span>
+                            <span class="officer-main">
+                                <span class="officer-topline"><span class="officer-name">{{ $officerName }}</span></span>
+                                <span class="officer-meta">{{ $rank }} <span aria-hidden="true">&bull;</span> {{ $role }}</span>
+                            </span>
+                            <span class="station-person-trailing">
+                                <span class="status-pill officer-status {{ $statusClass }}">{{ ucwords(str_replace('-', ' ', $status)) }}</span>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </span>
+                        </button>
                     @endforeach
                 </div>
             @endif
@@ -149,6 +145,7 @@
                             type="button"
                             class="crew-member-card"
                             data-crew-member-card
+                            data-member-group="Response crew"
                             data-member-name="{{ $member->name }}"
                             data-member-position="{{ $memberPosition }}"
                             data-member-role="{{ ucfirst($member->role_name ?: 'firefighter') }}"
@@ -180,29 +177,3 @@
         </div>
     </section>
 </section>
-
-<div class="crew-member-modal" id="crewMemberDetailModal" aria-hidden="true">
-    <button type="button" class="crew-member-modal__backdrop" data-crew-member-close aria-label="Close firefighter details"></button>
-    <section class="crew-member-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="crewMemberDetailName">
-        <button type="button" class="crew-member-modal__close" data-crew-member-close aria-label="Close firefighter details">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-        <div class="crew-member-modal__identity">
-            <div class="crew-member-modal__photo" data-crew-modal-photo></div>
-            <div>
-                <span class="crew-member-modal__eyebrow">Response crew</span>
-                <h3 id="crewMemberDetailName" data-crew-modal-name>Firefighter</h3>
-                <p data-crew-modal-position>Position</p>
-            </div>
-        </div>
-        <dl class="crew-member-modal__details">
-            <div><dt>Rank</dt><dd data-crew-modal-rank>Not recorded</dd></div>
-            <div><dt>Role</dt><dd data-crew-modal-role>Firefighter</dd></div>
-            <div><dt>Status</dt><dd data-crew-modal-status>Available</dd></div>
-            <div><dt>Contact</dt><dd data-crew-modal-contact>Not provided</dd></div>
-        </dl>
-        <a class="crew-member-modal__email" data-crew-modal-email hidden>
-            <i class="fa-solid fa-envelope"></i><span></span>
-        </a>
-    </section>
-</div>

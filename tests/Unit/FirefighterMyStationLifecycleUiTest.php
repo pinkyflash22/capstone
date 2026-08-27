@@ -30,22 +30,53 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
     public function crew_members_render_as_profile_cards_with_a_compact_detail_modal(): void
     {
         $controller = file_get_contents(app_path('Http/Controllers/staff/FirefighterController.php'));
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
         $personnel = file_get_contents(resource_path('views/firefighters/mystation-personnel.blade.php'));
+        $reportPerson = file_get_contents(resource_path('views/firefighters/partials/person-trigger.blade.php'));
         $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));
+        $redesignStyles = file_get_contents(resource_path('css/firefighters/my-station.css'));
 
         $this->assertStringContainsString('first_name,last_name,email,contact_number,image,role_id', $controller);
         $this->assertStringContainsString("'profile_image_url' => \$member->user->profile_image_url", $controller);
         $this->assertStringContainsString('data-crew-member-card', $personnel);
-        $this->assertStringContainsString('id="crewMemberDetailModal"', $personnel);
+        $this->assertStringContainsString('data-member-image="{{ $profileImage }}"', $personnel);
+        $this->assertStringContainsString('id="crewMemberDetailModal"', $view);
+        $this->assertStringContainsString('class="report-person-card"', $reportPerson);
+        $this->assertStringContainsString('profile_thumbnail_url', $reportPerson);
         $this->assertStringContainsString('function openCrewMemberModal', $script);
         $this->assertStringContainsString('function closeCrewMemberModal', $script);
+        $this->assertStringContainsString('function createCurrentOfficerTrigger', $script);
         $this->assertStringContainsString('.crew-member-card:hover', $styles);
         $this->assertStringContainsString('.crew-member-modal__dialog', $styles);
+        $this->assertStringContainsString('.officer-card.station-person-card', $redesignStyles);
         $this->assertStringContainsString('Identity and contact safeguards live with the primary station breakpoint.', $styles);
         $this->assertStringNotContainsString('My Station mobile identity polish', $styles);
         $this->assertStringContainsString('[data-ff-page-root="station"] > .main-content > .station-shell-page', $styles);
         $this->assertStringNotContainsString('.main-content:has(> [data-ff-page-root="station"])', $styles);
+    }
+
+    #[Test]
+    public function station_content_is_ordered_by_operational_priority_and_has_mobile_specific_polish(): void
+    {
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
+        $styles = file_get_contents(resource_path('css/firefighters/my-station.css'));
+        $reports = file_get_contents(resource_path('views/firefighters/mystation-reports-table.blade.php'));
+
+        $personnelPosition = strpos($view, 'id="stationPersonnelSection"');
+        $equipmentPosition = strpos($view, 'id="stationEquipmentSection"');
+        $reportsPosition = strpos($view, 'id="stationReportsSection"');
+        $galleryPosition = strpos($view, 'id="stationOverviewSection"');
+
+        $this->assertNotFalse($personnelPosition);
+        $this->assertGreaterThan($personnelPosition, $equipmentPosition);
+        $this->assertGreaterThan($equipmentPosition, $reportsPosition);
+        $this->assertGreaterThan($reportsPosition, $galleryPosition);
+        $this->assertStringContainsString('Operational readiness', $view);
+        $this->assertStringContainsString('Highest priority', $view);
+        $this->assertStringContainsString("@media (max-width: 768px)", $styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr));', $styles);
+        $this->assertSame(3, substr_count($reports, "firefighters.partials.person-trigger"));
     }
 
     #[Test]

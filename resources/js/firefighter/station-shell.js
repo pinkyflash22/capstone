@@ -10,6 +10,7 @@ function bootFirefighterMyStationPage() {
     const routes = config.routes || {};
     const csrfToken = config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || '';
     const currentOfficerName = config.currentOfficerName || 'Current Station Officer';
+    const currentOfficer = config.currentOfficer || { name: currentOfficerName };
     const finalSubstantiatingDocumentOptions = Array.isArray(config.finalSubstantiatingDocumentOptions)
         ? config.finalSubstantiatingDocumentOptions
         : [];
@@ -63,6 +64,32 @@ function bootFirefighterMyStationPage() {
         return div.innerHTML;
     }
 
+    function createCurrentOfficerTrigger(contextLabel = 'Report investigator') {
+        const name = currentOfficer.name || currentOfficerName;
+        const rank = currentOfficer.rank || 'Rank not recorded';
+        const initials = currentOfficer.initials || 'FF';
+        const photo = currentOfficer.image
+            ? `<img src="${escapeHtml(currentOfficer.image)}" alt="" loading="lazy">`
+            : `<span>${escapeHtml(initials)}</span>`;
+
+        return `<button type="button" class="report-person-card" data-crew-member-card
+            data-member-group="${escapeHtml(contextLabel)}"
+            data-member-name="${escapeHtml(name)}"
+            data-member-position="${escapeHtml(rank)}"
+            data-member-role="${escapeHtml(currentOfficer.role || 'Firefighter')}"
+            data-member-rank="${escapeHtml(rank)}"
+            data-member-status="${escapeHtml(currentOfficer.status || 'Available')}"
+            data-member-email="${escapeHtml(currentOfficer.email || '')}"
+            data-member-contact="${escapeHtml(currentOfficer.contact || '')}"
+            data-member-image="${escapeHtml(currentOfficer.image || '')}"
+            data-member-initials="${escapeHtml(initials)}"
+            aria-haspopup="dialog" aria-controls="crewMemberDetailModal">
+            <span class="report-person-photo" aria-hidden="true">${photo}</span>
+            <span class="report-person-copy"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(rank)}</small></span>
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        </button>`;
+    }
+
     function closeCrewMemberModal({ restoreFocus = true } = {}) {
         const modal = document.getElementById('crewMemberDetailModal');
         if (!modal) return;
@@ -88,6 +115,7 @@ function bootFirefighterMyStationPage() {
         };
 
         setText('[data-crew-modal-name]', data.memberName, 'Firefighter');
+        setText('[data-crew-modal-group]', data.memberGroup, 'Station personnel');
         setText('[data-crew-modal-position]', data.memberPosition, 'Response Crew');
         setText('[data-crew-modal-rank]', data.memberRank, 'Not recorded');
         setText('[data-crew-modal-role]', data.memberRole, 'Firefighter');
@@ -1441,12 +1469,12 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="spot-report-${report.id}">
-                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Spot report</div></td>
-                <td>${escapeHtml(report.investigator_name || currentOfficerName)}</td>
-                <td>${escapeHtml(formatDateTime(report.fire_started))}<br>${escapeHtml(formatDateTime(report.fire_out))}</td>
-                <td>${escapeHtml(formatMoney(report.estimated_damage))}</td>
-                <td>${escapeHtml(String(report.occupancy || 'n/a').replace(/^./, (match) => match.toUpperCase()))}</td>
-                <td>${createActionButtons('spot', report)}</td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Spot report</div></td>
+                <td data-label="Investigator">${createCurrentOfficerTrigger('Spot report investigator')}</td>
+                <td data-label="Fire timeline">${escapeHtml(formatDateTime(report.fire_started))}<br>${escapeHtml(formatDateTime(report.fire_out))}</td>
+                <td data-label="Damage">${escapeHtml(formatMoney(report.estimated_damage))}</td>
+                <td data-label="Occupancy">${escapeHtml(String(report.occupancy || 'n/a').replace(/^./, (match) => match.toUpperCase()))}</td>
+                <td data-label="Actions">${createActionButtons('spot', report)}</td>
             </tr>
         `);
 
@@ -1461,12 +1489,12 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="progress-report-${report.id}">
-                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Progress report</div></td>
-                <td>${escapeHtml(report.fire_origin_name || 'N/A')}</td>
-                <td>${escapeHtml(report.fire_cause || 'N/A')}</td>
-                <td>${escapeHtml(report.responsible_arson || 'Not specified')}</td>
-                <td>${escapeHtml(report.investigator_name || currentOfficerName)}</td>
-                <td>${createActionButtons('progress', report)}</td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Progress report</div></td>
+                <td data-label="Fire origin">${escapeHtml(report.fire_origin_name || 'N/A')}</td>
+                <td data-label="Cause">${escapeHtml(report.fire_cause || 'N/A')}</td>
+                <td data-label="Responsible party">${escapeHtml(report.responsible_arson || 'Not specified')}</td>
+                <td data-label="Investigator">${createCurrentOfficerTrigger('Progress report investigator')}</td>
+                <td data-label="Actions">${createActionButtons('progress', report)}</td>
             </tr>
         `);
 
@@ -1476,16 +1504,17 @@ function bootFirefighterMyStationPage() {
     function appendFinalReportRow(report) {
         const tbody = document.getElementById('finalReportsTableBody');
         if (!tbody || !report?.id) return;
-        const emptyState = tbody.querySelector('td[colspan="5"]')?.closest('tr');
+        const emptyState = tbody.querySelector('td[colspan="6"]')?.closest('tr');
         if (emptyState) emptyState.remove();
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="final-report-${report.id}">
-                <td><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Final report</div></td>
-                <td>${escapeHtml(report.exact_address || 'N/A')}</td>
-                <td>${escapeHtml(formatMoney(report.total_damage))}</td>
-                <td>${escapeHtml(formatDateTime(report.created_at))}</td>
-                <td>${createActionButtons('final', report)}</td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Final report</div></td>
+                <td data-label="Address">${escapeHtml(report.exact_address || 'N/A')}</td>
+                <td data-label="Total damage">${escapeHtml(formatMoney(report.total_damage))}</td>
+                <td data-label="Investigator">${createCurrentOfficerTrigger('Final report investigator')}</td>
+                <td data-label="Created">${escapeHtml(formatDateTime(report.created_at))}</td>
+                <td data-label="Actions">${createActionButtons('final', report)}</td>
             </tr>
         `);
 

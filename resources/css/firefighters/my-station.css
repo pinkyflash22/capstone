@@ -1,0 +1,572 @@
+/* Final, page-specific cascade for the firefighter operational station workspace. */
+[data-ff-page-root="station"] .station-shell {
+    width: min(1380px, 100%);
+    margin-inline: auto;
+    gap: 18px;
+}
+
+[data-ff-page-root="station"] .station-identity-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+    padding: 26px 28px;
+    border: 1px solid rgba(234, 88, 12, 0.14);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at 88% 12%, rgba(251, 191, 36, 0.2), transparent 28%),
+        linear-gradient(135deg, #fff7ed 0%, #fffbeb 44%, #fff 100%);
+    box-shadow: 0 20px 48px rgba(124, 45, 18, 0.08);
+}
+
+[data-ff-page-root="station"] .station-identity-avatar {
+    width: 82px;
+    height: 82px;
+    flex: 0 0 82px;
+    overflow: hidden;
+    border: 5px solid rgba(255, 255, 255, 0.9);
+    border-radius: 24px;
+    box-shadow: 0 14px 30px rgba(194, 65, 12, 0.16);
+}
+
+[data-ff-page-root="station"] .station-identity-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: min(210px, 100%);
+}
+
+[data-ff-page-root="station"] .station-identity-actions .btn {
+    min-height: 42px;
+    justify-content: flex-start;
+    border-radius: 13px;
+    box-shadow: none;
+}
+
+[data-ff-page-root="station"] .station-workspace-heading,
+[data-ff-page-root="station"] .station-flow-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+    padding-inline: 4px;
+}
+
+[data-ff-page-root="station"] .station-workspace-kicker,
+[data-ff-page-root="station"] .station-flow-heading > div > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #c2410c;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+[data-ff-page-root="station"] .station-workspace-heading h2,
+[data-ff-page-root="station"] .station-flow-heading h2 {
+    margin: 6px 0 0;
+    color: #172033;
+    letter-spacing: -0.025em;
+}
+
+[data-ff-page-root="station"] .station-workspace-heading h2 {
+    font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+}
+
+[data-ff-page-root="station"] .station-workspace-heading p,
+[data-ff-page-root="station"] .station-flow-heading p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.55;
+}
+
+[data-ff-page-root="station"] .station-workspace-order {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border: 1px solid #fed7aa;
+    border-radius: 999px;
+    color: #9a3412;
+    background: #fff7ed;
+    font-size: 0.7rem;
+    font-weight: 850;
+}
+
+[data-ff-page-root="station"] .station-flow-heading {
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 8px;
+}
+
+[data-ff-page-root="station"] .station-flow-index {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border: 1px solid #fed7aa;
+    border-radius: 15px;
+    color: #c2410c;
+    background: linear-gradient(145deg, #fff7ed, #fffbeb);
+    font-size: 0.78rem;
+    font-weight: 950;
+}
+
+[data-ff-page-root="station"] .station-flow-heading h2 {
+    font-size: 1.08rem;
+}
+
+[data-ff-page-root="station"] .station-flow-heading--supporting .station-flow-index {
+    color: #64748b;
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+[data-ff-page-root="station"] .station-summary-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 104px;
+    border: 1px solid #e8edf3;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.045);
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+[data-ff-page-root="station"] .station-summary-card::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(#f97316, #fbbf24);
+}
+
+[data-ff-page-root="station"] .station-summary-card:hover {
+    transform: translateY(-2px);
+    border-color: #fed7aa;
+    box-shadow: 0 14px 30px rgba(124, 45, 18, 0.07);
+}
+
+[data-ff-page-root="station"] .section-card,
+[data-ff-page-root="station"] .section-shell-card {
+    padding: 20px;
+    border: 1px solid #e8edf3;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+[data-ff-page-root="station"] .station-ops-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(265px, 0.65fr);
+    gap: 16px;
+}
+
+[data-ff-page-root="station"] .officer-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+[data-ff-page-root="station"] .officer-card.station-person-card {
+    appearance: none;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 11px;
+    margin: 0;
+    padding: 11px;
+    overflow: hidden;
+    border: 1px solid #e8edf3;
+    border-radius: 16px;
+    color: inherit;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+[data-ff-page-root="station"] .officer-card.station-person-card:hover,
+[data-ff-page-root="station"] .officer-card.station-person-card:focus-visible,
+[data-ff-page-root="station"] .report-person-card:hover,
+[data-ff-page-root="station"] .report-person-card:focus-visible {
+    outline: none;
+    transform: translateY(-1px);
+    border-color: #fdba74;
+    box-shadow: 0 10px 22px rgba(124, 45, 18, 0.08);
+}
+
+[data-ff-page-root="station"] .officer-avatar {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    border: 3px solid #fff7ed;
+    border-radius: 15px;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b, #c2410c);
+    box-shadow: inset 0 0 0 1px #fed7aa;
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+[data-ff-page-root="station"] .officer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+[data-ff-page-root="station"] .officer-name,
+[data-ff-page-root="station"] .officer-meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-ff-page-root="station"] .officer-name {
+    color: #1e293b;
+    font-size: 0.83rem;
+    font-weight: 850;
+}
+
+[data-ff-page-root="station"] .officer-meta {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 0.69rem;
+}
+
+[data-ff-page-root="station"] .station-person-trailing {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+}
+
+[data-ff-page-root="station"] .station-person-trailing > i {
+    color: #cbd5e1;
+    font-size: 0.66rem;
+}
+
+[data-ff-page-root="station"] .officer-status {
+    max-width: 94px;
+    padding: 5px 7px;
+    overflow: hidden;
+    font-size: 0.58rem;
+    letter-spacing: 0.03em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-ff-page-root="station"] .crew-card-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+}
+
+[data-ff-page-root="station"] .crew-member-card {
+    min-width: 0;
+    width: 100%;
+}
+
+[data-ff-page-root="station"] .station-reports-card .section-header {
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+[data-ff-page-root="station"] .report-tabs {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 14px 0;
+    padding: 4px;
+    overflow-x: auto;
+    border: 1px solid #e8edf3;
+    border-radius: 14px;
+    background: #f8fafc;
+}
+
+[data-ff-page-root="station"] .report-tab {
+    min-height: 38px;
+    border-radius: 10px;
+}
+
+[data-ff-page-root="station"] .report-tab.active {
+    color: #fff;
+    background: linear-gradient(135deg, #c2410c, #ea580c);
+    box-shadow: 0 7px 16px rgba(194, 65, 12, 0.18);
+}
+
+[data-ff-page-root="station"] .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e8edf3;
+    border-radius: 16px;
+}
+
+[data-ff-page-root="station"] .data-table th {
+    color: #64748b;
+    background: #f8fafc;
+    font-size: 0.66rem;
+    letter-spacing: 0.065em;
+}
+
+[data-ff-page-root="station"] .data-table td {
+    color: #334155;
+    font-size: 0.78rem;
+    vertical-align: middle;
+}
+
+[data-ff-page-root="station"] .report-person-card {
+    appearance: none;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: min(210px, 100%);
+    min-width: 150px;
+    padding: 6px 8px;
+    border: 1px solid #e8edf3;
+    border-radius: 12px;
+    color: inherit;
+    background: #fff;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+[data-ff-page-root="station"] .report-person-photo {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    overflow: hidden;
+    border-radius: 10px;
+    color: #fff;
+    background: linear-gradient(135deg, #f59e0b, #c2410c);
+    font-size: 0.65rem;
+    font-weight: 900;
+}
+
+[data-ff-page-root="station"] .report-person-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+[data-ff-page-root="station"] .report-person-copy {
+    min-width: 0;
+}
+
+[data-ff-page-root="station"] .report-person-copy strong,
+[data-ff-page-root="station"] .report-person-copy small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-ff-page-root="station"] .report-person-copy strong {
+    color: #334155;
+    font-size: 0.72rem;
+}
+
+[data-ff-page-root="station"] .report-person-copy small {
+    margin-top: 2px;
+    color: #94a3b8;
+    font-size: 0.61rem;
+}
+
+[data-ff-page-root="station"] .report-person-card > i {
+    color: #cbd5e1;
+    font-size: 0.7rem;
+}
+
+[data-ff-page-root="station"] .crew-member-modal__dialog {
+    border-radius: 22px;
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+}
+
+@media (max-width: 1100px) {
+    [data-ff-page-root="station"] .station-identity-card {
+        grid-template-columns: 1fr;
+    }
+
+    [data-ff-page-root="station"] .station-identity-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    [data-ff-page-root="station"] .station-identity-actions .btn {
+        justify-content: center;
+    }
+
+    [data-ff-page-root="station"] .officer-list {
+        grid-template-columns: 1fr;
+    }
+
+    [data-ff-page-root="station"] .crew-card-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    [data-ff-page-root="station"] .station-shell {
+        gap: 12px;
+    }
+
+    [data-ff-page-root="station"] .station-identity-card {
+        padding: 15px;
+        border-radius: 21px;
+    }
+
+    [data-ff-page-root="station"] .station-identity-avatar {
+        width: 52px;
+        height: 52px;
+        flex-basis: 52px;
+        border-width: 3px;
+        border-radius: 16px;
+    }
+
+    [data-ff-page-root="station"] .station-identity-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    [data-ff-page-root="station"] .station-identity-actions .btn:first-child {
+        grid-column: 1 / -1;
+    }
+
+    [data-ff-page-root="station"] .station-workspace-heading {
+        align-items: flex-start;
+        padding-inline: 2px;
+    }
+
+    [data-ff-page-root="station"] .station-workspace-order {
+        padding: 7px;
+        font-size: 0;
+    }
+
+    [data-ff-page-root="station"] .station-workspace-order i {
+        font-size: 0.76rem;
+    }
+
+    [data-ff-page-root="station"] .station-flow-heading {
+        padding: 6px 2px 0;
+    }
+
+    [data-ff-page-root="station"] .station-flow-index {
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
+        border-radius: 13px;
+        font-size: 0.68rem;
+    }
+
+    [data-ff-page-root="station"] .station-flow-heading h2 {
+        margin-top: 3px;
+        font-size: 0.98rem;
+    }
+
+    [data-ff-page-root="station"] .station-flow-heading p {
+        margin-top: 3px;
+        font-size: 0.7rem;
+    }
+
+    [data-ff-page-root="station"] .section-card,
+    [data-ff-page-root="station"] .section-shell-card {
+        padding: 12px;
+        border-radius: 18px;
+    }
+
+    [data-ff-page-root="station"] .station-summary-card {
+        min-height: 84px;
+    }
+
+    [data-ff-page-root="station"] .station-ops-grid,
+    [data-ff-page-root="station"] .crew-card-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    [data-ff-page-root="station"] .officer-card.station-person-card {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        padding: 9px;
+    }
+
+    [data-ff-page-root="station"] .officer-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .section-header {
+        align-items: stretch;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .action-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .action-row .btn {
+        min-width: 0;
+        padding-inline: 7px;
+        font-size: 0.68rem;
+    }
+
+    [data-ff-page-root="station"] .report-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        overflow: visible;
+    }
+
+    [data-ff-page-root="station"] .report-tab {
+        min-width: 0;
+        padding-inline: 6px;
+        font-size: 0.66rem;
+        white-space: normal;
+    }
+
+    [data-ff-page-root="station"] .report-person-card {
+        width: 100%;
+        min-width: 0;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .data-table tr {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        padding: 12px;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .data-table td,
+    [data-ff-page-root="station"] .station-reports-card .data-table td[data-label] {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        justify-self: stretch;
+        text-align: left;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .data-table td + td {
+        padding-top: 8px;
+        border-top: 1px solid #eef2f7;
+    }
+
+    [data-ff-page-root="station"] .station-reports-card .data-table td[data-label="Actions"] {
+        padding-top: 10px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-ff-page-root="station"] .station-summary-card,
+    [data-ff-page-root="station"] .officer-card.station-person-card,
+    [data-ff-page-root="station"] .report-person-card {
+        transition: none;
+    }
+}

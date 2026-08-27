@@ -15,15 +15,15 @@
                 @forelse($reports as $report)
                     @php $hasFinal = (bool) $report->finalInvestigation; @endphp
                     <tr id="progress-report-{{ $report->progress_investigation_report_id }}">
-                        <td>
+                        <td data-label="Incident">
                             <div class="table-title">{{ $report->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
                             <div class="table-muted">Spot report</div>
                         </td>
-                        <td>{{ $report->fireOrigin?->origin ?? 'N/A' }}</td>
-                        <td>{{ $report->fire_cause ?? 'N/A' }}</td>
-                        <td>{{ $report->responsible_arson ?? 'Not specified' }}</td>
-                        <td>{{ trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unknown investigator' }}</td>
-                        <td>
+                        <td data-label="Fire origin">{{ $report->fireOrigin?->origin ?? 'N/A' }}</td>
+                        <td data-label="Cause">{{ $report->fire_cause ?? 'N/A' }}</td>
+                        <td data-label="Responsible party">{{ $report->responsible_arson ?? 'Not specified' }}</td>
+                        <td data-label="Investigator">@include('firefighters.partials.person-trigger', ['personOfficer' => $report->investigator, 'contextLabel' => 'Progress report investigator'])</td>
+                        <td data-label="Actions">
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.progress-reports.pir.word', ['progressReportId' => $report->progress_investigation_report_id]) }}">Word</a>
@@ -55,6 +55,7 @@
                     <th>Progress Report</th>
                     <th>Exact Address</th>
                     <th>Total Damage</th>
+                    <th>Investigator</th>
                     <th>Created</th>
                     <th>Actions</th>
                 </tr>
@@ -62,14 +63,15 @@
             <tbody id="finalReportsTableBody">
                 @forelse($reports as $report)
                     <tr id="final-report-{{ $report->final_investigation_report_id }}">
-                        <td>
+                        <td data-label="Incident">
                             <div class="table-title">{{ $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
                             <div class="table-muted">Progress report</div>
                         </td>
-                        <td>{{ $report->exact_address ?? 'N/A' }}</td>
-                        <td>PHP {{ number_format((float) ($report->total_damage ?? 0), 2) }}</td>
-                        <td>{{ optional($report->created_at)->format('M d, Y h:i A') ?: 'N/A' }}</td>
-                        <td>
+                        <td data-label="Address">{{ $report->exact_address ?? 'N/A' }}</td>
+                        <td data-label="Total damage">PHP {{ number_format((float) ($report->total_damage ?? 0), 2) }}</td>
+                        <td data-label="Investigator">@include('firefighters.partials.person-trigger', ['personOfficer' => $report->investigator, 'contextLabel' => 'Final report investigator'])</td>
+                        <td data-label="Created">{{ optional($report->created_at)->format('M d, Y h:i A') ?: 'N/A' }}</td>
+                        <td data-label="Actions">
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.final-reports.fir.word', ['finalReportId' => $report->final_investigation_report_id]) }}">Word</a>
@@ -80,7 +82,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-box-open"></i>
                                 <div>No final reports yet.</div>
@@ -108,15 +110,15 @@
                 @forelse($reports as $report)
                     @php $hasProgress = (bool) $report->progressInvestigation; @endphp
                     <tr id="spot-report-{{ $report->spot_investigation_report_id }}">
-                        <td>
+                        <td data-label="Incident">
                             <div class="table-title">{{ $report->incident?->marker?->title ?? 'Fire incident' }}</div>
                             <div class="table-muted">Spot report</div>
                         </td>
-                        <td>{{ trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unknown investigator' }}</td>
-                        <td>{{ optional($report->fire_started)->format('M d, Y h:i A') ?: 'N/A' }}<br>{{ optional($report->fire_out)->format('M d, Y h:i A') ?: 'N/A' }}</td>
-                        <td>PHP {{ number_format((float) ($report->estimated_damage ?? 0), 2) }}</td>
-                        <td>{{ ucfirst($report->occupancy ?? 'n/a') }}</td>
-                        <td>
+                        <td data-label="Investigator">@include('firefighters.partials.person-trigger', ['personOfficer' => $report->investigator, 'contextLabel' => 'Spot report investigator'])</td>
+                        <td data-label="Fire timeline">{{ optional($report->fire_started)->format('M d, Y h:i A') ?: 'N/A' }}<br>{{ optional($report->fire_out)->format('M d, Y h:i A') ?: 'N/A' }}</td>
+                        <td data-label="Damage">PHP {{ number_format((float) ($report->estimated_damage ?? 0), 2) }}</td>
+                        <td data-label="Occupancy">{{ ucfirst($report->occupancy ?? 'n/a') }}</td>
+                        <td data-label="Actions">
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.spot-reports.sir.word', ['spotReportId' => $report->spot_investigation_report_id]) }}">Word</a>

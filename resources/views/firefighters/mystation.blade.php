@@ -12,6 +12,7 @@
         'resources/css/app.css',
         'resources/css/firefighters/portal.css',
         'resources/css/firefighters/station-shell.css',
+        'resources/css/firefighters/my-station.css',
     ])
 
     @php
@@ -54,7 +55,7 @@
                         </div>
 
                         <div class="station-identity-copy">
-                            <span class="station-chip"><i class="fa-solid fa-location-dot"></i> Responder Station</span>
+                            <span class="station-chip"><i class="fa-solid fa-shield-halved"></i> Station command workspace</span>
                             <h1 class="station-title" id="stationIdentityTitle">{{ $stationName }}</h1>
                             <div class="station-identity-meta" aria-label="Station quick details">
                                 {{-- <span><i class="fa-solid fa-hashtag"></i>{{ $stationCode }}</span> --}}
@@ -77,16 +78,26 @@
                     </div>
 
                     <div class="station-identity-actions">
-                        <a href="#stationPersonnelSection" class="btn btn-outline"><i class="fa-solid fa-users"></i> Roster</a>
-                        <a href="#stationReportsPanelContainer" class="btn btn-primary"><i class="fa-solid fa-file-lines"></i> Reports</a>
+                        <a href="#stationPersonnelSection" class="btn btn-primary"><i class="fa-solid fa-people-group"></i> Response team</a>
+                        <a href="#stationEquipmentSection" class="btn btn-outline"><i class="fa-solid fa-truck-medical"></i> Readiness</a>
+                        <a href="#stationReportsSection" class="btn btn-outline"><i class="fa-solid fa-file-lines"></i> Reports</a>
                     </div>
                 </section>
+
+                <header class="station-workspace-heading">
+                    <div>
+                        <span class="station-workspace-kicker"><i class="fa-solid fa-signal"></i> Live station overview</span>
+                        <h2>Operational readiness</h2>
+                        <p>Response personnel and deployable resources are prioritized before administrative documentation.</p>
+                    </div>
+                    <span class="station-workspace-order"><i class="fa-solid fa-arrow-down-wide-short"></i> Priority order</span>
+                </header>
 
                 <section class="station-summary-grid" aria-label="Station operations summary">
                     <article class="station-summary-card" data-station-summary-card="officers">
                         <span class="station-summary-icon"><i class="fa-solid fa-user-shield"></i></span>
                         <div>
-                            <span class="station-summary-label">Officers on Duty</span>
+                            <span class="station-summary-label">Available officers</span>
                             <strong data-station-summary-value="officers">--</strong>
                             <small data-station-summary-context="officers">Loading roster</small>
                         </div>
@@ -94,7 +105,7 @@
                     <article class="station-summary-card" data-station-summary-card="equipment">
                         <span class="station-summary-icon"><i class="fa-solid fa-toolbox"></i></span>
                         <div>
-                            <span class="station-summary-label">Ready Equipment</span>
+                            <span class="station-summary-label">Deployable equipment</span>
                             <strong data-station-summary-value="equipment">--</strong>
                             <small data-station-summary-context="equipment">Loading equipment</small>
                         </div>
@@ -102,7 +113,7 @@
                     <article class="station-summary-card" data-station-summary-card="reports">
                         <span class="station-summary-icon"><i class="fa-solid fa-clipboard-list"></i></span>
                         <div>
-                            <span class="station-summary-label">Investigation Reports</span>
+                            <span class="station-summary-label">Documentation</span>
                             <strong data-station-summary-value="reports">--</strong>
                             <small data-station-summary-context="reports">Loading current tab</small>
                         </div>
@@ -110,13 +121,17 @@
                     <article class="station-summary-card" data-station-summary-card="photos">
                         <span class="station-summary-icon"><i class="fa-solid fa-image"></i></span>
                         <div>
-                            <span class="station-summary-label">Station Photos</span>
+                            <span class="station-summary-label">Station gallery</span>
                             <strong data-station-summary-value="photos">--</strong>
                             <small data-station-summary-context="photos">Loading gallery</small>
                         </div>
                     </article>
                 </section>
 
+                <div class="station-flow-heading">
+                    <span class="station-flow-index">01</span>
+                    <div><span>Highest priority</span><h2>Response personnel</h2><p>See who is available, assigned, or currently part of your response crew.</p></div>
+                </div>
                 <div id="stationPersonnelSection" class="station-section-shell" data-station-section="personnel">
                     <div class="section-shell-card station-loading-card">
                         <i class="fa-solid fa-users"></i>
@@ -124,10 +139,26 @@
                     </div>
                 </div>
 
-                <section class="section-card">
+                <div class="station-flow-heading">
+                    <span class="station-flow-index">02</span>
+                    <div><span>Deployment readiness</span><h2>Vehicles and equipment</h2><p>Review resources that can be deployed before preparing station documentation.</p></div>
+                </div>
+                <div id="stationEquipmentSection" class="station-section-shell" data-station-section="equipment">
+                    <div class="section-shell-card station-loading-card">
+                        <i class="fa-solid fa-truck-medical"></i>
+                        <span>Loading equipment...</span>
+                    </div>
+                </div>
+
+                <div class="station-flow-heading">
+                    <span class="station-flow-index">03</span>
+                    <div><span>After-action records</span><h2>Investigation documentation</h2><p>Create, review, and download station investigation reports.</p></div>
+                </div>
+                <section class="section-card station-reports-card" id="stationReportsSection">
                     <div class="section-header">
                         <div>
                             <div class="section-title"><i class="fa-solid fa-file-lines"></i> Investigation Reports</div>
+                            <div class="section-subtitle">Station-scoped reports, ordered from the latest record.</div>
                         </div>
                         <div class="action-row">
                             <button type="button" class="btn btn-outline" data-open-report-modal="spot"><i class="fa-solid fa-plus"></i> New Spot</button>
@@ -150,13 +181,10 @@
                     </div>
                 </section>
 
-                <div id="stationEquipmentSection" class="station-section-shell" data-station-section="equipment">
-                    <div class="section-shell-card station-loading-card">
-                        <i class="fa-solid fa-truck-medical"></i>
-                        <span>Loading equipment...</span>
-                    </div>
+                <div class="station-flow-heading station-flow-heading--supporting">
+                    <span class="station-flow-index">04</span>
+                    <div><span>Supporting information</span><h2>Station gallery</h2><p>Reference photos and visual records for the assigned station.</p></div>
                 </div>
-
                 <div id="stationOverviewSection" class="station-section-shell" data-station-section="overview">
                     <div class="section-shell-card station-loading-card">
                         <i class="fa-solid fa-images"></i>
@@ -166,6 +194,24 @@
             </div>
         </div>
     </main>
+
+    <div class="crew-member-modal" id="crewMemberDetailModal" aria-hidden="true">
+        <button type="button" class="crew-member-modal__backdrop" data-crew-member-close aria-label="Close personnel details"></button>
+        <section class="crew-member-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="crewMemberDetailName">
+            <button type="button" class="crew-member-modal__close" data-crew-member-close aria-label="Close personnel details"><i class="fa-solid fa-xmark"></i></button>
+            <div class="crew-member-modal__identity">
+                <div class="crew-member-modal__photo" data-crew-modal-photo></div>
+                <div><span class="crew-member-modal__eyebrow" data-crew-modal-group>Station personnel</span><h3 id="crewMemberDetailName" data-crew-modal-name>Firefighter</h3><p data-crew-modal-position>Position</p></div>
+            </div>
+            <dl class="crew-member-modal__details">
+                <div><dt>Rank</dt><dd data-crew-modal-rank>Not recorded</dd></div>
+                <div><dt>Role</dt><dd data-crew-modal-role>Firefighter</dd></div>
+                <div><dt>Status</dt><dd data-crew-modal-status>Available</dd></div>
+                <div><dt>Contact</dt><dd data-crew-modal-contact>Not provided</dd></div>
+            </dl>
+            <a class="crew-member-modal__email" data-crew-modal-email hidden><i class="fa-solid fa-envelope"></i><span></span></a>
+        </section>
+    </div>
 
     <div class="report-modal" id="spotReportModal" role="dialog" aria-modal="true" aria-labelledby="spotReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
@@ -580,6 +626,16 @@
             csrfToken: @json(csrf_token()),
             activeReportTab: @json($activeReportTab),
             currentOfficerName: @json($currentOfficerName),
+            currentOfficer: @json([
+                'name' => $currentOfficerName,
+                'rank' => $stationOfficer?->rank ?: 'Rank not recorded',
+                'role' => ucfirst($user?->role?->role ?? 'firefighter'),
+                'status' => ucwords(str_replace('-', ' ', strtolower($stationOfficer?->status ?: 'available'))),
+                'email' => $user?->email,
+                'contact' => $user?->contact_number,
+                'image' => $user?->profile_thumbnail_url ?: $user?->profile_image_url,
+                'initials' => collect(preg_split('/\s+/', trim($currentOfficerName)) ?: [])->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'FF',
+            ]),
             stationId: @json($stationId),
             routes: {
                 overview: @json(route('firefighter.my-station.overview')),
