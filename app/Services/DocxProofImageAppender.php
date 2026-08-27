@@ -9,6 +9,7 @@ use DOMElement;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Throwable;
 use ZipArchive;
 
 class DocxProofImageAppender
@@ -50,14 +51,26 @@ class DocxProofImageAppender
         $appendXml = $this->headingXml();
 
         foreach ($images->values() as $index => $image) {
-            $bytes = Storage::disk(MediaPath::diskFor($image->file_path))
-                ->get((string) MediaPath::stripPrefix($image->file_path));
-
-            if (! is_string($bytes) || $bytes === '') {
-                throw new RuntimeException('A proof image could not be read while generating the Word report.');
+            try {
+                $bytes = Storage::disk(MediaPath::diskFor($image->file_path))
+                    ->get((string) MediaPath::stripPrefix($image->file_path));
+            } catch (Throwable $exception) {
+                report($exception);
+                $bytes = null;
             }
 
-            $mime = strtolower((string) $image->mime_type);
+            if (! is_string($bytes) || $bytes === '') {
+                $appendXml .= $this->unavailableImageXml($index + 1, (string) $image->file_name);
+                continue;
+            }
+
+            $imageInfo = @getimagesizefromstring($bytes);
+            $mime = strtolower((string) ($imageInfo['mime'] ?? ''));
+            if (! in_array($mime, ['image/png', 'image/jpeg'], true)) {
+                $appendXml .= $this->unavailableImageXml($index + 1, (string) $image->file_name);
+                continue;
+            }
+
             $extension = $mime === 'image/png' ? 'png' : 'jpeg';
             $contentType = $extension === 'png' ? 'image/png' : 'image/jpeg';
             $mediaName = sprintf('proof-image-%d-%d.%s', $image->investigation_report_image_id, $index + 1, $extension);
@@ -91,6 +104,9 @@ class DocxProofImageAppender
             . $appendXml
             . substr($documentXml, $insertAt);
 
+        // Refuse to write malformed document XML into an otherwise valid ZIP.
+        $this->loadXml($updatedDocumentXml, 'updated Word document');
+
         $zip->addFromString($documentPath, $updatedDocumentXml);
         $zip->addFromString($relationshipsPath, (string) $relationships->saveXML());
         $zip->addFromString($contentTypesPath, (string) $contentTypes->saveXML());
@@ -108,7 +124,11 @@ class DocxProofImageAppender
         $safeCaption = htmlspecialchars($caption, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 
         return '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="80"/></w:pPr><w:r><w:drawing>'
-            . '<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' . $width . '" cy="' . $height . '"/>'
+            . '<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+            . ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+            . ' xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"'
+            . ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+            . ' distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' . $width . '" cy="' . $height . '"/>'
             . '<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="' . $drawingId . '" name="' . $safeName . '"/>'
             . '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic>'
             . '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'
@@ -119,6 +139,15 @@ class DocxProofImageAppender
             . '</wp:inline></w:drawing></w:r></w:p>'
             . '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="160"/></w:pPr>'
             . '<w:r><w:rPr><w:i/><w:sz w:val="18"/></w:rPr><w:t>' . $safeCaption . '</w:t></w:r></w:p>';
+    }
+
+    private function unavailableImageXml(int $number, string $filename): string
+    {
+        $safeFilename = htmlspecialchars($filename !== '' ? $filename : 'Unnamed image', ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+        return '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="160"/></w:pPr>'
+            . '<w:r><w:rPr><w:i/><w:color w:val="7F1D1D"/><w:sz w:val="18"/></w:rPr>'
+            . '<w:t>Proof image ' . $number . ' could not be embedded: ' . $safeFilename . '</w:t></w:r></w:p>';
     }
 
     private function scaledDimensions(string $bytes): array

@@ -81,9 +81,30 @@ class FinalInvestigationFirExporter
             throw new RuntimeException('The FIR template is missing its main document XML.');
         }
 
-        $zip->addFromString($documentEntryName, $this->populateDocumentXml($documentXml, $this->buildDocumentData($report)));
-        $this->proofImageAppender->append($zip, $report->proofImages()->get());
-        $zip->close();
+        if (! $zip->addFromString($documentEntryName, $this->populateDocumentXml($documentXml, $this->buildDocumentData($report))) || ! $zip->close()) {
+            @unlink($docxPath);
+            throw new RuntimeException('Unable to save the generated FIR Word document.');
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($docxPath) !== true) {
+            @unlink($docxPath);
+            throw new RuntimeException('Unable to reopen the generated FIR Word document.');
+        }
+
+        try {
+            $report->loadMissing('proofImages');
+            $this->proofImageAppender->append($zip, $report->proofImages);
+        } catch (\Throwable $exception) {
+            $zip->close();
+            @unlink($docxPath);
+            throw $exception;
+        }
+
+        if (! $zip->close()) {
+            @unlink($docxPath);
+            throw new RuntimeException('Unable to finalize the generated FIR Word document.');
+        }
 
         return $docxPath;
     }

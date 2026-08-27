@@ -72,14 +72,14 @@
             <table class="checklist-table">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" data-select-all aria-label="Select all rows on this page"></th>
-                        <th>Action plan</th>
-                        <th>Area</th>
-                        <th>Priority</th>
-                        <th>Progress</th>
-                        <th>Status</th>
-                        <th>Target</th>
-                        <th><span class="sr-only">Actions</span></th>
+                        <th class="checklist-col-select"><input type="checkbox" data-select-all aria-label="Select all rows on this page"></th>
+                        <th class="checklist-col-plan">Plan and area</th>
+                        <th class="checklist-col-area">Area</th>
+                        <th class="checklist-col-state">Priority and status</th>
+                        <th class="checklist-col-progress">Progress</th>
+                        <th class="checklist-col-status">Status</th>
+                        <th class="checklist-col-target">Target</th>
+                        <th class="checklist-col-actions"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -98,21 +98,21 @@
                             $evidence = data_get($checklist->ai_payload, 'evidence_summary', []);
                         @endphp
                         <tr data-checklist-row="{{ $checklist->ai_action_plan_checklist_id }}">
-                            <td data-label="Select"><input type="checkbox" data-select-checklist value="{{ $checklist->ai_action_plan_checklist_id }}" aria-label="Select {{ $checklist->plan_title }}"></td>
-                            <td data-label="Action plan">
+                            <td data-label="Select" class="checklist-col-select"><input type="checkbox" data-select-checklist value="{{ $checklist->ai_action_plan_checklist_id }}" aria-label="Select {{ $checklist->plan_title }}"></td>
+                            <td data-label="Action plan" class="checklist-col-plan">
                                 <div class="plan-cell">
                                     <span class="plan-cell__icon"><i class="fa-solid fa-clipboard-check"></i></span>
-                                    <span><strong>{{ $checklist->plan_title ?: $checklist->source_title ?: 'Untitled action plan' }}</strong></span>
+                                    <span><strong>{{ $checklist->plan_title ?: $checklist->source_title ?: 'Untitled action plan' }}</strong><small><i class="fa-solid fa-location-dot"></i><span>{{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span></small></span>
                                 </div>
                             </td>
-                            <td data-label="Area"><span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span></td>
-                            <td data-label="Priority"><span class="priority-pill priority-pill--{{ $priority }}"><i class="fa-solid fa-flag"></i> {{ ucfirst($priority) }}</span></td>
-                            <td data-label="Progress">
+                            <td data-label="Area" class="checklist-col-area"><span class="table-location"><i class="fa-solid fa-location-dot"></i> {{ $checklist->barangay->barangay_name ?? 'All barangays' }}</span></td>
+                            <td data-label="Priority / status" class="checklist-col-state"><div class="table-state"><span class="priority-pill priority-pill--{{ $priority }}"><i class="fa-solid fa-flag"></i> {{ ucfirst($priority) }}</span><span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span></div></td>
+                            <td data-label="Progress" class="checklist-col-progress">
                                 <div class="table-progress"><span><i style="width:{{ $progress['percent'] }}%"></i></span><small>{{ $progress['followed'] }}/{{ $progress['total'] }} · {{ $progress['percent'] }}%</small></div>
                             </td>
-                            <td data-label="Status"><span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span></td>
-                            <td data-label="Target"><span class="target-date"><i class="fa-regular fa-calendar"></i> {{ $checklist->target_date?->format('M d') ?? 'None' }}</span></td>
-                            <td data-label="Actions">
+                            <td data-label="Status" class="checklist-col-status"><span class="status-pill status-pill--{{ $status }}"><i class="fa-solid fa-circle"></i> {{ ucfirst(str_replace('_', ' ', $status)) }}</span></td>
+                            <td data-label="Target" class="checklist-col-target"><span class="target-date"><i class="fa-regular fa-calendar"></i> {{ $checklist->target_date?->format('M d') ?? 'None' }}</span></td>
+                            <td data-label="Actions" class="checklist-col-actions">
                                 <div class="table-actions">
                                     <button type="button" class="icon-button icon-button--primary" data-open-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Review checklist" aria-label="Review {{ $checklist->plan_title }}"><i class="fa-solid fa-eye"></i></button>
                                     <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create mitigation draft' }}" aria-label="Open mitigation"><i class="fa-solid fa-shield-halved"></i></a>

@@ -14,7 +14,7 @@
         body { margin: 0; background: #f3f4f6; color: #0f172a; font-family: Inter, system-ui, sans-serif; }
         .mitigation-shell { min-height: 100vh; background: radial-gradient(circle at 92% 2%, rgba(251,191,36,.12), transparent 28%), linear-gradient(180deg, #fffaf5 0, #f3f4f6 310px); }
         .mitigation-main { min-width: 0; width: 100%; overflow: visible; }
-        .mitigation-wrap { width: 100%; max-width: 1480px; margin: 0 auto; }
+        .mitigation-wrap { width: 100%; max-width: 1320px; margin: 0 auto; }
         .dashboard-container { padding: 20px; overflow: visible; }
         .top-bar { background: rgba(255,255,255,.9); backdrop-filter: blur(14px); border: 1px solid rgba(226,232,240,.92); min-height: 72px; padding: 0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:16px; z-index:40; margin-bottom:16px; border-radius:24px; box-shadow:0 16px 36px rgba(15,23,42,.06); }
         .workflow-nav { display:flex; align-items:center; gap:8px; margin:0 0 20px; padding:8px; width:max-content; max-width:100%; border:1px solid rgba(226,232,240,.94); border-radius:999px; background:rgba(255,255,255,.9); box-shadow:0 10px 28px rgba(15,23,42,.04); overflow-x:auto; }
@@ -122,6 +122,21 @@
         .filter-actions { display:flex; gap:10px; align-items:flex-end; justify-content:flex-end; }
         .attachments { display:flex; flex-direction:column; gap:8px; }
         .attachments a { display:block; color:#c2410c; font-weight:700; text-decoration:none; overflow-wrap:anywhere; }
+        .attachment-gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:9px; }
+        .attachment-thumb { position:relative; display:block; min-width:0; aspect-ratio:4/3; overflow:hidden; border:1px solid #e2e8f0; border-radius:13px; background:#f1f5f9; color:#fff !important; }
+        .attachment-thumb img { width:100%; height:100%; display:block; object-fit:cover; transition:transform .2s ease; }
+        .attachment-thumb:hover img { transform:scale(1.04); }
+        .attachment-thumb span { position:absolute; right:0; bottom:0; left:0; padding:18px 8px 7px; background:linear-gradient(transparent,rgba(15,23,42,.82)); font-size:.62rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .attachment-file { display:flex !important; align-items:center; gap:8px; min-height:42px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:11px; background:#f8fafc; color:#475569 !important; font-size:.72rem; }
+        .attachment-file i { color:#f97316; }
+        .attachment-lightbox[hidden] { display:none; }
+        .attachment-lightbox { position:fixed; inset:0; z-index:140; display:grid; grid-template-columns:52px minmax(0,1fr) 52px; align-items:center; gap:12px; padding:24px; background:rgba(2,6,23,.9); backdrop-filter:blur(10px); }
+        .attachment-lightbox__figure { min-width:0; max-width:min(1050px,100%); max-height:calc(100dvh - 80px); margin:auto; display:flex; flex-direction:column; align-items:center; gap:10px; }
+        .attachment-lightbox__figure img { display:block; max-width:100%; max-height:calc(100dvh - 130px); object-fit:contain; border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.38); }
+        .attachment-lightbox__figure figcaption { max-width:80vw; color:#e2e8f0; font-size:.78rem; font-weight:750; text-align:center; overflow-wrap:anywhere; }
+        .attachment-lightbox__button { display:grid; place-items:center; width:46px; height:46px; border:1px solid rgba(255,255,255,.18); border-radius:14px; background:rgba(255,255,255,.1); color:#fff; cursor:pointer; }
+        .attachment-lightbox__button:hover { background:rgba(255,255,255,.18); }
+        .attachment-lightbox__close { position:absolute; top:18px; right:18px; }
         .progress-wrap { display:flex; flex-direction:column; gap:8px; }
         .progress-meta { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:.76rem; color:#64748b; font-weight:700; }
         .progress-bar { height:10px; border-radius:999px; background:#e2e8f0; overflow:hidden; }
@@ -191,6 +206,62 @@
         .mitigation-ai-recommendations article.card > div > div:last-child .filter-btn { width:34px !important; min-height:34px; padding:0; justify-content:center; border-radius:11px; box-shadow:none; }
         .mitigation-ai-saved article.card > div > div:last-child span,
         .mitigation-ai-recommendations article.card > div > div:last-child span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+        .insight-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+        .insight-card { display:flex; flex-direction:column; min-width:0; padding:15px; border:1px solid #e2e8f0; border-radius:17px; background:#fff; box-shadow:none; }
+        .insight-card__top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+        .insight-card__eyebrow { display:flex; align-items:center; gap:6px; margin-bottom:7px; color:#64748b; font-size:.65rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+        .insight-card__title { margin:0; color:#0f172a; font-size:.9rem; font-weight:900; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .insight-card__meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; color:#64748b; font-size:.7rem; line-height:1.4; }
+        .insight-card__summary { margin:10px 0 0; color:#64748b; font-size:.73rem; line-height:1.48; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .insight-card__footer { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:auto; padding-top:13px; }
+        .insight-card__actions { display:flex; align-items:center; gap:6px; }
+        .insight-card__actions form { margin:0; }
+        .insight-action { width:36px !important; min-height:36px !important; padding:0 !important; justify-content:center !important; border-radius:11px !important; box-shadow:none !important; }
+        .insight-action span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+        .mitigation-register .panel-head { align-items:center; }
+        .register-sort { display:inline-flex; align-items:center; gap:7px; min-height:38px; padding:0 9px 0 11px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; color:#64748b; }
+        .register-sort i { color:#f97316; font-size:.72rem; }
+        .register-sort select { max-width:132px; border:0; outline:0; background:transparent; color:#334155; font-size:.72rem; font-weight:800; cursor:pointer; }
+        .mitigation-register-table { min-width:720px; table-layout:fixed; }
+        .mitigation-register-table .register-plan-col { width:44%; }
+        .mitigation-register-table .register-status-col { width:21%; }
+        .mitigation-register-table .register-owner-col { width:23%; }
+        .mitigation-register-table .register-actions-col { width:12%; }
+        .register-col-location, .register-col-source { display:none; }
+        .register-plan { min-width:0; }
+        .register-plan__location { display:flex; align-items:flex-start; gap:6px; margin-top:5px; color:#64748b; font-size:.72rem; line-height:1.4; }
+        .register-plan__location i { margin-top:2px; color:#f97316; }
+        .register-meta { display:flex; flex-direction:column; gap:6px; }
+        .register-owner { color:#1e293b; font-size:.78rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .register-due { color:#64748b; font-size:.7rem; }
+        .details-dialog { display:flex; flex-direction:column; width:min(900px,calc(100vw - 48px)) !important; max-width:900px !important; max-height:min(90vh,820px) !important; padding:0 !important; overflow:hidden !important; }
+        .details-dialog .mitigation-dialog__head { align-items:center; margin:0; padding:18px 20px; background:#fff; flex:0 0 auto; }
+        .details-dialog__body { min-height:0; padding:18px 20px 22px; overflow-y:auto; background:#f8fafc; }
+        .detail-hero { padding:18px; border:1px solid #fed7aa; border-radius:18px; background:linear-gradient(135deg,#fff7ed,#fff 72%); }
+        .detail-hero__badges { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+        .detail-hero__copy { margin:0; color:#334155; font-size:.82rem; line-height:1.6; white-space:pre-line; }
+        .detail-facts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:10px 0; }
+        .detail-fact { min-width:0; padding:11px 12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; }
+        .detail-fact span { display:block; color:#94a3b8; font-size:.6rem; font-weight:850; letter-spacing:.07em; text-transform:uppercase; }
+        .detail-fact strong { display:block; margin-top:5px; color:#1e293b; font-size:.76rem; line-height:1.35; overflow-wrap:anywhere; }
+        .detail-disclosures { display:flex; flex-direction:column; gap:8px; }
+        .detail-disclosure { border:1px solid #e2e8f0; border-radius:16px; background:#fff; overflow:hidden; }
+        .detail-disclosure > summary { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; min-height:54px; padding:10px 14px; cursor:pointer; list-style:none; }
+        .detail-disclosure > summary::-webkit-details-marker { display:none; }
+        .detail-disclosure__icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; color:#c2410c; background:#ffedd5; }
+        .detail-disclosure__label strong { display:block; color:#1e293b; font-size:.78rem; }
+        .detail-disclosure__label span { display:block; margin-top:2px; color:#94a3b8; font-size:.65rem; }
+        .detail-disclosure__chevron { color:#94a3b8; transition:transform .18s ease; }
+        .detail-disclosure[open] .detail-disclosure__chevron { transform:rotate(180deg); }
+        .detail-disclosure__content { padding:0 14px 14px; border-top:1px solid #f1f5f9; }
+        .detail-content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding-top:13px; }
+        .detail-content-item { min-width:0; }
+        .detail-content-item.is-wide { grid-column:1 / -1; }
+        .detail-content-item > span { display:block; margin-bottom:4px; color:#94a3b8; font-size:.61rem; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+        .detail-content-item > div { color:#475569; font-size:.76rem; line-height:1.55; overflow-wrap:anywhere; }
+        @media (min-width:1025px) {
+            .mitigation-dialog { left:var(--sidebar-w,280px); }
+        }
 
         @media (min-width: 1025px) {
             .mitigation-main { margin-left: var(--sidebar-w, 280px); width: calc(100% - var(--sidebar-w, 280px)); }
@@ -280,7 +351,23 @@
             .compact-draft-card { grid-template-columns:1fr; gap:9px; padding:11px; }
             .compact-draft-card__actions { justify-content:flex-end; }
             .compact-action { width:34px !important; min-height:34px; padding:0; }
-            .mitigation-ai-saved > div:last-child, .mitigation-ai-recommendations > div:last-child { grid-template-columns:1fr; }
+            .mitigation-ai-saved > div:last-child, .mitigation-ai-recommendations > div:last-child, .insight-list { grid-template-columns:1fr; }
+            .insight-card { padding:12px; border-radius:14px; }
+            .insight-card__summary { -webkit-line-clamp:2; }
+            .mitigation-register .panel-head > .chip-row { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; }
+            .register-sort { min-width:0; width:100%; }
+            .register-sort select { width:100%; max-width:none; }
+            .details-dialog { width:100% !important; max-width:100% !important; max-height:92dvh !important; border-radius:24px 24px 12px 12px !important; }
+            .details-dialog .mitigation-dialog__head { padding:14px; }
+            .details-dialog__body { padding:10px; }
+            .detail-hero { padding:13px; border-radius:15px; }
+            .detail-facts { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+            .detail-content-grid { grid-template-columns:1fr; gap:10px; }
+            .detail-content-item.is-wide { grid-column:auto; }
+            .attachment-gallery { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .attachment-lightbox { grid-template-columns:40px minmax(0,1fr) 40px; gap:5px; padding:58px 8px 18px; }
+            .attachment-lightbox__button { width:38px; height:38px; border-radius:12px; }
+            .attachment-lightbox__close { top:10px; right:10px; }
         }
     </style>
 </head>
@@ -392,7 +479,7 @@
                             @if(($newAiDraftMitigations ?? collect())->isEmpty())
                                 <div class="empty">No new AI-linked draft mitigation records are waiting for review right now.</div>
                             @else
-                                <div style="display:grid; gap:14px;">
+                                <div class="insight-list">
                                     @foreach($newAiDraftMitigations as $action)
                                         @php
                                             $linkedChecklist = $action->aiActionPlanChecklist;
@@ -469,43 +556,23 @@
                                                 'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
                                             ];
                                         @endphp
-                                        <article class="card" style="padding:18px; border:1px solid rgba(226,232,240,.9);">
-                                            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:14px;">
-                                                <div style="min-width:0; flex:1 1 360px;">
-                                                    <div class="chip-row" style="margin-bottom:10px;">
-                                                        <span class="tag {{ $riskLevel === 'high' ? 'critical' : ($riskLevel === 'low' ? 'low' : 'medium') }}">{{ strtoupper($riskLevel) }} RISK</span>
-                                                        <span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span>
-                                                        <span class="tag ai_action_plan">{{ $sourceLabel }}</span>
-                                                        <span class="tag draft">DRAFT</span>
-                                                    </div>
-                                                    <div class="title">{{ $action->title }}</div>
-                                                    <div class="note">
-                                                        {{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}
-                                                        @if($action->riskArea?->marker?->title)
-                                                            · Linked marker: {{ $action->riskArea->marker->title }}
-                                                        @endif
-                                                        · Category: {{ $categoryLabel }}
-                                                    </div>
-                                                    <div class="note" style="margin-top:10px; white-space:pre-line;">{{ \Illuminate\Support\Str::limit($action->description, 360) }}</div>
-                                                    @if($linkedSuggestion?->estimated_timeline)
-                                                        <div class="note" style="margin-top:10px;"><strong>Suggested timeline:</strong> {{ $linkedSuggestion->estimated_timeline }}</div>
-                                                    @endif
-                                                    @if($action->target_date)
-                                                        <div class="note" style="margin-top:6px;"><strong>Target date:</strong> {{ optional($action->target_date)->format('M d, Y') }}</div>
-                                                    @endif
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; gap:10px; min-width:220px;">
-                                                    <button
-                                                        type="button"
-                                                        class="hero-btn"
-                                                        style="width:100%; justify-content:center;"
-                                                        data-open-details-modal
-                                                        data-payload='@json($draftPayload)'>
-                                                        <i class="fa-solid fa-eye"></i><span>Review Draft</span>
-                                                    </button>
-                                                    <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary" style="width:100%; justify-content:center;">
-                                                        <i class="fa-solid fa-table-list"></i><span>Locate in Register</span>
-                                                    </a>
+                                        <article class="insight-card">
+                                            <div class="insight-card__top">
+                                                <div class="insight-card__eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI mitigation draft</div>
+                                                <span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span>
+                                            </div>
+                                            <h4 class="insight-card__title">{{ $action->title }}</h4>
+                                            <div class="insight-card__meta">
+                                                <span><i class="fa-solid fa-location-dot"></i> {{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</span>
+                                                <span>&middot;</span><span>{{ $categoryLabel }}</span>
+                                                <span>&middot;</span><span>{{ strtoupper($riskLevel) }} risk</span>
+                                            </div>
+                                            <p class="insight-card__summary">{{ \Illuminate\Support\Str::limit($action->description, 180) }}</p>
+                                            <div class="insight-card__footer">
+                                                <span class="tag draft">Ready to review</span>
+                                                <div class="insight-card__actions">
+                                                    <button type="button" class="hero-btn insight-action" title="Review draft" aria-label="Review draft" data-open-details-modal data-payload='@json($draftPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
+                                                    <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary insight-action" title="Locate in register" aria-label="Locate in register"><i class="fa-solid fa-table-list"></i><span>Locate</span></a>
                                                 </div>
                                             </div>
                                         </article>
@@ -524,7 +591,7 @@
                             @if(($generatedMitigationDrafts ?? collect())->isEmpty())
                                 <div class="empty">No pending system-generated mitigation drafts right now.</div>
                             @else
-                                <div style="display:grid; gap:14px;">
+                                <div class="insight-list">
                                     @foreach($generatedMitigationDrafts as $draftChecklist)
                                         @php
                                             $draftPayload = is_array($draftChecklist->ai_payload) ? $draftChecklist->ai_payload : [];
@@ -532,46 +599,47 @@
                                             $draftFactors = collect($draftPayload['contributing_factors'] ?? [])->take(4)->map(fn ($factor) => ucwords(str_replace('_', ' ', (string) $factor)))->values();
                                             $riskLevel = strtolower((string) ($draftPayload['risk_level'] ?? $draftChecklist->priority_level ?? 'medium'));
                                             $categoryLabel = $mitigationCategoryOptions[\Illuminate\Support\Str::snake((string) ($draftPayload['recommended_category'] ?? 'other'))] ?? ucfirst(str_replace('_', ' ', (string) ($draftPayload['recommended_category'] ?? 'other')));
+                                            $suggestionTasks = collect($draftChecklist->items ?? [])->map(fn ($item) => ['text' => $item->item_text, 'status' => $item->status])->values()->all();
+                                            $suggestionReviewPayload = [
+                                                'title' => $draftChecklist->plan_title,
+                                                'description' => $draftChecklist->plan_description,
+                                                'category_label' => $categoryLabel,
+                                                'priority_level' => $draftChecklist->priority_level,
+                                                'status' => 'draft',
+                                                'status_label' => 'Pending review',
+                                                'source_type' => 'ai_action_plan',
+                                                'source_label' => 'AI Action Plan',
+                                                'barangay_label' => $draftChecklist->barangay?->barangay_name,
+                                                'location_label' => $draftChecklist->riskArea?->marker?->title,
+                                                'risk_level' => strtoupper($riskLevel),
+                                                'factors' => $draftFactors->all(),
+                                                'source_references' => $draftDrivers->all(),
+                                                'tasks' => $suggestionTasks,
+                                                'tasks_done' => collect($suggestionTasks)->where('status', 'followed')->count(),
+                                                'tasks_total' => count($suggestionTasks),
+                                                'progress_percent' => 0,
+                                                'effectiveness' => 'Pending evaluation',
+                                                'attachments' => [],
+                                            ];
                                         @endphp
-                                        <article class="card" style="padding:18px; border:1px solid rgba(226,232,240,.9);">
-                                            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:14px;">
-                                                <div style="min-width:0; flex:1 1 360px;">
-                                                    <div class="chip-row" style="margin-bottom:10px;">
-                                                        <span class="tag {{ $riskLevel === 'high' ? 'critical' : ($riskLevel === 'low' ? 'low' : 'medium') }}">{{ strtoupper($riskLevel) }} RISK</span>
-                                                        <span class="tag {{ $draftChecklist->priority_level }}">{{ strtoupper($draftChecklist->priority_level) }}</span>
-                                                        <span class="tag ai_action_plan">AI Action Plan</span>
-                                                    </div>
-                                                    <div class="title">{{ $draftChecklist->plan_title }}</div>
-                                                    <div class="note">
-                                                        {{ $draftChecklist->barangay?->barangay_name ?? 'Unknown barangay' }}
-                                                        @if($draftChecklist->riskArea?->marker?->title)
-                                                            · Linked marker: {{ $draftChecklist->riskArea->marker->title }}
-                                                        @endif
-                                                    </div>
-                                                    <div class="note" style="margin-top:10px; white-space:pre-line;">{{ \Illuminate\Support\Str::limit($draftChecklist->plan_description, 380) }}</div>
-                                                    @if($draftDrivers->isNotEmpty())
-                                                        <div class="note" style="margin-top:10px;"><strong>Why generated:</strong> {{ $draftDrivers->implode(' | ') }}</div>
-                                                    @endif
-                                                    @if($draftFactors->isNotEmpty())
-                                                        <div class="chip-row" style="margin-top:10px;">
-                                                            @foreach($draftFactors as $factor)
-                                                                <span class="chip"><i class="fa-solid fa-circle-exclamation"></i> {{ $factor }}</span>
-                                                            @endforeach
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                                <div style="display:flex; flex-direction:column; gap:10px; min-width:220px;">
-                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.approve', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">
-                                                        @csrf
-                                                        <button type="submit" class="hero-btn" style="width:100%; justify-content:center;"><i class="fa-solid fa-circle-check"></i><span>Approve</span></button>
-                                                    </form>
-                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="filter-btn secondary" style="width:100%; justify-content:center;">
-                                                        <i class="fa-solid fa-pen"></i><span>Edit Draft</span>
-                                                    </a>
-                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">
-                                                        @csrf
-                                                        <button type="submit" class="filter-btn secondary" style="width:100%; justify-content:center; color:#b91c1c; border-color:#fecaca; background:#fff5f5;"><i class="fa-solid fa-ban"></i><span>Reject</span></button>
-                                                    </form>
+                                        <article class="insight-card">
+                                            <div class="insight-card__top">
+                                                <div class="insight-card__eyebrow"><i class="fa-solid fa-list-check"></i> Checklist suggestion</div>
+                                                <span class="tag {{ $draftChecklist->priority_level }}">{{ strtoupper($draftChecklist->priority_level) }}</span>
+                                            </div>
+                                            <h4 class="insight-card__title">{{ $draftChecklist->plan_title }}</h4>
+                                            <div class="insight-card__meta">
+                                                <span><i class="fa-solid fa-location-dot"></i> {{ $draftChecklist->barangay?->barangay_name ?? 'Unknown barangay' }}</span>
+                                                <span>&middot;</span><span>{{ $categoryLabel }}</span>
+                                                <span>&middot;</span><span>{{ strtoupper($riskLevel) }} risk</span>
+                                            </div>
+                                            <p class="insight-card__summary">{{ \Illuminate\Support\Str::limit($draftChecklist->plan_description, 180) }}</p>
+                                            <div class="insight-card__footer">
+                                                <button type="button" class="filter-btn secondary" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
+                                                <div class="insight-card__actions">
+                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.approve', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="hero-btn insight-action" title="Approve suggestion" aria-label="Approve suggestion"><i class="fa-solid fa-check"></i><span>Approve</span></button></form>
+                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="filter-btn secondary insight-action" title="Edit suggestion" aria-label="Edit suggestion"><i class="fa-solid fa-pen"></i><span>Edit</span></a>
+                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="filter-btn secondary insight-action" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5" title="Reject suggestion" aria-label="Reject suggestion"><i class="fa-solid fa-ban"></i><span>Reject</span></button></form>
                                                 </div>
                                             </div>
                                         </article>
@@ -596,7 +664,7 @@
                                     <p>Track, assign, and review prevention actions.</p>
                                 </div>
                                 <div class="chip-row">
-                                    <span class="chip"><i class="fa-solid fa-file-lines"></i> 10 per page</span>
+                                    <label class="register-sort" for="mitigationRegisterSort"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="sr-only">Sort mitigation register</span><select id="mitigationRegisterSort" data-mitigation-sort aria-label="Sort mitigation register"><option value="priority" @selected(($filters['sort'] ?? 'priority') === 'priority')>Priority</option><option value="due_date_asc" @selected(($filters['sort'] ?? '') === 'due_date_asc')>Due date: earliest</option><option value="due_date_desc" @selected(($filters['sort'] ?? '') === 'due_date_desc')>Due date: latest</option><option value="status" @selected(($filters['sort'] ?? '') === 'status')>Status</option></select></label>
                                     <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
                                 </div>
                             </div>
@@ -604,6 +672,7 @@
                             <details class="filter-disclosure" @if($hasActiveFilters) open @endif>
                                 <summary><i class="fa-solid fa-sliders"></i> Filters @if($hasActiveFilters)<span class="chip">Active</span>@endif</summary>
                             <form id="mitigationFilters" method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:14px; box-shadow:none;">
+                                <input type="hidden" name="sort" value="{{ $filters['sort'] ?? 'priority' }}" data-mitigation-sort-value>
                                 <div class="filters-grid">
                                     <div class="mitigation-field mitigation-field--full">
                                         <label for="filterSearch">Search</label>
@@ -683,15 +752,15 @@
                                 <div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>
                             @else
                                 <div class="table-wrap">
-                                    <table>
+                                    <table class="mitigation-register-table">
                                         <thead>
                                             <tr>
-                                                <th>Plan</th>
-                                                <th>Location</th>
-                                                <th>Priority / Stage</th>
-                                                <th>Owner / Target</th>
-                                                <th>Source</th>
-                                                <th>Actions</th>
+                                                <th class="register-plan-col">Plan and coverage</th>
+                                                <th class="register-col-location">Location</th>
+                                                <th class="register-status-col">Status</th>
+                                                <th class="register-owner-col">Owner and due date</th>
+                                                <th class="register-col-source">Source</th>
+                                                <th class="register-actions-col">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -801,9 +870,11 @@
                                                 @endphp
                                                 <tr id="mitigation-row-{{ $action->mitigation_action_id }}">
                                                     <td data-label="Plan">
-                                                        <div class="title">{{ $action->title }}</div>
+                                                        <div class="register-plan"><div class="title">{{ $action->title }}</div>
+                                                        <div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>{{ $action->scope_type === 'citywide' ? (($action->barangay?->city?->city_name ?? 'City') . ' citywide') : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay')) }}{{ $action->riskArea?->marker?->title ? ' · ' . $action->riskArea->marker->title : '' }}</span></div></div>
                                                         <div class="chip-row" style="margin-top:7px;">
                                                             <span class="chip">{{ $categoryLabel }}</span>
+                                                            <span class="tag {{ $sourceType }}">{{ $sourceLabel }}</span>
                                                             @if($isOverdue)
                                                                 <span class="chip overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>
                                                             @endif
@@ -812,16 +883,16 @@
                                                             @endif
                                                         </div>
                                                     </td>
-                                                    <td data-label="Location">
+                                                    <td data-label="Location" class="register-col-location">
                                                         <div class="title" style="font-size:.86rem;">{{ $action->scope_type === 'citywide' ? (($action->barangay?->city?->city_name ?? 'City') . ' · Citywide') : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay')) }}</div>
                                                         <div class="note">{{ $action->riskArea?->marker?->title ?? 'No linked location marker' }}</div>
                                                     </td>
                                                     <td data-label="Priority / Stage"><div class="chip-row"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span>@if($action->completion_approval_status === 'pending')<span class="chip overdue"><i class="fa-solid fa-user-check"></i> Completion review</span>@endif</div></td>
                                                     <td data-label="Owner / Target">
-                                                        <div class="title" style="font-size:.82rem;">{{ $action->responsibleUser?->full_name ?? 'Unassigned person' }}</div>
-                                                        <div class="note"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div>
+                                                        <div class="register-meta"><div class="register-owner">{{ $action->responsibleUser?->full_name ?? ($action->responsibleTeam?->team_name ?? 'Unassigned') }}</div>
+                                                        <div class="register-due"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div></div>
                                                     </td>
-                                                    <td data-label="Source">
+                                                    <td data-label="Source" class="register-col-source">
                                                         <div class="chip-row">
                                                             <span class="tag {{ $sourceType }}">{{ $sourceLabel }}</span>
                                                             @if($action->aiActionPlanChecklist)
@@ -859,16 +930,20 @@
     </div>
 
     <div class="mitigation-dialog" id="detailsModal" aria-hidden="true">
-        <div class="mitigation-dialog__card wide">
+        <div class="mitigation-dialog__card details-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
             <div class="mitigation-dialog__head">
-                <div>
-                    <h3 id="detailsTitle">Mitigation Details</h3>
-                    <p id="detailsSubtitle">Lifecycle, traceability, implementation, and evaluation context.</p>
-                </div>
-                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <div class="mitigation-dialog__title"><span class="mitigation-dialog__title-icon"><i class="fa-solid fa-shield-heart"></i></span><div><h3 id="detailsTitle">Mitigation details</h3><p id="detailsSubtitle">Plan context, ownership, progress, and evidence.</p></div></div>
+                <button type="button" class="mitigation-dialog__close" data-close-modal aria-label="Close mitigation details"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="details-stack" id="detailsContent"></div>
+            <div class="details-dialog__body" id="detailsContent"></div>
         </div>
+    </div>
+
+    <div class="attachment-lightbox" id="mitigationAttachmentLightbox" role="dialog" aria-modal="true" aria-label="Proof image preview" hidden>
+        <button type="button" class="attachment-lightbox__button" data-lightbox-previous aria-label="Previous image"><i class="fa-solid fa-chevron-left"></i></button>
+        <figure class="attachment-lightbox__figure"><img data-lightbox-image src="" alt=""><figcaption data-lightbox-caption></figcaption></figure>
+        <button type="button" class="attachment-lightbox__button" data-lightbox-next aria-label="Next image"><i class="fa-solid fa-chevron-right"></i></button>
+        <button type="button" class="attachment-lightbox__button attachment-lightbox__close" data-lightbox-close aria-label="Close image preview"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="mitigation-dialog" id="createModal" aria-hidden="true">
@@ -936,6 +1011,11 @@
             const detailsTitle = document.getElementById('detailsTitle');
             const detailsSubtitle = document.getElementById('detailsSubtitle');
             const detailsContent = document.getElementById('detailsContent');
+            const attachmentLightbox = document.getElementById('mitigationAttachmentLightbox');
+            const lightboxImage = attachmentLightbox?.querySelector('[data-lightbox-image]');
+            const lightboxCaption = attachmentLightbox?.querySelector('[data-lightbox-caption]');
+            let lightboxItems = [];
+            let lightboxIndex = 0;
             const updateBaseUrl = @json(route('station-admin.mitigations.update', ['mitigationActionId' => '__ID__']));
             const deleteBaseUrl = @json(route('station-admin.mitigations.destroy', ['mitigationActionId' => '__ID__']));
             const menuToggle = document.getElementById('mitigationUserMenuToggle');
@@ -1058,14 +1138,121 @@
                     return `<div class="note">No photos or files uploaded yet.</div>`;
                 }
 
-                return `<div class="attachments">${attachments.map((attachment) => `<a href="${escapeHtml(attachment.url)}" target="_blank" rel="noopener">${escapeHtml(attachment.name)}</a>`).join('')}</div>`;
+                const imagePattern = /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i;
+                return `<div class="attachment-gallery">${attachments.map((attachment) => {
+                    const url = escapeHtml(attachment.url || '');
+                    const name = escapeHtml(attachment.name || 'Attachment');
+                    if (imagePattern.test(String(attachment.url || '')) || imagePattern.test(String(attachment.name || ''))) {
+                        return `<a class="attachment-thumb" href="${url}" target="_blank" rel="noopener" title="Preview ${name}" data-attachment-image data-image-url="${url}" data-image-name="${name}"><img src="${url}" alt="${name}" loading="lazy" decoding="async"><span>${name}</span></a>`;
+                    }
+                    return `<a class="attachment-file" href="${url}" target="_blank" rel="noopener"><i class="fa-solid fa-file-arrow-down"></i><span>${name}</span></a>`;
+                }).join('')}</div>`;
             };
+
+            const showLightboxImage = () => {
+                const item = lightboxItems[lightboxIndex];
+                if (!item || !lightboxImage || !lightboxCaption) return;
+                lightboxImage.src = item.url;
+                lightboxImage.alt = item.name;
+                lightboxCaption.textContent = `${item.name} · ${lightboxIndex + 1} of ${lightboxItems.length}`;
+                attachmentLightbox.querySelector('[data-lightbox-previous]').hidden = lightboxItems.length < 2;
+                attachmentLightbox.querySelector('[data-lightbox-next]').hidden = lightboxItems.length < 2;
+            };
+
+            const openAttachmentLightbox = (trigger) => {
+                const nodes = Array.from(detailsContent.querySelectorAll('[data-attachment-image]'));
+                lightboxItems = nodes.map((node) => ({ url: node.dataset.imageUrl, name: node.dataset.imageName || 'Proof image' }));
+                lightboxIndex = Math.max(0, nodes.indexOf(trigger));
+                showLightboxImage();
+                attachmentLightbox.hidden = false;
+                attachmentLightbox.querySelector('[data-lightbox-close]')?.focus();
+            };
+
+            const closeAttachmentLightbox = () => {
+                if (!attachmentLightbox || attachmentLightbox.hidden) return;
+                attachmentLightbox.hidden = true;
+                if (lightboxImage) lightboxImage.src = '';
+                lightboxItems = [];
+            };
+
+            detailsContent?.addEventListener('click', (event) => {
+                const trigger = event.target.closest('[data-attachment-image]');
+                if (!trigger) return;
+                event.preventDefault();
+                openAttachmentLightbox(trigger);
+            });
+            attachmentLightbox?.querySelector('[data-lightbox-close]')?.addEventListener('click', closeAttachmentLightbox);
+            attachmentLightbox?.querySelector('[data-lightbox-previous]')?.addEventListener('click', () => {
+                lightboxIndex = (lightboxIndex - 1 + lightboxItems.length) % lightboxItems.length;
+                showLightboxImage();
+            });
+            attachmentLightbox?.querySelector('[data-lightbox-next]')?.addEventListener('click', () => {
+                lightboxIndex = (lightboxIndex + 1) % lightboxItems.length;
+                showLightboxImage();
+            });
+            attachmentLightbox?.addEventListener('click', (event) => {
+                if (event.target === attachmentLightbox) closeAttachmentLightbox();
+            });
+
+            const renderCompactDetails = (payload, followUpText) => `
+                <section class="detail-hero">
+                    <div class="detail-hero__badges">
+                        ${renderBadge(payload.risk_level || 'UNKNOWN RISK', payload.priority_level || 'medium')}
+                        ${renderBadge(payload.status_label || 'Draft', payload.status || 'draft')}
+                        ${renderBadge(payload.source_label || 'Manual', payload.source_type || 'manual')}
+                    </div>
+                    <p class="detail-hero__copy">${escapeHtml(payload.description || 'No mitigation objective has been recorded.')}</p>
+                </section>
+                <div class="detail-facts">
+                    <div class="detail-fact"><span>Category</span><strong>${escapeHtml(payload.category_label || 'Other')}</strong></div>
+                    <div class="detail-fact"><span>Owner</span><strong>${escapeHtml(payload.responsible_user_label || payload.responsible_team_label || 'Unassigned')}</strong></div>
+                    <div class="detail-fact"><span>Target</span><strong>${escapeHtml(payload.target_date_label || 'Not scheduled')}</strong></div>
+                    <div class="detail-fact"><span>Progress</span><strong>${escapeHtml(payload.progress_percent || 0)}%</strong></div>
+                </div>
+                <div class="detail-disclosures">
+                    <details class="detail-disclosure" open>
+                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-magnifying-glass-chart"></i></span><span class="detail-disclosure__label"><strong>Evidence and rationale</strong><span>Risk factors, recommendation, and source links</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                        <div class="detail-disclosure__content"><div class="detail-content-grid">
+                            <div class="detail-content-item is-wide"><span>Contributing factors</span><div>${renderList(payload.factors, 'No contributing factors attached.')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Recommendation</span><div>${escapeHtml(payload.recommendation || 'No linked recommendation recorded.')}</div></div>
+                            <div class="detail-content-item"><span>Analysis</span><div>${escapeHtml(payload.analysis_label || 'No linked analysis')}</div></div>
+                            <div class="detail-content-item"><span>AI checklist</span><div>${escapeHtml(payload.checklist_label || 'No linked AI checklist')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Traceability</span><div>${renderList(payload.source_references, 'No source references attached.')}</div></div>
+                        </div></div>
+                    </details>
+                    <details class="detail-disclosure">
+                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-list-check"></i></span><span class="detail-disclosure__label"><strong>Execution and checklist</strong><span>Ownership, tasks, approval, and current updates</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                        <div class="detail-disclosure__content"><div class="detail-content-grid">
+                            <div class="detail-content-item"><span>Responsible team</span><div>${escapeHtml(payload.responsible_team_label || 'Not assigned')}</div></div>
+                            <div class="detail-content-item"><span>Responsible person</span><div>${escapeHtml(payload.responsible_user_label || 'Not assigned')}</div></div>
+                            <div class="detail-content-item"><span>Approval</span><div>${escapeHtml(payload.approval_label || 'Not approved yet')}</div></div>
+                            <div class="detail-content-item"><span>Approved at</span><div>${escapeHtml(payload.approval_date_label || 'Pending')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Checklist tasks</span><div>${renderTasks(payload.tasks, payload.tasks_done || 0, payload.tasks_total || 0)}</div></div>
+                            <div class="detail-content-item is-wide"><span>Implementation updates</span><div>${escapeHtml(payload.implementation_notes || 'No implementation updates recorded yet.')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Planning remarks</span><div>${escapeHtml(payload.remarks || 'No planning remarks recorded.')}</div></div>
+                        </div></div>
+                    </details>
+                    <details class="detail-disclosure">
+                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-file-shield"></i></span><span class="detail-disclosure__label"><strong>Results and documentation</strong><span>Proof files, completion notes, and follow-up</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                        <div class="detail-disclosure__content"><div class="detail-content-grid">
+                            <div class="detail-content-item is-wide"><span>Attachments</span><div>${renderAttachments(payload.attachments)}</div></div>
+                            <div class="detail-content-item is-wide"><span>Completion notes</span><div>${escapeHtml(payload.completion_notes || 'No completion notes recorded yet.')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Outcome</span><div>${escapeHtml(payload.outcome_result || 'No outcome recorded yet.')}</div></div>
+                            <div class="detail-content-item"><span>Effectiveness</span><div>${escapeHtml(payload.effectiveness || 'Pending evaluation')}</div></div>
+                            <div class="detail-content-item"><span>Follow-up required</span><div>${escapeHtml(followUpText)}</div></div>
+                            <div class="detail-content-item is-wide"><span>Follow-up notes</span><div>${escapeHtml(payload.follow_up_notes || 'No follow-up notes recorded.')}</div></div>
+                        </div></div>
+                    </details>
+                </div>
+            `;
 
             const renderDetails = (payload) => {
                 detailsTitle.textContent = payload.title || 'Mitigation Details';
-                detailsSubtitle.textContent = `${payload.scope_label || 'Barangay'} · ${payload.barangay_label || 'Unknown barangay'}${payload.location_label ? ' · ' + payload.location_label : ''}`;
-
                 const followUpText = payload.follow_up_required ? 'Yes' : 'No';
+                detailsSubtitle.textContent = [payload.scope_label || 'Barangay', payload.barangay_label || 'Unknown barangay', payload.location_label].filter(Boolean).join(' · ');
+
+                detailsContent.innerHTML = renderCompactDetails(payload, followUpText);
+                return;
 
                 detailsContent.innerHTML = `
                     <section class="details-section">
@@ -1171,6 +1358,10 @@
 
             document.addEventListener('keydown', (event) => {
                 if (event.key !== 'Escape') return;
+                if (attachmentLightbox && !attachmentLightbox.hidden) {
+                    closeAttachmentLightbox();
+                    return;
+                }
                 [createModal, editModal, deleteModal, detailsModal].forEach((modal) => {
                     if (modal?.classList.contains('is-open')) closeModal(modal);
                 });
@@ -1259,8 +1450,8 @@
                     const pageUrl = new URL(url, window.location.origin);
                     const pageLink = (page) => { const link = new URL(pageUrl); link.searchParams.set('page', page); return link.href; };
                     table.innerHTML = rows.length ? `
-                        <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Location</th><th>Priority / Stage</th><th>Owner / Target</th><th>Source</th><th>Open</th></tr></thead><tbody>
-                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Location"><div class="title" style="font-size:.86rem;">${escapeHtml(item.barangay || 'Unknown barangay')}</div><div class="note">${escapeHtml(item.location || 'No linked location')}</div></td><td data-label="Priority / Stage"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="title" style="font-size:.82rem;">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="note"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></td><td data-label="Source"><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
+                        <div class="table-wrap"><table class="mitigation-register-table"><thead><tr><th class="register-plan-col">Plan and coverage</th><th class="register-status-col">Status</th><th class="register-owner-col">Owner and due date</th><th class="register-actions-col">Open</th></tr></thead><tbody>
+                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
                         </tbody></table></div>
                         <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
                     table.style.opacity = '1';
@@ -1274,6 +1465,14 @@
             };
 
             const mitigationFilters = document.getElementById('mitigationFilters');
+            const mitigationSort = document.querySelector('[data-mitigation-sort]');
+            const mitigationSortValue = mitigationFilters?.querySelector('[data-mitigation-sort-value]');
+            mitigationSort?.addEventListener('change', () => {
+                if (mitigationSortValue) mitigationSortValue.value = mitigationSort.value;
+                const params = new URLSearchParams(new FormData(mitigationFilters));
+                params.delete('page');
+                loadMitigationTable(`${mitigationFilters.action}?${params.toString()}`);
+            });
             mitigationFilters?.addEventListener('change', () => {
                 const params = new URLSearchParams(new FormData(mitigationFilters));
                 loadMitigationTable(`${mitigationFilters.action}?${params.toString()}`);

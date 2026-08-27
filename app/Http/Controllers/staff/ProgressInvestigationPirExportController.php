@@ -7,13 +7,20 @@ use App\Models\ProgressInvestigationReport;
 use App\Models\StationOfficer;
 use App\Services\ProgressInvestigationPirExporter;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ProgressInvestigationPirExportController extends Controller
 {
     public function downloadWord(Request $request, int $progressReportId, ProgressInvestigationPirExporter $exporter)
     {
         $report = $this->resolveAccessibleProgressReport($request, $progressReportId);
-        $path = $exporter->buildDocx($report);
+        try {
+            $path = $exporter->buildDocx($report);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'The Progress Investigation Report Word file could not be generated. Please try again.');
+        }
 
         return response()->download(
             $path,

@@ -43,6 +43,7 @@ use Illuminate\Validation\ValidationException;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Services\PredictedRiskAreaService;
+use App\Services\ProfileImageService;
 use Carbon\Carbon;
 
 class StationAdminController extends Controller
@@ -1531,7 +1532,7 @@ class StationAdminController extends Controller
         return view('chief.profile', compact('user', 'cities', 'stationOfficer', 'activityLogs', 'profileStats'));
     }
 
-    public function updateProfile(Request $request)
+    public function updateProfile(Request $request, ProfileImageService $profileImages)
     {
         $user = User::with('address.barangay.city')->findOrFail(Auth::user()->user_id);
 
@@ -1549,6 +1550,11 @@ class StationAdminController extends Controller
                 }),
             ],
             'street' => ['required', 'string', 'max:255'],
+            'profile_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'profile_image.image' => 'Profile photo must be a valid image file.',
+            'profile_image.mimes' => 'Profile photo must be a JPG, PNG, or WebP image.',
+            'profile_image.max' => 'Profile photo must not exceed 5 MB.',
         ]);
 
         $user->first_name = $validated['first_name'];
@@ -1573,7 +1579,11 @@ class StationAdminController extends Controller
             $user->address_id = $address->address_id;
         }
 
-        $user->save();
+        if ($request->hasFile('profile_image')) {
+            $user = $profileImages->replace($user, $validated['profile_image']);
+        } else {
+            $user->save();
+        }
         UserActivityLogger::log('updated profile', Auth::user()?->user_id, $request);
         $user->load(['role', 'address.barangay.city']);
 
@@ -1595,6 +1605,8 @@ class StationAdminController extends Controller
                     'barangay_id' => $user->address?->barangay?->barangay_id,
                     'city' => $user->address?->barangay?->city?->city_name,
                     'city_id' => $user->address?->barangay?->city?->city_id,
+                    'image_url' => $user->profile_image_url,
+                    'thumbnail_url' => $user->profile_thumbnail_url,
                 ],
             ]);
         }
@@ -1868,6 +1880,9 @@ class StationAdminController extends Controller
                 'revision_review' => request()->boolean('revision_review'),
                 'mitigation_action_id' => request()->integer('mitigation_action_id') ?: null,
                 'search' => trim(request()->string('search')->toString()) ?: null,
+                'sort' => in_array(request()->string('sort')->toString(), ['priority', 'due_date_asc', 'due_date_desc', 'status'], true)
+                    ? request()->string('sort')->toString()
+                    : 'priority',
             ];
 
             try {
@@ -1988,35 +2003,24 @@ class StationAdminController extends Controller
                         default => $query->where('source_type', $value),
                     };
                 })
-                ->orderByRaw("
-                    CASE priority_level
-                        WHEN 'critical' THEN 1
-                        WHEN 'high' THEN 2
-                        WHEN 'medium' THEN 3
-                        WHEN 'low' THEN 4
-                        ELSE 5
-                    END
-                ")
-                ->orderByRaw("
-                    CASE status
-                        WHEN 'draft' THEN 1
-                        WHEN 'planned' THEN 2
-                        WHEN 'approved' THEN 3
-                        WHEN 'in_progress' THEN 4
-                        WHEN 'blocked' THEN 5
-                        WHEN 'completed' THEN 6
-                        WHEN 'cancelled' THEN 7
-                        ELSE 8
-                    END
-                ")
-                ->orderByRaw("
-                    CASE
-                        WHEN target_date IS NULL THEN 2
-                        WHEN target_date < CURRENT_DATE AND status NOT IN ('completed', 'cancelled') THEN 1
-                        ELSE 3
-                    END
-                ")
-                ->orderBy('target_date')
+                ->when($filters['sort'] === 'priority', fn ($query) => $query
+                    ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+                    ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'planned' THEN 3 WHEN 'draft' THEN 4 WHEN 'blocked' THEN 5 WHEN 'completed' THEN 6 WHEN 'cancelled' THEN 7 ELSE 8 END")
+                    ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                    ->orderBy('target_date'))
+                ->when($filters['sort'] === 'due_date_asc', fn ($query) => $query
+                    ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                    ->orderBy('target_date')
+                    ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
+                ->when($filters['sort'] === 'due_date_desc', fn ($query) => $query
+                    ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                    ->orderByDesc('target_date')
+                    ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
+                ->when($filters['sort'] === 'status', fn ($query) => $query
+                    ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'planned' THEN 3 WHEN 'draft' THEN 4 WHEN 'blocked' THEN 5 WHEN 'completed' THEN 6 WHEN 'cancelled' THEN 7 ELSE 8 END")
+                    ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+                    ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                    ->orderBy('target_date'))
                 ->orderByDesc('created_at')
                 ->paginate(10)
                 ->withQueryString();
@@ -2258,6 +2262,9 @@ class StationAdminController extends Controller
             'revision_review' => $request->boolean('revision_review'),
             'mitigation_action_id' => $request->integer('mitigation_action_id') ?: null,
             'search' => trim($request->string('search')->toString()) ?: null,
+            'sort' => in_array($request->string('sort')->toString(), ['priority', 'due_date_asc', 'due_date_desc', 'status'], true)
+                ? $request->string('sort')->toString()
+                : 'priority',
         ];
 
         $actions = MitigationAction::query()
@@ -2279,7 +2286,20 @@ class StationAdminController extends Controller
             ->when($filters['revision_review'], fn ($query) => $query->where('requires_revision_review', true))
             ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
             ->when($filters['source_type'], fn ($query, $value) => $query->where('source_type', $value))
-            ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+            ->when($filters['sort'] === 'priority', fn ($query) => $query
+                ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'planned' THEN 3 WHEN 'draft' THEN 4 WHEN 'blocked' THEN 5 WHEN 'completed' THEN 6 WHEN 'cancelled' THEN 7 ELSE 8 END"))
+            ->when($filters['sort'] === 'due_date_asc', fn ($query) => $query
+                ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                ->orderBy('target_date')
+                ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
+            ->when($filters['sort'] === 'due_date_desc', fn ($query) => $query
+                ->orderByRaw('CASE WHEN target_date IS NULL THEN 2 ELSE 1 END')
+                ->orderByDesc('target_date')
+                ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
+            ->when($filters['sort'] === 'status', fn ($query) => $query
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'planned' THEN 3 WHEN 'draft' THEN 4 WHEN 'blocked' THEN 5 WHEN 'completed' THEN 6 WHEN 'cancelled' THEN 7 ELSE 8 END")
+                ->orderByRaw("CASE priority_level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
             ->orderByDesc('created_at')
             ->paginate(10);
 

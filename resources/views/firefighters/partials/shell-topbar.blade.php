@@ -24,7 +24,7 @@
             <span class="ff-topbar-call__icon"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></span>
             <span class="ff-topbar-call__copy">
                 <strong>Call station</strong>
-                <small>Agora voice call</small>
+                <small>Secure internet call</small>
             </span>
         </button>
 

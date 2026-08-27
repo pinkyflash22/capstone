@@ -63,6 +63,35 @@ async function loadAgoraRtc() {
     return agoraSdkPromise;
 }
 
+function prepareAgoraForCallInterface(reason = 'call-ui') {
+    if (!voiceConfig.configured || !navigator.onLine) return Promise.resolve(null);
+
+    document.documentElement.dataset.pyroAgoraLoad = 'loading';
+    document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
+        node.hidden = false;
+        node.textContent = 'Preparing secure call…';
+    });
+    return loadAgoraRtc()
+        .then((sdk) => {
+            document.documentElement.dataset.pyroAgoraLoad = 'ready';
+            document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
+                node.hidden = true;
+                node.textContent = 'Secure calling ready';
+            });
+            window.dispatchEvent(new CustomEvent('pyro:agora-ready', { detail: { reason } }));
+            return sdk;
+        })
+        .catch((error) => {
+            document.documentElement.dataset.pyroAgoraLoad = 'failed';
+            document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
+                node.hidden = false;
+                node.textContent = 'Phone fallback available';
+            });
+            console.warn('Agora could not be prepared for the calling interface:', error);
+            return null;
+        });
+}
+
 function routeFor(name, callId = '') {
     return String(routes[name] || '').replace('__CALL__', callId);
 }
@@ -154,13 +183,15 @@ function setCallerTriggerState(trigger, state = 'idle') {
         || 'Call BFP';
 
     trigger.dataset.originalVoiceLabel = originalLabel;
-    trigger.classList.toggle('is-loading', state === 'calling');
+    trigger.classList.toggle('is-loading', state === 'preparing' || state === 'calling');
     trigger.classList.toggle('is-active-call', state === 'connected' || state === 'ringing');
-    trigger.setAttribute('aria-busy', state === 'calling' ? 'true' : 'false');
-    trigger.disabled = state === 'calling' || state === 'connected' || state === 'ringing';
+    trigger.setAttribute('aria-busy', ['preparing', 'calling'].includes(state) ? 'true' : 'false');
+    trigger.disabled = ['preparing', 'calling', 'connected', 'ringing'].includes(state);
 
     if (labelNode) {
-        if (state === 'calling') {
+        if (state === 'preparing') {
+            labelNode.textContent = 'Preparing secure call…';
+        } else if (state === 'calling') {
             labelNode.textContent = 'Calling BFP...';
         } else if (state === 'connected' || state === 'ringing') {
             labelNode.textContent = 'BFP Call Active';
@@ -513,6 +544,7 @@ function ensureIncomingPanel() {
                 </div>
             </div>
             <div class="pyro-voice-panel__summary">
+                <span class="pyro-voice-badge" data-pyro-secure-call-state hidden>Preparing secure call…</span>
                 <span class="pyro-voice-badge" data-pyro-voice-active-count>0 active</span>
                 <span class="pyro-voice-badge" data-pyro-voice-count>0 total</span>
                 <button type="button" class="pyro-voice-panel__close" data-pyro-voice-panel-close aria-label="Close dispatch call center"><i class="fa-solid fa-xmark"></i></button>
@@ -604,7 +636,10 @@ function setResponderPanelOpen(open) {
     launcher.setAttribute('aria-label', responderPanelOpen ? 'Close dispatch call center' : 'Open dispatch call center');
     if (backdrop) backdrop.hidden = !responderPanelOpen;
     document.body.classList.toggle('pyro-voice-panel-open', responderPanelOpen);
-    if (responderPanelOpen) window.setTimeout(() => panel.querySelector('[data-pyro-voice-panel-close]')?.focus(), 0);
+    if (responderPanelOpen) {
+        void prepareAgoraForCallInterface('responder-panel');
+        window.setTimeout(() => panel.querySelector('[data-pyro-voice-panel-close]')?.focus(), 0);
+    }
 }
 
 function updateResponderLauncher(actionableCount, incomingCount) {
@@ -1265,12 +1300,22 @@ async function triggerCitizenCall(trigger, event = null) {
     }
 
     activeCallerTrigger = trigger;
-    setCallerTriggerState(trigger, 'calling');
-    toast('Calling station...');
-    const [, callerLocation] = await Promise.all([
+    setCallerTriggerState(trigger, 'preparing');
+    toast('Preparing secure call…');
+    const [secureCalling, , callerLocation] = await Promise.all([
+        prepareAgoraForCallInterface('caller-panel'),
         primeCallerVoiceAccess(),
         getFreshCallerLocationPayload(),
     ]);
+
+    if (!secureCalling) {
+        setCallerTriggerState(trigger, 'idle');
+        openEmergencyTelephoneFallback('Secure internet calling is unavailable.');
+        return;
+    }
+
+    setCallerTriggerState(trigger, 'calling');
+    toast('Calling station...');
 
     try {
         await ensureCitizenVoiceSession();
@@ -1302,7 +1347,7 @@ async function triggerCitizenCall(trigger, event = null) {
         window.dispatchEvent(new CustomEvent('pyro:voice-call-failed', {
             detail: { error, trigger },
         }));
-        openEmergencyTelephoneFallback('Agora calling could not connect.');
+        openEmergencyTelephoneFallback('Secure internet calling could not connect.');
     }
 }
 
@@ -1414,6 +1459,7 @@ async function pollCitizenCallback() {
         }
 
         activeCall = callback;
+        void prepareAgoraForCallInterface('incoming-callback');
         renderCallerDock(callback);
         if (callback.status === 'ringing' && Number(knownCallbackId) !== Number(callback.id)) {
             knownCallbackId = callback.id;

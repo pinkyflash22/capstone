@@ -47,6 +47,13 @@ class VoiceCallUiSemanticsTest extends TestCase
         $this->assertStringContainsString("import('agora-rtc-sdk-ng/esm')", $script);
         $this->assertStringContainsString('.then(({ createClient, createMicrophoneAudioTrack })', $script);
         $this->assertStringNotContainsString("import AgoraRTC from 'agora-rtc-sdk-ng'", $script);
+        $this->assertStringContainsString("function prepareAgoraForCallInterface(reason = 'call-ui')", $script);
+        $this->assertStringContainsString("prepareAgoraForCallInterface('responder-panel')", $script);
+        $this->assertStringContainsString("prepareAgoraForCallInterface('caller-panel')", $script);
+        $this->assertStringContainsString("prepareAgoraForCallInterface('incoming-callback')", $script);
+        $this->assertStringContainsString('Preparing secure call…', $script);
+        $this->assertStringContainsString('Secure internet calling could not connect.', $script);
+        $this->assertStringNotContainsString("openEmergencyTelephoneFallback('Agora", $script);
         $this->assertStringContainsString('data-pyro-voice-filter="active"', $script);
         $this->assertStringContainsString('data-pyro-voice-filter="missed"', $script);
         $this->assertStringContainsString('data-pyro-voice-filter="completed"', $script);

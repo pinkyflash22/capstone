@@ -58,6 +58,7 @@ class CitizenMobileNavigationTest extends TestCase
         $this->assertStringContainsString('openEmergencyTelephoneFallback', $voiceCalls);
         $this->assertStringContainsString('window.location.assign(`tel:${stationPhone}`)', $voiceCalls);
         $this->assertStringContainsString("window.location.assign('tel:911')", $voiceCalls);
-        $this->assertStringContainsString('Agora first, station phone if unavailable', $view);
+        $this->assertStringContainsString('Secure internet call, with phone fallback', $view);
+        $this->assertStringNotContainsString('Agora first', $view);
     }
 }

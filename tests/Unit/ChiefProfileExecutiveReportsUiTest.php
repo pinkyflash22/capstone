@@ -22,6 +22,14 @@ class ChiefProfileExecutiveReportsUiTest extends TestCase
         $this->assertStringContainsString('class="lector-top-bar"', $view);
         $this->assertStringContainsString('id="userDropdownMenu"', $view);
         $this->assertStringContainsString('chief-theme-shell', $view);
+        $this->assertStringContainsString('enctype="multipart/form-data"', $view);
+        $this->assertStringContainsString('name="profile_image"', $view);
+        $this->assertStringContainsString('accept="image/jpeg,image/png,image/webp"', $view);
+        $this->assertStringContainsString('chiefProfilePhotoClear', $view);
+        $this->assertStringContainsString("'profile_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120']", $controller);
+        $this->assertStringContainsString('ProfileImageService $profileImages', $controller);
+        $this->assertStringContainsString("hasFile('profile_image')", $controller);
+        $this->assertStringContainsString("'thumbnail_url' => \$user->profile_thumbnail_url", $controller);
     }
 
     #[Test]

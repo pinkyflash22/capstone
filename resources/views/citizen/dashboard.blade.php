@@ -2730,7 +2730,7 @@
                                             </span>
                                             <span class="mobile-hub-btn__copy">
                                                 <strong class="block text-sm font-bold">Call BFP</strong>
-                                                <small class="block mt-0.5 text-xs font-medium text-amber-700">Agora first, station phone if unavailable</small>
+                                                <small class="block mt-0.5 text-xs font-medium text-amber-700">Secure internet call, with phone fallback</small>
                                             </span>
                                         </span>
                                     </button>

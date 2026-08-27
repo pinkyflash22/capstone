@@ -42,6 +42,26 @@ class ChiefChecklistMobileUiTest extends TestCase
     }
 
     #[Test]
+    public function checklist_desktop_layout_respects_sidebar_and_long_plan_titles(): void
+    {
+        $view = file_get_contents(resource_path('views/chief/course-checklists.blade.php'));
+        $workspace = file_get_contents(resource_path('views/chief/partials/course-checklist-workspace.blade.php'));
+
+        $this->assertStringContainsString('@media(min-width:1025px)', $view);
+        $this->assertStringContainsString('margin-left:var(--sidebar-w,280px)', $view);
+        $this->assertStringContainsString('.checklist-modal{left:var(--sidebar-w,280px)}', $view);
+        $this->assertStringContainsString('.plan-cell>span:last-child{display:block;min-width:0;flex:1}', $view);
+        $this->assertStringContainsString('-webkit-line-clamp:2', $view);
+        $this->assertStringContainsString('table-layout:fixed;min-width:760px', $view);
+
+        $this->assertStringContainsString('Plan and area', $workspace);
+        $this->assertStringContainsString('Priority and status', $workspace);
+        $this->assertStringContainsString('class="checklist-col-area"', $workspace);
+        $this->assertStringContainsString('class="checklist-col-status"', $workspace);
+        $this->assertStringContainsString('class="table-state"', $workspace);
+    }
+
+    #[Test]
     public function authenticated_browser_audit_is_fail_fast_and_has_an_isolated_fixture(): void
     {
         $audit = file_get_contents(base_path('tests/Browser/run-announcement-visual-smoke.ps1'));

@@ -41,4 +41,51 @@ class ChiefMitigationFormUiTest extends TestCase
             $this->assertStringContainsString('name="'.$name.'"', $fields);
         }
     }
+
+    public function test_register_drafts_suggestions_and_details_use_compact_responsive_presentations(): void
+    {
+        $page = file_get_contents(resource_path('views/chief/mitigations.blade.php'));
+
+        $this->assertStringContainsString('class="insight-list"', $page);
+        $this->assertStringContainsString('class="insight-card"', $page);
+        $this->assertStringContainsString('Checklist suggestion', $page);
+        $this->assertStringContainsString('data-payload=\'@json($suggestionReviewPayload)\'', $page);
+
+        $this->assertStringContainsString('class="mitigation-register-table"', $page);
+        $this->assertStringContainsString('Plan and coverage', $page);
+        $this->assertStringContainsString('register-col-location', $page);
+        $this->assertStringContainsString('register-plan__location', $page);
+
+        $this->assertStringContainsString('class="mitigation-dialog__card details-dialog"', $page);
+        $this->assertStringContainsString('const renderCompactDetails', $page);
+        $this->assertStringContainsString('Evidence and rationale', $page);
+        $this->assertStringContainsString('Execution and checklist', $page);
+        $this->assertStringContainsString('Results and documentation', $page);
+        $this->assertStringContainsString('left:var(--sidebar-w,280px)', $page);
+    }
+
+    public function test_documentation_thumbnails_and_server_backed_register_sorting_are_available(): void
+    {
+        $page = file_get_contents(resource_path('views/chief/mitigations.blade.php'));
+        $controller = file_get_contents(app_path('Http/Controllers/Chief/StationAdminController.php'));
+
+        $this->assertStringContainsString('class="attachment-gallery"', $page);
+        $this->assertStringContainsString('class="attachment-thumb"', $page);
+        $this->assertStringContainsString('loading="lazy" decoding="async"', $page);
+        $this->assertStringContainsString('imagePattern.test', $page);
+
+        $this->assertStringContainsString('data-mitigation-sort', $page);
+        $this->assertStringContainsString('data-mitigation-sort-value', $page);
+        $this->assertStringContainsString('<option value="priority"', $page);
+        $this->assertStringContainsString('<option value="due_date_asc"', $page);
+        $this->assertStringContainsString('<option value="due_date_desc"', $page);
+        $this->assertStringContainsString('<option value="status"', $page);
+        $this->assertStringContainsString("['priority', 'due_date_asc', 'due_date_desc', 'status']", $controller);
+        $this->assertStringContainsString("\$filters['sort'] === 'due_date_asc'", $controller);
+        $this->assertStringContainsString("\$filters['sort'] === 'due_date_desc'", $controller);
+        $this->assertStringContainsString("\$filters['sort'] === 'status'", $controller);
+        $this->assertStringContainsString('id="mitigationAttachmentLightbox"', $page);
+        $this->assertStringContainsString('data-attachment-image', $page);
+        $this->assertStringContainsString('openAttachmentLightbox', $page);
+    }
 }

@@ -24,6 +24,12 @@
         .profile-stat{border-radius:22px;border-color:rgba(245,158,11,.12);background:rgba(255,255,255,.82)}
         @media(max-width:1024px){.main-content{margin-left:0;width:100%;padding:20px 24px 96px}.profile-hero{grid-template-columns:1fr}}
         @media(max-width:700px){.main-content{padding:6px 0 calc(96px + env(safe-area-inset-bottom))}.profile-shell{padding:0 12px}.profile-hero{padding:22px 18px;border-radius:24px}.profile-card{border-radius:24px}.profile-card__head{padding:18px}}
+        .profile-hero{grid-template-columns:minmax(0,1fr) minmax(270px,340px);align-items:center}
+        .profile-avatar-shell{position:relative;flex:0 0 auto}.profile-avatar-change{position:absolute;right:-5px;bottom:-5px;display:grid;place-items:center;width:38px;height:38px;border:4px solid #fff;border-radius:13px;background:linear-gradient(135deg,#c84f24,#e89a24);color:#fff;box-shadow:0 8px 18px rgba(200,79,36,.25);cursor:pointer;transition:transform .18s ease}.profile-avatar-change:hover{transform:translateY(-2px)}
+        .profile-photo-editor{display:grid;grid-template-columns:42px minmax(0,1fr);gap:11px;padding:15px;border:1px solid rgba(245,158,11,.22);border-radius:19px;background:rgba(255,255,255,.78);box-shadow:0 10px 25px rgba(120,75,20,.05)}.profile-photo-editor__icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#ffedd5;color:#c2410c}.profile-photo-editor__copy{min-width:0}.profile-photo-editor__copy strong{display:block;color:#1e293b;font-size:.82rem}.profile-photo-editor__copy p{margin:3px 0 0;font-size:.68rem;line-height:1.42}.profile-photo-editor__actions{grid-column:1/-1;display:flex;align-items:center;gap:8px}.profile-photo-select,.profile-photo-clear{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:37px;padding:0 13px;border-radius:11px;font-size:.72rem;font-weight:850;cursor:pointer}.profile-photo-select{border:0;background:#fff1e6;color:#a43f1d}.profile-photo-clear{border:1px solid #e2e8f0;background:#fff;color:#64748b}.profile-photo-clear[hidden]{display:none}.profile-photo-name{grid-column:1/-1;min-width:0;color:#64748b;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#chief_profile_image{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+        .profile-section-heading{display:flex;align-items:center;gap:9px;margin:0 0 16px!important;color:#334155!important;font-size:.78rem!important;text-transform:uppercase;letter-spacing:.07em!important}.profile-section-heading i{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff1e6;color:#c2410c;font-size:.72rem}.profile-field label{display:flex;align-items:center;gap:7px}.profile-field label i{width:16px;color:#d97706;font-size:.7rem;text-align:center}
+        @media(max-width:1024px){.profile-hero{grid-template-columns:1fr}.profile-photo-editor{max-width:500px}}
+        @media(max-width:700px){.profile-hero__identity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px}.profile-photo-editor{grid-template-columns:36px minmax(0,1fr);padding:12px;border-radius:16px}.profile-photo-editor__icon{width:36px;height:36px}.profile-photo-editor__actions{display:grid;grid-template-columns:1fr auto}.profile-photo-select{width:100%}.profile-photo-name{white-space:normal;overflow-wrap:anywhere}.profile-hero h1{font-size:1.55rem;line-height:1.08}.profile-hero p{font-size:.78rem}.profile-status{top:12px;right:12px}}
     </style>
 </head>
 @php
@@ -43,13 +49,34 @@
     <div class="profile-shell chief-theme-shell">
         @if(session('success'))<div class="profile-alert profile-alert--success">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="profile-alert profile-alert--error"><strong>Please review the highlighted fields.</strong><ul class="mt-1 pl-5 list-disc">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-        <section class="profile-hero"><div class="profile-hero__identity"><div id="chiefProfileCardInitials" class="profile-avatar">@if($profileImageUrl)<img src="{{ $profileImageUrl }}" alt="{{ $profileName }}">@else{{ $profileInitials }}@endif</div><div><span class="profile-eyebrow"><i class="fa-solid fa-shield-halved"></i> BFP command account</span><h1 id="chiefProfileCardName">{{ $profileName }}</h1><p><span id="chiefProfileCardEmail">{{ $profileUser->email }}</span> · {{ $profileStats['station_name'] }}</p></div></div><span class="profile-status"><i class="fa-solid fa-circle-check"></i> {{ str_replace('_',' ',$profileStats['duty_status']) }}</span></section>
+        <section class="profile-hero">
+            <div class="profile-hero__identity">
+                <div class="profile-avatar-shell">
+                    <div id="chiefProfileCardInitials" class="profile-avatar">
+                        @if($profileImageUrl)<img src="{{ $profileImageUrl }}" alt="{{ $profileName }}">@else<span data-profile-initials>{{ $profileInitials }}</span>@endif
+                    </div>
+                    <label class="profile-avatar-change" for="chief_profile_image" title="Change profile photo" aria-label="Change profile photo"><i class="fa-solid fa-camera"></i></label>
+                </div>
+                <div><span class="profile-eyebrow"><i class="fa-solid fa-shield-halved"></i> BFP command account</span><h1 id="chiefProfileCardName">{{ $profileName }}</h1><p><span id="chiefProfileCardEmail">{{ $profileUser->email }}</span> &middot; {{ $profileStats['station_name'] }}</p></div>
+            </div>
+            <aside class="profile-photo-editor" aria-label="Profile photo settings">
+                <span class="profile-photo-editor__icon"><i class="fa-solid fa-user-shield"></i></span>
+                <div class="profile-photo-editor__copy"><strong>Commander photo</strong><p>Use a clear square portrait. JPG, PNG, or WebP up to 5 MB.</p></div>
+                <div class="profile-photo-editor__actions">
+                    <label class="profile-photo-select" for="chief_profile_image"><i class="fa-solid fa-image"></i> Choose photo</label>
+                    <button id="chiefProfilePhotoClear" class="profile-photo-clear" type="button" hidden><i class="fa-solid fa-rotate-left"></i> Discard</button>
+                </div>
+                <span id="chiefProfilePhotoName" class="profile-photo-name" aria-live="polite">Your current profile photo is shown.</span>
+                <input id="chief_profile_image" name="profile_image" type="file" accept="image/jpeg,image/png,image/webp" form="chiefProfileForm">
+            </aside>
+            <span class="profile-status"><i class="fa-solid fa-circle-check"></i> {{ str_replace('_',' ',$profileStats['duty_status']) }}</span>
+        </section>
         <section class="profile-stats" aria-label="Profile summary"><article class="profile-stat"><span>Rank / position</span><strong>{{ $profileStats['rank'] }}</strong></article><article class="profile-stat"><span>Station personnel</span><strong>{{ number_format($profileStats['station_personnel']) }}</strong></article><article class="profile-stat"><span>Recorded activities</span><strong>{{ number_format($profileStats['activity_count']) }}</strong></article></section>
         <div class="profile-grid">
             <section class="profile-card"><header class="profile-card__head"><div><h2>Edit account information</h2><p>These values are read from and saved directly to your commander account.</p></div><span class="profile-card__icon"><i class="fa-solid fa-user-pen"></i></span></header>
-                <form id="chiefProfileForm" method="POST" action="{{ route('station-admin.profile.update') }}" class="profile-card__body">@csrf @method('PUT')
-                    <div class="profile-form-section"><h3>Personal details</h3><div class="profile-fields"><div class="profile-field"><label for="chief_first_name">First name</label><input id="chief_first_name" name="first_name" value="{{ old('first_name',$profileUser->first_name) }}" required></div><div class="profile-field"><label for="chief_middle_name">Middle name</label><input id="chief_middle_name" name="middle_name" value="{{ old('middle_name',$profileUser->middle_name) }}"></div><div class="profile-field"><label for="chief_last_name">Last name</label><input id="chief_last_name" name="last_name" value="{{ old('last_name',$profileUser->last_name) }}" required></div><div class="profile-field"><label for="chief_contact_number">Contact number</label><input id="chief_contact_number" name="contact_number" value="{{ old('contact_number',$profileUser->contact_number) }}" inputmode="tel"></div><div class="profile-field profile-field--wide"><label for="chief_email">Email address</label><input id="chief_email" name="email" type="email" value="{{ old('email',$profileUser->email) }}" required></div></div></div>
-                    <div class="profile-form-section"><h3>Residential address</h3><div class="profile-fields"><div class="profile-field"><label for="chief_city_id">City / municipality</label><select id="chief_city_id" name="city_id" required><option value="">Select city</option>@foreach($cities as $city)<option value="{{ $city->city_id }}" @selected((string)old('city_id',$profileCity?->city_id)===(string)$city->city_id)>{{ $city->city_name }}</option>@endforeach</select></div><div class="profile-field"><label for="chief_barangay_id">Barangay</label><select id="chief_barangay_id" name="barangay_id" required><option value="">Select barangay</option>@foreach($barangayOptions as $barangay)<option value="{{ $barangay->barangay_id }}" @selected((string)old('barangay_id',$profileBarangay?->barangay_id)===(string)$barangay->barangay_id)>{{ $barangay->barangay_name }}</option>@endforeach</select></div><div class="profile-field profile-field--wide"><label for="chief_street">Street address</label><input id="chief_street" name="street" value="{{ old('street',$profileAddress?->street) }}" required></div></div></div>
+                <form id="chiefProfileForm" method="POST" action="{{ route('station-admin.profile.update') }}" enctype="multipart/form-data" class="profile-card__body">@csrf @method('PUT')
+                    <div class="profile-form-section"><h3 class="profile-section-heading"><i class="fa-solid fa-id-card"></i> Personal details</h3><div class="profile-fields"><div class="profile-field"><label for="chief_first_name">First name</label><input id="chief_first_name" name="first_name" value="{{ old('first_name',$profileUser->first_name) }}" required></div><div class="profile-field"><label for="chief_middle_name">Middle name</label><input id="chief_middle_name" name="middle_name" value="{{ old('middle_name',$profileUser->middle_name) }}"></div><div class="profile-field"><label for="chief_last_name">Last name</label><input id="chief_last_name" name="last_name" value="{{ old('last_name',$profileUser->last_name) }}" required></div><div class="profile-field"><label for="chief_contact_number">Contact number</label><input id="chief_contact_number" name="contact_number" value="{{ old('contact_number',$profileUser->contact_number) }}" inputmode="tel"></div><div class="profile-field profile-field--wide"><label for="chief_email">Email address</label><input id="chief_email" name="email" type="email" value="{{ old('email',$profileUser->email) }}" required></div></div></div>
+                    <div class="profile-form-section"><h3 class="profile-section-heading"><i class="fa-solid fa-location-dot"></i> Residential address</h3><div class="profile-fields"><div class="profile-field"><label for="chief_city_id">City / municipality</label><select id="chief_city_id" name="city_id" required><option value="">Select city</option>@foreach($cities as $city)<option value="{{ $city->city_id }}" @selected((string)old('city_id',$profileCity?->city_id)===(string)$city->city_id)>{{ $city->city_name }}</option>@endforeach</select></div><div class="profile-field"><label for="chief_barangay_id">Barangay</label><select id="chief_barangay_id" name="barangay_id" required><option value="">Select barangay</option>@foreach($barangayOptions as $barangay)<option value="{{ $barangay->barangay_id }}" @selected((string)old('barangay_id',$profileBarangay?->barangay_id)===(string)$barangay->barangay_id)>{{ $barangay->barangay_name }}</option>@endforeach</select></div><div class="profile-field profile-field--wide"><label for="chief_street">Street address</label><input id="chief_street" name="street" value="{{ old('street',$profileAddress?->street) }}" required></div></div></div>
                     <div class="profile-actions"><button id="chiefProfileSaveBtn" class="profile-save" type="submit"><i class="fa-solid fa-floppy-disk"></i><span>Save profile</span></button></div>
                 </form>
             </section>
@@ -59,6 +86,156 @@
     </div>
 </main>
 @include('chief.partials.logs-modal') @include('chief.partials.logs-script') @include('chief.partials.logout-confirmation')
-<script>document.addEventListener('DOMContentLoaded',()=>{const sidebar=document.getElementById('sidebar'),backdrop=document.getElementById('sidebarBackdrop');document.getElementById('openSidebar')?.addEventListener('click',()=>{sidebar?.classList.add('open');backdrop?.classList.remove('hidden')});backdrop?.addEventListener('click',()=>{sidebar?.classList.remove('open');backdrop.classList.add('hidden')});const form=document.getElementById('chiefProfileForm'),city=document.getElementById('chief_city_id'),barangay=document.getElementById('chief_barangay_id'),save=document.getElementById('chiefProfileSaveBtn'),initialBarangay=@json((string)old('barangay_id',$profileBarangay?->barangay_id));async function loadBarangays(cityId,selected=''){barangay.innerHTML='<option value="">Select barangay</option>';if(!cityId)return;try{const response=await fetch(`/api/barangays/${cityId}`,{headers:{Accept:'application/json'}});if(!response.ok)throw new Error('Unable to load barangays.');(await response.json()).forEach(row=>barangay.add(new Option(row.barangay_name,row.barangay_id,false,String(row.barangay_id)===String(selected))))}catch(error){window.PyroNotify?.notify(error.message,'error')}}city?.addEventListener('change',()=>loadBarangays(city.value));if(city?.value)loadBarangays(city.value,initialBarangay);form?.addEventListener('submit',async event=>{event.preventDefault();form.querySelectorAll('.chief-profile-error').forEach(node=>node.remove());save.disabled=true;save.querySelector('span').textContent='Saving…';try{const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body:new FormData(form)}),payload=await response.json();if(!response.ok){if(payload.errors)Object.entries(payload.errors).forEach(([name,messages])=>{const field=form.elements.namedItem(name);if(field){const error=document.createElement('p');error.className='chief-profile-error';error.textContent=messages[0];field.after(error)}});throw new Error(payload.message||'Please review the profile fields.')}document.getElementById('chiefProfileCardName').textContent=payload.user.full_name;document.getElementById('chiefProfileCardEmail').textContent=payload.user.email;document.getElementById('chiefProfileTopbarName').textContent=payload.user.first_name;window.PyroNotify?.notify(payload.message||'Profile updated.','success')}catch(error){window.PyroNotify?.notify(error.message||'Unable to update profile.','error')}finally{save.disabled=false;save.querySelector('span').textContent='Save profile'}})});</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('chief_profile_image');
+    const discard = document.getElementById('chiefProfilePhotoClear');
+    const fileName = document.getElementById('chiefProfilePhotoName');
+    const initials = @json($profileInitials);
+    let currentPhotoUrl = @json($profileImageUrl);
+    let previewUrl = null;
+
+    const renderPhoto = (container, url) => {
+        if (!container) return;
+        container.replaceChildren();
+        if (url) {
+            const image = document.createElement('img');
+            image.src = url;
+            image.alt = 'Commander profile photo';
+            image.className = 'w-full h-full object-cover';
+            container.appendChild(image);
+            return;
+        }
+        const fallback = document.createElement('span');
+        fallback.textContent = initials;
+        fallback.dataset.profileInitials = '';
+        container.appendChild(fallback);
+    };
+
+    const applyPhoto = url => {
+        renderPhoto(document.getElementById('chiefProfileCardInitials'), url);
+        renderPhoto(document.getElementById('chiefProfileTopbarInitials'), url);
+    };
+
+    const releasePreview = () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+    };
+
+    input?.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type) || file.size > 5 * 1024 * 1024) {
+            input.value = '';
+            applyPhoto(currentPhotoUrl);
+            fileName.textContent = file.size > 5 * 1024 * 1024 ? 'Photo exceeds the 5 MB limit.' : 'Choose a JPG, PNG, or WebP image.';
+            discard.hidden = true;
+            window.PyroNotify?.notify(fileName.textContent, 'error');
+            return;
+        }
+        releasePreview();
+        previewUrl = URL.createObjectURL(file);
+        applyPhoto(previewUrl);
+        fileName.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+        discard.hidden = false;
+    });
+
+    discard?.addEventListener('click', () => {
+        input.value = '';
+        releasePreview();
+        applyPhoto(currentPhotoUrl);
+        fileName.textContent = 'Photo change discarded.';
+        discard.hidden = true;
+    });
+
+    window.chiefApplyProfilePhoto = url => {
+        currentPhotoUrl = url || currentPhotoUrl;
+        releasePreview();
+        applyPhoto(currentPhotoUrl);
+        if (input) input.value = '';
+        if (discard) discard.hidden = true;
+        if (fileName) fileName.textContent = 'Profile photo updated.';
+    };
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const form = document.getElementById('chiefProfileForm');
+    const city = document.getElementById('chief_city_id');
+    const barangay = document.getElementById('chief_barangay_id');
+    const save = document.getElementById('chiefProfileSaveBtn');
+    const initialBarangay = @json((string) old('barangay_id', $profileBarangay?->barangay_id));
+
+    document.getElementById('openSidebar')?.addEventListener('click', () => {
+        sidebar?.classList.add('open');
+        backdrop?.classList.remove('hidden');
+    });
+    backdrop?.addEventListener('click', () => {
+        sidebar?.classList.remove('open');
+        backdrop.classList.add('hidden');
+    });
+
+    async function loadBarangays(cityId, selected = '') {
+        barangay.innerHTML = '<option value="">Select barangay</option>';
+        if (!cityId) return;
+        try {
+            const response = await fetch(`/api/barangays/${cityId}`, { headers: { Accept: 'application/json' } });
+            if (!response.ok) throw new Error('Unable to load barangays.');
+            (await response.json()).forEach(row => barangay.add(new Option(row.barangay_name, row.barangay_id, false, String(row.barangay_id) === String(selected))));
+        } catch (error) {
+            window.PyroNotify?.notify(error.message, 'error');
+        }
+    }
+
+    city?.addEventListener('change', () => loadBarangays(city.value));
+    if (city?.value) loadBarangays(city.value, initialBarangay);
+
+    form?.addEventListener('submit', async event => {
+        event.preventDefault();
+        form.querySelectorAll('.chief-profile-error').forEach(node => node.remove());
+        save.disabled = true;
+        save.querySelector('span').textContent = form.elements.namedItem('profile_image')?.files?.length ? 'Uploading and saving…' : 'Saving…';
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: new FormData(form),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                if (payload.errors) Object.entries(payload.errors).forEach(([name, messages]) => {
+                    const field = form.elements.namedItem(name);
+                    if (field) {
+                        const error = document.createElement('p');
+                        error.className = 'chief-profile-error';
+                        error.textContent = messages[0];
+                        field.after(error);
+                    }
+                });
+                throw new Error(payload.message || 'Please review the profile fields.');
+            }
+            document.getElementById('chiefProfileCardName').textContent = payload.user.full_name;
+            document.getElementById('chiefProfileCardEmail').textContent = payload.user.email;
+            document.getElementById('chiefProfileTopbarName').textContent = payload.user.first_name;
+            document.getElementById('chiefProfileDropdownEmail').textContent = payload.user.email;
+            const savedPhoto = payload.user.thumbnail_url || payload.user.image_url;
+            if (savedPhoto) window.chiefApplyProfilePhoto?.(savedPhoto);
+            window.PyroNotify?.notify(payload.message || 'Profile updated.', 'success');
+        } catch (error) {
+            window.PyroNotify?.notify(error.message || 'Unable to update profile.', 'error');
+        } finally {
+            save.disabled = false;
+            save.querySelector('span').textContent = 'Save profile';
+        }
+    });
+});
+</script>
 <script>document.addEventListener('DOMContentLoaded',()=>{const button=document.getElementById('userDropdownBtn'),menu=document.getElementById('userDropdownMenu');if(!button||!menu)return;button.addEventListener('click',event=>{event.stopPropagation();const open=menu.classList.toggle('show');button.setAttribute('aria-expanded',open?'true':'false')});document.addEventListener('click',event=>{if(!button.contains(event.target)&&!menu.contains(event.target)){menu.classList.remove('show');button.setAttribute('aria-expanded','false')}})});</script>
 </body></html>

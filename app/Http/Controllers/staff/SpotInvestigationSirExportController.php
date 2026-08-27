@@ -7,13 +7,20 @@ use App\Models\SpotInvestigationReport;
 use App\Models\StationOfficer;
 use App\Services\SpotInvestigationSirExporter;
 use Illuminate\Http\Request;
+use Throwable;
 
 class SpotInvestigationSirExportController extends Controller
 {
     public function downloadWord(Request $request, int $spotReportId, SpotInvestigationSirExporter $exporter)
     {
         $report = $this->resolveAccessibleSpotReport($request, $spotReportId);
-        $path = $exporter->buildDocx($report);
+        try {
+            $path = $exporter->buildDocx($report);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'The Spot Investigation Report Word file could not be generated. Please try again.');
+        }
 
         return response()->download(
             $path,

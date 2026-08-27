@@ -3,8 +3,10 @@
 namespace Tests\Unit;
 
 use App\Models\InvestigationReportImage;
+use App\Models\SpotInvestigationReport;
 use App\Services\DocxProofImageAppender;
 use App\Services\InvestigationReportImageService;
+use App\Services\SpotInvestigationSirExporter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
@@ -217,6 +219,89 @@ class InvestigationReportProofImageTest extends TestCase
         $this->assertStringContainsString('Scene proof.png', $documentXml);
         $this->assertStringContainsString('rIdProofImage91_1', $relationshipsXml);
         $this->assertNotFalse($zip->locateName('word/media/proof-image-91-1.png'));
+        $this->assertTrue((new \DOMDocument())->loadXML($documentXml));
+        $this->assertTrue((new \DOMDocument())->loadXML($relationshipsXml));
+
+        $zip->close();
+        @unlink($path);
+    }
+
+    #[Test]
+    public function a_missing_proof_image_does_not_corrupt_or_abort_the_word_report(): void
+    {
+        Storage::fake('supabase');
+
+        $image = new InvestigationReportImage([
+            'file_path' => 'supabase://investigation-reports/spot/1/missing.png',
+            'file_name' => 'Missing scene proof.png',
+            'mime_type' => 'image/png',
+            'file_size' => 2048,
+            'sort_order' => 1,
+        ]);
+        $image->setAttribute('investigation_report_image_id', 92);
+
+        $path = tempnam(sys_get_temp_dir(), 'missing_proof_docx_') . '.docx';
+        copy(storage_path('app/private/templates/sir-template-follow.docx'), $path);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        app(DocxProofImageAppender::class)->append($zip, collect([$image]));
+        $this->assertTrue($zip->close());
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path, ZipArchive::CHECKCONS) === true);
+        $documentXml = $zip->getFromName('word/document.xml');
+
+        $this->assertIsString($documentXml);
+        $this->assertStringContainsString('Proof image 1 could not be embedded: Missing scene proof.png', $documentXml);
+        $this->assertTrue((new \DOMDocument())->loadXML($documentXml));
+
+        $zip->close();
+        @unlink($path);
+    }
+
+    #[Test]
+    public function the_complete_spot_export_with_a_proof_image_is_a_consistent_docx_package(): void
+    {
+        Storage::fake('supabase');
+        $imageBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        Storage::disk('supabase')->put('investigation-reports/spot/44/proof.png', $imageBytes);
+
+        $image = new InvestigationReportImage([
+            'file_path' => 'supabase://investigation-reports/spot/44/proof.png',
+            'file_name' => 'Complete export proof.png',
+            'mime_type' => 'image/png',
+            'file_size' => strlen($imageBytes),
+            'sort_order' => 1,
+        ]);
+        $image->setAttribute('investigation_report_image_id', 93);
+
+        $report = new SpotInvestigationReport([
+            'incident_id' => 12,
+            'report_completed_at' => now(),
+            'details_of_investigation' => 'Initial findings were documented.',
+            'disposition' => 'Report retained for follow-up.',
+        ]);
+        $report->setAttribute('spot_investigation_report_id', 44);
+        $report->setRelation('incident', null);
+        $report->setRelation('investigator', null);
+        $report->setRelation('notedBy', null);
+        $report->setRelation('approvedBy', null);
+        $report->setRelation('proofImages', collect([$image]));
+
+        $path = app(SpotInvestigationSirExporter::class)->buildDocx($report);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path, ZipArchive::CHECKCONS) === true);
+        $documentXml = $zip->getFromName('word/document.xml');
+        $relationshipsXml = $zip->getFromName('word/_rels/document.xml.rels');
+        $this->assertIsString($documentXml);
+        $this->assertIsString($relationshipsXml);
+        $this->assertTrue((new \DOMDocument())->loadXML($documentXml));
+        $this->assertTrue((new \DOMDocument())->loadXML($relationshipsXml));
+        $this->assertStringContainsString('Complete export proof.png', $documentXml);
+        $this->assertStringContainsString('rIdProofImage93_1', $relationshipsXml);
+        $this->assertNotFalse($zip->locateName('word/media/proof-image-93-1.png'));
 
         $zip->close();
         @unlink($path);

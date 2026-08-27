@@ -7,13 +7,20 @@ use App\Models\FinalInvestigationReport;
 use App\Models\StationOfficer;
 use App\Services\FinalInvestigationFirExporter;
 use Illuminate\Http\Request;
+use Throwable;
 
 class FinalInvestigationFirExportController extends Controller
 {
     public function downloadWord(Request $request, int $finalReportId, FinalInvestigationFirExporter $exporter)
     {
         $report = $this->resolveAccessibleFinalReport($request, $finalReportId);
-        $path = $exporter->buildDocx($report);
+        try {
+            $path = $exporter->buildDocx($report);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'The Final Investigation Report Word file could not be generated. Please try again.');
+        }
 
         return response()->download(
             $path,
