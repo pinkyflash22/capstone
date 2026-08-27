@@ -1954,18 +1954,12 @@
             ])->values(),
     ])
     @vite(['resources/css/app.css', 'resources/css/citizen/dashboard.css', 'resources/js/user.js'])
-    @vite(['resources/js/map.js'])
 
     <script>
     document.addEventListener('DOMContentLoaded', function(){
           
           var user = @json($usermarker)|| [];
           
-   window.mapInstanceConfig = {
-        containerId: 'userMap',
-        instanceKey: 'citizenDashboard'
-    };
-
    window.mapData = {
         usermark: @json($usermarker) || [],
         marker: @json($usermarker) || []
@@ -3215,9 +3209,7 @@
             // );
     window.currentUserId = {{ auth()->user()->user_id ?? 'null' }};
     const CITIZEN_LOCATION_PUSH_INTERVAL_MS = 45000;
-    const CITIZEN_LOCATION_PULL_INTERVAL_MS = 45000;
     let citizenLocationPushInterval = null;
-    let citizenLocationPullInterval = null;
 
     function citizenDashboardIsVisible() {
         return document.visibilityState === 'visible';
@@ -3227,10 +3219,6 @@
         if (citizenLocationPushInterval) {
             clearInterval(citizenLocationPushInterval);
             citizenLocationPushInterval = null;
-        }
-        if (citizenLocationPullInterval) {
-            clearInterval(citizenLocationPullInterval);
-            citizenLocationPullInterval = null;
         }
     }
 
@@ -3251,7 +3239,10 @@
                         accuracy: position.coords.accuracy,
                         timestamp: new Date().toISOString(),
                     });
-                    updateUserLocation(window.currentUserId, lat, lng);
+                    window.updateUserLocation?.(window.currentUserId, lat, lng, {
+                        accuracy: position.coords.accuracy,
+                        timestamp: position.timestamp
+                    });
                     window.userCoords.currentLatitude = lat;
                     window.userCoords.currentLongitude = lng;
                     window.userCoords.ready = true;
@@ -3262,8 +3253,6 @@
                     if (window.refreshCitizenOverviewData) {
                         window.refreshCitizenOverviewData();
                     }
-
-                    sendUserLocationToServer(lat, lng);
 
                     if (typeof window.currentLoc === 'function') {
                         console.log('[CitizenLocation] interval rendering marker via currentLoc');
@@ -3281,10 +3270,6 @@
             );
         }, CITIZEN_LOCATION_PUSH_INTERVAL_MS);
 
-        citizenLocationPullInterval = setInterval(() => {
-            if (!citizenDashboardIsVisible()) return;
-            fetchAllFirefighterLocations();
-        }, CITIZEN_LOCATION_PULL_INTERVAL_MS);
     }
 
     window.citizenDashboardIsVisible = citizenDashboardIsVisible;
@@ -3374,7 +3359,10 @@
                                 timestamp: new Date().toISOString(),
                             });
 
-                            updateUserLocation(window.currentUserId, lat, lng);
+                            window.updateUserLocation?.(window.currentUserId, lat, lng, {
+                                accuracy: position.coords.accuracy,
+                                timestamp: position.timestamp
+                            });
                             window.userCoords.currentLatitude = lat;
                             window.userCoords.currentLongitude = lng;
                             window.userCoords.ready = true;
@@ -3390,7 +3378,6 @@
                                 window.__pendingCitizenLocation = { lat, lng };
                             }
                             updateCitizenResolvedLocation(lat, lng);
-                            sendUserLocationToServer(lat, lng);
                             document.dispatchEvent(new Event("locationReady"));
                             resolve(window.userCoords);
                         },
@@ -3425,7 +3412,10 @@ if (navigator.geolocation) {
             // const lng = 120.232331;
 
             // Update for current user
-            updateUserLocation(window.currentUserId, lat, lng);
+            window.updateUserLocation?.(window.currentUserId, lat, lng, {
+                accuracy: position.coords.accuracy,
+                timestamp: position.timestamp
+            });
             window.userCoords.currentLatitude = lat;
             window.userCoords.currentLongitude = lng;
             window.userCoords.ready = true;
@@ -3454,7 +3444,6 @@ if (navigator.geolocation) {
             updateCitizenResolvedLocation(lat, lng);
             
             // Send location to server for other users to see
-            sendUserLocationToServer(lat, lng);
             
             document.dispatchEvent(new Event("locationReady"));
         },
@@ -3475,7 +3464,6 @@ if (navigator.geolocation) {
     
     // Initial fetch
     setTimeout(() => {
-        fetchAllFirefighterLocations();
     }, 2000);
     
 } else {
@@ -5394,8 +5382,8 @@ async function submitCitizenQuickReport(reportKind) {
             if (typeof window.refreshCitizenRiskConcernMap === 'function') {
                 window.refreshCitizenRiskConcernMap(window.citizenRiskMapReports);
             }
-            if (typeof window.refreshMapMarkers === 'function') {
-                window.refreshMapMarkers({ force: true }).catch((refreshError) => {
+            if (typeof window.refreshCitizenMapData === 'function') {
+                Promise.resolve(window.refreshCitizenMapData()).catch((refreshError) => {
                     console.error('Citizen marker refresh failed after risk/hazard report submit:', refreshError);
                 });
             } else if (window.usermap && typeof window.loadMarkers === 'function') {

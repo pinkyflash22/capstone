@@ -44,6 +44,21 @@ class InvestigationReportProofImageTest extends TestCase
         foreach ($templates as $template) {
             $this->assertStringContainsString('!templates/'.$template, $privateStorageIgnore);
         }
+
+        $dockerfile = file_get_contents(base_path('Dockerfile'));
+        foreach ($templates as $template) {
+            $this->assertStringContainsString('storage/app/private/templates/'.$template, $dockerfile);
+        }
+
+        foreach ([
+            'SpotInvestigationSirExportController.php',
+            'ProgressInvestigationPirExportController.php',
+            'FinalInvestigationFirExportController.php',
+        ] as $controller) {
+            $source = file_get_contents(app_path('Http/Controllers/staff/'.$controller));
+            $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $source);
+            $this->assertStringContainsString("'X-Content-Type-Options' => 'nosniff'", $source);
+        }
     }
 
     #[Test]

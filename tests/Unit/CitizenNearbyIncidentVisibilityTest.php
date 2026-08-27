@@ -53,4 +53,19 @@ class CitizenNearbyIncidentVisibilityTest extends TestCase
         $this->assertStringContainsString('nearby alerts remain disabled', $dashboard);
         $this->assertStringNotContainsString('initial GPS error, using fallback location', $dashboard);
     }
+
+    #[Test]
+    public function citizen_dashboard_uses_only_its_map_runtime_and_never_posts_firefighter_telemetry(): void
+    {
+        $userMap = file_get_contents(resource_path('js/user.js'));
+        $dashboard = file_get_contents(resource_path('views/citizen/dashboard.blade.php'));
+
+        $this->assertStringNotContainsString("@vite(['resources/js/map.js'])", $dashboard);
+        $this->assertStringNotContainsString('sendUserLocationToServer(', $dashboard);
+        $this->assertStringNotContainsString('fetchAllFirefighterLocations(', $dashboard);
+        $this->assertStringContainsString('window.updateUserLocation = function updateCitizenUserLocation', $userMap);
+        $this->assertStringContainsString('window.userMap = window.usermap;', $userMap);
+        $this->assertStringContainsString("typeof targetLayer.addLayer !== 'function'", $userMap);
+        $this->assertStringContainsString('window.refreshCitizenMapData()', $dashboard);
+    }
 }

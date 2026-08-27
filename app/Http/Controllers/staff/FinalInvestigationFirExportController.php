@@ -17,7 +17,12 @@ class FinalInvestigationFirExportController extends Controller
 
         return response()->download(
             $path,
-            $exporter->buildFilename($report, 'docx')
+            $exporter->buildFilename($report, 'docx'),
+            [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, no-store, max-age=0',
+            ]
         )->deleteFileAfterSend(true);
     }
 

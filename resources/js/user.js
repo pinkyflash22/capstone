@@ -38,6 +38,32 @@ window.userCoords = window.userCoords || {
     currentLongitude: null,
     ready: false
 };
+window.userLocations = window.userLocations || {};
+window.updateUserLocation = function updateCitizenUserLocation(userId, latitude, longitude, metadata = {}) {
+    const accuracy = Number(metadata.accuracy);
+    const timestamp = Number(metadata.timestamp) || Date.now();
+    const location = {
+        lat: Number(latitude),
+        lng: Number(longitude),
+        accuracy: Number.isFinite(accuracy) ? accuracy : null,
+        timestamp,
+        lastUpdated: new Date(timestamp),
+        ready: true,
+    };
+
+    window.userLocations[userId] = location;
+    if (String(userId) === String(window.currentUserId)) {
+        window.userCoords = {
+            currentLatitude: location.lat,
+            currentLongitude: location.lng,
+            accuracy: location.accuracy,
+            timestamp: location.timestamp,
+            ready: true,
+        };
+    }
+
+    return location;
+};
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
 // Flag to prevent multiple marker loads
@@ -1261,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', function(){
     // Initialize map only once
     if (!window.usermap || !window.usermap._container) {
         window.usermap = L.map('userMap').setView([15.8222, 120.3297], 13);
+        window.userMap = window.usermap;
         ensureCitizenMarkerPanes();
 
         var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -1352,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', function(){
         }, 500);
     } else {
         console.log("Map already exists, skipping initialization");
+        window.userMap = window.usermap;
         ensureCitizenMarkerPanes();
         if (!boundaryLayerGroup) {
             boundaryLayerGroup = L.layerGroup().addTo(window.usermap);
@@ -2493,6 +2521,13 @@ export async function loadMarkers() {
                 popupContent
             };
             
+            if (!targetLayer) {
+                targetLayer = otherLayerGroup;
+            }
+            if (!targetLayer || typeof targetLayer.addLayer !== 'function') {
+                console.warn('Citizen marker layer is not ready; marker refresh deferred.', usermark?.marker_id);
+                return;
+            }
             targetLayer.addLayer(marker);
 
             if (incident) {

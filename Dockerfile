@@ -35,6 +35,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Copy project
 COPY . .
 
+# Report downloads depend on immutable Word templates bundled with the release.
+# Fail the image build instead of deploying an application that returns an HTML
+# error page when SIR, PIR, or FIR is downloaded.
+RUN test -f storage/app/private/templates/sir-template-follow.docx \
+    && test -f storage/app/private/templates/progress-investigation-template-edited.docx \
+    && test -f storage/app/private/templates/final-investigation-template-edited.docx
+
 # Install PHP dependencies
 RUN composer config -g github-protocols https \
     && composer clear-cache \
