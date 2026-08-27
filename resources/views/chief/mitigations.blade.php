@@ -81,16 +81,39 @@
         .note { margin-top:6px; color:#64748b; font-size:.82rem; line-height:1.5; }
         .note--clamp { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
         .empty { padding:26px 24px; border-radius:22px; border:1px dashed rgba(203,213,225,.96); color:#64748b; text-align:center; background:#f8fafc; }
-        .filters-grid, .form-grid, .details-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; }
+        .filters-grid, .details-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; }
         .details-grid.two-col { grid-template-columns:repeat(2, minmax(0, 1fr)); }
         .mitigation-field, .details-card { display:flex; flex-direction:column; gap:8px; }
         .mitigation-field--full, .details-card--full { grid-column:1 / -1; }
-        .mitigation-field label { color:#334155; font-size:.78rem; font-weight:800; }
-        .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; min-height:44px; border:1px solid rgba(203,213,225,.96); border-radius:14px; padding:10px 12px; font-size:.84rem; color:#0f172a; background:#fff; }
+        .mitigation-field label { display:flex; align-items:center; gap:8px; color:#334155; font-size:.78rem; font-weight:850; line-height:1.35; }
+        .mitigation-field label i { display:inline-flex; align-items:center; justify-content:center; width:19px; color:#ea580c; font-size:.8rem; flex:0 0 19px; }
+        .mitigation-field label em { margin-left:auto; color:#94a3b8; font-size:.65rem; font-style:normal; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
+        .mitigation-field > small { color:#64748b; font-size:.7rem; line-height:1.4; }
+        .mitigation-field input, .mitigation-field select, .mitigation-field textarea { width:100%; min-height:48px; border:1px solid rgba(203,213,225,.96); border-radius:13px; padding:11px 13px; font-size:.84rem; color:#0f172a; background:#fff; transition:border-color .16s ease, box-shadow .16s ease, background .16s ease; }
         .mitigation-field input:focus, .mitigation-field select:focus, .mitigation-field textarea:focus { outline:none; border-color:#f97316; box-shadow:0 0 0 4px rgba(249,115,22,.12); }
-        .mitigation-field label::before { font-family:"Font Awesome 6 Free"; font-weight:900; color:#f97316; margin-right:7px; content:"\f058"; }
-        .mitigation-form-section { grid-column:1 / -1; display:flex; align-items:center; gap:10px; margin-top:8px; padding:12px 14px; border-radius:14px; background:#fff7ed; color:#9a3412; font-size:.82rem; font-weight:900; }
-        .mitigation-form-section small { color:#b45309; font-size:.73rem; font-weight:600; }
+        .mitigation-field input:hover, .mitigation-field select:hover, .mitigation-field textarea:hover { border-color:#94a3b8; }
+        .mitigation-form-layout { display:flex; flex-direction:column; gap:16px; }
+        .mitigation-form-block { border:1px solid rgba(226,232,240,.98); border-radius:20px; background:#fff; box-shadow:0 8px 22px rgba(15,23,42,.035); overflow:hidden; }
+        .mitigation-form-block__head { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; min-height:74px; padding:15px 18px; border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg, #fffaf5, #fff 68%); }
+        .mitigation-form-block__head h4 { margin:0; color:#0f172a; font-size:.9rem; font-weight:900; letter-spacing:-.01em; }
+        .mitigation-form-block__head p { margin:4px 0 0; color:#64748b; font-size:.72rem; line-height:1.45; }
+        .mitigation-form-block__icon { display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:13px; color:#c2410c; background:#ffedd5; border:1px solid #fed7aa; font-size:1rem; }
+        .mitigation-form-block__icon.is-blue { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe; }
+        .mitigation-form-block__icon.is-green { color:#047857; background:#ecfdf5; border-color:#a7f3d0; }
+        .mitigation-form-block__step { color:#cbd5e1; font-size:.68rem; font-weight:900; letter-spacing:.12em; }
+        .mitigation-form-block__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:17px 18px; padding:20px; }
+        .mitigation-form-block--details > summary { cursor:pointer; list-style:none; border-bottom:0; }
+        .mitigation-form-block--details > .mitigation-form-block__head { grid-template-columns:auto minmax(0,1fr) auto auto; }
+        .mitigation-form-block--details > summary::-webkit-details-marker { display:none; }
+        .mitigation-form-block--details[open] > summary { border-bottom:1px solid #f1f5f9; }
+        .mitigation-form-block__chevron { color:#94a3b8; transition:transform .18s ease; }
+        .mitigation-form-block--details[open] .mitigation-form-block__chevron { transform:rotate(180deg); }
+        .mitigation-workflow-note { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border-radius:16px; border:1px solid rgba(249,115,22,.22); background:#fff7ed; color:#9a3412; }
+        .mitigation-workflow-note__icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:11px; background:#ffedd5; flex:0 0 34px; }
+        .mitigation-workflow-note strong { font-size:.78rem; }
+        .mitigation-workflow-note p { margin:3px 0 0; color:#b45309; font-size:.72rem; line-height:1.5; }
+        .mitigation-upload-field input[type="file"] { padding:9px; background:#f8fafc; }
+        .mitigation-upload-field input[type="file"]::file-selector-button { min-height:30px; margin-right:10px; padding:0 12px; border:0; border-radius:9px; color:#9a3412; background:#ffedd5; font-weight:800; cursor:pointer; }
         .table-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 4px 0; color:#64748b; font-size:.82rem; }
         .table-pagination nav { display:flex; gap:6px; flex-wrap:wrap; }
         .table-pagination a, .table-pagination span { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 10px; border:1px solid #e2e8f0; border-radius:10px; color:#475569; text-decoration:none; font-weight:800; background:#fff; }
@@ -115,15 +138,22 @@
         .task-item .fa-circle-check { color:#16a34a; }
         .task-item .fa-clock { color:#f59e0b; }
         .task-item .fa-ban { color:#dc2626; }
-        .mitigation-dialog { position:fixed; inset:0; z-index:90; display:none; align-items:flex-start; justify-content:center; padding:28px 20px; background:rgba(15,23,42,.52); backdrop-filter: blur(8px); overflow-y:auto; }
+        .mitigation-dialog { position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(15,23,42,.58); backdrop-filter:blur(8px); overflow:hidden; }
         .mitigation-dialog.is-open { display:flex; }
         .mitigation-dialog__card { width:min(680px, calc(100vw - 40px)); max-width:680px; max-height:min(86vh, 760px); overflow-y:auto; padding:18px; border-radius:24px; border:1px solid rgba(226,232,240,.94); background:rgba(255,255,255,.98); box-shadow:0 28px 60px rgba(15,23,42,.18); flex:0 0 auto; margin:0 auto; }
         .mitigation-dialog__card.wide { width:min(860px, calc(100vw - 40px)); max-width:860px; }
+        .mitigation-dialog__card.mitigation-form-dialog { display:flex; flex-direction:column; width:min(980px, calc(100vw - 48px)); max-width:980px; max-height:min(92vh, 900px); padding:0; overflow:hidden; }
         .mitigation-dialog__head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(226,232,240,.92); }
+        .mitigation-form-dialog .mitigation-dialog__head { align-items:center; margin:0; padding:19px 22px; background:#fff; flex:0 0 auto; }
+        .mitigation-dialog__title { display:flex; align-items:center; gap:13px; min-width:0; }
+        .mitigation-dialog__title-icon { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:14px; color:#fff; background:linear-gradient(135deg,#f97316,#dc2626); box-shadow:0 8px 18px rgba(234,88,12,.2); flex:0 0 44px; }
         .mitigation-dialog__head h3 { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
         .mitigation-dialog__head p { margin:4px 0 0; color:#64748b; font-size:.82rem; line-height:1.5; max-width:42ch; }
         .mitigation-dialog__close { width:42px; height:42px; border:1px solid rgba(226,232,240,.94); border-radius:14px; background:#fff; color:#334155; }
+        .mitigation-form-dialog form { display:flex; flex-direction:column; min-height:0; }
+        .mitigation-form-scroll { min-height:0; padding:20px 22px; overflow-y:auto; overscroll-behavior:contain; background:#f8fafc; }
         .form-actions { display:flex; justify-content:end; gap:12px; margin-top:20px; }
+        .mitigation-form-dialog .form-actions { margin:0; padding:15px 22px; border-top:1px solid #e2e8f0; background:#fff; box-shadow:0 -8px 22px rgba(15,23,42,.035); flex:0 0 auto; }
         .user-dropdown { position:relative; }
         .user-dropdown-toggle { display:flex; align-items:center; gap:12px; padding:8px 16px; border-radius:999px; background:#fffbeb; border:1px solid #fef3c7; cursor:pointer; }
         .user-dropdown-menu { position:absolute; top:calc(100% + 12px); right:0; width:260px; background:white; border-radius:18px; box-shadow:0 24px 56px rgba(15,23,42,.14); border:1px solid rgba(226,232,240,.95); opacity:0; visibility:hidden; transform:translateY(10px); transition:all .2s ease; overflow:hidden; }
@@ -168,13 +198,13 @@
 
         @media (max-width: 1400px) {
             .summary-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
-            .filters-grid, .form-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
+            .filters-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
         }
 
         @media (max-width: 992px) {
             .mitigation-banner, .panel-head, .top-bar { flex-direction:column; align-items:flex-start; }
             .mitigation-banner__meta { width:100%; min-width:0; }
-            .summary-grid, .filters-grid, .form-grid, .details-grid, .details-grid.two-col { grid-template-columns:repeat(2, minmax(0,1fr)); }
+            .summary-grid, .filters-grid, .details-grid, .details-grid.two-col { grid-template-columns:repeat(2, minmax(0,1fr)); }
             .filter-actions { grid-column:1 / -1; justify-content:flex-start; }
             .compact-draft-list { grid-template-columns:1fr; }
         }
@@ -197,7 +227,7 @@
             .mitigation-banner__meta-card { padding:7px 8px; border-radius:11px; }
             .mitigation-banner__meta-label { font-size:.5rem; }
             .mitigation-banner__meta-value { margin-top:2px; font-size:.64rem; line-height:1.28; }
-            .summary-grid, .filters-grid, .form-grid, .details-grid, .details-grid.two-col { grid-template-columns:1fr; gap:8px; }
+            .summary-grid, .filters-grid, .details-grid, .details-grid.two-col { grid-template-columns:1fr; gap:8px; }
             .mitigation-stack { gap:8px; }
             .panel, .card { padding:10px; border-radius:15px; }
             .card-label { font-size:.58rem; }
@@ -221,8 +251,29 @@
             .row-actions { justify-content:flex-end; gap:5px; }
             .row-btn { width:30px; min-height:30px; font-size:.62rem; }
             .attachments a, .note, .details-item span, .details-item div { font-size:.68rem; }
-            .mitigation-dialog { align-items:flex-end; padding:10px; }
-            .mitigation-dialog__card, .mitigation-dialog__card.wide { width:100%; max-width:100%; max-height:min(84dvh, 700px); border-radius:22px 22px 16px 16px; padding:11px; }
+            .mitigation-dialog { align-items:flex-end; padding:8px; }
+            .mitigation-dialog__card, .mitigation-dialog__card.wide { width:100%; max-width:100%; max-height:min(88dvh, 760px); border-radius:22px 22px 16px 16px; padding:11px; }
+            .mitigation-dialog__card.mitigation-form-dialog { width:100%; max-width:100%; max-height:92dvh; padding:0; border-radius:24px 24px 12px 12px; }
+            .mitigation-dialog__card.mitigation-form-dialog::before { display:none; }
+            .mitigation-form-dialog .mitigation-dialog__head { padding:14px 14px 12px; }
+            .mitigation-dialog__title-icon { width:38px; height:38px; border-radius:12px; flex-basis:38px; }
+            .mitigation-dialog__head h3 { font-size:.9rem; }
+            .mitigation-dialog__head p { font-size:.68rem; line-height:1.35; }
+            .mitigation-dialog__close { width:38px; height:38px; border-radius:12px; flex:0 0 38px; }
+            .mitigation-form-scroll { padding:10px; }
+            .mitigation-form-layout { gap:10px; }
+            .mitigation-form-block { border-radius:16px; }
+            .mitigation-form-block__head { grid-template-columns:auto minmax(0,1fr) auto; min-height:62px; gap:9px; padding:11px 12px; }
+            .mitigation-form-block__icon { width:36px; height:36px; border-radius:11px; font-size:.86rem; }
+            .mitigation-form-block__head h4 { font-size:.8rem; }
+            .mitigation-form-block__head p { margin-top:2px; font-size:.63rem; line-height:1.35; }
+            .mitigation-form-block__step { display:none; }
+            .mitigation-form-block__grid { grid-template-columns:1fr; gap:13px; padding:13px 12px; }
+            .mitigation-field input, .mitigation-field select, .mitigation-field textarea { min-height:46px; font-size:.78rem; border-radius:12px; }
+            .mitigation-field label { font-size:.72rem; }
+            .mitigation-field label em { font-size:.56rem; }
+            .mitigation-form-dialog .form-actions { display:grid; grid-template-columns:1fr 1.45fr; gap:8px; padding:11px 12px calc(11px + env(safe-area-inset-bottom, 0px)); }
+            .mitigation-form-dialog .form-actions .cancel-btn, .mitigation-form-dialog .form-actions .submit-btn { width:100%; min-height:44px; }
             .mitigation-dialog__card::before { content:""; display:block; width:52px; height:5px; border-radius:999px; background:#cbd5e1; margin:4px auto 10px; }
             .form-actions { flex-direction:column; align-items:stretch; }
             .hero-btn, .submit-btn, .cancel-btn, .filter-btn { width:100%; justify-content:center; min-height:38px; padding:0 12px; font-size:.72rem; }
@@ -821,35 +872,35 @@
     </div>
 
     <div class="mitigation-dialog" id="createModal" aria-hidden="true">
-        <div class="mitigation-dialog__card">
+        <div class="mitigation-dialog__card mitigation-form-dialog" role="dialog" aria-modal="true" aria-labelledby="createMitigationTitle">
             <div class="mitigation-dialog__head">
-                <div><h3>Add Mitigation</h3><p>Create a mitigation plan with planning, ownership, implementation, and evaluation fields.</p></div>
-                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <div class="mitigation-dialog__title"><span class="mitigation-dialog__title-icon"><i class="fa-solid fa-shield-halved"></i></span><div><h3 id="createMitigationTitle">Create mitigation plan</h3><p>Start with the plan and owner. Delivery details can be completed as work progresses.</p></div></div>
+                <button type="button" class="mitigation-dialog__close" data-close-modal aria-label="Close create mitigation"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
                 @csrf
-                <div class="form-grid">@include('chief.partials.mitigation-form-fields')</div>
+                <div class="mitigation-form-scroll"><div class="mitigation-form-layout">@include('chief.partials.mitigation-form-fields', ['fieldPrefix' => 'createMitigation', 'formMode' => 'create'])</div></div>
                 <div class="form-actions">
-                    <button type="button" class="cancel-btn" data-close-modal>Cancel</button>
-                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Save</span></button>
+                    <button type="button" class="cancel-btn" data-close-modal><i class="fa-solid fa-xmark"></i><span>Cancel</span></button>
+                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Save mitigation</span></button>
                 </div>
             </form>
         </div>
     </div>
 
     <div class="mitigation-dialog" id="editModal" aria-hidden="true">
-        <div class="mitigation-dialog__card">
+        <div class="mitigation-dialog__card mitigation-form-dialog" role="dialog" aria-modal="true" aria-labelledby="editMitigationTitle">
             <div class="mitigation-dialog__head">
-                <div><h3>Edit Mitigation</h3><p>Update stage, ownership, implementation notes, and evaluation details.</p></div>
-                <button type="button" class="mitigation-dialog__close" data-close-modal><i class="fa-solid fa-xmark"></i></button>
+                <div class="mitigation-dialog__title"><span class="mitigation-dialog__title-icon"><i class="fa-solid fa-pen-to-square"></i></span><div><h3 id="editMitigationTitle">Edit mitigation plan</h3><p>Review ownership, update delivery progress, and record the outcome in one workspace.</p></div></div>
+                <button type="button" class="mitigation-dialog__close" data-close-modal aria-label="Close edit mitigation"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form method="POST" id="editForm" action="{{ route('station-admin.mitigations.update', ['mitigationActionId' => 0]) }}" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
-                <div class="form-grid">@include('chief.partials.mitigation-form-fields')</div>
+                <div class="mitigation-form-scroll"><div class="mitigation-form-layout">@include('chief.partials.mitigation-form-fields', ['fieldPrefix' => 'editMitigation', 'formMode' => 'edit'])</div></div>
                 <div class="form-actions">
-                    <button type="button" class="cancel-btn" data-close-modal>Cancel</button>
-                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Update</span></button>
+                    <button type="button" class="cancel-btn" data-close-modal><i class="fa-solid fa-xmark"></i><span>Cancel</span></button>
+                    <button type="submit" class="submit-btn"><i class="fa-solid fa-floppy-disk"></i><span>Update mitigation</span></button>
                 </div>
             </form>
         </div>
@@ -944,12 +995,14 @@
 
             const openModal = (modal) => {
                 if (!modal) return;
-                const modalCard = modal.querySelector('.mitigation-dialog__card');
-                if (modalCard) {
-                    modalCard.scrollTop = 0;
-                }
+                const scrollRegion = modal.querySelector('.mitigation-form-scroll') || modal.querySelector('.mitigation-dialog__card');
+                if (scrollRegion) scrollRegion.scrollTop = 0;
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
+                window.requestAnimationFrame(() => {
+                    const firstField = modal.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[data-close-modal]');
+                    firstField?.focus({ preventScroll: true });
+                });
             };
 
             const escapeHtml = (value) => String(value ?? '')
@@ -1115,6 +1168,13 @@
             [createModal, editModal, deleteModal, detailsModal].forEach((modal) => modal?.addEventListener('click', (event) => {
                 if (event.target === modal) closeModal(modal);
             }));
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+                [createModal, editModal, deleteModal, detailsModal].forEach((modal) => {
+                    if (modal?.classList.contains('is-open')) closeModal(modal);
+                });
+            });
 
             const bindMitigationTableActions = () => {
             document.querySelectorAll('#mitigationTableData [data-open-edit-modal]').forEach((button) => {
