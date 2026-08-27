@@ -18,6 +18,11 @@ function bootFirefighterMyStationPage() {
     const referenceCache = { spot: null, progress: null, final: null };
     const requestControllers = new Map();
     let activeCrewMemberTrigger = null;
+    let rosterSearchQuery = '';
+    let readinessRefreshTimer = null;
+    let readinessRefreshInFlight = false;
+    let lastReadinessRefreshAt = 0;
+    const READINESS_REFRESH_INTERVAL_MS = Math.max(10000, Number(config.readinessRefreshIntervalMs) || 30000);
     const MAX_PROOF_UPLOAD_BYTES = 25 * 1024 * 1024;
     const MAX_PROOF_UPLOAD_FILES = 20;
     const ALLOWED_PROOF_IMAGE_TYPES = ['image/jpeg', 'image/png'];
@@ -1122,6 +1127,26 @@ function bootFirefighterMyStationPage() {
         setSummaryMetric('officers', available, `${total} rostered officers`);
     }
 
+    function applyRosterSearch(query = rosterSearchQuery) {
+        const search = personnelSection?.querySelector('[data-station-roster-search]');
+        const cards = Array.from(personnelSection?.querySelectorAll('.station-person-card') || []);
+        const empty = personnelSection?.querySelector('[data-station-roster-empty]');
+        const count = personnelSection?.querySelector('[data-station-roster-search-count]');
+
+        rosterSearchQuery = String(query || '').trim().toLocaleLowerCase();
+        if (search && search.value !== query) search.value = query;
+
+        let visible = 0;
+        cards.forEach((card) => {
+            const matches = !rosterSearchQuery || String(card.dataset.rosterSearchText || '').includes(rosterSearchQuery);
+            card.hidden = !matches;
+            if (matches) visible += 1;
+        });
+
+        if (count) count.textContent = rosterSearchQuery ? `${visible} of ${cards.length} shown` : `${cards.length} shown`;
+        if (empty) empty.hidden = visible > 0;
+    }
+
     function syncEquipmentSummary() {
         const equipmentSummary = equipmentSection?.querySelector('[data-equipment-summary]');
         if (!equipmentSummary) return;
@@ -1149,20 +1174,23 @@ function bootFirefighterMyStationPage() {
         }
     }
 
-    async function loadPersonnel(force = false) {
+    async function loadPersonnel(force = false, preserveOnError = false) {
         try {
             const query = force ? `${routes.personnel}?refresh=1` : routes.personnel;
             const result = await fetchStationSection('personnel', query);
             personnelSection.innerHTML = result?.data?.html || '';
             syncPersonnelSummary();
+            applyRosterSearch();
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station personnel failed:', error);
-            renderSectionError(personnelSection, 'Unable to load station personnel.', 'loadFirefighterStationPersonnel');
+            if (!preserveOnError) {
+                renderSectionError(personnelSection, 'Unable to load station personnel.', 'loadFirefighterStationPersonnel');
+            }
         }
     }
 
-    async function loadEquipment(force = false) {
+    async function loadEquipment(force = false, preserveOnError = false) {
         try {
             const query = force ? `${routes.equipment}?refresh=1` : routes.equipment;
             const result = await fetchStationSection('equipment', query);
@@ -1171,7 +1199,33 @@ function bootFirefighterMyStationPage() {
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station equipment failed:', error);
-            renderSectionError(equipmentSection, 'Unable to load station equipment.', 'loadFirefighterStationEquipment');
+            if (!preserveOnError) {
+                renderSectionError(equipmentSection, 'Unable to load station equipment.', 'loadFirefighterStationEquipment');
+            }
+        }
+    }
+
+    async function refreshReadiness() {
+        if (readinessRefreshInFlight || document.hidden || !document.body.contains(root)) return;
+
+        readinessRefreshInFlight = true;
+        try {
+            await Promise.allSettled([loadPersonnel(true, true), loadEquipment(true, true)]);
+            lastReadinessRefreshAt = Date.now();
+        } finally {
+            readinessRefreshInFlight = false;
+        }
+    }
+
+    function handleReadinessVisibilityChange() {
+        if (!document.hidden && Date.now() - lastReadinessRefreshAt >= READINESS_REFRESH_INTERVAL_MS) {
+            refreshReadiness();
+        }
+    }
+
+    function handlePersonnelSearch(event) {
+        if (event.target.matches('[data-station-roster-search]')) {
+            applyRosterSearch(event.target.value);
         }
     }
 
@@ -2178,6 +2232,8 @@ function bootFirefighterMyStationPage() {
         }
     };
     document.addEventListener('keydown', documentKeydownHandler);
+    personnelSection?.addEventListener('input', handlePersonnelSearch);
+    document.addEventListener('visibilitychange', handleReadinessVisibilityChange);
 
     reportTabs?.addEventListener('click', (event) => {
         const tab = event.target.closest('.report-tab');
@@ -2209,9 +2265,13 @@ function bootFirefighterMyStationPage() {
     loadPersonnel();
     loadReports(initialReportTab);
     loadEquipment();
+    lastReadinessRefreshAt = Date.now();
+    readinessRefreshTimer = window.setInterval(refreshReadiness, READINESS_REFRESH_INTERVAL_MS);
     handleReportDeepLink();
 
     window.__ffCurrentPageCleanup = function () {
+        if (readinessRefreshTimer) window.clearInterval(readinessRefreshTimer);
+        readinessRefreshTimer = null;
         cleanupRequests();
         closeCrewMemberModal({ restoreFocus: false });
         closeReportPicker();
@@ -2224,6 +2284,8 @@ function bootFirefighterMyStationPage() {
         updateModalOpenState();
         document.removeEventListener('click', documentClickHandler);
         document.removeEventListener('keydown', documentKeydownHandler);
+        personnelSection?.removeEventListener('input', handlePersonnelSearch);
+        document.removeEventListener('visibilitychange', handleReadinessVisibilityChange);
     };
 }
 

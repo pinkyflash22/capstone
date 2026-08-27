@@ -52,6 +52,12 @@ class VoiceCallUiSemanticsTest extends TestCase
         $this->assertStringContainsString("prepareAgoraForCallInterface('caller-panel')", $script);
         $this->assertStringContainsString("prepareAgoraForCallInterface('incoming-callback')", $script);
         $this->assertStringContainsString('Preparing secure call…', $script);
+        $this->assertStringContainsString('function measureAgoraSdkLoad(completedAt)', $script);
+        $this->assertStringContainsString("performance.getEntriesByType?.('resource')", $script);
+        $this->assertStringContainsString('window.PyroSenseVoiceMetrics', $script);
+        $this->assertStringContainsString("new CustomEvent('pyro:agora-load-measured'", $script);
+        $this->assertStringContainsString('Still loading secure calling…', $script);
+        $this->assertStringContainsString("node.setAttribute('aria-live', 'polite')", $script);
         $this->assertStringContainsString('Secure internet calling could not connect.', $script);
         $this->assertStringNotContainsString("openEmergencyTelephoneFallback('Agora", $script);
         $this->assertStringContainsString('data-pyro-voice-filter="active"', $script);

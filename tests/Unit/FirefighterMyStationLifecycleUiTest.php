@@ -80,6 +80,24 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
     }
 
     #[Test]
+    public function readiness_auto_refreshes_and_large_rosters_are_searchable(): void
+    {
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
+        $personnel = file_get_contents(resource_path('views/firefighters/mystation-personnel.blade.php'));
+        $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+        $styles = file_get_contents(resource_path('css/firefighters/my-station.css'));
+
+        $this->assertStringContainsString('readinessRefreshIntervalMs: 30000', $view);
+        $this->assertStringContainsString('$stationOfficers->count() >= 8', $personnel);
+        $this->assertStringContainsString('data-station-roster-search', $personnel);
+        $this->assertStringContainsString('data-roster-search-text', $personnel);
+        $this->assertStringContainsString('window.setInterval(refreshReadiness, READINESS_REFRESH_INTERVAL_MS)', $script);
+        $this->assertStringContainsString("document.addEventListener('visibilitychange', handleReadinessVisibilityChange)", $script);
+        $this->assertStringContainsString('applyRosterSearch();', $script);
+        $this->assertStringContainsString('.station-roster-search', $styles);
+    }
+
+    #[Test]
     public function investigation_report_modal_has_one_authoritative_mobile_height_layer(): void
     {
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));

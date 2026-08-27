@@ -18,6 +18,7 @@
             <div class="section-title"><i class="fa-solid fa-truck-medical"></i> Vehicles and Equipment</div>
             <div class="section-subtitle">Readiness from current station assignments</div>
         </div>
+        <small class="station-readiness-refresh-note"><i class="fa-solid fa-arrows-rotate"></i> Updates every 30 seconds</small>
     </div>
     <div class="section-body">
         <div class="readiness-strip" aria-label="Equipment readiness summary">

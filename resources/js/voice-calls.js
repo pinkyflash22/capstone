@@ -39,6 +39,8 @@ let responderCallFilter = 'all';
 let responderCallSort = 'newest';
 let latestResponderPayload = null;
 let agoraSdkPromise = null;
+let agoraSdkLoadStartedAt = null;
+let agoraSdkLoadMetrics = null;
 let pendingNotificationCallId = null;
 
 const routes = voiceConfig.routes || {};
@@ -47,15 +49,53 @@ const pollMs = Number(voiceConfig.pollIntervalMs || 2000);
 const AGORA_JOIN_TIMEOUT_MS = 15000;
 const REQUEST_TIMEOUT_MS = 12000;
 
+function measureAgoraSdkLoad(completedAt) {
+    const resource = performance.getEntriesByType?.('resource')
+        ?.filter((entry) => entry.name.includes('/assets/AgoraRTC_N-') || entry.name.includes('AgoraRTC_N-production'))
+        .at(-1);
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const metrics = {
+        duration_ms: Math.max(0, Math.round(completedAt - (agoraSdkLoadStartedAt || completedAt))),
+        transfer_bytes: Number(resource?.transferSize || 0),
+        compressed_bytes: Number(resource?.encodedBodySize || 0),
+        decoded_bytes: Number(resource?.decodedBodySize || 0),
+        connection_type: connection?.effectiveType || null,
+        measured_at: new Date().toISOString(),
+    };
+
+    agoraSdkLoadMetrics = metrics;
+    window.PyroSenseVoiceMetrics = { ...(window.PyroSenseVoiceMetrics || {}), agora_sdk: metrics };
+    window.dispatchEvent(new CustomEvent('pyro:agora-load-measured', { detail: metrics }));
+    return metrics;
+}
+
+function updateAgoraLoadStatus(elapsedMs = 0) {
+    const elapsedSeconds = Math.max(1, Math.ceil(elapsedMs / 1000));
+    const message = elapsedMs >= 3000
+        ? `Still loading secure calling… ${elapsedSeconds}s`
+        : elapsedMs >= 1000
+            ? `Preparing secure call… ${elapsedSeconds}s`
+            : 'Preparing secure call…';
+
+    document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
+        node.hidden = false;
+        node.setAttribute('role', 'status');
+        node.setAttribute('aria-live', 'polite');
+        node.textContent = message;
+    });
+}
+
 async function loadAgoraRtc() {
     if (!agoraSdkPromise) {
+        agoraSdkLoadStartedAt = performance.now();
         agoraSdkPromise = import('agora-rtc-sdk-ng/esm')
-            .then(({ createClient, createMicrophoneAudioTrack }) => ({
-                createClient,
-                createMicrophoneAudioTrack,
-            }))
+            .then(({ createClient, createMicrophoneAudioTrack }) => {
+                measureAgoraSdkLoad(performance.now());
+                return { createClient, createMicrophoneAudioTrack };
+            })
             .catch((error) => {
                 agoraSdkPromise = null;
+                agoraSdkLoadStartedAt = null;
                 throw error;
             });
     }
@@ -67,21 +107,26 @@ function prepareAgoraForCallInterface(reason = 'call-ui') {
     if (!voiceConfig.configured || !navigator.onLine) return Promise.resolve(null);
 
     document.documentElement.dataset.pyroAgoraLoad = 'loading';
-    document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
-        node.hidden = false;
-        node.textContent = 'Preparing secure call…';
-    });
+    const progressStartedAt = performance.now();
+    updateAgoraLoadStatus();
+    const progressTimer = window.setInterval(() => {
+        updateAgoraLoadStatus(performance.now() - progressStartedAt);
+    }, 500);
     return loadAgoraRtc()
         .then((sdk) => {
+            window.clearInterval(progressTimer);
             document.documentElement.dataset.pyroAgoraLoad = 'ready';
             document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
                 node.hidden = true;
                 node.textContent = 'Secure calling ready';
             });
-            window.dispatchEvent(new CustomEvent('pyro:agora-ready', { detail: { reason } }));
+            window.dispatchEvent(new CustomEvent('pyro:agora-ready', {
+                detail: { reason, metrics: agoraSdkLoadMetrics },
+            }));
             return sdk;
         })
         .catch((error) => {
+            window.clearInterval(progressTimer);
             document.documentElement.dataset.pyroAgoraLoad = 'failed';
             document.querySelectorAll('[data-pyro-secure-call-state]').forEach((node) => {
                 node.hidden = false;

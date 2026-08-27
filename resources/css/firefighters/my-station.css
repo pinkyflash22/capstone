@@ -171,6 +171,64 @@
     gap: 10px;
 }
 
+[data-ff-page-root="station"] .station-readiness-refresh-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+[data-ff-page-root="station"] .station-roster-search {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 12px;
+    padding: 9px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    color: #64748b;
+    background: #f8fafc;
+}
+
+[data-ff-page-root="station"] .station-roster-search:focus-within {
+    border-color: #fb923c;
+    box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.14);
+}
+
+[data-ff-page-root="station"] .station-roster-search input {
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    color: #0f172a;
+    background: transparent;
+    font: inherit;
+}
+
+[data-ff-page-root="station"] .station-roster-search span {
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+[data-ff-page-root="station"] .station-roster-empty {
+    padding: 22px 12px;
+    color: #64748b;
+    text-align: center;
+}
+
+[data-ff-page-root="station"] .station-roster-empty i {
+    margin-right: 6px;
+}
+
+[data-ff-page-root="station"] .station-person-card[hidden],
+[data-ff-page-root="station"] .station-roster-empty[hidden] {
+    display: none;
+}
+
 [data-ff-page-root="station"] .officer-card.station-person-card {
     appearance: none;
     width: 100%;
@@ -481,6 +539,23 @@
     [data-ff-page-root="station"] .section-shell-card {
         padding: 12px;
         border-radius: 18px;
+    }
+
+    [data-ff-page-root="station"] .station-section-header-compact {
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    [data-ff-page-root="station"] .station-readiness-refresh-note {
+        font-size: 0.61rem;
+    }
+
+    [data-ff-page-root="station"] .station-roster-search {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    [data-ff-page-root="station"] .station-roster-search span {
+        grid-column: 2;
     }
 
     [data-ff-page-root="station"] .station-summary-card {

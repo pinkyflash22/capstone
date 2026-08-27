@@ -13,6 +13,7 @@
                     Station Officers <span class="station-officers-count">&middot; {{ $stationOfficers->count() }}</span>
                 </div>
             </div>
+            <small class="station-readiness-refresh-note"><i class="fa-solid fa-arrows-rotate"></i> Updates every 30 seconds</small>
         </div>
         <div
             class="section-body"
@@ -27,6 +28,21 @@
                     <div>No station officers found.</div>
                 </div>
             @else
+                @if($stationOfficers->count() >= 8)
+                    <div class="station-roster-search">
+                        <label for="stationRosterSearch" class="sr-only">Search station roster</label>
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        <input
+                            id="stationRosterSearch"
+                            type="search"
+                            inputmode="search"
+                            autocomplete="off"
+                            placeholder="Search by name, rank, role, or status"
+                            data-station-roster-search
+                        >
+                        <span data-station-roster-search-count aria-live="polite">{{ $stationOfficers->count() }} shown</span>
+                    </div>
+                @endif
                 <div class="officer-list" aria-label="Station officers">
                     @foreach($stationOfficers as $officer)
                         @php
@@ -64,6 +80,7 @@
                             data-member-contact="{{ $phone }}"
                             data-member-image="{{ $profileImage }}"
                             data-member-initials="{{ $initials }}"
+                            data-roster-search-text="{{ strtolower(implode(' ', array_filter([$officerName, $rank, $role, $status, $email]))) }}"
                             aria-haspopup="dialog"
                             aria-controls="crewMemberDetailModal"
                         >
@@ -80,6 +97,10 @@
                             </span>
                         </button>
                     @endforeach
+                </div>
+                <div class="station-roster-empty" data-station-roster-empty hidden>
+                    <i class="fa-solid fa-user-slash"></i>
+                    <span>No personnel match this search.</span>
                 </div>
             @endif
         </div>

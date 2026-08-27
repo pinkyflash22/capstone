@@ -637,6 +637,7 @@
                 'initials' => collect(preg_split('/\s+/', trim($currentOfficerName)) ?: [])->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'FF',
             ]),
             stationId: @json($stationId),
+            readinessRefreshIntervalMs: 30000,
             routes: {
                 overview: @json(route('firefighter.my-station.overview')),
                 personnel: @json(route('firefighter.my-station.personnel')),
