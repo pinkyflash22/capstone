@@ -20,6 +20,33 @@ use ZipArchive;
 class InvestigationReportProofImageTest extends TestCase
 {
     #[Test]
+    public function production_word_templates_are_present_and_not_gitignored(): void
+    {
+        $templates = [
+            'sir-template-follow.docx',
+            'progress-investigation-template-edited.docx',
+            'final-investigation-template-edited.docx',
+        ];
+
+        foreach ($templates as $template) {
+            $path = storage_path('app/private/templates/'.$template);
+
+            $this->assertFileExists($path, $template.' must be included in deployments.');
+            $this->assertGreaterThan(0, filesize($path), $template.' must not be empty.');
+
+            $archive = new ZipArchive();
+            $this->assertTrue($archive->open($path) === true, $template.' must be a valid DOCX archive.');
+            $this->assertNotFalse($archive->getFromName('word/document.xml'), $template.' must contain its Word document XML.');
+            $archive->close();
+        }
+
+        $privateStorageIgnore = file_get_contents(storage_path('app/private/.gitignore'));
+        foreach ($templates as $template) {
+            $this->assertStringContainsString('!templates/'.$template, $privateStorageIgnore);
+        }
+    }
+
+    #[Test]
     public function report_forms_and_server_rules_allow_multiple_images_up_to_twenty_five_mb_combined(): void
     {
         $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));

@@ -7,6 +7,18 @@ use Tests\TestCase;
 
 class ResourceManagementUiSemanticsTest extends TestCase
 {
+    public function test_shared_resource_script_uses_the_page_station_payload_without_debug_noise(): void
+    {
+        $script = file_get_contents(resource_path('js/admin/resource-management.js'));
+        $chiefView = file_get_contents(resource_path('views/chief/resource-management.blade.php'));
+
+        $this->assertStringContainsString('window.resourcesData?.activeStations', $script);
+        $this->assertStringContainsString("station.marker?.lat !== undefined", $script);
+        $this->assertStringNotContainsString('console.log(window.stationary)', $script);
+        $this->assertStringNotContainsString("console.log('Available officers by station:'", $chiefView);
+        $this->assertStringNotContainsString("console.log('Station selected:'", $chiefView);
+    }
+
     #[Test]
     public function every_resource_table_is_paginated_and_mobile_dialogs_are_scroll_safe(): void
     {

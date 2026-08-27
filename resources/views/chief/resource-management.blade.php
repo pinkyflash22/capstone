@@ -5800,7 +5800,6 @@ let currentTeamOfficers = {
 //         }
 //     });
     
-//     console.log('Available officers by station:', officersByStation);
 // }
 // Fixed loadOfficersData function
 function loadOfficersData() {
@@ -5867,7 +5866,6 @@ function loadOfficersData() {
         }
     });
     
-    console.log('Available officers by station:', officersByStation);
 }
 // Get available officers excluding selected ones
 function getAvailableOfficers(stationId, excludeUserIds = []) {
@@ -6236,7 +6234,6 @@ function getSelectLabel(selectId) {
 // Station change handler
 // function stationChangeHandler() {
 //     const stationId = this.value;
-//     console.log('Station selected:', stationId);
     
 //     if (stationId && stationId !== '') {
 //         if (officersByStation[stationId] && officersByStation[stationId].length > 0) {
@@ -6252,8 +6249,6 @@ function getSelectLabel(selectId) {
 // }
 function stationChangeHandler() {
     const stationId = this.value;
-    console.log('Station selected:', stationId);
-    
     if (stationId && stationId !== '') {
         // Check if we have officers for this station
         if (officersByStation[stationId] && officersByStation[stationId].length > 0) {

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Marker;
 use App\Models\Multimedia;
+use App\Models\RiskArea;
+use App\Models\RiskAreaPhoto;
+use App\Models\StationOfficer;
 use App\Models\Status;
 use App\Services\BoundaryMatcherService;
 use App\Support\MarkerFeedBuilder;
@@ -11,6 +14,7 @@ use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -223,7 +227,7 @@ class MarkerController extends Controller
         return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, BoundaryMatcherService $boundaryMatcherService)
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -234,7 +238,10 @@ class MarkerController extends Controller
             'category' => ['nullable', Rule::in(self::MARKER_CATEGORIES)],
             'status_id' => 'nullable',
             'markerCategory_id' => 'nullable',
-            'image' => 'nullable|file|image|max:5120',
+            'classification' => ['nullable', Rule::in(['people_density', 'housing_material', 'housing_spacing', 'electrical', 'wiring', 'flammable'])],
+            'assessment_level' => ['nullable', Rule::in(['low', 'moderate', 'high'])],
+            'photos' => ['nullable', 'array', 'max:5'],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $resolvedStatus = $this->resolveStatus(
@@ -247,6 +254,10 @@ class MarkerController extends Controller
             $request->input('markerCategory_id')
         );
 
+        if (in_array($resolvedCategory, ['risk', 'hazard'], true)) {
+            return $this->storeRiskOrHazardMarker($request, $validated, $resolvedCategory, $resolvedStatus, $boundaryMatcherService);
+        }
+
         $data = Marker::create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -254,7 +265,6 @@ class MarkerController extends Controller
             'lng' => $validated['lng'],
             'status' => $resolvedStatus,
             'category' => $resolvedCategory,
-            'image' => $validated['image'] ?? null,
         ]);
 
         $data->refresh();
@@ -274,6 +284,144 @@ class MarkerController extends Controller
             'data' => $data,
             'marker' => $data,
         ], 201);
+    }
+
+    private function storeRiskOrHazardMarker(
+        Request $request,
+        array $validated,
+        string $category,
+        string $status,
+        BoundaryMatcherService $boundaryMatcherService
+    ) {
+        $request->validate([
+            'classification' => ['required', Rule::in(['people_density', 'housing_material', 'housing_spacing', 'electrical', 'wiring', 'flammable'])],
+            'assessment_level' => ['required', Rule::in(['low', 'moderate', 'high'])],
+        ]);
+
+        $lat = round((float) $validated['lat'], 7);
+        $lng = round((float) $validated['lng'], 7);
+        $hall = $boundaryMatcherService->locateBarangayHall($lat, $lng);
+
+        if (! $hall) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the risk or hazard marker inside a saved barangay boundary with a linked barangay hall.',
+            ]);
+        }
+
+        $classification = (string) $validated['classification'];
+        $assessmentLevel = (string) $validated['assessment_level'];
+        $profile = $this->riskHazardProfile($category, $classification);
+        $stationId = DB::table('station_barangay_coverage')
+            ->where('barangay_id', $hall->barangay_id)
+            ->where('is_active', true)
+            ->orderByRaw("CASE WHEN LOWER(COALESCE(coverage_type, '')) = 'primary' THEN 0 ELSE 1 END")
+            ->value('station_id');
+
+        if (! $stationId) {
+            $stationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
+        }
+
+        $riskArea = DB::transaction(function () use ($request, $validated, $category, $status, $lat, $lng, $hall, $stationId, $assessmentLevel, $profile) {
+            $marker = Marker::create([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'lat' => $lat,
+                'lng' => $lng,
+                'status' => $status,
+                'category' => $category,
+            ]);
+
+            $riskArea = RiskArea::create([
+                'marker_id' => $marker->marker_id,
+                'barangay_hall_id' => $hall->barangay_hall_id,
+                'station_id' => $stationId,
+                'entry_type' => $category,
+                'hazard_category' => $profile['hazard_category'],
+                'risk_type' => $profile['risk_type'],
+                'risk_factor' => $profile['risk_factor'],
+                'mode' => $profile['mode'],
+                'condition_code' => $profile['condition_code'],
+                'condition_label' => $profile['condition_label'],
+                'hazard_type' => $profile['hazard_type'],
+                'risk_score' => match ($assessmentLevel) {
+                    'high' => 80,
+                    'moderate' => 55,
+                    default => 25,
+                },
+                'assessment_level' => $assessmentLevel,
+                'assessment_description' => $validated['description'] ?? null,
+                'status' => 'verified',
+                'review_status' => 'approved',
+                'review_type' => 'create',
+                'review_notes' => 'Verified map marker created by an authorized administrator.',
+                'reviewed_at' => now(),
+                'reviewed_by' => Auth::id(),
+                'reported_by' => Auth::id(),
+            ]);
+
+            $firstPhotoPath = null;
+            foreach ($request->file('photos', []) as $photo) {
+                $storedPath = MediaPath::storeForDisk($photo->store('risk-areas', 'supabase'), 'supabase');
+                $firstPhotoPath ??= $storedPath;
+                RiskAreaPhoto::create([
+                    'risk_area_id' => $riskArea->risk_area_id,
+                    'photo_path' => $storedPath,
+                    'photo_name' => $photo->getClientOriginalName(),
+                ]);
+            }
+
+            if ($firstPhotoPath) {
+                $marker->update(['image' => $firstPhotoPath]);
+            }
+
+            return $riskArea;
+        });
+
+        Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
+        RiskAreaReviewController::flushRiskReviewCache();
+
+        $marker = $riskArea->marker()->with('riskAreas.photos')->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => ucfirst($category).' marker saved and matched to its barangay.',
+            'data' => $marker,
+            'marker' => $marker,
+        ], 201);
+    }
+
+    private function riskHazardProfile(string $category, string $classification): array
+    {
+        $profiles = [
+            'people_density' => ['people_density', 'high', 'overcrowding', 'population_density_risk', 'population_exposure_hazard', 'high', 'High population density'],
+            'housing_material' => ['housing_material', 'light_materials', 'flammable', 'housing_material_risk', 'structural_hazard', 'light_materials', 'Combustible housing materials'],
+            'housing_spacing' => ['housing_spacing', 'dikit_dikit', 'overcrowding', 'housing_spacing_risk', 'structural_hazard', 'dikit_dikit', 'Closely spaced structures'],
+            'electrical' => ['electrical_risk', 'overflow', 'electrical', 'electrical_load_risk', 'electrical_hazard', 'overloaded_electrical_usage', 'Electrical overload exposure'],
+            'wiring' => ['wiring', 'octopus', 'electrical', 'electrical_load_risk', 'electrical_hazard', 'octopus_wiring_area', 'Unsafe or octopus wiring'],
+            'flammable' => ['housing_material', 'light_materials', 'flammable', 'combustible_storage_risk', 'flammable_material_hazard', 'heavy_combustible_buildup', 'Flammable material exposure'],
+        ];
+        [$riskFactor, $mode, $hazardType, $riskType, $hazardCategory, $conditionCode, $conditionLabel] = $profiles[$classification];
+
+        if ($category === 'hazard') {
+            $conditionCode = match ($classification) {
+                'people_density' => 'high_population_density',
+                'housing_material', 'housing_spacing' => 'houses_too_close_together',
+                'electrical' => 'overloaded_outlets',
+                'wiring' => 'octopus_wiring',
+                'flammable' => 'large_amounts_of_paper_cardboard',
+            };
+        }
+
+        return [
+            'risk_factor' => $riskFactor,
+            'mode' => $mode,
+            'hazard_type' => $hazardType,
+            'risk_type' => $category === 'risk' ? $riskType : null,
+            'hazard_category' => $category === 'hazard' ? $hazardCategory : null,
+            'condition_code' => $conditionCode,
+            'condition_label' => $conditionLabel,
+        ];
     }
 
     public function getCount(Request $request)

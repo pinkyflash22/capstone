@@ -3651,7 +3651,6 @@ function loadOfficersData() {
         }
     });
     
-    console.log('Available officers by station:', officersByStation);
 }
 
 // Get available officers excluding selected ones
@@ -3852,8 +3851,6 @@ function getSelectLabel(selectId) {
 // Station change handler
 function stationChangeHandler() {
     const stationId = this.value;
-    console.log('Station selected:', stationId);
-    
     if (stationId && stationId !== '') {
         if (officersByStation[stationId] && officersByStation[stationId].length > 0) {
             populateStationOfficers(stationId);

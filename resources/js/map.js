@@ -2643,6 +2643,10 @@ function getMarkerFeedEndpoint() {
     return resolveCurrentUserMapId() !== 'guest' ? '/map/markers/feed' : '/api/markers';
 }
 
+function getMarkerCreateEndpoint() {
+    return resolveCurrentUserMapId() !== 'guest' ? '/map/markers' : '/api/markers';
+}
+
 const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
     || [2, 3, 4].includes(Number(roleToken));
 const apiKey = "83677a1086d44c4e82f903fd2fe2ea9b";
@@ -10493,7 +10497,7 @@ function deleteMarker(value) {
 async function saveMarker(lat, lng, title, description, categoryId) {
     try {
         const category = getMarkerCategoryEnumValue(categoryId) || categoryId;
-        const markerRes = await fetch(getMarkerFeedEndpoint(), {
+        const markerRes = await fetch(getMarkerCreateEndpoint(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
             body: JSON.stringify({ lat, lng, title, description, category, status: 'active', multimedia_id: 1 })
@@ -12374,6 +12378,8 @@ function getMarkerSaveFormContext() {
     const categoryName = selectedOption?.getAttribute('data-category-name') || '';
     const categoryEnum = selectedOption?.getAttribute('data-category-enum') || getMarkerCategoryEnumValue(categoryId) || categoryId;
 
+    const riskHazardPhotos = Array.from(document.getElementById('riskHazardPhotos')?.files || []);
+
     return {
         title: document.getElementById('markerTitle')?.value?.trim() || '',
         description: document.getElementById('markerDescription')?.value?.trim() || '',
@@ -12385,6 +12391,10 @@ function getMarkerSaveFormContext() {
         isHydrantMarker: categoryEnum === 'hydrant' || categoryName.toLowerCase() === 'hydrant',
         isSchoolMarker: categoryEnum === 'school' || categoryName.toLowerCase() === 'school',
         isBarangayMarker: categoryEnum === 'barangay' || categoryName.toLowerCase() === 'barangay hall',
+        isRiskHazardMarker: categoryEnum === 'risk' || categoryEnum === 'hazard',
+        riskHazardClassification: document.getElementById('riskHazardClassification')?.value || '',
+        riskHazardAssessment: document.getElementById('riskHazardAssessment')?.value || '',
+        riskHazardPhotos,
         reportedByUserIdInput: document.getElementById('reportedByUserId'),
         reportedBySearchInput: document.getElementById('reportedBySearch'),
         reportedByWalkInInput: document.getElementById('reportedByWalkIn'),
@@ -12453,6 +12463,18 @@ function validateMarkerSaveContext(context) {
         }
     }
 
+    if (context.isRiskHazardMarker) {
+        if (!context.riskHazardClassification || !context.riskHazardAssessment) {
+            return 'Choose the risk or hazard classification and assessment level.';
+        }
+        if (context.riskHazardPhotos.length > 5) {
+            return 'You can attach up to 5 proof images.';
+        }
+        if (context.riskHazardPhotos.some(file => file.size > 5 * 1024 * 1024)) {
+            return 'Each proof image must be 5 MB or smaller.';
+        }
+    }
+
     return null;
 }
 
@@ -12510,7 +12532,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
             }
         }
 
-        const incidentResponse = await fetch('/api/incidents', {
+        const incidentResponse = await fetch('/map/marker-details/incidents', {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -12529,7 +12551,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
     }
 
     if (context.isStationMarker) {
-        const addressResponse = await fetch('/api/full-addresses', {
+        const addressResponse = await fetch('/map/marker-details/full-addresses', {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -12541,7 +12563,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
         const addressResult = await readJsonResponse(addressResponse, 'Failed to create station address');
         if (!addressResult.success) throw new Error(addressResult.message || 'Failed to create station address');
 
-        const stationResponse = await fetch('/api/station', {
+        const stationResponse = await fetch('/map/marker-details/stations', {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -12558,7 +12580,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
     }
 
     if (context.isHydrantMarker) {
-        const hydrantResponse = await fetch('/api/hydrant', {
+        const hydrantResponse = await fetch('/map/marker-details/hydrants', {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -12573,15 +12595,8 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
     }
 
     if (context.isSchoolMarker) {
-        const schoolResponse = await fetch('/api/schools', {
-            method: 'POST',
-            headers: jsonHeaders,
-            body: JSON.stringify({
-                school_name: document.getElementById('schoolName')?.value,
-                marker_id: markerId
-            })
-        });
-        await readJsonResponse(schoolResponse, 'Failed to create school marker details');
+        // Schools are represented directly by their categorized marker. There is
+        // no separate schools table in the current schema.
         return;
     }
 
@@ -12590,7 +12605,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
         let addressId = null;
 
         if (hallStreet) {
-            const hallAddressResponse = await fetch('/api/full-addresses', {
+            const hallAddressResponse = await fetch('/map/marker-details/full-addresses', {
                 method: 'POST',
                 headers: jsonHeaders,
                 body: JSON.stringify({
@@ -12604,7 +12619,7 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
             addressId = hallAddressResult.address_id;
         }
 
-        const hallResponse = await fetch('/api/barangay-halls', {
+        const hallResponse = await fetch('/map/marker-details/barangay-halls', {
             method: 'POST',
             headers: jsonHeaders,
             body: JSON.stringify({
@@ -12652,31 +12667,70 @@ async function saveMarkerOptimisticallyFromForm(saveButton) {
     window.closeModal?.({ skipPlacementCleanup: true });
     showMarkerFeedback('Marker is saving in the background.', 'info', 'Saving marker');
 
+    let savedMarkerId = null;
+    let categoryDetailsSaved = false;
+
     try {
-        const markerResponse = await fetch(getMarkerFeedEndpoint(), {
-            method: 'POST',
-            headers: jsonHeaders,
-            body: JSON.stringify({
-                title: context.title || context.categoryName || 'Map marker',
-                description: context.description,
-                lat: saveLat,
-                lng: saveLng,
-                category: context.categoryEnum,
-                status: 'active'
-            })
-        });
+        let markerResponse;
+        if (context.isRiskHazardMarker) {
+            const markerForm = new FormData();
+            markerForm.append('title', context.title || context.categoryName || 'Map marker');
+            markerForm.append('description', context.description);
+            markerForm.append('lat', saveLat);
+            markerForm.append('lng', saveLng);
+            markerForm.append('category', context.categoryEnum);
+            markerForm.append('status', 'active');
+            markerForm.append('classification', context.riskHazardClassification);
+            markerForm.append('assessment_level', context.riskHazardAssessment);
+            context.riskHazardPhotos.forEach(photo => markerForm.append('photos[]', photo, photo.name));
+            markerResponse = await fetch(getMarkerCreateEndpoint(), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: markerForm,
+            });
+        } else {
+            markerResponse = await fetch(getMarkerCreateEndpoint(), {
+                method: 'POST',
+                headers: jsonHeaders,
+                body: JSON.stringify({
+                    title: context.title || context.categoryName || 'Map marker',
+                    description: context.description,
+                    lat: saveLat,
+                    lng: saveLng,
+                    category: context.categoryEnum,
+                    status: 'active'
+                })
+            });
+        }
 
         const markerResult = await readJsonResponse(markerResponse, 'Failed to create marker');
-        const markerId = markerResult.marker?.marker_id || markerResult.data?.marker_id || markerResult.marker_id;
-        if (!markerId) throw new Error('Failed to create marker');
+        savedMarkerId = markerResult.marker?.marker_id || markerResult.data?.marker_id || markerResult.marker_id;
+        if (!savedMarkerId) throw new Error('Failed to create marker');
 
-        await saveMarkerDetailsForCategory(markerId, context, jsonHeaders);
+        if (!context.isRiskHazardMarker) {
+            await saveMarkerDetailsForCategory(savedMarkerId, context, jsonHeaders);
+        }
+        categoryDetailsSaved = true;
         removeOptimisticMapMarker(optimisticMarkerId);
         invalidateMarkerReferenceData();
-        await refreshDynamicMapData({ reason: 'marker-created' });
+        await refreshDynamicMapData({ reason: 'marker-created' }).catch((refreshError) => {
+            console.warn('Marker saved, but the live map refresh was deferred:', refreshError);
+        });
         showMarkerFeedback('Marker saved and added to the map.', 'success', 'Marker saved');
     } catch (error) {
         console.error('Error saving marker:', error);
+        if (savedMarkerId && !categoryDetailsSaved) {
+            await fetch(`/map/markers/${encodeURIComponent(savedMarkerId)}`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            }).catch((rollbackError) => console.warn('Unable to roll back incomplete marker:', rollbackError));
+        }
         removeOptimisticMapMarker(optimisticMarkerId);
         window.removeMapPlacementMarker?.({ clearCoordinates: true });
         await fetchCoordinate({ force: true }).catch(() => {});
@@ -12780,7 +12834,7 @@ setTimeout(() => {
             };
             
             try {
-                const markerResponse = await fetch(getMarkerFeedEndpoint(), {
+                const markerResponse = await fetch(getMarkerCreateEndpoint(), {
                     method: 'POST',
                     headers: jsonHeaders,
                     body: JSON.stringify({ title, description, lat: selectedLat, lng: selectedLng, category: categoryEnum, status: 'active' })
@@ -13099,6 +13153,7 @@ window.openModal = function(options = {}) {
     const schoolFieldsDiv = document.getElementById('schoolFields');
     const barangayHallFieldsDiv = document.getElementById('barangayHallFields');
     const incidentFieldsDiv = document.getElementById('incidentFields');
+    const riskHazardFieldsDiv = document.getElementById('riskHazardFields');
     const reportedByWalkInInput = document.getElementById('reportedByWalkIn');
     
     if (titleInput) titleInput.value = '';
@@ -13109,6 +13164,11 @@ window.openModal = function(options = {}) {
     if (schoolFieldsDiv) schoolFieldsDiv.classList.remove('show');
     if (barangayHallFieldsDiv) barangayHallFieldsDiv.classList.remove('show');
     if (incidentFieldsDiv) incidentFieldsDiv.classList.remove('show');
+    if (riskHazardFieldsDiv) riskHazardFieldsDiv.classList.remove('show');
+    const riskHazardPhotosInput = document.getElementById('riskHazardPhotos');
+    if (riskHazardPhotosInput) riskHazardPhotosInput.value = '';
+    const riskHazardPhotoPreviews = document.getElementById('riskHazardPhotoPreviews');
+    if (riskHazardPhotoPreviews) riskHazardPhotoPreviews.replaceChildren();
     if (reportedByWalkInInput) reportedByWalkInInput.checked = false;
     
     const modal = document.getElementById('markerModal');
@@ -13118,6 +13178,45 @@ window.openModal = function(options = {}) {
         modal.setAttribute('aria-hidden', 'false');
     }
 };
+
+function bindRiskHazardPhotoPreviews() {
+    const input = document.getElementById('riskHazardPhotos');
+    const preview = document.getElementById('riskHazardPhotoPreviews');
+    if (!input || !preview || input.dataset.previewBound === 'true') return;
+    input.dataset.previewBound = 'true';
+
+    const render = () => {
+        preview.replaceChildren();
+        Array.from(input.files || []).forEach((file, index) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#e2e8f0;border:1px solid #cbd5e1;';
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(file);
+            image.alt = `Proof image ${index + 1}`;
+            image.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+            image.addEventListener('load', () => URL.revokeObjectURL(image.src), { once: true });
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', `Remove ${file.name}`);
+            remove.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            remove.style.cssText = 'position:absolute;top:5px;right:5px;width:26px;height:26px;border:0;border-radius:999px;background:rgba(15,23,42,.86);color:#fff;cursor:pointer;';
+            remove.addEventListener('click', () => {
+                const transfer = new DataTransfer();
+                Array.from(input.files || []).forEach((candidate, candidateIndex) => {
+                    if (candidateIndex !== index) transfer.items.add(candidate);
+                });
+                input.files = transfer.files;
+                render();
+            });
+            card.append(image, remove);
+            preview.append(card);
+        });
+    };
+
+    input.addEventListener('change', render);
+}
+
+bindRiskHazardPhotoPreviews();
 
 const markerModalCleanupTarget = document.getElementById('markerModal');
 if (markerModalCleanupTarget && !markerModalCleanupTarget.dataset.markerCleanupBound) {

@@ -6,6 +6,47 @@ use PHPUnit\Framework\TestCase;
 
 class MapMarkerSemanticsTest extends TestCase
 {
+    public function test_chief_marker_creation_uses_a_protected_write_endpoint_and_rolls_back_incomplete_details(): void
+    {
+        $mapScript = file_get_contents(__DIR__.'/../../resources/js/map.js');
+        $routes = file_get_contents(__DIR__.'/../../routes/web.php');
+        $detailsStart = strpos($mapScript, 'async function saveMarkerDetailsForCategory');
+        $detailsEnd = strpos($mapScript, 'async function saveMarkerOptimisticallyFromForm', $detailsStart);
+        $categoryDetailsScript = substr($mapScript, $detailsStart, $detailsEnd - $detailsStart);
+
+        $this->assertStringContainsString("function getMarkerCreateEndpoint()", $mapScript);
+        $this->assertStringContainsString("return resolveCurrentUserMapId() !== 'guest' ? '/map/markers' : '/api/markers';", $mapScript);
+        $this->assertStringContainsString("fetch(getMarkerCreateEndpoint(), {", $mapScript);
+        $this->assertStringContainsString('fetch(`/map/markers/${encodeURIComponent(savedMarkerId)}`', $mapScript);
+        $this->assertStringContainsString("Route::post('/map/markers', [ManagedMarkerController::class, 'store'])", $routes);
+        $this->assertStringContainsString("role:admin,provincial admin,station admin,chief", $routes);
+        $this->assertStringContainsString("fetch('/map/marker-details/incidents'", $mapScript);
+        $this->assertStringContainsString("fetch('/map/marker-details/stations'", $mapScript);
+        $this->assertStringContainsString("fetch('/map/marker-details/hydrants'", $mapScript);
+        $this->assertStringContainsString("fetch('/map/marker-details/barangay-halls'", $mapScript);
+        $this->assertStringNotContainsString("fetch('/api/schools'", $categoryDetailsScript);
+    }
+
+    public function test_admin_and_chief_can_create_boundary_matched_risk_hazard_markers_with_optional_photos(): void
+    {
+        $mapScript = file_get_contents(__DIR__.'/../../resources/js/map.js');
+        $controller = file_get_contents(__DIR__.'/../../app/Http/Controllers/MarkerController.php');
+        $adminView = file_get_contents(__DIR__.'/../../resources/views/admin/dashboard.blade.php');
+        $chiefView = file_get_contents(__DIR__.'/../../resources/views/chief/dashboard.blade.php');
+
+        foreach ([$adminView, $chiefView] as $view) {
+            $this->assertStringContainsString('data-category-enum="risk">Risk Area', $view);
+            $this->assertStringContainsString('data-category-enum="hazard">Hazard Area', $view);
+            $this->assertStringContainsString('id="riskHazardPhotos"', $view);
+        }
+
+        $this->assertStringContainsString("markerForm.append('photos[]', photo, photo.name)", $mapScript);
+        $this->assertStringContainsString('bindRiskHazardPhotoPreviews()', $mapScript);
+        $this->assertStringContainsString('$boundaryMatcherService->locateBarangayHall($lat, $lng)', $controller);
+        $this->assertStringContainsString("'review_status' => 'approved'", $controller);
+        $this->assertStringContainsString('RiskAreaPhoto::create([', $controller);
+    }
+
     public function test_live_apparatus_gps_rejects_stale_inaccurate_and_implausible_fixes(): void
     {
         $dashboardScript = file_get_contents(__DIR__.'/../../resources/js/firefighter/dashboard-shell.js');

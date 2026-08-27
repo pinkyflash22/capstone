@@ -51,8 +51,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== DATA LOADING =====
     function loadSampleData() {
-        const stationary = Array.isArray(window.stationary) ? window.stationary : [];
-        console.log(window.stationary);
+        const stationary = Array.isArray(window.resourcesData?.activeStations)
+            ? window.resourcesData.activeStations
+            : (Array.isArray(window.stationary) ? window.stationary : []);
         state.stations = [];
 
         if (!stationary.length) {
@@ -75,7 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: station.station_name,
                 // code: station.station_code,
                 // chief: station.station_code,
-                address:station.marker.lat + ", "+station.marker.lng,
+                address: station.marker?.lat !== undefined && station.marker?.lng !== undefined
+                    ? `${station.marker.lat}, ${station.marker.lng}`
+                    : (station.address?.street || 'Location not recorded'),
                 personnel: count, vehicles: 8, equipment: 156
             
         });

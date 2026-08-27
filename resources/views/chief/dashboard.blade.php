@@ -1072,7 +1072,40 @@
                 <option value="station" data-category-name="Fire Station" data-category-enum="station">Fire Station</option>
                 <option value="hydrant" data-category-name="Hydrant" data-category-enum="hydrant">Hydrant</option>
                 <option value="barangay" data-category-name="Barangay Hall" data-category-enum="barangay">Barangay Hall</option>
+                <option value="risk" data-category-name="Risk" data-category-enum="risk">Risk Area</option>
+                <option value="hazard" data-category-name="Hazard" data-category-enum="hazard">Hazard Area</option>
             </select>
+        </div>
+
+        <div id="riskHazardFields" class="station-fields">
+            <h4><i class="fa-solid fa-shield-halved"></i> Risk / Hazard Evidence</h4>
+            <div class="form-row">
+                <label><i class="fa-solid fa-tags"></i> Classification *</label>
+                <select id="riskHazardClassification" class="w-full">
+                    <option value="">Select classification</option>
+                    <option value="people_density">Population density</option>
+                    <option value="housing_material">Combustible housing materials</option>
+                    <option value="housing_spacing">Closely spaced structures</option>
+                    <option value="electrical">Electrical overload</option>
+                    <option value="wiring">Unsafe / octopus wiring</option>
+                    <option value="flammable">Flammable materials</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label><i class="fa-solid fa-gauge-high"></i> Assessment level *</label>
+                <select id="riskHazardAssessment" class="w-full">
+                    <option value="">Select level</option>
+                    <option value="low">Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label><i class="fa-solid fa-images"></i> Proof images (optional)</label>
+                <input id="riskHazardPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+                <div class="marker-subnote">Up to 5 JPG, PNG, or WebP images; 5 MB each.</div>
+                <div id="riskHazardPhotoPreviews" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;margin-top:10px;"></div>
+            </div>
         </div>
 
         <div id="incidentFields" class="station-fields">
@@ -2479,6 +2512,7 @@
     const schoolFields = document.getElementById('schoolFields');
     const barangayHallFields = document.getElementById('barangayHallFields');
     const incidentFields = document.getElementById('incidentFields');
+    const riskHazardFields = document.getElementById('riskHazardFields');
     const reportedBySearch = document.getElementById('reportedBySearch');
     const reportedByUserId = document.getElementById('reportedByUserId');
     const reportedByWalkIn = document.getElementById('reportedByWalkIn');
@@ -2529,6 +2563,7 @@
             if (schoolFields) schoolFields.classList.remove('show');
             if (barangayHallFields) barangayHallFields.classList.remove('show');
             if (incidentFields) incidentFields.classList.remove('show');
+            if (riskHazardFields) riskHazardFields.classList.remove('show');
             
             // Remove required attributes from all
             if (document.getElementById('stationName')) document.getElementById('stationName').required = false;
@@ -2582,6 +2617,9 @@
                 } else if (reportedBySearch) {
                     reportedBySearch.required = true;
                 }
+            }
+            else if (categoryEnum === 'risk' || categoryEnum === 'hazard') {
+                if (riskHazardFields) riskHazardFields.classList.add('show');
             }
         }
     }

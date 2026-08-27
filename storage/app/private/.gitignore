@@ -1,2 +1,7 @@
 *
 !.gitignore
+!templates/
+templates/*
+!templates/sir-template-follow.docx
+!templates/progress-investigation-template-edited.docx
+!templates/final-investigation-template-edited.docx

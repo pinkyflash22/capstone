@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\PostController;
 // use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Api\MarkerController;
+use App\Http\Controllers\MarkerController as ManagedMarkerController;
 use App\Http\Controllers\staff\FirefighterController;
 use App\Http\Controllers\staff\FirefighterV3Controller;
 use App\Http\Controllers\staff\FinalInvestigationFirExportController;
@@ -235,6 +236,15 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
 Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     Route::get('/map/markers/feed', [MarkerController::class, 'index'])->name('map.markers.feed');
     Route::get('/map/markers/latest', [MarkerController::class, 'latestForViewer'])->name('map.markers.latest');
+    Route::middleware(['role:admin,provincial admin,station admin,chief'])->group(function () {
+        Route::post('/map/markers', [ManagedMarkerController::class, 'store'])->name('map.markers.store');
+        Route::delete('/map/markers/{markerId}', [ManagedMarkerController::class, 'destroy'])->name('map.markers.destroy');
+        Route::post('/map/marker-details/incidents', [IncidentController::class, 'store'])->name('map.marker-details.incidents.store');
+        Route::post('/map/marker-details/full-addresses', [AdminController::class, 'storeFullAddress'])->name('map.marker-details.addresses.store');
+        Route::post('/map/marker-details/stations', [\App\Http\Controllers\StationController::class, 'store'])->name('map.marker-details.stations.store');
+        Route::post('/map/marker-details/hydrants', [\App\Http\Controllers\HydrantController::class, 'store'])->name('map.marker-details.hydrants.store');
+        Route::post('/map/marker-details/barangay-halls', [\App\Http\Controllers\BarangayHallController::class, 'store'])->name('map.marker-details.barangay-halls.store');
+    });
 
     Route::prefix('voice-calls')->name('voice-calls.')->group(function () {
         Route::post('/', [VoiceCallController::class, 'store'])->name('store');

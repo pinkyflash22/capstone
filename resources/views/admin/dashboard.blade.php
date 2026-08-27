@@ -2089,7 +2089,40 @@
                         {{ $category->marker_category }}
                     </option>
                 @endforeach
+                <option value="risk" data-category-name="Risk" data-category-enum="risk">Risk Area</option>
+                <option value="hazard" data-category-name="Hazard" data-category-enum="hazard">Hazard Area</option>
             </select>
+        </div>
+
+        <div id="riskHazardFields" class="station-fields">
+            <h4><i class="fa-solid fa-shield-halved"></i> Risk / Hazard Evidence</h4>
+            <div class="form-row">
+                <label><i class="fa-solid fa-tags"></i> Classification *</label>
+                <select id="riskHazardClassification" class="w-full">
+                    <option value="">Select classification</option>
+                    <option value="people_density">Population density</option>
+                    <option value="housing_material">Combustible housing materials</option>
+                    <option value="housing_spacing">Closely spaced structures</option>
+                    <option value="electrical">Electrical overload</option>
+                    <option value="wiring">Unsafe / octopus wiring</option>
+                    <option value="flammable">Flammable materials</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label><i class="fa-solid fa-gauge-high"></i> Assessment level *</label>
+                <select id="riskHazardAssessment" class="w-full">
+                    <option value="">Select level</option>
+                    <option value="low">Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label><i class="fa-solid fa-images"></i> Proof images (optional)</label>
+                <input id="riskHazardPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+                <div class="marker-subnote">Up to 5 JPG, PNG, or WebP images; 5 MB each.</div>
+                <div id="riskHazardPhotoPreviews" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;margin-top:10px;"></div>
+            </div>
         </div>
         
         <!-- Station Fields (Fire Station) -->
@@ -3132,6 +3165,7 @@
     const stationFields = document.getElementById('stationFields');
     const hydrantFields = document.getElementById('hydrantFields');
     const schoolFields = document.getElementById('schoolFields');
+    const riskHazardFields = document.getElementById('riskHazardFields');
     
     // Function to check selected category and show appropriate fields
     function checkCategoryFields() {
@@ -3145,6 +3179,7 @@
             if (stationFields) stationFields.classList.remove('show');
             if (hydrantFields) hydrantFields.classList.remove('show');
             if (schoolFields) schoolFields.classList.remove('show');
+            if (riskHazardFields) riskHazardFields.classList.remove('show');
             
             // Remove required attributes from all
             if (document.getElementById('stationName')) document.getElementById('stationName').required = false;
@@ -3176,6 +3211,9 @@
                 console.log('Showing school fields');
                 if (schoolFields) schoolFields.classList.add('show');
                 if (document.getElementById('schoolName')) document.getElementById('schoolName').required = true;
+            }
+            else if (categorySelect.value === 'risk' || categorySelect.value === 'hazard') {
+                if (riskHazardFields) riskHazardFields.classList.add('show');
             }
         }
     }
@@ -3248,6 +3286,7 @@
         if (stationFields) stationFields.classList.remove('show');
         if (hydrantFields) hydrantFields.classList.remove('show');
         if (schoolFields) schoolFields.classList.remove('show');
+        if (riskHazardFields) riskHazardFields.classList.remove('show');
         
         // Clear all inputs
         const inputs = modal.querySelectorAll('input, textarea, select');
