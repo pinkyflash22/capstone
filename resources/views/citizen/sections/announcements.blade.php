@@ -158,45 +158,52 @@
         @endif
         <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form">
             @csrf
-            <div class="citizen-request-grid">
+            <div class="citizen-request-form__body">
+                <div class="citizen-request-grid">
+                    <label>
+                        <span>Request type <span class="citizen-request-required" aria-hidden="true">*</span></span>
+                        <select name="request_type" required>
+                            @foreach(['orientation' => 'Orientation', 'seminar' => 'Seminar', 'drill' => 'Drill', 'inspection' => 'Inspection', 'community_meeting' => 'Community meeting', 'other' => 'Other'] as $value => $label)
+                                <option value="{{ $value }}" @selected(old('request_type', 'orientation') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        <span>Preferred date</span>
+                        <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ now()->toDateString() }}">
+                    </label>
+                    <label>
+                        <span>Start time</span>
+                        <input type="time" name="preferred_start_time" value="{{ old('preferred_start_time') }}">
+                    </label>
+                    <label>
+                        <span>End time</span>
+                        <input type="time" name="preferred_end_time" value="{{ old('preferred_end_time') }}">
+                    </label>
+                </div>
                 <label>
-                    <span>Request type</span>
-                    <select name="request_type">
-                        @foreach(['orientation' => 'Orientation', 'seminar' => 'Seminar', 'drill' => 'Drill', 'inspection' => 'Inspection', 'community_meeting' => 'Community meeting', 'other' => 'Other'] as $value => $label)
-                            <option value="{{ $value }}" @selected(old('request_type', 'orientation') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    <span>Title <span class="citizen-request-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="title" value="{{ old('title') }}" placeholder="Example: Fire safety seminar for our neighborhood" required maxlength="255">
                 </label>
                 <label>
-                    <span>Preferred date</span>
-                    <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ now()->toDateString() }}">
+                    <span>Reason for request <span class="citizen-request-required" aria-hidden="true">*</span></span>
+                    <textarea name="description" rows="4" placeholder="Describe the audience, concern, and support needed." required maxlength="2000">{{ old('description') }}</textarea>
                 </label>
                 <label>
-                    <span>Start time</span>
-                    <input type="time" name="preferred_start_time" value="{{ old('preferred_start_time') }}">
-                </label>
-                <label>
-                    <span>End time</span>
-                    <input type="time" name="preferred_end_time" value="{{ old('preferred_end_time') }}">
+                    <span>Contact number</span>
+                    <input type="text" name="contact_number" value="{{ old('contact_number', auth()->user()->contact_number) }}" placeholder="Optional contact number" maxlength="60">
                 </label>
             </div>
-            <label>
-                <span>Title</span>
-                <input type="text" name="title" value="{{ old('title') }}" placeholder="Example: Fire safety seminar for our neighborhood" required maxlength="255">
-            </label>
-            <label>
-                <span>Reason for request</span>
-                <textarea name="description" rows="4" placeholder="Describe the audience, concern, and support needed." required maxlength="2000">{{ old('description') }}</textarea>
-            </label>
-            <label>
-                <span>Contact number</span>
-                <input type="text" name="contact_number" value="{{ old('contact_number', auth()->user()->contact_number) }}" placeholder="Optional contact number" maxlength="60">
-            </label>
             <div class="citizen-request-modal__actions">
+                <p class="citizen-request-submit-status" data-community-request-submit-status role="status" aria-live="polite" hidden></p>
+                <button type="button" class="citizen-request-refresh-status" data-community-request-refresh hidden>
+                    <i class="fa-solid fa-rotate-right"></i>
+                    Refresh and check requests
+                </button>
                 <button type="button" class="citizen-request-modal__cancel" data-community-request-close>Cancel</button>
-                <button type="submit" class="citizen-request-submit">
-                    <i class="fa-solid fa-paper-plane"></i>
-                    Send request to station
+                <button type="submit" class="citizen-request-submit" data-community-request-submit>
+                    <i class="fa-solid fa-paper-plane" data-community-request-submit-icon></i>
+                    <span data-community-request-submit-label>Save and send request</span>
                 </button>
             </div>
         </form>
@@ -415,6 +422,15 @@
         justify-content: center;
         gap: 0.6rem;
     }
+    .citizen-request-submit:disabled {
+        cursor: wait;
+        opacity: 0.78;
+        filter: saturate(0.82);
+    }
+    .citizen-request-required {
+        color: var(--ann-red);
+        font-weight: 900;
+    }
     .citizen-request-item {
         border: 1px solid rgba(226, 232, 240, 0.9);
         border-radius: 1.1rem;
@@ -477,12 +493,13 @@
         position: relative;
         width: min(720px, 100%);
         max-height: min(90dvh, 820px);
-        overflow-y: auto;
+        overflow: hidden;
         border: 1px solid rgba(198, 61, 38, 0.14);
         border-radius: 1.75rem;
         background: #fffdfa;
         box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
-        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
     }
     .citizen-request-modal__header {
         display: flex;
@@ -490,6 +507,8 @@
         justify-content: space-between;
         gap: 1rem;
         margin-bottom: 1rem;
+        padding: 1.25rem 1.25rem 0;
+        flex: 0 0 auto;
     }
     .citizen-request-modal__close {
         width: 42px;
@@ -502,7 +521,7 @@
         cursor: pointer;
     }
     .citizen-request-modal__error {
-        margin-bottom: 0.9rem;
+        margin: 0 1.25rem 0.9rem;
         border: 1px solid rgba(239, 68, 68, 0.2);
         border-radius: 1rem;
         background: #fff1f2;
@@ -513,8 +532,42 @@
     }
     .citizen-request-modal__actions {
         display: flex;
+        flex-wrap: wrap;
         justify-content: flex-end;
         gap: 0.7rem;
+        flex: 0 0 auto;
+        border-top: 1px solid rgba(198, 61, 38, 0.12);
+        background: rgba(255, 253, 250, 0.97);
+        box-shadow: 0 -12px 28px rgba(88, 43, 20, 0.08);
+        padding: 0.9rem 1.25rem 1.25rem;
+    }
+    .citizen-request-submit-status {
+        flex: 1 0 100%;
+        margin: 0;
+        border-radius: 0.85rem;
+        background: #fff7ed;
+        color: #9a3412;
+        padding: 0.7rem 0.85rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+    .citizen-request-refresh-status {
+        border: 1px solid rgba(198, 61, 38, 0.24);
+        border-radius: 1rem;
+        background: #fff7ed;
+        color: var(--ann-red-dark);
+        padding: 0.9rem 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+    }
+    .citizen-request-submit-status[hidden],
+    .citizen-request-refresh-status[hidden] {
+        display: none;
     }
     .citizen-request-modal__cancel {
         border: 1px solid rgba(148, 163, 184, 0.35);
@@ -527,6 +580,24 @@
     }
     body.citizen-request-modal-open {
         overflow: hidden;
+    }
+    .citizen-request-modal .citizen-request-form {
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 0;
+    }
+    .citizen-request-form__body {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        scrollbar-color: rgba(198, 61, 38, 0.45) transparent;
+        display: grid;
+        gap: 0.8rem;
+        padding: 0 1.25rem 1rem;
     }
     .citizen-announcements-stat {
         position: relative;
@@ -1180,11 +1251,24 @@
             width: 100%;
             max-height: 92dvh;
             border-radius: 1.5rem 1.5rem 0 0;
-            padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+        }
+        .citizen-request-modal__header {
+            padding: 1rem 1rem 0;
+        }
+        .citizen-request-modal__error {
+            margin-inline: 1rem;
+        }
+        .citizen-request-form__body {
+            padding: 0 1rem 0.9rem;
         }
         .citizen-request-modal__actions {
             display: grid;
             grid-template-columns: 1fr 1.35fr;
+            padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom, 0px));
+        }
+        .citizen-request-submit-status,
+        .citizen-request-refresh-status {
+            grid-column: 1 / -1;
         }
         .citizen-announcements-stat {
             min-height: 8.25rem;
@@ -1394,7 +1478,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const requestModal = document.getElementById('citizenCommunityRequestModal');
     const requestOpenButtons = document.querySelectorAll('[data-community-request-open]');
     const requestCloseButtons = requestModal?.querySelectorAll('[data-community-request-close]') || [];
+    const requestForm = requestModal?.querySelector('.citizen-request-form');
+    const requestSubmitButton = requestForm?.querySelector('[data-community-request-submit]');
+    const requestSubmitIcon = requestSubmitButton?.querySelector('[data-community-request-submit-icon]');
+    const requestSubmitLabel = requestSubmitButton?.querySelector('[data-community-request-submit-label]');
+    const requestSubmitStatus = requestForm?.querySelector('[data-community-request-submit-status]');
+    const requestRefreshButton = requestForm?.querySelector('[data-community-request-refresh]');
     let requestModalTrigger = null;
+    let requestSubmitting = false;
+    let requestSubmissionTimer = null;
 
     const openRequestModal = (trigger = null) => {
         if (!requestModal) return;
@@ -1420,6 +1512,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
     requestOpenButtons.forEach((button) => button.addEventListener('click', () => openRequestModal(button)));
     requestCloseButtons.forEach((button) => button.addEventListener('click', closeRequestModal));
+    requestForm?.addEventListener('submit', (event) => {
+        if (requestSubmitting) {
+            event.preventDefault();
+            return;
+        }
+
+        requestSubmitting = true;
+        requestForm.setAttribute('aria-busy', 'true');
+
+        if (requestSubmitButton) {
+            requestSubmitButton.disabled = true;
+            requestSubmitButton.setAttribute('aria-disabled', 'true');
+        }
+        if (requestSubmitIcon) {
+            requestSubmitIcon.className = 'fa-solid fa-spinner fa-spin';
+        }
+        if (requestSubmitLabel) {
+            requestSubmitLabel.textContent = 'Sending request...';
+        }
+
+        requestSubmissionTimer = window.setTimeout(() => {
+            if (!requestSubmitting) return;
+
+            if (requestSubmitLabel) {
+                requestSubmitLabel.textContent = 'Still sending...';
+            }
+            if (requestSubmitStatus) {
+                requestSubmitStatus.hidden = false;
+                requestSubmitStatus.textContent = 'This is taking longer than expected. Refresh to check whether your request was saved before trying again.';
+            }
+            if (requestRefreshButton) {
+                requestRefreshButton.hidden = false;
+            }
+        }, 12000);
+    });
+    requestRefreshButton?.addEventListener('click', () => window.location.reload());
+    window.addEventListener('pagehide', () => {
+        if (requestSubmissionTimer) window.clearTimeout(requestSubmissionTimer);
+    });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && requestModal && !requestModal.hidden) closeRequestModal();
     });

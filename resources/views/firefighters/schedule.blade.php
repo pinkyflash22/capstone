@@ -1402,7 +1402,7 @@
                         </div>
                         <h5>${event.event}</h5>
                         <p><i class="fa-regular fa-location-dot"></i> ${event.barangay || stationName}</p>
-                        ${event.source_type === 'duty' ? `<div class="duty-detail-row"><span class="duty-detail-chip"><i class="fa-solid fa-people-group"></i> Team ${event.team_id}</span><span class="duty-detail-chip"><i class="fa-solid fa-user-shield"></i> ${event.duty_role_label}</span><span class="duty-detail-chip${event.availability_type ? ' alert' : ''}"><i class="fa-solid ${event.availability_type ? 'fa-calendar-xmark' : 'fa-circle-check'}"></i> ${event.status_label}</span>${event.is_recurring ? '<span class="duty-detail-chip"><i class="fa-solid fa-repeat"></i> Weekly</span>' : ''}</div>` : ''}
+                        ${event.source_type === 'duty' ? `<div class="duty-detail-row"><span class="duty-detail-chip"><i class="fa-solid fa-people-group"></i> Team ${event.team_id}</span><span class="duty-detail-chip"><i class="fa-solid fa-user-shield"></i> ${event.duty_role_label}</span><span class="duty-detail-chip${event.availability_type ? ' alert' : ''}"><i class="fa-solid ${event.availability_type ? 'fa-calendar-xmark' : 'fa-circle-check'}"></i> ${event.status_label}</span>${event.is_recurring ? `<span class="duty-detail-chip"><i class="fa-solid fa-repeat"></i> ${event.recurrence_label || 'Weekly'}</span>` : ''}</div>` : ''}
                         ${event.notes ? `<p>${event.notes}</p>` : ''}
                         ${event.can_edit || event.can_delete ? `
                             <div class="agenda-actions">

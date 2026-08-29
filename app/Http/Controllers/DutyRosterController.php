@@ -7,6 +7,7 @@ use App\Models\DutyRosterTemplate;
 use App\Models\DutyShift;
 use App\Models\DutyShiftAssignment;
 use App\Models\StationOfficer;
+use App\Models\Station;
 use App\Models\Team;
 use App\Services\DutyRosterService;
 use App\Services\DutyRosterRecurrenceService;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +24,7 @@ class DutyRosterController extends Controller
 {
     public function index(Request $request, DutyRosterService $service, DutyRosterRecurrenceService $recurrence): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
         $from = Carbon::parse($request->input('from', now()->startOfWeek()->toDateString()))->startOfDay();
         $to = Carbon::parse($request->input('to', now()->addDays(14)->toDateString()))->endOfDay();
         abort_if($to->diffInDays($from) > 62, 422, 'Roster windows are limited to 62 days.');
@@ -64,16 +66,21 @@ class DutyRosterController extends Controller
 
     public function storeShift(Request $request, DutyRosterService $service, DutyRosterRecurrenceService $recurrence): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
         $data = $this->validateShift($request);
         $team = Team::query()->where('station_id', $stationId)->findOrFail($data['team_id']);
         [$startsAt, $endsAt] = $this->window($data['starts_at'], $data['ends_at']);
-        if (($data['recurrence'] ?? 'none') === 'weekly') {
+        if (in_array($data['schedule_template'] ?? 'single', ['two_team_12', 'three_team_24'], true)) {
+            return $this->storeTeamRotation($data, $stationId, $startsAt, $endsAt, $service, $recurrence);
+        }
+        if (($data['recurrence'] ?? 'none') !== 'none') {
             $until = Carbon::parse($data['recurrence_until'])->endOfDay();
-            if ($startsAt->diffInHours($endsAt) > 24) throw ValidationException::withMessages(['ends_at' => 'A recurring weekly shift cannot exceed 24 hours.']);
-            if ($startsAt->diffInDays($until) > 366) throw ValidationException::withMessages(['recurrence_until' => 'Weekly schedules can be created for up to one year.']);
+            if ($startsAt->diffInHours($endsAt) > 24) throw ValidationException::withMessages(['ends_at' => 'A recurring shift cannot exceed 24 hours.']);
+            if ($startsAt->diffInDays($until) > 366) throw ValidationException::withMessages(['recurrence_until' => 'Recurring schedules can be created for up to one year.']);
             $prototype = $this->templatePrototype($data, $team, $stationId, $startsAt, $endsAt, $until);
-            foreach ($recurrence->occurrences($prototype, $startsAt, $until) as [, $occurrenceStart, $occurrenceEnd]) {
+            $occurrences = $recurrence->occurrences($prototype, $startsAt, $until);
+            if ($occurrences === []) throw ValidationException::withMessages(['weekdays' => 'Select a weekday that occurs before the repeat-until date.']);
+            foreach ($occurrences as [, $occurrenceStart, $occurrenceEnd]) {
                 $this->validateTeamWindow((int) $team->team_id, $occurrenceStart, $occurrenceEnd);
                 $this->validateAssignments($data['assignments'], $stationId, $occurrenceStart, $occurrenceEnd);
             }
@@ -83,10 +90,10 @@ class DutyRosterController extends Controller
                 $template->assignments()->createMany($data['assignments']);
                 $team->forceFill(['roster_managed' => true])->save();
                 $recurrence->generate((int) $template->station_id, $startsAt, $until);
-                return $template->shifts()->whereDate('occurrence_date', $startsAt->toDateString())->firstOrFail();
+                return $template->shifts()->orderBy('starts_at')->firstOrFail();
             });
             $service->syncTeam($team->fresh());
-            return response()->json(['success' => true, 'message' => 'Weekly duty schedule created.', 'shift' => $this->serializeShift($shift->load(['assignments.officer.user.role', 'team', 'template']))], 201);
+            return response()->json(['success' => true, 'message' => $this->recurrenceLabel($data['recurrence']).' duty schedule created.', 'shift' => $this->serializeShift($shift->load(['assignments.officer.user.role', 'team', 'template']))], 201);
         }
 
         $this->validateTeamWindow((int) $team->team_id, $startsAt, $endsAt);
@@ -114,7 +121,7 @@ class DutyRosterController extends Controller
 
     public function updateShift(Request $request, DutyShift $dutyShift, DutyRosterService $service, DutyRosterRecurrenceService $recurrence): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
         abort_unless((int) $dutyShift->station_id === $stationId, 403);
         abort_if($dutyShift->ends_at?->lte(now()), 409, 'Completed shifts are retained as duty history and cannot be changed.');
         abort_if($dutyShift->team?->status === 'responding' && (int) $dutyShift->team?->active_duty_shift_id === (int) $dutyShift->duty_shift_id, 409, 'A responding team cannot be changed until it returns.');
@@ -125,11 +132,12 @@ class DutyRosterController extends Controller
 
         if (($data['edit_scope'] ?? 'this') === 'future' && $dutyShift->duty_roster_template_id) {
             $until = Carbon::parse($data['recurrence_until'])->endOfDay();
-            if ($startsAt->diffInHours($endsAt) > 24) throw ValidationException::withMessages(['ends_at' => 'A recurring weekly shift cannot exceed 24 hours.']);
-            if ($startsAt->diffInDays($until) > 366) throw ValidationException::withMessages(['recurrence_until' => 'Weekly schedules can run for up to one year from the changed shift.']);
+            if ($startsAt->diffInHours($endsAt) > 24) throw ValidationException::withMessages(['ends_at' => 'A recurring shift cannot exceed 24 hours.']);
+            if ($startsAt->diffInDays($until) > 366) throw ValidationException::withMessages(['recurrence_until' => 'Recurring schedules can run for up to one year from the changed shift.']);
             $oldTemplate = $dutyShift->template()->firstOrFail();
             $cutoverDate = $dutyShift->occurrence_date?->copy() ?? $dutyShift->starts_at->copy()->startOfDay();
             $newPrototype = $this->templatePrototype($data, $team, $stationId, $startsAt, $endsAt, $until);
+            if ($recurrence->occurrences($newPrototype, $startsAt, $until) === []) throw ValidationException::withMessages(['weekdays' => 'Select a weekday that occurs before the repeat-until date.']);
 
             $newShift = DB::transaction(function () use ($oldTemplate, $cutoverDate, $dutyShift, $data, $team, $stationId, $startsAt, $until, $recurrence, $newPrototype) {
                 $oldTemplate->update(['effective_until' => $cutoverDate->copy()->subDay()->toDateString()]);
@@ -142,11 +150,11 @@ class DutyRosterController extends Controller
                 $newTemplate->assignments()->createMany($data['assignments']);
                 $team->forceFill(['roster_managed' => true])->save();
                 $recurrence->generate($stationId, $startsAt, $until);
-                return $newTemplate->shifts()->whereDate('occurrence_date', $startsAt->toDateString())->firstOrFail();
+                return $newTemplate->shifts()->orderBy('starts_at')->firstOrFail();
             });
             if ($previousTeam && (int) $previousTeam->team_id !== (int) $team->team_id) $service->syncTeam($previousTeam->fresh());
             $service->syncTeam($team->fresh());
-            return response()->json(['success' => true, 'message' => 'This and future weekly shifts were updated.', 'shift' => $this->serializeShift($newShift->load(['assignments.officer.user.role', 'team', 'template']))]);
+            return response()->json(['success' => true, 'message' => 'This and next shifts changed.', 'shift' => $this->serializeShift($newShift->load(['assignments.officer.user.role', 'team', 'template']))]);
         }
 
         $this->validateTeamWindow((int) $team->team_id, $startsAt, $endsAt, $dutyShift->duty_shift_id);
@@ -167,28 +175,58 @@ class DutyRosterController extends Controller
         }
         $service->syncTeam($team->fresh());
 
-        return response()->json(['success' => true, 'message' => $dutyShift->duty_roster_template_id ? 'Only this shift was updated.' : 'Duty shift updated.', 'shift' => $this->serializeShift($dutyShift->fresh(['assignments.officer.user.role', 'team', 'template']))]);
+        return response()->json(['success' => true, 'message' => $dutyShift->duty_roster_template_id ? 'Only this day changed.' : 'Shift changed.', 'shift' => $this->serializeShift($dutyShift->fresh(['assignments.officer.user.role', 'team', 'template']))]);
     }
 
-    public function destroyShift(DutyShift $dutyShift, DutyRosterService $service): JsonResponse
+    public function destroyShift(Request $request, DutyShift $dutyShift, DutyRosterService $service): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
+        $data = $request->validate([
+            'delete_scope' => ['nullable', Rule::in(['this', 'future'])],
+        ]);
         abort_unless((int) $dutyShift->station_id === $stationId, 403);
         $team = $dutyShift->team;
         abort_if($dutyShift->ends_at?->lte(now()), 409, 'Completed shifts are retained as duty history and cannot be removed.');
         abort_if($team?->status === 'responding' && (int) $team->active_duty_shift_id === (int) $dutyShift->duty_shift_id, 409, 'An active responding shift cannot be deleted.');
+        if (($data['delete_scope'] ?? 'this') === 'future' && $dutyShift->duty_roster_template_id) {
+            $template = $dutyShift->template()->firstOrFail();
+            $cutoverDate = $dutyShift->occurrence_date?->copy() ?? $dutyShift->starts_at->copy()->startOfDay();
+            $teamIdsToSync = $template->rotation_group
+                ? DutyRosterTemplate::query()->where('station_id', $template->station_id)->where('rotation_group', $template->rotation_group)->pluck('team_id')
+                : collect([$template->team_id]);
+
+            DB::transaction(function () use ($template, $cutoverDate, $dutyShift): void {
+                $templates = $template->rotation_group
+                    ? DutyRosterTemplate::query()->where('station_id', $template->station_id)->where('rotation_group', $template->rotation_group)->get()
+                    : collect([$template]);
+                foreach ($templates as $linkedTemplate) {
+                    $linkedTemplate->update([
+                        'effective_until' => $cutoverDate->copy()->subDay()->toDateString(),
+                        'status' => $cutoverDate->lte($linkedTemplate->effective_from) ? 'inactive' : $linkedTemplate->status,
+                    ]);
+                    $linkedTemplate->shifts()
+                        ->where('starts_at', '>=', $dutyShift->starts_at)
+                        ->delete();
+                }
+            });
+
+            Team::query()->whereIn('team_id', $teamIdsToSync)->get()->each(fn (Team $linkedTeam) => $service->syncTeam($linkedTeam));
+
+            return response()->json(['success' => true, 'message' => 'This and next shifts removed.']);
+        }
+
         if ($dutyShift->duty_roster_template_id) {
             $dutyShift->forceFill(['status' => 'cancelled', 'is_override' => true])->save();
         } else {
             $dutyShift->delete();
         }
         if ($team) $service->syncTeam($team->fresh());
-        return response()->json(['success' => true, 'message' => 'Duty shift removed.']);
+        return response()->json(['success' => true, 'message' => 'Shift removed.']);
     }
 
     public function storeException(Request $request, DutyRosterService $service): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
         $data = $request->validate([
             'station_officer_id' => ['required', 'integer', 'exists:station_officers,station_officer_id'],
             'type' => ['required', Rule::in(['rest_day', 'leave'])],
@@ -206,9 +244,9 @@ class DutyRosterController extends Controller
         return response()->json(['success' => true, 'message' => 'Rest/leave period saved.', 'exception' => $this->serializeException($exception->load('officer.user.role'))], 201);
     }
 
-    public function destroyException(DutyException $dutyException, DutyRosterService $service): JsonResponse
+    public function destroyException(Request $request, DutyException $dutyException, DutyRosterService $service): JsonResponse
     {
-        $stationId = $this->managedStationId();
+        $stationId = $this->managedStationId($request);
         abort_unless((int) $dutyException->station_id === $stationId, 403);
         $dutyException->delete();
         $service->sync($stationId);
@@ -220,13 +258,124 @@ class DutyRosterController extends Controller
         return $request->validate([
             'team_id' => ['required', 'integer', 'exists:teams,team_id'], 'label' => ['required', 'string', 'max:100'],
             'starts_at' => ['required', 'date'], 'ends_at' => ['required', 'date'], 'notes' => ['nullable', 'string', 'max:1000'],
-            'recurrence' => ['nullable', Rule::in(['none', 'weekly'])],
-            'recurrence_until' => ['nullable', 'required_if:recurrence,weekly', 'date'],
+            'schedule_template' => ['nullable', Rule::in(['single', 'two_team_12', 'three_team_24'])],
+            'rotation_team_ids' => ['nullable', 'array'],
+            'rotation_team_ids.*' => ['integer', 'distinct', 'exists:teams,team_id'],
+            'recurrence' => ['nullable', Rule::in(['none', 'daily', 'weekly', 'weekdays', 'rotation'])],
+            'recurrence_until' => ['nullable', 'required_if:recurrence,daily,weekly,weekdays,rotation', 'date'],
+            'rotation_interval_days' => ['nullable', 'required_if:recurrence,rotation', 'integer', 'between:2,31'],
+            'weekdays' => ['nullable', 'required_if:recurrence,weekdays', 'array', 'min:1'],
+            'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
             'edit_scope' => ['nullable', Rule::in(['this', 'future'])],
-            'assignments' => ['required', 'array', 'min:3'],
+            'assignments' => ['required', 'array', 'min:1'],
             'assignments.*.station_officer_id' => ['required', 'integer', 'distinct', 'exists:station_officers,station_officer_id'],
             'assignments.*.team_role' => ['required', 'string', Rule::in(DutyRosterService::ALL_ROLES)],
         ]);
+    }
+
+    private function storeTeamRotation(array $data, int $stationId, Carbon $startsAt, Carbon $endsAt, DutyRosterService $service, DutyRosterRecurrenceService $recurrence): JsonResponse
+    {
+        $plan = $data['schedule_template'];
+        $neededTeams = $plan === 'two_team_12' ? 2 : 3;
+        $hoursPerTurn = $plan === 'two_team_12' ? 12 : 24;
+        $teamIds = collect($data['rotation_team_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+
+        if ($teamIds->count() !== $neededTeams) {
+            throw ValidationException::withMessages(['rotation_team_ids' => "Choose {$neededTeams} teams."]);
+        }
+        if (abs((int) $startsAt->diffInMinutes($endsAt)) !== $hoursPerTurn * 60) {
+            throw ValidationException::withMessages(['ends_at' => "This plan needs a {$hoursPerTurn}-hour shift."]);
+        }
+
+        $until = Carbon::parse($data['recurrence_until'])->endOfDay();
+        if ($startsAt->diffInDays($until) > 366) {
+            throw ValidationException::withMessages(['recurrence_until' => 'The end date can be up to one year away.']);
+        }
+
+        $teams = Team::query()->where('station_id', $stationId)->whereIn('team_id', $teamIds)->get()->keyBy('team_id');
+        if ($teams->count() !== $neededTeams) {
+            throw ValidationException::withMessages(['rotation_team_ids' => 'Choose teams from this station.']);
+        }
+
+        $commandAssignments = collect($data['assignments'])
+            ->where('team_role', 'station_duty')
+            ->map(fn ($item) => ['station_officer_id' => (int) $item['station_officer_id'], 'team_role' => 'station_duty'])
+            ->values()
+            ->all();
+        if ($commandAssignments === []) {
+            throw ValidationException::withMessages(['assignments' => 'Choose a chief or station admin.']);
+        }
+
+        $plans = [];
+        $rotationGroup = (string) Str::uuid();
+        foreach ($teamIds as $turn => $teamId) {
+            $team = $teams->get($teamId);
+            $turnStart = $plan === 'two_team_12'
+                ? $startsAt->copy()->addHours($turn * 12)
+                : $startsAt->copy()->addDays($turn);
+            if ($turnStart->gt($until)) {
+                throw ValidationException::withMessages(['recurrence_until' => 'Choose a later end date.']);
+            }
+            $turnEnd = $turnStart->copy()->addHours($hoursPerTurn);
+            $teamAssignments = collect(DutyRosterService::DEPLOYABLE_ROLES)
+                ->map(fn ($role) => $team->{$role} ? ['station_officer_id' => (int) $team->{$role}, 'team_role' => $role] : null)
+                ->filter()
+                ->unique('station_officer_id')
+                ->values()
+                ->all();
+            if (count($teamAssignments) < 2) {
+                throw ValidationException::withMessages(['rotation_team_ids' => "Team {$teamId} needs at least two saved members."]);
+            }
+
+            $assignments = [...$teamAssignments, ...$commandAssignments];
+            $prototype = new DutyRosterTemplate([
+                'station_id' => $stationId,
+                'team_id' => $teamId,
+                'label' => trim($data['label'])." - Team {$teamId}",
+                'weekday' => $turnStart->dayOfWeekIso,
+                'recurrence_type' => $plan === 'two_team_12' ? 'daily' : 'rotation',
+                'weekdays' => null,
+                'rotation_interval_days' => $plan === 'three_team_24' ? 3 : null,
+                'rotation_group' => $rotationGroup,
+                'starts_time' => $turnStart->format('H:i:s'),
+                'ends_time' => $turnEnd->format('H:i:s'),
+                'effective_from' => $turnStart->toDateString(),
+                'effective_until' => $until->toDateString(),
+                'status' => 'active',
+                'created_by' => Auth::id(),
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            foreach ($recurrence->occurrences($prototype, $turnStart, $until) as [, $occurrenceStart, $occurrenceEnd]) {
+                $this->validateTeamWindow((int) $teamId, $occurrenceStart, $occurrenceEnd);
+                $this->validateAssignments($assignments, $stationId, $occurrenceStart, $occurrenceEnd);
+            }
+            $plans[] = [$team, $prototype, $assignments];
+        }
+
+        $firstShift = DB::transaction(function () use ($plans, $stationId, $startsAt, $until, $recurrence) {
+            $templateIds = [];
+            foreach ($plans as [$team, $prototype, $assignments]) {
+                $template = DutyRosterTemplate::create($prototype->getAttributes());
+                $templateIds[] = $template->duty_roster_template_id;
+                $template->assignments()->createMany($assignments);
+                $team->forceFill(['roster_managed' => true])->save();
+            }
+            $recurrence->generate($stationId, $startsAt, $until);
+
+            return DutyShift::query()
+                ->whereIn('duty_roster_template_id', $templateIds)
+                ->orderBy('starts_at')
+                ->firstOrFail();
+        });
+
+        foreach ($plans as [$team]) $service->syncTeam($team->fresh());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team turns saved.',
+            'shift' => $this->serializeShift($firstShift->load(['assignments.officer.user.role', 'team', 'template'])),
+        ], 201);
     }
 
     private function validateAssignments(array $assignments, int $stationId, Carbon $startsAt, Carbon $endsAt, ?int $exceptShiftId = null): void
@@ -314,9 +463,16 @@ class DutyRosterController extends Controller
         return [$startsAt, $endsAt];
     }
 
-    private function managedStationId(): int
+    private function managedStationId(Request $request): int
     {
         $role = strtolower((string) Auth::user()?->role?->role);
+        if ($role === 'provincial admin') {
+            $stationId = (int) $request->input('station_id');
+            abort_unless($stationId && Station::query()->whereKey($stationId)->exists(), 422, 'Select a valid station before managing its duty roster.');
+
+            return $stationId;
+        }
+
         abort_unless(in_array($role, ['chief', 'station admin', 'chief station admin'], true), 403);
         $stationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
         abort_unless($stationId, 403, 'Your account is not assigned to a station.');
@@ -331,6 +487,11 @@ class DutyRosterController extends Controller
             'team_id' => $team->team_id,
             'label' => $data['label'],
             'weekday' => $startsAt->dayOfWeekIso,
+            'recurrence_type' => $data['recurrence'],
+            'weekdays' => $data['recurrence'] === 'weekdays'
+                ? collect($data['weekdays'] ?? [])->map(fn ($weekday) => (int) $weekday)->unique()->sort()->values()->all()
+                : null,
+            'rotation_interval_days' => $data['recurrence'] === 'rotation' ? (int) $data['rotation_interval_days'] : null,
             'starts_time' => $startsAt->format('H:i:s'),
             'ends_time' => $endsAt->format('H:i:s'),
             'effective_from' => $startsAt->toDateString(),
@@ -342,6 +503,15 @@ class DutyRosterController extends Controller
     }
 
     private function serializeOfficer($officer): array { return ['id' => $officer->station_officer_id, 'name' => trim(($officer->user?->first_name ?? '').' '.($officer->user?->last_name ?? '')), 'role' => $officer->user?->role?->role, 'rank' => $officer->rank, 'status' => $officer->status]; }
-    private function serializeShift(DutyShift $shift): array { return ['id' => $shift->duty_shift_id, 'team_id' => $shift->team_id, 'label' => $shift->label, 'starts_at' => $shift->starts_at?->toIso8601String(), 'ends_at' => $shift->ends_at?->toIso8601String(), 'status' => $shift->status, 'notes' => $shift->notes, 'is_recurring' => (bool) $shift->duty_roster_template_id, 'is_override' => (bool) $shift->is_override, 'occurrence_date' => $shift->occurrence_date?->toDateString(), 'recurrence_until' => $shift->template?->effective_until?->toDateString(), 'assignments' => $shift->assignments->map(fn ($a) => ['id' => $a->duty_shift_assignment_id, 'station_officer_id' => $a->station_officer_id, 'team_role' => $a->team_role, 'officer' => $this->serializeOfficer($a->officer)])->values()]; }
+    private function recurrenceLabel(string $recurrence): string
+    {
+        return match ($recurrence) {
+            'daily' => 'Daily',
+            'weekdays' => 'Selected-weekday',
+            default => 'Weekly',
+        };
+    }
+
+    private function serializeShift(DutyShift $shift): array { return ['id' => $shift->duty_shift_id, 'team_id' => $shift->team_id, 'label' => $shift->label, 'starts_at' => $shift->starts_at?->toIso8601String(), 'ends_at' => $shift->ends_at?->toIso8601String(), 'status' => $shift->status, 'notes' => $shift->notes, 'is_recurring' => (bool) $shift->duty_roster_template_id, 'recurrence_type' => $shift->template?->recurrence_type ?: ($shift->duty_roster_template_id ? 'weekly' : 'none'), 'weekdays' => $shift->template?->weekdays ?? [], 'rotation_interval_days' => $shift->template?->rotation_interval_days, 'is_override' => (bool) $shift->is_override, 'occurrence_date' => $shift->occurrence_date?->toDateString(), 'recurrence_until' => $shift->template?->effective_until?->toDateString(), 'assignments' => $shift->assignments->map(fn ($a) => ['id' => $a->duty_shift_assignment_id, 'station_officer_id' => $a->station_officer_id, 'team_role' => $a->team_role, 'officer' => $this->serializeOfficer($a->officer)])->values()]; }
     private function serializeException(DutyException $exception): array { return ['id' => $exception->duty_exception_id, 'station_officer_id' => $exception->station_officer_id, 'type' => $exception->type, 'starts_at' => $exception->starts_at?->toIso8601String(), 'ends_at' => $exception->ends_at?->toIso8601String(), 'reason' => $exception->reason, 'officer' => $this->serializeOfficer($exception->officer)]; }
 }

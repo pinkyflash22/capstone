@@ -227,18 +227,59 @@ class ManagementPage {
         const closeEditStationBtn = document.getElementById('editStationModalClose');
         const cancelEditStationBtn = document.getElementById('cancelEditStationBtn');
         const editStationForm = document.getElementById('editStationForm');
+        const provinceSelect = document.getElementById('editStationProvince');
+        const citySelect = document.getElementById('editStationCity');
+        const barangaySelect = document.getElementById('editStationBarangay');
 
         if (!editStationBtn || !editStationModal || !editStationForm) {
             return;
         }
 
-        editStationBtn.addEventListener('click', () => {
+        editStationBtn.addEventListener('click', async () => {
             editStationModal.classList.add('active');
             document.body.style.overflow = 'hidden';
+            if (citySelect?.value && barangaySelect?.disabled) {
+                await loadOptions(barangaySelect, `/api/barangays/${encodeURIComponent(citySelect.value)}`, 'barangay_id', 'barangay_name', 'Select barangay');
+            }
         });
 
         closeEditStationBtn?.addEventListener('click', () => this.closeModal('editStationModal'));
         cancelEditStationBtn?.addEventListener('click', () => this.closeModal('editStationModal'));
+
+        const loadOptions = async (select, url, valueKey, labelKey, placeholder) => {
+            select.disabled = true;
+            select.innerHTML = `<option value="">Loading…</option>`;
+            try {
+                const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                if (!response.ok) throw new Error('Address options could not be loaded.');
+                const rows = await response.json();
+                select.innerHTML = `<option value="">${placeholder}</option>${rows.map((row) => `<option value="${this.escapeHtml(row[valueKey])}">${this.escapeHtml(row[labelKey])}</option>`).join('')}`;
+                select.disabled = false;
+            } catch (error) {
+                select.innerHTML = `<option value="">Unavailable</option>`;
+                this.showToast(error.message, 'error');
+            }
+        };
+
+        provinceSelect?.addEventListener('change', async () => {
+            barangaySelect.innerHTML = '<option value="">Select barangay</option>';
+            barangaySelect.disabled = true;
+            if (!provinceSelect.value) {
+                citySelect.innerHTML = '<option value="">Select city</option>';
+                citySelect.disabled = true;
+                return;
+            }
+            await loadOptions(citySelect, `/api/cities/${encodeURIComponent(provinceSelect.value)}`, 'city_id', 'city_name', 'Select city');
+        });
+
+        citySelect?.addEventListener('change', async () => {
+            if (!citySelect.value) {
+                barangaySelect.innerHTML = '<option value="">Select barangay</option>';
+                barangaySelect.disabled = true;
+                return;
+            }
+            await loadOptions(barangaySelect, `/api/barangays/${encodeURIComponent(citySelect.value)}`, 'barangay_id', 'barangay_name', 'Select barangay');
+        });
 
         editStationForm.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -249,6 +290,10 @@ class ManagementPage {
                 station_code: document.getElementById('editStationCode')?.value?.trim() || '',
                 contact_number: document.getElementById('editStationContactNumber')?.value?.trim() || '',
                 email: document.getElementById('editStationEmail')?.value?.trim() || '',
+                province_id: provinceSelect?.value || '',
+                city_id: citySelect?.value || '',
+                barangay_id: barangaySelect?.value || '',
+                street: document.getElementById('editStationStreet')?.value?.trim() || '',
             };
 
             try {

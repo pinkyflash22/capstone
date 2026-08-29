@@ -64,8 +64,23 @@ class DutyRosterRecurrenceService
         $endDate = ($template->effective_until ? Carbon::parse($template->effective_until)->endOfDay() : $to->copy())->min($to);
         $cursor = $startDate->copy()->startOfDay();
         $occurrences = [];
+        $recurrenceType = $template->recurrence_type ?: 'weekly';
+        $selectedWeekdays = collect($template->weekdays ?? [])
+            ->map(fn ($weekday) => (int) $weekday)
+            ->filter(fn ($weekday) => $weekday >= 1 && $weekday <= 7)
+            ->unique()
+            ->values();
+        $rotationStart = Carbon::parse($template->effective_from)->startOfDay();
+        $rotationInterval = max(1, (int) ($template->rotation_interval_days ?? 1));
         while ($cursor->lte($endDate)) {
-            if ($cursor->dayOfWeekIso === (int) $template->weekday) {
+            $matchesRecurrence = match ($recurrenceType) {
+                'daily' => true,
+                'weekdays' => $selectedWeekdays->contains($cursor->dayOfWeekIso),
+                'rotation' => ((int) $rotationStart->diffInDays($cursor)) % $rotationInterval === 0,
+                default => $cursor->dayOfWeekIso === (int) $template->weekday,
+            };
+
+            if ($matchesRecurrence) {
                 $startsAt = $cursor->copy()->setTimeFromTimeString((string) $template->starts_time);
                 $endsAt = $cursor->copy()->setTimeFromTimeString((string) $template->ends_time);
                 if ($endsAt->lte($startsAt)) $endsAt->addDay();

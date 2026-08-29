@@ -1,3 +1,8 @@
+@php
+    $isProvincialResourceAdmin = strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) === 'provincial admin';
+    $resourceRoutePrefix = $isProvincialResourceAdmin ? 'admin' : 'station-admin';
+    $resourceBaseUrl = url('/'.$resourceRoutePrefix);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1654,7 +1659,7 @@
 </head>
 <body class="chief-legacy-layout resource-management-page">
     <!-- Side Navigation -->
-    @include('chief.partials.sidebar', ['active' => 'resources'])
+    @include($isProvincialResourceAdmin ? 'admin.partials.sidebar' : 'chief.partials.sidebar', ['active' => 'resources'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
@@ -1685,21 +1690,21 @@
         <nav class="sidebar-nav">
             <div class="nav-section">
                 <div class="nav-section-title">MAIN</div>
-                <a href="{{ route('station-admin.dashboard') }}" class="nav-item active"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
-                <a href="{{ route('station-admin.fsic') }}" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
+                <a href="{{ route($resourceRoutePrefix.'.dashboard') }}" class="nav-item active"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.fsic') }}" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Requests</span>
                             <span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $activeAlerts ?? 2 }}</span>
                         </a>
-                <a href="{{ route('station-admin.announcements') }}" class="nav-item"><i class="fa-solid fa-bullhorn"></i><span>Announcements</span></a>
-                <a href="{{ route('station-admin.management') }}" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Management</span></a>
-                <a href="{{ route('station-admin.reports') }}" class="nav-item"><i class="fa-solid fa-chart-pie"></i><span>Reports</span></a>
-                <a href="{{ route('station-admin.resource-management.index') }}" class="nav-item"><i class="fa-solid fa-toolbox"></i><span>Resources</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.announcements') }}" class="nav-item"><i class="fa-solid fa-bullhorn"></i><span>Announcements</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.management') }}" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Management</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.reports') }}" class="nav-item"><i class="fa-solid fa-chart-pie"></i><span>Reports</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.resource-management.index') }}" class="nav-item"><i class="fa-solid fa-toolbox"></i><span>Resources</span></a>
                 
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">ANALYTICS</div>
-                <a href="{{ route('station-admin.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
+                <a href="{{ route($resourceRoutePrefix.'.analytics') }}" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Fire Risk Forecast</span></a>
                 {{-- <a href="#" class="nav-item"><i class="fa-solid fa-clock-rotate-left"></i><span>History</span></a>
                 <a href="#" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alerts</span></a> --}}
             </div>
@@ -1738,9 +1743,9 @@
                             <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
                         </div>
                         <div class="p-2">
-                            <a href="{{ route('station-admin.profile') }}" class="user-dropdown-item">
+                            <a href="{{ $isProvincialResourceAdmin ? route('admin.dashboard') : route('station-admin.profile') }}" class="user-dropdown-item">
                                 <i class="fa-regular fa-user"></i>
-                                <span>Commander Profile</span>
+                                <span>{{ $isProvincialResourceAdmin ? 'Admin Home' : 'Commander Profile' }}</span>
                             </a>
                             <a href="#" class="user-dropdown-item chief-open-logs">
                                 <i class="fa-solid fa-clock-rotate-left"></i>
@@ -1761,14 +1766,14 @@
         </nav>
 
         <div class="management-container chief-theme-shell">
-            <section class="chief-theme-hero">
+            <section class="chief-theme-hero resource-order-hero">
                 <div>
                     <span class="chief-theme-hero__eyebrow">
                         <i class="fa-solid fa-toolbox"></i>
                         Station Resource Desk
                     </span>
                     <h1 class="chief-theme-hero__title">Resource Management</h1>
-                    <p class="chief-theme-hero__copy">Manage personnel, teams, equipment, and covered barangay boundaries with the same command dashboard feel used in Activity Schedule.</p>
+                    <p class="chief-theme-hero__copy">Review deployable crews and apparatus first, then manage inventory, community coverage, and account records.</p>
                     <div class="chief-theme-badges">
                         <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs</span>
                         <span class="chief-theme-badge"><i class="fa-solid fa-circle-info"></i> Multi-station resource registry</span>
@@ -1793,13 +1798,33 @@
                 </div>
             </section>
 
+            <nav class="resource-priority-map" aria-label="Resource management priorities">
+                <a href="#personnelResourceSection"><span>01</span><i class="fa-solid fa-bolt"></i><div><strong>Response readiness</strong><small>Personnel, roster, teams, apparatus</small></div></a>
+                <a href="#equipmentResourceSection"><span>02</span><i class="fa-solid fa-boxes-stacked"></i><div><strong>Inventory</strong><small>Equipment catalogue and availability</small></div></a>
+                <a href="#boundaryResourceSection"><span>03</span><i class="fa-solid fa-map-location-dot"></i><div><strong>Community coverage</strong><small>Boundaries and barangay officers</small></div></a>
+                <a href="#usersResourceSection"><span>04</span><i class="fa-solid fa-address-book"></i><div><strong>Account records</strong><small>Users, roles, and verification</small></div></a>
+            </nav>
+
+            <header class="resource-tier-heading resource-tier-heading--operations">
+                <span>Priority 01</span><div><h2>Response readiness</h2><p>Resources that determine whether the station can respond now.</p></div>
+            </header>
+            <header class="resource-tier-heading resource-tier-heading--inventory">
+                <span>Priority 02</span><div><h2>Inventory control</h2><p>Maintain concise equipment records after operational staffing is confirmed.</p></div>
+            </header>
+            <header class="resource-tier-heading resource-tier-heading--community">
+                <span>Priority 03</span><div><h2>Community coverage</h2><p>Manage station jurisdiction, synchronized boundaries, and local officers.</p></div>
+            </header>
+            <header class="resource-tier-heading resource-tier-heading--records">
+                <span>Priority 04</span><div><h2>Account records</h2><p>Administrative identities and access records appear last.</p></div>
+            </header>
+
             @php
                 $syncedBoundaryCount = $boundaryBarangays->where('boundary_status', 'synced')->count();
                 $invalidBoundaryCount = $boundaryBarangays->where('boundary_status', 'invalid')->count();
                 $missingBoundaryCount = $boundaryBarangays->where('boundary_status', 'missing')->count();
             @endphp
 
-            <section class="boundary-control-card" id="boundaryResourceSection">
+            <section class="boundary-control-card resource-tier resource-tier--community" id="boundaryResourceSection">
                 <div class="boundary-control-header">
                     <div>
                         <h3><i class="fa-solid fa-draw-polygon"></i> Barangay Boundary Control</h3>
@@ -1840,14 +1865,14 @@
                                     <td data-label="Last Sync">{{ $boundaryBarangay['boundary_updated_at_human'] ?? 'Never synced' }}</td>
                                     <td data-label="Action" class="actions">
                                         <div class="boundary-action-group">
-                                            <form class="boundary-sync-form" method="POST" action="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route('station-admin.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
+                                            <form class="boundary-sync-form" method="POST" action="{{ route($resourceRoutePrefix.'.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}" data-route="{{ route($resourceRoutePrefix.'.barangay-boundaries.sync', $boundaryBarangay['barangay_id']) }}">
                                                 @csrf
                                                 <button type="submit" class="boundary-sync-btn" title="Fetch the latest barangay polygon from Geoapify">
                                                     <i class="fa-solid fa-arrows-rotate"></i>
                                                     {{ $boundaryBarangay['boundary_status'] === 'synced' ? 'Refresh' : 'Sync' }}
                                                 </button>
                                             </form>
-                                            <a href="{{ route('station-admin.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-visit-btn" title="Open barangay boundary details">
+                                            <a href="{{ route($resourceRoutePrefix.'.barangays.show', $boundaryBarangay['barangay_id']) }}" class="boundary-visit-btn" title="Open barangay boundary details">
                                                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Details
                                             </a>
                                         </div>
@@ -1864,14 +1889,7 @@
                 <div class="resource-pagination">{{ $boundaryPage->onEachSide(1)->links() }}</div>
             </section>
 
-            <div class="stats-grid">
-                <div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-user"></i></div><div class="stat-info"><h3>Total Personnel</h3><div class="stat-number">{{ $stationOfficers->count() }}</div><div class="stat-change">{{$stationOfficers->where('status','available')->count()}} active</div></div></div>
-                <div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-truck"></i></div><div class="stat-info"><h3>Fleet Vehicles</h3><div class="stat-number" id="totalVehicles">0</div><div class="stat-change">operational</div></div></div>
-                <div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-kit-medical"></i></div><div class="stat-info"><h3>Equipment Items</h3><div class="stat-number">{{ $equipments->count() }}</div><div class="stat-change">total units</div></div></div>
-                <div class="stat-card"><div class="stat-icon purple"><i class="fa-solid fa-building"></i></div><div class="stat-info"><h3>Active Stations</h3><div class="stat-number">{{ $activeStations->count() }}</div><div class="stat-change">online</div></div></div>
-            </div>
-
-            <div class="search-filter-bar">
+            <div class="search-filter-bar resource-order-tools">
                 <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="searchInput" placeholder="Search personnel, teams, or equipment..."></div>
                 <div class="filter-actions">
                     <select class="filter-select" id="statusFilter">
@@ -1910,7 +1928,7 @@
                 </div>
             </div>
 
-            <div class="tab-navigation" id="stationTabs">
+            <div class="tab-navigation resource-order-station" id="stationTabs">
                      @foreach ($activeStations as $station)
 
                 <button class="tab-btn active" data-station="all"><i class="fa-solid fa-building"></i>
@@ -1922,7 +1940,7 @@
             </div>
 
             <!-- Personnel Table -->
-            <div class="station-grid" id="personnelResourceSection">
+            <div class="station-grid resource-tier resource-tier--operations resource-table-compact" id="personnelResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-user"></i> Personnel Management</h3>
                     <span class="stat-badge" id="personnelCount">{{ $stationOfficers->count() }} total</span>
@@ -1989,8 +2007,15 @@
                 <div class="resource-pagination">{{ $personnelPage->onEachSide(1)->links() }}</div>
             </div>
 
-            @if(in_array(strtolower((string) (auth()->user()?->role?->role ?? '')), ['chief', 'station admin', 'chief station admin'], true))
-            <section class="duty-roster" id="dutyRosterApp" aria-labelledby="dutyRosterTitle">
+            @php
+                $dutyRosterRole = strtolower(trim((string) (auth()->user()?->role?->role ?? '')));
+                $isProvincialRosterAdmin = $dutyRosterRole === 'provincial admin';
+                $dutyRosterStationId = $isProvincialRosterAdmin
+                    ? (int) request('roster_station_id', $activeStations->first()?->station_id)
+                    : (int) ($currentStation?->station_id ?? 0);
+            @endphp
+            @if(in_array($dutyRosterRole, ['chief', 'station admin', 'chief station admin', 'provincial admin'], true))
+            <section class="duty-roster resource-tier resource-tier--roster" id="dutyRosterApp" aria-labelledby="dutyRosterTitle">
                 <div class="duty-roster__header">
                     <div>
                         <span class="duty-roster__eyebrow"><i class="fa-solid fa-clock-rotate-left"></i> Live station staffing</span>
@@ -1998,6 +2023,16 @@
                         <p>Schedule handoffs, protect station command coverage, and keep deployed teams current automatically.</p>
                     </div>
                     <div class="duty-roster__actions">
+                        @if($isProvincialRosterAdmin)
+                            <label class="duty-roster__station-picker">
+                                <span>Station</span>
+                                <select id="dutyRosterStationSelect" aria-label="Select station duty roster">
+                                    @foreach($activeStations as $station)
+                                        <option value="{{ $station->station_id }}" @selected((int) $station->station_id === $dutyRosterStationId)>{{ $station->station_name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        @endif
                         <span class="duty-roster__clock" id="dutyRosterClock">Loading station time…</span>
                         <button type="button" class="duty-roster__button duty-roster__button--secondary" data-roster-action="exception">
                             <i class="fa-solid fa-calendar-xmark"></i> Rest / Leave
@@ -2029,24 +2064,47 @@
                 <dialog class="duty-roster__dialog" id="dutyShiftDialog">
                     <form id="dutyShiftForm" method="dialog">
                         <div class="duty-roster__dialog-head"><div><span>Duty planning</span><h4 id="dutyShiftDialogTitle">Schedule a shift</h4></div><button type="button" data-dialog-close aria-label="Close">&times;</button></div>
+                        <div class="duty-roster__form-grid duty-roster__plan-picker">
+                            <label>Quick plan<select name="schedule_template">
+                                <option value="single">One team</option>
+                                <option value="two_team_12">Two teams, 12-hour turns</option>
+                                <option value="three_team_24">Three teams, 24-hour turns</option>
+                            </select><small>Pick a plan or set one shift.</small></label>
+                        </div>
+                        <fieldset class="duty-roster__rotation-picker" data-rotation-picker hidden>
+                            <legend>Teams in order</legend>
+                            <p data-rotation-help>Choose teams.</p>
+                            <div data-rotation-teams></div>
+                        </fieldset>
+                        <section class="duty-roster__turn-preview" data-turn-preview hidden aria-live="polite">
+                            <h5><i class="fa-regular fa-calendar-check"></i> Turn preview</h5>
+                            <div data-turn-preview-list>Choose teams to see their turns.</div>
+                        </section>
                         <div class="duty-roster__form-grid">
                             <label>Shift name<input name="label" required maxlength="100" placeholder="e.g. Team 1 Night Shift"></label>
-                            <label>Response team<select name="team_id" required></select></label>
+                            <label data-single-team>Response team<select name="team_id" required></select></label>
                             <label>Starts<input name="starts_at" type="datetime-local" required></label>
                             <label>Ends<input name="ends_at" type="datetime-local" required><small>For overnight duty, select the following date.</small></label>
                         </div>
                         <div class="duty-roster__form-grid duty-roster__recurrence" data-recurrence-fields>
-                            <label>Repeats<select name="recurrence"><option value="none">Does not repeat</option><option value="weekly">Every week</option></select></label>
-                            <label data-repeat-until hidden>Repeat until<input name="recurrence_until" type="date"><small>Up to one year. Each week remains editable.</small></label>
+                            <label data-repeat-choice>Repeats<select name="recurrence"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="weekdays">Selected weekdays</option><option value="rotation">Team turns</option></select></label>
+                            <label data-repeat-until hidden>End date<input name="recurrence_until" type="date"><small>Up to one year. You can change one day later.</small></label>
+                            <input name="rotation_interval_days" type="hidden">
                         </div>
+                        <fieldset class="duty-roster__weekday-picker" data-weekday-picker hidden>
+                            <legend>Repeat on</legend>
+                            @foreach([1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'] as $weekdayValue => $weekdayLabel)
+                                <label><input type="checkbox" name="weekdays[]" value="{{ $weekdayValue }}"><span>{{ $weekdayLabel }}</span></label>
+                            @endforeach
+                        </fieldset>
                         <div class="duty-roster__edit-scope" data-edit-scope hidden>
                             <strong>Apply this change to</strong>
-                            <label><input type="radio" name="edit_scope" value="this" checked> This shift only</label>
-                            <label><input type="radio" name="edit_scope" value="future"> This and future shifts</label>
+                            <label><input type="radio" name="edit_scope" value="this" checked> Only this day</label>
+                            <label><input type="radio" name="edit_scope" value="future"> This and next days</label>
                             <small>Completed shifts remain unchanged.</small>
                         </div>
-                        <h5>Deployable firefighters</h5>
-                        <div class="duty-roster__assignment-grid" id="dutyAssignments"></div>
+                        <h5 data-deployable-title>Deployable firefighters</h5>
+                        <div class="duty-roster__assignment-grid" id="dutyAssignments" data-deployable-fields></div>
                         <h5>Must remain at the station</h5>
                         <div class="duty-roster__form-grid">
                             <label>Chief / station admin<select name="station_duty" required></select></label>
@@ -2072,12 +2130,30 @@
                         <div class="duty-roster__dialog-actions"><button type="button" class="duty-roster__button duty-roster__button--secondary" data-dialog-close>Cancel</button><button class="duty-roster__button" type="submit">Save availability</button></div>
                     </form>
                 </dialog>
-                <script type="application/json" id="dutyRosterConfig">{!! json_encode(['baseUrl' => url('/station-admin/duty-roster'), 'timezone' => config('app.timezone')], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
+                <dialog class="duty-roster__dialog duty-roster__delete-dialog" id="dutyDeleteDialog">
+                    <div class="duty-roster__delete-panel">
+                        <div class="duty-roster__dialog-head"><div><span>Remove shift</span><h4>What should be removed?</h4></div><button type="button" data-dialog-close aria-label="Close">&times;</button></div>
+                        <p data-delete-help>Choose one.</p>
+                        <div class="duty-roster__delete-choices">
+                            <button type="button" class="duty-roster__delete-choice" data-delete-scope="this">
+                                <i class="fa-regular fa-calendar"></i>
+                                <span><strong>Only this day</strong><small>Keep the next shifts.</small></span>
+                            </button>
+                            <button type="button" class="duty-roster__delete-choice duty-roster__delete-choice--danger" data-delete-scope="future">
+                                <i class="fa-solid fa-calendar-xmark"></i>
+                                <span><strong>This and next days</strong><small>Keep past shifts.</small></span>
+                            </button>
+                        </div>
+                        <div class="duty-roster__form-error" data-form-error></div>
+                        <div class="duty-roster__dialog-actions"><button type="button" class="duty-roster__button duty-roster__button--secondary" data-dialog-close>Cancel</button></div>
+                    </div>
+                </dialog>
+                <script type="application/json" id="dutyRosterConfig">{!! json_encode(['baseUrl' => url($isProvincialRosterAdmin ? '/admin/duty-roster' : '/station-admin/duty-roster'), 'timezone' => config('app.timezone'), 'stationId' => $dutyRosterStationId, 'isProvincialAdmin' => $isProvincialRosterAdmin], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
             </section>
             @endif
 
             <!-- Teams Table -->
-            <div class="station-grid" id="teamsResourceSection">
+            <div class="station-grid resource-tier resource-tier--teams resource-table-compact" id="teamsResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-people-group"></i> Team Management</h3>
                     <span class="stat-badge" id="teamsCount">{{ $allTeam->count() }} teams</span>
@@ -2146,7 +2222,7 @@
            
 
             @if(strtolower(trim((string) (auth()->user()?->role?->role ?? ''))) !== 'provincial admin')
-            <div class="station-grid" id="barangayOfficerResourceSection">
+            <div class="station-grid resource-tier resource-tier--barangay resource-table-compact" id="barangayOfficerResourceSection">
                 <div class="section-header">
                     <div><h3><i class="fa-solid fa-people-roof"></i> Barangay Officers</h3><small style="color:#64748b">Officers assigned within your station's active barangay coverage.</small></div>
                     <div style="display:flex;align-items:center;gap:10px"><span class="stat-badge">{{ $barangayOfficers->count() }} assigned</span><button type="button" class="btn-primary" onclick="openBarangayOfficerModal()"><i class="fa-solid fa-user-plus"></i> Add Officer</button></div>
@@ -2175,7 +2251,7 @@
             @endif
 
             <!-- All System Users Table with Enhanced Filtering and Edit Functionality -->
-            <div class="station-grid" id="usersResourceSection">
+            <div class="station-grid resource-tier resource-tier--records resource-table-compact" id="usersResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-users"></i> All System Users</h3>
                     <div class="filter-controls">
@@ -2256,7 +2332,7 @@
             </div>
 
              <!-- Equipment Inventory Table -->
-            <div class="station-grid" id="equipmentResourceSection">
+            <div class="station-grid resource-tier resource-tier--inventory resource-table-compact" id="equipmentResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-kit-medical"></i> Equipment Items</h3>
                     <span class="stat-badge" id="equipmentCount">{{ $equipments->count() }} items</span>
@@ -2293,7 +2369,7 @@
                 <div class="resource-pagination">{{ $equipmentPage->onEachSide(1)->links() }}</div>
             </div>
 
-            <div class="station-grid" id="apparatusResourceSection" style="margin-top: 22px;">
+            <div class="station-grid resource-tier resource-tier--apparatus resource-table-compact" id="apparatusResourceSection">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-truck-field"></i> Fire Apparatus Registry</h3>
                     <span class="stat-badge">{{ $apparatusRecords->count() }} units</span>
@@ -2337,7 +2413,7 @@
     <div id="barangayOfficerModal" class="modal">
         <div class="modal-content" style="max-width:760px">
             <div class="modal-header"><h2><i class="fa-solid fa-people-roof"></i> <span id="barangayOfficerModalTitle">Add Barangay Officer</span></h2><button class="modal-close" type="button" onclick="closeModal('barangayOfficerModal')"><i class="fa-solid fa-times"></i></button></div>
-            <form id="barangayOfficerForm" method="POST" action="{{ url('/station-admin/barangay-officers') }}">
+            <form id="barangayOfficerForm" method="POST" action="{{ $resourceBaseUrl.'/barangay-officers' }}">
                 @csrf<input type="hidden" name="_method" id="barangayOfficerMethod" value="POST">
                 <div class="modal-body">
                     <div id="barangayOfficerModeGroup" class="form-group full-width"><label class="form-label">Officer source *</label><div style="display:flex;gap:10px;flex-wrap:wrap"><label style="padding:10px 14px;border:1px solid #dbe4ee;border-radius:10px"><input type="radio" name="mode" value="existing" checked> Select existing user</label><label style="padding:10px 14px;border:1px solid #dbe4ee;border-radius:10px"><input type="radio" name="mode" value="new"> Register new account</label></div></div>
@@ -3281,7 +3357,7 @@
                 <h2><i class="fa-solid fa-tags"></i> Add Equipment Category</h2>
                 <button class="modal-close" onclick="closeModal('equipmentCategoryModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="equipmentForm" method="POST" action="{{ route('station-admin.equipment-category.store') }}">
+            <form id="equipmentForm" method="POST" action="{{ route($resourceRoutePrefix.'.equipment-category.store') }}">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
@@ -3304,7 +3380,7 @@
                 <h2><i class="fa-solid fa-box"></i> Add Equipment Item</h2>
                 <button class="modal-close" onclick="closeModal('equipmentItemModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="eform" action="{{ route('station-admin.equipment.store') }}" method="POST">
+            <form id="eform" action="{{ route($resourceRoutePrefix.'.equipment.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
@@ -3412,7 +3488,7 @@
                 <h2><i class="fa-solid fa-warehouse"></i> Assign Equipment to Station</h2>
                 <button class="modal-close" onclick="closeModal('stationEquipmentModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="stationEquipmentForm" action="{{ route('station-admin.resource-management.assign-equipment') }}" method="POST">
+            <form id="stationEquipmentForm" action="{{ route($resourceRoutePrefix.'.resource-management.assign-equipment') }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
@@ -3426,8 +3502,17 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-building"></i> Station</label>
-                        <input type="text" class="form-input" value="{{ $currentStation->station_name ?? 'No assigned station' }}" readonly>
-                        <input type="hidden" name="station_id" value="{{ $currentStation->station_id ?? '' }}">
+                        @if($isProvincialResourceAdmin)
+                            <select class="form-select" name="station_id" required>
+                                <option value="">Choose station</option>
+                                @foreach($activeStations as $station)
+                                    <option value="{{ $station->station_id }}">{{ $station->station_name }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" class="form-input" value="{{ $currentStation->station_name ?? 'No assigned station' }}" readonly>
+                            <input type="hidden" name="station_id" value="{{ $currentStation->station_id ?? '' }}">
+                        @endif
                     </div>
                     <div class="form-group">
                         <label class="form-label"><i class="fa-solid fa-cubes"></i> Quantity</label>
@@ -3450,9 +3535,10 @@
             activeStations: @json($activeStations),
             users: @json($users),
             allUsers: @json($systemUsers),
-            teamBaseUrl: @json(url(request()->is('admin/*') ? '/admin/teams' : '/station-admin/teams'))
+            teamBaseUrl: @json($resourceBaseUrl.'/teams')
         };
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const resourceAdminBaseUrl = @json($resourceBaseUrl);
 
         
         // Add Officer to Station - JavaScript ONLY (no duplicate)
@@ -4003,7 +4089,7 @@ if (officerForm) {
                 confirmButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
             }
 
-            fetch(`/station-admin/users/${userId}`, {
+            fetch(`${resourceAdminBaseUrl}/users/${userId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -4044,7 +4130,7 @@ if (officerForm) {
                 const officerId = this.dataset.officerId;
                 const newStatus = this.value;
                 
-                fetch(`/station-admin/station-officers/${officerId}/status`, {
+                fetch(`${resourceAdminBaseUrl}/station-officers/${officerId}/status`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -4871,7 +4957,7 @@ function validateTeamMembers(formData) {
             document.getElementById('editEquipmentName').value = equipment.equipment_name || '';
             document.getElementById('editEquipmentCategory').value = equipment.category || '';
             document.getElementById('editEquipmentType').value = equipment.type || '';
-            document.getElementById('editEquipmentForm').action = `/station-admin/equipment/${equipment.equipment_id}`;
+            document.getElementById('editEquipmentForm').action = `${resourceAdminBaseUrl}/equipment/${equipment.equipment_id}`;
             document.getElementById('editEquipmentModal').style.display = 'flex';
             document.getElementById('editEquipmentModal').classList.add('active');
         }
@@ -4899,7 +4985,7 @@ function validateTeamMembers(formData) {
                 deleteButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...';
             }
 
-            fetch(`/station-admin/equipment/${id}`, {
+            fetch(`${resourceAdminBaseUrl}/equipment/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -4960,7 +5046,7 @@ function validateTeamMembers(formData) {
 
         function confirmDeleteOfficer() {
             const id = document.getElementById('deleteOfficerId').value;
-            fetch(`/station-admin/station-officer/${id}`, { 
+            fetch(`${resourceAdminBaseUrl}/station-officer/${id}`, {
                 method: 'DELETE', 
                 headers: { 
                     'Accept': 'application/json', 
@@ -5104,7 +5190,7 @@ function validateTeamMembers(formData) {
         userData.password = password;
     }
     
-    fetch(`/station-admin/users/${userId}`, {
+    fetch(`${resourceAdminBaseUrl}/users/${userId}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -5130,7 +5216,7 @@ function validateTeamMembers(formData) {
             status: document.getElementById('editOfficerStatus').value,
             station_id: document.getElementById('editOfficerStationId').value
         };
-        return fetch(`/station-admin/officers/${officerId}`, {
+        return fetch(`${resourceAdminBaseUrl}/officers/${officerId}`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': csrfToken,
@@ -5185,7 +5271,7 @@ function validateTeamMembers(formData) {
                 userData.password = password;
             }
             
-            fetch(`/station-admin/users/${userId}`, {
+            fetch(`${resourceAdminBaseUrl}/users/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -5484,13 +5570,20 @@ function validateTeamMembers(formData) {
                 'apparatusResourceSection'
             ];
 
+            const applyResourceTextLimits = (scope = document) => {
+                scope.querySelectorAll('.resource-table-compact .station-table td:not(.actions)').forEach((cell) => {
+                    const text = cell.textContent.replace(/\s+/g, ' ').trim();
+                    if (text) cell.title = text;
+                });
+            };
+
             const bindDynamicStatusControls = () => {
                 document.querySelectorAll('.status-select[data-officer-id]').forEach((select) => {
                     if (select.dataset.dynamicBound === 'true') return;
                     select.dataset.dynamicBound = 'true';
                     select.addEventListener('change', function () {
                         const officerId = this.dataset.officerId;
-                        fetch(`/station-admin/station-officers/${officerId}/status`, {
+                        fetch(`${resourceAdminBaseUrl}/station-officers/${officerId}/status`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                             body: JSON.stringify({ status: this.value })
@@ -5541,6 +5634,7 @@ function validateTeamMembers(formData) {
                     });
                     window.history.replaceState({}, '', url.toString());
                     bindDynamicStatusControls();
+                    applyResourceTextLimits();
                 } catch (error) {
                     showToast(error.message || 'Unable to load resource records.', 'error');
                 } finally {
@@ -5567,6 +5661,7 @@ function validateTeamMembers(formData) {
             });
 
             toggleRegisterUserRankField();
+            applyResourceTextLimits();
 
             if (userDropdownBtn && userDropdownMenu) {
                 userDropdownBtn.addEventListener('click', function(event) {
@@ -6438,7 +6533,7 @@ document.getElementById('createTeamForm')?.addEventListener('submit', function(e
 const apparatusRegistry = @json($apparatusRecords);
 const apparatusBaseUrl = @json(url('/'.$apparatusRoutePrefix.'/apparatus'));
 const barangayOfficerRegistry = @json($barangayOfficers);
-const barangayOfficerBaseUrl = @json(url('/station-admin/barangay-officers'));
+const barangayOfficerBaseUrl = @json($resourceBaseUrl.'/barangay-officers');
 
 function syncBarangayOfficerMode() {
     const form = document.getElementById('barangayOfficerForm');

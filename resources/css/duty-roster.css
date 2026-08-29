@@ -10,3 +10,35 @@
 .resource-management-page .duty-roster__dialog-actions{position:sticky;bottom:0;z-index:3;flex:0 0 auto;margin:4px 0 0;padding:12px 20px max(14px,env(safe-area-inset-bottom,0px));border-top:1px solid #eaecf0;background:rgba(255,255,255,.98);box-shadow:0 -10px 24px rgba(15,23,42,.05)}
 @media(max-width:768px){.resource-management-page .duty-roster__dialog{inset:auto 0 0;width:100%;max-width:none;max-height:calc(100dvh - max(12px,env(safe-area-inset-top,0px)));margin:0;border-radius:24px 24px 0 0}.resource-management-page .duty-roster__dialog form{max-height:calc(100dvh - max(12px,env(safe-area-inset-top,0px)))}.resource-management-page .duty-roster__form-grid,.resource-management-page .duty-roster__assignment-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
 @media(max-width:430px){.resource-management-page .duty-roster__dialog-head{padding:14px 16px 11px}.resource-management-page .duty-roster__dialog .duty-roster__form-grid,.resource-management-page .duty-roster__dialog .duty-roster__edit-scope,.resource-management-page .duty-roster__dialog h5,.resource-management-page .duty-roster__dialog .duty-roster__assignment-grid,.resource-management-page .duty-roster__dialog .duty-roster__notes,.resource-management-page .duty-roster__dialog .duty-roster__form-error{margin-left:14px;margin-right:14px}.resource-management-page .duty-roster__dialog-actions{padding-left:14px;padding-right:14px}}
+
+.duty-roster [hidden]{display:none!important}
+.duty-roster__station-picker{display:grid;gap:4px;min-width:min(260px,100%);color:#475467;font-size:.66rem;font-weight:800;text-align:left;text-transform:uppercase;letter-spacing:.06em}
+.duty-roster__station-picker select{min-height:38px;padding:7px 32px 7px 10px;border:1px solid #d0d5dd;border-radius:10px;color:#101828;background:#fff;font:inherit;font-size:.76rem;font-weight:700;text-transform:none;letter-spacing:0}
+.duty-roster__weekday-picker{display:flex;gap:7px;flex-wrap:wrap;margin:.7rem 20px 0;padding:.8rem;border:1px solid #dbe4ee;border-radius:12px;background:#fff}
+.duty-roster__weekday-picker legend{padding:0 5px;color:#344054;font-size:.72rem;font-weight:800}
+.duty-roster__weekday-picker label{display:block;cursor:pointer}
+.duty-roster__weekday-picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.duty-roster__weekday-picker span{display:grid;place-items:center;min-width:42px;min-height:34px;padding:6px 9px;border:1px solid #d0d5dd;border-radius:999px;color:#475467;background:#fff;font-size:.68rem;font-weight:850}
+.duty-roster__weekday-picker input:checked+span{border-color:#b42318;color:#fff;background:#b42318;box-shadow:0 6px 14px rgba(180,35,24,.18)}
+.duty-roster__weekday-picker input:focus-visible+span{outline:3px solid rgba(21,112,239,.2);outline-offset:2px}
+.duty-roster__plan-picker{margin-top:16px;padding:.8rem;border:1px solid #fedf89;border-radius:12px;background:#fffaeb}
+.duty-roster__rotation-picker{margin:.8rem 20px 0;padding:.8rem;border:1px solid #b2ddff;border-radius:12px;background:#eff8ff}
+.duty-roster__rotation-picker legend{padding:0 5px;color:#175cd3;font-size:.75rem;font-weight:850}
+.duty-roster__rotation-picker>p{margin:0 0 8px;color:#475467;font-size:.72rem}
+.duty-roster__rotation-picker>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.duty-roster__rotation-picker label{display:flex;align-items:center;gap:7px;border:1px solid #b2ddff;border-radius:10px;padding:9px;background:#fff;cursor:pointer}
+.duty-roster__rotation-picker input{width:auto}
+.duty-roster__rotation-picker label.is-not-ready{border-color:#fecdca;background:#fff6f5;color:#b42318;cursor:not-allowed}.duty-roster__rotation-picker label small{margin-left:auto;color:#667085;font-size:.64rem}.duty-roster__rotation-picker label.is-not-ready small{color:#b42318}
+.duty-roster__turn-preview{margin:.8rem 20px 0;padding:.8rem;border:1px solid #d0d5dd;border-radius:12px;background:#fff}
+.duty-roster__turn-preview h5{margin:0 0 8px!important;color:#344054}.duty-roster__turn-preview>div{display:grid;gap:6px}.duty-roster__turn-preview article{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:9px;padding:8px;border-radius:10px;background:#f8fafc}.duty-roster__turn-preview article>span{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#fee4e2;color:#b42318;font-size:.72rem;font-weight:850}.duty-roster__turn-preview strong,.duty-roster__turn-preview small{display:block}.duty-roster__turn-preview strong{font-size:.76rem}.duty-roster__turn-preview small{margin-top:2px;color:#667085;font-size:.68rem}
+.resource-management-page .duty-roster__delete-dialog{width:min(460px,calc(100vw - 32px))}
+.resource-management-page .duty-roster__delete-panel{display:flex;flex-direction:column;max-height:min(82dvh,620px);overflow:auto}
+.resource-management-page .duty-roster__delete-panel>p{margin:16px 20px 4px;color:#667085;font-size:.8rem}
+.resource-management-page .duty-roster__delete-choices{display:grid;gap:10px;padding:12px 20px}
+.resource-management-page .duty-roster__delete-choice{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:10px;width:100%;border:1px solid #d0d5dd;border-radius:13px;padding:12px;background:#fff;color:#344054;text-align:left;cursor:pointer}
+.resource-management-page .duty-roster__delete-choice:hover{border-color:#b42318;background:#fff8f7}
+.resource-management-page .duty-roster__delete-choice>i{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#f2f4f7;color:#475467}
+.resource-management-page .duty-roster__delete-choice span,.resource-management-page .duty-roster__delete-choice strong,.resource-management-page .duty-roster__delete-choice small{display:block}
+.resource-management-page .duty-roster__delete-choice strong{font-size:.84rem}.resource-management-page .duty-roster__delete-choice small{margin-top:2px;color:#667085;font-size:.7rem;font-weight:500}
+.resource-management-page .duty-roster__delete-choice--danger>i{background:#fff1f0;color:#b42318}
+@media(max-width:560px){.duty-roster__station-picker{width:100%}.duty-roster__station-picker select{width:100%}.duty-roster__weekday-picker,.duty-roster__rotation-picker,.duty-roster__turn-preview{margin-left:14px;margin-right:14px}.duty-roster__weekday-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.duty-roster__weekday-picker span{min-width:0;padding-inline:5px}.duty-roster__rotation-picker>div{grid-template-columns:1fr}}

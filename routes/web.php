@@ -366,6 +366,14 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
         Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
+        Route::prefix('duty-roster')->name('duty-roster.')->group(function () {
+            Route::get('/', [DutyRosterController::class, 'index'])->name('index');
+            Route::post('/shifts', [DutyRosterController::class, 'storeShift'])->name('shifts.store');
+            Route::put('/shifts/{dutyShift}', [DutyRosterController::class, 'updateShift'])->name('shifts.update');
+            Route::delete('/shifts/{dutyShift}', [DutyRosterController::class, 'destroyShift'])->name('shifts.destroy');
+            Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
+            Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
+        });
         // Route::get('/resource', function(){
         //     return view('admin.resource-management');
         // });
@@ -393,6 +401,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/barangays/{barangay}', [BarangayController::class, 'show'])->name('barangays.show');
         Route::put('/barangays/{barangay}', [BarangayController::class, 'update'])->name('barangays.update');
         Route::delete('/barangays/{barangay}', [BarangayController::class, 'destroy'])->name('barangays.destroy');
+        Route::post('/barangay-officers', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'store'])->name('barangay-officers.store');
+        Route::put('/barangay-officers/{barangayOfficer}', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'update'])->name('barangay-officers.update');
+        Route::delete('/barangay-officers/{barangayOfficer}', [App\Http\Controllers\Chief\BarangayOfficerController::class, 'destroy'])->name('barangay-officers.destroy');
+        Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])->name('barangay-boundaries.sync');
      });
 
     Route::middleware(['role:station admin,chief'])->prefix('station-admin')->name('station-admin.')->group(function () {

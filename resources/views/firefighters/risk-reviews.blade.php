@@ -8,7 +8,11 @@
     <title>PyroSense · {{ $pageTitle ?? 'Risk Reviews' }}</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
+    @if (($mode ?? 'firefighter') === 'chief')
+        @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/firefighters/portal.css'])
+    @else
+        @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
+    @endif
     @include('partials.pwa-head')
 
     <style data-ff-page-style="risk-reviews">
@@ -1496,8 +1500,9 @@
         }
     </style>
 </head>
-<body class="firefighter-portal-shell">
+<body class="{{ ($mode ?? 'firefighter') === 'chief' ? 'chief-legacy-layout chief-risk-review-page' : 'firefighter-portal-shell' }}">
 @php
+    $isChiefReview = ($mode ?? 'firefighter') === 'chief';
     $summaryAll = (int) ($summaryCounts['all'] ?? 0);
     $summaryPending = (int) ($summaryCounts['pending'] ?? 0);
     $summaryApproved = (int) ($summaryCounts['approved'] ?? 0);
@@ -1506,14 +1511,68 @@
 @endphp
 
 <div class="dashboard-shell firefighter-shell ff-page-shell">
-    @include('firefighters.partials.shell-sidebar', ['active' => 'risk-reviews'])
+    @if ($isChiefReview)
+        @include('chief.partials.sidebar', ['active' => 'risk-reviews'])
+        <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden transition-opacity duration-300"></div>
+    @else
+        @include('firefighters.partials.shell-sidebar', ['active' => 'risk-reviews'])
+    @endif
 
     <div data-ff-page-root="risk-reviews">
     <main class="main-content">
-        @include('firefighters.partials.shell-topbar', [
-            'title' => $pageTitle ?? 'Risk & Hazard Verification',
-            'subtitle' => $pageSubtitle ?? 'Investigate pending submissions assigned to your station.',
-        ])
+        @if ($isChiefReview)
+            <nav class="ff-topbar-shell">
+                <div class="flex items-center gap-4">
+                    <button id="openSidebar" class="lg:hidden text-slate-600" type="button" aria-label="Open menu">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <div class="hidden lg:block">
+                        <h1 class="text-xl font-bold text-slate-800">{{ $pageTitle ?? 'Risk & Hazard Verification' }}</h1>
+                        <p class="text-xs text-slate-500 font-medium">{{ $pageSubtitle ?? 'Investigate pending submissions assigned to your station.' }}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 sm:gap-5">
+                    <div class="hidden sm:flex ff-topbar-status-pill"><span>Chief Command</span></div>
+                    <div class="user-dropdown">
+                        <button id="chiefReviewUserDropdownBtn" class="user-dropdown-toggle" type="button" aria-expanded="false" aria-controls="chiefReviewUserDropdownMenu">
+                            <div class="ff-topbar-profile-avatar">
+                                <span>{{ strtoupper(substr(auth()->user()->first_name ?? 'C', 0, 1) . substr(auth()->user()->last_name ?? 'A', 0, 1)) }}</span>
+                            </div>
+                            <span class="ff-topbar-profile-copy hidden sm:flex">
+                                <span class="ff-topbar-profile-name">{{ auth()->user()->first_name ?? auth()->user()->name ?? 'Chief' }}</span>
+                                <span class="ff-topbar-profile-role">Station Commander</span>
+                            </span>
+                            <i class="fas fa-chevron-down text-[10px] text-slate-400"></i>
+                        </button>
+
+                        <div id="chiefReviewUserDropdownMenu" class="user-dropdown-menu">
+                            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                                <p class="text-sm font-bold text-slate-800">{{ auth()->user()->first_name ?? '' }} {{ auth()->user()->last_name ?? auth()->user()->name ?? '' }}</p>
+                                <p class="text-[10px] text-slate-500 font-medium">{{ auth()->user()->email }}</p>
+                            </div>
+                            <div class="p-2">
+                                <a href="{{ route('station-admin.profile') }}" class="user-dropdown-item">
+                                    <i class="far fa-user"></i><span>Commander Profile</span>
+                                </a>
+                                <div class="h-px bg-slate-100 my-2"></div>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="user-dropdown-item text-red-600 w-full text-left">
+                                        <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        @else
+            @include('firefighters.partials.shell-topbar', [
+                'title' => $pageTitle ?? 'Risk & Hazard Verification',
+                'subtitle' => $pageSubtitle ?? 'Investigate pending submissions assigned to your station.',
+            ])
+        @endif
 
             <div class="ff-review-shell">
                 <section class="ff-review-hero">
@@ -2031,6 +2090,39 @@
 document.addEventListener('DOMContentLoaded', function () {
         let searchTimer = null;
         let currentRequest = null;
+
+        const chiefSidebar = document.getElementById('sidebar');
+        const chiefSidebarOpen = document.getElementById('openSidebar');
+        const chiefSidebarBackdrop = document.getElementById('sidebarBackdrop');
+        const chiefDropdownButton = document.getElementById('chiefReviewUserDropdownBtn');
+        const chiefDropdownMenu = document.getElementById('chiefReviewUserDropdownMenu');
+
+        if (chiefSidebar && chiefSidebarOpen && chiefSidebarBackdrop) {
+            chiefSidebarOpen.addEventListener('click', function () {
+                chiefSidebar.classList.add('active');
+                chiefSidebarBackdrop.classList.remove('hidden');
+            });
+
+            chiefSidebarBackdrop.addEventListener('click', function () {
+                chiefSidebar.classList.remove('active');
+                chiefSidebarBackdrop.classList.add('hidden');
+            });
+        }
+
+        if (chiefDropdownButton && chiefDropdownMenu) {
+            chiefDropdownButton.addEventListener('click', function (event) {
+                event.stopPropagation();
+                chiefDropdownMenu.classList.toggle('show');
+                chiefDropdownButton.setAttribute('aria-expanded', chiefDropdownMenu.classList.contains('show') ? 'true' : 'false');
+            });
+
+            document.addEventListener('click', function (event) {
+                if (!chiefDropdownButton.contains(event.target)) {
+                    chiefDropdownMenu.classList.remove('show');
+                    chiefDropdownButton.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
 
         const dynamicRoot = () => document.querySelector('[data-review-dynamic-root]');
         const filterForm = () => document.querySelector('[data-review-filter-form]');

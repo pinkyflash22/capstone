@@ -3048,6 +3048,12 @@
     $currentRoleName = strtolower(auth()->user()->role->role ?? '');
     $currentStationProfilePath = $currentStation?->profileMedia?->path;
     $currentStationProfileUrl = \App\Support\MediaPath::url($currentStationProfilePath);
+    $coverageCities = collect($managedBarangays ?? [])->pluck('city')->filter()->unique('city_id')->values();
+    $suggestedStationCity = !$currentStation?->address_id && $coverageCities->count() === 1
+        ? $coverageCities->first()
+        : null;
+    $stationAddressCity = $currentStation?->address?->barangay?->city ?? $suggestedStationCity;
+    $stationAddressProvince = $stationAddressCity?->province;
     $currentStationGallery = collect($currentStation?->galleryMedia ?? [])->map(function ($media) {
         $path = $media->path ?? '';
         $parsedPath = parse_url($path, PHP_URL_PATH) ?: $path;
@@ -3194,6 +3200,7 @@
                     <div class="chief-theme-badges">
                         <span class="chief-theme-badge"><i class="fa-solid fa-phone"></i> {{ $currentStation?->contact_number ?? 'No contact number' }}</span>
                         <span class="chief-theme-badge"><i class="fa-solid fa-envelope"></i> {{ $currentStation?->email ?? 'No email registered' }}</span>
+                        <span class="chief-theme-badge"><i class="fa-solid fa-location-dot"></i> {{ collect([$currentStation?->address?->street, $currentStation?->address?->barangay?->barangay_name, $currentStation?->address?->barangay?->city?->city_name])->filter()->join(', ') ?: 'Station address not configured' }}</span>
                         <span class="chief-theme-badge"><i class="fa-solid fa-users"></i> {{ $personnel->count() }} personnel records loaded</span>
                     </div>
                 </div>
@@ -3661,6 +3668,53 @@
                         <div class="form-group">
                             <label class="form-label"><i class="fa-solid fa-envelope"></i> Email Address</label>
                             <input type="email" class="form-input" id="editStationEmail" value="{{ $currentStation->email }}">
+                        </div>
+                    </div>
+                    <div class="management-form-section">
+                        <div class="management-form-section__heading">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <div><strong>Station address</strong><small>Controls the municipality and barangays used by station-scoped pages.</small></div>
+                        </div>
+                        @if($suggestedStationCity)
+                            <div class="station-address-suggestion" role="note" data-station-address-suggestion>
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                <div><strong>Suggested from active coverage</strong><span>{{ $suggestedStationCity->city_name }} was selected because all {{ $managedBarangays->count() }} covered barangays belong to this municipality. Choose the station barangay and verify the street before saving.</span></div>
+                            </div>
+                        @endif
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="editStationProvince">Province</label>
+                                <select class="form-select" id="editStationProvince" required>
+                                    <option value="">Select province</option>
+                                    @foreach($provinces as $province)
+                                        <option value="{{ $province->province_id }}" @selected((int) $stationAddressProvince?->province_id === (int) $province->province_id)>{{ $province->province_name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="editStationCity">City / Municipality</label>
+                                <select class="form-select" id="editStationCity" required @disabled(!$stationAddressCity?->city_id) data-address-suggested="{{ $suggestedStationCity ? 'true' : 'false' }}">
+                                    <option value="">Select city</option>
+                                    @if($stationAddressCity)
+                                        <option value="{{ $stationAddressCity->city_id }}" selected>{{ $stationAddressCity->city_name }}</option>
+                                    @endif
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="editStationBarangay">Barangay</label>
+                                <select class="form-select" id="editStationBarangay" required @disabled(!$currentStation?->address?->barangay_id)>
+                                    <option value="">Select barangay</option>
+                                    @if($currentStation?->address?->barangay)
+                                        <option value="{{ $currentStation->address->barangay->barangay_id }}" selected>{{ $currentStation->address->barangay->barangay_name }}</option>
+                                    @endif
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="editStationStreet">Street / Building</label>
+                                <input type="text" class="form-input" id="editStationStreet" maxlength="255" value="{{ $currentStation?->address?->street }}" placeholder="Station building, road, or sitio" required>
+                            </div>
                         </div>
                     </div>
                 </div>

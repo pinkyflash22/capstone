@@ -40,6 +40,7 @@ use App\Models\User;
 
 use App\Models\Equipment;
 use App\Models\EquipmentToStation;
+use App\Models\Apparatus;
 
 
 
@@ -117,7 +118,12 @@ class FirefighterController extends Controller
         $availability = $exception?->type === 'leave' ? 'On Leave' : ($exception?->type === 'rest_day' ? 'Rest Day' : null);
         $now = now();
         $dutyStatus = $availability ?: ($shift->starts_at?->lte($now) && $shift->ends_at?->gt($now) ? 'On Duty' : ($shift->ends_at?->lte($now) ? 'Completed' : 'Scheduled'));
-        $details = ["Assigned as {$roleLabel}", $shift->duty_roster_template_id ? 'Weekly recurring shift' : 'One-time duty shift'];
+        $recurrenceLabel = match ($shift->template?->recurrence_type) {
+            'daily' => 'Daily',
+            'weekdays' => 'Selected weekdays',
+            default => 'Weekly',
+        };
+        $details = ["Assigned as {$roleLabel}", $shift->duty_roster_template_id ? "{$recurrenceLabel} recurring shift" : 'One-time duty shift'];
         if ($exception?->reason) $details[] = $exception->reason;
         if ($shift->notes) $details[] = $shift->notes;
 
@@ -147,6 +153,8 @@ class FirefighterController extends Controller
             'duty_role' => $assignment?->team_role,
             'duty_role_label' => $roleLabel,
             'is_recurring' => (bool) $shift->duty_roster_template_id,
+            'recurrence_type' => $shift->template?->recurrence_type ?: ($shift->duty_roster_template_id ? 'weekly' : 'none'),
+            'recurrence_label' => $shift->duty_roster_template_id ? $recurrenceLabel : null,
             'is_override' => (bool) $shift->is_override,
             'availability_type' => $exception?->type,
             'source_type' => 'duty',
@@ -665,6 +673,28 @@ class FirefighterController extends Controller
             ])
             ->where('station_id', $stationId)
             ->orderBy('equipment_station_id')
+            ->get();
+    }
+
+    protected function loadStationApparatus(int $stationId)
+    {
+        return Apparatus::query()
+            ->select([
+                'apparatus_id',
+                'station_id',
+                'equipment_id',
+                'unit_number',
+                'plate_number',
+                'apparatus_type',
+                'status',
+                'maintenance_status',
+                'last_maintenance_at',
+                'next_maintenance_due_at',
+                'notes',
+            ])
+            ->with('equipment:equipment_id,equipment_name,category,type')
+            ->where('station_id', $stationId)
+            ->orderBy('unit_number')
             ->get();
     }
 
@@ -1480,12 +1510,14 @@ class FirefighterController extends Controller
         $userId = Auth::user()->user_id;
         $context = $this->getStationShellContext($userId);
         $equipmentAssignments = $this->loadStationEquipmentAssignments($context['stationId']);
+        $apparatusUnits = $this->loadStationApparatus($context['stationId']);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'html' => view('firefighters.mystation-equipment', [
                     'equipmentAssignments' => $equipmentAssignments,
+                    'apparatusUnits' => $apparatusUnits,
                 ])->render(),
             ],
         ]);
@@ -2295,7 +2327,7 @@ public function getAssignedIncidents(string $id){
                 ->where('station_officer_id', $stationOfficer->station_officer_id)
                 ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->get();
             $dutyEvents = DutyShift::query()
-                ->with(['assignments' => fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id), 'team.station'])
+                ->with(['assignments' => fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id), 'team.station', 'template'])
                 ->where('station_id', $stationId)->where('status', 'scheduled')
                 ->where('starts_at', '<', $to)->where('ends_at', '>', $from)
                 ->whereHas('assignments', fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id))

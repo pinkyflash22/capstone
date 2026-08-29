@@ -7,6 +7,22 @@ export default defineConfig({
         // Keep prior hashed assets so already-open tabs do not receive a 404
         // immediately after a new production bundle is generated.
         emptyOutDir: false,
+        // Agora stays lazy-loaded; its remaining core module is vendor-owned and
+        // sits just above Vite's default warning after the supporting code is split.
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('/node_modules/@agora-js/media/')) return 'agora-media';
+                    if (id.includes('/node_modules/@agora-js/protocol/')) return 'agora-protocol';
+                    if (id.includes('/node_modules/@agora-js/report/')) return 'agora-report';
+                    if (id.includes('/node_modules/@agora-js/shared/')) return 'agora-shared';
+                    if (id.includes('/node_modules/agora-rte-extension')) return 'agora-extension';
+                    if (id.includes('/node_modules/agora-rtc-sdk-ng/')) return 'agora-core';
+                    return undefined;
+                },
+            },
+        },
     },
     plugins: [
         laravel({

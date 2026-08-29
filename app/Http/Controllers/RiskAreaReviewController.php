@@ -211,7 +211,7 @@ class RiskAreaReviewController extends Controller
             }
         );
 
-        $viewName = $mode === 'firefighter'
+        $viewName = in_array($mode, ['chief', 'firefighter'], true)
             ? 'firefighters.risk-reviews'
             : 'reviews.risk-area-queue';
 
@@ -230,12 +230,10 @@ class RiskAreaReviewController extends Controller
             'summaryCounts' => $cachedPayload['summaryCounts'],
             'pageTitle' => $mode === 'admin'
                 ? 'Hazard & Risk Review Queue'
-                : ($mode === 'firefighter' ? 'Risk & Hazard Verification' : 'Risk Reviews'),
+                : 'Risk & Hazard Verification',
             'pageSubtitle' => $mode === 'admin'
                 ? 'Review barangay-submitted hazard and risk requests across the system.'
-                : ($mode === 'firefighter'
-                    ? 'Investigate pending hazard and risk submissions assigned to your station, then confirm or reject them.'
-                    : 'Review requests assigned to your station.'),
+                : 'Investigate pending hazard and risk submissions assigned to your station, then confirm or reject them.',
             'indexRouteName' => $mode === 'admin'
                 ? 'admin.risk-reviews.index'
                 : ($mode === 'firefighter' ? 'firefighter.risk-reviews.index' : 'station-admin.risk-reviews.index'),

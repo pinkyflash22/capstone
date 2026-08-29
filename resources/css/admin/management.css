@@ -1663,3 +1663,49 @@ body {
 #saveFormBtn:hover {
     background: #2563eb;
 }
+/* Station editor address grouping */
+.management-form-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.management-form-section__heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: #0f172a;
+}
+
+.management-form-section__heading > i {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    color: #c2410c;
+    background: #ffedd5;
+}
+
+.management-form-section__heading strong,
+.management-form-section__heading small { display: block; }
+.management-form-section__heading small { margin-top: 2px; color: #64748b; font-size: 0.72rem; }
+
+.station-address-suggestion {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 11px 12px;
+    border: 1px solid #fed7aa;
+    border-radius: 13px;
+    color: #9a3412;
+    background: #fff7ed;
+}
+
+.station-address-suggestion > i { margin-top: 2px; color: #ea580c; }
+.station-address-suggestion strong,
+.station-address-suggestion span { display: block; }
+.station-address-suggestion strong { font-size: 0.78rem; }
+.station-address-suggestion span { margin-top: 3px; color: #7c2d12; font-size: 0.7rem; line-height: 1.45; }

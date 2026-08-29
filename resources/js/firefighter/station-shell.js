@@ -19,6 +19,7 @@ function bootFirefighterMyStationPage() {
     const requestControllers = new Map();
     let activeCrewMemberTrigger = null;
     let rosterSearchQuery = '';
+    let maintenanceFilter = 'all';
     let readinessRefreshTimer = null;
     let readinessRefreshInFlight = false;
     let lastReadinessRefreshAt = 0;
@@ -1156,6 +1157,30 @@ function bootFirefighterMyStationPage() {
         setSummaryMetric('equipment', ready, `${lines} equipment records`);
     }
 
+    function applyMaintenanceFilter(filter = maintenanceFilter) {
+        const allowedFilters = ['all', 'attention', 'operational'];
+        maintenanceFilter = allowedFilters.includes(filter) ? filter : 'all';
+
+        const cards = Array.from(equipmentSection?.querySelectorAll('[data-maintenance-unit]') || []);
+        const buttons = Array.from(equipmentSection?.querySelectorAll('[data-maintenance-filter]') || []);
+        const empty = equipmentSection?.querySelector('[data-maintenance-filter-empty]');
+        let visible = 0;
+
+        buttons.forEach((button) => {
+            const isActive = button.dataset.maintenanceFilter === maintenanceFilter;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        cards.forEach((card) => {
+            const matches = maintenanceFilter === 'all' || card.dataset.maintenanceState === maintenanceFilter;
+            card.hidden = !matches;
+            if (matches) visible += 1;
+        });
+
+        if (empty) empty.hidden = visible > 0;
+    }
+
     function syncReportsSummary(tab = currentReportTab) {
         const loadedCount = Object.keys(reportStore[tab] || {}).length;
         setSummaryMetric('reports', loadedCount, `${tab} reports loaded`);
@@ -1196,6 +1221,7 @@ function bootFirefighterMyStationPage() {
             const result = await fetchStationSection('equipment', query);
             equipmentSection.innerHTML = result?.data?.html || '';
             syncEquipmentSummary();
+            applyMaintenanceFilter();
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station equipment failed:', error);
@@ -2168,6 +2194,12 @@ function bootFirefighterMyStationPage() {
     }
 
     const documentClickHandler = async (event) => {
+        const maintenanceFilterButton = event.target.closest('[data-maintenance-filter]');
+        if (maintenanceFilterButton && equipmentSection?.contains(maintenanceFilterButton)) {
+            applyMaintenanceFilter(maintenanceFilterButton.dataset.maintenanceFilter);
+            return;
+        }
+
         const crewMemberCard = event.target.closest('[data-crew-member-card]');
         if (crewMemberCard) {
             openCrewMemberModal(crewMemberCard);

@@ -23,11 +23,13 @@ use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\HistoricalFireIncident;
 use App\Models\Barangay;
+use App\Models\FullAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Validation\Rule;
 use App\Support\UserActivityLogger;
 use App\Services\IncidentResponderSnapshotService;
 use Carbon\Carbon;
@@ -77,7 +79,7 @@ class ManagementController extends Controller
     {
         if ($this->isProvincialAdmin()) {
             $mapmarker = Marker::with('stations')->get();
-            $stations = Station::with(['marker', 'profileMedia', 'galleryMedia'])->get();
+            $stations = Station::with(['marker', 'profileMedia', 'galleryMedia', 'address.barangay.city.province'])->get();
             $stationOfficers = StationOfficer::with(['user.role', 'station'])->get();
             $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter();
             $stationOfficerUserIds = $stationOfficers->pluck('user_id')->filter();
@@ -156,7 +158,7 @@ class ManagementController extends Controller
     
         $mapmarker = Marker::with('stations')->get();
 
-        $stations = Station::where('station_id', $stationExact)->with(['marker', 'profileMedia', 'galleryMedia'])->get();
+        $stations = Station::where('station_id', $stationExact)->with(['marker', 'profileMedia', 'galleryMedia', 'address.barangay.city.province'])->get();
         $stationOfficers = StationOfficer::with(['user.role', 'station'])
             ->where('station_id', $stationExact)
             ->get();
@@ -256,18 +258,55 @@ class ManagementController extends Controller
 
         $validated = $request->validate([
             'station_name' => 'required|string|max:255',
-            'station_code' => 'nullable|string|max:255',
+            'station_code' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('stations', 'station_code')->ignore($station->station_id, 'station_id'),
+            ],
             'contact_number' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('stations', 'email')->ignore($station->station_id, 'station_id'),
+            ],
+            'province_id' => ['required', 'integer', 'exists:provinces,province_id'],
+            'city_id' => [
+                'required',
+                'integer',
+                Rule::exists('cities', 'city_id')->where(fn ($query) => $query->where('province_id', $request->integer('province_id'))),
+            ],
+            'barangay_id' => [
+                'required',
+                'integer',
+                Rule::exists('barangays', 'barangay_id')->where(fn ($query) => $query->where('city_id', $request->integer('city_id'))),
+            ],
+            'street' => ['required', 'string', 'max:255'],
         ]);
 
-        $station->update($validated);
+        DB::transaction(function () use ($station, $validated) {
+            $address = FullAddress::firstOrCreate([
+                'street' => trim($validated['street']),
+                'barangay_id' => (int) $validated['barangay_id'],
+            ]);
+
+            $station->update([
+                'station_name' => $validated['station_name'],
+                'station_code' => $validated['station_code'] ?: $station->station_code,
+                'contact_number' => $validated['contact_number'] ?: null,
+                'email' => $validated['email'] ?: null,
+                'address_id' => $address->address_id,
+            ]);
+        });
+        Cache::forget("resource-management:station:{$station->station_id}:v4:stations");
+        Cache::forget("resource-management:station:{$station->station_id}:v4:boundaries");
         UserActivityLogger::log('updated station information', auth()->user()?->user_id, $request);
 
         return response()->json([
             'success' => true,
             'message' => 'Station information updated successfully.',
-            'data' => $station->fresh('marker'),
+            'data' => $station->fresh(['marker', 'address.barangay.city.province']),
         ]);
     }
 
@@ -867,6 +906,7 @@ protected function getManagedBarangays(?int $stationId)
     }
 
     return Barangay::query()
+        ->with('city.province')
         ->whereHas('stationCoverage', function ($query) use ($stationId) {
             $query->where('station_id', $stationId)
                 ->where(function ($coverageQuery) {
@@ -875,7 +915,7 @@ protected function getManagedBarangays(?int $stationId)
                 });
         })
         ->orderBy('barangay_name')
-        ->get(['barangay_id', 'barangay_name']);
+        ->get(['barangay_id', 'barangay_name', 'city_id']);
 }
 
 protected function storeHistoricalFireIncident(Request $request)

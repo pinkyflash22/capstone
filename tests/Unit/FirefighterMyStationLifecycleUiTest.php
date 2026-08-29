@@ -98,6 +98,28 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
     }
 
     #[Test]
+    public function firefighters_can_check_station_scoped_vehicle_and_equipment_maintenance(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/staff/FirefighterController.php'));
+        $equipment = file_get_contents(resource_path('views/firefighters/mystation-equipment.blade.php'));
+        $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+        $styles = file_get_contents(resource_path('css/firefighters/my-station.css'));
+
+        $this->assertStringContainsString('protected function loadStationApparatus(int $stationId)', $controller);
+        $this->assertStringContainsString("->where('station_id', \$stationId)", $controller);
+        $this->assertStringContainsString("'apparatusUnits' => \$apparatusUnits", $controller);
+        $this->assertStringContainsString('Maintenance check', $equipment);
+        $this->assertStringContainsString('Last maintenance', $equipment);
+        $this->assertStringContainsString('Next service due', $equipment);
+        $this->assertStringContainsString('Other equipment readiness', $equipment);
+        $this->assertStringContainsString('data-maintenance-filter="attention"', $equipment);
+        $this->assertStringContainsString('function applyMaintenanceFilter', $script);
+        $this->assertStringContainsString('applyMaintenanceFilter();', $script);
+        $this->assertStringContainsString('.maintenance-unit-card--overdue', $styles);
+        $this->assertStringContainsString('@media (max-width: 600px)', $styles);
+    }
+
+    #[Test]
     public function investigation_report_modal_has_one_authoritative_mobile_height_layer(): void
     {
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));

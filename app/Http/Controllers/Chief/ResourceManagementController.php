@@ -44,7 +44,7 @@ class ResourceManagementController extends Controller
     public function index(Request $request)
     {
         if ($this->isProvincialAdmin()) {
-            $cacheKey = 'resource-management:provincial:v3';
+            $cacheKey = 'resource-management:provincial:v4';
             $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
             $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->orderBy('station_id')->orderBy('unit_number')->get();
             $stationEquipmentAssignments = EquipmentToStation::with(['station', 'equipment'])->orderBy('station_id')->orderBy('equipment_station_id')->get();
@@ -63,7 +63,7 @@ class ResourceManagementController extends Controller
             $citizens = $allusers->where('role_id', $citizenRoleId)->values();
             $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
             $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
-            $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList(null, null));
+            $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList(null));
             $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->orderBy('barangay_id')->orderBy('position')->get();
             $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))->orderBy('last_name')->get();
             $systemUsers = $allusers;
@@ -102,7 +102,7 @@ class ResourceManagementController extends Controller
             ));
         }
 
-        $loggedInChief = Auth::user()?->loadMissing('address.barangay.city.province');
+        $loggedInChief = Auth::user();
         $thisUser = $loggedInChief?->user_id;
         //direct to station officer
         $thisStation = StationOfficer::where('user_id', $thisUser)->first();
@@ -113,7 +113,7 @@ class ResourceManagementController extends Controller
         }
 
        
-        $cacheKey = "resource-management:station:{$stationExact}:v3";
+        $cacheKey = "resource-management:station:{$stationExact}:v4";
         $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
         $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->where('station_id', $stationExact)->orderBy('unit_number')->get();
         $stationEquipmentAssignments = EquipmentToStation::with(['station', 'equipment'])->where('station_id', $stationExact)->orderBy('equipment_station_id')->get();
@@ -127,10 +127,11 @@ class ResourceManagementController extends Controller
             ->with(['marker', 'address.barangay.city.province'])
             ->get());
         $currentStation = $activeStations->first();
-        $chiefCityId = $loggedInChief?->address?->barangay?->city?->city_id
-            ?? $currentStation?->address?->barangay?->city?->city_id;
-        $chiefProvinceId = $loggedInChief?->address?->barangay?->city?->province?->province_id
-            ?? $currentStation?->address?->barangay?->city?->province?->province_id;
+        // Resource geography follows the chief's station assignment, never the chief's home address.
+        $stationCityId = $currentStation?->address?->barangay?->city?->city_id;
+        $stationProvinceId = $currentStation?->address?->barangay?->city?->province?->province_id;
+        $chiefCityId = $stationCityId;
+        $chiefProvinceId = $stationProvinceId;
         $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
 
         // $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->get();
@@ -169,7 +170,7 @@ class ResourceManagementController extends Controller
         //need padin include ung citizen e
         $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
         $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
-        $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList($stationExact, $chiefCityId));
+        $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList($stationExact));
         $coveredBarangayIds = collect($boundaryBarangays)->pluck('barangay_id')->filter()->map(fn ($id) => (int) $id);
         $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->whereIn('barangay_id', $coveredBarangayIds)->orderBy('barangay_id')->orderBy('position')->get();
         $eligibleBarangayOfficerUsers = User::with(['role', 'address.barangay'])->whereDoesntHave('barangayOfficer')
@@ -344,7 +345,7 @@ class ResourceManagementController extends Controller
         ))->withQueryString();
     }
 
-    protected function buildBoundaryBarangayList(?int $stationId, ?int $chiefCityId = null)
+    protected function buildBoundaryBarangayList(?int $stationId)
     {
         if ($this->isProvincialAdmin()) {
             $supportsBarangayBoundaries = Schema::hasColumn('boundary_location', 'barangay_id')
@@ -393,21 +394,24 @@ class ResourceManagementController extends Controller
                 : ['address.barangay.city', 'barangays.city'])
             ->find($stationId);
 
-        $cityId = $chiefCityId ?: $station?->address?->barangay?->city?->city_id;
+        $cityId = $station?->address?->barangay?->city?->city_id;
 
-        $barangays = $station?->barangays;
+        $barangays = $station?->barangays
+            ?->filter(fn (Barangay $barangay) => (bool) $barangay->pivot?->is_active);
 
         if ($barangays && $cityId) {
             $barangays = $barangays->filter(fn (Barangay $barangay) => (int) $barangay->city_id === (int) $cityId);
         }
 
-        if (! $barangays || $barangays->isEmpty()) {
+        if ((! $barangays || $barangays->isEmpty()) && $cityId) {
             $barangays = Barangay::query()
                 ->with($supportsBarangayBoundaries ? ['city', 'boundaryLocations'] : ['city'])
-                ->when($cityId, fn ($query) => $query->where('city_id', $cityId))
+                ->where('city_id', $cityId)
                 ->orderBy('barangay_name')
                 ->get();
         }
+
+        $barangays ??= collect();
 
         return $barangays
             ->sortBy('barangay_name')

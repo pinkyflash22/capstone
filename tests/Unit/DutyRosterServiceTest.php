@@ -40,7 +40,7 @@ class DutyRosterServiceTest extends TestCase
             $table->unsignedBigInteger('active_duty_shift_id')->nullable(); $table->unsignedBigInteger('pending_duty_shift_id')->nullable();
             $table->timestamp('roster_synced_at')->nullable(); $table->timestamps();
         });
-        Schema::create('duty_roster_templates', function (Blueprint $table) { $table->id('duty_roster_template_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('team_id'); $table->string('label'); $table->unsignedTinyInteger('weekday'); $table->time('starts_time'); $table->time('ends_time'); $table->date('effective_from'); $table->date('effective_until')->nullable(); $table->string('status')->default('active'); $table->unsignedBigInteger('created_by')->nullable(); $table->text('notes')->nullable(); $table->timestamps(); });
+        Schema::create('duty_roster_templates', function (Blueprint $table) { $table->id('duty_roster_template_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('team_id'); $table->string('label'); $table->unsignedTinyInteger('weekday'); $table->string('recurrence_type')->default('weekly'); $table->json('weekdays')->nullable(); $table->unsignedSmallInteger('rotation_interval_days')->nullable(); $table->uuid('rotation_group')->nullable(); $table->time('starts_time'); $table->time('ends_time'); $table->date('effective_from'); $table->date('effective_until')->nullable(); $table->string('status')->default('active'); $table->unsignedBigInteger('created_by')->nullable(); $table->text('notes')->nullable(); $table->timestamps(); });
         Schema::create('duty_roster_template_assignments', function (Blueprint $table) { $table->id('duty_roster_template_assignment_id'); $table->unsignedBigInteger('duty_roster_template_id'); $table->unsignedBigInteger('station_officer_id'); $table->string('team_role'); $table->timestamps(); });
         Schema::create('duty_shifts', function (Blueprint $table) { $table->id('duty_shift_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('team_id'); $table->unsignedBigInteger('duty_roster_template_id')->nullable(); $table->date('occurrence_date')->nullable(); $table->boolean('is_override')->default(false); $table->string('label'); $table->timestamp('starts_at'); $table->timestamp('ends_at'); $table->string('status')->default('scheduled'); $table->unsignedBigInteger('created_by')->nullable(); $table->text('notes')->nullable(); $table->timestamps(); $table->unique(['duty_roster_template_id', 'occurrence_date']); });
         Schema::create('duty_shift_assignments', function (Blueprint $table) { $table->id('duty_shift_assignment_id'); $table->unsignedBigInteger('duty_shift_id'); $table->unsignedBigInteger('station_officer_id'); $table->string('team_role'); $table->timestamps(); });
@@ -161,6 +161,158 @@ class DutyRosterServiceTest extends TestCase
 
         $this->assertSame(0, $recurrence->generate(10, Carbon::parse('2026-08-24'), Carbon::parse('2026-09-14')->endOfDay()));
         $this->assertSame('Special staffing', $first->fresh()->label);
+    }
+
+    public function test_daily_template_generates_a_shift_for_every_calendar_day(): void
+    {
+        $template = DutyRosterTemplate::create([
+            'station_id' => 10, 'team_id' => 1, 'label' => 'Daily Crew', 'weekday' => 1,
+            'recurrence_type' => 'daily', 'starts_time' => '08:00:00', 'ends_time' => '19:00:00',
+            'effective_from' => '2026-08-24', 'effective_until' => '2026-08-26', 'status' => 'active',
+        ]);
+        $template->assignments()->createMany([
+            ['station_officer_id' => 1, 'team_role' => 'team_leader'],
+            ['station_officer_id' => 2, 'team_role' => 'commander_driver'],
+            ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+        ]);
+
+        $created = app(DutyRosterRecurrenceService::class)->generate(
+            10,
+            Carbon::parse('2026-08-24'),
+            Carbon::parse('2026-08-26')->endOfDay()
+        );
+
+        $this->assertSame(3, $created);
+        $this->assertSame(
+            ['2026-08-24', '2026-08-25', '2026-08-26'],
+            DutyShift::orderBy('occurrence_date')->get()->map(fn ($shift) => $shift->occurrence_date->toDateString())->all()
+        );
+    }
+
+    public function test_chief_can_create_a_daily_shift_series_through_the_roster_endpoint(): void
+    {
+        Carbon::setTestNow('2026-08-20 09:00:00');
+        $this->actingAs(User::findOrFail(5));
+
+        $this->postJson('/station-admin/duty-roster/shifts', [
+            'team_id' => 1,
+            'label' => 'Everyday Day Shift',
+            'starts_at' => '2026-08-24 08:00:00',
+            'ends_at' => '2026-08-24 19:00:00',
+            'recurrence' => 'daily',
+            'recurrence_until' => '2026-08-26',
+            'assignments' => [
+                ['station_officer_id' => 1, 'team_role' => 'team_leader'],
+                ['station_officer_id' => 2, 'team_role' => 'commander_driver'],
+                ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+            ],
+        ])->assertCreated()->assertJsonPath('shift.recurrence_type', 'daily');
+
+        $this->assertSame(3, DutyShift::query()->count());
+        $this->assertDatabaseHas('duty_roster_templates', ['recurrence_type' => 'daily']);
+        Carbon::setTestNow();
+    }
+
+    public function test_selected_weekdays_template_only_generates_chosen_days(): void
+    {
+        $template = DutyRosterTemplate::create([
+            'station_id' => 10, 'team_id' => 1, 'label' => 'MWF Crew', 'weekday' => 1,
+            'recurrence_type' => 'weekdays', 'weekdays' => [1, 3, 5],
+            'starts_time' => '08:00:00', 'ends_time' => '19:00:00',
+            'effective_from' => '2026-08-24', 'effective_until' => '2026-08-30', 'status' => 'active',
+        ]);
+        $template->assignments()->createMany([
+            ['station_officer_id' => 1, 'team_role' => 'team_leader'],
+            ['station_officer_id' => 2, 'team_role' => 'commander_driver'],
+            ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+        ]);
+
+        $created = app(DutyRosterRecurrenceService::class)->generate(
+            10,
+            Carbon::parse('2026-08-24'),
+            Carbon::parse('2026-08-30')->endOfDay()
+        );
+
+        $this->assertSame(3, $created);
+        $this->assertSame(
+            ['2026-08-24', '2026-08-26', '2026-08-28'],
+            DutyShift::orderBy('occurrence_date')->get()->map(fn ($shift) => $shift->occurrence_date->toDateString())->all()
+        );
+    }
+
+    public function test_three_team_plan_builds_twenty_four_hour_turns_from_saved_team_members(): void
+    {
+        Carbon::setTestNow('2026-08-20 09:00:00');
+        DB::table('teams')->where('team_id', 1)->update(['team_leader' => 1, 'commander_driver' => 2]);
+        DB::table('teams')->insert([
+            ['team_id' => 2, 'station_id' => 10, 'status' => 'off', 'roster_managed' => true, 'team_leader' => 3, 'commander_driver' => 4],
+            ['team_id' => 3, 'station_id' => 10, 'status' => 'off', 'roster_managed' => true, 'team_leader' => 1, 'commander_driver' => 2],
+        ]);
+        $this->actingAs(User::findOrFail(5));
+
+        $this->postJson('/station-admin/duty-roster/shifts', [
+            'schedule_template' => 'three_team_24',
+            'rotation_team_ids' => [1, 2, 3],
+            'team_id' => 1,
+            'label' => 'Station Watch',
+            'starts_at' => '2026-08-24 08:00:00',
+            'ends_at' => '2026-08-25 08:00:00',
+            'recurrence' => 'rotation',
+            'rotation_interval_days' => 3,
+            'recurrence_until' => '2026-08-27',
+            'assignments' => [
+                ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+            ],
+        ])->assertCreated()->assertJsonPath('message', 'Team turns saved.');
+
+        $this->assertSame(3, DutyRosterTemplate::query()->count());
+        $this->assertSame([1, 2, 3, 1], DutyShift::query()->orderBy('starts_at')->pluck('team_id')->all());
+        $this->assertSame(
+            ['2026-08-24 08:00:00', '2026-08-25 08:00:00', '2026-08-26 08:00:00', '2026-08-27 08:00:00'],
+            DutyShift::query()->orderBy('starts_at')->get()->map(fn ($shift) => $shift->starts_at->format('Y-m-d H:i:s'))->all()
+        );
+        Carbon::setTestNow();
+    }
+
+    public function test_deleting_this_and_next_days_keeps_older_shifts(): void
+    {
+        Carbon::setTestNow('2026-08-21 10:00:00');
+        $template = DutyRosterTemplate::create([
+            'station_id' => 10, 'team_id' => 1, 'label' => 'Monday Crew', 'weekday' => 1,
+            'starts_time' => '08:00:00', 'ends_time' => '19:00:00',
+            'effective_from' => '2026-08-24', 'effective_until' => '2026-09-14', 'status' => 'active',
+        ]);
+        $template->assignments()->createMany([
+            ['station_officer_id' => 1, 'team_role' => 'team_leader'],
+            ['station_officer_id' => 2, 'team_role' => 'commander_driver'],
+            ['station_officer_id' => 5, 'team_role' => 'station_duty'],
+        ]);
+        app(DutyRosterRecurrenceService::class)->generate(10, Carbon::parse('2026-08-24'), Carbon::parse('2026-09-14')->endOfDay());
+        $target = DutyShift::query()->whereDate('occurrence_date', '2026-09-07')->firstOrFail();
+        $this->actingAs(User::findOrFail(5));
+
+        $this->deleteJson("/station-admin/duty-roster/shifts/{$target->duty_shift_id}", ['delete_scope' => 'future'])
+            ->assertOk()
+            ->assertJsonPath('message', 'This and next shifts removed.');
+
+        $this->assertSame(['2026-08-24', '2026-08-31'], DutyShift::query()->orderBy('occurrence_date')->get()->map(fn ($shift) => $shift->occurrence_date->toDateString())->all());
+        $this->assertSame('2026-09-06', $template->fresh()->effective_until->toDateString());
+        Carbon::setTestNow();
+    }
+
+    public function test_provincial_admin_duty_roster_requires_and_honors_an_explicit_station_scope(): void
+    {
+        DB::table('roles')->insert(['role_id' => 3, 'role' => 'provincial admin']);
+        DB::table('users')->insert(['user_id' => 6, 'role_id' => 3, 'first_name' => 'Provincial', 'last_name' => 'Admin']);
+        DB::table('stations')->insert(['station_id' => 20, 'station_name' => 'North Fire Station']);
+        $this->actingAs(User::findOrFail(6));
+
+        $this->getJson('/admin/duty-roster?from=2026-08-24&to=2026-08-31')
+            ->assertStatus(422);
+
+        $this->getJson('/admin/duty-roster?station_id=20&from=2026-08-24&to=2026-08-31')
+            ->assertOk()
+            ->assertJsonPath('station_id', 20);
     }
 
     public function test_editing_this_and_future_splits_the_series_without_changing_the_past(): void
