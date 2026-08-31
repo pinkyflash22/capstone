@@ -702,6 +702,7 @@
             </div>
 
             <!-- Report Generator Card -->
+            <div class="report-generator-card"><div class="card-header"><h2><i class="fa-solid fa-clipboard-check"></i> After Activity Reports</h2><a class="btn-generate" href="{{ route('admin.after-activity-reports.index') }}" style="text-decoration:none">Open review queue</a></div></div>
             <div class="report-generator-card">
                 <div class="card-header">
                     <h2>

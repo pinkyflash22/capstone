@@ -142,10 +142,16 @@ class ProgressInvestigationPirExporter
             collect([$districtOfficeLine, $regionalOfficeLine])->filter()->join(', '),
         ])->filter()->implode("\n");
 
+        $subject = match ($report->report_stage) {
+            ProgressInvestigationReport::STAGE_FIRST => '1st Progress Investigation Report (PIR)',
+            ProgressInvestigationReport::STAGE_SECOND => '2nd Progress Investigation Report (PIR)',
+            default => 'Progress Investigation Report (PIR)',
+        };
+
         return [
             'memorandum_for' => $report->memorandum_for ?: 'Respective head of office',
-            'subject' => 'Progress Investigation Report (PIR)',
-            'subject_variant' => 'Progress Investigation Report (PIR)',
+            'subject' => $subject,
+            'subject_variant' => $subject,
             'report_completed_display' => $this->formatBfpLongDate($report->report_completed_at ?: $report->created_at),
             'mission_order_number' => $report->mission_order_number ?: 'Not specified',
             'mission_order_date_display' => $this->formatBfpLongDate($report->mission_order_date),

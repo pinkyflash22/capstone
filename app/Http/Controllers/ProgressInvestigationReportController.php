@@ -14,6 +14,7 @@ use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ProgressInvestigationReportController extends Controller
@@ -27,7 +28,7 @@ class ProgressInvestigationReportController extends Controller
 
     public function create()
     {
-        $spotReports = SpotInvestigationReport::doesntHave('progressInvestigation')->get();
+        $spotReports = SpotInvestigationReport::doesntHave('progressInvestigations')->get();
         $fireOrigins = FireOrigin::all();
         $users = User::all();
         
@@ -41,7 +42,9 @@ class ProgressInvestigationReportController extends Controller
         }
 
         $validated = $request->validate([
-            'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id|unique:progress_investigation_report,spot_investigation_id',
+            'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id',
+            'report_stage' => 'sometimes|string|in:single,first,second',
+            'parent_progress_investigation_id' => 'nullable|exists:progress_investigation_report,progress_investigation_report_id',
             'fire_origin_id' => 'nullable',
             'fire_origin_other' => 'nullable|string|max:255',
             'responsible_arson' => 'nullable|string|max:255',
@@ -66,7 +69,11 @@ class ProgressInvestigationReportController extends Controller
         );
         unset($validated['fire_origin_other']);
 
-        $data = ProgressInvestigationReport::create($validated);
+        $data = DB::transaction(function () use ($validated) {
+            $validated = $this->validateAndPrepareSequence($validated);
+
+            return ProgressInvestigationReport::create($validated);
+        });
         $imageService->store($request, $data, 'progress');
         HistoricalFireIncidentSynchronizer::trySyncForIncidentId((int) $data->spotInvestigation?->incident_id);
         UserActivityLogger::log('created progress rpt', auth()->user()?->user_id, $request);
@@ -81,7 +88,7 @@ class ProgressInvestigationReportController extends Controller
      public function getAvailableSpotInvestigations()
     {
         $spotInvestigations = SpotInvestigationReport::with('incident')
-            ->whereDoesntHave('progressInvestigation')
+            ->whereDoesntHave('progressInvestigations')
             ->get();
         
         return response()->json($spotInvestigations);
@@ -89,14 +96,18 @@ class ProgressInvestigationReportController extends Controller
     public function storeProgress(Request $request)
 {
     $validated = $request->validate([
-        'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id|unique:progress_investigation_report,spot_investigation_id',
+        'spot_investigation_id' => 'required|exists:spot_investigation_report,spot_investigation_report_id',
+        'report_stage' => 'sometimes|string|in:single,first,second',
+        'parent_progress_investigation_id' => 'nullable|exists:progress_investigation_report,progress_investigation_report_id',
         'station_officer_id' => 'required|exists:station_officers,station_officer_id',
         'fire_origin_id' => 'required|string|max:255',
         'responsible_arson' => 'nullable|string|max:255',
         'fire_cause' => 'required|string',
     ]);
 
-    $progress = ProgressInvestigationReport::create($validated);
+    $progress = DB::transaction(function () use ($validated) {
+        return ProgressInvestigationReport::create($this->validateAndPrepareSequence($validated));
+    });
     HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $progress->spotInvestigation?->incident_id);
     return response()->json(['success' => true, 'data' => $progress]);
 }
@@ -233,6 +244,16 @@ class ProgressInvestigationReportController extends Controller
 
     public function destroy(ProgressInvestigationReport $progressInvestigationReport)
     {
+        if ($progressInvestigationReport->secondProgressInvestigation) {
+            $message = 'Delete the 2nd Progress Report before deleting the 1st Progress Report.';
+
+            if (request()->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+
+            return back()->with('error', $message);
+        }
+
         if ($progressInvestigationReport->finalInvestigation) {
             if (request()->expectsJson()) {
                 return response()->json([
@@ -281,5 +302,56 @@ class ProgressInvestigationReportController extends Controller
         }
 
         return FireOrigin::whereKey($selected)->exists() ? (int) $selected : null;
+    }
+
+    private function validateAndPrepareSequence(array $validated): array
+    {
+        $stage = $validated['report_stage'] ?? ProgressInvestigationReport::STAGE_SINGLE;
+        $spotId = (int) $validated['spot_investigation_id'];
+
+        SpotInvestigationReport::query()
+            ->whereKey($spotId)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if ($stage === ProgressInvestigationReport::STAGE_SECOND) {
+            $parentId = (int) ($validated['parent_progress_investigation_id'] ?? 0);
+            $firstReport = ProgressInvestigationReport::query()
+                ->whereKey($parentId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $firstReport || $firstReport->report_stage !== ProgressInvestigationReport::STAGE_FIRST) {
+                throw ValidationException::withMessages([
+                    'parent_progress_investigation_id' => 'Select a valid 1st Progress Report before creating the 2nd Progress Report.',
+                ]);
+            }
+
+            if ((int) $firstReport->spot_investigation_id !== $spotId) {
+                throw ValidationException::withMessages([
+                    'spot_investigation_id' => 'The selected spot report does not match the 1st Progress Report.',
+                ]);
+            }
+
+            if ($firstReport->secondProgressInvestigation()->exists()) {
+                throw ValidationException::withMessages([
+                    'parent_progress_investigation_id' => 'A 2nd Progress Report already exists for this 1st Progress Report.',
+                ]);
+            }
+
+            $validated['parent_progress_investigation_id'] = $firstReport->getKey();
+        } else {
+            if (ProgressInvestigationReport::query()->where('spot_investigation_id', $spotId)->exists()) {
+                throw ValidationException::withMessages([
+                    'spot_investigation_id' => 'This spot report already has a progress report path.',
+                ]);
+            }
+
+            $validated['parent_progress_investigation_id'] = null;
+        }
+
+        $validated['report_stage'] = $stage;
+
+        return $validated;
     }
 }

@@ -11,6 +11,7 @@ use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class FinalInvestigationReportController extends Controller
 {
@@ -28,7 +29,7 @@ class FinalInvestigationReportController extends Controller
 
     public function create()
     {
-        $progressReports = ProgressInvestigationReport::doesntHave('finalInvestigation')->get();
+        $progressReports = ProgressInvestigationReport::eligibleForFinal()->doesntHave('finalInvestigation')->get();
         $addresses = FullAddress::with('barangay.city.province')->get();
         
         return view('admin.investigations.final-reports.create', compact('progressReports', 'addresses'));
@@ -84,6 +85,7 @@ class FinalInvestigationReportController extends Controller
     public function getAvailableProgressInvestigations()
     {
         $progressInvestigations = ProgressInvestigationReport::with('spotInvestigation')
+            ->eligibleForFinal()
             ->whereDoesntHave('finalInvestigation')
             ->get();
         
@@ -99,6 +101,7 @@ class FinalInvestigationReportController extends Controller
         'exact_address' => 'required|string|max:500',
     ]);
 
+    $this->resolveLinkedProgressReport((int) $validated['progress_investigation_id']);
     $final = FinalInvestigationReport::create($validated);
     HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $final->progressInvestigation?->spotInvestigation?->incident_id);
     return response()->json(['success' => true, 'data' => $final]);
@@ -112,7 +115,7 @@ class FinalInvestigationReportController extends Controller
 
     public function edit(FinalInvestigationReport $finalInvestigationReport)
     {
-        $progressReports = ProgressInvestigationReport::all();
+        $progressReports = ProgressInvestigationReport::eligibleForFinal()->get();
         $addresses = FullAddress::with('barangay.city.province')->get();
         
         return view('admin.investigations.final-reports.edit', compact('finalInvestigationReport', 'progressReports', 'addresses'));
@@ -255,12 +258,20 @@ class FinalInvestigationReportController extends Controller
 
     private function resolveLinkedProgressReport(int $progressInvestigationId): ProgressInvestigationReport
     {
-        return ProgressInvestigationReport::with([
+        $progressReport = ProgressInvestigationReport::findOrFail($progressInvestigationId);
+
+        if (! $progressReport->isEligibleForFinal()) {
+            throw ValidationException::withMessages([
+                'progress_investigation_id' => 'Complete the 2nd Progress Report before creating the Final Report.',
+            ]);
+        }
+
+        return $progressReport->load([
             'spotInvestigation.incident.marker',
             'spotInvestigation.incident.barangay.city.province',
             'spotInvestigation.investigator.station.address.barangay.city.province',
             'fireOrigin',
-        ])->findOrFail($progressInvestigationId);
+        ]);
     }
 
     private function mergeDerivedDefaults(array $validated, ProgressInvestigationReport $progressReport): array

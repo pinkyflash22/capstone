@@ -14,8 +14,8 @@ function bootFirefighterMyStationPage() {
     const finalSubstantiatingDocumentOptions = Array.isArray(config.finalSubstantiatingDocumentOptions)
         ? config.finalSubstantiatingDocumentOptions
         : [];
-    const reportStore = { spot: {}, progress: {}, final: {} };
-    const referenceCache = { spot: null, progress: null, final: null };
+    const reportStore = { spot: {}, progress: {}, final: {}, aar: {} };
+    const referenceCache = { spot: null, progress: null, final: null, aar: null };
     const requestControllers = new Map();
     let activeCrewMemberTrigger = null;
     let rosterSearchQuery = '';
@@ -40,6 +40,7 @@ function bootFirefighterMyStationPage() {
     const spotForm = document.getElementById('spotReportForm');
     const progressForm = document.getElementById('progressReportForm');
     const finalForm = document.getElementById('finalReportForm');
+    const aarForm = document.getElementById('aarReportForm');
     const initialReportTab = config.activeReportTab || 'spot';
     let currentReportTab = initialReportTab;
 
@@ -194,6 +195,22 @@ function bootFirefighterMyStationPage() {
 
     function buildFirRoute(reportId) {
         return String(routes.firTemplate || '').replace('__FINAL_REPORT_ID__', encodeURIComponent(reportId));
+    }
+
+    function buildAarRoute(reportId) {
+        return String(routes.aarTemplate || '').replace('__AAR_REPORT_ID__', encodeURIComponent(reportId));
+    }
+
+    function buildAarPdfRoute(reportId) {
+        return String(routes.aarPdfTemplate || '').replace('__AAR_REPORT_ID__', encodeURIComponent(reportId));
+    }
+
+    function buildAarUpdateRoute(reportId) {
+        return String(routes.aarUpdateTemplate || '').replace('__AAR_REPORT_ID__', encodeURIComponent(reportId));
+    }
+
+    function buildAarDeleteRoute(reportId) {
+        return String(routes.aarDeleteTemplate || '').replace('__AAR_REPORT_ID__', encodeURIComponent(reportId));
     }
 
     function buildProofImageDeleteRoute(reportType, reportId, imageId) {
@@ -1263,7 +1280,7 @@ function bootFirefighterMyStationPage() {
             });
 
             if (reportsContainer) {
-                reportsContainer.innerHTML = buildLoadingCard(`Loading ${tab} investigation reports...`);
+                reportsContainer.innerHTML = buildLoadingCard(tab === 'aar' ? 'Loading After Activity Reports...' : `Loading ${tab} investigation reports...`);
             }
 
             const url = urlOverride || `${routes.reports}?tab=${encodeURIComponent(tab)}`;
@@ -1304,6 +1321,7 @@ function bootFirefighterMyStationPage() {
         const officerOptions = referenceCache.spot?.officers
             || referenceCache.progress?.officers
             || referenceCache.final?.officers
+            || referenceCache.aar?.officers
             || [];
 
         select.innerHTML = `<option value="">Select officer</option>${createOptions(officerOptions, selectedValue)}`;
@@ -1353,11 +1371,39 @@ function bootFirefighterMyStationPage() {
 
     function populateProgressModal(data) {
         const reportSelect = progressForm?.querySelector('select[name="spot_investigation_id"]');
+        const stageSelect = progressForm?.querySelector('select[name="report_stage"]');
         const fireOriginSelect = progressForm?.querySelector('select[name="fire_origin_id"]');
         const officerSelects = progressForm?.querySelectorAll('select[data-station-ref="officers"]');
-        if (!reportSelect || !fireOriginSelect || !officerSelects) return;
+        if (!reportSelect || !stageSelect || !fireOriginSelect || !officerSelects) return;
 
-        reportSelect.innerHTML = `<option value="">Select spot report</option>${createOptions(data.spot_reports || [])}`;
+        const refreshSourceReports = () => {
+            const sourceData = referenceCache.progress || data;
+            const isSecond = stageSelect.value === 'second';
+            const reports = isSecond ? (sourceData.first_progress_reports || []) : (sourceData.spot_reports || []);
+            const emptyText = isSecond ? 'No 1st Progress Report is ready' : 'Select spot report';
+            const sourceHelp = progressForm.querySelector('[data-progress-source-help]');
+            const parentInput = progressForm.querySelector('input[name="parent_progress_investigation_id"]');
+
+            reportSelect.innerHTML = `<option value="">${emptyText}</option>${createOptions(reports, '', (item) => `data-parent-id="${escapeHtml(item.parent_id || '')}"`)}`;
+            if (sourceHelp) {
+                sourceHelp.textContent = isSecond
+                    ? 'Only 1st Progress Reports without a 2nd report are shown.'
+                    : 'Select the spot report this progress report continues.';
+            }
+            if (parentInput) parentInput.value = '';
+        };
+
+        if (stageSelect.dataset.sequenceBound !== 'true') {
+            stageSelect.dataset.sequenceBound = 'true';
+            stageSelect.addEventListener('change', refreshSourceReports);
+            reportSelect.addEventListener('change', () => {
+                const parentInput = progressForm.querySelector('input[name="parent_progress_investigation_id"]');
+                const selected = reportSelect.options[reportSelect.selectedIndex];
+                if (parentInput) parentInput.value = selected?.dataset?.parentId || '';
+            });
+        }
+
+        refreshSourceReports();
         fireOriginSelect.innerHTML = `<option value="">Select fire origin</option>${createOptions(data.fire_origins || [])}<option value="other">Other</option>`;
         officerSelects.forEach((select) => populateOfficerSelect(select));
     }
@@ -1372,9 +1418,31 @@ function bootFirefighterMyStationPage() {
         hydrateFinalDocuments();
     }
 
+    function populateAarModal(data) {
+        const activitySelect = aarForm?.querySelector('select[name="event_activity_id"]');
+        const officerSelects = aarForm?.querySelectorAll('select[data-station-ref="officers"]');
+        if (!activitySelect || !officerSelects) return;
+
+        activitySelect.innerHTML = `<option value="">Unscheduled operation or activity</option>${createOptions(data.activities || [], '', (item) => `data-title="${escapeHtml(item.title || '')}" data-type="${escapeHtml(item.type || '')}" data-date="${escapeHtml(item.date || '')}" data-location="${escapeHtml(item.location || '')}"`)}`;
+        officerSelects.forEach((select) => populateOfficerSelect(select));
+
+        if (activitySelect.dataset.aarBound !== 'true') {
+            activitySelect.dataset.aarBound = 'true';
+            activitySelect.addEventListener('change', () => {
+                const option = activitySelect.options[activitySelect.selectedIndex];
+                if (!option?.value) return;
+                ['title', 'type', 'date', 'location'].forEach((field) => {
+                    const inputName = field === 'title' ? 'activity_title' : field === 'type' ? 'activity_type' : field === 'date' ? 'activity_date' : 'activity_location';
+                    const input = aarForm.querySelector(`[name="${inputName}"]`);
+                    if (input) input.value = option.dataset[field] || '';
+                });
+            });
+        }
+    }
+
     async function openReportModal(type) {
         const modal = document.getElementById(`${type}ReportModal`);
-        const form = type === 'spot' ? spotForm : type === 'progress' ? progressForm : finalForm;
+        const form = type === 'spot' ? spotForm : type === 'progress' ? progressForm : type === 'final' ? finalForm : aarForm;
 
         modal?.classList.add('active');
         setReportModalState(modal, 'loading');
@@ -1390,6 +1458,7 @@ function bootFirefighterMyStationPage() {
             if (type === 'spot') populateSpotModal(await ensureModalData('spot'));
             if (type === 'progress') populateProgressModal(await ensureModalData('progress'));
             if (type === 'final') populateFinalModal(await ensureModalData('final'));
+            if (type === 'aar') populateAarModal(await ensureModalData('aar'));
             setReportModalState(modal, 'ready');
             resetReportModalScroll(modal);
         } catch (error) {
@@ -1449,7 +1518,7 @@ function bootFirefighterMyStationPage() {
 
         if (!reportType) return;
 
-        if (!['spot', 'progress', 'final'].includes(reportType)) {
+        if (!['spot', 'progress', 'final', 'aar'].includes(reportType)) {
             params.delete('openReport');
             replaceCurrentQuery(params);
             return;
@@ -1528,6 +1597,8 @@ function bootFirefighterMyStationPage() {
             actions.push(`<a class="table-action edit" href="${buildPirRoute(report.id)}">Word</a>`);
             if (!report.has_final) {
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
+            }
+            if (!report.has_final && !report.has_second) {
                 actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
             }
         }
@@ -1536,6 +1607,15 @@ function bootFirefighterMyStationPage() {
             actions.push(`<a class="table-action edit" href="${buildFirRoute(report.id)}">Word</a>`);
             actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
             actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
+        }
+
+        if (type === 'aar') {
+            actions.push(`<a class="table-action edit" href="${buildAarRoute(report.id)}">Word</a>`);
+            actions.push(`<a class="table-action edit" href="${buildAarPdfRoute(report.id)}">PDF</a>`);
+            if (report.review_status !== 'approved') {
+                actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="aar" data-report-id="${report.id}">Edit</button>`);
+                actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="aar" data-report-id="${report.id}">Delete</button>`);
+            }
         }
 
         return `<div class="table-actions">${actions.join('')}</div>`;
@@ -1569,7 +1649,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="progress-report-${report.id}">
-                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Progress report</div></td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">${escapeHtml(report.report_stage_label || 'Progress Report')}</div></td>
                 <td data-label="Fire origin">${escapeHtml(report.fire_origin_name || 'N/A')}</td>
                 <td data-label="Cause">${escapeHtml(report.fire_cause || 'N/A')}</td>
                 <td data-label="Responsible party">${escapeHtml(report.responsible_arson || 'Not specified')}</td>
@@ -1601,16 +1681,34 @@ function bootFirefighterMyStationPage() {
         incrementCounter('finalReportsCount');
     }
 
+    function appendAarReportRow(report) {
+        const tbody = document.getElementById('aarReportsTableBody');
+        if (!tbody || !report?.id) return;
+        tbody.querySelector('td[colspan="6"]')?.closest('tr')?.remove();
+        tbody.insertAdjacentHTML('afterbegin', `
+            <tr id="aar-report-${report.id}">
+                <td data-label="Activity"><div class="table-title">${escapeHtml(report.activity_title || 'BFP activity')}</div><div class="table-muted">${escapeHtml(report.activity_location || 'Location not recorded')}</div></td>
+                <td data-label="Date">${escapeHtml(report.activity_date || 'N/A')}</td>
+                <td data-label="Type">${escapeHtml(report.activity_type || 'Activity')}</td>
+                <td data-label="Prepared by">${createCurrentOfficerTrigger('AAR prepared by')}</td>
+                <td data-label="Status"><span class="table-muted">${escapeHtml(String(report.review_status || 'submitted').replaceAll('_', ' '))}</span></td>
+                <td data-label="Actions">${createActionButtons('aar', report)}</td>
+            </tr>
+        `);
+        incrementCounter('aarReportsCount');
+    }
+
     function replaceRow(type, report) {
         const row = document.getElementById(`${type}-report-${report.id}`);
         row?.remove();
         if (type === 'spot') appendSpotReportRow(report);
         if (type === 'progress') appendProgressReportRow(report);
         if (type === 'final') appendFinalReportRow(report);
+        if (type === 'aar') appendAarReportRow(report);
     }
 
     function renderOfficerSelectOptions(selectedValue = '') {
-        const officers = referenceCache.spot?.officers || referenceCache.progress?.officers || referenceCache.final?.officers || [];
+        const officers = referenceCache.spot?.officers || referenceCache.progress?.officers || referenceCache.final?.officers || referenceCache.aar?.officers || [];
         return `<option value="">Select officer</option>${createOptions(officers, selectedValue)}`;
     }
 
@@ -1622,6 +1720,26 @@ function bootFirefighterMyStationPage() {
     }
 
     function renderViewDetails(type, report) {
+        if (type === 'aar') {
+            return `
+                <div class="detail-grid">
+                    <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">After Activity Report</div></div>
+                    <div class="detail-item"><div class="detail-label">Source</div><div class="detail-value">${escapeHtml(report.source_label || 'Unscheduled operation')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Activity</div><div class="detail-value">${escapeHtml(report.activity_title || 'BFP activity')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Date</div><div class="detail-value">${escapeHtml(report.activity_date || 'N/A')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.activity_location || 'Not recorded')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Participants</div><div class="detail-value">${escapeHtml((report.participants || []).join('\n') || 'None recorded')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Deployed Resources</div><div class="detail-value">${escapeHtml((report.deployed_resources || []).join('\n') || 'None recorded')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Review Status</div><div class="detail-value">${escapeHtml(String(report.review_status || 'submitted').replaceAll('_', ' '))}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Background</div><div class="detail-value">${escapeHtml(report.background || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Significance</div><div class="detail-value">${escapeHtml(report.significance || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Activity Details</div><div class="detail-value">${escapeHtml(report.activity_details || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Issues and Challenges</div><div class="detail-value">${escapeHtml(report.issues_challenges || 'None')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Discussion and Assessment</div><div class="detail-value">${escapeHtml(report.discussion_assessment || 'Not provided')}</div></div>
+                    <div class="detail-item full"><div class="detail-label">Recommendations</div><div class="detail-value">${escapeHtml(report.recommendations || 'None')}</div></div>
+                </div>`;
+        }
+
         if (type === 'spot') {
             return `
                 <div class="detail-grid">
@@ -1642,7 +1760,7 @@ function bootFirefighterMyStationPage() {
         if (type === 'progress') {
             return `
                 <div class="detail-grid">
-                    <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">Progress investigation</div></div>
+                    <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">${escapeHtml(report.report_stage_label || 'Progress Report')}</div></div>
                     <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.incident_location || 'Unknown incident location')}</div></div>
                     <div class="detail-item"><div class="detail-label">Fire Origin</div><div class="detail-value">${escapeHtml(report.fire_origin_name || 'N/A')}</div></div>
                     <div class="detail-item"><div class="detail-label">Responsible Arson</div><div class="detail-value">${escapeHtml(report.responsible_arson || 'Not specified')}</div></div>
@@ -1669,6 +1787,33 @@ function bootFirefighterMyStationPage() {
     }
 
     function renderEditForm(type, report) {
+        if (type === 'aar') {
+            return `
+                <form id="manageReportEditForm" class="form-grid">
+                    <input type="hidden" name="event_activity_id" value="${escapeHtml(report.event_activity_id || '')}">
+                    <div class="form-group full"><label class="form-label">Activity Source</label><div class="form-auto-value">${escapeHtml(report.source_label || 'Unscheduled operation')}</div></div>
+                    <div class="form-group full"><label class="form-label">Activity Title</label><input class="form-input" name="activity_title" value="${escapeHtml(report.activity_title || '')}" required></div>
+                    <div class="form-group"><label class="form-label">Activity Type</label><input class="form-input" name="activity_type" value="${escapeHtml(report.activity_type || '')}"></div>
+                    <div class="form-group"><label class="form-label">Activity Date</label><input class="form-input" type="date" name="activity_date" value="${escapeHtml(report.activity_date || '')}" required></div>
+                    <div class="form-group full"><label class="form-label">Location</label><input class="form-input" name="activity_location" value="${escapeHtml(report.activity_location || '')}"></div>
+                    <div class="form-group full"><label class="form-label">Participants</label><textarea class="form-textarea" name="participants_text">${escapeHtml(report.participants_text || (report.participants || []).join('\n'))}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Deployed Resources</label><textarea class="form-textarea" name="deployed_resources_text">${escapeHtml(report.deployed_resources_text || (report.deployed_resources || []).join('\n'))}</textarea></div>
+                    <div class="form-group"><label class="form-label">Memorandum For</label><input class="form-input" name="memorandum_for" value="${escapeHtml(report.memorandum_for || '')}"></div>
+                    <div class="form-group"><label class="form-label">Report Completed</label><input class="form-input" type="datetime-local" name="report_completed_at" value="${escapeHtml((report.report_completed_at || '').slice(0, 16))}"></div>
+                    <div class="form-group full"><label class="form-label">References</label><textarea class="form-textarea" name="references">${escapeHtml(report.references || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Background</label><textarea class="form-textarea" name="background">${escapeHtml(report.background || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Significance</label><textarea class="form-textarea" name="significance">${escapeHtml(report.significance || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Activity Details</label><textarea class="form-textarea" name="activity_details" required>${escapeHtml(report.activity_details || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Issues and Challenges</label><textarea class="form-textarea" name="issues_challenges">${escapeHtml(report.issues_challenges || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Discussion and Assessment</label><textarea class="form-textarea" name="discussion_assessment">${escapeHtml(report.discussion_assessment || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Recommendations</label><textarea class="form-textarea" name="recommendations">${escapeHtml(report.recommendations || '')}</textarea></div>
+                    <div class="form-group full"><label class="form-label">Existing Pictures</label>${renderExistingProofImages(report, type)}</div>
+                    <div class="form-group full"><label class="form-label">Add Pictures</label><input class="form-input" type="file" name="proof_images[]" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"></div>
+                    <div class="form-group full"><label class="form-label">Approved By</label><select class="form-select" name="approved_by_station_officer_id">${renderOfficerSelectOptions(report.approved_by_station_officer_id || '')}</select></div>
+                    <div class="form-group full"><label class="form-label">Electronic Signature</label><input class="form-input" name="signature_name" value="${escapeHtml(currentOfficerName)}" required><label><input type="checkbox" name="signature_consent" value="1" required> I certify and electronically sign this revision.</label></div>
+                </form>`;
+        }
+
         if (type === 'spot') {
             return `
                 <form id="manageReportEditForm" class="form-grid">
@@ -1744,9 +1889,11 @@ function bootFirefighterMyStationPage() {
     }
 
     async function openViewModal(type, report) {
-        openManageModal(`${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
+        openManageModal(type === 'aar' ? 'After Activity Report' : `${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
         manageReportModalBody.innerHTML = renderViewDetails(type, report);
-        const downloadButton = type === 'spot'
+        const downloadButton = type === 'aar'
+            ? `<a class="btn btn-outline" href="${buildAarRoute(report.id)}">Download Word</a>`
+            : type === 'spot'
             ? `<a class="btn btn-outline" href="${buildSirRoute(report.id)}">Download Word</a>`
             : type === 'progress'
                 ? `<a class="btn btn-outline" href="${buildPirRoute(report.id)}">Download Word</a>`
@@ -1760,11 +1907,13 @@ function bootFirefighterMyStationPage() {
             await ensureModalData('progress');
         } else if (type === 'final') {
             await ensureModalData('final');
+        } else if (type === 'aar') {
+            await ensureModalData('aar');
         } else {
             await ensureModalData('spot');
         }
 
-        openManageModal(`Edit ${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
+        openManageModal(type === 'aar' ? 'Edit After Activity Report' : `Edit ${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
         manageReportModalBody.innerHTML = renderEditForm(type, report);
         bindProofImagePreviews(manageReportModalBody);
         bindProofImageDeletion(manageReportModalBody);
@@ -1792,7 +1941,8 @@ function bootFirefighterMyStationPage() {
 
         try {
             const formData = new FormData(form);
-            const result = await sendMultipartRequest(`${routes.reportManageBase}/${type}-investigation/${reportId}`, formData, {
+            const updateEndpoint = type === 'aar' ? buildAarUpdateRoute(reportId) : `${routes.reportManageBase}/${type}-investigation/${reportId}`;
+            const result = await sendMultipartRequest(updateEndpoint, formData, {
                 methodOverride: 'PUT',
                 onProgress: (progress) => setProofUploadProgress(form, progress, `Uploading proof images · ${Math.round(progress)}%`),
                 onRetry: (attempt, maximum) => setProofUploadProgress(form, 0, `Connection interrupted · retrying ${attempt} of ${maximum}`),
@@ -1802,7 +1952,11 @@ function bootFirefighterMyStationPage() {
             const updated = { ...(reportStore[type][reportId] || {}) };
             updated.proof_images = result.data?.proof_images || updated.proof_images || [];
             Object.fromEntries(formData.entries());
-            if (type === 'spot') {
+            if (type === 'aar') {
+                ['activity_title', 'activity_type', 'activity_date', 'activity_location', 'memorandum_for', 'report_completed_at', 'references', 'background', 'significance', 'activity_details', 'issues_challenges', 'discussion_assessment', 'recommendations', 'approved_by_station_officer_id'].forEach((field) => {
+                    updated[field] = result.data?.[field] ?? formData.get(field);
+                });
+            } else if (type === 'spot') {
                 updated.dead = formData.get('dead');
                 updated.injured = formData.get('injured');
                 updated.owner = formData.get('owner');
@@ -1867,11 +2021,11 @@ function bootFirefighterMyStationPage() {
         const report = reportStore[type][reportId];
         if (!report) return;
 
-        openManageModal(`Delete ${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
+        openManageModal(type === 'aar' ? 'Delete After Activity Report' : `Delete ${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
         manageReportModalBody.innerHTML = `
             <div class="detail-item">
                 <div class="detail-label">Delete Report</div>
-                <div class="detail-value">This will permanently remove the ${type} investigation report for ${escapeHtml(report.incident_location || `record #${reportId}`)}.</div>
+                <div class="detail-value">This will permanently remove the ${type === 'aar' ? 'After Activity Report' : `${type} investigation report`} for ${escapeHtml(report.activity_title || report.incident_location || `record #${reportId}`)}.</div>
             </div>
         `;
         manageReportModalFooter.innerHTML = `
@@ -1882,7 +2036,8 @@ function bootFirefighterMyStationPage() {
 
         document.getElementById('confirmDeleteReportButton')?.addEventListener('click', async () => {
             try {
-                const response = await fetch(`${routes.reportManageBase}/${type}-investigation/${reportId}`, {
+                const deleteEndpoint = type === 'aar' ? buildAarDeleteRoute(reportId) : `${routes.reportManageBase}/${type}-investigation/${reportId}`;
+                const response = await fetch(deleteEndpoint, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': csrfToken,
@@ -1896,6 +2051,16 @@ function bootFirefighterMyStationPage() {
                 }
                 document.getElementById(`${type}-report-${reportId}`)?.remove();
                 delete reportStore[type][reportId];
+                if (type === 'progress') {
+                    referenceCache.progress = null;
+                    referenceCache.final = null;
+                }
+                if (type === 'final') {
+                    referenceCache.final = null;
+                }
+                if (type === 'aar') {
+                    referenceCache.aar = null;
+                }
                 decrementCounter(`${type}ReportsCount`);
                 closeManageModal();
                 showToast('Report deleted successfully.', 'success');
@@ -2117,6 +2282,9 @@ function bootFirefighterMyStationPage() {
                 id: data.progress_investigation_report_id,
                 type: 'progress',
                 spot_investigation_id: formData.get('spot_investigation_id'),
+                report_stage: data.report_stage || formData.get('report_stage') || 'single',
+                report_stage_label: data.report_stage_label || ({ first: '1st Progress Report', second: '2nd Progress Report' }[formData.get('report_stage')] || 'Progress Report'),
+                parent_progress_investigation_id: data.parent_progress_investigation_id || formData.get('parent_progress_investigation_id'),
                 incident_location: selectedLocation,
                 investigator_name: currentOfficerName,
                 fire_origin_id: data.fire_origin_id ?? formData.get('fire_origin_id'),
@@ -2132,6 +2300,7 @@ function bootFirefighterMyStationPage() {
                 noted_by_station_officer_id: formData.get('noted_by_station_officer_id'),
                 approved_by_station_officer_id: formData.get('approved_by_station_officer_id'),
                 has_final: false,
+                has_second: false,
             }), appendProgressReportRow);
 
             if (mapped) {
@@ -2140,7 +2309,13 @@ function bootFirefighterMyStationPage() {
                     reportStore.spot[selectedSpotId].has_progress = true;
                     replaceRow('spot', reportStore.spot[selectedSpotId]);
                 }
+                const parentId = mapped.parent_progress_investigation_id;
+                if (parentId && reportStore.progress[parentId]) {
+                    reportStore.progress[parentId].has_second = true;
+                }
                 removeOption(progressSelect, selectedSpotId);
+                referenceCache.progress = null;
+                referenceCache.final = null;
                 closeReportModal('progress');
                 switchReportTab('progress');
             }
@@ -2187,8 +2362,48 @@ function bootFirefighterMyStationPage() {
                     replaceRow('progress', reportStore.progress[selectedProgressId]);
                 }
                 removeOption(progressSelect, selectedProgressId);
+                referenceCache.final = null;
                 closeReportModal('final');
                 switchReportTab('final');
+            }
+        });
+
+        aarForm?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const activitySelect = aarForm.querySelector('select[name="event_activity_id"]');
+            const mapped = await submitReportForm(aarForm, routes.aarCreate, (formData, data) => ({
+                ...data,
+                id: data.after_activity_report_id,
+                type: 'aar',
+                event_activity_id: data.event_activity_id || formData.get('event_activity_id'),
+                source_label: (data.event_activity_id || formData.get('event_activity_id')) ? 'Scheduled activity' : 'Unscheduled operation',
+                activity_title: data.activity_title || formData.get('activity_title'),
+                activity_type: data.activity_type || formData.get('activity_type'),
+                activity_date: String(data.activity_date || formData.get('activity_date') || '').slice(0, 10),
+                activity_location: data.activity_location || formData.get('activity_location'),
+                participants: data.participants || String(formData.get('participants_text') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+                deployed_resources: data.deployed_resources || String(formData.get('deployed_resources_text') || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+                memorandum_for: data.memorandum_for || formData.get('memorandum_for'),
+                report_completed_at: data.report_completed_at || formData.get('report_completed_at'),
+                references: data.references || formData.get('references'),
+                background: data.background || formData.get('background'),
+                significance: data.significance || formData.get('significance'),
+                activity_details: data.activity_details || formData.get('activity_details'),
+                issues_challenges: data.issues_challenges || formData.get('issues_challenges'),
+                discussion_assessment: data.discussion_assessment || formData.get('discussion_assessment'),
+                recommendations: data.recommendations || formData.get('recommendations'),
+                approved_by_station_officer_id: data.approved_by_station_officer_id || formData.get('approved_by_station_officer_id'),
+                investigator_name: currentOfficerName,
+                created_at: data.created_at || new Date().toISOString(),
+                review_status: data.review_status || 'submitted',
+            }), appendAarReportRow);
+
+            if (mapped) {
+                reportStore.aar[mapped.id] = mapped;
+                removeOption(activitySelect, mapped.event_activity_id);
+                referenceCache.aar = null;
+                closeReportModal('aar');
+                switchReportTab('aar');
             }
         });
     }

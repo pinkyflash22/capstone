@@ -38,4 +38,9 @@ class EventActivity extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
+
+    public function afterActivityReport()
+    {
+        return $this->hasOne(AfterActivityReport::class, 'event_activity_id', 'event_id');
+    }
 }

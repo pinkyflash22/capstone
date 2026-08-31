@@ -4,6 +4,7 @@ namespace App\Http\Controllers\staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\FinalInvestigationReport;
+use App\Models\AfterActivityReport;
 use App\Models\InvestigationReportImage;
 use App\Models\ProgressInvestigationReport;
 use App\Models\SpotInvestigationReport;
@@ -80,6 +81,7 @@ class InvestigationReportImageController extends Controller
             'spot' => SpotInvestigationReport::class,
             'progress' => ProgressInvestigationReport::class,
             'final' => FinalInvestigationReport::class,
+            'aar' => AfterActivityReport::class,
             default => null,
         };
 
@@ -91,9 +93,14 @@ class InvestigationReportImageController extends Controller
 
         abort_unless($stationId, 403);
 
-        return $reportModel::query()
-            ->whereKey($reportId)
-            ->whereHas('investigator', fn ($query) => $query->where('station_id', $stationId))
-            ->firstOrFail();
+        $query = $reportModel::query()->whereKey($reportId);
+
+        if ($reportType === 'aar') {
+            $query->where('station_id', $stationId);
+        } else {
+            $query->whereHas('investigator', fn ($officerQuery) => $officerQuery->where('station_id', $stationId));
+        }
+
+        return $query->firstOrFail();
     }
 }

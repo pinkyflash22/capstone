@@ -2761,7 +2761,7 @@ class StationAdminController extends Controller
                 return [
                     'id' => $report->progress_investigation_report_id,
                     'report_kind' => 'progress',
-                    'report_label' => 'Progress Investigation Report',
+                    'report_label' => $report->report_stage_label,
                     'station_id' => $stationId,
                     'station_name' => $report->investigator?->station?->station_name,
                     'incident_id' => $report->spotInvestigation?->incident_id,

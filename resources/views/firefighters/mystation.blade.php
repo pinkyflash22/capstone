@@ -152,7 +152,7 @@
 
                 <div class="station-flow-heading">
                     <span class="station-flow-index">03</span>
-                    <div><span>After-action records</span><h2>Investigation documentation</h2><p>Create, review, and download station investigation reports.</p></div>
+                    <div><span>After-action records</span><h2>Station documentation</h2><p>Create investigation reports and AARs for scheduled or unscheduled BFP work.</p></div>
                 </div>
                 <section class="section-card station-reports-card" id="stationReportsSection">
                     <div class="section-header">
@@ -164,6 +164,7 @@
                             <button type="button" class="btn btn-outline" data-open-report-modal="spot"><i class="fa-solid fa-plus"></i> New Spot</button>
                             <button type="button" class="btn btn-outline" data-open-report-modal="progress"><i class="fa-solid fa-plus"></i> New Progress</button>
                             <button type="button" class="btn btn-primary" data-open-report-modal="final"><i class="fa-solid fa-plus"></i> New Final</button>
+                            <button type="button" class="btn btn-primary" data-open-report-modal="aar"><i class="fa-solid fa-plus"></i> New AAR</button>
                         </div>
                     </div>
 
@@ -171,6 +172,7 @@
                         <button type="button" class="report-tab {{ $activeReportTab === 'spot' ? 'active' : '' }}" data-report-tab="spot">Spot Investigation</button>
                         <button type="button" class="report-tab {{ $activeReportTab === 'progress' ? 'active' : '' }}" data-report-tab="progress">Progress Investigation</button>
                         <button type="button" class="report-tab {{ $activeReportTab === 'final' ? 'active' : '' }}" data-report-tab="final">Final Investigation</button>
+                        <button type="button" class="report-tab {{ $activeReportTab === 'aar' ? 'active' : '' }}" data-report-tab="aar">After Activity Report</button>
                     </div>
 
                     <div id="stationReportsPanelContainer" class="reports-shell-panel">
@@ -378,6 +380,49 @@
         </div>
     </div>
 
+    <div class="report-modal" id="aarReportModal" role="dialog" aria-modal="true" aria-labelledby="aarReportModalTitle" data-report-state="idle">
+        <div class="report-modal-panel">
+            <div class="report-modal-header">
+                <div class="report-modal-title" id="aarReportModalTitle"><span class="report-title-full">Create After Activity Report</span><span class="report-title-mobile">New AAR</span></div>
+                <button type="button" class="report-close" data-close-report-modal="aar" aria-label="Close After Activity Report form"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="aarReportForm">
+                <div class="report-modal-body">
+                    <div class="form-grid" data-report-form-content>
+                        <div class="report-form-hint full"><strong>Record any completed BFP activity.</strong><span>Link a scheduled activity, or leave it blank for an unscheduled rescue, operation, or community service.</span></div>
+                        <div class="form-section-label">Activity source</div>
+                        <div class="form-group full">
+                            <label class="form-label">Scheduled Activity (Optional)</label>
+                            <div class="form-helper">For an unscheduled operation, keep the first option and enter the details below.</div>
+                            <select name="event_activity_id" class="form-select" data-station-ref="aar-activities"><option value="">Unscheduled operation or activity</option></select>
+                        </div>
+                        <div class="form-group full"><label class="form-label">Activity Title</label><input type="text" name="activity_title" class="form-input" placeholder="Example: Rescue operation or fire safety seminar" required></div>
+                        <div class="form-group"><label class="form-label">Activity Type</label><input type="text" name="activity_type" class="form-input" placeholder="Rescue, seminar, drill, inspection"></div>
+                        <div class="form-group"><label class="form-label">Activity Date</label><input type="date" name="activity_date" class="form-input" max="{{ now()->format('Y-m-d') }}" required></div>
+                        <div class="form-group full"><label class="form-label">Location</label><input type="text" name="activity_location" class="form-input" placeholder="Barangay, facility, or exact location"></div>
+                        <div class="form-group full"><label class="form-label">Participants</label><textarea name="participants_text" class="form-textarea" rows="4" placeholder="One participant or group per line, e.g. FO1 Juan Dela Cruz — Team Leader"></textarea><small class="table-muted">Enter one participant, unit, or partner organization per line.</small></div>
+                        <div class="form-group full"><label class="form-label">Deployed Resources</label><textarea name="deployed_resources_text" class="form-textarea" rows="4" placeholder="One resource per line, e.g. Engine 1 — 1 unit; Hose — 200 meters"></textarea><small class="table-muted">Include apparatus, equipment, supplies, and quantities.</small></div>
+                        <div class="form-section-label">Memorandum</div>
+                        <div class="form-group"><label class="form-label">Memorandum For</label><input type="text" name="memorandum_for" class="form-input" placeholder="Respective head of office"></div>
+                        <div class="form-group"><label class="form-label">Report Completed</label><input type="datetime-local" name="report_completed_at" class="form-input"></div>
+                        <div class="form-group full"><label class="form-label">1. References</label><textarea name="references" class="form-textarea" rows="3" placeholder="Enter references, or write None"></textarea></div>
+                        <div class="form-group full"><label class="form-label">2. Background</label><textarea name="background" class="form-textarea" rows="4"></textarea></div>
+                        <div class="form-group full"><label class="form-label">3. Significance of the Activity</label><textarea name="significance" class="form-textarea" rows="4"></textarea></div>
+                        <div class="form-group full"><label class="form-label">4. Activity Details</label><textarea name="activity_details" class="form-textarea" rows="6" placeholder="Describe what happened, who participated, and what was accomplished." required></textarea></div>
+                        <div class="form-group full"><label class="form-label">5. Issues and Challenges</label><textarea name="issues_challenges" class="form-textarea" rows="4" placeholder="Write None if there were no issues."></textarea></div>
+                        <div class="form-group full"><label class="form-label">6. Discussion and Assessment</label><textarea name="discussion_assessment" class="form-textarea" rows="5"></textarea></div>
+                        <div class="form-group full"><label class="form-label">Recommendations</label><textarea name="recommendations" class="form-textarea" rows="4" placeholder="Write None if there are no recommendations."></textarea></div>
+                        <div class="form-section-label">Pictures and digital signature</div>
+                        <div class="form-group full"><label class="form-label">Activity Pictures</label><input type="file" name="proof_images[]" class="form-input" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png"><small class="table-muted">Optional JPG or PNG images. Up to 20 images and 25 MB combined. Pictures are added to Annex A.</small></div>
+                        <div class="form-group full"><label class="form-label">Requested Approver</label><select name="approved_by_station_officer_id" class="form-select" data-station-ref="officers"><option value="">Select approving officer</option></select><small class="table-muted">This requests review; it does not approve the AAR.</small></div>
+                        <div class="form-group full"><label class="form-label">Electronic Signature</label><input name="signature_name" class="form-input" value="{{ auth()->user()->full_name }}" required><label style="display:flex;gap:.65rem;align-items:flex-start;margin-top:.7rem"><input type="checkbox" name="signature_consent" value="1" required><span class="table-muted">I certify that this AAR is accurate and adopt the typed name above as my electronic signature.</span></label></div>
+                    </div>
+                </div>
+                <div class="report-modal-footer"><button type="button" class="btn btn-outline" data-close-report-modal="aar">Cancel</button><button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit AAR</button></div>
+            </form>
+        </div>
+    </div>
+
     <div class="report-modal" id="progressReportModal" role="dialog" aria-modal="true" aria-labelledby="progressReportModalTitle" data-report-state="idle">
         <div class="report-modal-panel">
             <div class="report-modal-header">
@@ -398,8 +443,18 @@
                         </div>
                         <div class="form-section-label">Source report</div>
                         <div class="form-group full">
+                            <label class="form-label">Progress Report Type</label>
+                            <div class="form-helper">Choose one report, or start a two-report sequence.</div>
+                            <select name="report_stage" class="form-select" required>
+                                <option value="single">Progress Report (one report)</option>
+                                <option value="first">1st Progress Report (2nd will follow)</option>
+                                <option value="second">2nd Progress Report</option>
+                            </select>
+                            <input type="hidden" name="parent_progress_investigation_id">
+                        </div>
+                        <div class="form-group full">
                             <label class="form-label">Source Spot Report</label>
-                            <div class="form-helper">Select the spot report this progress report continues.</div>
+                            <div class="form-helper" data-progress-source-help>Select the spot report this progress report continues.</div>
                             <select name="spot_investigation_id" class="form-select" data-station-ref="spot-reports" required>
                                 <option value="">Select spot report</option>
                             </select>
@@ -650,12 +705,17 @@
                 spotCreate: '/api/spot-investigation',
                 progressCreate: '/api/progress-investigation',
                 finalCreate: '/api/final-investigation',
+                aarCreate: @json(route('firefighter.after-activity-reports.store')),
+                aarUpdateTemplate: @json(route('firefighter.after-activity-reports.update', ['afterActivityReport' => '__AAR_REPORT_ID__'])),
+                aarDeleteTemplate: @json(route('firefighter.after-activity-reports.destroy', ['afterActivityReport' => '__AAR_REPORT_ID__'])),
                 reportManageBase: '/api',
                 proofImageDeleteTemplate: @json($proofImageDeleteTemplate),
                 proofImageOrderTemplate: @json($proofImageOrderTemplate),
                 sirTemplate: @json(route('firefighter.spot-reports.sir.word', ['spotReportId' => '__SPOT_REPORT_ID__'])),
                 pirTemplate: @json(route('firefighter.progress-reports.pir.word', ['progressReportId' => '__PROGRESS_REPORT_ID__'])),
                 firTemplate: @json(route('firefighter.final-reports.fir.word', ['finalReportId' => '__FINAL_REPORT_ID__'])),
+                aarTemplate: @json(route('firefighter.after-activity-reports.word', ['afterActivityReport' => '__AAR_REPORT_ID__'])),
+                aarPdfTemplate: @json(route('firefighter.after-activity-reports.pdf', ['afterActivityReport' => '__AAR_REPORT_ID__'])),
             },
             finalSubstantiatingDocumentOptions: @json($finalSubstantiatingDocumentOptions),
         };

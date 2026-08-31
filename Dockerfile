@@ -40,7 +40,8 @@ COPY . .
 # error page when SIR, PIR, or FIR is downloaded.
 RUN test -f storage/app/private/templates/sir-template-follow.docx \
     && test -f storage/app/private/templates/progress-investigation-template-edited.docx \
-    && test -f storage/app/private/templates/final-investigation-template-edited.docx
+    && test -f storage/app/private/templates/final-investigation-template-edited.docx \
+    && test -f storage/app/private/templates/after-activity-report-template.docx
 
 # Install PHP dependencies
 RUN composer config -g github-protocols https \

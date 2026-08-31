@@ -28,6 +28,7 @@ class InvestigationReportProofImageTest extends TestCase
             'sir-template-follow.docx',
             'progress-investigation-template-edited.docx',
             'final-investigation-template-edited.docx',
+            'after-activity-report-template.docx',
         ];
 
         foreach ($templates as $template) {
@@ -56,6 +57,7 @@ class InvestigationReportProofImageTest extends TestCase
             'SpotInvestigationSirExportController.php',
             'ProgressInvestigationPirExportController.php',
             'FinalInvestigationFirExportController.php',
+            'AfterActivityReportExportController.php',
         ] as $controller) {
             $source = file_get_contents(app_path('Http/Controllers/staff/'.$controller));
             $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $source);

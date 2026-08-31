@@ -76,7 +76,7 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
         $this->assertStringContainsString('Highest priority', $view);
         $this->assertStringContainsString("@media (max-width: 768px)", $styles);
         $this->assertStringContainsString('grid-template-columns: repeat(3, minmax(0, 1fr));', $styles);
-        $this->assertSame(3, substr_count($reports, "firefighters.partials.person-trigger"));
+        $this->assertSame(4, substr_count($reports, "firefighters.partials.person-trigger"));
     }
 
     #[Test]

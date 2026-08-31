@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
+        "endroid/qr-code": "^6.0",
         "guzzlehttp/guzzle": "^7.15.2",
         "ladumor/laravel-pwa": "^1.0.1",
         "laravel/framework": "^12.0",

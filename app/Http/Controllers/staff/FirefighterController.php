@@ -19,6 +19,7 @@ use App\Models\Province;
 use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
+use App\Models\AfterActivityReport;
 use App\Models\EventActivity;
 use App\Models\DutyException;
 use App\Models\DutyShift;
@@ -711,7 +712,7 @@ class FirefighterController extends Controller
     protected function loadProgressReportsPaginator($stationOfficerIds, int $perPage = 10)
     {
         return ProgressInvestigationReport::query()
-            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'proofImages'])
+            ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'secondProgressInvestigation', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
             ->paginate($perPage)
@@ -724,6 +725,17 @@ class FirefighterController extends Controller
             ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
             ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    protected function loadAfterActivityReportsPaginator(int $stationId, int $perPage = 10)
+    {
+        return AfterActivityReport::query()
+            ->with(['eventActivity', 'investigator.user.role', 'approvedBy.user', 'proofImages'])
+            ->where('station_id', $stationId)
+            ->latest('activity_date')
+            ->latest('after_activity_report_id')
             ->paginate($perPage)
             ->withQueryString();
     }
@@ -799,6 +811,9 @@ class FirefighterController extends Controller
                     'id' => $report->progress_investigation_report_id,
                     'type' => 'progress',
                     'spot_investigation_id' => $report->spot_investigation_id,
+                    'report_stage' => $report->report_stage,
+                    'report_stage_label' => $report->report_stage_label,
+                    'parent_progress_investigation_id' => $report->parent_progress_investigation_id,
                     'incident_location' => $incidentReferenceLabel,
                     'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
                     'fire_origin_id' => $report->fire_origin_id,
@@ -817,6 +832,7 @@ class FirefighterController extends Controller
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_final' => (bool) $report->finalInvestigation,
+                    'has_second' => (bool) $report->secondProgressInvestigation,
                 ],
             ];
         })->all();
@@ -866,6 +882,44 @@ class FirefighterController extends Controller
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
+                ],
+            ];
+        })->all();
+    }
+
+    protected function mapAfterActivityReportStore($reports, string $currentOfficerName): array
+    {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+            return [
+                $report->after_activity_report_id => [
+                    'id' => $report->after_activity_report_id,
+                    'type' => 'aar',
+                    'event_activity_id' => $report->event_activity_id,
+                    'source_label' => $report->event_activity_id ? 'Scheduled activity' : 'Unscheduled operation',
+                    'activity_title' => $report->activity_title,
+                    'activity_type' => $report->activity_type,
+                    'activity_date' => optional($report->activity_date)->format('Y-m-d'),
+                    'activity_location' => $report->activity_location,
+                    'participants' => $report->participants ?? [],
+                    'participants_text' => implode("\n", $report->participants ?? []),
+                    'deployed_resources' => $report->deployed_resources ?? [],
+                    'deployed_resources_text' => implode("\n", $report->deployed_resources ?? []),
+                    'memorandum_for' => $report->memorandum_for,
+                    'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
+                    'references' => $report->references,
+                    'background' => $report->background,
+                    'significance' => $report->significance,
+                    'activity_details' => $report->activity_details,
+                    'issues_challenges' => $report->issues_challenges,
+                    'discussion_assessment' => $report->discussion_assessment,
+                    'recommendations' => $report->recommendations,
+                    'review_status' => $report->review_status ?: 'submitted',
+                    'review_comments' => $report->review_comments,
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: $currentOfficerName,
+                    'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
+                    'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
+                    'created_at' => optional($report->created_at)->toIso8601String(),
                 ],
             ];
         })->all();
@@ -979,7 +1033,7 @@ class FirefighterController extends Controller
         return collect($reports)->map(function ($report) {
             return [
                 'id' => $report->progress_investigation_report_id,
-                'label' => $this->buildIncidentReferenceLabel(
+                'label' => $report->report_stage_label . ' - ' . $this->buildIncidentReferenceLabel(
                     $this->resolveIncidentPrimaryLocation(
                         $report->spotInvestigation?->incident?->marker?->title,
                         $report->spotInvestigation?->incident?->marker?->description
@@ -988,6 +1042,26 @@ class FirefighterController extends Controller
                     $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
                     $report->spotInvestigation?->incident?->created_at ?? $report->created_at,
                     'Spot investigation'
+                ),
+            ];
+        })->values()->all();
+    }
+
+    protected function buildSecondProgressOptions($reports): array
+    {
+        return collect($reports)->map(function ($report) {
+            return [
+                'id' => $report->spot_investigation_id,
+                'parent_id' => $report->progress_investigation_report_id,
+                'label' => $this->buildIncidentReferenceLabel(
+                    $this->resolveIncidentPrimaryLocation(
+                        $report->spotInvestigation?->incident?->marker?->title,
+                        $report->spotInvestigation?->incident?->marker?->description
+                    ),
+                    $report->spotInvestigation?->incident?->resolved_dropdown_barangay_name ?? $report->spotInvestigation?->incident?->barangay?->barangay_name,
+                    $report->spotInvestigation?->incident?->resolved_dropdown_city_name ?? $report->spotInvestigation?->incident?->barangay?->city?->city_name,
+                    $report->report_completed_at ?? $report->created_at,
+                    '1st Progress Report'
                 ),
             ];
         })->values()->all();
@@ -1415,7 +1489,7 @@ class FirefighterController extends Controller
             'stationAddress' => $context['stationAddress'],
             'stationImageUrl' => $context['stationImageUrl'],
             'currentOfficerName' => $context['currentOfficerName'],
-            'activeReportTab' => request('report_tab', 'spot'),
+            'activeReportTab' => in_array(request('report_tab'), ['spot', 'progress', 'final', 'aar'], true) ? request('report_tab') : 'spot',
             'proofImageDeleteTemplate' => route('firefighter.investigation-reports.proof-images.destroy', [
                 'reportType' => '__REPORT_TYPE__',
                 'reportId' => '__REPORT_ID__',
@@ -1526,7 +1600,7 @@ class FirefighterController extends Controller
     public function myStationReportsData(Request $request)
     {
         $tab = $request->validate([
-            'tab' => ['nullable', Rule::in(['spot', 'progress', 'final'])],
+            'tab' => ['nullable', Rule::in(['spot', 'progress', 'final', 'aar'])],
         ])['tab'] ?? 'spot';
 
         $userId = Auth::user()->user_id;
@@ -1534,7 +1608,10 @@ class FirefighterController extends Controller
         $stationOfficerIds = $this->getStationOfficerIdsForStation($context['stationId']);
         $currentOfficerName = $context['currentOfficerName'];
 
-        if ($tab === 'progress') {
+        if ($tab === 'aar') {
+            $reports = $this->loadAfterActivityReportsPaginator($context['stationId']);
+            $store = $this->mapAfterActivityReportStore($reports->items(), $currentOfficerName);
+        } elseif ($tab === 'progress') {
             $reports = $this->loadProgressReportsPaginator($stationOfficerIds);
             $store = $this->mapProgressReportStore($reports->items(), $currentOfficerName);
         } elseif ($tab === 'final') {
@@ -1561,7 +1638,7 @@ class FirefighterController extends Controller
     public function myStationModalData(Request $request, BoundaryMatcherService $boundaryMatcherService)
     {
         $scope = $request->validate([
-            'scope' => ['required', Rule::in(['spot', 'progress', 'final', 'common'])],
+            'scope' => ['required', Rule::in(['spot', 'progress', 'final', 'aar', 'common'])],
         ])['scope'];
 
         $userId = Auth::user()->user_id;
@@ -1582,23 +1659,50 @@ class FirefighterController extends Controller
 
         if ($scope === 'progress') {
             $availableSpotReports = SpotInvestigationReport::with(['incident.marker', 'incident.barangay.city'])
-                ->whereDoesntHave('progressInvestigation')
+                ->whereDoesntHave('progressInvestigations')
+                ->whereIn('station_officer_id', $stationOfficerIds)
+                ->latest()
+                ->get();
+
+            $availableFirstProgressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city'])
+                ->where('report_stage', ProgressInvestigationReport::STAGE_FIRST)
+                ->whereDoesntHave('secondProgressInvestigation')
                 ->whereIn('station_officer_id', $stationOfficerIds)
                 ->latest()
                 ->get();
 
             $payload['spot_reports'] = $this->buildSpotReportOptions($availableSpotReports);
+            $payload['first_progress_reports'] = $this->buildSecondProgressOptions($availableFirstProgressReports);
             $payload['fire_origins'] = $this->buildFireOriginOptions();
         }
 
         if ($scope === 'final') {
             $availableProgressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city'])
+                ->eligibleForFinal()
                 ->whereDoesntHave('finalInvestigation')
                 ->whereIn('station_officer_id', $stationOfficerIds)
                 ->latest()
                 ->get();
 
             $payload['progress_reports'] = $this->buildProgressReportOptions($availableProgressReports);
+        }
+
+        if ($scope === 'aar') {
+            $payload['activities'] = EventActivity::query()
+                ->where('station_id', $context['stationId'])
+                ->whereNull('user_id')
+                ->whereDate('event_date', '<=', today())
+                ->whereDoesntHave('afterActivityReport')
+                ->latest('event_date')
+                ->get()
+                ->map(fn (EventActivity $event) => [
+                    'id' => $event->event_id,
+                    'label' => $event->event . ' - ' . optional($event->event_date)->format('M d, Y'),
+                    'title' => $event->event,
+                    'type' => $event->activity_type,
+                    'date' => optional($event->event_date)->format('Y-m-d'),
+                    'location' => $event->barangay,
+                ])->values()->all();
         }
 
         return response()->json([

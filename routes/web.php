@@ -20,6 +20,9 @@ use App\Http\Controllers\staff\FirefighterController;
 use App\Http\Controllers\staff\FirefighterV3Controller;
 use App\Http\Controllers\staff\FinalInvestigationFirExportController;
 use App\Http\Controllers\staff\ProgressInvestigationPirExportController;
+use App\Http\Controllers\staff\AfterActivityReportController;
+use App\Http\Controllers\staff\AfterActivityReportExportController;
+use App\Http\Controllers\Chief\AfterActivityReportReviewController;
 use App\Http\Controllers\staff\SpotInvestigationSirExportController;
 use App\Http\Controllers\Admin\ManagementController;
 
@@ -58,6 +61,10 @@ use App\Http\Controllers\OTPController;
 // use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/verify/after-activity-reports/{afterActivityReport}', [AfterActivityReportExportController::class, 'verify'])
+    ->middleware('signed')
+    ->name('after-activity-reports.verify');
 
 Route::middleware(['auth', 'role:station admin,chief,provincial admin'])
     ->prefix('command')
@@ -290,6 +297,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
+        Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
+        Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::post('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [App\Http\Controllers\Chief\StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
@@ -420,6 +430,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [StationAdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[StationAdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
+        Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
+        Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::get('/mitigations/table', [StationAdminController::class, 'mitigationTable'])->name('mitigations.table');
         Route::post('/mitigations', [StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
@@ -588,14 +601,22 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/my-station/equipment', [FirefighterController::class, 'myStationEquipmentData'])->name('my-station.equipment');
         Route::get('/api/my-station/reports', [FirefighterController::class, 'myStationReportsData'])->name('my-station.reports');
         Route::get('/api/my-station/modal-data', [FirefighterController::class, 'myStationModalData'])->name('my-station.modal-data');
+        Route::get('/api/notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/api/notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+        Route::post('/api/notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('notifications.read');
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
         Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
+        Route::post('/after-activity-reports', [AfterActivityReportController::class, 'store'])->name('after-activity-reports.store');
+        Route::put('/after-activity-reports/{afterActivityReport}', [AfterActivityReportController::class, 'update'])->name('after-activity-reports.update');
+        Route::delete('/after-activity-reports/{afterActivityReport}', [AfterActivityReportController::class, 'destroy'])->name('after-activity-reports.destroy');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.docx', [AfterActivityReportExportController::class, 'downloadWord'])->name('after-activity-reports.word');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::patch('/investigation-reports/{reportType}/{reportId}/proof-images/order', [App\Http\Controllers\staff\InvestigationReportImageController::class, 'reorder'])
-            ->whereIn('reportType', ['spot', 'progress', 'final'])
+            ->whereIn('reportType', ['spot', 'progress', 'final', 'aar'])
             ->name('investigation-reports.proof-images.order');
         Route::delete('/investigation-reports/{reportType}/{reportId}/proof-images/{imageId}', [App\Http\Controllers\staff\InvestigationReportImageController::class, 'destroy'])
-            ->whereIn('reportType', ['spot', 'progress', 'final'])
+            ->whereIn('reportType', ['spot', 'progress', 'final', 'aar'])
             ->name('investigation-reports.proof-images.destroy');
         Route::redirect('/equipments', '/firefighter/fsic');
         Route::redirect('/fsic-requests', '/firefighter/fsic');

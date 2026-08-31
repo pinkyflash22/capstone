@@ -22,7 +22,7 @@ class DocxProofImageAppender
     private const MAX_HEIGHT_EMU = 3749040; // 4.1 inches; normally fits two photos per page
 
     /** @param Collection<int, InvestigationReportImage> $images */
-    public function append(ZipArchive $zip, Collection $images): void
+    public function append(ZipArchive $zip, Collection $images, string $heading = 'PHOTO DOCUMENTATION'): void
     {
         if ($images->isEmpty()) {
             return;
@@ -48,7 +48,7 @@ class DocxProofImageAppender
         $relationshipRoot = $relationships->documentElement;
         $contentTypes = $this->loadXml($contentTypesXml, 'Word content types');
         $contentTypesRoot = $contentTypes->documentElement;
-        $appendXml = $this->headingXml();
+        $appendXml = $this->headingXml($heading);
 
         foreach ($images->values() as $index => $image) {
             try {
@@ -112,10 +112,12 @@ class DocxProofImageAppender
         $zip->addFromString($contentTypesPath, (string) $contentTypes->saveXML());
     }
 
-    private function headingXml(): string
+    private function headingXml(string $heading): string
     {
+        $safeHeading = htmlspecialchars($heading, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
         return '<w:p><w:pPr><w:pageBreakBefore/><w:jc w:val="center"/></w:pPr>'
-            . '<w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>PHOTO DOCUMENTATION</w:t></w:r></w:p>';
+            . '<w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>' . $safeHeading . '</w:t></w:r></w:p>';
     }
 
     private function imageXml(string $relationshipId, int $drawingId, int $width, int $height, string $name, string $caption): string

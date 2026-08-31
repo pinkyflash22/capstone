@@ -887,6 +887,13 @@
             </button>
         </div>
         <div class="ff-mobile-panel__list">
+            @php($aarNotifications = auth()->user()?->notifications()->where('data->category', 'after_activity_report')->latest()->limit(5)->get() ?? collect())
+            @foreach($aarNotifications as $notification)
+                <a href="{{ data_get($notification->data, 'url', route('firefighter.my-station', ['tab' => 'aar'])) }}" class="ff-mobile-panel__action">
+                    <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">{{ $notification->read_at ? 'description' : 'notifications_active' }}</span></span>
+                    <span class="ff-mobile-panel__copy"><strong>{{ data_get($notification->data, 'title', 'AAR update') }}</strong><small>{{ data_get($notification->data, 'message') }}</small></span>
+                </a>
+            @endforeach
             <a href="{{ route('firefighter.incidents') }}" class="ff-mobile-panel__action" data-ff-nav-link data-ff-nav-key="incidents">
                 <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">local_fire_department</span></span>
                 <span class="ff-mobile-panel__copy">

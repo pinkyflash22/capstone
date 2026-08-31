@@ -63,7 +63,13 @@ class SpotInvestigationReport extends Model
 
     public function progressInvestigation()
     {
-        return $this->hasOne(ProgressInvestigationReport::class, 'spot_investigation_id', 'spot_investigation_report_id');
+        return $this->hasOne(ProgressInvestigationReport::class, 'spot_investigation_id', 'spot_investigation_report_id')
+            ->latestOfMany('progress_investigation_report_id');
+    }
+
+    public function progressInvestigations()
+    {
+        return $this->hasMany(ProgressInvestigationReport::class, 'spot_investigation_id', 'spot_investigation_report_id');
     }
 
     public function notedBy()
