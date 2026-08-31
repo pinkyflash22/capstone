@@ -8,6 +8,7 @@ use App\Models\AiActionPlanChecklistActivity;
 use App\Models\ChecklistStepVisit;
 use App\Models\MitigationAction;
 use App\Models\MitigationActionActivity;
+use App\Models\MitigationActionAttachment;
 use App\Models\StationBarangayCoverage;
 use App\Models\StationOfficer;
 use App\Support\BarangayNotificationService;
@@ -231,14 +232,27 @@ class BarangayCooperationController extends Controller
 
     public function updateMitigation(Request $request, int $mitigationActionId): JsonResponse
     {
+        $hasVerificationFields = Schema::hasColumn('mitigation_actions', 'blocked_reason')
+            && Schema::hasColumn('mitigation_actions', 'follow_up_date');
+        $hasProofTable = Schema::hasTable('mitigation_action_attachments');
         $validated = $request->validate([
             'status' => ['required', Rule::in(['in_progress', 'blocked', 'completed'])],
             'implementation_notes' => ['required', 'string', 'max:3000'],
+            'blocked_reason' => array_values(array_filter([
+                $hasVerificationFields ? Rule::requiredIf($request->input('status') === 'blocked') : null,
+                'nullable', 'string', 'max:2000',
+            ])),
             'completion_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->input('status') === 'completed')],
-            'outcome_result' => ['nullable', 'string', 'max:3000'],
-            'effectiveness' => ['nullable', Rule::in(['pending_evaluation', 'effective', 'partially_effective', 'ineffective'])],
+            'outcome_result' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->input('status') === 'completed')],
+            'effectiveness' => [Rule::requiredIf($request->input('status') === 'completed'), 'nullable', Rule::in(['pending_evaluation', 'effective', 'partially_effective', 'ineffective']), Rule::notIn($request->input('status') === 'completed' ? ['pending_evaluation'] : [])],
             'follow_up_required' => ['nullable', 'boolean'],
+            'follow_up_date' => array_values(array_filter([
+                $hasVerificationFields ? Rule::requiredIf($request->boolean('follow_up_required')) : null,
+                'nullable', 'date',
+            ])),
             'follow_up_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->boolean('follow_up_required'))],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx', 'max:10240'],
         ]);
         [$stationOfficer, $coverage] = $this->stationCoverage($request);
         $barangayIds = $coverage->pluck('barangay_id')->map(fn ($id) => (int) $id);
@@ -260,12 +274,19 @@ class BarangayCooperationController extends Controller
             })
             ->whereIn('status', ['planned', 'approved', 'in_progress', 'blocked', 'completed'])
             ->findOrFail($mitigationActionId);
+        if ($hasProofTable && $validated['status'] === 'completed' && ! $action->attachments()->exists() && ! $request->hasFile('attachments')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attach at least one proof file before asking the chief to close this plan.',
+                'errors' => ['attachments' => ['Proof is required for completion review.']],
+            ], 422);
+        }
         $oldStatus = $action->status;
 
-        DB::transaction(function () use ($action, $validated, $request, $oldStatus): void {
+        DB::transaction(function () use ($action, $validated, $request, $oldStatus, $hasVerificationFields, $hasProofTable): void {
             $completionRequested = $validated['status'] === 'completed';
             $status = $completionRequested ? 'in_progress' : $validated['status'];
-            $action->update([
+            $updates = [
                 'status' => $status,
                 'implementation_notes' => $validated['implementation_notes'],
                 'completion_notes' => $validated['completion_notes'] ?? null,
@@ -283,7 +304,12 @@ class BarangayCooperationController extends Controller
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
                 'is_manually_edited' => true,
-            ]);
+            ];
+            if ($hasVerificationFields) {
+                $updates['blocked_reason'] = $validated['blocked_reason'] ?? null;
+                $updates['follow_up_date'] = $validated['follow_up_date'] ?? null;
+            }
+            $action->update($updates);
 
             MitigationActionActivity::create([
                 'mitigation_action_id' => $action->getKey(),
@@ -294,6 +320,18 @@ class BarangayCooperationController extends Controller
                 'notes' => $validated['implementation_notes'],
                 'metadata' => ['effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation'],
             ]);
+
+            foreach ($hasProofTable ? $request->file('attachments', []) : [] as $file) {
+                $storedPath = MediaPath::storeForDisk($file->store('mitigation-actions', 'supabase'), 'supabase');
+                MitigationActionAttachment::create([
+                    'mitigation_action_id' => $action->getKey(),
+                    'file_path' => $storedPath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                    'attachment_type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'photo' : 'proof',
+                ]);
+            }
 
             UserActivityLogger::log('updated covered barangay mitigation progress', Auth::id(), $request);
         });

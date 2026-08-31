@@ -49,6 +49,11 @@
             <button type="submit" class="icon-button icon-button--primary" title="Apply filters" aria-label="Apply filters"><i class="fa-solid fa-filter"></i></button>
             <button type="button" class="icon-button" data-checklist-reset title="Clear filters" aria-label="Clear filters"><i class="fa-solid fa-rotate-left"></i></button>
         </form>
+        <nav class="checklist-quick-filters" aria-label="Quick checklist views">
+            @foreach (['' => 'All', 'my_tasks' => 'My tasks', 'needs_review' => 'Needs review', 'overdue' => 'Overdue', 'unassigned' => 'No owner'] as $viewValue => $viewLabel)
+                <a href="{{ route('station-admin.course-checklists', array_filter(['view' => $viewValue])) }}" class="{{ ($filters['view'] ?? '') === $viewValue ? 'is-active' : '' }}">{{ $viewLabel }}</a>
+            @endforeach
+        </nav>
 
         <div class="bulk-toolbar" data-bulk-toolbar>
             <span class="bulk-toolbar__count"><i class="fa-solid fa-check-double"></i> <b data-selected-count>0</b> selected</span>
@@ -77,7 +82,7 @@
                         <th class="checklist-col-area">Area</th>
                         <th class="checklist-col-state">Priority and status</th>
                         <th class="checklist-col-progress">Progress</th>
-                        <th class="checklist-col-status">Status</th>
+                        <th class="checklist-col-status">Stage</th>
                         <th class="checklist-col-target">Target</th>
                         <th class="checklist-col-actions"><span class="sr-only">Actions</span></th>
                     </tr>

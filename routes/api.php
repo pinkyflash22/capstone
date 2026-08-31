@@ -181,10 +181,11 @@ Route::post('/send-otp', [OTPController::class, 'sendOTP']);
 Route::post('/verify-otp', [OTPController::class, 'verifyOTP']);
 Route::post('/telnyx/webhook', TelnyxWebhookController::class);
 
-Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,chief'])
+Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,chief,provincial admin'])
     ->prefix('station-admin')
     ->group(function () {
         Route::post('/predictions', [ChiefAnalyticController::class, 'runPredictionApi']);
+        Route::get('/predictions/{runId}', [ChiefAnalyticController::class, 'predictionRunStatus']);
     });
 // Add to your routes/api.php or web.php
 Route::get('/firefighter/assigned-incidents/{firefighterId}', [IncidentController::class, 'getAssignedIncidents']);

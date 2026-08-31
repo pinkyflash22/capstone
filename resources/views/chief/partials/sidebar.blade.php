@@ -193,6 +193,7 @@
 
             <button type="button" class="chief-mobile-dock__item" aria-label="{{ $mobileDockItems[1]['label'] }}" data-chief-notifications-open>
                 {!! $renderMobileIcon($mobileDockItems[1]['mobile_icon'], 'chief-mobile-material-icon chief-mobile-dock__icon') !!}
+                <span class="command-notification-mobile-badge" data-command-notification-mobile-badge hidden>0</span>
                 <span class="chief-mobile-dock__label">Alerts</span>
             </button>
 
@@ -302,7 +303,7 @@
                 {!! $renderMobileIcon('close', 'chief-mobile-material-icon') !!}
             </button>
         </div>
-        <div class="chief-mobile-panel__body" id="chiefMobileNotificationsContent">
+        <div class="chief-mobile-panel__body" id="chiefMobileNotificationsContent" data-command-notification-mobile>
             <div class="chief-mobile-panel__empty">
                 {!! $renderMobileIcon('notifications', 'chief-mobile-material-icon') !!}
                 <p>No mobile notifications yet.</p>
@@ -310,6 +311,7 @@
         </div>
     </div>
 </div>
+@include('partials.command-notification-center', ['notificationRoutePrefix' => 'station-admin'])
 @include('partials.user-activity-logger')
 <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -373,23 +375,7 @@
         };
 
         const syncMobileNotifications = () => {
-            if (!notificationsContent) {
-                return;
-            }
-
-            const source = document.getElementById('alertsDropdownList');
-
-            if (!source) {
-                notificationsContent.innerHTML = `
-                    <div class="chief-mobile-panel__empty">
-                        ${notificationFallbackIcon}
-                        <p>Notifications are not available on this page.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            notificationsContent.innerHTML = source.innerHTML;
+            window.refreshCommandNotifications?.();
         };
 
         const startHold = () => {

@@ -97,6 +97,7 @@
             </a>
             <button type="button" class="chief-mobile-dock__item" aria-label="{{ $mobileDockItems[1]['label'] }}" data-admin-notifications-open>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-dock__icon" aria-hidden="true">{{ $mobileDockItems[1]['mobile_icon'] }}</span>
+                <span class="command-notification-mobile-badge" data-command-notification-mobile-badge hidden>0</span>
             </button>
             <div class="chief-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}" data-admin-nav-center>
                 <div class="chief-mobile-dock__burst" data-admin-nav-burst>
@@ -174,7 +175,7 @@
                 <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">close</span>
             </button>
         </div>
-        <div class="chief-mobile-panel__body">
+        <div class="chief-mobile-panel__body" data-command-notification-mobile>
             <div class="chief-mobile-panel__empty">
                 <span class="material-symbols-rounded chief-mobile-material-icon" aria-hidden="true">notifications</span>
                 <p>No mobile notifications yet.</p>
@@ -182,6 +183,7 @@
         </div>
     </div>
 </div>
+@include('partials.command-notification-center', ['notificationRoutePrefix' => 'admin'])
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -270,7 +272,10 @@
         });
 
         settingsOpen?.addEventListener('click', () => openPanel(settingsPanel));
-        notificationsOpen?.addEventListener('click', () => openPanel(notificationsPanel));
+        notificationsOpen?.addEventListener('click', () => {
+            window.refreshCommandNotifications?.();
+            openPanel(notificationsPanel);
+        });
 
         document.querySelectorAll('[data-admin-panel-close]').forEach((button) => {
             button.addEventListener('click', () => closePanel(settingsPanel));

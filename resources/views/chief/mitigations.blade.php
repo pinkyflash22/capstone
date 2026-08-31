@@ -374,7 +374,7 @@
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
     @php
-        $summary = $mitigationSummaryCounts ?? ['total' => 0, 'awaiting_approval' => 0, 'in_progress' => 0, 'overdue' => 0, 'high_priority' => 0, 'completed' => 0];
+        $summary = $mitigationSummaryCounts ?? ['total' => 0, 'awaiting_approval' => 0, 'in_progress' => 0, 'overdue' => 0, 'high_priority' => 0, 'completed' => 0, 'blocked' => 0, 'missing_owner' => 0, 'follow_up' => 0];
         $filters = $filters ?? [];
         $hasActiveFilters = collect($filters)->filter(fn ($value) => filled($value) && $value !== false)->isNotEmpty();
     @endphp
@@ -657,6 +657,14 @@
                             <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $summary['completed'] }}</div><div class="card-copy">Finished and logged.</div></article>
                         </section>
 
+                        <nav class="chip-row" aria-label="Mitigation attention views" style="margin:0 0 14px;">
+                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'overdue' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
+                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'blocked' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
+                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'awaiting_review' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'awaiting_review']) }}"><i class="fa-solid fa-user-check"></i><span>Needs review</span></a>
+                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'missing_owner' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'missing_owner']) }}"><i class="fa-solid fa-user-slash"></i><span>No owner {{ $summary['missing_owner'] }}</span></a>
+                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'follow_up' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'follow_up']) }}"><i class="fa-solid fa-rotate"></i><span>Follow-up {{ $summary['follow_up'] }}</span></a>
+                        </nav>
+
                         <section class="panel mitigation-register">
                             <div class="panel-head">
                                 <div>
@@ -831,13 +839,21 @@
                                                         'target_date_label' => $action->target_date?->format('M d, Y'),
                                                         'completed_at_label' => optional($action->completed_at)->format('M d, Y h:i A'),
                                                         'description' => $action->description,
+                                                        'baseline_condition' => $action->baseline_condition,
+                                                        'expected_result' => $action->expected_result,
                                                         'remarks' => $action->remarks,
                                                         'implementation_notes' => $action->implementation_notes,
+                                                        'blocked_reason' => $action->blocked_reason,
                                                         'completion_notes' => $action->completion_notes,
                                                         'outcome_result' => $action->outcome_result,
                                                         'effectiveness_key' => $action->effectiveness ?: 'pending_evaluation',
                                                         'effectiveness' => $mitigationEffectivenessOptions[$action->effectiveness ?: 'pending_evaluation'] ?? 'Pending Evaluation',
+                                                        'verification_date' => optional($action->verification_date)->format('Y-m-d'),
+                                                        'verification_date_label' => optional($action->verification_date)->format('M d, Y'),
+                                                        'verified_by_label' => $action->verifier?->full_name,
                                                         'follow_up_required' => (bool) $action->follow_up_required,
+                                                        'follow_up_date' => optional($action->follow_up_date)->format('Y-m-d'),
+                                                        'follow_up_date_label' => optional($action->follow_up_date)->format('M d, Y'),
                                                         'follow_up_notes' => $action->follow_up_notes,
                                                         'risk_area_id' => $action->risk_area_id,
                                                         'barangay_prediction_checklist_id' => $action->barangay_prediction_checklist_id,
@@ -906,7 +922,7 @@
                                                             <button type="button" class="row-btn edit" title="Edit action" aria-label="Edit action" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i></button>
                                                             @if($action->completion_approval_status === 'pending')
                                                                 <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="approved"><button type="submit" class="row-btn view" title="Approve completion" aria-label="Approve completion"><i class="fa-solid fa-check"></i></button></form>
-                                                                <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="rejected"><button type="submit" class="row-btn delete" title="Return for further work" aria-label="Return for further work"><i class="fa-solid fa-rotate-left"></i></button></form>
+                                                                <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline" onsubmit="const reason=window.prompt('Why is this completion being returned?');if(!reason||!reason.trim())return false;this.elements.decision_notes.value=reason.trim();">@csrf<input type="hidden" name="decision" value="rejected"><input type="hidden" name="decision_notes" value=""><button type="submit" class="row-btn delete" title="Return for further work" aria-label="Return for further work"><i class="fa-solid fa-rotate-left"></i></button></form>
                                                             @endif
                                                             <button type="button" class="row-btn delete" title="Delete action" aria-label="Delete action" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i></button>
                                                         </div>
@@ -1229,6 +1245,7 @@
                             <div class="detail-content-item"><span>Approved at</span><div>${escapeHtml(payload.approval_date_label || 'Pending')}</div></div>
                             <div class="detail-content-item is-wide"><span>Checklist tasks</span><div>${renderTasks(payload.tasks, payload.tasks_done || 0, payload.tasks_total || 0)}</div></div>
                             <div class="detail-content-item is-wide"><span>Implementation updates</span><div>${escapeHtml(payload.implementation_notes || 'No implementation updates recorded yet.')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Blocked reason</span><div>${escapeHtml(payload.blocked_reason || 'Not blocked')}</div></div>
                             <div class="detail-content-item is-wide"><span>Planning remarks</span><div>${escapeHtml(payload.remarks || 'No planning remarks recorded.')}</div></div>
                         </div></div>
                     </details>
@@ -1236,10 +1253,14 @@
                         <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-file-shield"></i></span><span class="detail-disclosure__label"><strong>Results and documentation</strong><span>Proof files, completion notes, and follow-up</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
                         <div class="detail-disclosure__content"><div class="detail-content-grid">
                             <div class="detail-content-item is-wide"><span>Attachments</span><div>${renderAttachments(payload.attachments)}</div></div>
+                            <div class="detail-content-item is-wide"><span>Condition before work</span><div>${escapeHtml(payload.baseline_condition || 'No baseline recorded.')}</div></div>
+                            <div class="detail-content-item is-wide"><span>Expected result</span><div>${escapeHtml(payload.expected_result || 'No expected result recorded.')}</div></div>
                             <div class="detail-content-item is-wide"><span>Completion notes</span><div>${escapeHtml(payload.completion_notes || 'No completion notes recorded yet.')}</div></div>
                             <div class="detail-content-item is-wide"><span>Outcome</span><div>${escapeHtml(payload.outcome_result || 'No outcome recorded yet.')}</div></div>
                             <div class="detail-content-item"><span>Effectiveness</span><div>${escapeHtml(payload.effectiveness || 'Pending evaluation')}</div></div>
+                            <div class="detail-content-item"><span>Verified</span><div>${escapeHtml(payload.verification_date_label ? `${payload.verification_date_label}${payload.verified_by_label ? ` by ${payload.verified_by_label}` : ''}` : 'Not verified')}</div></div>
                             <div class="detail-content-item"><span>Follow-up required</span><div>${escapeHtml(followUpText)}</div></div>
+                            <div class="detail-content-item"><span>Follow-up date</span><div>${escapeHtml(payload.follow_up_date_label || 'Not scheduled')}</div></div>
                             <div class="detail-content-item is-wide"><span>Follow-up notes</span><div>${escapeHtml(payload.follow_up_notes || 'No follow-up notes recorded.')}</div></div>
                         </div></div>
                     </details>
@@ -1386,12 +1407,17 @@
                     set('source_type', payload.source_type, 'manual');
                     set('target_date', payload.target_date);
                     set('description', payload.description);
+                    set('baseline_condition', payload.baseline_condition);
+                    set('expected_result', payload.expected_result);
                     set('remarks', payload.remarks);
                     set('implementation_notes', payload.implementation_notes);
+                    set('blocked_reason', payload.blocked_reason);
                     set('completion_notes', payload.completion_notes);
                     set('outcome_result', payload.outcome_result);
                     set('effectiveness', payload.effectiveness_key, 'pending_evaluation');
+                    set('verification_date', payload.verification_date);
                     set('follow_up_required', payload.follow_up_required ? '1' : '0');
+                    set('follow_up_date', payload.follow_up_date);
                     set('follow_up_notes', payload.follow_up_notes);
                     set('responsible_team_id', payload.responsible_team_id);
                     set('responsible_user_id', payload.responsible_user_id);

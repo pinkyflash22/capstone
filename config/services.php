@@ -103,6 +103,7 @@ return [
         'training_queue_connection' => env('AI_TRAINING_QUEUE_CONNECTION', 'database'),
         'training_queue' => env('AI_TRAINING_QUEUE', 'forecast-training'),
         'training_status_cache_store' => env('AI_TRAINING_STATUS_CACHE_STORE', 'database'),
+        'failure_email_enabled' => filter_var(env('AI_FAILURE_EMAIL_ENABLED', true), FILTER_VALIDATE_BOOL),
         'artifact_persistence_enabled' => (bool) env('AI_ARTIFACT_PERSISTENCE_ENABLED', true),
         'artifact_disk' => env('AI_ARTIFACT_DISK', env('FILESYSTEM_DISK', 'local')),
         'artifact_prefix' => trim((string) env('AI_ARTIFACT_PREFIX', 'ai/forecast-model'), '/'),

@@ -318,6 +318,11 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
 
         Route::post('/api/explore-recommendation', [App\Http\Controllers\Chief\AnalyticController::class, 'exploreRecommendation']);
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
+        Route::get('/analytics/accuracy.csv', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyCsv'])->name('analytics.accuracy.csv');
+        Route::get('/analytics/accuracy.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyPdf'])->name('analytics.accuracy.pdf');
+        Route::get('/api/command-notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('command-notifications.index');
+        Route::post('/api/command-notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('command-notifications.read-all');
+        Route::post('/api/command-notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('command-notifications.read');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
@@ -463,6 +468,11 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         //     })->name('analytics');
         Route::post('/api/explore-recommendation', [App\Http\Controllers\Chief\AnalyticController::class, 'exploreRecommendation']);
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
+        Route::get('/analytics/accuracy.csv', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyCsv'])->name('analytics.accuracy.csv');
+        Route::get('/analytics/accuracy.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyPdf'])->name('analytics.accuracy.pdf');
+        Route::get('/api/command-notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('command-notifications.index');
+        Route::post('/api/command-notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('command-notifications.read-all');
+        Route::post('/api/command-notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('command-notifications.read');
         Route::get('/weather-context', [App\Http\Controllers\Chief\WeatherContextController::class, 'index'])->name('weather-context.index');
         Route::post('/weather-context/backfill', [App\Http\Controllers\Chief\WeatherContextController::class, 'backfill'])->name('weather-context.backfill');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');

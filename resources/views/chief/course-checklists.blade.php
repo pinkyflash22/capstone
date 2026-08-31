@@ -27,7 +27,8 @@
     </style>
     <style>
         .bulk-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 24px 14px}.bulk-toolbar__count{margin-right:auto;display:inline-flex;align-items:center;gap:7px;color:#6d7889;font-size:10px;font-weight:800}.bulk-toolbar select{height:35px;min-width:145px;border:1px solid #ddd8d2;border-radius:10px;background:#fff;padding:0 10px;color:#475467;font-size:10px}.bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}.checklist-table input[type=checkbox]{width:15px;height:15px;accent-color:#d55327;cursor:pointer}.history-list{display:grid;gap:8px}.history-event{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;padding:9px;border:1px solid #ece7e1;border-radius:12px;background:#fdfcfb}.history-event__icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#c24824}.history-event strong,.history-event small{display:block}.history-event strong{font-size:11px}.history-event small{margin-top:3px;color:#7d8796;font-size:9.5px;line-height:1.4}.history-event time{color:#9098a5;font-size:9px;white-space:nowrap}.history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px}.history-pagination button{width:29px;height:29px;border:1px solid #ddd8d2;border-radius:9px;background:#fff;color:#647084;cursor:pointer}.history-pagination button:disabled{opacity:.4;cursor:not-allowed}
-        @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}.modal-evidence-grid{grid-template-columns:1fr}}
+        .checklist-quick-filters{display:flex;gap:7px;flex-wrap:wrap;padding:0 24px 12px}.checklist-quick-filters a{padding:7px 10px;border:1px solid #e5ded6;border-radius:999px;background:#fff;color:#667085;font-size:10px;font-weight:800;text-decoration:none}.checklist-quick-filters a.is-active{background:#9a3412;border-color:#9a3412;color:#fff}
+        @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-quick-filters{padding-inline:15px}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}.modal-evidence-grid{grid-template-columns:1fr}}
     </style>
     <style data-checklist-mobile-style>
         @media (max-width: 767px), (display-mode: standalone) and (max-width: 1024px) {
@@ -456,7 +457,15 @@
         const bulk = event.target.closest('[data-apply-bulk]');
         if (bulk) { applyBulkChecklistUpdate(bulk); return; }
         const step = event.target.closest('[data-step-status]');
-        if (step) { patchChecklist(checklistEndpoint('items', step.dataset.checklistId), {item_id:Number(step.dataset.itemId),status:step.dataset.status}, step, step.dataset.checklistId); return; }
+        if (step) {
+            let reviewNotes = '';
+            if (step.dataset.status === 'not_followed') {
+                reviewNotes = window.prompt('Why was this step not followed? Use a short reason.')?.trim() || '';
+                if (!reviewNotes) { showChecklistToast('A short reason is required.', 'error'); return; }
+            }
+            patchChecklist(checklistEndpoint('items', step.dataset.checklistId), {item_id:Number(step.dataset.itemId),status:step.dataset.status,review_notes:reviewNotes}, step, step.dataset.checklistId);
+            return;
+        }
         const status = event.target.closest('[data-checklist-status]');
         if (status) {
             const notes = document.getElementById(`notes-${status.dataset.checklistId}`)?.value || '';

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 
 class MitigationAction extends Model
 {
@@ -36,12 +36,18 @@ class MitigationAction extends Model
         'completion_decided_at',
         'completion_decision_notes',
         'description',
+        'baseline_condition',
+        'expected_result',
         'remarks',
         'implementation_notes',
+        'blocked_reason',
         'completion_notes',
         'outcome_result',
         'effectiveness',
+        'verification_date',
+        'verified_by',
         'follow_up_required',
+        'follow_up_date',
         'follow_up_notes',
         'created_by',
         'reviewed_by',
@@ -65,6 +71,8 @@ class MitigationAction extends Model
             'approved_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'follow_up_required' => 'boolean',
+            'verification_date' => 'date',
+            'follow_up_date' => 'date',
             'analysis_revision' => 'integer',
             'is_superseded' => 'boolean',
             'requires_revision_review' => 'boolean',
@@ -123,6 +131,11 @@ class MitigationAction extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by', 'user_id');
+    }
+
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by', 'user_id');
     }
 
     public function attachments()

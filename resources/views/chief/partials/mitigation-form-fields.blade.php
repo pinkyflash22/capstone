@@ -63,6 +63,14 @@
             <textarea id="{{ $fieldId('description') }}" name="description" rows="5" placeholder="Describe the intended risk reduction and the action to be carried out" required>{{ old('description', $draft['description'] ?? '') }}</textarea>
         </div>
         <div class="mitigation-field mitigation-field--full">
+            <label for="{{ $fieldId('baselineCondition') }}"><i class="fa-solid fa-camera-retro"></i><span>Condition before work</span><em>Optional for drafts</em></label>
+            <textarea id="{{ $fieldId('baselineCondition') }}" name="baseline_condition" rows="3" placeholder="Record the current condition so the result can be compared later">{{ old('baseline_condition', $draft['baseline_condition'] ?? '') }}</textarea>
+        </div>
+        <div class="mitigation-field mitigation-field--full">
+            <label for="{{ $fieldId('expectedResult') }}"><i class="fa-solid fa-bullseye"></i><span>Expected result</span><em>Optional for drafts</em></label>
+            <textarea id="{{ $fieldId('expectedResult') }}" name="expected_result" rows="3" placeholder="State the result that will show this plan worked">{{ old('expected_result', $draft['expected_result'] ?? '') }}</textarea>
+        </div>
+        <div class="mitigation-field mitigation-field--full">
             <label for="{{ $fieldId('remarks') }}"><i class="fa-regular fa-note-sticky"></i><span>Planning remarks</span><em>Optional</em></label>
             <textarea id="{{ $fieldId('remarks') }}" name="remarks" rows="3" placeholder="Add constraints, coordination notes, or planning context">{{ old('remarks', $draft['remarks'] ?? '') }}</textarea>
         </div>
@@ -115,6 +123,10 @@
             <textarea id="{{ $fieldId('implementation') }}" name="implementation_notes" rows="4" placeholder="Record work completed, coordination, and current blockers">{{ old('implementation_notes', $draft['implementation_notes'] ?? '') }}</textarea>
         </div>
         <div class="mitigation-field mitigation-field--full">
+            <label for="{{ $fieldId('blockedReason') }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked reason</span><em>Required when blocked</em></label>
+            <textarea id="{{ $fieldId('blockedReason') }}" name="blocked_reason" rows="3" placeholder="What is preventing the work from continuing?">{{ old('blocked_reason', $draft['blocked_reason'] ?? '') }}</textarea>
+        </div>
+        <div class="mitigation-field mitigation-field--full">
             <label for="{{ $fieldId('completion') }}"><i class="fa-solid fa-circle-check"></i><span>Completion notes</span><em>Optional</em></label>
             <textarea id="{{ $fieldId('completion') }}" name="completion_notes" rows="3" placeholder="Summarize what was completed and verified">{{ old('completion_notes', $draft['completion_notes'] ?? '') }}</textarea>
         </div>
@@ -127,8 +139,16 @@
             <select id="{{ $fieldId('effectiveness') }}" name="effectiveness">@foreach(($mitigationEffectivenessOptions ?? []) as $value => $label)<option value="{{ $value }}" @selected(old('effectiveness', $draft['effectiveness'] ?? 'pending_evaluation') === $value)>{{ $label }}</option>@endforeach</select>
         </div>
         <div class="mitigation-field">
+            <label for="{{ $fieldId('verificationDate') }}"><i class="fa-solid fa-user-check"></i><span>Verification date</span><em>Optional</em></label>
+            <input id="{{ $fieldId('verificationDate') }}" name="verification_date" type="date" value="{{ old('verification_date', $draft['verification_date'] ?? '') }}">
+        </div>
+        <div class="mitigation-field">
             <label for="{{ $fieldId('followUpRequired') }}"><i class="fa-solid fa-rotate"></i><span>Follow-up required</span></label>
             <select id="{{ $fieldId('followUpRequired') }}" name="follow_up_required"><option value="0" @selected((string) old('follow_up_required', $draft['follow_up_required'] ?? '0') === '0')>No</option><option value="1" @selected((string) old('follow_up_required', $draft['follow_up_required'] ?? '0') === '1')>Yes</option></select>
+        </div>
+        <div class="mitigation-field">
+            <label for="{{ $fieldId('followUpDate') }}"><i class="fa-regular fa-calendar"></i><span>Follow-up date</span><em>Required when needed</em></label>
+            <input id="{{ $fieldId('followUpDate') }}" name="follow_up_date" type="date" value="{{ old('follow_up_date', $draft['follow_up_date'] ?? '') }}">
         </div>
         <div class="mitigation-field mitigation-field--full">
             <label for="{{ $fieldId('followUpNotes') }}"><i class="fa-regular fa-comments"></i><span>Follow-up notes</span><em>Optional</em></label>

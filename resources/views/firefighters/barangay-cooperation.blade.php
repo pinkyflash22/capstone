@@ -132,10 +132,11 @@
         .coop-mitigation-fields label { display: grid; gap: 5px; min-width: 0; }
         .coop-mitigation-fields label.wide { grid-column: 1/-1; }
         .coop-mitigation-fields label > span { color: #64748b; font-size: .6rem; font-weight: 850; }
-        .coop-mitigation-fields select, .coop-mitigation-fields textarea { width: 100%; min-width: 0; border: 1px solid #dbe3ec; border-radius: 9px; background: #fff; color: #334155; font-size: .68rem; outline: none; }
+        .coop-mitigation-fields select, .coop-mitigation-fields textarea, .coop-mitigation-fields input { width: 100%; min-width: 0; border: 1px solid #dbe3ec; border-radius: 9px; background: #fff; color: #334155; font-size: .68rem; outline: none; }
         .coop-mitigation-fields select { height: 37px; padding: 0 9px; }
+        .coop-mitigation-fields input { min-height:37px;padding:7px 9px; }
         .coop-mitigation-fields textarea { min-height: 76px; padding: 9px; resize: vertical; line-height: 1.45; }
-        .coop-mitigation-fields select:focus, .coop-mitigation-fields textarea:focus { border-color: rgba(198,61,38,.42); box-shadow: 0 0 0 3px rgba(198,61,38,.07); }
+        .coop-mitigation-fields select:focus, .coop-mitigation-fields textarea:focus, .coop-mitigation-fields input:focus { border-color: rgba(198,61,38,.42); box-shadow: 0 0 0 3px rgba(198,61,38,.07); }
         .coop-mitigation-form__footer small { color: #94a3b8; font-size: .57rem; line-height: 1.4; }
         .coop-mitigation-form__footer button { min-height: 37px; flex: 0 0 auto; padding: 0 13px; border: 0; border-radius: 9px; background: linear-gradient(135deg,#c63d26,#d18a16); color: #fff; font-size: .66rem; font-weight: 900; }
         .coop-mitigation-form__footer button:disabled { opacity: .6; cursor: wait; }
@@ -455,14 +456,28 @@
                         event.preventDefault();
                         const statusValue = mitigationForm.querySelector('[name="status"]')?.value || '';
                         const completionNotes = mitigationForm.querySelector('[name="completion_notes"]')?.value?.trim() || '';
+                        const outcomeResult = mitigationForm.querySelector('[name="outcome_result"]')?.value?.trim() || '';
+                        const effectiveness = mitigationForm.querySelector('[name="effectiveness"]')?.value || 'pending_evaluation';
+                        const blockedReason = mitigationForm.querySelector('[name="blocked_reason"]')?.value?.trim() || '';
                         const followUpRequired = mitigationForm.querySelector('[name="follow_up_required"]')?.value === '1';
+                        const followUpDate = mitigationForm.querySelector('[name="follow_up_date"]')?.value || '';
                         const followUpNotes = mitigationForm.querySelector('[name="follow_up_notes"]')?.value?.trim() || '';
                         if (statusValue === 'completed' && !completionNotes) {
                             toast('Completion notes are required when a mitigation is completed.', 'error');
                             mitigationForm.querySelector('[name="completion_notes"]')?.focus();
                             return;
                         }
-                        if (followUpRequired && !followUpNotes) {
+                        if (statusValue === 'completed' && (!outcomeResult || effectiveness === 'pending_evaluation')) {
+                            toast('Record the result and evaluate effectiveness before requesting completion.', 'error');
+                            mitigationForm.querySelector('[name="outcome_result"]')?.focus();
+                            return;
+                        }
+                        if (statusValue === 'blocked' && !blockedReason) {
+                            toast('Explain what is blocking the work.', 'error');
+                            mitigationForm.querySelector('[name="blocked_reason"]')?.focus();
+                            return;
+                        }
+                        if (followUpRequired && (!followUpNotes || !followUpDate)) {
                             toast('Add follow-up notes when follow-up is required.', 'error');
                             mitigationForm.querySelector('[name="follow_up_notes"]')?.focus();
                             return;
@@ -473,9 +488,9 @@
                         button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
                         try {
                             const formData = new FormData(mitigationForm);
-                            const payload = Object.fromEntries(formData.entries());
-                            payload.follow_up_required = followUpRequired;
-                            const response = await fetch(mitigationForm.action, { method: 'PATCH', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: JSON.stringify(payload) });
+                            formData.set('_method', 'PATCH');
+                            formData.set('follow_up_required', followUpRequired ? '1' : '0');
+                            const response = await fetch(mitigationForm.action, { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }, body: formData });
                             const result = await response.json();
                             if (!response.ok || result.success === false) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to update mitigation progress.');
 
@@ -488,7 +503,7 @@
                             const template = document.getElementById(`mitigation-${mitigationForm.dataset.mitigationId}`);
                             const sourceForm = template?.content.querySelector('[data-mitigation-update]');
                             if (sourceForm) {
-                                ['status', 'implementation_notes', 'completion_notes', 'outcome_result', 'effectiveness', 'follow_up_notes'].forEach((name) => {
+                                ['status', 'implementation_notes', 'blocked_reason', 'completion_notes', 'outcome_result', 'effectiveness', 'follow_up_date', 'follow_up_notes'].forEach((name) => {
                                     const source = sourceForm.querySelector(`[name="${name}"]`);
                                     const current = mitigationForm.querySelector(`[name="${name}"]`);
                                     if (!source || !current) return;

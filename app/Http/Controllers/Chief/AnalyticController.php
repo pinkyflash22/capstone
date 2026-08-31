@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Chief;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\RetrainForecastModelJob;
+use App\Jobs\RunPredictiveAnalysisJob;
 use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistActivity;
 use App\Models\AiActionPlanChecklistItem;
@@ -11,6 +12,7 @@ use App\Models\AiRecommendationSuggestion;
 use App\Models\Analysis;
 use App\Models\Incident;
 use App\Models\MitigationAction;
+use App\Models\Station;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\User;
@@ -18,12 +20,14 @@ use App\Services\BarangayPredictionService;
 use App\Services\DailyWeatherContextService;
 use App\Services\ForecastModelService;
 use App\Services\PredictionFeedbackSignalService;
+use App\Support\AnalysisRunStatus;
 use App\Support\BarangayNotificationService;
 use App\Support\ForecastIncidentCalibration;
 use App\Support\ForecastTrainingStatus;
 use App\Support\HistoricalFireRecordSemantics;
 use App\Support\PeakHourEstimator;
 use App\Support\UserActivityLogger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -66,7 +70,73 @@ class AnalyticController extends Controller
 
     public function index()
     {
-        return view('chief.analytics');
+        $completionNotifications = collect();
+        $user = Auth::user();
+
+        if ($user && Schema::hasTable('notifications')) {
+            $completionNotifications = $user->unreadNotifications()
+                ->latest()
+                ->limit(10)
+                ->get()
+                ->filter(fn ($notification) => data_get($notification->data, 'category') === 'analysis_run')
+                ->take(3)
+                ->values();
+
+            $completionNotifications->each->markAsRead();
+        }
+
+        return view('chief.analytics', [
+            'isProvincialAdmin' => strtolower(trim((string) ($user?->role?->role ?? ''))) === 'provincial admin',
+            'analysisCompletionNotifications' => $completionNotifications->map(fn ($notification) => [
+                'title' => data_get($notification->data, 'title', 'Forecast update'),
+                'message' => data_get($notification->data, 'message', 'Your forecast status changed.'),
+                'status' => data_get($notification->data, 'meta.status', 'completed'),
+            ])->all(),
+        ]);
+    }
+
+    public function exportAccuracyCsv(Request $request)
+    {
+        $report = $this->buildAccuracyExportReport($request);
+        $filename = 'forecast-accuracy-'.Str::slug($report['station']->station_name ?: 'station').'-'.now()->format('Ymd').'.csv';
+
+        return response()->streamDownload(function () use ($report) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['PyroSense Real-world Forecast Accuracy']);
+            fputcsv($output, ['Station', $report['station']->station_name]);
+            fputcsv($output, ['Year', $report['filters']['year'] === 'all' ? 'All years' : $report['filters']['year']]);
+            fputcsv($output, ['Quarter', $report['filters']['quarter'] === 'all' ? 'All quarters' : 'Q'.$report['filters']['quarter']]);
+            fputcsv($output, []);
+            fputcsv($output, ['Target month', 'Actual incidents', 'Predicted incidents', 'Error']);
+
+            foreach ($report['outcomes'] as $outcome) {
+                fputcsv($output, [
+                    $outcome['label'],
+                    $outcome['actual'],
+                    $outcome['predicted'],
+                    round($outcome['predicted'] - $outcome['actual'], 2),
+                ]);
+            }
+
+            fputcsv($output, []);
+            fputcsv($output, ['Completed months', $report['metrics']['sample_size']]);
+            fputcsv($output, ['Average error (MAE)', $report['metrics']['mae']]);
+            fputcsv($output, ['Large-error score (RMSE)', $report['metrics']['rmse']]);
+            fputcsv($output, ['Forecast bias', $report['metrics']['mean_error']]);
+            fputcsv($output, ['Within 1 incident (%)', $report['metrics']['within_one_incident_percent']]);
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function exportAccuracyPdf(Request $request)
+    {
+        $report = $this->buildAccuracyExportReport($request);
+        $filename = 'forecast-accuracy-'.Str::slug($report['station']->station_name ?: 'station').'-'.now()->format('Ymd').'.pdf';
+
+        return Pdf::loadView('chief.exports.forecast-accuracy', $report)
+            ->setPaper('a4', 'landscape')
+            ->download($filename);
     }
 
     public function checklistIndex(Request $request)
@@ -80,7 +150,7 @@ class AnalyticController extends Controller
             ->when(! $stationId && ! $isProvincialAdmin, fn ($builder) => $builder->whereRaw('1 = 0'));
 
         $summaryRow = (clone $baseQuery)
-            ->selectRaw("COUNT(*) AS total")
+            ->selectRaw('COUNT(*) AS total')
             ->selectRaw("SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) AS open")
             ->selectRaw("SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) AS submitted")
             ->selectRaw("SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed")
@@ -125,6 +195,19 @@ class AnalyticController extends Controller
             });
         }
 
+        $view = in_array($request->input('view'), ['my_tasks', 'needs_review', 'overdue', 'unassigned'], true)
+            ? $request->input('view')
+            : null;
+        $query
+            ->when($view === 'my_tasks', fn ($builder) => $builder->where('assigned_to', Auth::id()))
+            ->when($view === 'needs_review', fn ($builder) => $builder->where(function ($scope) {
+                $scope->where('status', 'submitted')->orWhere('requires_revision_review', true);
+            }))
+            ->when($view === 'overdue', fn ($builder) => $builder
+                ->whereDate('target_date', '<', today())
+                ->whereNotIn('status', ['confirmed', 'rejected']))
+            ->when($view === 'unassigned', fn ($builder) => $builder->whereNull('assigned_to'));
+
         $checklists = $query
             ->orderByRaw("
                 CASE priority_level
@@ -134,6 +217,9 @@ class AnalyticController extends Controller
                     ELSE 4
                 END
             ")
+            ->orderByRaw("CASE WHEN target_date IS NOT NULL AND target_date < CURRENT_DATE AND status NOT IN ('confirmed', 'rejected') THEN 0 ELSE 1 END")
+            ->orderByRaw('CASE WHEN target_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('target_date')
             ->orderByDesc('created_at')
             ->paginate(max(5, min(25, $request->integer('per_page', 10))))
             ->withQueryString();
@@ -168,6 +254,7 @@ class AnalyticController extends Controller
                 'status' => $status,
                 'priority' => $priority,
                 'q' => mb_substr((string) $request->input('q'), 0, 100),
+                'view' => $view,
             ],
         ];
 
@@ -338,6 +425,13 @@ class AnalyticController extends Controller
                 (int) ($analysisData['station_id'] ?? $locationId),
                 $selectedBarangayId
             );
+            $structuredAnalysis['data_freshness'] = [
+                'generated_at' => now()->toISOString(),
+                'latest_incident_at' => $analysisData['latest_incident_at'] ?? null,
+                'weather_observed_at' => data_get($analysisData, 'weather_context.latest_observation_date')
+                    ?? data_get($analysisData, 'weather_context.observed_through'),
+                'model_trained_at' => data_get($structuredAnalysis, 'model_metadata.trained_at'),
+            ];
             $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
 
             $structuredAnalysis['checklist_debug'] = [
@@ -368,6 +462,7 @@ class AnalyticController extends Controller
             // Store analysis in database (optional, catch errors)
             $analysisId = null;
             try {
+                DB::beginTransaction();
                 $analysisId = $this->storeAnalysis($locationId, $days, $structuredAnalysis, $analysisData);
                 if ($analysisId) {
                     $structuredAnalysis['analysis_id'] = $analysisId;
@@ -416,7 +511,12 @@ class AnalyticController extends Controller
                     $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
                     $this->updateStoredAnalysisArtifacts($analysisId, $structuredAnalysis, $analysisData);
                 }
+                DB::commit();
             } catch (\Exception $storeError) {
+                if (DB::transactionLevel() > 0) {
+                    DB::rollBack();
+                }
+                $analysisId = null;
                 Log::warning('Failed to store analysis/checklists: '.$storeError->getMessage(), [
                     'exception' => $storeError,
                 ]);
@@ -475,6 +575,53 @@ class AnalyticController extends Controller
     }
 
     public function runPredictionApi(Request $request)
+    {
+        $validated = $request->validate([
+            'location_id' => ['required'],
+            'barangay_id' => ['nullable'],
+            'days' => ['required', 'integer', 'min:7', 'max:365'],
+            'prediction_scope' => ['required', 'in:current_month,next_month'],
+            'analysis_kind' => ['nullable', 'in:forecast,actual_analysis'],
+            'replace_existing' => ['nullable', 'boolean'],
+            'historical_window' => ['nullable', 'in:3,5,all'],
+        ]);
+        $userId = (int) $request->user()->user_id;
+        $signature = hash('sha256', $userId.'|'.json_encode($validated));
+        $active = AnalysisRunStatus::active($signature);
+        if ($active) {
+            unset($active['user_id'], $active['result']);
+            $active['success'] = true;
+            $active['status_url'] = '/api/station-admin/predictions/'.$active['run_id'];
+
+            return response()->json($active, 202);
+        }
+
+        $runId = (string) Str::uuid();
+        AnalysisRunStatus::put($runId, $userId, 'queued', 5, 'Analysis is queued. Your current saved forecast remains available.');
+        AnalysisRunStatus::rememberActive($signature, $runId);
+        RunPredictiveAnalysisJob::dispatch($runId, $userId, $validated);
+
+        return response()->json([
+            'success' => true,
+            'status' => 'queued',
+            'progress' => 5,
+            'message' => 'Analysis started in the background.',
+            'run_id' => $runId,
+            'status_url' => '/api/station-admin/predictions/'.$runId,
+        ], 202);
+    }
+
+    public function predictionRunStatus(Request $request, string $runId)
+    {
+        abort_unless(Str::isUuid($runId), 404);
+        $status = AnalysisRunStatus::get($runId);
+        abort_unless($status && (int) ($status['user_id'] ?? 0) === (int) $request->user()->user_id, 404);
+        unset($status['user_id']);
+
+        return response()->json(array_merge(['success' => ($status['status'] ?? null) !== 'failed'], $status));
+    }
+
+    public function runPredictionApiSynchronously(Request $request)
     {
         try {
             if (! $this->forecastModelService->ensureReady()) {
@@ -949,6 +1096,7 @@ class AnalyticController extends Controller
             'recommendation_context' => $recommendationContext,
             'chart_context' => $chartContext,
             'evidence_provenance' => $evidenceProvenance,
+            'latest_incident_at' => optional($incidents->max('updated_at'))?->toISOString(),
         ];
     }
 
@@ -1051,6 +1199,9 @@ class AnalyticController extends Controller
                 'total_actions' => (int) ($mitigationContext['total_mitigation_actions'] ?? 0),
                 'risk_reduction_percent' => (float) ($mitigationContext['risk_reduction_percent'] ?? 0),
                 'risk_reduction_points' => (float) ($riskScore['mitigation_reduction_points'] ?? 0),
+                'estimated_readiness_improvement_percent' => (float) ($mitigationContext['readiness_improvement_percent'] ?? 0),
+                'estimated_readiness_adjustment_points' => (float) ($riskScore['estimated_readiness_adjustment_points'] ?? 0),
+                'hazard_score_adjusted' => (bool) ($riskScore['score_adjustment_applied'] ?? false),
             ],
             'result' => [
                 'base_risk_score' => (float) ($riskScore['base_score'] ?? $riskScore['score'] ?? 0),
@@ -1074,7 +1225,7 @@ class AnalyticController extends Controller
                 'historical_fire_baseline' => 'For each barangay, the model uses the larger of the positive fire-occurrence total for the same calendar month in the prior three years or the most recent 12 months.',
                 'weather_observation_rows' => 'Historical rows with zero or null incident_count that contain weather measurements. They inform weather context and are not counted as fires.',
                 'daily_weather_rows' => 'Dedicated completed-day weather observations are stored separately from incidents and aggregated by barangay and calendar day.',
-                'mitigation_effect' => 'Completed checklists, followed steps, hydrant or water readiness, and completed actions reduce risk pressure; they do not erase the underlying evidence.',
+                'mitigation_effect' => 'Completed work improves operational readiness. It does not lower the recorded hazard score until an outcome is measured and verified.',
             ],
         ];
     }
@@ -1144,7 +1295,7 @@ class AnalyticController extends Controller
             ->avg(function ($action) {
                 return Carbon::parse($action->created_at)->diffInDays(Carbon::parse($action->completed_at));
             }), 1);
-        $riskReductionPercent = round(min(
+        $readinessImprovementPercent = round(min(
             35,
             (($checklistCompletionRatio * 18) + ($mitigationCompletionRatio * 12) + ($itemFollowedRatio * 5))
         ), 2);
@@ -1166,7 +1317,10 @@ class AnalyticController extends Controller
             'completed_mitigations' => $completedMitigations,
             'blocked_mitigations' => $blockedMitigations,
             'avg_completion_days' => $avgCompletionDays > 0 ? $avgCompletionDays : null,
-            'risk_reduction_percent' => $riskReductionPercent,
+            'readiness_improvement_percent' => $readinessImprovementPercent,
+            // Kept for older saved payload readers. Workflow completion is not
+            // presented as verified hazard reduction without measured evidence.
+            'risk_reduction_percent' => 0.0,
             'summary' => $totalWeight > 0
                 ? "{$checklists->count()} mitigation checklist(s) tracked, with ".round($checklistCompletionRatio * 100, 1).'% weighted completion.'
                 : 'No confirmed mitigation checklist actions yet.',
@@ -1314,13 +1468,17 @@ class AnalyticController extends Controller
             ->values()
             ->all();
 
+        $operationalFallback = $this->buildOperationalPredictionEvaluationSeries($stationId, $selectedBarangayId);
+        if ($operationalFallback !== null) {
+            $learning['operational_accuracy'] = $operationalFallback['metrics'];
+        }
+
         if (! empty($actualVsPredictedLabels) && ! empty($residualLabels)) {
             $metadata['learning_performance'] = $learning;
 
             return $metadata;
         }
 
-        $operationalFallback = $this->buildOperationalPredictionEvaluationSeries($stationId, $selectedBarangayId);
         if ($operationalFallback === null) {
             $metadata['learning_performance'] = $learning;
 
@@ -1514,9 +1672,9 @@ class AnalyticController extends Controller
     private function applyMitigationToRiskScore(array $riskScore, array $mitigationContext): array
     {
         $baseScore = (float) ($riskScore['score'] ?? 0);
-        $reductionPercent = (float) ($mitigationContext['risk_reduction_percent'] ?? 0);
-        $reductionPoints = round($baseScore * ($reductionPercent / 100), 1);
-        $adjustedScore = max(0, round($baseScore - $reductionPoints));
+        $readinessPercent = (float) ($mitigationContext['readiness_improvement_percent'] ?? 0);
+        $estimatedReadinessPoints = round($baseScore * ($readinessPercent / 100), 1);
+        $adjustedScore = round($baseScore);
 
         $level = 'Low';
         if ($adjustedScore >= 70) {
@@ -1531,7 +1689,10 @@ class AnalyticController extends Controller
             'score' => $adjustedScore,
             'level' => $level,
             'base_score' => $baseScore,
-            'mitigation_reduction_points' => $reductionPoints,
+            'mitigation_reduction_points' => 0.0,
+            'estimated_readiness_adjustment_points' => $estimatedReadinessPoints,
+            'readiness_improvement_percent' => $readinessPercent,
+            'score_adjustment_applied' => false,
         ];
     }
 
@@ -1595,12 +1756,15 @@ class AnalyticController extends Controller
                 ->values()
                 ->all();
 
-            $confidenceBand = 'low';
-            if ($stationProbability >= 75 || $stationProbability <= 20) {
-                $confidenceBand = 'high';
-            } elseif ($stationProbability >= 55 || $stationProbability <= 30) {
-                $confidenceBand = 'medium';
-            }
+            $trainedPredictionCount = collect($barangayPredictions)
+                ->where('prediction_source', 'trained_model')
+                ->count();
+            $trainedCoverage = count($barangayPredictions) > 0
+                ? $trainedPredictionCount / count($barangayPredictions)
+                : 0;
+            $confidenceBand = $trainedPredictionCount === 0
+                ? 'fallback'
+                : (($trainedCoverage >= 0.8 && count($barangayPredictions) >= 3) ? 'high' : 'medium');
 
             $decoded = [
                 'prediction' => $riskLevel === 'high' ? 1 : 0,
@@ -1736,7 +1900,7 @@ class AnalyticController extends Controller
         $prediction['incident_count_summary'] = $isCurrentMonth
             ? "{$normalized['observed_fire_incidents_to_date']} fire incident(s) have already been observed in {$targetLabel}. The calibrated planning range is {$rangeLabel} total incident(s), with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate."
             : "The calibrated planning range is {$rangeLabel} fire incident(s) for {$targetLabel}, with {$normalized['expected_month_total_fire_incidents']} as the midpoint estimate. The forecast month has not started, so there are no observed incidents in that window yet.";
-        $prediction['summary'] = $prediction['incident_count_summary']." Risk outlook: {$outlook}. Review probability, confidence, and the listed drivers together before operational decisions.";
+        $prediction['summary'] = $prediction['incident_count_summary']." Risk outlook: {$outlook}. Review probability, evidence quality, model source, and the listed drivers together before operational decisions.";
 
         $analysis['predictions'] = $prediction;
 
@@ -2602,7 +2766,7 @@ class AnalyticController extends Controller
             $mitigation = $data['mitigation_context'];
             $prompt .= "MITIGATION STATUS:\n";
             $prompt .= '- '.($mitigation['summary'] ?? 'No mitigation summary available')."\n";
-            $prompt .= '- Estimated risk reduction from confirmed actions: '.($mitigation['risk_reduction_percent'] ?? 0)."%\n\n";
+            $prompt .= '- Estimated readiness improvement from tracked work: '.($mitigation['readiness_improvement_percent'] ?? 0)."% (do not treat this as verified hazard reduction)\n\n";
         }
 
         if (! empty($data['selected_barangay_prediction'])) {
@@ -2699,7 +2863,7 @@ class AnalyticController extends Controller
 
         if (! empty($data['mitigation_context'])) {
             $prompt .= 'MITIGATION SUMMARY: '.($data['mitigation_context']['summary'] ?? 'N/A')."\n";
-            $prompt .= 'MITIGATION RISK REDUCTION: '.($data['mitigation_context']['risk_reduction_percent'] ?? 0)."%\n";
+            $prompt .= 'ESTIMATED READINESS IMPROVEMENT: '.($data['mitigation_context']['readiness_improvement_percent'] ?? 0)."% (not verified hazard reduction)\n";
         }
 
         if (! empty($data['recommendation_context']['focus_findings'])) {
@@ -2772,7 +2936,7 @@ class AnalyticController extends Controller
         $prompt = "You are the BFP implementation planner. Convert the fire-risk analysis into a checklist-style action plan that BFP can monitor and confirm.\n\n";
         $prompt .= "STATION: {$data['location_name']}\n";
         $prompt .= "RISK LEVEL: {$analysis['risk_level']}\n";
-        $prompt .= 'CONFIDENCE SCORE: '.($analysis['confidence_score'] ?? 'N/A')."\n";
+        $prompt .= 'EVIDENCE QUALITY SCORE: '.($analysis['confidence_score'] ?? 'N/A')."\n";
 
         if (! empty($analysis['predictions']['summary'])) {
             $prompt .= "PREDICTION SUMMARY: {$analysis['predictions']['summary']}\n";
@@ -4349,12 +4513,13 @@ class AnalyticController extends Controller
 
     private function calculateAnalysisConfidence(array $data, bool $aiResponseAvailable): array
     {
-        $score = 20;
+        $rawScore = 0;
+        $maximumScore = 65;
         $factors = [];
         $historicalYears = (int) data_get($data, 'chart_context.historical_window_meta.year_count', 0);
         if ($historicalYears > 0) {
             $points = min(15, $historicalYears * 5);
-            $score += $points;
+            $rawScore += $points;
             $factors[] = "{$historicalYears} historical comparison year(s) (+{$points})";
         } else {
             $factors[] = 'No historical comparison years (+0)';
@@ -4362,7 +4527,7 @@ class AnalyticController extends Controller
 
         $incidentCount = (int) ($data['total_incidents'] ?? 0);
         $incidentPoints = $incidentCount >= 10 ? 10 : ($incidentCount >= 3 ? 7 : ($incidentCount >= 1 ? 4 : 0));
-        $score += $incidentPoints;
+        $rawScore += $incidentPoints;
         $factors[] = "{$incidentCount} scoped actual incident record(s) (+{$incidentPoints})";
 
         $predictions = collect($data['barangay_predictions'] ?? []);
@@ -4372,47 +4537,52 @@ class AnalyticController extends Controller
             : max(1, $this->resolveStationBarangays((int) ($data['station_id'] ?? 0))->count());
         $coverageRatio = min(1, $predictions->count() / $expectedBarangays);
         $coveragePoints = (int) round($coverageRatio * 12);
-        $score += $coveragePoints;
+        $rawScore += $coveragePoints;
         $factors[] = $predictions->count()."/{$expectedBarangays} barangay forecast(s) available (+{$coveragePoints})";
 
         $trainedPredictionCount = $predictions->where('prediction_source', 'trained_model')->count();
         if ($trainedPredictionCount > 0) {
-            $score += 8;
+            $rawScore += 8;
             $factors[] = "{$trainedPredictionCount} trained-model barangay forecast(s) (+8)";
         } elseif ($predictions->isNotEmpty()) {
             $factors[] = 'Barangay forecasts use deterministic fallback (+0 model points)';
         }
 
         if (! empty($data['weather_context'])) {
-            $score += 6;
+            $rawScore += 6;
             $factors[] = 'Weather context available (+6)';
         }
 
         $riskFindingCount = count(data_get($data, 'recommendation_context.focus_findings', []));
         if ($riskFindingCount > 0) {
             $points = min(6, $riskFindingCount * 2);
-            $score += $points;
+            $rawScore += $points;
             $factors[] = "{$riskFindingCount} verified risk finding(s) (+{$points})";
         }
 
         $currentFireCount = (int) data_get($data, 'prediction_context.current_month_fire_incidents', 0);
         $previousFireCount = (int) data_get($data, 'prediction_context.previous_month_fire_incidents', 0);
         if (($currentFireCount + $previousFireCount) > 0) {
-            $score += 5;
+            $rawScore += 5;
             $factors[] = "Current/previous fire trend evidence {$currentFireCount}/{$previousFireCount} (+5)";
         }
 
         if ($aiResponseAvailable) {
-            $score += 3;
+            $rawScore += 3;
             $factors[] = 'AI prediction and recommendation responses parsed (+3)';
         }
 
-        $score = max(30, min(95, $score));
+        $score = (int) round((min($maximumScore, $rawScore) / $maximumScore) * 100);
+        $qualityBand = $score >= 75 ? 'high' : ($score >= 45 ? 'medium' : 'low');
 
         return [
             'score' => $score,
-            'method' => 'evidence_coverage_v1',
-            'meaning' => 'Confidence measures evidence coverage and model availability; it is separate from fire-risk probability.',
+            'quality_band' => $qualityBand,
+            'label' => ucfirst($qualityBand).' evidence',
+            'raw_points' => $rawScore,
+            'maximum_points' => $maximumScore,
+            'method' => 'evidence_coverage_v2',
+            'meaning' => 'Evidence quality measures coverage and model availability. It is not prediction accuracy or fire-risk probability.',
             'factors' => $factors,
             'historical_year_count' => $historicalYears,
             'scoped_incident_count' => $incidentCount,
@@ -5094,18 +5264,19 @@ class AnalyticController extends Controller
                 $query->where('analysis_id', $request->integer('analysis_id'));
             }
 
-            $checklists = $query->get();
+            $perPage = max(5, min(25, $request->integer('per_page', 10)));
+            $checklists = $query->paginate($perPage);
             $linkedMitigationCounts = MitigationAction::query()
                 ->selectRaw('ai_action_plan_checklist_id, COUNT(*) as aggregate_count, MAX(mitigation_action_id) as mitigation_action_id')
                 ->whereNotNull('ai_action_plan_checklist_id')
-                ->whereIn('ai_action_plan_checklist_id', $checklists->pluck('ai_action_plan_checklist_id')->all())
+                ->whereIn('ai_action_plan_checklist_id', collect($checklists->items())->pluck('ai_action_plan_checklist_id')->all())
                 ->groupBy('ai_action_plan_checklist_id')
                 ->get()
                 ->keyBy('ai_action_plan_checklist_id');
 
             return response()->json([
                 'success' => true,
-                'data' => $checklists->map(function (AiActionPlanChecklist $item) use ($linkedMitigationCounts) {
+                'data' => collect($checklists->items())->map(function (AiActionPlanChecklist $item) use ($linkedMitigationCounts) {
                     $payload = $item->toArray();
                     $linkedMitigation = $linkedMitigationCounts->get($item->ai_action_plan_checklist_id);
                     $payload['checklist_progress'] = $item->checklist_progress;
@@ -5133,6 +5304,12 @@ class AnalyticController extends Controller
 
                     return $payload;
                 })->values(),
+                'pagination' => [
+                    'current_page' => $checklists->currentPage(),
+                    'last_page' => max(1, $checklists->lastPage()),
+                    'per_page' => $checklists->perPage(),
+                    'total' => $checklists->total(),
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('Error fetching action plan checklists: '.$e->getMessage());
@@ -5191,6 +5368,8 @@ class AnalyticController extends Controller
                 ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
                 ->findOrFail($id);
 
+            $this->assertChecklistReadyForStatus($checklist, $validated['status'], $validated['confirmation_notes'] ?? null);
+
             $oldStatus = (string) $checklist->status;
 
             $checklist->update([
@@ -5223,6 +5402,11 @@ class AnalyticController extends Controller
             'status' => 'required|in:pending,followed,not_followed',
             'review_notes' => 'nullable|string|max:1000',
         ]);
+        if ($validated['status'] === 'not_followed' && blank($validated['review_notes'] ?? null)) {
+            throw ValidationException::withMessages([
+                'review_notes' => 'Add a short reason when a step is not followed.',
+            ]);
+        }
 
         try {
             $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
@@ -5389,6 +5573,7 @@ class AnalyticController extends Controller
                     $this->recordChecklistActivity($checklist, 'assignment_changed', (string) ($oldAssignee ?? ''), (string) ($validated['assigned_to'] ?? ''));
                 }
                 if (! empty($validated['status'])) {
+                    $this->assertChecklistReadyForStatus($checklist, $validated['status'], 'Bulk checklist update');
                     $oldStatus = (string) $checklist->status;
                     $checklist->status = $validated['status'];
                     if (in_array($validated['status'], ['confirmed', 'rejected'], true)) {
@@ -5414,6 +5599,35 @@ class AnalyticController extends Controller
         return AiActionPlanChecklist::query()
             ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
             ->when(! $stationId && ! $isProvincialAdmin, fn ($query) => $query->whereRaw('1 = 0'));
+    }
+
+    private function assertChecklistReadyForStatus(AiActionPlanChecklist $checklist, string $status, ?string $notes = null): void
+    {
+        if (! in_array($status, ['submitted', 'confirmed'], true)) {
+            return;
+        }
+
+        if (! $checklist->assigned_to) {
+            throw ValidationException::withMessages(['assigned_to' => 'Assign this checklist before sending it for review.']);
+        }
+        if (! $checklist->target_date) {
+            throw ValidationException::withMessages(['target_date' => 'Set a target date before sending this checklist for review.']);
+        }
+
+        $items = $checklist->items()->get(['status', 'review_notes']);
+        if ($items->isEmpty() || $items->contains(fn ($item) => $item->status === 'pending')) {
+            throw ValidationException::withMessages(['status' => 'Review every checklist step before sending it for approval.']);
+        }
+        if ($items->contains(fn ($item) => $item->status === 'not_followed' && blank($item->review_notes))) {
+            throw ValidationException::withMessages(['status' => 'Every step marked not followed needs a reason.']);
+        }
+
+        $evidenceScore = $checklist->analysis()->value('confidence_data');
+        if (is_numeric($evidenceScore) && (int) $evidenceScore < 45 && blank($notes)) {
+            throw ValidationException::withMessages([
+                'confirmation_notes' => 'Evidence quality is low. Add a note explaining why this plan is safe to approve.',
+            ]);
+        }
     }
 
     private function recordChecklistActivity(AiActionPlanChecklist $checklist, string $eventType, ?string $oldValue, ?string $newValue, ?string $notes = null, ?int $itemId = null, array $metadata = []): void
@@ -6267,8 +6481,8 @@ class AnalyticController extends Controller
             }
         }
 
-        if (! empty($data['mitigation_context']['risk_reduction_percent'])) {
-            $summary .= " Confirmed mitigation actions are currently reducing the projected risk context by about {$data['mitigation_context']['risk_reduction_percent']}%.";
+        if (! empty($data['mitigation_context']['readiness_improvement_percent'])) {
+            $summary .= " Tracked mitigation work indicates about {$data['mitigation_context']['readiness_improvement_percent']}% estimated readiness improvement; this does not lower the recorded hazard score without verified outcomes.";
         }
 
         if (! is_null($predictedDamage)) {
@@ -8143,7 +8357,9 @@ class AnalyticController extends Controller
             return null;
         }
 
-        if ($targetMonth->isFuture()) {
+        // A month-end forecast is not a fair comparison until the full target
+        // month has closed. Partial-month outcomes would inflate the error.
+        if ($targetMonth->greaterThanOrEqualTo(Carbon::today()->startOfMonth())) {
             return null;
         }
 
@@ -8152,8 +8368,9 @@ class AnalyticController extends Controller
             ? Team::query()->where('station_id', $stationId)->pluck('team_id')->filter()->map(fn ($id) => (int) $id)->all()
             : [];
 
+        $incidentDateColumn = Schema::hasColumn('incidents', 'occurred_at') ? 'occurred_at' : 'created_at';
         $actualQuery = Incident::query()
-            ->whereBetween('created_at', [$targetMonth->copy()->startOfMonth(), $targetMonth->copy()->endOfMonth()])
+            ->whereBetween($incidentDateColumn, [$targetMonth->copy()->startOfMonth(), $targetMonth->copy()->endOfMonth()])
             ->whereRaw('LOWER(status) IN (?, ?)', ['closed', 'completed']);
 
         if (Schema::hasColumn('incidents', 'incident_type_id')) {
@@ -8183,12 +8400,88 @@ class AnalyticController extends Controller
         return (int) $actualQuery->count();
     }
 
+    private function buildAccuracyExportReport(Request $request): array
+    {
+        $validated = $request->validate([
+            'station_id' => ['nullable', 'integer', 'exists:stations,station_id'],
+            'barangay_id' => ['nullable', 'integer'],
+            'year' => ['nullable', 'regex:/^(all|20\d{2})$/'],
+            'quarter' => ['nullable', 'in:all,1,2,3,4'],
+        ]);
+        $user = Auth::user();
+        $isProvincialAdmin = strtolower(trim((string) ($user?->role?->role ?? ''))) === 'provincial admin';
+        $stationId = $isProvincialAdmin
+            ? (int) ($validated['station_id'] ?? 0)
+            : (int) StationOfficer::query()->where('user_id', $user?->user_id)->value('station_id');
+
+        abort_if($stationId < 1, 422, 'Select a station before exporting accuracy.');
+        $station = Station::query()->findOrFail($stationId);
+        $barangayId = $this->normalizeSelectedBarangayId($validated['barangay_id'] ?? null);
+        if ($barangayId) {
+            abort_unless(
+                $this->resolveStationBarangays($stationId)->contains(fn ($barangay) => (int) $barangay->barangay_id === $barangayId),
+                403,
+                'The selected barangay is outside this station coverage.'
+            );
+        }
+
+        $year = (string) ($validated['year'] ?? 'all');
+        $quarter = (string) ($validated['quarter'] ?? 'all');
+        $evaluation = $this->buildOperationalPredictionEvaluationSeries($stationId, $barangayId);
+        $outcomes = collect(data_get($evaluation, 'metrics.outcomes', []))
+            ->filter(function (array $outcome) use ($year, $quarter) {
+                try {
+                    $month = Carbon::createFromFormat('Y-m', (string) ($outcome['target_month'] ?? ''));
+                } catch (\Throwable $exception) {
+                    return false;
+                }
+
+                return ($year === 'all' || $month->format('Y') === $year)
+                    && ($quarter === 'all' || (string) $month->quarter === $quarter);
+            })
+            ->values()
+            ->all();
+
+        return [
+            'station' => $station,
+            'outcomes' => $outcomes,
+            'metrics' => $this->summarizeAccuracyOutcomes($outcomes),
+            'filters' => ['year' => $year, 'quarter' => $quarter],
+            'generatedAt' => now(),
+        ];
+    }
+
+    private function summarizeAccuracyOutcomes(array $outcomes): array
+    {
+        $sampleSize = count($outcomes);
+        if ($sampleSize === 0) {
+            return [
+                'sample_size' => 0,
+                'mae' => null,
+                'rmse' => null,
+                'mean_error' => null,
+                'within_one_incident_percent' => null,
+            ];
+        }
+
+        $signedErrors = array_map(fn ($row) => (float) $row['predicted'] - (float) $row['actual'], $outcomes);
+        $absoluteErrors = array_map('abs', $signedErrors);
+
+        return [
+            'sample_size' => $sampleSize,
+            'mae' => round(array_sum($absoluteErrors) / $sampleSize, 2),
+            'rmse' => round(sqrt(array_sum(array_map(fn ($error) => $error ** 2, $absoluteErrors)) / $sampleSize), 2),
+            'mean_error' => round(array_sum($signedErrors) / $sampleSize, 2),
+            'within_one_incident_percent' => round((count(array_filter($absoluteErrors, fn ($error) => $error <= 1)) / $sampleSize) * 100, 1),
+        ];
+    }
+
     private function buildOperationalPredictionEvaluationSeries(int $stationId, ?int $selectedBarangayId = null): ?array
     {
         $rows = Analysis::query()
             ->where('station_id', $stationId)
             ->latest('created_at')
-            ->limit(18)
+            ->limit(60)
             ->get()
             ->map(function (Analysis $analysis) use ($selectedBarangayId) {
                 $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
@@ -8197,6 +8490,19 @@ class AnalyticController extends Controller
                 $scopedPrediction = $this->resolveScopedPredictionFromAnalysis($analysis, $selectedBarangayId);
 
                 if ($selectedBarangayId && $scopedPrediction === null) {
+                    return null;
+                }
+
+                $targetMonthLabel = (string) ($predictionContext['target_month_label'] ?? '');
+                try {
+                    $targetMonth = $targetMonthLabel !== ''
+                        ? Carbon::createFromFormat('F Y', $targetMonthLabel)->startOfMonth()
+                        : null;
+                } catch (\Throwable $exception) {
+                    $targetMonth = null;
+                }
+
+                if (! $targetMonth) {
                     return null;
                 }
 
@@ -8214,7 +8520,7 @@ class AnalyticController extends Controller
                 }
 
                 $label = (string) (
-                    $predictionContext['target_month_label']
+                    $targetMonthLabel
                     ?? $predictionContext['target_period_label']
                     ?? optional($analysis->created_at)?->format('M d, Y')
                     ?? 'Saved run'
@@ -8222,6 +8528,7 @@ class AnalyticController extends Controller
 
                 return [
                     'label' => $label,
+                    'target_month' => $targetMonth->format('Y-m'),
                     'actual' => (float) $actual,
                     'predicted' => (float) $predicted,
                     'sort_key' => optional($analysis->created_at)?->timestamp ?? 0,
@@ -8230,7 +8537,7 @@ class AnalyticController extends Controller
             ->filter()
             ->sortBy('sort_key')
             ->values()
-            ->take(12)
+            ->take(36)
             ->all();
 
         if (count($rows) < 2) {
@@ -8244,8 +8551,29 @@ class AnalyticController extends Controller
             fn ($row) => round((float) $row['predicted'] - (float) $row['actual'], 2),
             $rows
         );
+        $absoluteErrors = array_map(fn ($row) => abs((float) $row['predicted'] - (float) $row['actual']), $rows);
+        $squaredErrors = array_map(fn ($error) => $error ** 2, $absoluteErrors);
+        $signedErrors = array_map(fn ($row) => (float) $row['predicted'] - (float) $row['actual'], $rows);
+        $withinOneIncident = count(array_filter($absoluteErrors, fn ($error) => $error <= 1));
+        $sampleSize = count($rows);
 
         return [
+            'metrics' => [
+                'sample_size' => $sampleSize,
+                'mae' => round(array_sum($absoluteErrors) / $sampleSize, 2),
+                'rmse' => round(sqrt(array_sum($squaredErrors) / $sampleSize), 2),
+                'mean_error' => round(array_sum($signedErrors) / $sampleSize, 2),
+                'within_one_incident_percent' => round(($withinOneIncident / $sampleSize) * 100, 1),
+                'evaluated_through' => (string) ($rows[$sampleSize - 1]['label'] ?? ''),
+                'source' => 'matured_saved_forecasts',
+                'meaning' => 'Calculated from saved forecasts whose target month has ended and completed incident records are available.',
+                'outcomes' => collect($rows)->map(fn ($row) => [
+                    'label' => $row['label'],
+                    'target_month' => $row['target_month'],
+                    'actual' => $row['actual'],
+                    'predicted' => $row['predicted'],
+                ])->values()->all(),
+            ],
             'actual_vs_predicted' => [
                 'target' => 'saved_forecast_runs',
                 'target_column' => 'incident_count',

@@ -1661,6 +1661,30 @@
             font-weight: 700;
             border: 1px solid rgba(251, 146, 60, 0.18);
         }
+        .command-decision-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .command-decision-card {
+            min-width: 0;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #fff, #f8fafc);
+        }
+        .command-decision-card small { display:block;color:#64748b;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.08em; }
+        .command-decision-card strong { display:block;margin-top:7px;color:#0f172a;font-size:1.2rem;line-height:1.25;overflow-wrap:anywhere; }
+        .command-decision-card span { display:block;margin-top:6px;color:#64748b;font-size:11px;line-height:1.45; }
+        .analysis-source-banner { display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding:11px 14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:12px;line-height:1.5; }
+        .analysis-source-banner.is-fallback { background:#fff7ed;border-color:#fed7aa;color:#9a3412; }
+        .supporting-analysis { border-top:1px solid #e2e8f0;padding-top:12px; }
+        .supporting-analysis > summary { cursor:pointer;color:#475569;font-size:12px;font-weight:850;list-style:none; }
+        .supporting-analysis > summary::-webkit-details-marker { display:none; }
+        .supporting-analysis[open] > summary { margin-bottom:14px; }
+        @media(max-width:900px){.command-decision-strip{grid-template-columns:repeat(2,minmax(0,1fr));}}
+        @media(max-width:520px){.command-decision-strip{grid-template-columns:1fr;}}
 
         .analytics-empty-state {
             border-radius: 22px;
@@ -2737,7 +2761,11 @@
 </head>
 <body class="chief-legacy-layout">
 
-    @include('chief.partials.sidebar', ['active' => 'analytics'])
+    @if($isProvincialAdmin ?? false)
+        @include('admin.partials.sidebar', ['active' => 'analytics'])
+    @else
+        @include('chief.partials.sidebar', ['active' => 'analytics'])
+    @endif
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
         <div class="sidebar-header">
             <div class="sidebar-header-content">
@@ -2942,7 +2970,7 @@
                     <div class="analytics-section__head">
                         <div>
                             <div class="analytics-section__title"><i class="fa-solid fa-bolt"></i> Prediction Summary</div>
-                            <p class="analytics-section__copy">A compact command summary of probability, forecasted load, confidence, and hotspot signals derived from the latest analysis response.</p>
+                            <p class="analytics-section__copy">A compact command summary of probability, forecasted load, evidence quality, and hotspot signals derived from the latest analysis response.</p>
                         </div>
                         <div class="analytics-section__actions">
                             <div id="predictionScopeLabel" class="analytics-empty-pill" style="display:none;">Prediction scope</div>
@@ -2952,6 +2980,17 @@
                             </button>
                         </div>
                     </div>
+                    <div id="analysisSourceBanner" class="analysis-source-banner" role="status">
+                        <i class="fa-solid fa-circle-info"></i><span>Run an analysis to see its source, age, and review status.</span>
+                    </div>
+                    <div class="command-decision-strip" aria-label="Decision summary">
+                        <article class="command-decision-card"><small>Current risk</small><strong id="decisionRisk">--</strong><span>Recorded hazard level</span></article>
+                        <article class="command-decision-card"><small>Expected range</small><strong id="decisionRange">--</strong><span>Planning range, not a guarantee</span></article>
+                        <article class="command-decision-card"><small>Evidence quality</small><strong id="decisionEvidence">--</strong><span id="decisionEvidenceCopy">Coverage of trusted inputs</span></article>
+                        <article class="command-decision-card"><small>Next action</small><strong id="decisionNextAction">Run analysis</strong><span>Recommended command step</span></article>
+                    </div>
+                    <details class="supporting-analysis">
+                        <summary><i class="fa-solid fa-chevron-down"></i> View supporting analysis</summary>
                     <div class="prediction-summary-grid">
                         <article class="prediction-card">
                             <div class="prediction-card__head">
@@ -3016,7 +3055,7 @@
                         <article class="prediction-card">
                             <div class="prediction-card__head">
                                 <div>
-                                    <div class="prediction-card__label">Confidence Score</div>
+                                    <div class="prediction-card__label">Evidence Quality</div>
                                     <div id="confidenceScore" class="prediction-card__value">--</div>
                                 </div>
                                 <div class="prediction-card__icon" style="background: linear-gradient(135deg, #2563eb, #38bdf8);"><i class="fa-solid fa-crosshairs"></i></div>
@@ -3046,6 +3085,7 @@
                             <div id="summaryDrivers" class="prediction-drivers"></div>
                         </article>
                     </div>
+                    </details>
                     <div id="riskScore" style="display:none;">--</div>
                     <div id="riskFactors" style="display:none;"></div>
                 </section>
@@ -3155,7 +3195,7 @@
                             <div class="analytics-section__head">
                                 <div>
                                     <div class="analytics-section__title"><i class="fa-solid fa-brain"></i> ML Trend Analysis</div>
-                                    <p class="analytics-section__copy">Reuses the dashboard trend-analysis pattern to compare saved analysis runs, their actual incident counts, predicted fire incidents, and confidence trend over time.</p>
+                                    <p class="analytics-section__copy">Compares saved runs, actual incident counts, predicted fire incidents, and evidence-quality trends over time.</p>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span id="analysisRevisionBadge" class="analytics-empty-pill">Revision --</span>
@@ -3176,7 +3216,7 @@
                                     <div id="mlTrendLatestRisk" class="analytics-mini-stat__value">No data</div>
                                 </div>
                                 <div class="analytics-mini-stat">
-                                    <div class="analytics-mini-stat__label">Latest Confidence</div>
+                                    <div class="analytics-mini-stat__label">Latest Evidence Quality</div>
                                     <div id="mlTrendLatestConfidence" class="analytics-mini-stat__value">0%</div>
                                 </div>
                                 <div class="analytics-mini-stat">
@@ -3432,6 +3472,35 @@
                                 <div class="analytics-metric-card__label">Model type</div>
                                 <div class="analytics-metric-card__value" style="font-size:20px;">Waiting for model</div>
                                 <div class="analytics-metric-card__copy">The active forecast model will appear after the latest snapshot loads.</div>
+                            </div>
+                        </div>
+                        <div class="analytics-section__title" style="margin-top:20px;"><i class="fa-solid fa-bullseye"></i> Real-world forecast accuracy</div>
+                        <p class="analytics-section__copy">Uses only saved forecasts whose target month has ended. Current and future months are excluded.</p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; margin:14px 0;">
+                            <label class="filter-group" style="min-width:150px; margin:0;">
+                                <span>Year</span>
+                                <select id="accuracyYearFilter"><option value="all">All years</option></select>
+                            </label>
+                            <label class="filter-group" style="min-width:150px; margin:0;">
+                                <span>Quarter</span>
+                                <select id="accuracyQuarterFilter">
+                                    <option value="all">All quarters</option>
+                                    <option value="1">Q1 · Jan–Mar</option>
+                                    <option value="2">Q2 · Apr–Jun</option>
+                                    <option value="3">Q3 · Jul–Sep</option>
+                                    <option value="4">Q4 · Oct–Dec</option>
+                                </select>
+                            </label>
+                            <div style="display:flex; gap:8px; align-items:flex-end; margin-left:auto;">
+                                <button type="button" class="analytics-empty-pill" onclick="exportAccuracyReport('csv')" style="cursor:pointer;"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                                <button type="button" class="analytics-empty-pill" onclick="exportAccuracyReport('pdf')" style="cursor:pointer;"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                            </div>
+                        </div>
+                        <div class="analytics-metric-grid" id="operationalAccuracyMetricGrid">
+                            <div class="analytics-metric-card">
+                                <div class="analytics-metric-card__label">Waiting for outcomes</div>
+                                <div class="analytics-metric-card__value" style="font-size:20px;">Not enough data</div>
+                                <div class="analytics-metric-card__copy">Accuracy appears after at least two forecast months have completed.</div>
                             </div>
                         </div>
                         <div id="modelPerformanceStatus" class="analytics-model-status">
@@ -4309,7 +4378,7 @@
                                     <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px;">
                                         <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Actual</small><div style="font-weight:900;">${escapeHtml(String(revision.incident_count ?? 0))}</div></div>
                                         <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Predicted</small><div style="font-weight:900;">${revision.predicted_fire_incidents ?? 'N/A'}</div></div>
-                                        <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Confidence</small><div style="font-weight:900;">${escapeHtml(String(revision.confidence ?? 0))}%</div></div>
+                                        <div style="padding:10px; border-radius:12px; background:#f8fafc;"><small style="color:#64748b;">Evidence quality</small><div style="font-weight:900;">${escapeHtml(String(revision.confidence ?? 0))}%</div></div>
                                     </div>
                                     ${!revision.is_current ? `<div style="font-size:11px; color:#64748b; margin-top:10px;">Compared with current: actual ${incidentDelta >= 0 ? '+' : ''}${incidentDelta}, predicted ${predictedDelta >= 0 ? '+' : ''}${predictedDelta}.</div>` : ''}
                                     <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:12px;">
@@ -4865,7 +4934,7 @@
                             ${escapeHtml(run.scopeMeta?.chipLabel || 'All barangays')}
                         </span>
                         <span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(run.outlook || 'Forecast')}</span>
-                        ${run.confidenceScore !== null && run.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(run.confidenceScore))}% confidence</span>` : ''}
+                        ${run.confidenceScore !== null && run.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(run.confidenceScore))}% evidence</span>` : ''}
                         ${run.predictedIncidents !== null && run.predictedIncidents !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-fire-flame-curved" style="color:#dc2626;"></i>${escapeHtml(String(run.predictedIncidents))} possible incident(s)</span>` : ''}
                         ${run.hotspotName ? `<span class="recommendation-run-chip"><i class="fa-solid fa-location-dot" style="color:#dc2626;"></i>${escapeHtml(run.hotspotName)}</span>` : ''}
                     </div>
@@ -5201,7 +5270,7 @@
                             <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${escapeHtml(group.riskLevel || 'Unknown')}</div>
                         </div>
                         <div class="analytics-run-modal__stat">
-                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Confidence</div>
+                            <div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase;">Evidence quality</div>
                             <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:6px;">${group.confidenceScore !== null && group.confidenceScore !== undefined ? `${escapeHtml(String(group.confidenceScore))}%` : 'N/A'}</div>
                         </div>
                         <div class="analytics-run-modal__stat">
@@ -5313,7 +5382,7 @@
                     `<span class="recommendation-run-chip"><i class="fa-solid ${group.scopeMeta?.isBarangaySpecific ? 'fa-map-pin' : 'fa-map'}" style="color:${group.scopeMeta?.isBarangaySpecific ? '#dc2626' : '#475569'};"></i>${escapeHtml(group.scopeMeta?.chipLabel || 'All barangays')}</span>`,
                     `<span class="recommendation-run-chip"><i class="fa-solid fa-list-check" style="color:#2563eb;"></i>${escapeHtml(String(recommendations.length))} recommendation(s)</span>`,
                     group.riskLevel ? `<span class="recommendation-run-chip"><i class="fa-solid fa-shield-heart" style="color:#f59e0b;"></i>${escapeHtml(group.riskLevel)}</span>` : '',
-                    group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% confidence</span>` : ''
+                    group.confidenceScore !== null && group.confidenceScore !== undefined ? `<span class="recommendation-run-chip"><i class="fa-solid fa-crosshairs" style="color:#059669;"></i>${escapeHtml(String(group.confidenceScore))}% evidence</span>` : ''
                 ].filter(Boolean).join('');
 
                 return `
@@ -5463,6 +5532,25 @@
             return `${numericValue.toFixed(decimals)}${suffix}`;
         }
 
+        function exportAccuracyReport(format) {
+            const stationId = document.getElementById('stationSelect')?.value || '';
+            if (!stationId) {
+                showAnalyticsToast('Select a station before exporting.', 'warning');
+                return;
+            }
+
+            const role = String(document.querySelector('meta[name="user-role"]')?.content || '').toLowerCase();
+            const prefix = role.includes('provincial admin') ? '/admin' : '/station-admin';
+            const params = new URLSearchParams({
+                station_id: stationId,
+                year: document.getElementById('accuracyYearFilter')?.value || 'all',
+                quarter: document.getElementById('accuracyQuarterFilter')?.value || 'all',
+            });
+            const barangayId = document.getElementById('barangaySelect')?.value || '';
+            if (barangayId && barangayId !== 'all') params.set('barangay_id', barangayId);
+            window.location.assign(`${prefix}/analytics/accuracy.${format}?${params.toString()}`);
+        }
+
         function setChartEmptyNote(containerId, message = '') {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -5483,6 +5571,7 @@
             const actualVsPredicted = learning.actual_vs_predicted || null;
             const residualPattern = learning.residual_pattern || null;
             const regressionMetrics = learning.regression_performance || modelMetadata.regression_metrics || {};
+            const operationalAccuracy = learning.operational_accuracy || null;
             const compactChart = isAnalyticsMobile();
             const chartFontSize = compactChart ? 10 : 12;
             const chartPointRadius = compactChart ? 2 : 3;
@@ -5502,6 +5591,7 @@
             };
 
             const metricGrid = document.getElementById('modelPerformanceMetricGrid');
+            const operationalGrid = document.getElementById('operationalAccuracyMetricGrid');
             const modelMeta = document.getElementById('modelPerformanceMeta');
             const modelStatus = document.getElementById('modelPerformanceStatus');
             const modelPerformanceExplainer = document.getElementById('modelPerformanceExplainer');
@@ -5516,6 +5606,9 @@
                 ?? modelMetadata.metrics?.classification_report?.['1']?.support
                 ?? 0
             );
+            const confusionMatrix = classification.confusion_matrix ?? modelMetadata.metrics?.confusion_matrix ?? [];
+            const falseAlerts = Number(confusionMatrix?.[0]?.[1] ?? 0);
+            const missedHighRisk = Number(confusionMatrix?.[1]?.[0] ?? 0);
 
             if (modelStatus) {
                 const statusMessage = learning.available
@@ -5551,6 +5644,21 @@
                         <div class="analytics-metric-card__copy">Probability discrimination score for the high-risk classification target.</div>
                     </div>
                     <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Precision / recall</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(classification.precision ?? modelMetadata.metrics?.precision, '', 4))} / ${escapeHtml(formatLearningMetric(classification.recall ?? modelMetadata.metrics?.recall, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">How often high-risk alerts were correct / how many real high-risk cases were found.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Brier score</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(classification.brier_score ?? modelMetadata.metrics?.brier_score, '', 4))}</div>
+                        <div class="analytics-metric-card__copy">Probability error; lower is better.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">False alerts / missed</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(String(falseAlerts))} / ${escapeHtml(String(missedHighRisk))}</div>
+                        <div class="analytics-metric-card__copy">Incorrect high-risk alerts / high-risk cases the test split missed.</div>
+                    </div>
+                    <div class="analytics-metric-card">
                         <div class="analytics-metric-card__label">Incident-count MAE</div>
                         <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(incidentRegression.mae, '', 4))}</div>
                         <div class="analytics-metric-card__copy">Average absolute error for the saved incident-count regression output.</div>
@@ -5562,6 +5670,85 @@
                     </div>
                 `;
             }
+
+            const renderOperationalAccuracy = (metrics) => {
+                if (!operationalGrid) return;
+                operationalGrid.innerHTML = metrics ? `
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Completed forecast months</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(String(metrics.sample_size ?? 0))}</div>
+                        <div class="analytics-metric-card__copy">Only matured forecasts with recorded outcomes.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Average error</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(metrics.mae, '', 2))}</div>
+                        <div class="analytics-metric-card__copy">Average number of incidents above or below the real result; lower is better.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Large-error score</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(metrics.rmse, '', 2))}</div>
+                        <div class="analytics-metric-card__copy">Gives more weight to forecasts with larger misses; lower is better.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Forecast bias</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(metrics.mean_error, '', 2))}</div>
+                        <div class="analytics-metric-card__copy">Positive means forecasts run high; negative means they run low.</div>
+                    </div>
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Within 1 incident</div>
+                        <div class="analytics-metric-card__value">${escapeHtml(formatLearningMetric(metrics.within_one_incident_percent, '%', 1))}</div>
+                        <div class="analytics-metric-card__copy">Share of completed forecasts within one incident of the real result.</div>
+                    </div>
+                ` : `
+                    <div class="analytics-metric-card">
+                        <div class="analytics-metric-card__label">Waiting for outcomes</div>
+                        <div class="analytics-metric-card__value" style="font-size:20px;">Not enough data</div>
+                        <div class="analytics-metric-card__copy">At least two completed forecast months are needed. Current-month results are intentionally excluded.</div>
+                    </div>
+                `;
+            };
+
+            const accuracyOutcomes = Array.isArray(operationalAccuracy?.outcomes) ? operationalAccuracy.outcomes : [];
+            const yearFilter = document.getElementById('accuracyYearFilter');
+            const quarterFilter = document.getElementById('accuracyQuarterFilter');
+            const years = [...new Set(accuracyOutcomes.map((outcome) => String(outcome.target_month || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+            if (yearFilter) {
+                const selectedYear = yearFilter.value;
+                yearFilter.innerHTML = '<option value="all">All years</option>' + years.map((year) => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`).join('');
+                yearFilter.value = years.includes(selectedYear) ? selectedYear : 'all';
+            }
+
+            const applyAccuracyFilters = () => {
+                const selectedYear = yearFilter?.value || 'all';
+                const selectedQuarter = quarterFilter?.value || 'all';
+                const filtered = accuracyOutcomes.filter((outcome) => {
+                    const [year, monthText] = String(outcome.target_month || '').split('-');
+                    const quarter = Math.ceil(Number(monthText) / 3);
+                    return (selectedYear === 'all' || year === selectedYear)
+                        && (selectedQuarter === 'all' || String(quarter) === selectedQuarter);
+                });
+
+                if (!filtered.length) {
+                    renderOperationalAccuracy(null);
+                    return;
+                }
+
+                const signedErrors = filtered.map((outcome) => Number(outcome.predicted || 0) - Number(outcome.actual || 0));
+                const absoluteErrors = signedErrors.map((error) => Math.abs(error));
+                const sampleSize = filtered.length;
+                renderOperationalAccuracy({
+                    sample_size: sampleSize,
+                    mae: absoluteErrors.reduce((sum, error) => sum + error, 0) / sampleSize,
+                    rmse: Math.sqrt(absoluteErrors.reduce((sum, error) => sum + (error * error), 0) / sampleSize),
+                    mean_error: signedErrors.reduce((sum, error) => sum + error, 0) / sampleSize,
+                    within_one_incident_percent: (absoluteErrors.filter((error) => error <= 1).length / sampleSize) * 100,
+                });
+            };
+
+            if (yearFilter) yearFilter.onchange = applyAccuracyFilters;
+            if (quarterFilter) quarterFilter.onchange = applyAccuracyFilters;
+            if (accuracyOutcomes.length) applyAccuracyFilters();
+            else renderOperationalAccuracy(operationalAccuracy);
 
             if (modelMeta) {
                 const pills = [
@@ -5960,6 +6147,7 @@
                 ?? prediction?.model_prediction?.forecast_calibration
                 ?? null;
             const confidenceScore = analysisData.confidence_score ?? prediction?.model_prediction?.confidence_band ?? null;
+            const confidenceContext = analysisData.confidence_context || {};
             const drivers = Array.isArray(prediction?.drivers) ? prediction.drivers : [];
 
             document.getElementById('summaryProbability').textContent = probability !== null ? `${Number(probability).toFixed(1)}%` : 'Unavailable';
@@ -5985,7 +6173,6 @@
                 ? (typeof confidenceScore === 'number' ? `${confidenceScore}%` : String(confidenceScore))
                 : 'Unavailable';
             const confidenceCopy = document.getElementById('confidenceScoreCopy');
-            const confidenceContext = analysisData.confidence_context || {};
             if (confidenceCopy) {
                 const factors = Array.isArray(confidenceContext.factors) ? confidenceContext.factors.slice(0, 3) : [];
                 confidenceCopy.textContent = factors.length
@@ -5994,6 +6181,37 @@
                 confidenceCopy.title = Array.isArray(confidenceContext.factors)
                     ? confidenceContext.factors.join('\n')
                     : '';
+            }
+
+            const decisionRisk = document.getElementById('decisionRisk');
+            const decisionRange = document.getElementById('decisionRange');
+            const decisionEvidence = document.getElementById('decisionEvidence');
+            const decisionEvidenceCopy = document.getElementById('decisionEvidenceCopy');
+            const decisionNextAction = document.getElementById('decisionNextAction');
+            const sourceBanner = document.getElementById('analysisSourceBanner');
+            const lower = Number(incidentRange?.lower);
+            const upper = Number(incidentRange?.upper);
+            const qualityBand = String(confidenceContext.quality_band || (Number(confidenceScore) >= 75 ? 'high' : (Number(confidenceScore) >= 45 ? 'medium' : 'low'))).toLowerCase();
+            const isFallback = analysisData.ai_source === false
+                || (Array.isArray(analysisData.barangay_predictions) && analysisData.barangay_predictions.some((item) => item.prediction_source === 'deterministic_fallback'));
+            const generatedAt = analysisData.data_freshness?.generated_at || analysisData.evidence_provenance?.generated_at || analysisData.generated_at || null;
+            const generatedLabel = generatedAt ? new Date(generatedAt).toLocaleString() : 'time unavailable';
+            const incidentFreshness = analysisData.data_freshness?.latest_incident_at
+                ? new Date(analysisData.data_freshness.latest_incident_at).toLocaleString()
+                : 'no incident update recorded';
+
+            if (decisionRisk) decisionRisk.textContent = analysisData.risk_level || prediction?.outlook || 'Unavailable';
+            if (decisionRange) decisionRange.textContent = Number.isFinite(lower) && Number.isFinite(upper) ? (lower === upper ? String(lower) : `${lower}–${upper}`) : 'Unavailable';
+            if (decisionEvidence) decisionEvidence.textContent = `${qualityBand.charAt(0).toUpperCase() + qualityBand.slice(1)}${Number.isFinite(Number(confidenceScore)) ? ` · ${Number(confidenceScore)}%` : ''}`;
+            if (decisionEvidenceCopy) decisionEvidenceCopy.textContent = confidenceContext.meaning || 'Coverage of incidents, history, weather, verified findings, and model availability.';
+            if (decisionNextAction) {
+                decisionNextAction.textContent = qualityBand === 'low'
+                    ? 'Review the evidence'
+                    : (String(analysisData.risk_level || '').toLowerCase().match(/high|critical/) ? 'Review urgent actions' : 'Review action plans');
+            }
+            if (sourceBanner) {
+                sourceBanner.classList.toggle('is-fallback', isFallback);
+                sourceBanner.innerHTML = `<i class="fa-solid ${isFallback ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i><span><strong>${isFallback ? 'Fallback estimate — review before acting.' : 'Trained forecast with recorded evidence.'}</strong> Generated ${escapeHtml(generatedLabel)}; latest incident update ${escapeHtml(incidentFreshness)}. Risk probability and evidence quality are separate measures.</span>`;
             }
 
             const trendDirection = document.getElementById('summaryTrendDirection');
@@ -6346,7 +6564,7 @@
                             fill: false
                         },
                         {
-                            label: 'Confidence %',
+                            label: 'Evidence quality %',
                             data: mlTrendSeries.map((item) => item.confidence),
                             borderColor: '#10b981',
                             backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -6381,7 +6599,7 @@
                                 ...chartTicks,
                                 callback: (value) => `${value}%`
                             },
-                            title: { display: !compactChart, text: 'Confidence %' }
+                            title: { display: !compactChart, text: 'Evidence quality %' }
                         },
                         x: {
                             grid: { display: false },
@@ -6719,7 +6937,7 @@
                 'mlTrendInsights',
                 [
                     mlTrendAnalysis?.missing?.series ? 'No saved analysis history is available yet for the ML trend comparison chart.' : null,
-                    mlTrendSeries.length > 1 ? `This panel compares ${mlTrendSeries.length} saved analysis run(s) so you can track how incident counts, predicted incidents, and confidence have been moving over time.` : null,
+                    mlTrendSeries.length > 1 ? `This panel compares ${mlTrendSeries.length} saved analysis run(s) so you can track incident counts, predictions, and evidence quality over time.` : null,
                 ].filter(Boolean),
                 'ML trend analysis is unavailable for the current dataset.'
             );
@@ -7096,8 +7314,37 @@
                     );
                 }
                 
-                const result = await response.json();
+                let result = await response.json();
                 console.log('AI Analysis Result:', result);
+
+                if (response.status === 202 && result.status_url) {
+                    window.localStorage.setItem('pyrosense-active-analysis-run', JSON.stringify({
+                        statusUrl: result.status_url,
+                        predictionScope,
+                        startedAt: Date.now(),
+                    }));
+                    let pollAttempts = 0;
+                    while (!['completed', 'failed'].includes(result.status) && pollAttempts < 180) {
+                        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+                        const statusResponse = await fetch(result.status_url, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        result = await statusResponse.json().catch(() => ({}));
+                        if (!statusResponse.ok) throw new Error(result.message || 'Unable to read analysis progress.');
+                        const progress = Math.max(0, Math.min(100, Number(result.progress || 0)));
+                        analyticsLoadingState.percent = Math.max(analyticsLoadingState.percent, progress);
+                        updateAnalyticsLoadingUI(analyticsLoadingState.percent, predictionScope);
+                        pollAttempts += 1;
+                    }
+                    if (result.status === 'failed' || !result.success) {
+                        throw new Error([result.message, result.details].filter(Boolean).join(' '));
+                    }
+                    if (result.status !== 'completed' || !result.result) {
+                        throw new Error('Analysis is still running. You can leave this page; the saved result will appear when it finishes.');
+                    }
+                    window.localStorage.removeItem('pyrosense-active-analysis-run');
+                    result = result.result;
+                }
                 
                 if (result.success) {
                     updateTargetMonthDisplay(predictionScope, result.data?.prediction_context || null);
@@ -8198,6 +8445,14 @@
             replaceChiefAnalyticsFaIcons();
             updateHistoricalWindowBadge();
             setHistoricalWeatherSaveButtonState(true);
+
+            const completedRunNotifications = @json($analysisCompletionNotifications ?? []);
+            completedRunNotifications.forEach((notification, index) => {
+                window.setTimeout(() => {
+                    const message = [notification.title, notification.message].filter(Boolean).join(': ');
+                    showAnalyticsToast(message, notification.status === 'failed' ? 'error' : 'success');
+                }, index * 500);
+            });
 
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {

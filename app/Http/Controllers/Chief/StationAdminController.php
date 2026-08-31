@@ -3,55 +3,51 @@
 namespace App\Http\Controllers\Chief;
 
 use App\Http\Controllers\Controller;
-
-use App\Models\Marker;
-use App\Models\StationOfficer;
-use App\Models\Incident;
-use App\Models\User;
-use App\Models\UserLog;
-use App\Models\Station;
-use App\Models\Team;
-use App\Models\Province;
-use App\Models\City;
+use App\Models\AiActionPlanChecklist;
+use App\Models\AiActionPlanChecklistItem;
 use App\Models\Barangay;
 use App\Models\BarangayOfficer;
 use App\Models\BarangayPredictionChecklist;
-use App\Models\AiActionPlanChecklist;
-use App\Models\AiActionPlanChecklistItem;
-use App\Models\FullAddress;
-use App\Models\FsicRequest;
-use App\Models\FsicApproval;
-use App\Models\MitigationAction;
-use App\Models\MitigationActionAttachment;
-use App\Models\RiskArea;
-use App\Models\SpotInvestigationReport;
-use App\Models\ProgressInvestigationReport;
-use App\Models\FinalInvestigationReport;
+use App\Models\City;
 use App\Models\CommunityActivityRequest;
 use App\Models\EventActivity;
-
-
-use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
-use App\Support\MediaPath;
-use App\Support\UserActivityLogger;
+use App\Models\FinalInvestigationReport;
+use App\Models\FsicApproval;
+use App\Models\FsicRequest;
+use App\Models\FullAddress;
+use App\Models\Incident;
+use App\Models\Marker;
+use App\Models\MitigationAction;
+use App\Models\MitigationActionAttachment;
+use App\Models\ProgressInvestigationReport;
+use App\Models\Province;
+use App\Models\RiskArea;
+use App\Models\SpotInvestigationReport;
+use App\Models\Station;
+use App\Models\StationOfficer;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\UserLog;
 use App\Services\PredictedRiskAreaService;
 use App\Services\ProfileImageService;
+use App\Support\MediaPath;
+use App\Support\UserActivityLogger;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class StationAdminController extends Controller
 {
     public function __construct(
         protected PredictedRiskAreaService $predictedRiskAreaService
-    ) {
-    }
+    ) {}
 
     protected function serializeScheduleEvent(EventActivity $event): array
     {
@@ -101,7 +97,7 @@ class StationAdminController extends Controller
             if ($requestedStartHour < $minimumStartHour) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'For today, only current or future Asia/Manila time slots can be scheduled.'
+                    'message' => 'For today, only current or future Asia/Manila time slots can be scheduled.',
                 ], 422);
             }
         }
@@ -112,8 +108,8 @@ class StationAdminController extends Controller
     protected function buildScheduleLabel(string $startTime, string $endTime): string
     {
         return Carbon::createFromFormat('H:i', $startTime)->format('g:i A')
-            . ' - '
-            . Carbon::createFromFormat('H:i', $endTime)->format('g:i A');
+            .' - '
+            .Carbon::createFromFormat('H:i', $endTime)->format('g:i A');
     }
 
     protected function hasOfficialScheduleConflict(int $stationId, array $validated, ?int $ignoreEventId = null): bool
@@ -215,6 +211,7 @@ class StationAdminController extends Controller
                 $predictions = is_array($analysis->predictions ?? null)
                     ? $analysis->predictions
                     : (json_decode((string) ($analysis->predictions ?? '[]'), true) ?: []);
+
                 return [
                     'date' => Carbon::parse($analysis->created_at)->toDateString(),
                     'predicted_fire_incidents' => (int) (data_get($predictions, 'predicted_fire_incidents') ?? 0),
@@ -254,7 +251,7 @@ class StationAdminController extends Controller
             ->leftJoin('roles', 'users.role_id', '=', 'roles.role_id')
             ->select('stations.station_id', 'stations.station_name')
             ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(roles.role) IN ({$rolePlaceholders}) THEN users.user_id END) AS total_personnel_count", $eligibleRoles)
-            ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(roles.role) = ? THEN users.user_id END) AS firefighter_count", ['firefighter'])
+            ->selectRaw('COUNT(DISTINCT CASE WHEN LOWER(roles.role) = ? THEN users.user_id END) AS firefighter_count', ['firefighter'])
             ->groupBy('stations.station_id', 'stations.station_name')
             ->orderBy('stations.station_name')
             ->get()
@@ -273,7 +270,7 @@ class StationAdminController extends Controller
 
     protected function getStationOfficerIdsForStation(?int $stationId)
     {
-        if (!$stationId) {
+        if (! $stationId) {
             return collect();
         }
 
@@ -313,7 +310,7 @@ class StationAdminController extends Controller
 
     protected function getFirstTeamForStation(?int $stationId): ?Team
     {
-        if (!$stationId) {
+        if (! $stationId) {
             return null;
         }
 
@@ -324,7 +321,7 @@ class StationAdminController extends Controller
 
     protected function getTeamIdsForStation(?int $stationId)
     {
-        if (!$stationId) {
+        if (! $stationId) {
             return collect();
         }
 
@@ -494,12 +491,17 @@ class StationAdminController extends Controller
             'status' => ['required', Rule::in(array_keys($this->mitigationStatusLabels()))],
             'source_type' => ['nullable', Rule::in(array_keys($this->mitigationSourceOptions()))],
             'description' => ['required', 'string', 'max:3000'],
+            'baseline_condition' => ['nullable', 'string', 'max:3000'],
+            'expected_result' => ['nullable', 'string', 'max:3000'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'implementation_notes' => ['nullable', 'string', 'max:3000'],
+            'blocked_reason' => ['nullable', 'string', 'max:2000'],
             'completion_notes' => ['nullable', 'string', 'max:3000'],
             'outcome_result' => ['nullable', 'string', 'max:3000'],
             'effectiveness' => ['nullable', Rule::in(array_keys($this->mitigationEffectivenessOptions()))],
+            'verification_date' => ['nullable', 'date'],
             'follow_up_required' => ['nullable', 'boolean'],
+            'follow_up_date' => ['nullable', 'date'],
             'follow_up_notes' => ['nullable', 'string', 'max:3000'],
             'target_date' => ['nullable', 'date'],
             'risk_area_id' => ['nullable', 'integer'],
@@ -510,6 +512,52 @@ class StationAdminController extends Controller
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx', 'max:10240'],
         ];
+    }
+
+    protected function validateMitigationWorkflowRequirements(array $validated, ?MitigationAction $existing = null): void
+    {
+        $status = (string) ($validated['status'] ?? 'draft');
+
+        if (in_array($status, ['approved', 'in_progress', 'blocked', 'completed'], true)) {
+            if (empty($validated['responsible_team_id']) && empty($validated['responsible_user_id'])) {
+                throw ValidationException::withMessages([
+                    'responsible_user_id' => 'Assign a team or responsible person before starting this plan.',
+                ]);
+            }
+            if (empty($validated['target_date'])) {
+                throw ValidationException::withMessages([
+                    'target_date' => 'Set a target date before starting this plan.',
+                ]);
+            }
+        }
+
+        if ($status === 'blocked' && blank($validated['blocked_reason'] ?? null)) {
+            throw ValidationException::withMessages([
+                'blocked_reason' => 'Briefly explain what is blocking this plan.',
+            ]);
+        }
+
+        if ($status === 'completed') {
+            $hasExistingProof = $existing?->attachments()->exists() ?? false;
+            $hasNewProof = request()->hasFile('attachments');
+
+            if (blank($validated['completion_notes'] ?? null)) {
+                throw ValidationException::withMessages(['completion_notes' => 'Add completion notes before closing this plan.']);
+            }
+            if (blank($validated['outcome_result'] ?? null)) {
+                throw ValidationException::withMessages(['outcome_result' => 'Record the actual result before closing this plan.']);
+            }
+            if (($validated['effectiveness'] ?? 'pending_evaluation') === 'pending_evaluation') {
+                throw ValidationException::withMessages(['effectiveness' => 'Evaluate the result before closing this plan.']);
+            }
+            if (! $hasExistingProof && ! $hasNewProof) {
+                throw ValidationException::withMessages(['attachments' => 'Attach at least one proof file before closing this plan.']);
+            }
+        }
+
+        if (! empty($validated['follow_up_required']) && empty($validated['follow_up_date'])) {
+            throw ValidationException::withMessages(['follow_up_date' => 'Set a follow-up date when follow-up is required.']);
+        }
     }
 
     protected function validateMitigationLinksForStation(array $validated, array $allowedBarangayIds): array
@@ -751,6 +799,7 @@ class StationAdminController extends Controller
 
                 if ($stationId) {
                     $query->where('station_id', $stationId);
+
                     return;
                 }
 
@@ -765,20 +814,20 @@ class StationAdminController extends Controller
         $firstSuggestion = $checklist->suggestions->sortByDesc('created_at')->first();
         $steps = collect($firstSuggestion?->steps ?: $checklist->checklist_items ?: [])
             ->filter()
-            ->map(fn ($step) => '- ' . trim((string) $step))
+            ->map(fn ($step) => '- '.trim((string) $step))
             ->values()
             ->all();
 
         $resources = collect($firstSuggestion?->resources_needed ?: [])
             ->filter()
-            ->map(fn ($resource) => '- ' . trim((string) $resource))
+            ->map(fn ($resource) => '- '.trim((string) $resource))
             ->values()
             ->all();
 
         $descriptionParts = array_filter([
             $checklist->plan_description ?: $checklist->source_description,
-            ! empty($steps) ? "Suggested steps:\n" . implode("\n", $steps) : null,
-            ! empty($resources) ? "Resources needed:\n" . implode("\n", $resources) : null,
+            ! empty($steps) ? "Suggested steps:\n".implode("\n", $steps) : null,
+            ! empty($resources) ? "Resources needed:\n".implode("\n", $resources) : null,
             $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
         ]);
 
@@ -792,7 +841,7 @@ class StationAdminController extends Controller
             'target_date' => optional($checklist->target_date)->format('Y-m-d'),
             'description' => implode("\n\n", $descriptionParts),
             'remarks' => $firstSuggestion?->estimated_timeline
-                ? 'Drafted from AI action-plan checklist. Timeline suggestion: ' . $firstSuggestion->estimated_timeline
+                ? 'Drafted from AI action-plan checklist. Timeline suggestion: '.$firstSuggestion->estimated_timeline
                 : 'Drafted from AI action-plan checklist.',
             'implementation_notes' => null,
             'completion_notes' => null,
@@ -892,7 +941,7 @@ class StationAdminController extends Controller
         $riskLevel = strtolower((string) ($predictedArea['risk_level'] ?? 'medium'));
         $category = $this->resolveMitigationCategoryForPredictedArea($predictedArea);
         $title = $this->buildMitigationRecommendationTitle($predictedArea, $category);
-        $signature = 'risk-area:' . $riskAreaId . '|category:' . $category;
+        $signature = 'risk-area:'.$riskAreaId.'|category:'.$category;
         $targetDays = match ($riskLevel) {
             'high' => 7,
             'medium' => 14,
@@ -902,12 +951,12 @@ class StationAdminController extends Controller
         $drivers = array_slice(array_values($predictedArea['drivers'] ?? []), 0, 4);
         $factorSummary = array_slice(array_values($predictedArea['contributing_factors'] ?? []), 0, 4);
         $descriptionParts = array_filter([
-            "System-generated mitigation draft for a {$riskLevel} predicted risk zone near " . ($predictedArea['name'] ?? 'the affected area') . '.',
-            ! empty($drivers) ? 'Key drivers: ' . implode('; ', $drivers) . '.' : null,
-            ! empty($factorSummary) ? 'Contributing factors observed: ' . implode(', ', array_map(fn ($factor) => str_replace('_', ' ', (string) $factor), $factorSummary)) . '.' : null,
-            "Nearby approved hazards/risks: " . (int) data_get($predictedArea, 'metrics.verified_records', 0)
-                . " | Historical incidents: " . (int) data_get($predictedArea, 'metrics.historical_incidents', 0)
-                . " | Support points in cluster: " . (int) data_get($predictedArea, 'metrics.support_points', 0) . '.',
+            "System-generated mitigation draft for a {$riskLevel} predicted risk zone near ".($predictedArea['name'] ?? 'the affected area').'.',
+            ! empty($drivers) ? 'Key drivers: '.implode('; ', $drivers).'.' : null,
+            ! empty($factorSummary) ? 'Contributing factors observed: '.implode(', ', array_map(fn ($factor) => str_replace('_', ' ', (string) $factor), $factorSummary)).'.' : null,
+            'Nearby approved hazards/risks: '.(int) data_get($predictedArea, 'metrics.verified_records', 0)
+                .' | Historical incidents: '.(int) data_get($predictedArea, 'metrics.historical_incidents', 0)
+                .' | Support points in cluster: '.(int) data_get($predictedArea, 'metrics.support_points', 0).'.',
             "Response/resource context: {$resourceContext['team_count']} team(s), {$resourceContext['personnel_count']} personnel, {$resourceContext['available_crew_count']} currently available/dispatched crew, {$resourceContext['hydrant_count']} hydrant marker(s), {$resourceContext['active_incident_count']} active incident(s).",
             "Recommended action type: {$actionTypeLabel}.",
         ]);
@@ -920,7 +969,7 @@ class StationAdminController extends Controller
             'barangay_id' => $barangayId,
             'risk_area_id' => $riskAreaId,
             'source_type' => 'action_plan',
-            'source_title' => 'System mitigation recommendation for ' . ($predictedArea['name'] ?? 'predicted risk area'),
+            'source_title' => 'System mitigation recommendation for '.($predictedArea['name'] ?? 'predicted risk area'),
             'source_description' => 'Generated from clustered nearby evidence, approved hazards/risks, historical incidents, and station response context.',
             'plan_title' => $title,
             'plan_description' => implode("\n\n", $descriptionParts),
@@ -992,7 +1041,7 @@ class StationAdminController extends Controller
             default => 'Inspect and mitigate high-risk condition',
         };
 
-        return trim($actionLabel . ' near ' . $location . ', ' . $barangayName);
+        return trim($actionLabel.' near '.$location.', '.$barangayName);
     }
 
     protected function buildGeneratedMitigationChecklistItems(array $predictedArea, string $category, array $resourceContext): array
@@ -1125,6 +1174,7 @@ class StationAdminController extends Controller
                 ]);
 
                 $this->syncChecklistItems($existingDraft, $payload['checklist_items']);
+
                 continue;
             }
 
@@ -1156,6 +1206,7 @@ class StationAdminController extends Controller
 
                 if ($stationId) {
                     $query->where('station_id', $stationId);
+
                     return;
                 }
 
@@ -1167,7 +1218,7 @@ class StationAdminController extends Controller
             || (($checklist->source_type ?? null) === 'action_plan' && $checklist->status === 'pending');
 
         if (! $isEligibleDraft) {
-            throw (new ModelNotFoundException())->setModel(AiActionPlanChecklist::class, [$checklistId]);
+            throw (new ModelNotFoundException)->setModel(AiActionPlanChecklist::class, [$checklistId]);
         }
 
         return $checklist;
@@ -1179,7 +1230,7 @@ class StationAdminController extends Controller
             'status' => 'confirmed',
             'confirmed_by' => $userId,
             'confirmed_at' => now(),
-            'confirmation_notes' => 'Approved and converted to mitigation action #' . $mitigationActionId . '.',
+            'confirmation_notes' => 'Approved and converted to mitigation action #'.$mitigationActionId.'.',
         ]);
     }
 
@@ -1210,16 +1261,19 @@ class StationAdminController extends Controller
                 Auth::user()?->user_id ?? $action->reviewed_by ?? $action->created_by,
                 (int) $action->mitigation_action_id
             );
+
             return;
         }
 
         if ($action->status === 'completed' && ! in_array($checklist->status, ['confirmed', 'rejected'], true)) {
             $checklist->update(['status' => 'submitted']);
+
             return;
         }
 
         if (in_array($action->status, ['approved', 'in_progress', 'blocked'], true) && $checklist->status === 'pending') {
             $checklist->update(['status' => 'in_progress']);
+
             return;
         }
 
@@ -1278,7 +1332,7 @@ class StationAdminController extends Controller
     protected function generateCitizenAccountCode(): string
     {
         $roleCode = 'CIT';
-        $lastUser = User::where('account_code', 'LIKE', $roleCode . '-%')
+        $lastUser = User::where('account_code', 'LIKE', $roleCode.'-%')
             ->orderByDesc('user_id')
             ->first();
 
@@ -1288,9 +1342,11 @@ class StationAdminController extends Controller
             $newNumber = $lastNumber + 1;
         }
 
-        return $roleCode . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        return $roleCode.'-'.str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
-    public function announcement(){
+
+    public function announcement()
+    {
         return view('chief.announcements');
     }
 
@@ -1365,10 +1421,10 @@ class StationAdminController extends Controller
         $stationOfficer = $this->getAuthenticatedStationOfficer();
         $stationId = $stationOfficer?->station_id;
 
-        if (!$stationId) {
+        if (! $stationId) {
             return response()->json([
                 'success' => false,
-                'message' => 'No station is linked to the current commander account.'
+                'message' => 'No station is linked to the current commander account.',
             ], 422);
         }
 
@@ -1391,7 +1447,7 @@ class StationAdminController extends Controller
         if ($hasConflict) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected time range is already occupied for this station.'
+                'message' => 'The selected time range is already occupied for this station.',
             ], 422);
         }
 
@@ -1451,7 +1507,7 @@ class StationAdminController extends Controller
         if ($this->hasOfficialScheduleConflict($stationId, $validated, (int) $eventActivity->event_id)) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected time range is already occupied for this station.'
+                'message' => 'The selected time range is already occupied for this station.',
             ], 422);
         }
 
@@ -1597,8 +1653,8 @@ class StationAdminController extends Controller
                     'last_name' => $user->last_name,
                     'email' => $user->email,
                     'contact_number' => $user->contact_number,
-                    'full_name' => trim($user->first_name . ' ' . $user->last_name),
-                    'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1) . substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
+                    'full_name' => trim($user->first_name.' '.$user->last_name),
+                    'initials' => strtoupper(substr($user->first_name ?: 'C', 0, 1).substr(($user->last_name ?: $user->first_name ?: 'P'), 0, 1)),
                     'role' => $user->role->role ?? 'Chief',
                     'street' => $user->address?->street,
                     'barangay' => $user->address?->barangay?->barangay_name,
@@ -1617,7 +1673,7 @@ class StationAdminController extends Controller
     }
 
     public function index()
-    {   
+    {
         $accountId = Auth::user()->user_id;
 
         // The shared map immediately revalidates from /map/markers/feed. Avoid
@@ -1642,9 +1698,9 @@ class StationAdminController extends Controller
             ->orderBy('last_name')
             ->get(['user_id', 'account_code', 'first_name', 'middle_name', 'last_name', 'contact_number']);
         $barangayOfficers = BarangayOfficer::with([
-                'user:user_id,first_name,middle_name,last_name',
-                'barangay:barangay_id,barangay_name',
-            ])
+            'user:user_id,first_name,middle_name,last_name',
+            'barangay:barangay_id,barangay_name',
+        ])
             ->where('status', 'active')
             ->orderBy('position')
             ->get(['barangay_officer_id', 'barangay_id', 'user_id', 'position', 'status']);
@@ -1726,7 +1782,7 @@ class StationAdminController extends Controller
     //     $fsicRequests= FsicRequest::all();
     //     return view('chief.fsic', compact('fsicRequests'));
     // }
-    //for reports
+    // for reports
 
     public function reports(Request $request)
     {
@@ -1878,6 +1934,9 @@ class StationAdminController extends Controller
                 'responsible_team_id' => request()->integer('responsible_team_id') ?: null,
                 'source_type' => request()->string('source_type')->toString() ?: null,
                 'revision_review' => request()->boolean('revision_review'),
+                'attention' => in_array(request()->string('attention')->toString(), ['overdue', 'blocked', 'awaiting_review', 'missing_owner', 'follow_up'], true)
+                    ? request()->string('attention')->toString()
+                    : null,
                 'mitigation_action_id' => request()->integer('mitigation_action_id') ?: null,
                 'search' => trim(request()->string('search')->toString()) ?: null,
                 'sort' => in_array(request()->string('sort')->toString(), ['priority', 'due_date_asc', 'due_date_desc', 'status'], true)
@@ -1920,12 +1979,18 @@ class StationAdminController extends Controller
                     'completion_decided_at',
                     'completion_decision_notes',
                     'description',
+                    'baseline_condition',
+                    'expected_result',
                     'remarks',
                     'implementation_notes',
+                    'blocked_reason',
                     'completion_notes',
                     'outcome_result',
                     'effectiveness',
+                    'verification_date',
+                    'verified_by',
                     'follow_up_required',
+                    'follow_up_date',
                     'follow_up_notes',
                     'created_by',
                     'approved_by',
@@ -1952,6 +2017,7 @@ class StationAdminController extends Controller
                     'responsibleTeam:team_id',
                     'responsibleUser:user_id,first_name,middle_name,last_name',
                     'approver:user_id,first_name,middle_name,last_name',
+                    'verifier:user_id,first_name,middle_name,last_name',
                     'activities.actor:user_id,first_name,middle_name,last_name',
                 ])
                 ->where(function ($query) use ($barangayIds, $cityIds, $stationId) {
@@ -1964,20 +2030,27 @@ class StationAdminController extends Controller
                 $mitigationBaseQuery->whereRaw('1 = 0');
             }
 
-            $summaryActions = (clone $mitigationBaseQuery)
-                ->get()
-                ->each(function (MitigationAction $action) {
-                    $action->category = $this->normalizeMitigationCategory($action->category);
-                    $action->source_type = $this->resolveMitigationSourceType($action->toArray());
-                });
+            $today = today()->toDateString();
+            $summaryRow = (clone $mitigationBaseQuery)
+                ->setEagerLoads([])
+                ->selectRaw('COUNT(*) AS total')
+                ->selectRaw("SUM(CASE WHEN status IN ('draft', 'planned') THEN 1 ELSE 0 END) AS awaiting_approval")
+                ->selectRaw("SUM(CASE WHEN status IN ('approved', 'in_progress', 'blocked') THEN 1 ELSE 0 END) AS in_progress")
+                ->selectRaw("SUM(CASE WHEN target_date < ? AND status NOT IN ('completed', 'cancelled') THEN 1 ELSE 0 END) AS overdue", [$today])
+                ->selectRaw("SUM(CASE WHEN priority_level IN ('critical', 'high') THEN 1 ELSE 0 END) AS high_priority")
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed")
+                ->selectRaw("SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked")
+                ->selectRaw('SUM(CASE WHEN responsible_team_id IS NULL AND responsible_user_id IS NULL THEN 1 ELSE 0 END) AS missing_owner')
+                ->selectRaw('SUM(CASE WHEN follow_up_required = 1 THEN 1 ELSE 0 END) AS follow_up')
+                ->first();
 
             $mitigationActions = (clone $mitigationBaseQuery)
                 ->when($filters['mitigation_action_id'], fn ($query, $value) => $query->where('mitigation_action_id', $value))
                 ->when($filters['search'], function ($query, $value) {
                     $query->where(function ($searchQuery) use ($value) {
-                        $searchQuery->where('title', 'like', '%' . $value . '%')
-                            ->orWhere('description', 'like', '%' . $value . '%')
-                            ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%' . $value . '%'));
+                        $searchQuery->where('title', 'like', '%'.$value.'%')
+                            ->orWhere('description', 'like', '%'.$value.'%')
+                            ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%'.$value.'%'));
                     });
                 })
                 ->when($filters['barangay_id'], fn ($query, $value) => $query->where('barangay_id', $value))
@@ -1987,6 +2060,13 @@ class StationAdminController extends Controller
                 ->when($filters['priority_level'], fn ($query, $value) => $query->where('priority_level', $value))
                 ->when($filters['status'], fn ($query, $value) => $query->where('status', $value))
                 ->when($filters['revision_review'], fn ($query) => $query->where('requires_revision_review', true))
+                ->when($filters['attention'] === 'overdue', fn ($query) => $query->whereDate('target_date', '<', today())->whereNotIn('status', ['completed', 'cancelled']))
+                ->when($filters['attention'] === 'blocked', fn ($query) => $query->where('status', 'blocked'))
+                ->when($filters['attention'] === 'awaiting_review', fn ($query) => $query->where(function ($scope) {
+                    $scope->where('completion_approval_status', 'pending')->orWhere('requires_revision_review', true);
+                }))
+                ->when($filters['attention'] === 'missing_owner', fn ($query) => $query->whereNull('responsible_team_id')->whereNull('responsible_user_id'))
+                ->when($filters['attention'] === 'follow_up', fn ($query) => $query->where('follow_up_required', true))
                 ->when($filters['responsible_team_id'], fn ($query, $value) => $query->where('responsible_team_id', $value))
                 ->when($filters['source_type'], function ($query, $value) {
                     match ($value) {
@@ -2026,9 +2106,9 @@ class StationAdminController extends Controller
                 ->withQueryString();
 
             $mitigationActions->getCollection()->each(function (MitigationAction $action) {
-                    $action->category = $this->normalizeMitigationCategory($action->category);
-                    $action->source_type = $this->resolveMitigationSourceType($action->toArray());
-                });
+                $action->category = $this->normalizeMitigationCategory($action->category);
+                $action->source_type = $this->resolveMitigationSourceType($action->toArray());
+            });
 
             $newAiDraftMitigations = $mitigationActions
                 ->filter(function (MitigationAction $action) {
@@ -2039,16 +2119,9 @@ class StationAdminController extends Controller
                 ->take(6)
                 ->values();
 
-            $summaryCounts = [
-                'total' => $summaryActions->count(),
-                'awaiting_approval' => $summaryActions->whereIn('status', ['draft', 'planned'])->count(),
-                'in_progress' => $summaryActions->whereIn('status', ['approved', 'in_progress', 'blocked'])->count(),
-                'overdue' => $summaryActions
-                    ->filter(fn (MitigationAction $action) => $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true))
-                    ->count(),
-                'high_priority' => $summaryActions->whereIn('priority_level', ['critical', 'high'])->count(),
-                'completed' => $summaryActions->where('status', 'completed')->count(),
-            ];
+            $summaryCounts = collect(['total', 'awaiting_approval', 'in_progress', 'overdue', 'high_priority', 'completed', 'blocked', 'missing_owner', 'follow_up'])
+                ->mapWithKeys(fn (string $key) => [$key => (int) ($summaryRow?->{$key} ?? 0)])
+                ->all();
 
             $riskAreas = RiskArea::query()
                 ->select(['risk_area_id', 'barangay_hall_id', 'marker_id'])
@@ -2144,6 +2217,7 @@ class StationAdminController extends Controller
 
                     if ($stationId) {
                         $query->where('station_id', $stationId);
+
                         return;
                     }
 
@@ -2274,9 +2348,9 @@ class StationAdminController extends Controller
             ->when($filters['mitigation_action_id'], fn ($query, $value) => $query->whereKey($value))
             ->when($filters['search'], function ($query, $value) {
                 $query->where(function ($searchQuery) use ($value) {
-                    $searchQuery->where('title', 'like', '%' . $value . '%')
-                        ->orWhere('description', 'like', '%' . $value . '%')
-                        ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%' . $value . '%'));
+                    $searchQuery->where('title', 'like', '%'.$value.'%')
+                        ->orWhere('description', 'like', '%'.$value.'%')
+                        ->orWhereHas('riskArea.marker', fn ($markerQuery) => $markerQuery->where('title', 'like', '%'.$value.'%'));
                 });
             })
             ->when($filters['barangay_id'], fn ($query, $value) => $query->where('barangay_id', $value))
@@ -2410,6 +2484,7 @@ class StationAdminController extends Controller
         $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
         $assignmentIds = $this->validateMitigationAssignments($validated, $stationId);
+        $this->validateMitigationWorkflowRequirements($validated);
         $status = $validated['status'];
         $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
@@ -2433,12 +2508,18 @@ class StationAdminController extends Controller
                 'target_date' => $validated['target_date'] ?? null,
                 'completed_at' => $status === 'completed' ? now() : null,
                 'description' => $validated['description'],
+                'baseline_condition' => $validated['baseline_condition'] ?? null,
+                'expected_result' => $validated['expected_result'] ?? null,
                 'remarks' => $validated['remarks'] ?? null,
                 'implementation_notes' => $validated['implementation_notes'] ?? null,
+                'blocked_reason' => $validated['blocked_reason'] ?? null,
                 'completion_notes' => $validated['completion_notes'] ?? null,
                 'outcome_result' => $validated['outcome_result'] ?? null,
                 'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'verification_date' => $validated['verification_date'] ?? null,
+                'verified_by' => ! empty($validated['verification_date']) ? Auth::id() : null,
                 'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_date' => $validated['follow_up_date'] ?? null,
                 'follow_up_notes' => $validated['follow_up_notes'] ?? null,
                 'created_by' => Auth::user()?->user_id,
                 'approved_by' => in_array($status, ['approved', 'in_progress', 'completed'], true) ? Auth::user()?->user_id : null,
@@ -2472,6 +2553,7 @@ class StationAdminController extends Controller
         $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
         $linkedIds = $this->validateMitigationLinksForStation($validated, $allowedBarangayIds);
         $assignmentIds = $this->validateMitigationAssignments($validated, $stationId);
+        $this->validateMitigationWorkflowRequirements($validated, $action);
         $status = $validated['status'];
         $sourceType = $this->resolveMitigationSourceType(array_merge($validated, $linkedIds));
 
@@ -2501,12 +2583,18 @@ class StationAdminController extends Controller
                     ? ($action->completed_at ?? now())
                     : null,
                 'description' => $validated['description'],
+                'baseline_condition' => $validated['baseline_condition'] ?? null,
+                'expected_result' => $validated['expected_result'] ?? null,
                 'remarks' => $validated['remarks'] ?? null,
                 'implementation_notes' => $validated['implementation_notes'] ?? null,
+                'blocked_reason' => $validated['blocked_reason'] ?? null,
                 'completion_notes' => $validated['completion_notes'] ?? null,
                 'outcome_result' => $validated['outcome_result'] ?? null,
                 'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'verification_date' => $validated['verification_date'] ?? null,
+                'verified_by' => ! empty($validated['verification_date']) ? Auth::id() : null,
                 'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_date' => $validated['follow_up_date'] ?? null,
                 'follow_up_notes' => $validated['follow_up_notes'] ?? null,
                 'approved_by' => $approvalTriggered ? Auth::user()?->user_id : $action->approved_by,
                 'approved_at' => $approvalTriggered ? now() : $action->approved_at,
@@ -2537,13 +2625,21 @@ class StationAdminController extends Controller
     {
         $validated = $request->validate([
             'decision' => ['required', Rule::in(['approved', 'rejected'])],
-            'decision_notes' => ['nullable', 'string', 'max:2000'],
+            'decision_notes' => ['nullable', 'string', 'max:2000', Rule::requiredIf($request->input('decision') === 'rejected')],
         ]);
         $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
             ->pluck('barangay_id')->map(fn ($id) => (int) $id)->all();
         $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
 
         abort_unless($action->completion_approval_status === 'pending', 409, 'This completion request is no longer pending.');
+        if ($validated['decision'] === 'approved') {
+            if (! $action->attachments()->exists()) {
+                throw ValidationException::withMessages(['decision' => 'Completion cannot be approved without proof.']);
+            }
+            if (blank($action->outcome_result) || in_array($action->effectiveness, [null, 'pending_evaluation'], true)) {
+                throw ValidationException::withMessages(['decision' => 'Record and evaluate the actual outcome before approving completion.']);
+            }
+        }
 
         DB::transaction(function () use ($action, $validated, $request): void {
             $approved = $validated['decision'] === 'approved';
@@ -2555,6 +2651,8 @@ class StationAdminController extends Controller
                 'completion_decided_by' => Auth::id(),
                 'completion_decided_at' => now(),
                 'completion_decision_notes' => $validated['decision_notes'] ?? null,
+                'verification_date' => $approved ? today() : null,
+                'verified_by' => $approved ? Auth::id() : null,
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
             ]);
@@ -2597,14 +2695,17 @@ class StationAdminController extends Controller
             ->with('success', 'Mitigation action deleted successfully.');
     }
 
-
-    public function alerts(){
+    public function alerts()
+    {
         $incidents = Incident::all();
-        return view('chief.alerts',compact('incidents'));
+
+        return view('chief.alerts', compact('incidents'));
     }
+
     public function maps()
-    {   
+    {
         $mapmarker = Marker::all();
+
         return view('chief.incidentmap', compact('mapmarker'));
     }
 
@@ -2616,7 +2717,7 @@ class StationAdminController extends Controller
         $cities = City::where('province_id', $provinceId)
             ->orderBy('city_name')
             ->get();
-        
+
         return response()->json($cities);
     }
 
@@ -2633,13 +2734,13 @@ class StationAdminController extends Controller
                     'station_id' => $stationId,
                     'station_name' => $report->investigator?->station?->station_name,
                     'incident_id' => $report->incident_id,
-                    'incident_title' => $report->incident?->marker?->title ?? ('Incident #' . $report->incident_id),
+                    'incident_title' => $report->incident?->marker?->title ?? ('Incident #'.$report->incident_id),
                     'incident_status' => $report->incident?->status,
-                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')),
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')),
                     'owner' => $report->owner,
                     'casualty' => trim(collect([
-                        (int) ($report->dead ?? 0) > 0 ? ((int) $report->dead . ' dead') : null,
-                        (int) ($report->injured ?? 0) > 0 ? ((int) $report->injured . ' injured') : null,
+                        (int) ($report->dead ?? 0) > 0 ? ((int) $report->dead.' dead') : null,
+                        (int) ($report->injured ?? 0) > 0 ? ((int) $report->injured.' injured') : null,
                     ])->filter()->implode(', ')) ?: 'none',
                     'fire_started' => optional($report->fire_started)->format('Y-m-d H:i:s'),
                     'fire_out' => optional($report->fire_out)->format('Y-m-d H:i:s'),
@@ -2664,9 +2765,9 @@ class StationAdminController extends Controller
                     'station_id' => $stationId,
                     'station_name' => $report->investigator?->station?->station_name,
                     'incident_id' => $report->spotInvestigation?->incident_id,
-                    'incident_title' => $report->spotInvestigation?->incident?->marker?->title ?? ('Incident #' . ($report->spotInvestigation?->incident_id ?? '')),
+                    'incident_title' => $report->spotInvestigation?->incident?->marker?->title ?? ('Incident #'.($report->spotInvestigation?->incident_id ?? '')),
                     'incident_status' => $report->spotInvestigation?->incident?->status,
-                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')),
+                    'investigator_name' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')),
                     'spot_investigation_id' => $report->spot_investigation_id,
                     'fire_origin' => $report->fireOrigin?->origin,
                     'responsible_arson' => $report->responsible_arson,
@@ -2683,6 +2784,7 @@ class StationAdminController extends Controller
             ->get()
             ->map(function ($report) use ($stationId) {
                 $investigator = $report->progressInvestigation?->investigator?->user;
+
                 return [
                     'id' => $report->final_investigation_report_id,
                     'report_kind' => 'final',
@@ -2690,9 +2792,9 @@ class StationAdminController extends Controller
                     'station_id' => $stationId,
                     'station_name' => $report->progressInvestigation?->investigator?->station?->station_name,
                     'incident_id' => $report->progressInvestigation?->spotInvestigation?->incident_id,
-                    'incident_title' => $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? ('Incident #' . ($report->progressInvestigation?->spotInvestigation?->incident_id ?? '')),
+                    'incident_title' => $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? ('Incident #'.($report->progressInvestigation?->spotInvestigation?->incident_id ?? '')),
                     'incident_status' => $report->progressInvestigation?->spotInvestigation?->incident?->status,
-                    'investigator_name' => trim(($investigator?->first_name ?? '') . ' ' . ($investigator?->last_name ?? '')),
+                    'investigator_name' => trim(($investigator?->first_name ?? '').' '.($investigator?->last_name ?? '')),
                     'progress_investigation_id' => $report->progress_investigation_id,
                     'total_damage' => (float) ($report->total_damage ?? 0),
                     'exact_address' => $report->exact_address,
@@ -2719,8 +2821,8 @@ class StationAdminController extends Controller
                 'id' => $report->progress_investigation_report_id,
                 'type' => 'progress',
                 'incident_id' => $incident?->incident_id,
-                'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
-                'investigator' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
+                'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+                'investigator' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
                 'station_id' => $stationId,
                 'station_name' => $report->investigator?->station?->station_name,
                 'status' => $report->finalInvestigation ? 'finalized' : 'conducting',
@@ -2740,8 +2842,8 @@ class StationAdminController extends Controller
                 'id' => $report->final_investigation_report_id,
                 'type' => 'final',
                 'incident_id' => $incident?->incident_id,
-                'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
-                'investigator' => trim(($investigator?->first_name ?? '') . ' ' . ($investigator?->last_name ?? '')) ?: 'Unassigned investigator',
+                'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+                'investigator' => trim(($investigator?->first_name ?? '').' '.($investigator?->last_name ?? '')) ?: 'Unassigned investigator',
                 'station_id' => $stationId,
                 'station_name' => $report->investigator?->station?->station_name,
                 'status' => 'completed',
@@ -2759,8 +2861,8 @@ class StationAdminController extends Controller
             'id' => $report->spot_investigation_report_id,
             'type' => 'spot',
             'incident_id' => $incident?->incident_id,
-            'incident_title' => $incident?->marker?->title ?: ('Incident #' . ($incident?->incident_id ?? 'N/A')),
-            'investigator' => trim(($report->investigator?->user?->first_name ?? '') . ' ' . ($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
+            'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+            'investigator' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
             'station_id' => $stationId,
             'station_name' => $report->investigator?->station?->station_name,
             'status' => $report->progressInvestigation ? 'progressed' : 'filed',
@@ -2793,7 +2895,7 @@ class StationAdminController extends Controller
                 $barangay?->barangay_name,
                 $city?->city_name,
             ])->filter()->implode(', '),
-            'chief_name' => trim((Auth::user()->first_name ?? '') . ' ' . (Auth::user()->last_name ?? '')),
+            'chief_name' => trim((Auth::user()->first_name ?? '').' '.(Auth::user()->last_name ?? '')),
             'personnel_count' => StationOfficer::where('station_id', $stationOfficer?->station_id)->count(),
         ];
     }
@@ -2806,78 +2908,81 @@ class StationAdminController extends Controller
         $barangays = Barangay::where('city_id', $cityId)
             ->orderBy('barangay_name')
             ->get();
-        
+
         return response()->json($barangays);
     }
-public function storeFullAddress(Request $request)
-{
-    try {
-        $address = FullAddress::create([
-            'street' => $request->street,
-            'barangay_id' => $request->barangay_id,
-          
-        ]);
-        
-        return response()->json([
-            'success' => true,
-            'address_id' => $address->address_id,
-            'message' => 'Address created successfully'
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error creating address: ' . $e->getMessage()
-        ], 500);
+
+    public function storeFullAddress(Request $request)
+    {
+        try {
+            $address = FullAddress::create([
+                'street' => $request->street,
+                'barangay_id' => $request->barangay_id,
+
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'address_id' => $address->address_id,
+                'message' => 'Address created successfully',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error creating address: '.$e->getMessage(),
+            ], 500);
+        }
     }
-}
+
     /**
      * Store marker with station and address
      */
     public function storeMarker(Request $request)
     {
-      try {
-        DB::beginTransaction();
+        try {
+            DB::beginTransaction();
 
-        // Create the marker
-        $marker = Marker::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'lat' => $request->lat,
-            'lng' => $request->lng,
-            'category' => $request->category,
-            'status' => 'active',
-        ]);
-
-        // If station category and station data exists
-        if ($request->has('station_data')) {
-            $stationData = $request->station_data;
-            
-            // Create station with the address_id from the request
-            $station = Station::create([
-                'station_name' => $stationData['station_name'],
-                'station_code' => $stationData['station_code'],
-                'contact_number' => $stationData['contact_number'],
-                'email' => $stationData['email'],
-                'address_id' => $stationData['address_id'] ?? null, // Use the address_id from the request
-                'marker_id' => $marker->marker_id,
+            // Create the marker
+            $marker = Marker::create([
+                'title' => $request->title,
+                'description' => $request->description,
+                'lat' => $request->lat,
+                'lng' => $request->lng,
+                'category' => $request->category,
+                'status' => 'active',
             ]);
+
+            // If station category and station data exists
+            if ($request->has('station_data')) {
+                $stationData = $request->station_data;
+
+                // Create station with the address_id from the request
+                $station = Station::create([
+                    'station_name' => $stationData['station_name'],
+                    'station_code' => $stationData['station_code'],
+                    'contact_number' => $stationData['contact_number'],
+                    'email' => $stationData['email'],
+                    'address_id' => $stationData['address_id'] ?? null, // Use the address_id from the request
+                    'marker_id' => $marker->marker_id,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Marker and station saved successfully',
+                'marker' => $marker,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: '.$e->getMessage(),
+            ], 500);
         }
-
-        DB::commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Marker and station saved successfully',
-            'marker' => $marker
-        ]);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'success' => false,
-            'message' => 'Error: ' . $e->getMessage()
-        ], 500);
-    }
     }
 
     public function createWalkInCitizen(Request $request)
