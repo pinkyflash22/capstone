@@ -1,5 +1,3 @@
-import '../../css/staff/announcements.css';
-
 class AnnouncementSystem {
     constructor() {
         this.posts = [];

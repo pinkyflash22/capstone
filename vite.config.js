@@ -40,6 +40,7 @@ export default defineConfig({
                 'resources/css/firefighters/portal.css',
                 'resources/css/firefighters/station-shell.css',
                 'resources/css/firefighters/my-station.css',
+                'resources/css/staff/announcements.css',
                 'resources/css/landing/styles.css',
                 'resources/css/voice-calls.css',
                 'resources/css/duty-roster.css',

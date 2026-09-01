@@ -8,7 +8,11 @@
     <title>PyroSense - Announcements</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
+    @vite([
+        'resources/css/app.css',
+        'resources/css/firefighters/portal.css',
+        'resources/css/staff/announcements.css',
+    ])
 
     @php
         $authName = trim((auth()->user()->first_name ?? '') . ' ' . (auth()->user()->last_name ?? '')) ?: 'Firefighter';
@@ -22,13 +26,14 @@
 
     <div data-ff-page-root="announcements">
     <main class="main-content">
+        <div class="announcements-shell">
         @include('firefighters.partials.shell-topbar', [
             'title' => 'Announcements',
             'subtitle' => 'Station communication, updates, polls, and media posts'
         ])
 
         <div class="page-shell staff-announcements__workspace">
-            <div class="top-bar staff-announcements__heading">
+            <div class="staff-announcements__heading">
                 <div class="page-title">
                     <h1>Announcements</h1>
                     <p>Post updates, alerts, polls, and internal media for your station.</p>
@@ -121,6 +126,7 @@
 
             <div class="feed" id="feed"></div>
             <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+        </div>
         </div>
     </main>
 

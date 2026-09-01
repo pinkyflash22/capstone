@@ -35,6 +35,18 @@ return Application::configure(basePath: $basePath)
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+    // Render and container deployments sit behind a reverse proxy. Trust the
+    // forwarded request metadata so request()->ip() records the actual client
+    // address instead of the proxy/loopback address in the audit trail.
+    $trustedProxies = array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('TRUSTED_PROXIES', '*'))
+    )));
+
+    $middleware->trustProxies(
+        at: count($trustedProxies) === 1 ? $trustedProxies[0] : $trustedProxies
+    );
+
     $middleware->alias([
           'auth' => \App\Http\Middleware\Authenticate::class,
         'role' => \App\Http\Middleware\RoleMiddleware::class,
