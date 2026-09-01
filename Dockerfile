@@ -62,11 +62,22 @@ RUN if [ -f python/requirements.txt ]; then \
         pip3 install --break-system-packages --no-cache-dir -r python/requirements.txt; \
     fi
 
-# Laravel permissions
-RUN chown -R www-data:www-data \
+# Laravel runtime directories are excluded from the Docker build context because
+# their contents are disposable. Recreate the directories required by file-based
+# cache/session/view stores before assigning Apache ownership.
+RUN mkdir -p \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/testing \
+    /var/www/html/storage/framework/views \
+    /var/www/html/bootstrap/cache \
+    && chown -R www-data:www-data \
     /var/www/html/storage \
     /var/www/html/bootstrap/cache \
-    /var/www/html/capstone-ai
+    /var/www/html/capstone-ai \
+    && chmod -R ug+rwX \
+    /var/www/html/storage \
+    /var/www/html/bootstrap/cache
 
 # Apache + Render startup
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf

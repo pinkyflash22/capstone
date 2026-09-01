@@ -1,6 +1,21 @@
 #!/bin/sh
 set -eu
 
+# Workers boot from the same ephemeral image and may also use Laravel's file
+# cache, compiled views, or locks.
+mkdir -p \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/testing \
+    /var/www/html/storage/framework/views \
+    /var/www/html/bootstrap/cache
+chown -R www-data:www-data \
+    /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+chmod -R ug+rwX \
+    /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+
 WORKER_NAME="${WORKER_NAME:-general}"
 QUEUE_CONNECTION_NAME="${WORKER_QUEUE_CONNECTION:-database}"
 QUEUE_NAMES="${WORKER_QUEUES:-default,notifications,emails}"

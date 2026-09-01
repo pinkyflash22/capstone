@@ -53,13 +53,10 @@ services:
 
       # Laravel
       - key: SESSION_DRIVER
-        value: redis
-
-      - key: SESSION_CONNECTION
-        value: default
+        value: database
 
       - key: CACHE_STORE
-        value: redis
+        value: file
 
       - key: REDIS_URL
         fromService:

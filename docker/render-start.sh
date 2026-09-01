@@ -1,6 +1,21 @@
 #!/bin/sh
 set -eu
 
+# Render containers use an ephemeral filesystem. Recreate Laravel's writable
+# runtime directories on every boot before commands can read or write cache.
+mkdir -p \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/testing \
+    /var/www/html/storage/framework/views \
+    /var/www/html/bootstrap/cache
+chown -R www-data:www-data \
+    /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+chmod -R ug+rwX \
+    /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+
 php artisan config:clear || true
 php artisan route:clear || true
 php artisan view:clear || true
