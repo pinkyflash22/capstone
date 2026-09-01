@@ -9,7 +9,7 @@ use App\Models\City;
 use App\Models\MitigationAction;
 use App\Models\Incident;
 use App\Models\Marker;
-use App\Models\User;
+use App\Models\StationOfficer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -348,10 +348,18 @@ class BarangayController extends Controller
             return null;
         }
 
-        $loggedInUser = Auth::user();
-        $loggedInUser?->loadMissing('address.barangay.city.province');
+        $userId = Auth::user()?->user_id ?? Auth::id();
 
-        return $loggedInUser?->address?->barangay?->city;
+        if (! $userId) {
+            return null;
+        }
+
+        $stationOfficer = StationOfficer::query()
+            ->with('station.address.barangay.city.province')
+            ->where('user_id', $userId)
+            ->first();
+
+        return $stationOfficer?->station?->address?->barangay?->city;
     }
 
     private function scopedBarangayRoute(string $action): string
