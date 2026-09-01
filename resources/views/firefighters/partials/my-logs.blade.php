@@ -158,7 +158,7 @@
                                         </div>
                                         <div class="flex items-start gap-2 text-sm text-slate-600">
                                             <span class="mt-0.5 text-slate-400"><i class="fa-solid fa-desktop"></i></span>
-                                            <span class="break-words"><span class="font-semibold text-slate-700">User Agent:</span> ${summarizeUserAgent(log.user_agent)}</span>
+                                            <span class="break-words"><span class="font-semibold text-slate-700">Device information:</span> ${log.device_info || summarizeUserAgent(log.user_agent)}</span>
                                         </div>
                                         <div class="flex items-start gap-2 text-sm text-slate-600">
                                             <span class="mt-0.5 text-slate-400"><i class="fa-solid fa-globe"></i></span>

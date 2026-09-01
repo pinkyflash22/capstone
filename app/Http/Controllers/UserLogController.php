@@ -85,6 +85,7 @@ class UserLogController extends Controller
                     'action' => $log->action,
                     'ip_address' => $log->ip_address,
                     'user_agent' => $log->user_agent,
+                    'device_info' => $log->device_info,
                     'created_at' => $log->created_at,
                     'user_name' => trim(($log->user?->first_name ?? '') . ' ' . ($log->user?->last_name ?? '')) ?: 'Unknown user',
                     'role' => $log->user?->role?->role ?? 'Unknown role',
