@@ -9,6 +9,10 @@ $aiPythonBinary = PHP_OS_FAMILY === 'Windows'
 
 return [
 
+    'aar_notifications' => [
+        'queue_connection' => env('AAR_NOTIFICATION_QUEUE_CONNECTION', 'database'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

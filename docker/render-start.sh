@@ -37,6 +37,7 @@ fi
 # filesystem is ephemeral. Restore the latest verified artifact set before the
 # web server starts; the repository model remains available if no backup exists.
 php artisan ai:restore-forecast-artifacts || true
+php artisan config:cache
 
 # Process only forecast-training jobs in this existing web service so Render's
 # paid background-worker service is not required. The database queue keeps the
@@ -50,6 +51,23 @@ if [ "${RUN_FORECAST_QUEUE_WORKER:-true}" = "true" ]; then
                 --tries=1 \
                 --timeout="${AI_QUEUE_WORKER_TIMEOUT:-300}" \
                 --max-jobs=100 || true
+            sleep 2
+        done
+    ) &
+fi
+
+# Deliver AAR in-app and email notifications outside the review request. Failed
+# jobs remain visible in Laravel's failed_jobs table and permanent failures are
+# also written to the application log by the notification class.
+if [ "${RUN_NOTIFICATION_QUEUE_WORKER:-true}" = "true" ]; then
+    (
+        while true; do
+            php artisan queue:work "${AAR_NOTIFICATION_QUEUE_CONNECTION:-database}" \
+                --queue="notifications,emails" \
+                --sleep=2 \
+                --tries=3 \
+                --timeout=90 \
+                --max-jobs=200 || true
             sleep 2
         done
     ) &

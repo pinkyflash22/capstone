@@ -42,24 +42,52 @@ class HistoricalDataSeeder extends Seeder
         $monthlyRows = $this->buildMonthlyRows((int) $stationId, $now);
         $incidentRows = $this->buildIncidentRows($barangayIds, $now);
 
-        DB::transaction(function () use ($stationId, $barangayIds, $monthlyRows, $incidentRows) {
-            DB::table('historical_data')
-                ->where('station_id', $stationId)
-                ->whereBetween('year', [2023, 2026])
-                ->delete();
-
-            DB::table('historical_fire_incidents')
-                ->whereIn('barangay_id', $barangayIds->values())
-                ->whereBetween('incident_date', ['2023-01-01', '2026-12-31'])
-                ->where('source_name', 'Urbiztondo historical fire dataset')
-                ->delete();
-
+        DB::transaction(function () use ($stationId, $monthlyRows, $incidentRows) {
             foreach ($monthlyRows as $row) {
-                DB::table('historical_data')->insert($row);
+                DB::table('historical_data')->updateOrInsert(
+                    [
+                        'station_id' => $stationId,
+                        'month' => $row['month'],
+                        'year' => $row['year'],
+                    ],
+                    collect($row)->except(['station_id', 'month', 'year'])->all()
+                );
             }
 
             foreach ($incidentRows as $row) {
-                DB::table('historical_fire_incidents')->insert($row);
+                if (! $row['barangay_id']) {
+                    throw new \RuntimeException("Historical fire incident barangay could not be resolved for {$row['incident_date']}.");
+                }
+
+                $identity = [
+                    'barangay_id' => $row['barangay_id'],
+                    'incident_date' => $row['incident_date'],
+                    'source_name' => $row['source_name'],
+                ];
+
+                $existing = DB::table('historical_fire_incidents')->where($identity)->exists();
+
+                if (! $existing) {
+                    DB::table('historical_fire_incidents')->insert($row);
+                    continue;
+                }
+
+                // Weather enrichment is populated separately from the archive
+                // preview. Never replace those saved values when restoring the
+                // source incident facts from this seeder.
+                $facts = collect($row)->except([
+                    'barangay_id',
+                    'incident_date',
+                    'source_name',
+                    'created_at',
+                    'temperature',
+                    'humidity',
+                    'wind_speed',
+                    'wind_direction',
+                    'weather_condition',
+                ])->all();
+
+                DB::table('historical_fire_incidents')->where($identity)->update($facts);
             }
         });
     }

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Tests\TestCase;
 
 class AfterActivityReportTest extends TestCase
@@ -19,11 +20,12 @@ class AfterActivityReportTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['after_activity_report_reviews', 'investigation_report_images', 'after_activity_reports', 'event_activities', 'station_officers', 'stations', 'users', 'roles'] as $table) {
+        foreach (['after_activity_report_reviews', 'investigation_report_images', 'after_activity_reports', 'event_activities', 'station_officers', 'notifications', 'stations', 'users', 'roles'] as $table) {
             Schema::dropIfExists($table);
         }
         Schema::create('roles', function (Blueprint $table) { $table->id('role_id'); $table->string('role'); $table->timestamps(); });
         Schema::create('users', function (Blueprint $table) { $table->id('user_id'); $table->unsignedBigInteger('role_id'); $table->string('first_name'); $table->string('last_name'); $table->string('email')->nullable(); $table->string('password')->nullable(); $table->rememberToken(); $table->timestamps(); });
+        Schema::create('notifications', function (Blueprint $table) { $table->uuid('id')->primary(); $table->string('type'); $table->morphs('notifiable'); $table->text('data'); $table->timestamp('read_at')->nullable(); $table->timestamps(); });
         Schema::create('stations', function (Blueprint $table) { $table->id('station_id'); $table->string('station_name'); $table->timestamps(); });
         Schema::create('station_officers', function (Blueprint $table) { $table->id('station_officer_id'); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('user_id'); $table->timestamps(); });
         Schema::create('event_activities', function (Blueprint $table) { $table->id('event_id'); $table->string('event'); $table->date('event_date'); $table->time('start_time')->nullable(); $table->time('end_time')->nullable(); $table->string('activity_type')->nullable(); $table->string('barangay')->nullable(); $table->unsignedBigInteger('station_id'); $table->unsignedBigInteger('user_id')->nullable(); $table->timestamps(); });
@@ -163,8 +165,25 @@ class AfterActivityReportTest extends TestCase
         $notification = new AfterActivityReportReviewedNotification(44, 'Community Drill', 'approved', 'Complete.', 'Chief Reviewer');
 
         $this->assertSame(['database', 'mail'], $notification->via($user));
+        $this->assertInstanceOf(ShouldQueue::class, $notification);
+        $this->assertSame('database', $notification->connection);
+        $this->assertSame(['database' => 'notifications', 'mail' => 'emails'], $notification->viaQueues());
         $this->assertSame('Your AAR was approved', $notification->toMail($user)->subject);
         $this->assertSame('AAR approved', $notification->toArray($user)['title']);
+    }
+
+    public function test_opened_firefighter_notification_can_be_marked_read(): void
+    {
+        $user = User::findOrFail(5);
+        Notification::sendNow($user, new AfterActivityReportReviewedNotification(44, 'Community Drill', 'approved', null, 'Chief Reviewer'), ['database']);
+        $notification = $user->notifications()->latest()->firstOrFail();
+
+        $this->actingAs($user)
+            ->postJson('/firefighter/api/notifications/'.$notification->id.'/read')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertNotNull($notification->fresh()->read_at);
     }
 
     private function payload(): array

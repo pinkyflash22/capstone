@@ -28,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
         'logout',
         'voice-calls/anonymous/session',
     ]);
+    $middleware->web(append: [
+        \App\Http\Middleware\EnforcePilotRollout::class,
+    ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TokenMismatchException $exception, $request) {

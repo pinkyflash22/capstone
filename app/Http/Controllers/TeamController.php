@@ -21,21 +21,25 @@ class TeamController extends Controller
 
 
         $officer = StationOfficer::where('user_id', $id)->first(); //hanapin sa station officers!
-        $stationExact = $officer -> station_id; //kunin ung station id ng officer
+        abort_unless($officer, 404);
+        $stationExact = (int) $officer->station_id; //kunin ung station id ng officer
+        $this->assertStationAccess($stationExact);
 
         $teamOfficers = Team::findOrFail($teamId);
+        $this->assertStationAccess((int) ($teamOfficers->station_id ?: $teamOfficers->teamLeader?->station_id));
 
         $assignedOfficer = StationOfficer::where('station_id', $stationExact)->get(); 
         // Get all teams with their relations
-        $teams = Team::with('station','commander', 'teamLeader')->get();
+        $teams = Team::with('station','commander', 'teamLeader')->where('station_id', $stationExact)->get();
 
         $allofficers = StationOfficer::with('user')->where('station_id', $stationExact)->get(); //allofficers na same station para mafetch
         // Get available teams only
         $availableTeams = Team::with('station', 'commander', 'teamLeader')
+            ->where('station_id', $stationExact)
             ->where('status', 'available')
             ->get();
-           $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->get();
-            $stationOfficers = StationOfficer::with('user','station')->get();
+           $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->where('station_id', $stationExact)->get();
+            $stationOfficers = StationOfficer::with('user','station')->where('station_id', $stationExact)->get();
         // Return in a consistent format
         return response()->json([
             'success' => true,
@@ -51,7 +55,11 @@ class TeamController extends Controller
         
     }
     public function fetchTeam(){
-            $allTeam = Team::with('teamLeader')->get();
+        $stationId = $this->managedStationId();
+        abort_unless($stationId || $this->isProvincialAdmin(), 403);
+        $allTeam = Team::with('teamLeader')
+            ->when(! $this->isProvincialAdmin(), fn ($query) => $query->where('station_id', $stationId))
+            ->get();
     return response()->json([
         'success' => true,
         'data' => $allTeam
@@ -119,6 +127,7 @@ class TeamController extends Controller
 
     public function show(Team $team)
     {
+        $this->assertStationAccess((int) ($team->station_id ?: $team->teamLeader?->station_id));
         $team->load('station', 'commander', 'pumpers', 'teamLeader',
             'officer1', 'officer2', 'officer3', 'rescueRadio', 'incidents');
         return view('admin.incidents.teams.show', compact('team'));
@@ -126,10 +135,12 @@ class TeamController extends Controller
 
     public function edit(Team $team)
     {
-        $stations = Station::all();
+        $stationId = (int) ($team->station_id ?: $team->teamLeader?->station_id);
+        $this->assertStationAccess($stationId);
+        $stations = Station::query()->when(! $this->isProvincialAdmin(), fn ($query) => $query->where('station_id', $stationId))->get();
         $firefighters = User::whereHas('role', function($query) {
             $query->where('role', 'like', '%firefighter%');
-        })->get();
+        })->when(! $this->isProvincialAdmin(), fn ($query) => $query->whereHas('stations', fn ($stations) => $stations->where('stations.station_id', $stationId)))->get();
         
         return view('admin.incidents.teams.edit', compact('team', 'stations', 'firefighters'));
     }
@@ -137,6 +148,8 @@ class TeamController extends Controller
     public function update(Request $request, string $id)
     {
         $team = Team::findOrFail($id);
+        $originalStationId = (int) ($team->station_id ?: $team->teamLeader?->station_id);
+        $this->assertStationAccess($originalStationId);
         abort_if($team->roster_managed, 409, 'This team is controlled by the duty roster. Edit its scheduled shift instead.');
         
         $validated = $request->validate([
@@ -164,6 +177,7 @@ class TeamController extends Controller
 
     public function destroy(Team $team)
     {
+        $this->assertStationAccess((int) ($team->station_id ?: $team->teamLeader?->station_id));
         if ($team->incidents()->count() > 0) {
             return back()->with('error', 'Cannot delete team with assigned incidents.');
         }
@@ -227,13 +241,24 @@ class TeamController extends Controller
 
     private function assertStationAccess(int $stationId): void
     {
-        $role = strtolower(trim((string) Auth::user()?->role?->role));
-        if ($role === 'provincial admin') {
+        if ($this->isProvincialAdmin()) {
             return;
         }
 
-        $managedStationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
+        $managedStationId = $this->managedStationId();
         abort_unless($managedStationId && (int) $managedStationId === $stationId, 403, 'You can only manage teams assigned to your station.');
+    }
+
+    private function isProvincialAdmin(): bool
+    {
+        return strtolower(trim((string) Auth::user()?->role?->role)) === 'provincial admin';
+    }
+
+    private function managedStationId(): ?int
+    {
+        $stationId = StationOfficer::query()->where('user_id', Auth::user()?->user_id)->value('station_id');
+
+        return $stationId ? (int) $stationId : null;
     }
 
     private function clearResourceCache(int $stationId): void

@@ -889,7 +889,7 @@
         <div class="ff-mobile-panel__list">
             @php($aarNotifications = auth()->user()?->notifications()->where('data->category', 'after_activity_report')->latest()->limit(5)->get() ?? collect())
             @foreach($aarNotifications as $notification)
-                <a href="{{ data_get($notification->data, 'url', route('firefighter.my-station', ['tab' => 'aar'])) }}" class="ff-mobile-panel__action">
+                <a href="{{ data_get($notification->data, 'url', route('firefighter.my-station', ['tab' => 'aar'])) }}" class="ff-mobile-panel__action" data-aar-notification-id="{{ $notification->id }}">
                     <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">{{ $notification->read_at ? 'description' : 'notifications_active' }}</span></span>
                     <span class="ff-mobile-panel__copy"><strong>{{ data_get($notification->data, 'title', 'AAR update') }}</strong><small>{{ data_get($notification->data, 'message') }}</small></span>
                 </a>
@@ -1717,6 +1717,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     notificationsOpenButton?.addEventListener('click', function () {
         openPanel(notificationsPanel);
+    });
+
+    document.querySelectorAll('[data-aar-notification-id]').forEach(function (link) {
+        link.addEventListener('click', function () {
+            const endpoint = @json(route('firefighter.notifications.read', ['notificationId' => '__NOTIFICATION_ID__']))
+                .replace('__NOTIFICATION_ID__', encodeURIComponent(link.dataset.aarNotificationId || ''));
+            fetch(endpoint, {
+                method: 'POST',
+                keepalive: true,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                }
+            }).catch(function () {});
+        });
     });
 
     settingsOpenButton?.addEventListener('click', function () {

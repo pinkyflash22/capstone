@@ -41,7 +41,7 @@ class ChiefDecisionWorkflowReliabilityTest extends TestCase
         $this->assertStringContainsString("'outcomes' =>", $controller);
     }
 
-    public function test_command_notifications_are_available_across_chief_and_admin_pages(): void
+    public function test_command_notifications_are_available_across_staff_pages(): void
     {
         $chiefSidebar = file_get_contents(resource_path('views/chief/partials/sidebar.blade.php'));
         $adminSidebar = file_get_contents(resource_path('views/admin/partials/sidebar.blade.php'));
@@ -52,7 +52,7 @@ class ChiefDecisionWorkflowReliabilityTest extends TestCase
         $this->assertStringContainsString("partials.command-notification-center', ['notificationRoutePrefix' => 'admin'", $adminSidebar);
         $this->assertStringContainsString('data-command-notification-read-all', $center);
         $this->assertStringContainsString('window.setInterval(refresh, 30000)', $center);
-        $this->assertSame(6, substr_count($routes, 'CommandNotificationController'));
+        $this->assertSame(9, substr_count($routes, 'CommandNotificationController'));
     }
 
     public function test_critical_forecast_failures_use_email_without_emailing_successes(): void

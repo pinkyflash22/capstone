@@ -61,6 +61,7 @@ use App\Http\Controllers\OTPController;
 // use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HealthController;
 
 Route::get('/verify/after-activity-reports/{afterActivityReport}', [AfterActivityReportExportController::class, 'verify'])
     ->middleware('signed')
@@ -82,21 +83,21 @@ Route::get('/build/assets/map-{hash}.js', function () {
     Route::middleware('redirect.if.authenticated')->group(function () {
         Route::get('/', [PublicController::class, 'homepage'])->name('home');
         Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-        Route::post('/register', [RegisterController::class, 'register'])->name('register.store');
+        Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:5,1')->name('register.store');
         Route::get('/login',[LoginController::class, 'index'])->name('auth.login');
         Route::get('/auth/session-refresh', [LoginController::class, 'refreshLoginSession'])->name('auth.session-refresh');
-        Route::post('/auth', [LoginController::class, 'authenticate'])->name('auth.authenticate');
+        Route::post('/auth', [LoginController::class, 'authenticate'])->middleware('throttle:10,1')->name('auth.authenticate');
         Route::get('/forgot-password', [LoginController::class, 'showForgotPasswordForm'])->name('password.request');
-        Route::post('/forgot-password/search', [LoginController::class, 'searchPasswordRecoveryAccount'])->name('password.lookup');
-        Route::post('/forgot-password/send-code', [LoginController::class, 'sendPasswordResetOtp'])->name('password.email');
+        Route::post('/forgot-password/search', [LoginController::class, 'searchPasswordRecoveryAccount'])->middleware('throttle:5,1')->name('password.lookup');
+        Route::post('/forgot-password/send-code', [LoginController::class, 'sendPasswordResetOtp'])->middleware('throttle:3,5')->name('password.email');
         Route::get('/reset-password', [LoginController::class, 'showResetPasswordForm'])->name('password.reset.form');
-        Route::post('/reset-password', [LoginController::class, 'resetPasswordWithOtp'])->name('password.update');
+        Route::post('/reset-password', [LoginController::class, 'resetPasswordWithOtp'])->middleware('throttle:5,1')->name('password.update');
         Route::get('/auth', fn () => redirect()->route('auth.login'));
         Route::get('/auth/google/redirect', [LoginController::class, 'redirectToGoogle'])->name('auth.google.redirect');
         Route::get('/auth/google/callback', [LoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');
         Route::get('/auth/google/verify', [LoginController::class, 'showGoogleVerificationForm'])->name('auth.google.verify');
-        Route::post('/auth/google/verify', [LoginController::class, 'verifyGoogleOtp'])->name('auth.google.verify.submit');
-        Route::post('/auth/google/resend-otp', [LoginController::class, 'resendGoogleOtp'])->name('auth.google.resend-otp');
+        Route::post('/auth/google/verify', [LoginController::class, 'verifyGoogleOtp'])->middleware('throttle:10,1')->name('auth.google.verify.submit');
+        Route::post('/auth/google/resend-otp', [LoginController::class, 'resendGoogleOtp'])->middleware('throttle:3,5')->name('auth.google.resend-otp');
     });
 
     Route::get('/pwa/start', [PublicController::class, 'pwaQuickReport'])->name('pwa.start');
@@ -104,12 +105,13 @@ Route::get('/build/assets/map-{hash}.js', function () {
 
     // Registration routes with OTP
 // Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-Route::post('/register/send-otp', [RegisterController::class, 'sendOTP'])->name('register.send-otp');
-Route::post('/register/verify-otp', [RegisterController::class, 'verifyOTPAndRegister'])->name('register.verify-otp');
-Route::post('/register/resend-otp', [RegisterController::class, 'resendOTP'])->name('register.resend-otp');
+Route::post('/register/send-otp', [RegisterController::class, 'sendOTP'])->middleware('throttle:5,1')->name('register.send-otp');
+Route::post('/register/verify-otp', [RegisterController::class, 'verifyOTPAndRegister'])->middleware('throttle:10,1')->name('register.verify-otp');
+Route::post('/register/resend-otp', [RegisterController::class, 'resendOTP'])->middleware('throttle:3,5')->name('register.resend-otp');
 Route::get('/api/recent-incidents',[IncidentController::class,'getRecentIncident']);
 
 Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/test-api-key', function() {
+    abort_unless(app()->environment('local'), 404);
     $apiKey = env('OPENROUTER_API_KEY');
     
     // Test with a simple models list request (this endpoint exists)
@@ -120,11 +122,10 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
     
     return response()->json([
         'api_key_exists' => !empty($apiKey),
-        'api_key_preview' => substr($apiKey, 0, 15) . '...',
         'response_status' => $response->status(),
         'is_valid' => $response->status() === 200,
         'models_count' => $response->successful() ? count($response->json()['data'] ?? []) : 0,
-        'error' => $response->status() !== 200 ? $response->body() : null
+        'error' => $response->status() !== 200 ? 'The provider rejected the diagnostic request.' : null
     ]);
 });
     // Route::get('/register', [RegisterController::class,'show'])->name('register');
@@ -139,7 +140,9 @@ Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'boot
     ->name('voice-calls.anonymous-session');
 
     //locations based
-    Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations']);
+Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations'])
+    ->middleware(['auth', 'role:firefighter,station admin,chief,provincial admin'])
+    ->name('firefighter-locations.index');
 
     // Route::get('/', [LandingPageController::class, 'index'])->name('landing');
     Route::get('/api/stations', [LandingPageController::class, 'getStations'])->name('api.stations');
@@ -171,14 +174,18 @@ Route::get('/check-auth', function() {
 Route::middleware('auth')->post('/citizen/marker', [MarkerController::class, 'store']);
 // Route::get('/register',[LoginController::class, 'register'])->name('auth.register');
 //register infos
-Route::post('/multimedia/store', [MultimediaController::class, 'store'])
-    ->name('multimedia.store');
-Route::get('/multimedia', [MultimediaController::class, 'index'])->name('multimedia.index');
+Route::middleware(['auth', 'role:admin,provincial admin,station admin,chief,firefighter'])->group(function () {
+    Route::post('/multimedia/store', [MultimediaController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('multimedia.store');
+    Route::get('/multimedia', [MultimediaController::class, 'index'])->name('multimedia.index');
+});
 Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/weather', function(){
     return view('admin.weather');
 });
 
 Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/debug-incidents', function() {
+    abort_unless(app()->environment('local'), 404);
     // Check stations and their marker_ids
     $stations = DB::table('stations')->select('station_id', 'station_name', 'marker_id')->get();
     
@@ -207,6 +214,7 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
 
 
 Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/test-db', function() {
+    abort_unless(app()->environment('local'), 404);
     try {
         $incidents = DB::table('incidents')->count();
         $markers = DB::table('markers')->count();
@@ -795,3 +803,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
 // Route::post('/markers', [MarkerController::class, 'store'])->name('markers.store');
 // Route::put('/markers/{marker}', [MarkerController::class, 'update'])->name('markers.update');
 // Route::delete('/markers/{marker}', [MarkerController::class, 'destroy'])->name('markers.destroy');
+Route::get('/health/ready', [HealthController::class, 'ready'])->name('health.ready');
+Route::get('/health/status', [HealthController::class, 'status'])
+    ->middleware(['auth', 'role:provincial admin'])
+    ->name('health.status');

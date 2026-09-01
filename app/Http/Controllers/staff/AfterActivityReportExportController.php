@@ -49,7 +49,7 @@ class AfterActivityReportExportController extends Controller
     public function downloadPdf(Request $request, AfterActivityReport $afterActivityReport)
     {
         $this->authorizeAccess($request, $afterActivityReport);
-        $afterActivityReport->load(['station.address.barangay.city.province', 'preparedBy.user', 'approvedBy.user', 'reviewedBy', 'proofImages']);
+        $afterActivityReport->load(['station.address.barangay.city.province', 'preparedBy.user', 'approvedBy.user', 'reviewedBy', 'proofImages', 'reviewHistory.reviewer']);
         $filename = preg_replace('/\.docx$/', '.pdf', app(AfterActivityReportExporter::class)->buildFilename($afterActivityReport));
         $verificationUrl = null;
         $verificationQr = null;

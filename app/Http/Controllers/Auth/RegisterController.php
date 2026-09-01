@@ -510,7 +510,7 @@ $request->session()->put('pending_registration', [
         \Log::error('Email OTP send exception: ' . $e->getMessage());
         return response()->json([
             'success' => false,
-            'message' => 'Server error: ' . $e->getMessage()
+            'message' => 'Unable to send a verification code right now. Please try again later.'
         ], 500);
     }
 }

@@ -4,7 +4,8 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     autoDeploy: true
-    healthCheckPath: /
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 90
 
     envVars:
       - key: APP_NAME
@@ -52,13 +53,49 @@ services:
 
       # Laravel
       - key: SESSION_DRIVER
-        value: file
+        value: redis
+
+      - key: SESSION_CONNECTION
+        value: default
 
       - key: CACHE_STORE
-        value: file
+        value: redis
+
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: pyrosense-shared-state
+          property: connectionString
+
+      - key: ROLLOUT_MODE
+        value: pilot
+
+      - key: PILOT_STATION_IDS
+        sync: false
+
+      - key: BACKUP_DISK
+        value: backups
+
+      - key: BACKUP_ACCESS_KEY_ID
+        sync: false
+
+      - key: BACKUP_SECRET_ACCESS_KEY
+        sync: false
+
+      - key: BACKUP_BUCKET
+        sync: false
+
+      - key: BACKUP_ENDPOINT
+        sync: false
 
       - key: QUEUE_CONNECTION
-        value: sync
+        value: database
+
+      - key: AAR_NOTIFICATION_QUEUE_CONNECTION
+        value: database
+
+      - key: RUN_NOTIFICATION_QUEUE_WORKER
+        value: "false"
 
       # Supabase Storage
       - key: FILESYSTEM_DISK
@@ -117,7 +154,7 @@ services:
         value: "360"
 
       - key: RUN_FORECAST_QUEUE_WORKER
-        value: "true"
+        value: "false"
 
       - key: AI_QUEUE_WORKER_TIMEOUT
         value: "300"
@@ -152,3 +189,215 @@ services:
 
       - key: GOOGLE_REDIRECT_URI
         sync: false
+
+  - type: worker
+    name: pyrosense-general-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: /usr/local/bin/render-worker.sh
+    maxShutdownDelaySeconds: 120
+    envVars:
+      - key: APP_NAME
+        value: PyroSense
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: CACHE_STORE
+        value: redis
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: pyrosense-shared-state
+          property: connectionString
+      - key: WORKER_NAME
+        value: general
+      - key: WORKER_QUEUE_CONNECTION
+        value: database
+      - key: WORKER_QUEUES
+        value: default,notifications,emails
+      - key: WORKER_TIMEOUT
+        value: "120"
+      - key: WORKER_TRIES
+        value: "3"
+      - key: MAIL_MAILER
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+
+  - type: worker
+    name: pyrosense-forecast-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: /usr/local/bin/render-worker.sh
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: APP_NAME
+        value: PyroSense
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: CACHE_STORE
+        value: redis
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: pyrosense-shared-state
+          property: connectionString
+      - key: WORKER_NAME
+        value: forecast
+      - key: WORKER_QUEUE_CONNECTION
+        value: database
+      - key: WORKER_QUEUES
+        value: forecast-training
+      - key: WORKER_TIMEOUT
+        value: "300"
+      - key: WORKER_TRIES
+        value: "2"
+      - key: AI_ARTIFACT_DISK
+        value: supabase
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SECRET
+        sync: false
+      - key: SUPABASE_REGION
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ENDPOINT
+        sync: false
+
+  - type: cron
+    name: pyrosense-database-backup
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: php artisan ops:backup-database
+    schedule: "30 18 * * *"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: BACKUP_DISK
+        value: backups
+      - key: BACKUP_ACCESS_KEY_ID
+        sync: false
+      - key: BACKUP_SECRET_ACCESS_KEY
+        sync: false
+      - key: BACKUP_BUCKET
+        sync: false
+      - key: BACKUP_ENDPOINT
+        sync: false
+      - key: BACKUP_REGION
+        value: auto
+      - key: BACKUP_RETENTION_DAYS
+        value: "35"
+
+  - type: cron
+    name: pyrosense-operations-monitor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: php artisan ops:monitor
+    schedule: "*/5 * * * *"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: CACHE_STORE
+        value: redis
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: pyrosense-shared-state
+          property: connectionString
+      - key: BACKUP_DISK
+        value: backups
+      - key: BACKUP_ACCESS_KEY_ID
+        sync: false
+      - key: BACKUP_SECRET_ACCESS_KEY
+        sync: false
+      - key: BACKUP_BUCKET
+        sync: false
+      - key: BACKUP_ENDPOINT
+        sync: false
+      - key: MONITORING_WEBHOOK_URL
+        sync: false
+
+  - type: keyvalue
+    name: pyrosense-shared-state
+    plan: 256mb
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+    persistenceMode: snapshot

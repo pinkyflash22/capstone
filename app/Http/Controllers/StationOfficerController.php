@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\StationOfficer;
 use App\Models\User;
 use App\Models\FullAddress;
+use App\Models\Role;
 use App\Support\UserActivityLogger;
 
 class StationOfficerController extends Controller
@@ -37,9 +38,12 @@ class StationOfficerController extends Controller
     {
         $validated = $request->validate([
             'station_id'=>'required|exists:stations,station_id',
-            'user_id'=>'required|exists:users,user_id',
+            'user_id'=>'required|exists:users,user_id|unique:station_officers,user_id',
             'rank'=> 'required|string|max:50',
         ]);
+        $this->assertStationAccess((int) $validated['station_id']);
+        $this->assertAssignableUser((int) $validated['user_id']);
+
       $data = StationOfficer::create($validated);
         UserActivityLogger::log('assigned personnel', Auth::user()?->user_id, $request);
         return response()->json(['success'=>true, 'data'=>$data]);
@@ -63,6 +67,7 @@ class StationOfficerController extends Controller
         if (!$stationOfficer) {
             return response()->json(['success' => false, 'message' => 'Station Officer not found'], 404);
         }
+        $this->assertStationAccess((int) $stationOfficer->station_id);
 
         $stationOfficer->status = $validated['status'];
         $stationOfficer->save();
@@ -88,6 +93,7 @@ public function updateUser(Request $request, string $id)
     if (!$user) {
         return response()->json(['success' => false, 'message' => 'User not found'], 404);
     }
+    $this->assertUserAccess($user);
     
     $rules = [
         'first_name' => 'sometimes|required|string|max:255',
@@ -109,6 +115,11 @@ public function updateUser(Request $request, string $id)
     }
     
     $validated = $request->validate($rules);
+
+    if (isset($validated['role_id']) && ! $this->isProvincialAdmin()) {
+        $requestedRole = Role::roleNameForId((int) $validated['role_id']);
+        abort_if(in_array($requestedRole, ['admin', 'provincial admin'], true), 403, 'You cannot assign a province-wide role.');
+    }
     
     // Update fields only if they exist in validated data
     if (isset($validated['first_name'])) $user->first_name = $validated['first_name'];
@@ -173,6 +184,10 @@ public function updateStationOfficer(Request $request, string $id)
     if (!$stationOfficer) {
         return response()->json(['success' => false, 'message' => 'Station Officer not found'], 404);
     }
+    $this->assertStationAccess((int) $stationOfficer->station_id);
+    if (isset($validated['station_id'])) {
+        $this->assertStationAccess((int) $validated['station_id']);
+    }
     if (isset($validated['rank'])) $stationOfficer->rank = $validated['rank'];
     if (isset($validated['status'])) $stationOfficer->status = $validated['status'];
     if (isset($validated['station_id'])) $stationOfficer->station_id = $validated['station_id'];
@@ -189,6 +204,7 @@ public function destroyUser(string $id)
     if (!$user) {
         return response()->json(['success' => false, 'message' => 'User not found'], 404);
     }
+    $this->assertUserAccess($user);
 
     if ((int) Auth::id() === (int) $user->user_id) {
         return response()->json(['success' => false, 'message' => 'You cannot delete your own account'], 422);
@@ -225,10 +241,11 @@ public function destroyUser(string $id)
         return response()->json(['success' => true, 'message' => 'User deleted successfully']);
     } catch (\Throwable $e) {
         DB::rollBack();
+        report($e);
 
         return response()->json([
             'success' => false,
-            'message' => 'Failed to delete user: ' . $e->getMessage(),
+            'message' => 'Failed to delete user.',
         ], 500);
     }
 }
@@ -242,8 +259,57 @@ public function destroyUser(string $id)
             return response()->json(['success' => false, 'message' => 'Station Officer not
     found'], 404);
         }
+        $this->assertStationAccess((int) $stationOfficer->station_id);
         $stationOfficer->delete();
         UserActivityLogger::log('removed personnel', Auth::user()?->user_id, request());
         return response()->json(['success' => true, 'message' => 'Station Officer removed successfully']);
+    }
+
+    private function isProvincialAdmin(): bool
+    {
+        return Role::roleNameForId((int) (Auth::user()?->role_id ?? 0)) === 'provincial admin';
+    }
+
+    private function managedStationId(): ?int
+    {
+        $stationId = StationOfficer::query()
+            ->where('user_id', Auth::user()?->user_id)
+            ->value('station_id');
+
+        return $stationId ? (int) $stationId : null;
+    }
+
+    private function assertStationAccess(int $stationId): void
+    {
+        if ($this->isProvincialAdmin()) {
+            return;
+        }
+
+        $managedStationId = $this->managedStationId();
+        abort_unless($managedStationId && $managedStationId === $stationId, 403, 'You can only manage personnel assigned to your station.');
+    }
+
+    private function assertUserAccess(User $user): void
+    {
+        if ($this->isProvincialAdmin()) {
+            return;
+        }
+
+        $targetStationId = StationOfficer::query()
+            ->where('user_id', $user->user_id)
+            ->value('station_id');
+
+        abort_unless($targetStationId, 403, 'This user is not assigned to your station.');
+        $this->assertStationAccess((int) $targetStationId);
+    }
+
+    private function assertAssignableUser(int $userId): void
+    {
+        if ($this->isProvincialAdmin()) {
+            return;
+        }
+
+        $role = Role::roleNameForId((int) User::query()->whereKey($userId)->value('role_id'));
+        abort_if(in_array($role, ['admin', 'provincial admin'], true), 403, 'You cannot assign a province-wide account to a station.');
     }
 }

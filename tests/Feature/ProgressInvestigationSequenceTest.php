@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\ProgressInvestigationReport;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,12 +16,29 @@ class ProgressInvestigationSequenceTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['investigation_report_images', 'final_investigation_report', 'progress_investigation_report', 'fire_origin', 'spot_investigation_report', 'station_officers'] as $table) {
+        foreach (['investigation_report_images', 'final_investigation_report', 'progress_investigation_report', 'fire_origin', 'spot_investigation_report', 'station_officers', 'users', 'roles'] as $table) {
             Schema::dropIfExists($table);
         }
 
+        Schema::create('roles', function (Blueprint $table) {
+            $table->id('role_id');
+            $table->string('role');
+            $table->timestamps();
+        });
+        Schema::create('users', function (Blueprint $table) {
+            $table->id('user_id');
+            $table->unsignedBigInteger('role_id');
+            $table->string('first_name');
+            $table->string('last_name');
+            $table->string('email')->nullable();
+            $table->string('password')->nullable();
+            $table->rememberToken();
+            $table->timestamps();
+        });
         Schema::create('station_officers', function (Blueprint $table) {
             $table->id('station_officer_id');
+            $table->unsignedBigInteger('station_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
         });
         Schema::create('spot_investigation_report', function (Blueprint $table) {
             $table->id('spot_investigation_report_id');
@@ -68,11 +87,20 @@ class ProgressInvestigationSequenceTest extends TestCase
             $table->timestamps();
         });
 
-        DB::table('station_officers')->insert(['station_officer_id' => 10]);
+        DB::table('roles')->insert(['role_id' => 2, 'role' => 'firefighter']);
+        DB::table('users')->insert([
+            'user_id' => 10,
+            'role_id' => 2,
+            'first_name' => 'Test',
+            'last_name' => 'Investigator',
+        ]);
+        DB::table('station_officers')->insert(['station_officer_id' => 10, 'station_id' => 1, 'user_id' => 10]);
         DB::table('spot_investigation_report')->insert([
             ['spot_investigation_report_id' => 101, 'station_officer_id' => 10],
             ['spot_investigation_report_id' => 102, 'station_officer_id' => 10],
         ]);
+        Role::flushDefinitionCache();
+        $this->actingAs(User::findOrFail(10));
     }
 
     public function test_first_then_second_progress_is_allowed_but_regular_path_cannot_be_mixed_in(): void

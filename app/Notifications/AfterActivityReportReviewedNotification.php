@@ -4,12 +4,18 @@ namespace App\Notifications;
 
 use App\Models\AfterActivityReport;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
-class AfterActivityReportReviewedNotification extends Notification
+class AfterActivityReportReviewedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 3;
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         private readonly int $reportId,
@@ -17,7 +23,9 @@ class AfterActivityReportReviewedNotification extends Notification
         private readonly string $decision,
         private readonly ?string $comments,
         private readonly string $reviewerName,
-    ) {}
+    ) {
+        $this->onConnection((string) config('services.aar_notifications.queue_connection', 'database'));
+    }
 
     public static function fromReport(AfterActivityReport $report, string $decision, ?string $comments, string $reviewerName): self
     {
@@ -27,6 +35,11 @@ class AfterActivityReportReviewedNotification extends Notification
     public function via(object $notifiable): array
     {
         return filled($notifiable->email ?? null) ? ['database', 'mail'] : ['database'];
+    }
+
+    public function viaQueues(): array
+    {
+        return ['database' => 'notifications', 'mail' => 'emails'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -57,5 +70,14 @@ class AfterActivityReportReviewedNotification extends Notification
             'meta' => ['report_id' => $this->reportId, 'decision' => $this->decision],
             'created_at' => now()->toIso8601String(),
         ];
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('AAR review notification permanently failed.', [
+            'after_activity_report_id' => $this->reportId,
+            'decision' => $this->decision,
+            'exception' => $exception->getMessage(),
+        ]);
     }
 }

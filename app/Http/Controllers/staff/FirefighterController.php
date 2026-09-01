@@ -20,6 +20,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\AfterActivityReport;
+use App\Models\Role;
 use App\Models\EventActivity;
 use App\Models\DutyException;
 use App\Models\DutyShift;
@@ -1996,8 +1997,19 @@ public function updateMyProfilePassword(Request $request)
         ->route('firefighter.my-profile')
         ->with('success', 'Password updated successfully.');
 }
-    public function getAllLocations()
+    public function getAllLocations(Request $request)
     {
+        $role = Role::roleNameForId((int) ($request->user()?->role_id ?? 0));
+        abort_unless(in_array($role, ['firefighter', 'station admin', 'chief', 'provincial admin'], true), 403);
+
+        $stationId = null;
+        if ($role !== 'provincial admin') {
+            $stationId = StationOfficer::query()
+                ->where('user_id', $request->user()?->user_id)
+                ->value('station_id');
+            abort_unless($stationId, 403, 'Your account is not assigned to a station.');
+        }
+
         try {
             $userLocationTable = $this->resolveUserLocationTable();
 
@@ -2010,13 +2022,18 @@ public function updateMyProfilePassword(Request $request)
             }
             // Get all online/active firefighters with their last known locations
             
+            $scopeKey = $stationId ? 'station-'.$stationId : 'province';
             $locations = Cache::remember(
-                'firefighter:locations:active',
+                'firefighter:locations:active:'.$scopeKey,
                 now()->addSeconds(self::ACTIVE_FIREFIGHTER_LOCATIONS_CACHE_SECONDS),
-                function () use ($userLocationTable) {
+                function () use ($userLocationTable, $stationId) {
                     return DB::table($userLocationTable)
                         ->join('users', $userLocationTable . '.user_id', '=', 'users.user_id')
+                        ->join('roles', 'users.role_id', '=', 'roles.role_id')
+                        ->join('station_officers', 'users.user_id', '=', 'station_officers.user_id')
                         ->where($userLocationTable . '.updated_at', '>=', Carbon::now()->subMinutes(5))
+                        ->whereRaw('LOWER(roles.role) = ?', ['firefighter'])
+                        ->when($stationId, fn ($query, $value) => $query->where('station_officers.station_id', $value))
                         ->select([
                             $userLocationTable . '.user_id',
                             $userLocationTable . '.latitude',
@@ -2024,7 +2041,9 @@ public function updateMyProfilePassword(Request $request)
                             $userLocationTable . '.updated_at',
                             'users.first_name',
                             'users.last_name',
+                            'station_officers.station_id',
                         ])
+                        ->distinct()
                         ->get();
                 }
             );

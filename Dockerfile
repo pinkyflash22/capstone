@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql zip gd \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -69,8 +71,9 @@ RUN chown -R www-data:www-data \
 # Apache + Render startup
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/render-start.sh /usr/local/bin/render-start.sh
+COPY docker/render-worker.sh /usr/local/bin/render-worker.sh
 
-RUN chmod +x /usr/local/bin/render-start.sh
+RUN chmod +x /usr/local/bin/render-start.sh /usr/local/bin/render-worker.sh
 
 EXPOSE 80
 
