@@ -11,6 +11,7 @@ class ChiefStationAddressUiTest extends TestCase
     public function chief_can_edit_and_persist_the_assigned_station_address_hierarchy(): void
     {
         $controller = file_get_contents(app_path('Http/Controllers/Chief/ManagementController.php'));
+        $stationModel = file_get_contents(app_path('Models/Station.php'));
         $view = file_get_contents(resource_path('views/chief/management.blade.php'));
         $script = file_get_contents(resource_path('js/chief/management.js'));
 
@@ -25,6 +26,7 @@ class ChiefStationAddressUiTest extends TestCase
         $this->assertStringContainsString('DB::transaction', $controller);
         $this->assertStringContainsString('forgetStationManagementCaches', $controller);
         $this->assertStringContainsString('catch (\\Throwable $exception)', $controller);
+        $this->assertStringContainsString('public $timestamps = false;', $stationModel);
 
         foreach (['editStationProvince', 'editStationCity', 'editStationBarangay', 'editStationStreet'] as $id) {
             $this->assertStringContainsString("id=\"{$id}\"", $view);

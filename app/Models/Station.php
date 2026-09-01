@@ -19,6 +19,10 @@ use App\Models\StationMedia;
 class Station extends Model
 {
     protected $primaryKey = 'station_id';
+
+    /** The existing stations table was created without created_at/updated_at columns. */
+    public $timestamps = false;
+
     protected $fillable = [
         'station_name',
         'station_code',
