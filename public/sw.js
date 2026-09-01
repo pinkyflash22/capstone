@@ -1,7 +1,8 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260821-3';
+const CACHE_VERSION = 'pyrosense-pwa-v20260901-4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
+const MEDIA_CACHE = `${CACHE_VERSION}-media`;
 const TILE_CACHE = `${CACHE_VERSION}-tiles`;
 const OFFLINE_URL = '/offline.html';
 const LANDING_URL = '/';
@@ -31,6 +32,7 @@ const MAX_CACHE_ENTRIES = {
     [SHELL_CACHE]: 20,
     [STATIC_CACHE]: 120,
     [DYNAMIC_CACHE]: 40,
+    [MEDIA_CACHE]: 80,
     [TILE_CACHE]: 80,
 };
 
@@ -69,6 +71,7 @@ async function reclaimQuota(targetCacheName) {
         await trimCache(DYNAMIC_CACHE, Math.min(18, getMaxEntries(DYNAMIC_CACHE)));
     }
 
+    await trimCache(MEDIA_CACHE, Math.min(40, getMaxEntries(MEDIA_CACHE)));
     await trimCache(TILE_CACHE, Math.min(30, getMaxEntries(TILE_CACHE)));
 
     if (targetCacheName === STATIC_CACHE) {
@@ -141,6 +144,7 @@ self.addEventListener('activate', (event) => {
                 SHELL_CACHE,
                 STATIC_CACHE,
                 DYNAMIC_CACHE,
+                MEDIA_CACHE,
                 TILE_CACHE
             ].includes(key)) {
                 return caches.delete(key);
@@ -210,13 +214,16 @@ self.addEventListener('fetch', (event) => {
     const isProtectedHtmlRoute = isSameOrigin && NO_CACHE_HTML_PATTERNS.some((pattern) => pattern.test(url.pathname));
     const isTileRequest = url.hostname.includes('tile.openstreetmap.org')
         || url.pathname.includes('/MapServer/tile/');
+    const isImageRequest = request.destination === 'image';
+    const isMutableMediaRequest = isImageRequest && (
+        !isSameOrigin
+        || url.pathname.startsWith('/storage/')
+    );
     const isStaticAsset = request.destination === 'style'
         || request.destination === 'script'
-        || request.destination === 'image'
         || request.destination === 'font'
         || url.pathname.startsWith('/build/')
         || url.pathname.startsWith('/assets/')
-        || url.pathname.startsWith('/storage/')
         || url.pathname.endsWith('.css')
         || url.pathname.endsWith('.js')
         || url.pathname.endsWith('.png')
@@ -242,13 +249,18 @@ self.addEventListener('fetch', (event) => {
         || url.pathname === '/check-auth'
     );
 
-    if (isStaticAsset) {
-        event.respondWith(cacheFirst(request, STATIC_CACHE));
+    if (isTileRequest) {
+        event.respondWith(cacheFirst(request, TILE_CACHE));
         return;
     }
 
-    if (isTileRequest) {
-        event.respondWith(cacheFirst(request, TILE_CACHE));
+    if (isMutableMediaRequest) {
+        event.respondWith(networkFirstImage(request));
+        return;
+    }
+
+    if (isImageRequest || isStaticAsset) {
+        event.respondWith(cacheFirst(request, STATIC_CACHE));
         return;
     }
 
@@ -369,14 +381,35 @@ async function cacheFirst(request, cacheName) {
         }
         return response;
     } catch (error) {
-        if (request.destination === 'image') {
-            const fallbackImage = await caches.match('/logo.png') || await caches.match('/icon-192x192.png');
-            if (fallbackImage) {
-                return fallbackImage;
-            }
+        throw error;
+    }
+}
+
+async function networkFirstImage(request) {
+    const cacheKeyUrl = new URL(request.url);
+    cacheKeyUrl.searchParams.delete('_pyro_image_retry');
+    const cacheKey = cacheKeyUrl.href;
+    const cachedImage = await caches.match(cacheKey);
+
+    try {
+        const response = await fetch(request);
+        const usableResponse = response && (response.ok || response.type === 'opaque');
+
+        if (usableResponse) {
+            await safeCachePut(MEDIA_CACHE, cacheKey, response);
+            return response;
         }
 
-        throw error;
+        return cachedImage || response;
+    } catch (error) {
+        if (cachedImage) {
+            return cachedImage;
+        }
+
+        return new Response('', {
+            status: 503,
+            statusText: 'Image unavailable'
+        });
     }
 }
 

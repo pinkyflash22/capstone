@@ -10,6 +10,32 @@
 <script src="{{ $pwaInstallScript }}"></script>
 <script src="{{ $pwaBackgroundSyncScript }}"></script>
 
+<style>
+    @keyframes pyrosense-image-shimmer {
+        0% { background-position: 180% 0; }
+        100% { background-position: -180% 0; }
+    }
+
+    img[data-pyro-image-state="loading"] {
+        background-color: #e8edf3;
+        background-image: linear-gradient(100deg, transparent 25%, rgba(255, 255, 255, 0.78) 46%, transparent 67%);
+        background-repeat: no-repeat;
+        background-size: 220% 100%;
+        animation: pyrosense-image-shimmer 1.15s ease-in-out infinite;
+    }
+
+    img[data-pyro-image-state="error"] {
+        background-color: #eef2f6;
+        background-image: linear-gradient(135deg, #eef2f6, #e2e8f0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        img[data-pyro-image-state="loading"] {
+            animation: none;
+        }
+    }
+</style>
+
 @if ($showPwaInstallButton)
     <style>
         .pyrosense-pwa-install {
@@ -445,6 +471,7 @@
         const pageSnapshotBadge = document.getElementById('pyrosensePageSnapshotBadge');
         const pageSnapshotBadgeTitle = document.getElementById('pyrosensePageSnapshotBadgeTitle');
         const pageSnapshotBadgeText = document.getElementById('pyrosensePageSnapshotBadgeText');
+        let imageStateObserver = null;
         if (!window.__pyroNativeFetch) {
             window.__pyroNativeFetch = window.fetch.bind(window);
         }
@@ -452,6 +479,145 @@
         const nativeFetch = window.__pyroNativeFetch;
         let sessionExpiredPromptOpen = false;
         let sessionExpiredDetected = false;
+
+        function isManagedContentImage(image) {
+            if (!(image instanceof HTMLImageElement) || image.dataset.pyroImageLoader === 'off') {
+                return false;
+            }
+
+            if (image.classList.contains('leaflet-tile') || image.closest('.leaflet-container')) {
+                return false;
+            }
+
+            const source = image.currentSrc || image.getAttribute('src') || '';
+            if (!source || source.startsWith('data:') || source.startsWith('blob:')) {
+                return false;
+            }
+
+            try {
+                const imageUrl = new URL(source, window.location.href);
+                return imageUrl.origin !== window.location.origin
+                    || imageUrl.pathname.startsWith('/storage/');
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function setImageState(image, state) {
+            image.dataset.pyroImageState = state;
+            if (state === 'loading') {
+                image.setAttribute('aria-busy', 'true');
+            } else {
+                image.removeAttribute('aria-busy');
+            }
+        }
+
+        function prepareContentImage(image) {
+            if (!isManagedContentImage(image)) {
+                return;
+            }
+
+            const source = image.currentSrc || image.src;
+            if (!image.dataset.pyroImageRetrying) {
+                image.dataset.pyroImageOriginalSrc = image.getAttribute('src') || source;
+                if (image.getAttribute('srcset')) {
+                    image.dataset.pyroImageOriginalSrcset = image.getAttribute('srcset');
+                }
+            }
+
+            if (!image.dataset.pyroImageBound) {
+                image.dataset.pyroImageBound = 'true';
+                image.addEventListener('load', () => {
+                    image.dataset.pyroImageFailed = 'false';
+                    delete image.dataset.pyroImageRetrying;
+                    setImageState(image, 'loaded');
+                });
+                image.addEventListener('error', () => {
+                    image.dataset.pyroImageFailed = 'true';
+                    delete image.dataset.pyroImageRetrying;
+                    setImageState(image, 'error');
+                });
+            }
+
+            if (image.complete) {
+                setImageState(image, image.naturalWidth > 0 ? 'loaded' : 'error');
+                image.dataset.pyroImageFailed = image.naturalWidth > 0 ? 'false' : 'true';
+                return;
+            }
+
+            setImageState(image, 'loading');
+        }
+
+        function appendImageRetryToken(source) {
+            try {
+                const retryUrl = new URL(source, window.location.href);
+                retryUrl.searchParams.set('_pyro_image_retry', String(Date.now()));
+                return retryUrl.href;
+            } catch (error) {
+                return source;
+            }
+        }
+
+        function retryFailedContentImages() {
+            document.querySelectorAll('img[data-pyro-image-failed="true"]').forEach((image) => {
+                const originalSource = image.dataset.pyroImageOriginalSrc || image.getAttribute('src');
+                if (!originalSource) {
+                    return;
+                }
+
+                image.dataset.pyroImageRetrying = 'true';
+                image.dataset.pyroImageFailed = 'false';
+                setImageState(image, 'loading');
+
+                const originalSrcset = image.dataset.pyroImageOriginalSrcset;
+                if (originalSrcset) {
+                    image.setAttribute('srcset', originalSrcset
+                        .split(',')
+                        .map((candidate) => {
+                            const parts = candidate.trim().split(/\s+/);
+                            parts[0] = appendImageRetryToken(parts[0]);
+                            return parts.join(' ');
+                        })
+                        .join(', '));
+                }
+
+                image.src = appendImageRetryToken(originalSource);
+            });
+        }
+
+        function initializeContentImageStates() {
+            document.querySelectorAll('img').forEach(prepareContentImage);
+
+            if (imageStateObserver) {
+                return;
+            }
+
+            imageStateObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.target instanceof HTMLImageElement) {
+                        prepareContentImage(mutation.target);
+                        return;
+                    }
+
+                    mutation.addedNodes.forEach((node) => {
+                        if (!(node instanceof Element)) {
+                            return;
+                        }
+
+                        if (node instanceof HTMLImageElement) {
+                            prepareContentImage(node);
+                        }
+                        node.querySelectorAll?.('img').forEach(prepareContentImage);
+                    });
+                });
+            });
+            imageStateObserver.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src', 'srcset']
+            });
+        }
 
         function getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -928,6 +1094,7 @@
             updatePageSnapshot,
             readPageSnapshot,
             registerPageSnapshot,
+            retryFailedImages: retryFailedContentImages,
             getPendingReportCount: () => getQueue().length,
             getQueuedReports: () => getQueue().slice(),
             isOffline: () => !window.navigator.onLine
@@ -936,6 +1103,7 @@
         window.addEventListener('online', function () {
             updateConnectionState(true);
             syncQueuedReports();
+            retryFailedContentImages();
         });
 
         window.addEventListener('offline', function () {
@@ -946,6 +1114,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             rememberOfflineReturnRoute();
             ensureServiceWorker();
+            initializeContentImageStates();
             updateConnectionState(false);
             if (window.navigator.onLine && getQueue().length) {
                 syncQueuedReports();

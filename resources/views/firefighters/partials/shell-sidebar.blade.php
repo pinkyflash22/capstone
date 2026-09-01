@@ -887,7 +887,18 @@
             </button>
         </div>
         <div class="ff-mobile-panel__list">
-            @php($aarNotifications = auth()->user()?->notifications()->where('data->category', 'after_activity_report')->latest()->limit(5)->get() ?? collect())
+            @php
+                // Production stores notifications.data as TEXT, so filter by the
+                // notification class instead of applying JSON operators to data.
+                $notificationUser = auth()->user();
+                $aarNotifications = $notificationUser
+                    ? $notificationUser->notifications()
+                        ->where('type', \App\Notifications\AfterActivityReportReviewedNotification::class)
+                        ->latest()
+                        ->limit(5)
+                        ->get()
+                    : collect();
+            @endphp
             @foreach($aarNotifications as $notification)
                 <a href="{{ data_get($notification->data, 'url', route('firefighter.my-station', ['tab' => 'aar'])) }}" class="ff-mobile-panel__action" data-aar-notification-id="{{ $notification->id }}">
                     <span class="ff-mobile-panel__action-icon"><span class="ff-mobile-icon" aria-hidden="true">{{ $notification->read_at ? 'description' : 'notifications_active' }}</span></span>

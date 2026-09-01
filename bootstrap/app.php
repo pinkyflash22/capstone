@@ -9,8 +9,25 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
+
+// File-based cache and compiled views are needed before Laravel can finish
+// booting. Keep this safeguard here in addition to the container entrypoint so
+// alternate web/worker commands cannot start with missing runtime directories.
+$basePath = dirname(__DIR__);
+foreach ([
+    $basePath.'/storage/framework/cache/data',
+    $basePath.'/storage/framework/sessions',
+    $basePath.'/storage/framework/testing',
+    $basePath.'/storage/framework/views',
+    $basePath.'/bootstrap/cache',
+] as $runtimeDirectory) {
+    if (! is_dir($runtimeDirectory)) {
+        @mkdir($runtimeDirectory, 0775, true);
+    }
+}
+
 // use App\Http\Middleware\RoleMiddleware;
-return Application::configure(basePath: dirname(__DIR__))
+return Application::configure(basePath: $basePath)
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
