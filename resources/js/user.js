@@ -89,7 +89,7 @@ const CITIZEN_ROUTE_POLL_INTERVAL_MS = 10000;
 const CITIZEN_LIVE_FETCH_TIMEOUT_MS = 10000;
 const citizenLiveRequestRegistry = new Map();
 let citizenBaseLayers = {};
-let citizenActiveBaseLayerKey = 'Carto Light';
+let citizenActiveBaseLayerKey = 'OSM Standard';
 let citizenRouteDiscoveryFailureCount = 0;
 let citizenRouteDiscoveryPausedUntil = 0;
 let citizenMapPreviewPreviousFocus = null;
@@ -547,18 +547,14 @@ function isCitizenMobileViewport() {
 function normalizeCitizenBaseLayerLabel(label = '') {
     const normalized = String(label || '').trim().toLowerCase();
     if (!normalized) {
-        return 'Carto Light';
+        return 'OSM Standard';
     }
 
     if (['satellite'].includes(normalized)) {
         return 'Satellite';
     }
 
-    if (['street map', 'carto light', 'carto'].includes(normalized)) {
-        return 'Carto Light';
-    }
-
-    if (['osm', 'osm standard'].includes(normalized)) {
+    if (['street map', 'osm', 'osm standard'].includes(normalized)) {
         return 'OSM Standard';
     }
 
@@ -566,7 +562,7 @@ function normalizeCitizenBaseLayerLabel(label = '') {
         return 'OSM HOT';
     }
 
-    return 'Carto Light';
+    return 'OSM Standard';
 }
 
 function getCitizenActiveBaseLayer() {
@@ -713,7 +709,6 @@ function enhanceCitizenLeafletLayerControl() {
 
     const normalizeLayerLabel = (value) => String(value || '').replace(/\s+/g, ' ').trim();
     const displayLabelMap = {
-        'Carto Light': 'Carto',
         'OSM Standard': 'OSM',
         'OSM HOT': 'OSM HOT',
         Satellite: 'Satellite',
@@ -1290,13 +1285,10 @@ document.addEventListener('DOMContentLoaded', function(){
         window.userMap = window.usermap;
         ensureCitizenMarkerPanes();
 
-        var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap, &copy; CartoDB'
-        }).addTo(window.usermap);
-
         var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        });
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(window.usermap);
 
         var hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
@@ -1326,12 +1318,11 @@ document.addEventListener('DOMContentLoaded', function(){
         boundaryLayerGroup = L.layerGroup().addTo(window.usermap);
 
         citizenBaseLayers = {
-            "Carto Light": cartoLight,
             "OSM Standard": street,
             "OSM HOT": hotStreet,
             "Satellite": satellite
         };
-        citizenActiveBaseLayerKey = 'Carto Light';
+        citizenActiveBaseLayerKey = 'OSM Standard';
         
         // Create layer control with all groups
         citizenLayerControl = L.control.layers(citizenBaseLayers, {

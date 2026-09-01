@@ -281,6 +281,23 @@ aside#sidebar.chief-shell-sidebar .chief-shell-profile-role {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
+.dashboard-header-actions {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.dashboard-header-actions .chief-alerts-host {
+  position: static;
+}
+
+.dashboard-header-actions #alertsDropdown {
+  top: calc(100% + 12px);
+  right: 0;
+  left: auto;
+  margin-top: 0 !important;
+  transform-origin: top right;
+}
+
 /* ─── User Dropdown ────────────────────────────── */
 .user-dropdown {
   position: relative;

@@ -7415,9 +7415,8 @@ function initAfterMapReady() {
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
 
-    var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap, &copy; CartoDB',
-        subdomains: 'abcd',
+    var osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19
     });
     var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -7431,14 +7430,14 @@ function initAfterMapReady() {
         maxZoom: 18,
         attribution: 'Hydro reference (c) Esri'
     });
-    (isFirefighterDashboardMap ? cartoLight : street).addTo(window.map);
+    (isFirefighterDashboardMap ? osmStandard : street).addTo(window.map);
     window.pyroPwa?.attachMapOfflineNotice?.(window.map);
 
     console.log(roleToken);
     console.log('User Role:', roleName, 'Role ID:', roleToken);
     const routeBaseMaps = isFirefighterDashboardMap
         ? {
-            "Carto Light": cartoLight,
+            "OSM Standard": osmStandard,
             "OSM Standard": street,
             "OSM HOT": hotStreet,
             "Satellite": satellite

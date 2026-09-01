@@ -58,11 +58,14 @@ class MarkerFeedBuilder
             'category' => $marker->category,
             'status' => $marker->status,
             'image' => $marker->image,
+            'incident_id' => $incident?->incident_id,
             'station' => $station ? [
+                'station_id' => $station->station_id,
                 'station_name' => static::publicValue($station->station_name),
                 'contact_number' => static::publicValue($station->contact_number),
             ] : null,
             'station_public' => $station ? [
+                'id' => $station->station_id,
                 'name' => static::publicValue($station->station_name),
                 'address' => static::formatFullAddress($station->address),
                 'contact_number' => static::publicValue($station->contact_number),
@@ -137,6 +140,12 @@ class MarkerFeedBuilder
     protected static function markerIsVisible(Marker $marker, $riskArea, ?User $viewer = null, array $visibility = []): bool
     {
         $category = strtolower(trim((string) ($marker->category ?? '')));
+
+        // A fire marker without an incident cannot be routed safely. Keep stale
+        // marker rows out of every map feed until an administrator audits them.
+        if ($category === 'fire' && $marker->incidents->isEmpty()) {
+            return false;
+        }
 
         if (! in_array($category, ['risk', 'hazard'], true)) {
             return strtolower(trim((string) ($marker->status ?? 'active'))) !== 'inactive';

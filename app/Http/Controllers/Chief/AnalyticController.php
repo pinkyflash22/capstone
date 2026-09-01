@@ -39,6 +39,8 @@ use Illuminate\Support\Str;
 
 class AnalyticController extends Controller
 {
+    private const HISTORICAL_WEATHER_START_YEAR = 2023;
+
     private $apiKey;
 
     private ?string $lastAiModelUsed = null;
@@ -7130,7 +7132,8 @@ class AnalyticController extends Controller
         ]);
 
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
-        if (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
+        $isProvincialAdmin = Str::lower(trim((string) (Auth::user()?->role?->role ?? ''))) === 'provincial admin';
+        if (! $isProvincialAdmin && (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id'])) {
             abort(403, 'You are not authorized to preview archive weather for this station.');
         }
 
@@ -7161,12 +7164,12 @@ class AnalyticController extends Controller
             ], 422);
         }
 
-        $archivePeriods = $this->resolveHistoricalArchivePeriods($stationId, $barangayId, $historicalWindow);
+        $archivePeriods = $this->resolveHistoricalArchivePeriods($stationId, $barangayId);
         if (empty($archivePeriods)) {
             return response()->json([
                 'success' => true,
                 'preview_only' => true,
-                'message' => 'No historical fire-incident years were found for the selected barangay.',
+                'message' => 'No Open-Meteo archive periods could be resolved for the selected barangay.',
                 'barangay' => [
                     'id' => $barangayId,
                     'name' => $coordinateRow->barangay_name,
@@ -7220,8 +7223,8 @@ class AnalyticController extends Controller
                     'longitude' => (float) $coordinateRow->lng,
                 ],
                 'historical_window' => [
-                    'value' => (string) $historicalWindow,
-                    'label' => $this->formatHistoricalWindowLabel($historicalWindow, count($archivePeriods)),
+                    'value' => '2023-current',
+                    'label' => sprintf('January %d to %s', self::HISTORICAL_WEATHER_START_YEAR, Carbon::today('Asia/Manila')->format('F Y')),
                 ],
                 'years' => collect($archivePeriods)->pluck('year')->values()->all(),
                 'archive_periods' => $archivePeriods,
@@ -7275,7 +7278,8 @@ class AnalyticController extends Controller
         ]);
 
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
-        if (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id']) {
+        $isProvincialAdmin = Str::lower(trim((string) (Auth::user()?->role?->role ?? ''))) === 'provincial admin';
+        if (! $isProvincialAdmin && (! $stationOfficer || (int) $stationOfficer->station_id !== (int) $validated['station_id'])) {
             abort(403, 'You are not authorized to save archive weather for this station.');
         }
 
@@ -7296,11 +7300,11 @@ class AnalyticController extends Controller
             ], 422);
         }
 
-        $archivePeriods = $this->resolveHistoricalArchivePeriods($stationId, $barangayId, $historicalWindow);
+        $archivePeriods = $this->resolveHistoricalArchivePeriods($stationId, $barangayId);
         if (empty($archivePeriods)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No historical fire-incident years were found for the selected barangay.',
+                'message' => 'No Open-Meteo archive periods could be resolved for the selected barangay.',
             ], 422);
         }
 
@@ -7479,7 +7483,7 @@ class AnalyticController extends Controller
         return $resolvedYears->all();
     }
 
-    private function resolveHistoricalArchivePeriods(int $stationId, int $barangayId, $historicalWindow = '3'): array
+    private function resolveHistoricalArchivePeriods(int $stationId, int $barangayId): array
     {
         $barangayIds = $this->resolveStationBarangays($stationId)
             ->pluck('barangay_id')
@@ -7493,39 +7497,30 @@ class AnalyticController extends Controller
             return [];
         }
 
-        $years = DB::table('historical_fire_incidents')
-            ->where('barangay_id', $barangayId)
-            ->selectRaw('CAST(EXTRACT(YEAR FROM incident_date) AS INTEGER) as year_value')
-            ->distinct()
-            ->orderByDesc('year_value')
-            ->pluck('year_value')
-            ->map(fn ($value) => (int) $value)
-            ->filter(fn ($year) => $year > 0)
-            ->unique()
-            ->sortDesc()
-            ->values();
-
-        $limit = $this->normalizeHistoricalWindowLimit($historicalWindow);
-        if ($limit !== null) {
-            $years = $years->take($limit);
+        // Archive preview/save is intentionally independent of incident rows.
+        // A barangay with no fire records still needs its complete weather baseline.
+        $today = Carbon::today('Asia/Manila');
+        if ((int) $today->year < self::HISTORICAL_WEATHER_START_YEAR) {
+            return [];
         }
 
-        $today = Carbon::today();
+        return collect(range(self::HISTORICAL_WEATHER_START_YEAR, (int) $today->year))
+            ->map(function (int $year) use ($today) {
+                $startDate = Carbon::create($year, 1, 1)->toDateString();
+                $endDate = Carbon::create($year, 12, 31)->toDateString();
 
-        return $years->map(function (int $year) use ($today) {
-            $startDate = Carbon::create($year, 1, 1)->toDateString();
-            $endDate = Carbon::create($year, 12, 31)->toDateString();
+                if ($year >= (int) $today->year) {
+                    $endDate = $today->toDateString();
+                }
 
-            if ($year >= (int) $today->year) {
-                $endDate = $today->toDateString();
-            }
-
-            return [
-                'year' => $year,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-            ];
-        })->values()->all();
+                return [
+                    'year' => $year,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function buildHistoricalWeatherPreviewPayload(int $stationId, int $barangayId, float $latitude, float $longitude, array $archivePeriods): array
@@ -7538,6 +7533,8 @@ class AnalyticController extends Controller
             $year = (int) ($period['year'] ?? 0);
             $startDate = (string) ($period['start_date'] ?? sprintf('%d-01-01', $year));
             $endDate = (string) ($period['end_date'] ?? sprintf('%d-12-31', $year));
+            $periodStart = Carbon::parse($startDate);
+            $periodEnd = Carbon::parse($endDate);
 
             $monthlyIncidentCounts = DB::table('historical_fire_incidents')
                 ->where('barangay_id', $barangayId)
@@ -7555,7 +7552,7 @@ class AnalyticController extends Controller
             $archivePayload = $this->fetchOpenMeteoArchiveRange($latitude, $longitude, $startDate, $endDate, $year);
             $monthlyWeather = $this->summarizeOpenMeteoArchiveByMonth($archivePayload);
 
-            for ($month = 1; $month <= 12; $month++) {
+            for ($month = (int) $periodStart->month; $month <= (int) $periodEnd->month; $month++) {
                 $dbMonthRow = $monthlyIncidentCounts->get($month, [
                     'incident_count' => 0,
                     'matched_row_count' => 0,

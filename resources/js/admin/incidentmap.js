@@ -24,8 +24,9 @@ class IncidentMap {
         
         this.map = L.map('incidentMap').setView(defaultCenter, 11);
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
         }).addTo(this.map);
 
         // Initialize draw control

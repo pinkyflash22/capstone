@@ -1790,12 +1790,9 @@
                 .setView([defaultLat, defaultLng], 14);
             window.barangayOperationsMap = map;
 
-            const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
-            }).addTo(map);
             const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
-            });
+            }).addTo(map);
             const hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
                 maxZoom: 19, attribution: '&copy; OpenStreetMap, HOT',
             });
@@ -1814,7 +1811,6 @@
             const boundaryLayer = L.layerGroup().addTo(map);
 
             const baseMaps = {
-                'Carto Light': cartoLight,
                 'OSM Standard': street,
                 'OSM HOT': hotStreet,
                 'Satellite': satellite,

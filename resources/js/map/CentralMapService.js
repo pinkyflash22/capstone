@@ -58,9 +58,8 @@ class CentralMapService {
         const defaultCenter = [16.0433, 120.3333];
         this.map = L.map(this.mapElementId).setView(defaultCenter, 13);
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap, &copy; CartoDB',
-            subdomains: 'abcd',
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(this.map);
         

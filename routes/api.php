@@ -345,7 +345,11 @@ Route::get('/markers/latest', [MarkerController::class, 'latest'])->middleware([
 // Route::get('/coordinate/latest', [CoordinateController::class, 'latest']); //latest markers 
 
 // Route::resource('coordinate', CoordinateController::class);
-Route::resource('station', StationController::class)->middleware(['web', 'auth', 'role:provincial admin']);
+Route::get('/station', [StationController::class, 'index'])
+    ->middleware(['web', 'auth', 'role:admin,station admin,chief,firefighter,provincial admin']);
+Route::resource('station', StationController::class)
+    ->except(['index'])
+    ->middleware(['web', 'auth', 'role:provincial admin']);
 
 // Update marker
 Route::put('/markers/{markerId}', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);

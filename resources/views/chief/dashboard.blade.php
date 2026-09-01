@@ -430,9 +430,9 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-6">
+            <div class="dashboard-header-actions flex items-center gap-3">
                 <!-- Notification Bell -->
-                <div class="hidden md:block relative chief-alerts-host">
+                <div class="hidden md:block chief-alerts-host">
                     <button id="notificationBtn" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative" aria-controls="alertsDropdown" aria-expanded="false" aria-label="Open incident notifications">
                         <i class="fa-regular fa-bell"></i>
                         @if($alerts->count() > 0)

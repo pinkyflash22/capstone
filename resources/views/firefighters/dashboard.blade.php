@@ -1903,11 +1903,7 @@
             <div class="firefighter-mobile-map-panel__body">
                 <div class="firefighter-mobile-map-panel__base" role="radiogroup" aria-label="Map style">
                     <label class="firefighter-mobile-map-panel__base-item">
-                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="Carto Light" checked>
-                        <span>Carto</span>
-                    </label>
-                    <label class="firefighter-mobile-map-panel__base-item">
-                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="OSM Standard">
+                        <input type="radio" name="firefighter_map_base" data-ff-map-base-toggle="OSM Standard" checked>
                         <span>OSM</span>
                     </label>
                     <label class="firefighter-mobile-map-panel__base-item">

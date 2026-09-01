@@ -50,8 +50,9 @@ function initMap() {
     // Default center (Pangasinan)
     map = L.map('map').setView([16.0433, 120.3333], 11);
     
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
     }).addTo(map);
 
     landingMapBoundaryLayer = L.layerGroup().addTo(map);
@@ -888,8 +889,9 @@ function initMobilePreviewMap() {
         attributionControl: true,
     }).setView([16.0433, 120.3333], 10);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
     }).addTo(mobilePreviewMap);
 
     mobilePreviewBoundaryLayer = L.layerGroup().addTo(mobilePreviewMap);

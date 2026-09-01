@@ -12,6 +12,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <meta name="user-role" content="{{ auth()->user()->role->role ?? 'citizen' }}">
     <meta name="user-role-id" content="{{ auth()->user()->role_id ?? 4 }}">
+    <meta name="station-id" content="{{ $stationperson->firstWhere('user_id', auth()->user()?->user_id)?->station_id ?? '' }}">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -1524,15 +1525,37 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-6">
+            <div class="dashboard-header-actions flex items-center gap-3">
                 <!-- Notifications -->
-                <div class="hidden md:block relative">
-                    <button class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative">
+                <div class="hidden md:block chief-alerts-host">
+                    <button id="notificationBtn" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative" aria-controls="alertsDropdown" aria-expanded="false" aria-label="Open incident notifications">
                         <i class="fa-regular fa-bell"></i>
                         @if($alerts->count() > 0)
-                        <span class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
+                        <span id="alertBadge" class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
                         @endif
                     </button>
+                    <div id="alertsDropdown" class="hidden absolute right-0 mt-3 w-[24rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl z-[5200] overflow-hidden" aria-hidden="true">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                            <div>
+                                <p class="text-sm font-bold text-slate-800">Incident Notifications</p>
+                                <p class="text-[11px] text-slate-500">Province-wide live incident alerts</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="markAllAsRead()" class="text-[11px] font-semibold text-amber-700 hover:text-amber-800">
+                                    Mark all as read
+                                </button>
+                                <button type="button" id="alertsDropdownClose" class="chief-alerts-mobile-close" aria-label="Close incident notifications">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="alertsDropdownList" class="max-h-[24rem] overflow-y-auto divide-y divide-slate-100">
+                            <div class="px-4 py-6 text-sm text-slate-500 text-center">
+                                No live incident notifications yet.
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chiefNotificationBackdrop" class="chief-notification-backdrop" hidden></div>
                 </div>
 
                 <!-- User Profile Dropdown -->
@@ -2771,20 +2794,48 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // Alert bell toggle
-        const alertBell = document.getElementById('alertBell');
+        const alertBell = document.getElementById('notificationBtn');
         const alertsDropdown = document.getElementById('alertsDropdown');
+        const alertsClose = document.getElementById('alertsDropdownClose');
+        const alertsBackdrop = document.getElementById('chiefNotificationBackdrop');
+
+        const closeAlertsDropdown = () => {
+            if (!alertsDropdown) return;
+            alertsDropdown.classList.remove('show');
+            alertsDropdown.classList.add('hidden');
+            alertsDropdown.setAttribute('aria-hidden', 'true');
+            alertBell?.setAttribute('aria-expanded', 'false');
+            alertsBackdrop?.setAttribute('hidden', 'hidden');
+            document.body.classList.remove('chief-notifications-open');
+        };
+
+        const openAlertsDropdown = () => {
+            if (!alertsDropdown) return;
+            alertsDropdown.classList.add('show');
+            alertsDropdown.classList.remove('hidden');
+            alertsDropdown.setAttribute('aria-hidden', 'false');
+            alertBell?.setAttribute('aria-expanded', 'true');
+            alertsBackdrop?.removeAttribute('hidden');
+            document.body.classList.add('chief-notifications-open');
+        };
         
         if (alertBell) {
             alertBell.addEventListener('click', function(e) {
+                e.preventDefault();
                 e.stopPropagation();
-                alertsDropdown.classList.toggle('show');
+                alertsDropdown?.classList.contains('show')
+                    ? closeAlertsDropdown()
+                    : openAlertsDropdown();
             });
         }
+
+        alertsClose?.addEventListener('click', closeAlertsDropdown);
+        alertsBackdrop?.addEventListener('click', closeAlertsDropdown);
         
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!alertBell?.contains(e.target) && !alertsDropdown?.contains(e.target)) {
-                alertsDropdown?.classList.remove('show');
+                closeAlertsDropdown();
             }
         });
 
@@ -3254,17 +3305,28 @@
     function focusOnMarker(lat, lng) {
         if (window.map) {
             window.map.setView([lat, lng], 16);
-            document.getElementById('alertsDropdown')?.classList.remove('show');
+            const dropdown = document.getElementById('alertsDropdown');
+            dropdown?.classList.remove('show');
+            dropdown?.classList.add('hidden');
+            dropdown?.setAttribute('aria-hidden', 'true');
+            document.getElementById('notificationBtn')?.setAttribute('aria-expanded', 'false');
         }
     }
 
     function markAllAsRead() {
+        window.markAllIncidentAlertsRead?.();
         const badge = document.getElementById('alertBadge');
         if (badge) badge.textContent = '0';
         document.querySelectorAll('.alert-item-dropdown').forEach(item => {
             item.classList.remove('unread');
         });
-        document.getElementById('alertsDropdown')?.classList.remove('show');
+        const dropdown = document.getElementById('alertsDropdown');
+        dropdown?.classList.remove('show');
+        dropdown?.classList.add('hidden');
+        dropdown?.setAttribute('aria-hidden', 'true');
+        document.getElementById('notificationBtn')?.setAttribute('aria-expanded', 'false');
+        document.getElementById('chiefNotificationBackdrop')?.setAttribute('hidden', 'hidden');
+        document.body.classList.remove('chief-notifications-open');
     }
 
     function openModal(options = {}) {

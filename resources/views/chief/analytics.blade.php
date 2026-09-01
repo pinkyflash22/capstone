@@ -2958,7 +2958,7 @@
                             <button id="previewHistoricalWeatherBtn" class="analytics-btn analytics-btn--secondary" type="button">
                                 <div class="analytics-btn__copy">
                                     <strong><i class="fa-solid fa-cloud-sun-rain"></i> Preview Historical Weather</strong>
-                                    <span>Temporarily queries Open-Meteo archive weather for the selected barangay before any save step.</span>
+                                    <span>Queries Open-Meteo from January 2023 through the current date for the selected barangay.</span>
                                 </div>
                                 <i class="fa-solid fa-magnifying-glass-chart"></i>
                             </button>
@@ -4469,7 +4469,7 @@
 
             body.innerHTML = `
                 <div class="historical-weather-preview-note">
-                    Preview only. This does not save anything yet. Monthly incident totals come from the exact matching rows in <strong>historical_fire_incidents</strong> for the selected <strong>barangay_id</strong>. The table shows both the number of matched historical rows and the summed <strong>incident_count</strong> from those rows, while weather values are aggregated from the Open-Meteo archive query built from the barangay hall marker coordinates.
+                    Preview only. This queries Open-Meteo from January 2023 through the current date and does not save anything yet. Monthly incident totals come from the exact matching rows in <strong>historical_fire_incidents</strong> for the selected <strong>barangay_id</strong>. Daily scheduled weather audits remain separate in <strong>daily_weather_contexts</strong> and do not increase incident totals.
                 </div>
                 <div class="historical-weather-preview-meta">
                     <div class="historical-weather-preview-card">
@@ -4481,7 +4481,7 @@
                         <div class="historical-weather-preview-card__value">${formatHistoricalWeatherPreviewValue(latitude, 6)}, ${formatHistoricalWeatherPreviewValue(longitude, 6)}</div>
                     </div>
                     <div class="historical-weather-preview-card">
-                        <div class="historical-weather-preview-card__label">Historical Window</div>
+                        <div class="historical-weather-preview-card__label">Archive Range</div>
                         <div class="historical-weather-preview-card__value">${escapeHtml(result?.historical_window?.label || 'Historical preview')}</div>
                     </div>
                     <div class="historical-weather-preview-card">
@@ -4537,7 +4537,6 @@
         async function previewHistoricalWeatherArchive() {
             const stationSelect = document.getElementById('stationSelect');
             const barangaySelect = document.getElementById('barangaySelect');
-            const historicalWindowSelect = document.getElementById('historicalWindowSelect');
             const button = document.getElementById('previewHistoricalWeatherBtn');
 
             if (!stationSelect?.value) {
@@ -4564,7 +4563,7 @@
                 body.innerHTML = `
                     <div class="text-center py-8">
                         <div class="loading-spinner" style="width: 34px; height: 34px;"></div>
-                        <p class="mt-3 text-gray-500">Querying Open-Meteo archive weather for the selected barangay...</p>
+                        <p class="mt-3 text-gray-500">Querying Open-Meteo from 2023 through the current date for the selected barangay...</p>
                     </div>
                 `;
             }
@@ -4576,10 +4575,10 @@
                 const params = new URLSearchParams({
                     station_id: stationSelect.value,
                     barangay_id: barangaySelect.value,
-                    historical_window: historicalWindowSelect?.value || '3',
                 });
 
-                const response = await fetch(`/station-admin/api/historical-weather-preview?${params.toString()}`, {
+                const previewEndpoint = @json($isProvincialAdmin ? url('/admin/api/historical-weather-preview') : url('/station-admin/api/historical-weather-preview'));
+                const response = await fetch(`${previewEndpoint}?${params.toString()}`, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -4632,10 +4631,10 @@
                 const payload = {
                     station_id: document.getElementById('stationSelect')?.value || '',
                     barangay_id: state.barangay.id,
-                    historical_window: document.getElementById('historicalWindowSelect')?.value || '3',
                 };
 
-                const response = await fetch('/station-admin/api/historical-weather-save', {
+                const saveEndpoint = @json($isProvincialAdmin ? url('/admin/api/historical-weather-save') : url('/station-admin/api/historical-weather-save'));
+                const response = await fetch(saveEndpoint, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',

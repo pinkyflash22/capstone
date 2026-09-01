@@ -412,6 +412,13 @@ function buildIncidentLookup(incidents) {
     return lookup;
 }
 
+function getMarkerIncidentId(marker) {
+    return marker?.incident_id
+        ?? marker?.incident_public?.id
+        ?? marker?.incident?.incident_id
+        ?? null;
+}
+
 function findIncidentInLookup(marker, incidentLookup, fallbackIncident = null) {
     if (fallbackIncident) {
         return fallbackIncident;
@@ -428,8 +435,9 @@ function findIncidentInLookup(marker, incidentLookup, fallbackIncident = null) {
         }
     }
 
-    if (marker?.incident_id !== null && marker?.incident_id !== undefined) {
-        const byIncident = incidentLookup.get(`incident:${marker.incident_id}`);
+    const markerIncidentId = getMarkerIncidentId(marker);
+    if (markerIncidentId !== null && markerIncidentId !== undefined) {
+        const byIncident = incidentLookup.get(`incident:${markerIncidentId}`);
         if (byIncident) {
             return byIncident;
         }
@@ -935,12 +943,6 @@ window.userCoords = window.userCoords || {
     ready: false
 };
 
-const DEMO_ROUTE_FALLBACK_ORIGIN = {
-    lat: 15.8222,
-    lng: 120.3297,
-    title: 'Demo dispatch origin'
-};
-
 function buildRouteOrigin(lat, lng, options = {}) {
     const numericLat = Number(lat);
     const numericLng = Number(lng);
@@ -1037,20 +1039,37 @@ async function getFreshRealRouteOrigin() {
 
 async function getDemoRouteOrigin(destination = null) {
     try {
-        await fetchStations({ preferSeeded: true });
+        await fetchStations({ preferSeeded: true, force: true });
     } catch (error) {
         console.warn('Unable to refresh stations for demo route origin:', error);
     }
 
-    const preferredStationId = Number(window.userStationId || 0);
+    const stationMetaValue = document.querySelector('meta[name="station-id"]')?.getAttribute('content');
+    const preferredStationId = Number(window.userStationId || stationMetaValue || 0);
     const preferredStation = Array.isArray(stations)
         ? stations.find((station) => Number(station.station_id) === preferredStationId)
         : null;
+    const stationMarkerPool = [
+        ...(Array.isArray(window.mapData?.marker) ? window.mapData.marker : []),
+        ...(Array.isArray(window.allMarkers) ? window.allMarkers : []),
+    ];
+    const preferredStationMarker = stationMarkerPool.find((marker) =>
+        Number(marker?.station?.station_id ?? marker?.station_public?.id ?? 0) === preferredStationId
+    );
 
-    const candidateStation = preferredStation
-        || (Array.isArray(stations) ? stations.find((station) => Number.isFinite(Number(station.lat)) && Number.isFinite(Number(station.lng))) : null);
+    const candidateStation = preferredStation && Number.isFinite(Number(preferredStation.lat)) && Number.isFinite(Number(preferredStation.lng))
+        ? preferredStation
+        : preferredStationMarker
+            ? {
+                station_id: preferredStationId,
+                station_name: preferredStationMarker.station?.station_name
+                    || preferredStationMarker.station_public?.name,
+                lat: preferredStationMarker.lat,
+                lng: preferredStationMarker.lng,
+            }
+            : null;
 
-    if (candidateStation) {
+    if (preferredStationId > 0 && candidateStation) {
         return buildRouteOrigin(candidateStation.lat, candidateStation.lng, {
             routeSource: 'demo',
             routeSourceLabel: 'Demo Route',
@@ -1061,23 +1080,18 @@ async function getDemoRouteOrigin(destination = null) {
         });
     }
 
-    if (destination && Number.isFinite(Number(destination.lat)) && Number.isFinite(Number(destination.lng))) {
-        return buildRouteOrigin(Number(destination.lat) - 0.0125, Number(destination.lng) - 0.0095, {
-            routeSource: 'demo',
-            routeSourceLabel: 'Demo Route',
-            suppressLiveTracking: true,
-            meta: {
-                title: DEMO_ROUTE_FALLBACK_ORIGIN.title
-            }
-        });
-    }
+    console.error('Assigned station coordinates are unavailable for demo routing.', {
+        stationId: preferredStationId || null,
+    });
 
-    return buildRouteOrigin(DEMO_ROUTE_FALLBACK_ORIGIN.lat, DEMO_ROUTE_FALLBACK_ORIGIN.lng, {
+    return buildRouteOrigin(Number.NaN, Number.NaN, {
         routeSource: 'demo',
         routeSourceLabel: 'Demo Route',
         suppressLiveTracking: true,
         meta: {
-            title: DEMO_ROUTE_FALLBACK_ORIGIN.title
+            title: preferredStationId > 0
+                ? `Assigned station #${preferredStationId}`
+                : 'No assigned station'
         }
     });
 }
@@ -1088,6 +1102,35 @@ async function resolveRouteOrigin(mode = 'real', destination = null) {
     }
 
     return getFreshRealRouteOrigin();
+}
+
+function showMissingAssignedStationWarning() {
+    const normalizedRole = String(
+        document.querySelector('meta[name="user-role"]')?.getAttribute('content') || ''
+    ).trim().toLowerCase();
+    const path = String(window.location?.pathname || '').toLowerCase();
+    const canConfigureStation = ['admin', 'provincial admin', 'chief', 'station admin'].includes(normalizedRole);
+    const configurationUrl = path.includes('/station-admin') || ['chief', 'station admin'].includes(normalizedRole)
+        ? '/station-admin/management'
+        : canConfigureStation
+            ? '/admin/management'
+            : null;
+    const message = configurationUrl
+        ? 'Your assigned station needs valid map coordinates before a demo route can start.'
+        : 'Your assigned station has no map coordinates. Ask your station administrator to configure its location.';
+
+    if (window.PyroNotify?.notify) {
+        window.PyroNotify.notify(message, {
+            type: 'warning',
+            title: 'Station location required',
+            duration: 10000,
+            actionLabel: configurationUrl ? 'Configure station' : '',
+            onAction: configurationUrl ? () => window.location.assign(configurationUrl) : null,
+        });
+        return;
+    }
+
+    showToast(message, 'warning');
 }
 
 function promptRouteSourceSelection(options = {}) {
@@ -2387,6 +2430,22 @@ function updateRouteInfoCard() {
 // ROUTE DATABASE FUNCTIONS
 // ============================================================================
 
+async function reportActiveRouteResponseFailure(response, context) {
+    let payload = null;
+
+    try {
+        payload = await response.json();
+    } catch (error) {
+        payload = null;
+    }
+
+    console.error(`${context} (${response.status})`, {
+        error: payload?.error || response.statusText || 'Request failed',
+        errorId: payload?.error_id || null,
+        debug: payload?.debug || null,
+    });
+}
+
 async function saveRouteToDatabase(route, destination, origin = null) {
     try {
         const routeSource = origin?.routeSource || destination?.routeSource || 'real';
@@ -2431,7 +2490,10 @@ async function saveRouteToDatabase(route, destination, origin = null) {
 async function fetchActiveRouteFromDatabase() {
     try {
         const response = await fetchLiveResponseOnce('route-active-single', '/api/route/active');
-        if (!response.ok) return null;
+        if (!response.ok) {
+            await reportActiveRouteResponseFailure(response, 'Unable to fetch active route');
+            return null;
+        }
         
         const routes = await response.json();
         const activeRouteData = routes.find(route => route.status === 'active' || route.status === 'moving');
@@ -7031,8 +7093,8 @@ async function fetchStations(options = {}) {
                 id: station.station_id || station.id,
                 station_id: station.station_id || station.id,
                 station_name: station.station_name,
-                lat: station.marker?.lat || station.lat,
-                lng: station.marker?.lng || station.lng,
+                lat: station.marker?.lat ?? station.lat,
+                lng: station.marker?.lng ?? station.lng,
                 marker_id: station.marker_id,
                 marker: station.marker
             }));
@@ -7099,7 +7161,12 @@ async function fetchStations(options = {}) {
 function generatePopupContent(coord, incidents) {
     const marker = coord.marker || coord;
     const incident = coord.incident
-        || incidents.find(inc => inc.marker_id === marker.marker_id);
+        || incidents.find(inc => Number(inc.marker_id) === Number(marker.marker_id))
+        || (getMarkerIncidentId(marker) ? {
+            ...marker.incident_public,
+            incident_id: getMarkerIncidentId(marker),
+            marker_id: marker.marker_id,
+        } : null);
     const loadingMarkup = coord?.isLoadingDetails && isIncidentMarker(marker)
         ? buildIncidentPopupLoadingMarkup(coord.loadingMessage || 'Loading latest incident details...')
         : '';
@@ -7729,7 +7796,7 @@ window.closeIncidentCommandPanel = closeIncidentCommandPanel;
 function buildResponderPopupContent(marker, incident, imagePath = null, options = {}) {
     const markerPresentation = getResponderPopupPresentation(marker);
     const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status);
-    const targetIncidentId = incident?.incident_id ?? marker?.incident_id ?? null;
+    const targetIncidentId = incident?.incident_id ?? getMarkerIncidentId(marker);
     const loadingMarkup = options.isLoadingDetails && isIncidentMarker(marker)
         ? buildIncidentPopupLoadingMarkup(options.loadingMessage || 'Loading latest incident details...')
         : '';
@@ -7990,7 +8057,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
 }
 
 function findIncidentForMarker(marker, fallbackIncident = null) {
-    const incidentId = marker?.incident_id ?? fallbackIncident?.incident_id ?? fallbackIncident?.id ?? null;
+    const incidentId = getMarkerIncidentId(marker) ?? fallbackIncident?.incident_id ?? fallbackIncident?.id ?? null;
     const cachedIncident = getCachedIncidentDetails(incidentId);
     if (cachedIncident) {
         return cachedIncident;
@@ -8175,7 +8242,7 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
     }
 
     const actions = [];
-    const incidentId = incident?.incident_id ?? marker?.incident_id ?? null;
+    const incidentId = incident?.incident_id ?? getMarkerIncidentId(marker);
     const incidentStatus = normalizeIncidentStatus(marker.incident_status || incident?.status || 'reported');
     const blockingRoute = isIncidentMarker(marker)
         ? getBlockingIncidentRouteForCurrentTeam(incidentId)
@@ -9836,7 +9903,10 @@ function startRoutePolling() {
                     'X-CSRF-TOKEN': csrfToken
                 }
             });
-            if (!response.ok) return;
+            if (!response.ok) {
+                await reportActiveRouteResponseFailure(response, 'Active-route polling failed');
+                return;
+            }
             
             const routes = await response.json();
             console.log('Polling - found routes:', routes.length);
@@ -11645,7 +11715,6 @@ function enhancePyroLayerControl() {
 
     const normalizeLayerLabel = (value) => String(value || '').replace(/\s+/g, ' ').trim();
     const displayLabelMap = {
-        'Carto Light': 'Carto',
         'Street Map': 'OSM',
         'OSM Standard': 'OSM',
         'OSM HOT': 'OSM HOT',
@@ -11843,11 +11912,7 @@ function createResponderMobileMapLayersPanel() {
             <div class="firefighter-mobile-map-panel__body">
                 <div class="firefighter-mobile-map-panel__base" role="radiogroup" aria-label="Map style">
                     <label class="firefighter-mobile-map-panel__base-item">
-                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="Carto Light" checked>
-                        <span>Carto</span>
-                    </label>
-                    <label class="firefighter-mobile-map-panel__base-item">
-                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="OSM Standard">
+                        <input type="radio" name="chief_map_base" data-ff-map-base-toggle="OSM Standard" checked>
                         <span>OSM</span>
                     </label>
                     <label class="firefighter-mobile-map-panel__base-item">
@@ -12077,13 +12142,9 @@ function initAfterMapReady() {
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';
     const isChiefCommandMap = isChiefCommandMapContext();
 
-    var cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap, &copy; CartoDB',
-        subdomains: 'abcd',
-        maxZoom: 19
-    });
     var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
     });
     var hotStreet = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
@@ -12093,7 +12154,7 @@ function initAfterMapReady() {
         maxZoom: 18,
         attribution: 'Hydro reference (c) Esri'
     });
-    ((isFirefighterDashboardMap || isChiefCommandMap) ? cartoLight : street).addTo(window.map);
+    street.addTo(window.map);
     window.pyroPwa?.attachMapOfflineNotice?.(window.map);
 
     console.log(roleToken);
@@ -12101,15 +12162,13 @@ function initAfterMapReady() {
     const isCitizenDashboardMap = isCitizenDashboardMapContext();
     const routeBaseMaps = (isFirefighterDashboardMap || isChiefCommandMap)
         ? {
-            "Carto Light": cartoLight,
             "OSM Standard": street,
             "OSM HOT": hotStreet,
             "Satellite": satellite
         }
         : isCitizenDashboardMap
             ? {
-                "Carto Light": cartoLight,
-                "OSM": street,
+                "OSM Standard": street,
                 "Satellite": satellite
             }
         : {
@@ -12164,7 +12223,7 @@ function initAfterMapReady() {
     exposePyroSharedMapLayers(
         routeBaseMaps,
         routeOverlays,
-        (isFirefighterDashboardMap || isChiefCommandMap) ? 'Carto Light' : (isCitizenDashboardMap ? 'Carto Light' : 'Street Map')
+        (isFirefighterDashboardMap || isChiefCommandMap || isCitizenDashboardMap) ? 'OSM Standard' : 'Street Map'
     );
     enhancePyroLayerControl();
     window.setTimeout(enhancePyroLayerControl, 100);
@@ -13083,7 +13142,7 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
         )
     );
     
-    const resolvedIncidentId = incident?.incident_id ?? markerRecord?.incident_id ?? null;
+    const resolvedIncidentId = incident?.incident_id ?? getMarkerIncidentId(markerRecord);
     const existingIncidentRoute = getBlockingIncidentRouteForCurrentTeam(resolvedIncidentId);
     const preferredSource = options?.source || 'real';
 
@@ -13107,9 +13166,11 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
     const origin = await resolveRouteOrigin(preferredSource, destination);
 
     if (!origin?.ready) {
-        showToast(preferredSource === 'demo'
-            ? 'Demo route origin is not available right now.'
-            : 'Getting your location... Please wait.', 'warning');
+        if (preferredSource === 'demo') {
+            showMissingAssignedStationWarning();
+        } else {
+            showToast('Getting your location... Please wait.', 'warning');
+        }
         return;
     }
 

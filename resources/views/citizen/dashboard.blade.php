@@ -2393,11 +2393,7 @@
             <div class="citizen-mobile-panel__body citizen-map-sheet-section">
                 <div class="citizen-map-base-list" role="radiogroup" aria-label="Map layer">
                     <label class="citizen-map-base-item">
-                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="Carto Light" checked>
-                        <span>Carto</span>
-                    </label>
-                    <label class="citizen-map-base-item">
-                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="OSM Standard">
+                        <input type="radio" class="citizen-map-base-item__toggle" name="citizen_map_base" data-citizen-map-base-toggle="OSM Standard" checked>
                         <span>OSM</span>
                     </label>
                     <label class="citizen-map-base-item">
@@ -3592,8 +3588,7 @@ if (navigator.geolocation) {
 
         const findLeafletLayerInput = (labels, groupSelector) => {
             const labelAliases = {
-                'Street Map': ['Street Map', 'Carto Light', 'Carto'],
-                'Carto Light': ['Carto Light', 'Carto'],
+                'Street Map': ['Street Map', 'OSM Standard', 'OSM'],
                 'OSM Standard': ['OSM Standard', 'OSM'],
                 'OSM HOT': ['OSM HOT'],
                 Satellite: ['Satellite'],

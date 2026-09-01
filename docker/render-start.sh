@@ -30,7 +30,9 @@ else
 fi
 
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-    php artisan migrate --force
+    # The distributed lock prevents overlapping Render instances from racing
+    # the same migration during a rolling deploy.
+    php artisan migrate --force --isolated
 fi
 
 # A retrained model is written to object storage because Render's container

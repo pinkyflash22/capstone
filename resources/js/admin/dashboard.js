@@ -19,8 +19,8 @@ class Dashboard {
         
     //     this.map = L.map('dashboardMap').setView(defaultCenter, 11);
         
-    //     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    //         attribution: '&copy; OpenStreetMap, &copy; CartoDB'
+    //     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    //         attribution: '&copy; OpenStreetMap contributors'
     //     }).addTo(this.map);
     // }
 

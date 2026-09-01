@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class RouteController extends Controller
 {
@@ -51,8 +52,20 @@ class RouteController extends Controller
                 'incident_id'=>'required|exists:incidents,incident_id'
             ]);
 
+            $supportsRouteSource = $this->routeColumnExists('route_source');
+
+            if (($validated['route_source'] ?? 'real') === 'demo' && ! $supportsRouteSource) {
+                Log::warning('Demo route persistence skipped because the routes table is missing route_source.');
+
+                return response()->json([
+                    'success' => false,
+                    'persistence_unavailable' => true,
+                    'message' => 'Demo route is available locally, but shared demo-route persistence is not configured yet.',
+                ]);
+            }
+
             $existingRoute = Route::where('incident_id', $validated['incident_id'])
-                ->where('route_source', $validated['route_source'] ?? 'real')
+                ->when($supportsRouteSource, fn ($query) => $query->where('route_source', $validated['route_source'] ?? 'real'))
                 ->whereIn('status', ['active', 'moving'])
                 ->latest('route_id')
                 ->first();
@@ -90,9 +103,10 @@ class RouteController extends Controller
             $validated['current_position_index'] = 0;
             $validated['progress_percentage'] = 0;
             $validated['last_updated_at'] = now();
+            $persistableRoute = $this->onlyExistingRouteColumns($validated);
 
             if ($existingRoute) {
-                $existingRoute->update([
+                $existingRoute->update($this->onlyExistingRouteColumns([
                     'coordinates' => $validated['coordinates'],
                     'total_distance' => $validated['total_distance'],
                     'estimated_time' => $validated['estimated_time'],
@@ -110,7 +124,7 @@ class RouteController extends Controller
                     'started_by' => $validated['started_by'],
                     'started_at' => null,
                     'last_updated_at' => now(),
-                ]);
+                ]));
 
                 $this->flushActiveRouteCaches($validated['incident_id']);
 
@@ -121,7 +135,7 @@ class RouteController extends Controller
                 ], 200);
             }
 
-            $route = Route::create($validated);
+            $route = Route::create($persistableRoute);
             $this->flushActiveRouteCaches($validated['incident_id']);
 
             return response()->json([
@@ -152,25 +166,7 @@ class RouteController extends Controller
     {
         try {
             $activeRoutes = $this->visibleRouteQuery()
-                    ->select([
-                        'route_id',
-                        'incident_id',
-                        'coordinates',
-                        'status',
-                        'route_source',
-                        'destination_title',
-                        'destination_lat',
-                        'destination_lng',
-                        'origin_lat',
-                        'origin_lng',
-                        'current_position_index',
-                        'current_lat',
-                        'current_lng',
-                        'progress_percentage',
-                        'created_at',
-                        'updated_at',
-                        'last_updated_at',
-                    ])
+                    ->select($this->activeRouteSelectColumns())
                     ->with([
                         'incident:incident_id,station_id,team_id,incident_status_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
@@ -185,8 +181,11 @@ class RouteController extends Controller
             return response()->json($activeRoutes);
             
         } catch (\Exception $e) {
-            Log::error('Error fetching active routes: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to fetch active routes'], 500);
+            return $this->activeRouteFailureResponse(
+                'Failed to fetch active routes',
+                $e,
+                ['scope' => 'all']
+            );
         }
     }
 
@@ -197,25 +196,7 @@ class RouteController extends Controller
     {
         try {
             $activeRoutes = $this->visibleRouteQuery()
-                    ->select([
-                        'route_id',
-                        'incident_id',
-                        'coordinates',
-                        'status',
-                        'route_source',
-                        'destination_title',
-                        'destination_lat',
-                        'destination_lng',
-                        'origin_lat',
-                        'origin_lng',
-                        'current_position_index',
-                        'current_lat',
-                        'current_lng',
-                        'progress_percentage',
-                        'created_at',
-                        'updated_at',
-                        'last_updated_at',
-                    ])
+                    ->select($this->activeRouteSelectColumns())
                     ->with([
                         'incident:incident_id,station_id,team_id,incident_status_id',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
@@ -230,11 +211,11 @@ class RouteController extends Controller
 
             return response()->json($activeRoutes);
         } catch (\Exception $e) {
-            Log::error('Error fetching active routes for incident: ' . $e->getMessage(), [
-                'incident_id' => $incidentId,
-            ]);
-
-            return response()->json(['error' => 'Failed to fetch active routes for incident'], 500);
+            return $this->activeRouteFailureResponse(
+                'Failed to fetch active routes for incident',
+                $e,
+                ['scope' => 'incident', 'incident_id' => $incidentId]
+            );
         }
     }
 
@@ -458,7 +439,7 @@ class RouteController extends Controller
                 'progress_percentage' => 'nullable|numeric|min:0|max:100'
             ]);
             
-            $route->update($validated);
+            $route->update($this->onlyExistingRouteColumns($validated));
             $route->last_updated_at = now();
             $route->save();
             
@@ -522,13 +503,13 @@ class RouteController extends Controller
             'leaflet_points' => $route->getLeafletPoints(),
             'remaining_points' => $route->getRemainingPoints(),
             'status' => $route->status,
-            'route_source' => $route->route_source ?: 'real',
+            'route_source' => $route->getAttribute('route_source') ?: 'real',
             'incident_status_id' => $route->incident?->incident_status_id,
             'destination_title' => $route->destination_title,
             'destination_lat' => $route->destination_lat,
             'destination_lng' => $route->destination_lng,
-            'origin_lat' => $route->origin_lat,
-            'origin_lng' => $route->origin_lng,
+            'origin_lat' => $route->getAttribute('origin_lat'),
+            'origin_lng' => $route->getAttribute('origin_lng'),
             'current_position_index' => $route->current_position_index,
             'current_lat' => $route->current_lat,
             'current_lng' => $route->current_lng,
@@ -658,13 +639,76 @@ class RouteController extends Controller
         return Route::query()
             ->select(['route_id', 'incident_id', 'status'])
             ->whereIn('status', ['active', 'moving'])
-            ->where('route_source', '!=', 'demo')
+            ->when($this->routeColumnExists('route_source'), fn ($query) => $query->where('route_source', '!=', 'demo'))
             ->where('incident_id', '!=', $requestedIncidentId)
             ->whereHas('incident', function ($query) use ($teamId) {
                 $query->where('team_id', $teamId);
             })
             ->orderByDesc('route_id')
             ->first();
+    }
+
+    private function activeRouteSelectColumns(): array
+    {
+        return array_values(array_filter([
+            'route_id',
+            'incident_id',
+            'coordinates',
+            'status',
+            $this->routeColumnExists('route_source') ? 'route_source' : null,
+            'destination_title',
+            'destination_lat',
+            'destination_lng',
+            $this->routeColumnExists('origin_lat') ? 'origin_lat' : null,
+            $this->routeColumnExists('origin_lng') ? 'origin_lng' : null,
+            'current_position_index',
+            'current_lat',
+            'current_lng',
+            'progress_percentage',
+            'created_at',
+            'updated_at',
+            'last_updated_at',
+        ]));
+    }
+
+    private function onlyExistingRouteColumns(array $attributes): array
+    {
+        return collect($attributes)
+            ->filter(fn ($value, $column) => $this->routeColumnExists((string) $column))
+            ->all();
+    }
+
+    private function routeColumnExists(string $column): bool
+    {
+        static $columns = [];
+
+        return $columns[$column] ??= Schema::hasColumn('routes', $column);
+    }
+
+    private function activeRouteFailureResponse(string $message, \Throwable $exception, array $context = [])
+    {
+        $errorId = (string) Str::uuid();
+
+        Log::error($message, array_merge($context, [
+            'error_id' => $errorId,
+            'exception_class' => $exception::class,
+            'exception_message' => $exception->getMessage(),
+            'exception' => $exception,
+        ]));
+
+        $response = [
+            'error' => $message,
+            'error_id' => $errorId,
+        ];
+
+        if (app()->environment(['local', 'staging'])) {
+            $response['debug'] = [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ];
+        }
+
+        return response()->json($response, 500);
     }
 
     private function visibleRouteQuery(): Builder

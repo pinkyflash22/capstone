@@ -55,6 +55,10 @@ class Route extends Model
         $coordinates = is_string($this->coordinates) 
             ? json_decode($this->coordinates, true) 
             : $this->coordinates;
+
+        if (!is_array($coordinates)) {
+            return [];
+        }
             
         // Flatten triple nested arrays if needed
         if (is_array($coordinates) && isset($coordinates[0][0]) && is_array($coordinates[0][0])) {
