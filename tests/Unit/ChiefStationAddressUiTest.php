@@ -23,6 +23,8 @@ class ChiefStationAddressUiTest extends TestCase
         $this->assertStringContainsString('FullAddress::firstOrCreate', $controller);
         $this->assertStringContainsString("'address_id' => \$address->address_id", $controller);
         $this->assertStringContainsString('DB::transaction', $controller);
+        $this->assertStringContainsString('forgetStationManagementCaches', $controller);
+        $this->assertStringContainsString('catch (\\Throwable $exception)', $controller);
 
         foreach (['editStationProvince', 'editStationCity', 'editStationBarangay', 'editStationStreet'] as $id) {
             $this->assertStringContainsString("id=\"{$id}\"", $view);

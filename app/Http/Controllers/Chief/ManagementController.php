@@ -299,8 +299,7 @@ class ManagementController extends Controller
                 'address_id' => $address->address_id,
             ]);
         });
-        Cache::forget("resource-management:station:{$station->station_id}:v4:stations");
-        Cache::forget("resource-management:station:{$station->station_id}:v4:boundaries");
+        $this->forgetStationManagementCaches((int) $station->station_id);
         UserActivityLogger::log('updated station information', auth()->user()?->user_id, $request);
 
         return response()->json([
@@ -308,6 +307,27 @@ class ManagementController extends Controller
             'message' => 'Station information updated successfully.',
             'data' => $station->fresh(['marker', 'address.barangay.city.province']),
         ]);
+    }
+
+    /**
+     * Cache invalidation is best-effort after the station transaction commits.
+     * A temporary cache outage must not turn a successful database update into
+     * a misleading HTTP 500 response.
+     */
+    protected function forgetStationManagementCaches(int $stationId): void
+    {
+        $keys = [
+            "resource-management:station:{$stationId}:v4:stations",
+            "resource-management:station:{$stationId}:v4:boundaries",
+        ];
+
+        foreach ($keys as $key) {
+            try {
+                Cache::forget($key);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
     }
 
     /**

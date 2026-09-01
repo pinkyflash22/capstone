@@ -2041,7 +2041,7 @@ class StationAdminController extends Controller
                 ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed")
                 ->selectRaw("SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked")
                 ->selectRaw('SUM(CASE WHEN responsible_team_id IS NULL AND responsible_user_id IS NULL THEN 1 ELSE 0 END) AS missing_owner')
-                ->selectRaw('SUM(CASE WHEN follow_up_required = 1 THEN 1 ELSE 0 END) AS follow_up')
+                ->selectRaw('SUM(CASE WHEN follow_up_required IS TRUE THEN 1 ELSE 0 END) AS follow_up')
                 ->first();
 
             $mitigationActions = (clone $mitigationBaseQuery)
@@ -2300,6 +2300,9 @@ class StationAdminController extends Controller
                     'overdue' => 0,
                     'high_priority' => 0,
                     'completed' => 0,
+                    'blocked' => 0,
+                    'missing_owner' => 0,
+                    'follow_up' => 0,
                 ],
                 'riskAreas' => collect(),
                 'predictionChecklists' => collect(),

@@ -88,4 +88,17 @@ class ChiefMitigationFormUiTest extends TestCase
         $this->assertStringContainsString('data-attachment-image', $page);
         $this->assertStringContainsString('openAttachmentLightbox', $page);
     }
+
+    public function test_summary_query_and_safe_mode_are_postgresql_compatible_and_complete(): void
+    {
+        $page = file_get_contents(resource_path('views/chief/mitigations.blade.php'));
+        $controller = file_get_contents(app_path('Http/Controllers/Chief/StationAdminController.php'));
+
+        $this->assertStringContainsString('follow_up_required IS TRUE', $controller);
+        $this->assertStringNotContainsString('follow_up_required = 1', $controller);
+        $this->assertStringContainsString("'blocked' => 0", $controller);
+        $this->assertStringContainsString("'missing_owner' => 0", $controller);
+        $this->assertStringContainsString("'follow_up' => 0", $controller);
+        $this->assertStringContainsString('$summary = array_replace(', $page);
+    }
 }

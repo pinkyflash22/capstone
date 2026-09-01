@@ -374,7 +374,10 @@
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
     @php
-        $summary = $mitigationSummaryCounts ?? ['total' => 0, 'awaiting_approval' => 0, 'in_progress' => 0, 'overdue' => 0, 'high_priority' => 0, 'completed' => 0, 'blocked' => 0, 'missing_owner' => 0, 'follow_up' => 0];
+        $summary = array_replace(
+            ['total' => 0, 'awaiting_approval' => 0, 'in_progress' => 0, 'overdue' => 0, 'high_priority' => 0, 'completed' => 0, 'blocked' => 0, 'missing_owner' => 0, 'follow_up' => 0],
+            $mitigationSummaryCounts ?? []
+        );
         $filters = $filters ?? [];
         $hasActiveFilters = collect($filters)->filter(fn ($value) => filled($value) && $value !== false)->isNotEmpty();
     @endphp
