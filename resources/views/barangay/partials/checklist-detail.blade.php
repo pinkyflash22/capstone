@@ -67,5 +67,26 @@
         </div>
     @endif
 
+    @if(!empty($item->legacy_checklist_id))
+        <div class="wide">
+            <span>Update checklist oversight</span>
+            <form method="POST" action="{{ route('barangay.checklists.prediction.update', $item->legacy_checklist_id) }}" class="barangay-record-update-form">
+                @csrf
+                @method('PATCH')
+                <label>Status
+                    <select name="status" required>
+                        @foreach(['pending' => 'Pending', 'in_progress' => 'In progress', 'complied' => 'Complied', 'not_complied' => 'Not complied', 'deferred' => 'Deferred'] as $value => $label)
+                            <option value="{{ $value }}" @selected($item->status === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Target date<input type="date" name="target_date" value="{{ $item->target?->format('Y-m-d') }}"></label>
+                <label class="full">Planning notes<textarea name="planning_notes" maxlength="3000" rows="3">{{ $item->planning_notes }}</textarea></label>
+                <label class="full">Compliance remarks<textarea name="compliance_remarks" maxlength="3000" rows="3">{{ $item->compliance_remarks }}</textarea></label>
+                <button type="submit"><i class="bi bi-save-fill"></i> Save checklist</button>
+            </form>
+        </div>
+    @endif
+
     <div class="wide"><span>Compliance note</span><strong>{{ $item->note }}</strong></div>
 </div>

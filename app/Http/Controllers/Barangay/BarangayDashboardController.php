@@ -19,6 +19,8 @@ use App\Models\Incident;
 use App\Models\IncidentContext;
 use App\Models\Marker;
 use App\Models\MitigationAction;
+use App\Models\MitigationActionActivity;
+use App\Models\MitigationActionAttachment;
 use App\Models\Post;
 use App\Models\RiskArea;
 use App\Models\RiskAreaPhoto;
@@ -685,7 +687,16 @@ class BarangayDashboardController extends Controller
                     'priority_level',
                     'status',
                     'target_date',
+                    'completion_approval_status',
                     'description',
+                    'implementation_notes',
+                    'blocked_reason',
+                    'completion_notes',
+                    'outcome_result',
+                    'effectiveness',
+                    'follow_up_required',
+                    'follow_up_date',
+                    'follow_up_notes',
                     'created_by',
                     'created_at',
                 ])
@@ -1336,6 +1347,147 @@ class BarangayDashboardController extends Controller
         return redirect()->route('barangay.checklists')->with('success', 'Checklist step updated.');
     }
 
+    public function updatePredictionChecklist(Request $request, int $checklistId)
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['pending', 'in_progress', 'complied', 'not_complied', 'deferred'])],
+            'target_date' => ['nullable', 'date'],
+            'planning_notes' => ['nullable', 'string', 'max:3000'],
+            'compliance_remarks' => ['nullable', 'string', 'max:3000'],
+        ]);
+        $context = $this->resolveBarangayContext();
+        $barangayId = (int) ($context['barangay']?->barangay_id ?? 0);
+
+        abort_if($barangayId <= 0, 403, 'Your account is not linked to a barangay.');
+
+        $checklist = BarangayPredictionChecklist::query()
+            ->where('barangay_id', $barangayId)
+            ->findOrFail($checklistId);
+        $oldStatus = (string) $checklist->status;
+
+        $checklist->update([
+            'status' => $validated['status'],
+            'target_date' => $validated['target_date'] ?? null,
+            'planning_notes' => $validated['planning_notes'] ?? null,
+            'compliance_remarks' => $validated['compliance_remarks'] ?? null,
+            'complied_at' => $validated['status'] === 'complied' ? ($checklist->complied_at ?? now()) : null,
+            'reviewed_by' => Auth::id(),
+        ]);
+
+        UserActivityLogger::log('updated assigned barangay prediction checklist from '.$oldStatus.' to '.$validated['status'], Auth::id(), $request);
+
+        return redirect()->route('barangay.checklists', ['checklist' => 'prediction-checklist-'.$checklist->getKey()])
+            ->with('success', 'Checklist updated successfully.');
+    }
+
+    public function updateMitigation(Request $request, int $mitigationActionId)
+    {
+        $hasVerificationFields = Schema::hasColumn('mitigation_actions', 'blocked_reason')
+            && Schema::hasColumn('mitigation_actions', 'follow_up_date');
+        $hasProofTable = Schema::hasTable('mitigation_action_attachments');
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['planned', 'in_progress', 'blocked', 'completed'])],
+            'implementation_notes' => ['required', 'string', 'max:3000'],
+            'blocked_reason' => array_values(array_filter([
+                $hasVerificationFields ? Rule::requiredIf($request->input('status') === 'blocked') : null,
+                'nullable', 'string', 'max:2000',
+            ])),
+            'completion_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->input('status') === 'completed')],
+            'outcome_result' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->input('status') === 'completed')],
+            'effectiveness' => [
+                Rule::requiredIf($request->input('status') === 'completed'),
+                'nullable',
+                Rule::in(['pending_evaluation', 'effective', 'partially_effective', 'ineffective']),
+                Rule::notIn($request->input('status') === 'completed' ? ['pending_evaluation'] : []),
+            ],
+            'follow_up_required' => ['nullable', 'boolean'],
+            'follow_up_date' => array_values(array_filter([
+                $hasVerificationFields ? Rule::requiredIf($request->boolean('follow_up_required')) : null,
+                'nullable', 'date',
+            ])),
+            'follow_up_notes' => ['nullable', 'string', 'max:3000', Rule::requiredIf($request->boolean('follow_up_required'))],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx', 'max:10240'],
+        ]);
+        $context = $this->resolveBarangayContext();
+        $barangayId = (int) ($context['barangay']?->barangay_id ?? 0);
+
+        abort_if($barangayId <= 0, 403, 'Your account is not linked to a barangay.');
+
+        $action = MitigationAction::query()
+            ->where('barangay_id', $barangayId)
+            ->whereIn('status', ['planned', 'approved', 'in_progress', 'blocked'])
+            ->findOrFail($mitigationActionId);
+
+        if ($hasProofTable && $validated['status'] === 'completed' && ! $action->attachments()->exists() && ! $request->hasFile('attachments')) {
+            throw ValidationException::withMessages([
+                'attachments' => 'Attach at least one proof file before asking the chief to complete this mitigation.',
+            ]);
+        }
+
+        $oldStatus = (string) $action->status;
+
+        DB::transaction(function () use ($action, $validated, $request, $oldStatus, $hasVerificationFields, $hasProofTable): void {
+            $completionRequested = $validated['status'] === 'completed';
+            $newStatus = $completionRequested ? 'in_progress' : $validated['status'];
+            $updates = [
+                'status' => $newStatus,
+                'implementation_notes' => $validated['implementation_notes'],
+                'completion_notes' => $validated['completion_notes'] ?? null,
+                'outcome_result' => $validated['outcome_result'] ?? null,
+                'effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation',
+                'follow_up_required' => (bool) ($validated['follow_up_required'] ?? false),
+                'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+                'completed_at' => null,
+                'completion_approval_status' => $completionRequested ? 'pending' : null,
+                'completion_requested_by' => $completionRequested ? Auth::id() : null,
+                'completion_requested_at' => $completionRequested ? now() : null,
+                'completion_decided_by' => null,
+                'completion_decided_at' => null,
+                'completion_decision_notes' => null,
+                'reviewed_by' => Auth::id(),
+                'reviewed_at' => now(),
+                'is_manually_edited' => true,
+            ];
+            if ($hasVerificationFields) {
+                $updates['blocked_reason'] = $validated['blocked_reason'] ?? null;
+                $updates['follow_up_date'] = $validated['follow_up_date'] ?? null;
+            }
+            $action->update($updates);
+
+            if (Schema::hasTable('mitigation_action_activities')) {
+                MitigationActionActivity::create([
+                    'mitigation_action_id' => $action->getKey(),
+                    'actor_user_id' => Auth::id(),
+                    'event_type' => $completionRequested ? 'completion_requested_by_barangay' : 'barangay_progress_updated',
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                    'notes' => $validated['implementation_notes'],
+                    'metadata' => ['effectiveness' => $validated['effectiveness'] ?? 'pending_evaluation'],
+                ]);
+            }
+
+            foreach ($hasProofTable ? $request->file('attachments', []) : [] as $file) {
+                $storedPath = MediaPath::storeForDisk($file->store('mitigation-actions', 'supabase'), 'supabase');
+                MitigationActionAttachment::create([
+                    'mitigation_action_id' => $action->getKey(),
+                    'file_path' => $storedPath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                    'attachment_type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'photo' : 'proof',
+                ]);
+            }
+
+            UserActivityLogger::log('updated assigned barangay mitigation progress', Auth::id(), $request);
+        });
+
+        return redirect()->route('barangay.checklists', ['mitigation' => $action->getKey()])
+            ->with('success', $validated['status'] === 'completed'
+                ? 'Completion was submitted to the chief for approval.'
+                : 'Mitigation progress updated successfully.');
+    }
+
     public function reports(Request $request)
     {
         $data = $this->buildPortalData(false, false);
@@ -1605,7 +1757,7 @@ class BarangayDashboardController extends Controller
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:1', 'max:100'],
+            'accuracy' => ['required', 'numeric', 'min:1', 'max:100000'],
             'location_captured_at' => ['required', 'date', 'after_or_equal:'.now()->subMinute()->toIso8601String(), 'before_or_equal:'.now()->addMinute()->toIso8601String()],
         ]);
 
@@ -1615,10 +1767,20 @@ class BarangayDashboardController extends Controller
         $timestamp = now();
         $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
 
-        if (! $hall || ! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
+        $weakAccuracy = (float) $validated['accuracy'] > 100;
+        if (! $hall || (! $weakAccuracy && (! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id))) {
             throw ValidationException::withMessages([
                 'lat' => 'Place the fire incident marker inside your assigned barangay boundary.',
             ]);
+        }
+
+        if ($weakAccuracy) {
+            $jurisdiction['barangay_id'] = (int) $hall->barangay_id;
+            $jurisdiction['station_id'] = DB::table('station_barangay_coverage')
+                ->where('barangay_id', $hall->barangay_id)
+                ->where('is_active', true)
+                ->orderByRaw("CASE coverage_type WHEN 'primary' THEN 1 WHEN 'support' THEN 2 ELSE 3 END")
+                ->value('station_id') ?? $jurisdiction['station_id'];
         }
 
         $incident = DB::transaction(function () use ($validated, $hall, $jurisdiction, $userId, $timestamp, $request) {
@@ -1626,7 +1788,7 @@ class BarangayDashboardController extends Controller
             $capturedAt = \Illuminate\Support\Carbon::parse($validated['location_captured_at'])->toIso8601String();
             $marker = Marker::create([
                 'title' => 'Barangay Fire Emergency',
-                'description' => "Fire emergency reported from barangay quick action. GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.",
+                'description' => "Fire emergency reported from barangay quick action. GPS accuracy ±{$accuracyMeters} m".($accuracyMeters > 100 ? ' (weak signal; best available fix)' : '')."; captured {$capturedAt}.",
                 'lat' => $validated['lat'],
                 'lng' => $validated['lng'],
                 'status' => 'active',
@@ -1641,7 +1803,7 @@ class BarangayDashboardController extends Controller
                 'barangay_id' => $jurisdiction['barangay_id'],
                 'station_id' => $jurisdiction['station_id'],
                 'barangay_resolution_status' => 'matched',
-                'barangay_resolution_source' => 'saved_boundary',
+                'barangay_resolution_source' => $accuracyMeters > 100 ? 'weak_gps_barangay_fallback' : 'saved_boundary',
                 'barangay_resolved_at' => now(),
             ]);
             IncidentContextDispatcher::dispatchFor($incident);

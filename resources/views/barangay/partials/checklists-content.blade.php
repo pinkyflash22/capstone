@@ -7,6 +7,7 @@
         'source' => $item->is_ai_generated ? 'AI Prediction Checklist' : 'Prediction Checklist',
         'title' => $item->title,
         'detail' => $item->planning_notes ?: $item->ai_output ?: 'No guidance recorded.',
+        'planning_notes' => $item->planning_notes,
         'priority' => $item->priority_level ?: 'medium',
         'status' => $item->status ?: 'pending',
         'family' => $item->status === 'complied' ? 'completed' : ($item->status === 'in_progress' ? 'in_progress' : 'pending'),
@@ -14,10 +15,12 @@
         'assignee' => $item->assignee?->full_name ?? 'Unassigned',
         'reviewer' => $item->reviewer?->full_name ?? 'Not reviewed',
         'note' => $item->compliance_remarks ?: 'No compliance note.',
+        'compliance_remarks' => $item->compliance_remarks,
         'mitigations' => (int) ($legacyMitigationCounts[$item->barangay_prediction_checklist_id] ?? 0),
         'progress' => $item->status === 'complied' ? 100 : ($item->status === 'in_progress' ? 50 : 0),
         'steps' => collect(),
         'checklist_id' => null,
+        'legacy_checklist_id' => $item->barangay_prediction_checklist_id,
     ]);
 
     $aiRecords = $aiActionPlanChecklists->map(function ($item) use ($aiMitigationCounts) {
@@ -27,6 +30,7 @@
             'source' => 'Approved AI Checklist',
             'title' => $item->plan_title,
             'detail' => $item->plan_description ?: $item->source_description ?: 'No description recorded.',
+            'planning_notes' => null,
             'priority' => $item->priority_level ?: 'medium',
             'status' => $item->status ?: 'confirmed',
             'family' => ($progress['percent'] ?? 0) >= 100 ? 'completed' : (($progress['percent'] ?? 0) > 0 ? 'in_progress' : 'pending'),
@@ -34,10 +38,12 @@
             'assignee' => $item->assignee?->full_name ?? 'Station command',
             'reviewer' => $item->confirmer?->full_name ?? 'Station command',
             'note' => $item->confirmation_notes ?: 'No confirmation note.',
+            'compliance_remarks' => null,
             'mitigations' => (int) ($aiMitigationCounts[$item->ai_action_plan_checklist_id] ?? 0),
             'progress' => (int) ($progress['percent'] ?? 0),
             'steps' => $item->items->values(),
             'checklist_id' => $item->ai_action_plan_checklist_id,
+            'legacy_checklist_id' => null,
         ];
     });
 
@@ -126,7 +132,7 @@
             <div class="checklist-table-wrap"><table class="checklist-table" data-compact-list="mitigations" data-page-size="6"><thead><tr><th>Mitigation</th><th>Priority</th><th>Status</th><th>Target</th><th></th></tr></thead><tbody>
             @foreach($mitigationActions as $action)
                 <tr data-compact-row><td><strong>{{ $action->title }}</strong><small>{{ $action->creator?->full_name ?? 'Station command' }}</small></td><td><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span></td><td><span class="tag {{ $action->status }}">{{ strtoupper(str_replace('_', ' ', $action->status)) }}</span></td><td>{{ $action->target_date?->format('M d, Y') ?? 'No date' }}</td><td><button type="button" class="checklist-view-button" data-checklist-detail="mitigation-{{ $action->mitigation_action_id }}"><i class="bi bi-eye"></i></button></td></tr>
-                <template id="mitigation-{{ $action->mitigation_action_id }}"><div class="checklist-detail-grid"><div class="wide"><span>Mitigation</span><strong>{{ $action->title }}</strong></div><div class="wide"><span>Description</span><strong>{{ $action->description ?: 'No description recorded.' }}</strong></div><div><span>Priority</span><strong>{{ strtoupper($action->priority_level) }}</strong></div><div><span>Status</span><strong>{{ strtoupper(str_replace('_', ' ', $action->status)) }}</strong></div><div><span>Target</span><strong>{{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</strong></div><div><span>Created by</span><strong>{{ $action->creator?->full_name ?? 'Station command' }}</strong></div><div class="wide"><span>Linked source</span><strong>{{ $action->checklist?->title ?? $action->aiActionPlanChecklist?->plan_title ?? $action->riskArea?->marker?->title ?? 'Direct mitigation' }}</strong></div><div class="wide"><span>Files</span><strong>{{ $action->attachments->count() }} attachment(s)</strong></div></div></template>
+                <template id="mitigation-{{ $action->mitigation_action_id }}">@include('barangay.partials.mitigation-detail', ['action' => $action])</template>
             @endforeach
             </tbody></table></div><div class="checklist-compact-pagination" data-pagination-for="mitigations"></div>
         @endif

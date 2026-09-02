@@ -67,7 +67,8 @@ function showHubStatus(message, type = 'error') {
     }
 
     statusBox.textContent = message;
-    statusBox.className = `mobile-hub-status is-visible ${type === 'success' ? 'is-success' : 'is-error'}`;
+    const toneClass = type === 'success' ? 'is-success' : (type === 'warning' ? 'is-warning' : 'is-error');
+    statusBox.className = `mobile-hub-status is-visible ${toneClass}`;
 }
 
 function openDashboard() {
@@ -405,7 +406,7 @@ function getDistanceMeters(lat1, lng1, lat2, lng2) {
 }
 
 async function getFreshCoords() {
-    const coords = await getReliableLocationFix();
+    const coords = await getReliableLocationFix({ acceptBestAvailable: true });
     writeCachedCoords(coords.lat, coords.lng);
     refreshLocationContext(coords.lat, coords.lng);
     return coords;
@@ -647,7 +648,12 @@ async function submitMobileHubIncidentReport() {
         showHubStatus('Getting a fresh, accurate GPS fix...', 'success');
 
         const coords = await getFreshCoords();
-        showHubStatus(`GPS ready within ±${Math.round(coords.accuracy)} m. Sending fire report...`, 'success');
+        showHubStatus(
+            coords.accuracyWarning
+                ? `Weak GPS (±${Math.round(coords.accuracy)} m). Sending the report with this best available location...`
+                : `GPS ready within ±${Math.round(coords.accuracy)} m. Sending fire report...`,
+            coords.accuracyWarning ? 'warning' : 'success'
+        );
         refreshLocationContext(coords.lat, coords.lng);
 
         if (!window.navigator.onLine) {

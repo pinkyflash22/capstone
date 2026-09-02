@@ -3120,6 +3120,8 @@ function ensureIncidentAlertPanel() {
 
     const notificationButton = document.getElementById('notificationBtn');
     const firefighterNotificationButton = document.querySelector('[data-ff-open-notifications]');
+    const unifiedNotificationCenter = document.querySelector('[data-command-notification-center]');
+    const unifiedNotificationButton = document.querySelector('[data-command-notification-trigger]');
     const nativeDropdown = document.getElementById('alertsDropdown');
     if (notificationButton && !notificationButton.dataset.incidentAlertBound) {
         notificationButton.dataset.incidentAlertBound = 'true';
@@ -3138,12 +3140,12 @@ function ensureIncidentAlertPanel() {
     const citizenNotificationFeed = document.getElementById('citizenNotificationsFeed');
     let floatingToggle = document.getElementById(INCIDENT_ALERT_TOGGLE_ID);
 
-    if (firefighterNotificationButton && floatingToggle) {
+    if ((firefighterNotificationButton || unifiedNotificationCenter || unifiedNotificationButton) && floatingToggle) {
         floatingToggle.remove();
         floatingToggle = null;
     }
 
-    if (!notificationButton && !firefighterNotificationButton && !citizenNotificationFeed && !floatingToggle) {
+    if (!notificationButton && !firefighterNotificationButton && !unifiedNotificationCenter && !unifiedNotificationButton && !citizenNotificationFeed && !floatingToggle) {
         floatingToggle = document.createElement('button');
         floatingToggle.id = INCIDENT_ALERT_TOGGLE_ID;
         floatingToggle.className = 'show';
@@ -3292,6 +3294,7 @@ function renderIncidentAlertPanel(feed = loadIncidentAlertFeed()) {
         syncIncidentAlertBadges(feed);
         renderCitizenNotificationFeed(feed);
         renderChiefNotificationDropdown(feed);
+        window.dispatchEvent(new CustomEvent('pyro:incident-notifications-updated', { detail: { feed } }));
         return;
     }
 

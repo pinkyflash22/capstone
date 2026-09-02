@@ -338,6 +338,11 @@
             color: #166534;
             border: 1px solid rgba(34, 197, 94, 0.16);
         }
+        .mobile-hub-status.is-warning {
+            border-color: rgba(245, 158, 11, .36);
+            background: rgba(255, 251, 235, .96);
+            color: #92400e;
+        }
 
         .mobile-hub-alert-tip {
             display: flex;

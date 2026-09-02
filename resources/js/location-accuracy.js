@@ -4,6 +4,7 @@ const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_FIX_AGE_MS = 15000;
 
 let activeReliableFixRequest = null;
+let activeReliableFixAcceptsBestAvailable = false;
 let activePermissionDialog = null;
 
 function normalizePosition(position) {
@@ -188,6 +189,7 @@ function collectReliableFix(options = {}) {
     const maxAccuracyMeters = Number(options.maxAccuracyMeters) || DEFAULT_MAX_ACCURACY_METERS;
     const targetAccuracyMeters = Number(options.targetAccuracyMeters) || DEFAULT_TARGET_ACCURACY_METERS;
     const timeoutMs = Number(options.timeoutMs) || DEFAULT_TIMEOUT_MS;
+    const acceptBestAvailable = options.acceptBestAvailable === true;
 
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -205,8 +207,12 @@ function collectReliableFix(options = {}) {
             window.clearTimeout(timeoutId);
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
-            if (bestFix && bestFix.accuracy <= maxAccuracyMeters) {
-                resolve(bestFix);
+            if (bestFix && (bestFix.accuracy <= maxAccuracyMeters || acceptBestAvailable)) {
+                resolve({
+                    ...bestFix,
+                    accuracyWarning: bestFix.accuracy > maxAccuracyMeters,
+                    accuracyLimit: maxAccuracyMeters,
+                });
                 return;
             }
 
@@ -267,11 +273,25 @@ async function requestReliableLocationFix(options = {}) {
 }
 
 export function getReliableLocationFix(options = {}) {
-    if (activeReliableFixRequest) return activeReliableFixRequest;
+    const acceptsBestAvailable = options.acceptBestAvailable === true;
+    if (activeReliableFixRequest) {
+        // An emergency report must not inherit a stricter background map request
+        // that would reject the best fix and block submission.
+        if (acceptsBestAvailable && !activeReliableFixAcceptsBestAvailable) {
+            return requestReliableLocationFix(options);
+        }
 
-    activeReliableFixRequest = requestReliableLocationFix(options).finally(() => {
-        activeReliableFixRequest = null;
+        return activeReliableFixRequest;
+    }
+
+    const request = requestReliableLocationFix(options).finally(() => {
+        if (activeReliableFixRequest === request) {
+            activeReliableFixRequest = null;
+            activeReliableFixAcceptsBestAvailable = false;
+        }
     });
+    activeReliableFixRequest = request;
+    activeReliableFixAcceptsBestAvailable = acceptsBestAvailable;
 
     return activeReliableFixRequest;
 }

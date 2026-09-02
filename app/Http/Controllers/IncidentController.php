@@ -570,7 +570,7 @@ class IncidentController extends Controller
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
             'dispatch_priority' => 'nullable|in:low,medium,high,critical',
-            'location_accuracy' => 'nullable|numeric|min:1|max:100',
+            'location_accuracy' => 'nullable|numeric|min:1|max:100000',
             'location_captured_at' => 'nullable|date|after_or_equal:'.now()->subMinute()->toIso8601String().'|before_or_equal:'.now()->addMinute()->toIso8601String(),
         ]);
 

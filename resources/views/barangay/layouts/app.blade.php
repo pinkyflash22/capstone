@@ -623,6 +623,11 @@
             background: #fef2f2;
             color: #991b1b;
         }
+        .barangay-quick-report-status.is-warning {
+            border-color: rgba(245, 158, 11, .38);
+            background: #fffbeb;
+            color: #92400e;
+        }
 
         .barangay-live-alert-toast {
             position: fixed;
@@ -1470,7 +1475,8 @@
                 }
 
                 quickReportStatus.textContent = message;
-                quickReportStatus.className = `barangay-quick-report-status is-visible ${type === 'success' ? 'is-success' : 'is-error'}`;
+                const toneClass = type === 'success' ? 'is-success' : (type === 'warning' ? 'is-warning' : 'is-error');
+                quickReportStatus.className = `barangay-quick-report-status is-visible ${toneClass}`;
                 window.clearTimeout(quickReportTimer);
                 quickReportTimer = window.setTimeout(() => {
                     quickReportStatus.className = 'barangay-quick-report-status';
@@ -1515,7 +1521,7 @@
                     throw new Error('Accurate location service is still loading. Please try again.');
                 }
 
-                const coords = await window.PyroLocation.getReliableLocationFix();
+                const coords = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
                 writeCachedCoords(coords.lat, coords.lng);
                 return coords;
             }
@@ -1543,7 +1549,12 @@
 
                 try {
                     const coords = await getCurrentCoords();
-                    showQuickReportStatus(`GPS ready within ±${Math.round(coords.accuracy)} m. Sending the fire report...`, 'success');
+                    showQuickReportStatus(
+                        coords.accuracyWarning
+                            ? `Weak GPS (±${Math.round(coords.accuracy)} m). Sending with the best available location...`
+                            : `GPS ready within ±${Math.round(coords.accuracy)} m. Sending the fire report...`,
+                        coords.accuracyWarning ? 'warning' : 'success'
+                    );
 
                     const reportBody = {
                         lat: coords.lat,

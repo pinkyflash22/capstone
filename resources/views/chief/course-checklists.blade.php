@@ -17,7 +17,7 @@
         .checklist-workspace{display:grid;gap:12px}.checklist-workspace[aria-busy=true]{opacity:.58;pointer-events:none}.checklist-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.checklist-metric{display:flex;align-items:center;gap:9px;min-height:58px;padding:9px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.94);box-shadow:0 6px 18px rgba(39,46,59,.035)}.checklist-metric__icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#fff3e8;color:var(--orange)}.checklist-metric small,.checklist-metric strong{display:block}.checklist-metric small{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#8590a2;font-weight:800}.checklist-metric strong{font-size:18px;margin-top:1px}.checklist-metric--amber .checklist-metric__icon{background:#fff7d9;color:#c57b00}.checklist-metric--blue .checklist-metric__icon{background:#eaf2ff;color:var(--blue)}.checklist-metric--green .checklist-metric__icon{background:#e6f8f1;color:var(--green)}
         .checklist-register{border:1px solid var(--line);border-radius:26px;background:var(--paper);box-shadow:0 18px 44px rgba(39,46,59,.07);overflow:hidden}.checklist-register__head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px 15px}.checklist-register__head h2{font-size:20px;margin:7px 0 3px}.checklist-register__head p{margin:0;color:var(--muted);font-size:13px}.checklist-result-count{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;background:var(--soft);border:1px solid #f6d4b1;border-radius:999px;color:#a43b1a;font-size:11px;font-weight:800;white-space:nowrap}
         .checklist-filters{display:grid;grid-template-columns:minmax(230px,1fr) repeat(3,minmax(135px,180px)) 40px 40px;gap:9px;padding:0 24px 17px}.checklist-filters input,.checklist-filters select{width:100%;height:40px;border:1px solid #ddd8d2;border-radius:12px;background:#fff;padding:0 12px;color:#344055;font:inherit;font-size:12px;outline:0}.checklist-filters input:focus,.checklist-filters select:focus,.modal-review textarea:focus{border-color:#e67d35;box-shadow:0 0 0 3px rgba(230,125,53,.12)}.checklist-search{position:relative}.checklist-search i{position:absolute;left:13px;top:13px;color:#9aa3b1;font-size:12px}.checklist-search input{padding-left:35px}.icon-button{display:inline-grid;place-items:center;width:36px;height:36px;border:1px solid #ddd8d2;border-radius:11px;background:#fff;color:#667085;text-decoration:none;cursor:pointer;transition:.18s}.checklist-filters>.icon-button{width:40px;height:40px}.icon-button:hover{transform:translateY(-1px);border-color:#e99a5a;color:#bd481f}.icon-button--primary{border-color:transparent;background:linear-gradient(135deg,#cf3f24,#e88313);color:#fff;box-shadow:0 7px 16px rgba(207,63,36,.18)}
-        .checklist-table-wrap{overflow-x:auto;border-top:1px solid #eee8e1}.checklist-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:760px}.checklist-table th{padding:11px 13px;background:#fbf8f4;color:#8992a0;font-size:10px;text-align:left;text-transform:uppercase;letter-spacing:.08em}.checklist-table td{min-width:0;padding:12px 13px;border-top:1px solid #f0ebe5;font-size:12px;vertical-align:middle}.checklist-table tbody tr{transition:.15s}.checklist-table tbody tr:hover{background:#fffaf4}.checklist-col-select{width:42px}.checklist-col-plan{width:38%}.checklist-col-state{width:18%}.checklist-col-progress{width:16%}.checklist-col-target{width:13%}.checklist-col-actions{width:92px}.checklist-col-area,.checklist-col-status{display:none}.plan-cell{display:flex;align-items:flex-start;gap:10px;min-width:0;max-width:none}.plan-cell>span:last-child{display:block;min-width:0;flex:1}.plan-cell__icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:11px;background:#fff0e6;color:#c44824}.plan-cell strong,.plan-cell small{display:block}.plan-cell strong{font-size:12.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.plan-cell small{display:flex;align-items:flex-start;gap:5px;margin-top:5px;color:#7b8797;font-size:10px;line-height:1.35}.plan-cell small i{margin-top:2px;color:#dc5a2a}.table-location,.target-date{display:inline-flex;align-items:center;gap:6px;color:#637086;white-space:nowrap}.table-location i{color:#dc5a2a}.table-state{display:flex;align-items:flex-start;flex-wrap:wrap;gap:5px}.priority-pill,.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap}.priority-pill--critical{background:#fee8e5;color:#b92e21}.priority-pill--high{background:#fff0e0;color:#b8580a}.priority-pill--medium{background:#fff7d7;color:#956800}.priority-pill--low{background:#e8f7f1;color:#137759}.status-pill{background:#f0f2f5;color:#5f6876}.status-pill i{font-size:6px}.status-pill--in_progress{background:#eaf2ff;color:#2864bd}.status-pill--submitted{background:#edeafe;color:#6754bb}.status-pill--confirmed{background:#e5f8ef;color:#147653}.status-pill--rejected{background:#fee9e7;color:#b6372a}.table-progress{width:100%;max-width:130px}.table-progress>span{display:block;height:6px;border-radius:999px;background:#eee9e3;overflow:hidden}.table-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#dc4a27,#ef9d18)}.table-progress small{display:block;margin-top:5px;color:#737f91;font-size:10px}.table-actions{display:flex;justify-content:flex-end;gap:6px}.checklist-empty{display:flex;flex-direction:column;align-items:center;gap:7px;padding:46px 20px;color:#788497}.checklist-empty i{font-size:25px;color:#dc7c43}.checklist-empty strong{color:var(--ink)}.checklist-pagination{padding:14px 20px;border-top:1px solid #eee8e1}.checklist-pagination nav>div:first-child{display:none}.checklist-pagination nav>div:last-child{display:flex;align-items:center;justify-content:space-between;gap:12px}.checklist-pagination p{font-size:11px;color:#778295}.checklist-pagination a,.checklist-pagination span[aria-current]>span{border-radius:9px!important;font-size:11px!important}
+        .checklist-table-wrap{overflow-x:auto;border-top:1px solid #eee8e1}.checklist-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:840px}.checklist-table th{padding:11px 13px;background:#fbf8f4;color:#8992a0;font-size:10px;text-align:left;text-transform:uppercase;letter-spacing:.08em}.checklist-table td{min-width:0;padding:12px 13px;border-top:1px solid #f0ebe5;font-size:12px;vertical-align:middle}.checklist-table tbody tr{transition:.15s}.checklist-table tbody tr:hover{background:#fffaf4}.checklist-col-select{width:42px}.checklist-col-plan{width:34%}.checklist-col-state{width:17%}.checklist-col-progress{width:15%}.checklist-col-target{width:12%}.checklist-col-actions{width:166px}.checklist-col-area,.checklist-col-status{display:none}.plan-cell{display:flex;align-items:flex-start;gap:10px;min-width:0;max-width:none}.plan-cell>span:last-child{display:block;min-width:0;flex:1}.plan-cell__icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:11px;background:#fff0e6;color:#c44824}.plan-cell strong,.plan-cell small{display:block}.plan-cell strong{font-size:12.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.plan-cell small{display:flex;align-items:flex-start;gap:5px;margin-top:5px;color:#7b8797;font-size:10px;line-height:1.35}.plan-cell small i{margin-top:2px;color:#dc5a2a}.table-location,.target-date{display:inline-flex;align-items:center;gap:6px;color:#637086;white-space:nowrap}.table-location i{color:#dc5a2a}.table-state{display:flex;align-items:flex-start;flex-wrap:wrap;gap:5px}.priority-pill,.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap}.priority-pill--critical{background:#fee8e5;color:#b92e21}.priority-pill--high{background:#fff0e0;color:#b8580a}.priority-pill--medium{background:#fff7d7;color:#956800}.priority-pill--low{background:#e8f7f1;color:#137759}.status-pill{background:#f0f2f5;color:#5f6876}.status-pill i{font-size:6px}.status-pill--in_progress{background:#eaf2ff;color:#2864bd}.status-pill--submitted{background:#edeafe;color:#6754bb}.status-pill--confirmed{background:#e5f8ef;color:#147653}.status-pill--rejected{background:#fee9e7;color:#b6372a}.table-progress{width:100%;max-width:130px}.table-progress>span{display:block;height:6px;border-radius:999px;background:#eee9e3;overflow:hidden}.table-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#dc4a27,#ef9d18)}.table-progress small{display:block;margin-top:5px;color:#737f91;font-size:10px}.table-actions{display:flex;justify-content:flex-end;gap:6px}.checklist-empty{display:flex;flex-direction:column;align-items:center;gap:7px;padding:46px 20px;color:#788497}.checklist-empty i{font-size:25px;color:#dc7c43}.checklist-empty strong{color:var(--ink)}.checklist-pagination{padding:14px 20px;border-top:1px solid #eee8e1}.checklist-pagination nav>div:first-child{display:none}.checklist-pagination nav>div:last-child{display:flex;align-items:center;justify-content:space-between;gap:12px}.checklist-pagination p{font-size:11px;color:#778295}.checklist-pagination a,.checklist-pagination span[aria-current]>span{border-radius:9px!important;font-size:11px!important}
         .checklist-modal[hidden]{display:none}.checklist-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(18,27,41,.58);backdrop-filter:blur(5px)}.checklist-modal__card{width:min(850px,100%);max-height:min(90vh,900px);display:flex;flex-direction:column;border:1px solid #eadfd3;border-radius:26px;background:#fffdfb;box-shadow:0 30px 80px rgba(17,24,39,.28);overflow:hidden}.checklist-modal__head{display:flex;align-items:center;justify-content:space-between;padding:16px 19px;border-bottom:1px solid #eee7df;background:#fff}.checklist-modal__head strong{display:block;font-size:15px}.checklist-modal__head small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.checklist-modal__body{padding:20px;overflow:auto}.checklist-modal__foot{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1px solid #eee7df;background:#fff}.close-button{border:0;background:#f5f2ee;color:#657085;border-radius:11px;width:36px;height:36px;cursor:pointer}.modal-plan-summary{display:grid;grid-template-columns:48px 1fr;gap:14px}.modal-plan-summary__icon{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#fff0e5,#ffe8cf);color:#c34321;font-size:18px}.modal-plan-summary h3{margin:9px 0 5px;font-size:20px}.modal-plan-summary p{margin:0;color:#657186;line-height:1.55;font-size:12px}.modal-success{display:flex;align-items:flex-start;gap:8px;margin-top:9px;padding:8px 10px;border-radius:11px;background:#f3f8f5;color:#4c685c;font-size:10px;line-height:1.45}.modal-success i{color:#15966f;margin-top:2px}.modal-badges{display:flex;gap:6px;flex-wrap:wrap}.modal-progress-card{margin:17px 0;padding:13px 15px;border:1px solid #f2d2b7;border-radius:16px;background:#fff8f1}.modal-progress-card>div:first-child{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#9b4a20;font-weight:800}.modal-progress-card__bar{height:7px;margin-top:10px;border-radius:999px;background:#f1e4d8;overflow:hidden}.modal-progress-card__bar span{display:block;height:100%;background:linear-gradient(90deg,#cf3e24,#ed9a15);border-radius:inherit}.modal-section{margin-top:14px;padding:15px;border:1px solid #e9e4de;border-radius:18px;background:#fff}.modal-section__head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.modal-section__head h4{margin:0;font-size:13px}.modal-section__head h4 i{color:#cf4b25;margin-right:7px}.modal-section__head>span{font-size:10px;color:#8791a0}.modal-steps{display:grid;gap:8px}.modal-step{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;padding:10px;border:1px solid #ece8e2;border-radius:13px;background:#fcfbf9}.modal-step--followed{border-color:#bee8d8;background:#f3fcf8}.modal-step--not_followed{border-color:#f4c8c3;background:#fff7f6}.modal-step__number{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#b94422;font-size:11px;font-weight:900}.modal-step__copy strong,.modal-step__copy small{display:block}.modal-step__copy strong{font-size:12px;line-height:1.4}.modal-step__copy small{margin-top:4px;color:#7d8796;font-size:9.5px}.modal-step__actions{display:flex;gap:5px}.step-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #dedbd6;border-radius:9px;background:#fff;color:#737c8b;cursor:pointer}.step-icon--done{color:#148160;border-color:#bae4d5}.step-icon--missed{color:#bd3c2e;border-color:#f0c4bf}.modal-review label{display:block;margin-bottom:6px;color:#6b7688;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}.modal-review textarea{width:100%;resize:vertical;border:1px solid #ddd8d2;border-radius:12px;padding:10px 12px;font:inherit;font-size:12px;outline:0}.modal-review__actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.action-button{display:inline-flex;align-items:center;gap:7px;min-height:35px;padding:0 11px;border:1px solid transparent;border-radius:10px;font-size:10px;font-weight:850;cursor:pointer}.action-button--progress{background:#eaf2ff;color:#2864bd}.action-button--submitted{background:#eeebff;color:#6754bb}.action-button--confirmed{background:#e5f8ef;color:#147653}.action-button--rejected{background:#fee9e7;color:#b6372a}.modal-links{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.modal-links a{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:11px 13px;border:1px solid #e8e2db;border-radius:13px;color:#3e4a5e;text-decoration:none;font-size:11px;font-weight:800}.modal-links a:hover{border-color:#efa76c;background:#fff8f1;color:#aa431f}.modal-empty{display:flex;align-items:center;gap:9px;color:#778295;font-size:11px;padding:12px}.toast-stack{position:fixed;right:20px;bottom:20px;z-index:120;display:grid;gap:8px}.toast{display:flex;align-items:center;gap:9px;min-width:250px;max-width:360px;padding:12px 14px;border-radius:13px;background:#172235;color:#fff;box-shadow:0 14px 35px rgba(15,23,42,.2);font-size:11px;font-weight:700}.toast--error{background:#a83227}.is-loading i{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
         .modal-evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}.modal-evidence-grid>div{min-width:0;padding:10px 11px;border-radius:12px;background:#f8fafc}.modal-evidence-grid dt{color:#8a94a3;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}.modal-evidence-grid dd{margin:4px 0 0;color:#344055;font-size:11px;font-weight:800;overflow-wrap:anywhere}.modal-evidence-focus{margin:9px 0 0;padding:9px 11px;border-radius:12px;background:#fff7ed;color:#795137;font-size:10.5px;line-height:1.45}
         .checklist-modal__head>div{min-width:0}.checklist-modal__head strong{overflow-wrap:anywhere}.modal-plan-summary>div:last-child{min-width:0}.modal-plan-summary h3{overflow-wrap:anywhere;line-height:1.3}.modal-step__copy{min-width:0}.modal-step__copy strong{overflow-wrap:anywhere}
@@ -28,7 +28,8 @@
     <style>
         .bulk-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 24px 14px}.bulk-toolbar__count{margin-right:auto;display:inline-flex;align-items:center;gap:7px;color:#6d7889;font-size:10px;font-weight:800}.bulk-toolbar select{height:35px;min-width:145px;border:1px solid #ddd8d2;border-radius:10px;background:#fff;padding:0 10px;color:#475467;font-size:10px}.bulk-toolbar button:disabled{opacity:.45;cursor:not-allowed}.checklist-table input[type=checkbox]{width:15px;height:15px;accent-color:#d55327;cursor:pointer}.history-list{display:grid;gap:8px}.history-event{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;padding:9px;border:1px solid #ece7e1;border-radius:12px;background:#fdfcfb}.history-event__icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#fff0e5;color:#c24824}.history-event strong,.history-event small{display:block}.history-event strong{font-size:11px}.history-event small{margin-top:3px;color:#7d8796;font-size:9.5px;line-height:1.4}.history-event time{color:#9098a5;font-size:9px;white-space:nowrap}.history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px}.history-pagination button{width:29px;height:29px;border:1px solid #ddd8d2;border-radius:9px;background:#fff;color:#647084;cursor:pointer}.history-pagination button:disabled{opacity:.4;cursor:not-allowed}
         .checklist-quick-filters{display:flex;gap:7px;flex-wrap:wrap;padding:0 24px 12px}.checklist-quick-filters a{padding:7px 10px;border:1px solid #e5ded6;border-radius:999px;background:#fff;color:#667085;font-size:10px;font-weight:800;text-decoration:none}.checklist-quick-filters a.is-active{background:#9a3412;border-color:#9a3412;color:#fff}
-        @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-quick-filters{padding-inline:15px}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}.modal-evidence-grid{grid-template-columns:1fr}}
+        .checklist-register__tools{display:flex;align-items:center;gap:8px}.checklist-register__tools .action-button{white-space:nowrap}.checklist-editor{position:fixed;inset:0;z-index:12100;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.56)}.checklist-editor[hidden]{display:none}.checklist-editor__card{width:min(680px,100%);max-height:92dvh;display:flex;flex-direction:column;border-radius:20px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.3);overflow:hidden}.checklist-editor__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid #eee8e1}.checklist-editor__head strong,.checklist-editor__head small{display:block}.checklist-editor__head small{margin-top:3px;color:#7a8492;font-size:10px}.checklist-editor__body{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px;overflow:auto}.checklist-editor__body label{display:grid;gap:6px;color:#475467;font-size:10px;font-weight:850}.checklist-editor__body label.is-wide{grid-column:1/-1}.checklist-editor__body input,.checklist-editor__body select,.checklist-editor__body textarea{width:100%;border:1px solid #ddd8d2;border-radius:11px;padding:10px 11px;background:#fff;color:#344054;font:inherit;font-size:12px}.checklist-editor__body textarea{resize:vertical}.checklist-editor__hint{grid-column:1/-1;margin:0;color:#7a8492;font-size:10px;line-height:1.45}.checklist-editor__error{grid-column:1/-1;padding:10px 12px;border-radius:11px;background:#fee9e7;color:#a83227;font-size:11px;font-weight:750}.checklist-editor__foot{display:flex;justify-content:flex-end;gap:8px;padding:13px 18px;border-top:1px solid #eee8e1}.checklist-editor__foot button{justify-content:center}
+        @media(max-width:767px){.bulk-toolbar{display:grid;grid-template-columns:1fr 1fr;padding:0 15px 12px}.bulk-toolbar__count{grid-column:1/-1}.bulk-toolbar select{min-width:0;width:100%}.bulk-toolbar button{grid-column:1/-1;justify-content:center}.checklist-quick-filters{padding-inline:15px}.checklist-table td[data-label=Select]{position:absolute;left:14px;top:19px;width:auto}.checklist-table tr{padding-left:42px}.history-event{grid-template-columns:28px 1fr}.history-event time{grid-column:2}.modal-evidence-grid{grid-template-columns:1fr}.checklist-register__tools{flex-direction:column;align-items:stretch}.checklist-register__tools .action-button span{display:none}.checklist-editor{align-items:end;padding:0}.checklist-editor__card{max-height:94dvh;border-radius:22px 22px 0 0}.checklist-editor__body{grid-template-columns:1fr;padding:15px}.checklist-editor__body label.is-wide{grid-column:1}.checklist-editor__foot{padding-bottom:calc(13px + env(safe-area-inset-bottom,0px))}}
     </style>
     <style data-checklist-mobile-style>
         .mobile-checklist-filter-toggle { display: none; }
@@ -272,6 +273,30 @@
         <footer class="checklist-modal__foot"><button type="button" class="action-button" data-close-checklist><i class="fa-solid fa-arrow-left"></i><span>Back to register</span></button></footer>
     </div>
 </div>
+<div id="checklistEditor" class="checklist-editor" role="dialog" aria-modal="true" aria-labelledby="checklistEditorTitle" hidden>
+    <form id="checklistEditorForm" class="checklist-editor__card">
+        <header class="checklist-editor__head">
+            <div><strong id="checklistEditorTitle">Create BFP checklist</strong><small id="checklistEditorSubtitle">Build a station-owned checklist manually.</small></div>
+            <button type="button" class="close-button" data-close-checklist-editor aria-label="Close checklist form"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="checklist-editor__body">
+            <div id="checklistEditorError" class="checklist-editor__error" hidden></div>
+            <label>Barangay<select name="barangay_id" required><option value="">Select covered barangay</option>@foreach($barangays as $barangay)<option value="{{ $barangay->barangay_id }}">{{ $barangay->barangay_name }}</option>@endforeach</select></label>
+            <label>Priority<select name="priority_level" required>@foreach(['critical','high','medium','low'] as $priority)<option value="{{ $priority }}" @selected($priority === 'medium')>{{ ucfirst($priority) }}</option>@endforeach</select></label>
+            <label class="is-wide">Checklist title<input name="plan_title" maxlength="255" required placeholder="Example: Market fire-prevention inspection"></label>
+            <label class="is-wide">Description<textarea name="plan_description" rows="3" maxlength="4000" placeholder="Purpose and operational context"></textarea></label>
+            <label>Target date<input type="date" name="target_date"></label>
+            <label>Assigned officer<select name="assigned_to"><option value="">Unassigned</option>@foreach($assignees as $assignee)<option value="{{ $assignee->user_id }}">{{ trim(($assignee->first_name ?? '') . ' ' . ($assignee->last_name ?? '')) }}</option>@endforeach</select></label>
+            <label class="is-wide">Success indicator<textarea name="success_indicator" rows="2" maxlength="1000" placeholder="How will BFP know this checklist succeeded?"></textarea></label>
+            <label class="is-wide">Checklist steps<textarea name="checklist_items_text" rows="7" required placeholder="Enter one checklist step per line"></textarea></label>
+            <p class="checklist-editor__hint"><i class="fa-solid fa-circle-info"></i> One non-empty line becomes one step. Unchanged steps keep their existing review progress when edited.</p>
+        </div>
+        <footer class="checklist-editor__foot">
+            <button type="button" class="action-button" data-close-checklist-editor>Cancel</button>
+            <button type="submit" class="action-button action-button--confirmed"><i class="fa-solid fa-floppy-disk"></i><span>Save checklist</span></button>
+        </footer>
+    </form>
+</div>
 <script>
     let checklistCsrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const checklistPageUrl = @json(route('station-admin.course-checklists'));
@@ -280,10 +305,14 @@
         items: @json(route('station-admin.action-plan-checklists.items', ['id' => '__CHECKLIST_ID__'])),
         confirm: @json(route('station-admin.action-plan-checklists.confirm', ['id' => '__CHECKLIST_ID__'])),
         bulk: @json(route('station-admin.action-plan-checklists.bulk')),
+        store: @json(route('station-admin.action-plan-checklists.store')),
+        update: @json(route('station-admin.action-plan-checklists.update', ['id' => '__CHECKLIST_ID__'])),
+        destroy: @json(route('station-admin.action-plan-checklists.destroy', ['id' => '__CHECKLIST_ID__'])),
         refreshSession: @json(route('auth.session-refresh')),
     };
     let checklistTrigger = null;
     let checklistSearchTimer = null;
+    let editingChecklistId = null;
 
     function checklistEndpoint(type, checklistId = null) {
         const endpoint = checklistEndpoints[type] || '';
@@ -422,6 +451,105 @@
         checklistTrigger?.focus?.();
     }
 
+    function openChecklistEditor(payload = null) {
+        const editor = document.getElementById('checklistEditor');
+        const form = document.getElementById('checklistEditorForm');
+        if (!editor || !form) return;
+        form.reset();
+        editingChecklistId = payload?.id || null;
+        document.getElementById('checklistEditorTitle').textContent = editingChecklistId ? 'Edit BFP checklist' : 'Create BFP checklist';
+        document.getElementById('checklistEditorSubtitle').textContent = payload?.is_ai_generated
+            ? 'This system-generated checklist will keep its original source label.'
+            : (editingChecklistId ? 'Update this station-owned checklist.' : 'Build a station-owned checklist manually.');
+        const setValue = (name, value) => {
+            const field = form.elements.namedItem(name);
+            if (field) field.value = value == null ? '' : String(value);
+        };
+        setValue('barangay_id', payload?.barangay_id);
+        setValue('priority_level', payload?.priority_level || 'medium');
+        setValue('plan_title', payload?.plan_title);
+        setValue('plan_description', payload?.plan_description);
+        setValue('target_date', payload?.target_date);
+        setValue('assigned_to', payload?.assigned_to);
+        setValue('success_indicator', payload?.success_indicator);
+        setValue('checklist_items_text', Array.isArray(payload?.checklist_items) ? payload.checklist_items.join('\n') : '');
+        const error = document.getElementById('checklistEditorError');
+        error.hidden = true;
+        error.textContent = '';
+        editor.hidden = false;
+        document.body.style.overflow = 'hidden';
+        window.requestAnimationFrame(() => form.elements.namedItem('barangay_id')?.focus());
+    }
+
+    function closeChecklistEditor() {
+        const editor = document.getElementById('checklistEditor');
+        if (!editor || editor.hidden) return;
+        editor.hidden = true;
+        editingChecklistId = null;
+        document.body.style.overflow = '';
+    }
+
+    function checklistErrorMessage(result, fallback) {
+        const validation = result?.errors && Object.values(result.errors).flat().find(Boolean);
+        return validation || result?.message || fallback;
+    }
+
+    async function saveChecklistEditor(form) {
+        const submit = form.querySelector('[type="submit"]');
+        const errorBox = document.getElementById('checklistEditorError');
+        const lines = String(form.elements.namedItem('checklist_items_text')?.value || '')
+            .split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        if (!lines.length) {
+            errorBox.textContent = 'Add at least one checklist step.';
+            errorBox.hidden = false;
+            return;
+        }
+        const payload = Object.fromEntries(new FormData(form).entries());
+        delete payload.checklist_items_text;
+        payload.checklist_items = lines;
+        payload.assigned_to = payload.assigned_to || null;
+        payload.target_date = payload.target_date || null;
+        const original = submit.innerHTML;
+        submit.disabled = true;
+        submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Saving</span>';
+        errorBox.hidden = true;
+        try {
+            const response = await checklistFetch(
+                editingChecklistId ? checklistEndpoint('update', editingChecklistId) : checklistEndpoints.store,
+                {method: editingChecklistId ? 'PUT' : 'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(payload)}
+            );
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) throw new Error(checklistErrorMessage(result, 'The checklist could not be saved.'));
+            closeChecklistEditor();
+            await loadChecklistWorkspace(window.location.href, {push:false});
+            showChecklistToast(result.message || 'Checklist saved successfully.');
+        } catch (error) {
+            errorBox.textContent = error.message || 'The checklist could not be saved.';
+            errorBox.hidden = false;
+        } finally {
+            submit.disabled = false;
+            submit.innerHTML = original;
+        }
+    }
+
+    async function deleteChecklist(id, title, button) {
+        if (!window.confirm(`Delete “${title || 'this checklist'}”? System-generated checklists can also be deleted. Linked mitigation records will be kept.`)) return;
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+            const response = await checklistFetch(checklistEndpoint('destroy', id), {method:'DELETE', headers:{'Accept':'application/json'}});
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) throw new Error(checklistErrorMessage(result, 'The checklist could not be deleted.'));
+            await loadChecklistWorkspace(window.location.href, {push:false});
+            showChecklistToast(result.message || 'Checklist deleted.');
+        } catch (error) {
+            button.disabled = false;
+            button.innerHTML = original;
+            showChecklistToast(error.message || 'The checklist could not be deleted.', 'error');
+        }
+    }
+
     async function loadChecklistWorkspace(targetUrl, { push = true, reopen = null } = {}) {
         const visibleUrl = new URL(targetUrl || window.location.href, window.location.origin);
         visibleUrl.searchParams.delete('partial');
@@ -499,6 +627,17 @@
             region?.classList.toggle('is-open', ! expanded);
             return;
         }
+        const create = event.target.closest('[data-create-checklist]');
+        if (create) { openChecklistEditor(); return; }
+        const edit = event.target.closest('[data-edit-checklist]');
+        if (edit) {
+            try { openChecklistEditor(JSON.parse(edit.getAttribute('data-edit-checklist') || '{}')); }
+            catch (error) { showChecklistToast('This checklist could not be opened for editing.', 'error'); }
+            return;
+        }
+        const remove = event.target.closest('[data-delete-checklist]');
+        if (remove) { deleteChecklist(remove.dataset.deleteChecklist, remove.dataset.checklistTitle, remove); return; }
+        if (event.target.closest('[data-close-checklist-editor]') || event.target.id === 'checklistEditor') { closeChecklistEditor(); return; }
         const open = event.target.closest('[data-open-checklist]');
         if (open) { openChecklistModal(open.dataset.openChecklist, open); return; }
         if (event.target.closest('#closeChecklistModal,[data-close-checklist]') || event.target.id === 'checklistModal') { closeChecklistModal(); return; }
@@ -528,6 +667,11 @@
     });
 
     document.addEventListener('submit', (event) => {
+        if (event.target.id === 'checklistEditorForm') {
+            event.preventDefault();
+            saveChecklistEditor(event.target);
+            return;
+        }
         if (event.target.id !== 'checklistFilters') return;
         event.preventDefault();
         const url = new URL(event.target.action);
@@ -550,7 +694,7 @@
         clearTimeout(checklistSearchTimer);
         checklistSearchTimer = setTimeout(() => event.target.form?.requestSubmit(), 350);
     });
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeChecklistModal(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeChecklistEditor(); closeChecklistModal(); } });
     window.addEventListener('popstate', () => loadChecklistWorkspace(window.location.href, {push:false}));
     document.getElementById('openSidebar')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.add('open'); document.getElementById('sidebarBackdrop')?.classList.remove('hidden'); });
     document.getElementById('sidebarBackdrop')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarBackdrop')?.classList.add('hidden'); });

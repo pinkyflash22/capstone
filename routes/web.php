@@ -342,6 +342,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/command-notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('command-notifications.read-all');
         Route::post('/api/command-notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('command-notifications.read');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
+        Route::post('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'storeActionPlanChecklist'])->name('action-plan-checklists.store');
+        Route::put('/api/action-plan-checklists/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'updateActionPlanChecklist'])->name('action-plan-checklists.update');
+        Route::delete('/api/action-plan-checklists/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'destroyActionPlanChecklist'])->name('action-plan-checklists.destroy');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
         Route::get('/api/historical-weather-preview', [App\Http\Controllers\Chief\AnalyticController::class, 'previewHistoricalWeatherArchive']);
@@ -497,6 +500,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/weather-context', [App\Http\Controllers\Chief\WeatherContextController::class, 'index'])->name('weather-context.index');
         Route::post('/weather-context/backfill', [App\Http\Controllers\Chief\WeatherContextController::class, 'backfill'])->name('weather-context.backfill');
         Route::get('/course-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'checklistIndex'])->name('course-checklists');
+        Route::post('/api/action-plan-checklists', [App\Http\Controllers\Chief\AnalyticController::class, 'storeActionPlanChecklist'])->name('action-plan-checklists.store');
+        Route::put('/api/action-plan-checklists/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'updateActionPlanChecklist'])->name('action-plan-checklists.update');
+        Route::delete('/api/action-plan-checklists/{id}', [App\Http\Controllers\Chief\AnalyticController::class, 'destroyActionPlanChecklist'])->name('action-plan-checklists.destroy');
         Route::get('/api/stations-for-analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'getStationsForAnalytics']);
         Route::get('/api/analyses/latest-snapshot', [App\Http\Controllers\Chief\AnalyticController::class, 'getLatestAnalysisSnapshot']);
         Route::get('/api/historical-weather-preview', [App\Http\Controllers\Chief\AnalyticController::class, 'previewHistoricalWeatherArchive']);
@@ -735,8 +741,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/assessment', [BarangayDashboardController::class, 'assessment'])->name('assessment');
         Route::get('/checklists', [BarangayDashboardController::class, 'checklists'])->name('checklists');
         Route::get('/checklists/content', [BarangayDashboardController::class, 'checklistsContent'])->name('checklists.content');
+        Route::patch('/checklists/prediction/{checklistId}', [BarangayDashboardController::class, 'updatePredictionChecklist'])->name('checklists.prediction.update');
         Route::patch('/checklists/{checklistId}/items/{itemId}', [BarangayDashboardController::class, 'updateChecklistItem'])->name('checklists.items.update');
         Route::patch('/checklists/visits/{visitId}/sign-off', [App\Http\Controllers\Barangay\ChecklistVisitController::class, 'signOff'])->name('checklists.visits.sign-off');
+        Route::patch('/mitigations/{mitigationActionId}', [BarangayDashboardController::class, 'updateMitigation'])->name('mitigations.update');
         Route::get('/notifications', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');

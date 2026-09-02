@@ -34,6 +34,7 @@
     .command-notification-center__category { color:#c2410c; font-weight:800; text-transform:capitalize; }
     .command-notification-center__empty { padding:28px 18px; color:#64748b; text-align:center; font-size:12px; }
     .command-notification-mobile-badge { position:absolute; top:3px; right:16%; min-width:17px; height:17px; padding:0 4px; border-radius:999px; background:#dc2626; color:#fff; border:2px solid #fff; font-size:9px; font-weight:900; line-height:13px; text-align:center; }
+    #incidentAlertCenterToggle { display:none !important; }
     @media (max-width:767px) { .command-notification-header { display:none !important; } }
 </style>
 
@@ -69,6 +70,10 @@
                     <div class="command-notification-center__list" data-command-notification-list><p class="command-notification-center__empty">Loading notifications…</p></div>
                 </section>`;
         }
+
+        // The map alert feed is merged below, so its separate floating bell is
+        // redundant on pages that provide this unified notification center.
+        document.getElementById('incidentAlertCenterToggle')?.remove();
         const trigger = headerHost?.querySelector('[data-command-notification-trigger]');
         const panel = headerHost?.querySelector('[data-command-notification-panel]');
         const list = headerHost?.querySelector('[data-command-notification-list]');

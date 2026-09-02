@@ -314,6 +314,13 @@
         .barangay-signoff-form button { min-width: 76px; height: 33px; border: 0; border-radius: 7px; background: #0369a1; color: #fff; font-size: .61rem; font-weight: 850; }
         .barangay-signoff-state { margin-top: 7px; padding: 6px 8px; border-radius: 7px; background: #ecfdf5; color: #047857; font-size: .6rem; font-weight: 800; line-height: 1.4; }
         .barangay-signoff-state.needs_follow_up { background: #fef2f2; color: #b91c1c; }
+        .barangay-record-update-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 8px; padding: 10px; border: 1px solid #fde68a; border-radius: 11px; background: #fffbeb; }
+        .barangay-record-update-form label { display: grid; gap: 4px; color: #78350f; font-size: .63rem; font-weight: 850; text-transform: none; letter-spacing: 0; }
+        .barangay-record-update-form .full { grid-column: 1 / -1; }
+        .barangay-record-update-form input:not([type="checkbox"]), .barangay-record-update-form select, .barangay-record-update-form textarea { width: 100%; min-width: 0; padding: 8px; border: 1px solid #fcd34d; border-radius: 8px; background: #fff; color: #334155; font-family: inherit; font-size: .7rem; font-weight: 500; line-height: 1.4; }
+        .barangay-record-update-form textarea { resize: vertical; }
+        .barangay-record-update-form button { justify-self: start; min-height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: #b45309; color: #fff; font-size: .68rem; font-weight: 850; }
+        .barangay-record-update-form small { color: #92400e; font-size: .6rem; line-height: 1.45; }
 
         @media (max-width: 900px) { .checklist-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
         @media (max-width: 520px) {
@@ -330,6 +337,8 @@
             .checklist-step-controls { grid-template-columns: 1fr; }
             .barangay-visit-card__head { align-items: flex-start; flex-direction: column; }
             .barangay-signoff-form { grid-template-columns: 1fr; }
+            .barangay-record-update-form { grid-template-columns: 1fr; }
+            .barangay-record-update-form .full { grid-column: auto; }
         }
 
     </style>

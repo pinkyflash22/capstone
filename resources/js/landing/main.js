@@ -1699,7 +1699,7 @@ function formatEmergencyCoordinates(coords) {
 }
 
 function getEmergencyGpsLocation() {
-    return getReliableLocationFix({ timeoutMs: 12000 }).then((fix) => {
+    return getReliableLocationFix({ timeoutMs: 12000, acceptBestAvailable: true }).then((fix) => {
         persistVisitorLocation(fix.lat, fix.lng);
         return fix;
     });
@@ -1833,7 +1833,7 @@ function queueOfflineEmergencyIncident(coords, cachedLocation) {
 }
 
 function getFreshVisitorLocation() {
-    return getReliableLocationFix().then((fix) => {
+    return getReliableLocationFix({ acceptBestAvailable: true }).then((fix) => {
         persistVisitorLocation(fix.lat, fix.lng);
         return fix;
     });

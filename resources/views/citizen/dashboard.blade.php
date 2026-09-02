@@ -5307,7 +5307,7 @@ async function submitCitizenQuickReport(reportKind) {
     showIncidentToast?.('Getting a fresh, accurate GPS fix...', false, 3200);
     let freshLocationFix;
     try {
-        freshLocationFix = await window.PyroLocation.getReliableLocationFix();
+        freshLocationFix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
         window.updateUserLocation?.(window.currentUserId, freshLocationFix.lat, freshLocationFix.lng, {
             accuracy: freshLocationFix.accuracy,
             timestamp: freshLocationFix.timestamp,
@@ -5317,7 +5317,13 @@ async function submitCitizenQuickReport(reportKind) {
         window.userCoords.accuracy = freshLocationFix.accuracy;
         window.userCoords.timestamp = freshLocationFix.timestamp;
         window.userCoords.ready = true;
-        showIncidentToast?.(`GPS ready within ±${Math.round(freshLocationFix.accuracy)} m.`, false, 2600);
+        showIncidentToast?.(
+            freshLocationFix.accuracyWarning
+                ? `GPS is weak (±${Math.round(freshLocationFix.accuracy)} m). Your report will still be sent with this location.`
+                : `GPS ready within ±${Math.round(freshLocationFix.accuracy)} m.`,
+            false,
+            freshLocationFix.accuracyWarning ? 4800 : 2600
+        );
     } catch (error) {
         showIncidentToast?.(error.message || 'Unable to get an accurate current location.', true, 5200);
         return;

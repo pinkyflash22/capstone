@@ -2033,6 +2033,7 @@ class StationAdminController extends Controller
             $today = today()->toDateString();
             $summaryRow = (clone $mitigationBaseQuery)
                 ->setEagerLoads([])
+                ->select([])
                 ->selectRaw('COUNT(*) AS total')
                 ->selectRaw("SUM(CASE WHEN status IN ('draft', 'planned') THEN 1 ELSE 0 END) AS awaiting_approval")
                 ->selectRaw("SUM(CASE WHEN status IN ('approved', 'in_progress', 'blocked') THEN 1 ELSE 0 END) AS in_progress")
@@ -2395,6 +2396,28 @@ class StationAdminController extends Controller
                 'responsible' => $action->responsibleUser?->full_name,
                 'requires_revision_review' => (bool) $action->requires_revision_review,
                 'analysis_revision' => $action->analysis_revision,
+                'barangay_id' => $action->barangay_id,
+                'scope_type' => $action->scope_type,
+                'priority_level' => $action->priority_level,
+                'source_type' => $action->source_type ?: 'manual',
+                'target_date_value' => optional($action->target_date)->format('Y-m-d'),
+                'baseline_condition' => $action->baseline_condition,
+                'expected_result' => $action->expected_result,
+                'remarks' => $action->remarks,
+                'implementation_notes' => $action->implementation_notes,
+                'blocked_reason' => $action->blocked_reason,
+                'completion_notes' => $action->completion_notes,
+                'outcome_result' => $action->outcome_result,
+                'effectiveness_key' => $action->effectiveness ?: 'pending_evaluation',
+                'verification_date' => optional($action->verification_date)->format('Y-m-d'),
+                'follow_up_required' => (bool) $action->follow_up_required,
+                'follow_up_date' => optional($action->follow_up_date)->format('Y-m-d'),
+                'follow_up_notes' => $action->follow_up_notes,
+                'risk_area_id' => $action->risk_area_id,
+                'barangay_prediction_checklist_id' => $action->barangay_prediction_checklist_id,
+                'ai_action_plan_checklist_id' => $action->ai_action_plan_checklist_id,
+                'responsible_team_id' => $action->responsible_team_id,
+                'responsible_user_id' => $action->responsible_user_id,
             ])->items(),
             'meta' => ['current_page' => $actions->currentPage(), 'last_page' => $actions->lastPage(), 'total' => $actions->total()],
         ]);

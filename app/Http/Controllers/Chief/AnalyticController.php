@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AnalyticController extends Controller
 {
@@ -226,12 +227,11 @@ class AnalyticController extends Controller
             ->paginate(max(5, min(25, $request->integer('per_page', 10))))
             ->withQueryString();
 
-        $barangayIdsQuery = (clone $baseQuery)
-            ->whereNotNull('barangay_id')
-            ->select('barangay_id')
-            ->distinct();
+        $barangayIds = $stationId
+            ? $this->resolveStationBarangays((int) $stationId)->pluck('barangay_id')
+            : (clone $baseQuery)->whereNotNull('barangay_id')->pluck('barangay_id');
         $barangays = \App\Models\Barangay::query()
-            ->whereIn('barangay_id', $barangayIdsQuery)
+            ->whereIn('barangay_id', $barangayIds)
             ->orderBy('barangay_name')
             ->get(['barangay_id', 'barangay_name']);
 
@@ -3322,7 +3322,8 @@ class AnalyticController extends Controller
     {
         $checklist->loadMissing(['items', 'mitigationActions']);
 
-        if (strtolower((string) $checklist->status) !== 'pending'
+        if (filled(data_get($checklist->ai_payload, 'bfp_manually_edited_at'))
+            || strtolower((string) $checklist->status) !== 'pending'
             || filled($checklist->assigned_to)
             || filled($checklist->confirmed_by)
             || filled($checklist->confirmed_at)
@@ -5591,6 +5592,158 @@ class AnalyticController extends Controller
         UserActivityLogger::log('bulk updated AI checklists', Auth::id(), $request);
 
         return response()->json(['success' => true, 'updated' => $checklists->count()]);
+    }
+
+    public function storeActionPlanChecklist(Request $request)
+    {
+        $validated = $this->validateEditableChecklist($request);
+        [$stationId, $barangayId, $assigneeId] = $this->validateChecklistOwnership($validated);
+
+        $checklist = DB::transaction(function () use ($validated, $stationId, $barangayId, $assigneeId) {
+            $checklist = AiActionPlanChecklist::create([
+                'station_id' => $stationId,
+                'barangay_id' => $barangayId,
+                'source_type' => 'action_plan',
+                'source_title' => 'BFP manually created checklist',
+                'source_description' => $validated['plan_description'] ?? null,
+                'plan_title' => $validated['plan_title'],
+                'plan_description' => $validated['plan_description'] ?? null,
+                'checklist_items' => array_values($validated['checklist_items']),
+                'success_indicator' => $validated['success_indicator'] ?? null,
+                'priority_level' => $validated['priority_level'],
+                'status' => 'pending',
+                'target_date' => $validated['target_date'] ?? null,
+                'assigned_to' => $assigneeId,
+                'ai_payload' => ['created_by' => 'bfp', 'created_by_user_id' => Auth::id()],
+                'is_ai_generated' => false,
+            ]);
+            $this->syncChecklistItems($checklist, $validated['checklist_items']);
+            if (Schema::hasTable('ai_action_plan_checklist_activities')) {
+                AiActionPlanChecklistActivity::create([
+                    'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                    'user_id' => Auth::id(),
+                    'event_type' => 'created',
+                    'new_value' => 'pending',
+                    'notes' => 'Created manually by BFP station command.',
+                    'created_at' => now(),
+                ]);
+            }
+
+            return $checklist;
+        });
+
+        UserActivityLogger::log('created BFP action plan checklist', Auth::id(), $request);
+
+        return response()->json(['success' => true, 'message' => 'Checklist created successfully.', 'id' => $checklist->ai_action_plan_checklist_id], 201);
+    }
+
+    public function updateActionPlanChecklist(Request $request, int $id)
+    {
+        $validated = $this->validateEditableChecklist($request);
+        [, $barangayId, $assigneeId] = $this->validateChecklistOwnership($validated);
+        $checklist = $this->scopedChecklistQuery()->findOrFail($id);
+
+        DB::transaction(function () use ($checklist, $validated, $barangayId, $assigneeId) {
+            $resetReview = in_array($checklist->status, ['submitted', 'confirmed', 'rejected'], true);
+            $checklist->update([
+                'barangay_id' => $barangayId,
+                'plan_title' => $validated['plan_title'],
+                'plan_description' => $validated['plan_description'] ?? null,
+                'checklist_items' => array_values($validated['checklist_items']),
+                'success_indicator' => $validated['success_indicator'] ?? null,
+                'priority_level' => $validated['priority_level'],
+                'target_date' => $validated['target_date'] ?? null,
+                'assigned_to' => $assigneeId,
+                'status' => $resetReview ? 'pending' : $checklist->status,
+                'confirmed_by' => $resetReview ? null : $checklist->confirmed_by,
+                'confirmed_at' => $resetReview ? null : $checklist->confirmed_at,
+                'confirmation_notes' => $resetReview ? null : $checklist->confirmation_notes,
+                'ai_payload' => array_merge((array) $checklist->ai_payload, [
+                    'bfp_manually_edited_at' => now()->toIso8601String(),
+                    'bfp_manually_edited_by' => Auth::id(),
+                ]),
+                'requires_revision_review' => false,
+            ]);
+            $this->syncEditableChecklistItems($checklist, $validated['checklist_items']);
+            $this->recordChecklistActivity($checklist, 'content_updated', 'existing', 'updated', 'Checklist content edited by BFP station command.');
+        });
+
+        UserActivityLogger::log('updated BFP action plan checklist', Auth::id(), $request);
+
+        return response()->json(['success' => true, 'message' => 'Checklist updated successfully.']);
+    }
+
+    public function destroyActionPlanChecklist(Request $request, int $id)
+    {
+        $checklist = $this->scopedChecklistQuery()->withCount('mitigationActions')->findOrFail($id);
+        $title = $checklist->plan_title ?: $checklist->source_title;
+        $linkedMitigations = (int) $checklist->mitigation_actions_count;
+
+        $checklist->delete();
+        UserActivityLogger::log('deleted BFP action plan checklist', Auth::id(), $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Checklist “'.$title.'” deleted.'.($linkedMitigations ? ' Linked mitigations were kept and detached.' : ''),
+        ]);
+    }
+
+    private function validateEditableChecklist(Request $request): array
+    {
+        return $request->validate([
+            'barangay_id' => 'required|integer|exists:barangays,barangay_id',
+            'plan_title' => 'required|string|max:255',
+            'plan_description' => 'nullable|string|max:4000',
+            'success_indicator' => 'nullable|string|max:1000',
+            'priority_level' => 'required|in:low,medium,high,critical',
+            'target_date' => 'nullable|date',
+            'assigned_to' => 'nullable|integer|exists:users,user_id',
+            'checklist_items' => 'required|array|min:1|max:50',
+            'checklist_items.*' => 'required|string|max:500',
+        ]);
+    }
+
+    private function validateChecklistOwnership(array $validated): array
+    {
+        $stationId = (int) (StationOfficer::where('user_id', Auth::id())->value('station_id') ?? 0);
+        abort_if($stationId < 1, 403, 'A station assignment is required to manage BFP checklists.');
+
+        $allowedBarangayIds = $this->resolveStationBarangays($stationId)
+            ->pluck('barangay_id')->map(fn ($value) => (int) $value)->all();
+        $barangayId = (int) $validated['barangay_id'];
+        abort_unless(in_array($barangayId, $allowedBarangayIds, true), 403, 'The selected barangay is outside your station coverage.');
+
+        $assigneeId = filled($validated['assigned_to'] ?? null) ? (int) $validated['assigned_to'] : null;
+        if ($assigneeId) {
+            abort_unless(StationOfficer::where('station_id', $stationId)->where('user_id', $assigneeId)->exists(), 422, 'The assignee must belong to your station.');
+        }
+
+        return [$stationId, $barangayId, $assigneeId];
+    }
+
+    private function syncEditableChecklistItems(AiActionPlanChecklist $checklist, array $items): void
+    {
+        $existing = $checklist->items()->get()->groupBy(fn ($item) => mb_strtolower(trim($item->item_text)));
+        $checklist->items()->delete();
+
+        $rows = collect($items)->values()->map(function ($text, $index) use ($checklist, $existing) {
+            $normalized = mb_strtolower(trim((string) $text));
+            $previous = $existing->get($normalized)?->shift();
+
+            return [
+                'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+                'item_order' => $index + 1,
+                'item_text' => trim((string) $text),
+                'status' => $previous?->status ?? 'pending',
+                'reviewed_by' => $previous?->reviewed_by,
+                'reviewed_at' => $previous?->reviewed_at,
+                'review_notes' => $previous?->review_notes,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->all();
+
+        AiActionPlanChecklistItem::query()->insert($rows);
     }
 
     private function scopedChecklistQuery()

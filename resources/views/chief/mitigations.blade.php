@@ -377,6 +377,9 @@
             .attachment-lightbox__close { top:10px; right:10px; }
         }
     </style>
+    <style>
+        .mitigation-form-errors{margin:12px 18px 0;padding:11px 13px;border:1px solid #fecaca;border-radius:12px;background:#fef2f2;color:#991b1b;font-size:.78rem;line-height:1.45}.mitigation-form-errors strong{display:block;margin-bottom:4px}.mitigation-form-errors ul{margin:0;padding-left:18px}
+    </style>
 </head>
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
@@ -980,6 +983,10 @@
             </div>
             <form method="POST" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
                 @csrf
+                <input type="hidden" name="mitigation_form_context" value="create">
+                @if($errors->any() && old('mitigation_form_context') === 'create')
+                    <div class="mitigation-form-errors" role="alert"><strong>Please correct the mitigation form:</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+                @endif
                 <div class="mitigation-form-scroll"><div class="mitigation-form-layout">@include('chief.partials.mitigation-form-fields', ['fieldPrefix' => 'createMitigation', 'formMode' => 'create'])</div></div>
                 <div class="form-actions">
                     <button type="button" class="cancel-btn" data-close-modal><i class="fa-solid fa-xmark"></i><span>Cancel</span></button>
@@ -998,6 +1005,11 @@
             <form method="POST" id="editForm" action="{{ route('station-admin.mitigations.update', ['mitigationActionId' => 0]) }}" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="mitigation_form_context" value="edit">
+                <input type="hidden" name="mitigation_action_id" value="{{ old('mitigation_action_id') }}">
+                @if($errors->any() && old('mitigation_form_context') === 'edit')
+                    <div class="mitigation-form-errors" role="alert"><strong>Please correct the mitigation form:</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+                @endif
                 <div class="mitigation-form-scroll"><div class="mitigation-form-layout">@include('chief.partials.mitigation-form-fields', ['fieldPrefix' => 'editMitigation', 'formMode' => 'edit'])</div></div>
                 <div class="form-actions">
                     <button type="button" class="cancel-btn" data-close-modal><i class="fa-solid fa-xmark"></i><span>Cancel</span></button>
@@ -1404,6 +1416,8 @@
                     const payload = JSON.parse(button.getAttribute('data-payload') || '{}');
                     if (!editForm || !payload.id) return;
                     editForm.action = updateBaseUrl.replace('__ID__', String(payload.id));
+                    const mitigationIdField = editForm.querySelector('[name="mitigation_action_id"]');
+                    if (mitigationIdField) mitigationIdField.value = String(payload.id);
                     const set = (name, value, fallback = '') => {
                         const field = editForm.querySelector(`[name="${name}"]`);
                         if (field) field.value = value ?? fallback;
@@ -1487,12 +1501,16 @@
                     const pageLink = (page) => { const link = new URL(pageUrl); link.searchParams.set('page', page); return link.href; };
                     table.innerHTML = rows.length ? `
                         <div class="table-wrap"><table class="mitigation-register-table"><thead><tr><th class="register-plan-col">Plan and coverage</th><th class="register-status-col">Status</th><th class="register-owner-col">Owner and due date</th><th class="register-actions-col">Open</th></tr></thead><tbody>
-                        ${rows.map((item) => `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Open"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td></tr>`).join('')}
+                        ${rows.map((item) => {
+                            const editPayload = {...item, target_date:item.target_date_value};
+                            return `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Actions"><div class="row-actions"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-eye"></i></a><button type="button" class="row-btn edit" data-open-edit-modal data-payload="${escapeHtml(JSON.stringify(editPayload))}" title="Edit mitigation" aria-label="Edit mitigation"><i class="fa-solid fa-pen"></i></button><button type="button" class="row-btn delete" data-open-delete-modal data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title || 'this mitigation')}" title="Delete mitigation" aria-label="Delete mitigation"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;
+                        }).join('')}
                         </tbody></table></div>
                         <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
                     table.style.opacity = '1';
                     table.setAttribute('aria-busy', 'false');
                     window.history.replaceState({}, '', url);
+                    bindMitigationTableActions();
                 } catch (error) {
                     console.error(error);
                     table.style.opacity = '1';
@@ -1544,7 +1562,12 @@
             }
 
             @if($errors->any())
-                openModal(createModal);
+                @if(old('mitigation_form_context') === 'edit' && old('mitigation_action_id'))
+                    editForm.action = updateBaseUrl.replace('__ID__', @json((string) old('mitigation_action_id')));
+                    openModal(editModal);
+                @else
+                    openModal(createModal);
+                @endif
             @endif
 
             @if(!empty($autoOpenCreateModal))
