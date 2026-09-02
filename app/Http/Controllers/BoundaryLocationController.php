@@ -73,6 +73,7 @@ class BoundaryLocationController extends Controller
         $validated = $this->validateBoundaryPayload($request);
         $payload = $this->normalizeBoundaryPayload($validated);
         $barangayId = $this->requiredBarangayId($payload);
+        $scope->assertBarangayInAssignedCity($user, $barangayId);
         $payload['station_id'] = $scope->stationForBarangay($user, $barangayId);
         $this->assertNoCompetingBoundary($scope, $user, $barangayId);
 
@@ -107,6 +108,7 @@ class BoundaryLocationController extends Controller
         $validated = $this->validateBoundaryPayload($request, true);
         $payload = $this->normalizeBoundaryPayload($validated, $boundary);
         $barangayId = (int) ($payload['barangay_id'] ?? $boundary->barangay_id);
+        $scope->assertBarangayInAssignedCity($user, $barangayId);
         $payload['station_id'] = $scope->stationForBarangay(
             $user,
             $barangayId,
@@ -147,13 +149,8 @@ class BoundaryLocationController extends Controller
     public function cityOptions(BoundaryManagementScope $scope): JsonResponse
     {
         $user = $scope->assertManager(Auth::user());
-        $coveredBarangayIds = $scope->coveredBarangayIds($user);
-
-        $cities = City::query()
-            ->with('province')
-            ->whereHas('barangays', fn ($query) => $query->whereIn('barangay_id', $coveredBarangayIds->all()))
-            ->orderBy('city_name')
-            ->get()
+        $assignedCity = $scope->assignedCity($user);
+        $cities = collect($assignedCity ? [$assignedCity] : [])
             ->map(function (City $city) {
                 return [
                     'city_id' => $city->city_id,
@@ -173,14 +170,15 @@ class BoundaryLocationController extends Controller
         $stationOfficer = StationOfficer::query()
             ->with(['station.address.barangay.city'])
             ->where('user_id', $user->getKey())
+            ->orderBy('station_officer_id')
             ->first();
-
-        $city = $stationOfficer?->station?->address?->barangay?->city;
+        $city = $scope->assignedCity($user);
 
         return response()->json([
             'default_city_id' => $city?->city_id,
             'default_city_name' => $city?->city_name,
             'locked_to_station_city' => (bool) $city,
+            'city_source' => $stationOfficer?->station?->address?->barangay?->city ? 'station_address' : ($city ? 'station_coverage' : null),
             'station_id' => $stationOfficer?->station_id,
             'station_name' => $stationOfficer?->station?->station_name,
         ]);
@@ -189,6 +187,8 @@ class BoundaryLocationController extends Controller
     public function availableBarangays(int $cityId, BoundaryManagementScope $scope): JsonResponse
     {
         $user = $scope->assertManager(Auth::user());
+        $assignedCity = $scope->assignedCity($user);
+        abort_unless($assignedCity && (int) $assignedCity->city_id === $cityId, 403, 'Only the assigned station municipality can be used.');
         $coveredBarangayIds = $scope->coveredBarangayIds($user);
         $existingBoundaryBarangayIds = BoundaryLocation::query()
             ->where('boundary_type', 'barangay')

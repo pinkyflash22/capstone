@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\BoundaryLocation;
+use App\Models\City;
+use App\Models\Barangay;
 use App\Models\StationBarangayCoverage;
 use App\Models\StationOfficer;
 use App\Models\User;
@@ -52,6 +54,47 @@ class BoundaryManagementScope
             ->map(fn ($barangayId) => (int) $barangayId)
             ->unique()
             ->values();
+    }
+
+    public function assignedCity(User $user): ?City
+    {
+        $stationOfficer = StationOfficer::query()
+            ->with('station.address.barangay.city.province')
+            ->where('user_id', $user->getKey())
+            ->orderBy('station_officer_id')
+            ->first();
+        $stationCity = $stationOfficer?->station?->address?->barangay?->city;
+
+        if ($stationCity) {
+            return $stationCity;
+        }
+
+        $coveredCityIds = Barangay::query()
+            ->whereIn('barangay_id', $this->coveredBarangayIds($user)->all())
+            ->pluck('city_id')
+            ->filter()
+            ->map(fn ($cityId) => (int) $cityId)
+            ->unique()
+            ->values();
+
+        return $coveredCityIds->count() === 1
+            ? City::query()->with('province')->find($coveredCityIds->first())
+            : null;
+    }
+
+    public function assertBarangayInAssignedCity(User $user, int $barangayId): int
+    {
+        $city = $this->assignedCity($user);
+        if (! $city) {
+            throw new AuthorizationException('The assigned station has no municipality configured. Update the station address first.');
+        }
+
+        $barangayCityId = Barangay::query()->whereKey($barangayId)->value('city_id');
+        if ((int) $barangayCityId !== (int) $city->city_id) {
+            throw new AuthorizationException('The selected barangay is outside the assigned station municipality.');
+        }
+
+        return (int) $city->city_id;
     }
 
     public function stationForBarangay(User $user, int $barangayId, ?int $requiredStationId = null): int

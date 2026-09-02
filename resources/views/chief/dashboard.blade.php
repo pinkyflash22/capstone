@@ -432,36 +432,7 @@
 
             <div class="dashboard-header-actions flex items-center gap-3">
                 <!-- Notification Bell -->
-                <div class="hidden md:block chief-alerts-host">
-                    <button id="notificationBtn" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative" aria-controls="alertsDropdown" aria-expanded="false" aria-label="Open incident notifications">
-                        <i class="fa-regular fa-bell"></i>
-                        @if($alerts->count() > 0)
-                        <span id="alertBadge" class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
-                        @endif
-                    </button>
-                    <div id="alertsDropdown" class="hidden absolute right-0 mt-3 w-[24rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl z-[5200] overflow-hidden" aria-hidden="true">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                            <div>
-                                <p class="text-sm font-bold text-slate-800">Incident Notifications</p>
-                                <p class="text-[11px] text-slate-500">Live alerts from field reports</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="markAllAsRead()" class="text-[11px] font-semibold text-amber-700 hover:text-amber-800">
-                                    Mark all as read
-                                </button>
-                                <button type="button" id="alertsDropdownClose" class="chief-alerts-mobile-close" aria-label="Close incident notifications">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="alertsDropdownList" class="max-h-[24rem] overflow-y-auto divide-y divide-slate-100">
-                            <div class="px-4 py-6 text-sm text-slate-500 text-center">
-                                No live incident notifications yet.
-                            </div>
-                        </div>
-                    </div>
-                    <div id="chiefNotificationBackdrop" class="chief-notification-backdrop" hidden></div>
-                </div>
+                <div class="hidden md:block" data-command-notification-header-host></div>
 
                 <!-- User Profile Dropdown -->
                 <div class="hidden md:block user-dropdown">

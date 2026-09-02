@@ -1428,7 +1428,7 @@ function ensureBoundarySaveModal() {
             <div class="boundary-save-modal__header">
                 <div class="boundary-save-modal__eyebrow">Boundary Setup</div>
                 <h3 id="boundarySaveModalTitle" class="boundary-save-modal__title">Save Boundary Shape</h3>
-                <p class="boundary-save-modal__copy">Name the shape, select the municipality or city, then connect it to the correct barangay before saving.</p>
+                <p class="boundary-save-modal__copy">Name the shape, confirm the municipality assigned to your station, then connect it to the correct covered barangay.</p>
             </div>
             <div class="boundary-save-modal__progress">
                 <div class="boundary-save-modal__step is-active" data-boundary-step="1"><span class="boundary-save-modal__step-index">1</span><span>Name</span></div>
@@ -1446,7 +1446,7 @@ function ensureBoundarySaveModal() {
                     <select id="boundaryCitySelect" class="boundary-save-modal__select">
                         <option value="">Select a municipality or city</option>
                     </select>
-                    <p class="boundary-save-modal__hint">Barangays in the next step will be filtered to the selected municipality or city.</p>
+                    <p class="boundary-save-modal__hint">This municipality is fetched from your assigned station and cannot be changed here.</p>
                 </section>
                 <section class="boundary-save-modal__panel" data-boundary-panel="3">
                     <label class="boundary-save-modal__label" for="boundaryBarangaySelect">Barangay</label>
@@ -1564,9 +1564,9 @@ async function openBoundarySaveModal({ defaultName = 'My Shape', context = null 
     let currentStep = 1;
     let isClosing = false;
     const editorDefaults = await fetchBoundaryEditorDefaults().catch(() => ({}));
-    let selectedCityId = context?.cityId || editorDefaults?.default_city_id || null;
+    let selectedCityId = editorDefaults?.default_city_id || context?.cityId || null;
     let selectedBarangayId = context?.barangayId || null;
-    const shouldLockCity = Boolean(context?.cityId || editorDefaults?.locked_to_station_city);
+    const shouldLockCity = Boolean(editorDefaults?.locked_to_station_city);
 
     const setStep = (step) => {
         currentStep = step;
@@ -1615,6 +1615,13 @@ async function openBoundarySaveModal({ defaultName = 'My Shape', context = null 
         const cities = await fetchBoundaryCities();
         citySelect.innerHTML = '<option value="">Select a municipality or city</option>';
 
+        if (cities.length === 0) {
+            selectedCityId = null;
+            citySelect.innerHTML = '<option value="">Station municipality is not configured</option>';
+            citySelect.disabled = true;
+            return;
+        }
+
         cities.forEach((city) => {
             const option = document.createElement('option');
             option.value = String(city.city_id);
@@ -1639,9 +1646,12 @@ async function openBoundarySaveModal({ defaultName = 'My Shape', context = null 
                 selectedCityId = Number(fallbackOption.value);
                 citySelect.value = fallbackOption.value;
             }
+        } else if (cities.length === 1) {
+            selectedCityId = Number(cities[0].city_id);
+            citySelect.value = String(cities[0].city_id);
         }
 
-        citySelect.disabled = shouldLockCity;
+        citySelect.disabled = shouldLockCity || cities.length === 1;
     };
 
     const fillBarangayOptions = async (cityId) => {
@@ -3288,6 +3298,7 @@ function renderIncidentAlertPanel(feed = loadIncidentAlertFeed()) {
     syncIncidentAlertBadges(feed);
     renderCitizenNotificationFeed(feed);
     renderChiefNotificationDropdown(feed);
+    window.dispatchEvent(new CustomEvent('pyro:incident-notifications-updated', { detail: { feed } }));
 }
 
 function markAllIncidentAlertsRead() {
@@ -3326,6 +3337,7 @@ function focusIncidentAlertEntry(entryId) {
 
 window.dismissIncidentAlertEntry = dismissIncidentAlertEntry;
 window.focusIncidentAlertEntry = focusIncidentAlertEntry;
+window.getIncidentAlertNotifications = () => loadIncidentAlertFeed();
 
 function ensureIncidentAlertAudioUnlocked() {
     if (incidentAlertAudioContext) {

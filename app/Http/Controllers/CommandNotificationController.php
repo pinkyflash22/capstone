@@ -27,6 +27,7 @@ class CommandNotificationController extends Controller
                     'category' => $data['category'] ?? 'general',
                     'url' => $data['url'] ?? null,
                     'is_read' => $notification->read_at !== null,
+                    'created_at' => optional($notification->created_at)->toIso8601String(),
                     'created_at_human' => optional($notification->created_at)->diffForHumans(),
                 ];
             })
