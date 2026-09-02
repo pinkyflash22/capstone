@@ -745,7 +745,8 @@ class IncidentController extends Controller
 
             $cityStationId = Station::query()
                 ->leftJoin('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
-                ->where('full_addresses.city_id', $barangayCityId)
+                ->leftJoin('barangays as station_barangays', 'full_addresses.barangay_id', '=', 'station_barangays.barangay_id')
+                ->where('station_barangays.city_id', $barangayCityId)
                 ->orderBy('stations.station_name')
                 ->value('stations.station_id');
 

@@ -978,6 +978,273 @@
         }
     </style>
     @stack('styles')
+    <style data-barangay-mobile-guardrails>
+        /* Final shared guardrails for the compact Barangay/PWA shell. The scoped
+           selectors also take precedence over inline page-specific styles. */
+        @media (max-width: 1024px) {
+            :root {
+                --barangay-mobile-bottom-h: calc(72px + var(--barangay-safe-bottom));
+            }
+
+            html,
+            body.barangay-portal-shell {
+                width: 100%;
+                max-width: 100%;
+                overflow-x: clip;
+            }
+
+            body.barangay-portal-shell #sidebar {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock {
+                display: block !important;
+                padding: 6px 8px calc(6px + var(--barangay-safe-bottom));
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-bottom-spacer {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel.is-open {
+                display: block !important;
+            }
+
+            body.barangay-portal-shell .portal-top-bar {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .main-content {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                min-height: 100dvh;
+                margin-left: 0 !important;
+                padding: max(8px, var(--barangay-safe-top)) 10px calc(var(--barangay-mobile-bottom-h) + 18px) !important;
+                overflow-x: clip;
+            }
+
+            body.barangay-portal-shell .portal-shell {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                margin-inline: 0 !important;
+                gap: 12px;
+            }
+
+            body.barangay-portal-shell .portal-shell > * {
+                min-width: 0 !important;
+                max-width: 100%;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__track {
+                width: min(100%, 330px);
+                min-height: 60px;
+                padding: 6px 10px;
+                gap: 4px;
+                border-radius: 23px;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__track::before {
+                border-radius: 22px;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__item {
+                min-width: 0;
+                min-height: 44px;
+                border-radius: 14px;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__icon {
+                font-size: 1.25rem;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__label {
+                max-width: 48px;
+                font-size: 7px;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__item--center {
+                width: 58px;
+                height: 58px;
+                min-height: 58px;
+                margin-top: -18px;
+                box-shadow: 0 12px 26px rgba(220, 38, 38, 0.34), 0 0 0 5px rgba(255, 255, 255, 0.14);
+            }
+
+            body.barangay-portal-shell .table-wrap,
+            body.barangay-portal-shell .checklist-table-wrap,
+            body.barangay-portal-shell #fireReportsTableWrap {
+                width: 100%;
+                max-width: 100%;
+                overflow-x: auto;
+                overscroll-behavior-inline: contain;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            body.barangay-portal-shell input,
+            body.barangay-portal-shell select,
+            body.barangay-portal-shell textarea,
+            body.barangay-portal-shell button {
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+
+            body.barangay-portal-shell .fire-report-modal,
+            body.barangay-portal-shell .risk-modal-root,
+            body.barangay-portal-shell .barangay-risk-modal,
+            body.barangay-portal-shell .checklist-detail-modal,
+            body.barangay-portal-shell .dashboard-record-modal {
+                z-index: 12050 !important;
+            }
+
+            body.barangay-portal-shell:has(
+                .fire-report-modal:not(.hidden),
+                .risk-modal-root.is-open,
+                .barangay-risk-modal:not(.hidden),
+                .checklist-detail-modal:not([hidden]),
+                .dashboard-record-modal:not([hidden])
+            ) .barangay-mobile-dock {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(110%);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body.barangay-portal-shell .hero-card,
+            body.barangay-portal-shell .panel-card,
+            body.barangay-portal-shell .metric-card,
+            body.barangay-portal-shell .list-item,
+            body.barangay-portal-shell .map-card {
+                padding: 12px !important;
+                border-radius: 16px !important;
+            }
+
+            body.barangay-portal-shell .hero-card {
+                gap: 12px !important;
+            }
+
+            body.barangay-portal-shell .hero-card h1 {
+                font-size: clamp(1.35rem, 7vw, 1.8rem) !important;
+                line-height: 1.08;
+            }
+
+            body.barangay-portal-shell .hero-card p,
+            body.barangay-portal-shell .panel-copy,
+            body.barangay-portal-shell .list-item p {
+                font-size: 0.82rem !important;
+                line-height: 1.45 !important;
+            }
+
+            body.barangay-portal-shell .panel-title {
+                font-size: 1rem !important;
+                line-height: 1.2;
+            }
+
+            body.barangay-portal-shell .two-col,
+            body.barangay-portal-shell .panel-grid.two,
+            body.barangay-portal-shell .panel-grid.three,
+            body.barangay-portal-shell .metric-grid,
+            body.barangay-portal-shell .fire-report-shell,
+            body.barangay-portal-shell .fire-report-form__grid,
+            body.barangay-portal-shell .fire-report-filterbar__grid,
+            body.barangay-portal-shell .risk-form-grid,
+            body.barangay-portal-shell form.list-stack > div[style*="grid-template-columns"] {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            body.barangay-portal-shell .fire-report-modal {
+                align-items: flex-end !important;
+                padding: 0 !important;
+            }
+
+            body.barangay-portal-shell .fire-report-modal__dialog {
+                display: flex !important;
+                flex-direction: column;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: calc(100dvh - max(8px, var(--barangay-safe-top))) !important;
+                margin: 0 !important;
+                padding: 12px 12px 0 !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain;
+                border-radius: 20px 20px 0 0 !important;
+            }
+
+            body.barangay-portal-shell .fire-report-modal__header {
+                flex: 0 0 auto;
+                margin-bottom: 10px !important;
+            }
+
+            body.barangay-portal-shell .fire-report-modal__actions {
+                position: sticky !important;
+                bottom: 0;
+                z-index: 3;
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px !important;
+                margin: 10px -12px 0 !important;
+                padding: 10px 12px calc(10px + var(--barangay-safe-bottom)) !important;
+                background: rgba(255, 253, 249, 0.98);
+                border-top: 1px solid rgba(226, 232, 240, 0.9);
+                box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
+            }
+
+            body.barangay-portal-shell .fire-report-modal__actions > button,
+            body.barangay-portal-shell .fire-report-modal__actions > a {
+                width: 100% !important;
+                min-height: 42px;
+                justify-content: center;
+            }
+
+            body.barangay-portal-shell .risk-form-actions,
+            body.barangay-portal-shell .barangay-risk-wizard__actions {
+                position: sticky !important;
+                bottom: 0 !important;
+                z-index: 4;
+                margin-bottom: 0 !important;
+                padding-bottom: calc(10px + var(--barangay-safe-bottom)) !important;
+                background: rgba(255, 255, 255, 0.98);
+            }
+
+            body.barangay-portal-shell .checklist-detail-modal,
+            body.barangay-portal-shell .dashboard-record-modal {
+                align-items: flex-end !important;
+                padding: 0 !important;
+            }
+
+            body.barangay-portal-shell .checklist-detail-modal__card,
+            body.barangay-portal-shell .dashboard-record-modal__card {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: calc(100dvh - max(8px, var(--barangay-safe-top))) !important;
+                border-radius: 20px 20px 0 0 !important;
+            }
+
+            body.barangay-portal-shell .checklist-detail-modal__footer,
+            body.barangay-portal-shell .dashboard-record-modal__footer {
+                padding-bottom: calc(12px + var(--barangay-safe-bottom)) !important;
+            }
+        }
+
+        @media (max-width: 380px) {
+            body.barangay-portal-shell .main-content {
+                padding-inline: 7px !important;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__track {
+                padding-inline: 6px;
+            }
+
+            body.barangay-portal-shell .barangay-mobile-dock__item--center {
+                width: 54px;
+                height: 54px;
+                min-height: 54px;
+            }
+        }
+    </style>
 </head>
 <body class="barangay-portal-shell">
     @include('partials.unified-notifications')

@@ -529,45 +529,18 @@ function scheduleResponderPrefetch(lat, lng) {
     window.setTimeout(run, 250);
 }
 
-async function createMarker(lat, lng, accuracy, capturedAt) {
-    const response = await fetch('/api/markers', {
-        method: 'POST',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-        body: JSON.stringify({
-            title: 'Fire Emergency',
-            description: `One-tap fire emergency report from mobile hub. GPS accuracy ±${Math.round(accuracy)} m; captured ${new Date(capturedAt).toISOString()}.`,
-            lat,
-            lng,
-            status: 'active',
-            category: 'fire',
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to save the incident marker.');
-    }
-
-    const payload = await response.json();
-    const markerId = payload?.data?.marker_id || payload?.marker_id || null;
-
-    if (!markerId) {
-        throw new Error('The system did not return a marker ID.');
-    }
-
-    return Number(markerId);
-}
-
-async function createIncident(markerId, stationId, teamId) {
+async function createIncident(coords, stationId, teamId) {
+    const capturedAt = new Date(coords.timestamp).toISOString();
     const body = {
-        marker_id: markerId,
-        incident_status_id: 1,
-        incident_type_id: 1,
+        lat: coords.lat,
+        lng: coords.lng,
+        title: 'Citizen Fire Emergency',
+        description: 'One-tap fire emergency report from the mobile hub.',
+        status: 'reported',
         reported_by: currentUserId,
-        alarmdatetime: new Date().toISOString(),
+        occurred_at: capturedAt,
+        location_accuracy: coords.accuracy,
+        location_captured_at: capturedAt,
     };
 
     if (stationId) {
@@ -589,7 +562,12 @@ async function createIncident(markerId, stationId, teamId) {
     });
 
     if (!response.ok) {
-        throw new Error('Failed to submit the incident report.');
+        const payload = await response.json().catch(() => null);
+        const validationMessage = payload?.errors
+            ? Object.values(payload.errors).flat().find(Boolean)
+            : null;
+
+        throw new Error(validationMessage || payload?.message || 'Failed to submit the incident report.');
     }
 
     return response.json();
@@ -620,11 +598,8 @@ function updateTeamStatusInBackground(teamId) {
 }
 
 async function sendMobileHubIncidentReport(coords) {
-    const [responder, markerId] = await Promise.all([
-        resolveNearestAvailableResponderForReport(coords.lat, coords.lng),
-        createMarker(coords.lat, coords.lng, coords.accuracy, coords.timestamp),
-    ]);
-    const incidentPayload = await createIncident(markerId, responder.stationId, responder.teamId);
+    const responder = await resolveNearestAvailableResponderForReport(coords.lat, coords.lng);
+    const incidentPayload = await createIncident(coords, responder.stationId, responder.teamId);
     updateTeamStatusInBackground(responder.teamId);
     clearCachedResponder();
 
