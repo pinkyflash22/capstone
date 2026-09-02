@@ -49,7 +49,9 @@ class BoundaryManagementScope
 
         return StationBarangayCoverage::query()
             ->whereIn('station_id', $stationIds->all())
-            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('is_active')->orWhere('is_active', true);
+            })
             ->pluck('barangay_id')
             ->map(fn ($barangayId) => (int) $barangayId)
             ->unique()
@@ -104,7 +106,9 @@ class BoundaryManagementScope
         $coverage = StationBarangayCoverage::query()
             ->whereIn('station_id', $stationIds->all())
             ->where('barangay_id', $barangayId)
-            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('is_active')->orWhere('is_active', true);
+            })
             ->when($requiredStationId, fn ($query) => $query->where('station_id', $requiredStationId))
             ->orderByRaw("CASE WHEN coverage_type = 'primary' THEN 0 ELSE 1 END")
             ->orderBy('station_id')

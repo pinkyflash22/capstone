@@ -200,12 +200,15 @@ class BoundaryLocationController extends Controller
         $barangays = Barangay::query()
             ->where('city_id', $cityId)
             ->whereIn('barangay_id', $coveredBarangayIds->all())
-            ->when(
-                $existingBoundaryBarangayIds->isNotEmpty(),
-                fn ($query) => $query->whereNotIn('barangay_id', $existingBoundaryBarangayIds->all())
-            )
             ->orderBy('barangay_name')
-            ->get(['barangay_id', 'barangay_name', 'city_id']);
+            ->get(['barangay_id', 'barangay_name', 'city_id'])
+            ->map(fn (Barangay $barangay) => [
+                'barangay_id' => (int) $barangay->barangay_id,
+                'barangay_name' => $barangay->barangay_name,
+                'city_id' => (int) $barangay->city_id,
+                'has_boundary' => $existingBoundaryBarangayIds->contains($barangay->barangay_id),
+            ])
+            ->values();
 
         return response()->json($barangays);
     }

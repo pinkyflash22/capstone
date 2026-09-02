@@ -1668,24 +1668,40 @@ async function openBoundarySaveModal({ defaultName = 'My Shape', context = null 
         barangays.forEach((barangay) => {
             const option = document.createElement('option');
             option.value = String(barangay.barangay_id);
-            option.textContent = barangay.barangay_name || `Barangay ${barangay.barangay_id}`;
+            option.textContent = `${barangay.barangay_name || `Barangay ${barangay.barangay_id}`}${barangay.has_boundary ? ' — boundary already saved' : ''}`;
             option.dataset.barangayName = barangay.barangay_name || '';
+            option.disabled = Boolean(barangay.has_boundary);
             barangaySelect.appendChild(option);
         });
 
         if (selectedBarangayId) {
-            barangaySelect.value = String(selectedBarangayId);
+            const selectedBarangay = barangays.find((barangay) => Number(barangay.barangay_id) === Number(selectedBarangayId));
+            if (selectedBarangay && !selectedBarangay.has_boundary) {
+                barangaySelect.value = String(selectedBarangayId);
+            } else {
+                selectedBarangayId = null;
+                barangaySelect.value = '';
+            }
         } else if (context?.barangayName) {
-            const fallbackOption = Array.from(barangaySelect.options).find((option) => option.dataset.barangayName === context.barangayName);
+            const fallbackOption = Array.from(barangaySelect.options).find((option) => !option.disabled && option.dataset.barangayName === context.barangayName);
             if (fallbackOption) {
                 selectedBarangayId = Number(fallbackOption.value);
                 barangaySelect.value = fallbackOption.value;
             }
         }
 
-        barangaySelect.disabled = false;
+        const availableBarangays = barangays.filter((barangay) => !barangay.has_boundary);
+        barangaySelect.disabled = availableBarangays.length === 0;
         if (barangays.length === 0) {
-            barangaySelect.innerHTML = '<option value="">No available barangays without a boundary yet</option>';
+            barangaySelect.innerHTML = '<option value="">No barangays are assigned to this station</option>';
+            barangaySelect.disabled = true;
+        } else if (availableBarangays.length === 0) {
+            barangaySelect.value = '';
+            const statusOption = document.createElement('option');
+            statusOption.value = '';
+            statusOption.textContent = 'All assigned barangays already have boundaries';
+            statusOption.selected = true;
+            barangaySelect.prepend(statusOption);
             barangaySelect.disabled = true;
         }
         syncSummary();
