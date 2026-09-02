@@ -56,7 +56,9 @@ services:
         value: database
 
       - key: CACHE_STORE
-        value: file
+        # Keep the local file cache as the primary store, but do not turn a
+        # transient Render filesystem failure into an HTTP 500 response.
+        value: failover
 
       - key: REDIS_URL
         fromService:

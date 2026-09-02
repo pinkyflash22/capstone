@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+umask 0002
 
 # Workers boot from the same ephemeral image and may also use Laravel's file
 # cache, compiled views, or locks.
@@ -14,6 +15,12 @@ chown -R www-data:www-data \
     /var/www/html/bootstrap/cache
 chmod -R ug+rwX \
     /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+# Preserve the www-data group on dynamically-created hashed cache folders.
+chmod 2775 \
+    /var/www/html/storage/framework \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/cache/data \
     /var/www/html/bootstrap/cache
 
 WORKER_NAME="${WORKER_NAME:-general}"

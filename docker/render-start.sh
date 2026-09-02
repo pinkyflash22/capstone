@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+umask 0002
 
 # Render containers use an ephemeral filesystem. Recreate Laravel's writable
 # runtime directories on every boot before commands can read or write cache.
@@ -14,6 +15,12 @@ chown -R www-data:www-data \
     /var/www/html/bootstrap/cache
 chmod -R ug+rwX \
     /var/www/html/storage/framework \
+    /var/www/html/bootstrap/cache
+# Preserve the www-data group on dynamically-created hashed cache folders.
+chmod 2775 \
+    /var/www/html/storage/framework \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/cache/data \
     /var/www/html/bootstrap/cache
 
 php artisan config:clear || true
