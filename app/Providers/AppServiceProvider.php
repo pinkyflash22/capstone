@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Cache\ResilientFileStore;
 use App\Models\BarangayPredictionChecklist;
 use App\Models\Incident;
 use App\Observers\IncidentObserver;
 use App\Observers\BarangayPredictionChecklistObserver;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +26,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Cache::extend('resilient_file', function ($app, array $config) {
+            $store = (new ResilientFileStore(
+                $app['files'],
+                $config['path'],
+                $config['permission'] ?? null,
+                $app['config']['cache.serializable_classes'] ?? null,
+            ))->setLockDirectory($config['lock_path'] ?? null);
+
+            return $app['cache']->repository($store, $config);
+        });
+
         BarangayPredictionChecklist::observe(BarangayPredictionChecklistObserver::class);
         Incident::observe(IncidentObserver::class);
 
