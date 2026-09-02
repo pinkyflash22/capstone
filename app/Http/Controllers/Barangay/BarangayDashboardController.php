@@ -1605,6 +1605,8 @@ class BarangayDashboardController extends Controller
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'min:1', 'max:100'],
+            'location_captured_at' => ['required', 'date', 'after_or_equal:'.now()->subMinute()->toIso8601String(), 'before_or_equal:'.now()->addMinute()->toIso8601String()],
         ]);
 
         $context = $this->resolveBarangayContext();
@@ -1620,9 +1622,11 @@ class BarangayDashboardController extends Controller
         }
 
         $incident = DB::transaction(function () use ($validated, $hall, $jurisdiction, $userId, $timestamp, $request) {
+            $accuracyMeters = (int) round((float) $validated['accuracy']);
+            $capturedAt = \Illuminate\Support\Carbon::parse($validated['location_captured_at'])->toIso8601String();
             $marker = Marker::create([
                 'title' => 'Barangay Fire Emergency',
-                'description' => 'Fire emergency reported from barangay quick action.',
+                'description' => "Fire emergency reported from barangay quick action. GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.",
                 'lat' => $validated['lat'],
                 'lng' => $validated['lng'],
                 'status' => 'active',
@@ -1651,7 +1655,7 @@ class BarangayDashboardController extends Controller
                     'incident_count' => 1,
                     'fire_classification' => 'undetermined',
                     'fire_cause' => null,
-                    'notes' => 'Submitted from the barangay quick report action.',
+                    'notes' => "Submitted from the barangay quick report action. GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.",
                 ]);
             }
 

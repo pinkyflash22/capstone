@@ -8,7 +8,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <title>PyroSense · @yield('page_title', 'Barangay Portal')</title>
 
-    @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css'])
+    @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/js/location-accuracy.js'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -472,11 +472,16 @@
             margin-top: -28px;
             border-radius: 999px;
             color: #ffffff;
-            background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+            background: linear-gradient(180deg, #f97316 0%, #dc2626 100%);
             box-shadow:
-                0 16px 34px rgba(22, 163, 74, 0.34),
+                0 16px 34px rgba(220, 38, 38, 0.38),
                 0 0 0 6px rgba(255, 255, 255, 0.16),
                 0 0 0 12px rgba(255, 255, 255, 0.08);
+        }
+
+        .barangay-mobile-dock__item--center.is-loading {
+            opacity: 0.72;
+            pointer-events: none;
         }
 
         .barangay-mobile-dock__item--center::before,
@@ -552,6 +557,8 @@
             text-decoration: none;
             font-size: 0.82rem;
             font-weight: 800;
+            border: 0;
+            cursor: pointer;
             transition: all 0.2s ease;
         }
 
@@ -1003,7 +1010,7 @@
                 @else
                     <a href="{{ route('barangay.reports') }}" class="portal-report-fire-btn" data-barangay-quick-report data-report-url="{{ route('barangay.reports.quick') }}">
                         <i class="fa-solid fa-fire-flame-curved"></i>
-                        <span>Report Fire</span>
+                        <span>1-Tap Fire Report</span>
                     </a>
                 @endif
 
@@ -1503,46 +1510,21 @@
                 }
             }
 
-            function getCurrentCoords(maxAgeMs = 10 * 60 * 1000) {
-                const cached = readCachedCoords();
-                if (cached && Date.now() - cached.timestamp <= maxAgeMs) {
-                    return Promise.resolve(cached);
+            async function getCurrentCoords() {
+                if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+                    throw new Error('Accurate location service is still loading. Please try again.');
                 }
 
-                if (!navigator.geolocation) {
-                    return Promise.reject(new Error('Location services are not available on this device.'));
-                }
-
-                return new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const coords = {
-                                lat: Number(position.coords.latitude),
-                                lng: Number(position.coords.longitude),
-                                timestamp: Date.now(),
-                            };
-
-                            writeCachedCoords(coords.lat, coords.lng);
-                            resolve(coords);
-                        },
-                        () => {
-                            if (cached) {
-                                resolve(cached);
-                                return;
-                            }
-
-                            reject(new Error('Unable to get your current location. Please allow location access and try again.'));
-                        },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0,
-                        }
-                    );
-                });
+                const coords = await window.PyroLocation.getReliableLocationFix();
+                writeCachedCoords(coords.lat, coords.lng);
+                return coords;
             }
 
             async function submitQuickFireReport(button) {
+                if (button.classList.contains('is-loading')) {
+                    return;
+                }
+
                 const reportUrl = button.getAttribute('data-report-url');
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -1553,10 +1535,44 @@
 
                 button.classList.add('is-loading');
                 button.setAttribute('aria-busy', 'true');
-                showQuickReportStatus('Getting your location and sending the fire report...', 'success');
+                button.setAttribute('aria-disabled', 'true');
+                if (button instanceof HTMLButtonElement) {
+                    button.disabled = true;
+                }
+                showQuickReportStatus('Getting a fresh, accurate GPS fix...', 'success');
 
                 try {
                     const coords = await getCurrentCoords();
+                    showQuickReportStatus(`GPS ready within ±${Math.round(coords.accuracy)} m. Sending the fire report...`, 'success');
+
+                    const reportBody = {
+                        lat: coords.lat,
+                        lng: coords.lng,
+                        accuracy: coords.accuracy,
+                        location_captured_at: new Date(coords.timestamp).toISOString(),
+                    };
+
+                    if (!window.navigator.onLine) {
+                        if (typeof window.pyroPwa?.enqueueOfflineReport !== 'function') {
+                            throw new Error('The offline report queue is not ready. Please keep this page open and try again.');
+                        }
+
+                        window.pyroPwa.enqueueOfflineReport({
+                            url: reportUrl,
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify(reportBody),
+                            type: 'barangay-one-tap-fire-report',
+                            meta: { queued_at: new Date().toISOString() },
+                        });
+                        showQuickReportStatus('Fire report saved offline. It will sync after reconnecting.', 'success');
+                        return;
+                    }
+
                     const response = await fetch(reportUrl, {
                         method: 'POST',
                         headers: {
@@ -1564,10 +1580,7 @@
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': csrfToken,
                         },
-                        body: JSON.stringify({
-                            lat: coords.lat,
-                            lng: coords.lng,
-                        }),
+                        body: JSON.stringify(reportBody),
                     });
 
                     const payload = await response.json().catch(() => ({}));
@@ -1582,6 +1595,10 @@
                 } finally {
                     button.classList.remove('is-loading');
                     button.removeAttribute('aria-busy');
+                    button.removeAttribute('aria-disabled');
+                    if (button instanceof HTMLButtonElement) {
+                        button.disabled = false;
+                    }
                 }
             }
         });

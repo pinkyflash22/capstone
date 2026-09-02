@@ -2,12 +2,21 @@
 
 @php
     $showPwaInstallButton = $showPwaInstallButton ?? false;
-    $pwaServiceWorkerVersion = file_exists(public_path('sw.js')) ? (string) filemtime(public_path('sw.js')) : (string) time();
+    $pwaVersionedFiles = [public_path('sw.js'), public_path('pwa-install.js'), public_path('background-sync.js')];
+    $pwaServiceWorkerVersion = (string) (collect($pwaVersionedFiles)
+        ->filter(fn ($path) => file_exists($path))
+        ->map(fn ($path) => filemtime($path))
+        ->max() ?: time());
     $pwaInstallScript = asset('pwa-install.js') . '?v=' . $pwaServiceWorkerVersion;
     $pwaBackgroundSyncScript = asset('background-sync.js') . '?v=' . $pwaServiceWorkerVersion;
 @endphp
 
 <script src="{{ $pwaInstallScript }}"></script>
+<script>
+    window.pyroOfflineConfig = {
+        userId: @json(auth()->id()),
+    };
+</script>
 <script src="{{ $pwaBackgroundSyncScript }}"></script>
 
 <style>
@@ -456,7 +465,8 @@
     (function () {
         const STORAGE_PREFIX = 'pyrosense-pwa';
         const DATASET_KEY = `${STORAGE_PREFIX}:datasets`;
-        const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue`;
+        const ACCOUNT_SCOPE = String(@json(auth()->id()) || 'guest');
+        const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue:${ACCOUNT_SCOPE}`;
         const STATUS_KEY = `${STORAGE_PREFIX}:status`;
         const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots`;
         const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return`;

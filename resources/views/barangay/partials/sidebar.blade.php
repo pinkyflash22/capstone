@@ -15,8 +15,8 @@
         ['label' => 'Fire Reports', 'route' => 'barangay.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
         ['label' => 'Hazards & Risks', 'route' => 'barangay.hazards', 'active' => 'hazards', 'mobile_icon' => 'warning'],
     ];
-    $mobileCenterItem = ['label' => 'Dashboard', 'route' => 'barangay.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'];
     $mobileCenterActions = [
+        ['label' => 'Dashboard', 'route' => 'barangay.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'],
         ['label' => 'Checklist Center', 'route' => 'barangay.checklists', 'active' => 'checklists', 'mobile_icon' => 'checklist'],
         ['label' => 'Awareness Posts', 'route' => 'barangay.awareness', 'active' => 'awareness', 'mobile_icon' => 'campaign'],
         ['label' => 'Barangay Profile', 'route' => 'barangay.profile', 'active' => 'profile', 'mobile_icon' => 'person'],
@@ -76,14 +76,17 @@
                 <span class="barangay-mobile-dock__label">Reports</span>
             </a>
 
-            <div class="barangay-mobile-dock__center-wrap {{ $active === $mobileCenterItem['active'] ? 'is-active' : '' }}">
-                <a
-                    href="{{ route($mobileCenterItem['route']) }}"
-                    class="barangay-mobile-dock__item barangay-mobile-dock__item--center {{ $active === $mobileCenterItem['active'] ? 'active' : '' }}"
-                    aria-label="{{ $mobileCenterItem['label'] }}"
+            <div class="barangay-mobile-dock__center-wrap">
+                <button
+                    type="button"
+                    class="barangay-mobile-dock__item barangay-mobile-dock__item--center"
+                    data-barangay-quick-report
+                    data-report-url="{{ route('barangay.reports.quick') }}"
+                    aria-label="Send a one-tap fire report using my current location"
                 >
-                    <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">{{ $mobileCenterItem['mobile_icon'] }}</span>
-                </a>
+                    <span class="material-symbols-rounded chief-mobile-material-icon barangay-mobile-dock__icon" aria-hidden="true">local_fire_department</span>
+                    <span class="barangay-mobile-dock__label">1-Tap</span>
+                </button>
             </div>
 
             <a href="{{ route($mobileDockItems[2]['route']) }}" class="barangay-mobile-dock__item {{ $active === $mobileDockItems[2]['active'] ? 'active' : '' }}" aria-label="{{ $mobileDockItems[2]['label'] }}">
@@ -121,7 +124,7 @@
                 </span>
                 <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-trailing" aria-hidden="true">chevron_right</span>
             </button>
-            @foreach (array_slice($mobileCenterActions, 0, 2) as $action)
+            @foreach (array_slice($mobileCenterActions, 0, 3) as $action)
                 <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
                     <span class="material-symbols-rounded chief-mobile-material-icon chief-mobile-panel__action-icon" aria-hidden="true">{{ $action['mobile_icon'] }}</span>
                     <span class="chief-mobile-panel__action-copy">

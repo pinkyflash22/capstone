@@ -201,7 +201,7 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('barangay.reports.fire.store') }}" class="fire-report-form">
+            <form method="POST" action="{{ route('barangay.reports.fire.store') }}" class="fire-report-form" data-offline-submit data-offline-type="barangay-fire-report">
                 @csrf
                 @include('barangay.partials.fire-report-form-fields', ['prefix' => 'create', 'record' => null])
                 <div class="fire-report-modal__actions">

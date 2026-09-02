@@ -1,3 +1,5 @@
+import { getReliableLocationFix } from './location-accuracy.js';
+
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const currentUserId = Number(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || 0);
 const reportButton = document.getElementById('mobileHubReportButton');
@@ -402,43 +404,11 @@ function getDistanceMeters(lat1, lng1, lat2, lng2) {
     return earthRadius * c;
 }
 
-function getFreshCoords(maxAgeMs = 10 * 60 * 1000) {
-    const cached = readCachedCoords();
-    if (cached && Date.now() - cached.timestamp <= maxAgeMs) {
-        return Promise.resolve(cached);
-    }
-
-    if (!navigator.geolocation) {
-        return Promise.reject(new Error('Location services are not available on this device.'));
-    }
-
-    return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const coords = {
-                    lat: Number(position.coords.latitude),
-                    lng: Number(position.coords.longitude),
-                    timestamp: Date.now(),
-                };
-                writeCachedCoords(coords.lat, coords.lng);
-                refreshLocationContext(coords.lat, coords.lng);
-                resolve(coords);
-            },
-            () => {
-                if (cached) {
-                    resolve(cached);
-                    return;
-                }
-
-                reject(new Error('Unable to get your current location. Please allow location access and try again.'));
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-            }
-        );
-    });
+async function getFreshCoords() {
+    const coords = await getReliableLocationFix();
+    writeCachedCoords(coords.lat, coords.lng);
+    refreshLocationContext(coords.lat, coords.lng);
+    return coords;
 }
 
 function normalizeResponder(responder) {
@@ -558,7 +528,7 @@ function scheduleResponderPrefetch(lat, lng) {
     window.setTimeout(run, 250);
 }
 
-async function createMarker(lat, lng) {
+async function createMarker(lat, lng, accuracy, capturedAt) {
     const response = await fetch('/api/markers', {
         method: 'POST',
         headers: {
@@ -568,7 +538,7 @@ async function createMarker(lat, lng) {
         },
         body: JSON.stringify({
             title: 'Fire Emergency',
-            description: 'One-tap fire emergency report from mobile hub.',
+            description: `One-tap fire emergency report from mobile hub. GPS accuracy ±${Math.round(accuracy)} m; captured ${new Date(capturedAt).toISOString()}.`,
             lat,
             lng,
             status: 'active',
@@ -651,7 +621,7 @@ function updateTeamStatusInBackground(teamId) {
 async function sendMobileHubIncidentReport(coords) {
     const [responder, markerId] = await Promise.all([
         resolveNearestAvailableResponderForReport(coords.lat, coords.lng),
-        createMarker(coords.lat, coords.lng),
+        createMarker(coords.lat, coords.lng, coords.accuracy, coords.timestamp),
     ]);
     const incidentPayload = await createIncident(markerId, responder.stationId, responder.teamId);
     updateTeamStatusInBackground(responder.teamId);
@@ -674,10 +644,45 @@ async function submitMobileHubIncidentReport() {
     try {
         setReportButtonLoading(true);
         showHubToast('Sending fire emergency report...', 'success');
-        showHubStatus('Sending fire report...', 'success');
+        showHubStatus('Getting a fresh, accurate GPS fix...', 'success');
 
         const coords = await getFreshCoords();
+        showHubStatus(`GPS ready within ±${Math.round(coords.accuracy)} m. Sending fire report...`, 'success');
         refreshLocationContext(coords.lat, coords.lng);
+
+        if (!window.navigator.onLine) {
+            if (typeof window.pyroPwa?.enqueueOfflineReport !== 'function') {
+                throw new Error('The offline report queue is not ready. Keep this page open and try again.');
+            }
+
+            const capturedAt = new Date(coords.timestamp).toISOString();
+            window.pyroPwa.enqueueOfflineReport({
+                url: '/citizen/incident',
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    title: 'Citizen Fire Emergency',
+                    description: 'One-tap fire emergency report queued from the mobile hub.',
+                    status: 'reported',
+                    reported_by: currentUserId,
+                    alarmdatetime: capturedAt,
+                    location_accuracy: coords.accuracy,
+                    location_captured_at: capturedAt,
+                }),
+                type: 'citizen-mobile-fire-report',
+                meta: { queued_at: capturedAt },
+            });
+
+            showHubStatus('Fire report saved offline. It will sync after reconnecting.', 'success');
+            showHubToast('Fire report queued for automatic sync.', 'success');
+            return;
+        }
 
         let optimisticFeedbackShown = false;
         optimisticTimer = window.setTimeout(() => {

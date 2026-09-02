@@ -156,7 +156,7 @@
         @if($errors->communityRequest->any())
             <div class="citizen-request-modal__error" role="alert">{{ $errors->communityRequest->first() }}</div>
         @endif
-        <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form">
+        <form method="POST" action="{{ route('citizen.community-activity-requests.store') }}" class="citizen-request-form" data-offline-submit data-offline-type="community-activity-request">
             @csrf
             <div class="citizen-request-form__body">
                 <div class="citizen-request-grid">

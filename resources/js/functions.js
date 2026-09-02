@@ -290,7 +290,7 @@ export async function userLocation(lat, lng, userid, values, image) {
     }
 }
 
-export async function saveIncident(description, lat, lng, type, imageInput, reporter) {
+export async function saveIncident(description, lat, lng, type, imageInput, reporter, locationMetadata = {}) {
     const reportProgress = (stage, detail = '') => {
         if (typeof window.updateIncidentReportLoading === 'function') {
             window.updateIncidentReportLoading(stage, detail);
@@ -314,6 +314,13 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
             reported_by: reporter,
             alarmdatetime: new Date().toISOString(),
         };
+
+        const locationAccuracy = Number(locationMetadata.accuracy);
+        const locationCapturedAt = Number(locationMetadata.timestamp);
+        if (Number.isFinite(locationAccuracy) && locationAccuracy > 0 && Number.isFinite(locationCapturedAt)) {
+            incidentPayload.location_accuracy = locationAccuracy;
+            incidentPayload.location_captured_at = new Date(locationCapturedAt).toISOString();
+        }
 
         const controller = new AbortController();
         let timedOut = false;

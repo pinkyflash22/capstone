@@ -3211,6 +3211,16 @@
         return document.visibilityState === 'visible';
     }
 
+    function citizenPositionIsReliable(position, maxAccuracyMeters = 150) {
+        const accuracy = Number(position?.coords?.accuracy);
+        const timestamp = Number(position?.timestamp) || Date.now();
+
+        return Number.isFinite(accuracy)
+            && accuracy > 0
+            && accuracy <= maxAccuracyMeters
+            && Date.now() - timestamp <= 30000;
+    }
+
     function clearCitizenDashboardLocationIntervals() {
         if (citizenLocationPushInterval) {
             clearInterval(citizenLocationPushInterval);
@@ -3226,6 +3236,14 @@
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
+                    if (!citizenPositionIsReliable(position)) {
+                        console.warn('[CitizenLocation] ignored inaccurate or stale interval fix', {
+                            accuracy: position?.coords?.accuracy,
+                            timestamp: position?.timestamp,
+                        });
+                        return;
+                    }
+
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     console.log('[CitizenLocation] interval GPS success', {
@@ -3262,7 +3280,7 @@
                 function(error) {
                     console.error('[CitizenLocation] interval GPS error', error);
                 },
-                { enableHighAccuracy: true, timeout: 10000 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }, CITIZEN_LOCATION_PUSH_INTERVAL_MS);
 
@@ -3345,6 +3363,11 @@
                 window.__citizenLocationRequest = new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(
                         function(position) {
+                            if (!citizenPositionIsReliable(position)) {
+                                reject(new Error(`Location accuracy is only ±${Math.round(Number(position?.coords?.accuracy) || 0)} m.`));
+                                return;
+                            }
+
                             const lat = position.coords.latitude;
                             const lng = position.coords.longitude;
                             console.log('[CitizenLocation] on-demand GPS success', {
@@ -3384,7 +3407,7 @@
                             }
                             reject(error);
                         },
-                        { enableHighAccuracy: true, timeout: 7000, maximumAge: 15000 }
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
                 }).finally(() => {
                     window.__citizenLocationRequest = null;
@@ -3395,6 +3418,16 @@
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
         function(position) {
+            if (!citizenPositionIsReliable(position)) {
+                console.warn('[CitizenLocation] ignored inaccurate or stale initial fix', {
+                    accuracy: position?.coords?.accuracy,
+                    timestamp: position?.timestamp,
+                });
+                window.userCoords.ready = false;
+                window.showCitizenToast?.('GPS accuracy is weak. Move outdoors or enable precise location.', true, 5000);
+                return;
+            }
+
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             console.log('[CitizenLocation] initial GPS success', {
@@ -3455,7 +3488,7 @@ if (navigator.geolocation) {
             window.loadMarkers?.();
             window.showCitizenToast?.('Allow location access to receive nearby fire alerts.', true, 5000);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
     
     // Initial fetch
@@ -5183,6 +5216,30 @@ async function submitCitizenQuickReport(reportKind) {
     };
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
+    if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+        showIncidentToast?.('Accurate location service is still loading. Please try again.', true);
+        return;
+    }
+
+    showIncidentToast?.('Getting a fresh, accurate GPS fix...', false, 3200);
+    let freshLocationFix;
+    try {
+        freshLocationFix = await window.PyroLocation.getReliableLocationFix();
+        window.updateUserLocation?.(window.currentUserId, freshLocationFix.lat, freshLocationFix.lng, {
+            accuracy: freshLocationFix.accuracy,
+            timestamp: freshLocationFix.timestamp,
+        });
+        window.userCoords.currentLatitude = freshLocationFix.lat;
+        window.userCoords.currentLongitude = freshLocationFix.lng;
+        window.userCoords.accuracy = freshLocationFix.accuracy;
+        window.userCoords.timestamp = freshLocationFix.timestamp;
+        window.userCoords.ready = true;
+        showIncidentToast?.(`GPS ready within ±${Math.round(freshLocationFix.accuracy)} m.`, false, 2600);
+    } catch (error) {
+        showIncidentToast?.(error.message || 'Unable to get an accurate current location.', true, 5200);
+        return;
+    }
+
     // Check if location is ready
     if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
         showIncidentToast?.('Getting your location. Please wait and try again.', true);
@@ -5239,6 +5296,10 @@ async function submitCitizenQuickReport(reportKind) {
             status: 'reported',
             reported_by: reporter,
             alarmdatetime: new Date().toISOString(),
+            ...(citizenFireDraft.mode === 'picked' ? {} : {
+                location_accuracy: freshLocationFix.accuracy,
+                location_captured_at: new Date(freshLocationFix.timestamp).toISOString(),
+            }),
         };
         const concernPayload = {
             report_kind: reportKind,
@@ -5327,7 +5388,8 @@ async function submitCitizenQuickReport(reportKind) {
                 fireLng,
                 incidentTypeId,
                 null,
-                reporter
+                reporter,
+                citizenFireDraft.mode === 'picked' ? {} : freshLocationFix
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
         } else {

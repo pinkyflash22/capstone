@@ -18,7 +18,7 @@
 @section('top_bar_actions')
     <a href="{{ route('barangay.reports') }}" class="portal-report-fire-btn" data-barangay-quick-report data-report-url="{{ route('barangay.reports.quick') }}">
         <i class="fa-solid fa-fire-flame-curved"></i>
-        <span>Report Fire</span>
+        <span>1-Tap Fire Report</span>
     </a>
 @endsection
 

@@ -61,6 +61,7 @@ export default defineConfig({
                 'resources/js/firefighter/station-shell.js',
                 'resources/js/functions.js',
                 'resources/js/landing/main.js',
+                'resources/js/location-accuracy.js',
                 'resources/js/map.js',
                 'resources/js/mobile-hub.js',
                 'resources/js/unified-notifications.js',

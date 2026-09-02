@@ -570,6 +570,8 @@ class IncidentController extends Controller
             'team_id' => 'nullable|exists:teams,team_id',
             'reported_by' => 'required|exists:users,user_id',
             'dispatch_priority' => 'nullable|in:low,medium,high,critical',
+            'location_accuracy' => 'nullable|numeric|min:1|max:100',
+            'location_captured_at' => 'nullable|date|after_or_equal:'.now()->subMinute()->toIso8601String().'|before_or_equal:'.now()->addMinute()->toIso8601String(),
         ]);
 
         $markerId = $validated['marker_id'] ?? null;
@@ -595,9 +597,16 @@ class IncidentController extends Controller
                         ], 422));
                     }
                 } else {
+                    $markerDescription = $validated['description'] ?? 'Citizen-submitted fire emergency.';
+                    if (isset($validated['location_accuracy'], $validated['location_captured_at'])) {
+                        $accuracyMeters = (int) round((float) $validated['location_accuracy']);
+                        $capturedAt = \Illuminate\Support\Carbon::parse($validated['location_captured_at'])->toIso8601String();
+                        $markerDescription .= " GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.";
+                    }
+
                     $createdMarker = Marker::create([
                         'title' => $validated['title'] ?? 'Citizen Fire Emergency',
-                        'description' => $validated['description'] ?? 'Citizen-submitted fire emergency.',
+                        'description' => $markerDescription,
                         'lat' => $lat,
                         'lng' => $lng,
                         'status' => 'inactive',
@@ -610,7 +619,14 @@ class IncidentController extends Controller
                 $validated['marker_id'] = $markerId;
             }
 
-            unset($validated['lat'], $validated['lng'], $validated['title'], $validated['description']);
+            unset(
+                $validated['lat'],
+                $validated['lng'],
+                $validated['title'],
+                $validated['description'],
+                $validated['location_accuracy'],
+                $validated['location_captured_at']
+            );
 
             $resolvedLat = $createdMarker?->lat ?? null;
             $resolvedLng = $createdMarker?->lng ?? null;

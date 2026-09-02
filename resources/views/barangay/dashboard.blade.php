@@ -86,6 +86,18 @@
     <span class="hero-badge"><i class="bi bi-clipboard-data"></i> Actions</span>
 @endsection
 
+@section('hero_actions')
+    <button
+        type="button"
+        class="hero-action-btn hero-action-btn--primary"
+        data-barangay-quick-report
+        data-report-url="{{ route('barangay.reports.quick') }}"
+    >
+        <i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i>
+        1-Tap Fire Report
+    </button>
+@endsection
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
