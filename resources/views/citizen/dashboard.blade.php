@@ -3231,8 +3231,19 @@
     function startCitizenDashboardLocationIntervals() {
         clearCitizenDashboardLocationIntervals();
 
-        citizenLocationPushInterval = setInterval(() => {
+        citizenLocationPushInterval = setInterval(async () => {
             if (!citizenDashboardIsVisible()) return;
+
+            if (navigator.permissions?.query) {
+                try {
+                    const permission = await navigator.permissions.query({ name: 'geolocation' });
+                    if (permission.state !== 'granted') return;
+                } catch (error) {
+                    return;
+                }
+            } else if (!window.userCoords?.ready) {
+                return;
+            }
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
@@ -3356,6 +3367,37 @@
                     return window.__citizenLocationRequest;
                 }
 
+                if (typeof window.PyroLocation?.getReliableLocationFix === 'function') {
+                    window.__citizenLocationRequest = window.PyroLocation.getReliableLocationFix()
+                        .then((fix) => {
+                            window.updateUserLocation?.(window.currentUserId, fix.lat, fix.lng, {
+                                accuracy: fix.accuracy,
+                                timestamp: fix.timestamp,
+                            });
+                            window.userCoords.currentLatitude = fix.lat;
+                            window.userCoords.currentLongitude = fix.lng;
+                            window.userCoords.accuracy = fix.accuracy;
+                            window.userCoords.timestamp = fix.timestamp;
+                            window.userCoords.ready = true;
+                            window.refreshCitizenMapData?.();
+                            window.refreshCitizenOverviewData?.();
+                            if (typeof window.currentLoc === 'function') window.currentLoc(fix.lat, fix.lng);
+                            else window.__pendingCitizenLocation = { lat: fix.lat, lng: fix.lng };
+                            updateCitizenResolvedLocation(fix.lat, fix.lng);
+                            document.dispatchEvent(new Event('locationReady'));
+                            return window.userCoords;
+                        })
+                        .catch((error) => {
+                            if (!silent) window.showCitizenToast?.(error.message || 'Unable to enable location.', true, 4200);
+                            throw error;
+                        })
+                        .finally(() => {
+                            window.__citizenLocationRequest = null;
+                        });
+
+                    return window.__citizenLocationRequest;
+                }
+
                 console.log('[CitizenLocation] requestCitizenLocationNow requesting browser GPS', {
                     silent,
                     timestamp: new Date().toISOString(),
@@ -3415,7 +3457,26 @@
 
                 return window.__citizenLocationRequest;
             };
+async function initializeCitizenLocationIfGranted() {
 if (navigator.geolocation) {
+    let permissionState = 'prompt';
+    if (navigator.permissions?.query) {
+        try {
+            permissionState = (await navigator.permissions.query({ name: 'geolocation' })).state;
+        } catch (error) {
+            permissionState = 'prompt';
+        }
+    }
+
+    if (permissionState !== 'granted') {
+        window.userCoords.currentLatitude = null;
+        window.userCoords.currentLongitude = null;
+        window.userCoords.ready = false;
+        window.usermap?.setView?.([15.8222, 120.3297], 13);
+        window.loadMarkers?.();
+        return;
+    }
+
     navigator.geolocation.getCurrentPosition(
         function(position) {
             if (!citizenPositionIsReliable(position)) {
@@ -3507,6 +3568,9 @@ if (navigator.geolocation) {
      
             
 }
+}
+
+initializeCitizenLocationIfGranted();
         });
 
         // Sidebar Toggle

@@ -1,5 +1,7 @@
 // resources/js/landing/main.js
 
+import { getReliableLocationFix } from '../location-accuracy.js';
+
 // Global variables
 let map;
 let stations = [];
@@ -1392,7 +1394,7 @@ function renderMobilePreviewMarkers() {
     }
 }
 
-function primeVisitorLocation() {
+async function primeVisitorLocation() {
     if (!navigator.geolocation) {
         showLandingToast('Location is not supported on this device.', true, 3200);
         return;
@@ -1404,6 +1406,20 @@ function primeVisitorLocation() {
     if (isFresh) {
         showLandingToast('Location ready.', false, 2600);
         scheduleLandingResponderPrefetch(Number(cached.lat), Number(cached.lng));
+        return;
+    }
+
+    if (navigator.permissions?.query) {
+        try {
+            const permission = await navigator.permissions.query({ name: 'geolocation' });
+            if (permission.state !== 'granted') {
+                showLandingToast('Tap a location or report action when you are ready to enable GPS.', false, 3600);
+                return;
+            }
+        } catch (error) {
+            return;
+        }
+    } else {
         return;
     }
 
@@ -1683,31 +1699,9 @@ function formatEmergencyCoordinates(coords) {
 }
 
 function getEmergencyGpsLocation() {
-    if (!navigator.geolocation) {
-        return Promise.reject(new Error('Location services are not available on this device.'));
-    }
-
-    return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = Number(position.coords.latitude);
-                const lng = Number(position.coords.longitude);
-                persistVisitorLocation(lat, lng);
-                resolve({
-                    lat,
-                    lng,
-                    accuracy: Number(position.coords.accuracy || 0) || null,
-                });
-            },
-            () => {
-                reject(new Error('Unable to get your current location.'));
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 12000,
-                maximumAge: 0,
-            }
-        );
+    return getReliableLocationFix({ timeoutMs: 12000 }).then((fix) => {
+        persistVisitorLocation(fix.lat, fix.lng);
+        return fix;
     });
 }
 
@@ -1838,36 +1832,10 @@ function queueOfflineEmergencyIncident(coords, cachedLocation) {
     };
 }
 
-function getFreshVisitorLocation(maxAgeMs = 10 * 60 * 1000) {
-    const cached = readCachedVisitorLocation();
-    if (cached?.lat && cached?.lng && Date.now() - Number(cached.timestamp || 0) <= maxAgeMs) {
-        return Promise.resolve({
-            lat: Number(cached.lat),
-            lng: Number(cached.lng),
-        });
-    }
-
-    if (!navigator.geolocation) {
-        return Promise.reject(new Error('Location services are not available on this device.'));
-    }
-
-    return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = Number(position.coords.latitude);
-                const lng = Number(position.coords.longitude);
-                persistVisitorLocation(lat, lng);
-                resolve({ lat, lng });
-            },
-            () => {
-                reject(new Error('Unable to get your current location. Please allow location access and try again.'));
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-            }
-        );
+function getFreshVisitorLocation() {
+    return getReliableLocationFix().then((fix) => {
+        persistVisitorLocation(fix.lat, fix.lng);
+        return fix;
     });
 }
 
@@ -1991,11 +1959,11 @@ function searchLocation() {
 }
 
 // Get user location
-function getUserLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
+async function getUserLocation() {
+    try {
+        const fix = await getReliableLocationFix();
+        const latitude = fix.lat;
+        const longitude = fix.lng;
                 
                 if (userMarker) {
                     map.removeLayer(userMarker);
@@ -2010,14 +1978,9 @@ function getUserLocation() {
                 
                 map.setView([latitude, longitude], 13);
                 findNearbyStations(latitude, longitude);
-            },
-            (error) => {
-                console.error('Geolocation error:', error);
-                alert('Unable to get your location. Please enable location services.');
-            }
-        );
-    } else {
-        alert('Geolocation is not supported by your browser.');
+    } catch (error) {
+        console.error('Geolocation error:', error);
+        showLandingToast(error.message || 'Unable to get your location.', true, 4200);
     }
 }
 
