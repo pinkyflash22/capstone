@@ -115,6 +115,18 @@
                                     'analysis_id' => $checklist->analysis_id,
                                 ]);
                             $evidence = data_get($checklist->ai_payload, 'evidence_summary', []);
+                            $checklistEditPayload = [
+                                'id' => $checklist->ai_action_plan_checklist_id,
+                                'barangay_id' => $checklist->barangay_id,
+                                'plan_title' => $checklist->plan_title,
+                                'plan_description' => $checklist->plan_description,
+                                'success_indicator' => $checklist->success_indicator,
+                                'priority_level' => $checklist->priority_level,
+                                'target_date' => $checklist->target_date?->format('Y-m-d'),
+                                'assigned_to' => $checklist->assigned_to,
+                                'checklist_items' => $checklist->items->pluck('item_text')->values()->all(),
+                                'is_ai_generated' => $checklist->is_ai_generated,
+                            ];
                         @endphp
                         <tr data-checklist-row="{{ $checklist->ai_action_plan_checklist_id }}">
                             <td data-label="Select" class="checklist-col-select"><input type="checkbox" data-select-checklist value="{{ $checklist->ai_action_plan_checklist_id }}" aria-label="Select {{ $checklist->plan_title }}"></td>
@@ -134,18 +146,7 @@
                             <td data-label="Actions" class="checklist-col-actions">
                                 <div class="table-actions">
                                     <button type="button" class="icon-button icon-button--primary" data-open-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Review checklist" aria-label="Review {{ $checklist->plan_title }}"><i class="fa-solid fa-eye"></i></button>
-                                    <button type="button" class="icon-button" data-edit-checklist='@json([
-                                        "id" => $checklist->ai_action_plan_checklist_id,
-                                        "barangay_id" => $checklist->barangay_id,
-                                        "plan_title" => $checklist->plan_title,
-                                        "plan_description" => $checklist->plan_description,
-                                        "success_indicator" => $checklist->success_indicator,
-                                        "priority_level" => $checklist->priority_level,
-                                        "target_date" => $checklist->target_date?->format("Y-m-d"),
-                                        "assigned_to" => $checklist->assigned_to,
-                                        "checklist_items" => $checklist->items->pluck("item_text")->values(),
-                                        "is_ai_generated" => $checklist->is_ai_generated,
-                                    ])' title="Edit checklist" aria-label="Edit {{ $checklist->plan_title }}"><i class="fa-solid fa-pen"></i></button>
+                                    <button type="button" class="icon-button" data-edit-checklist='@json($checklistEditPayload)' title="Edit checklist" aria-label="Edit {{ $checklist->plan_title }}"><i class="fa-solid fa-pen"></i></button>
                                     <button type="button" class="icon-button" data-delete-checklist="{{ $checklist->ai_action_plan_checklist_id }}" data-checklist-title="{{ $checklist->plan_title }}" title="Delete checklist" aria-label="Delete {{ $checklist->plan_title }}"><i class="fa-solid fa-trash"></i></button>
                                     <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create mitigation draft' }}" aria-label="Open mitigation"><i class="fa-solid fa-shield-halved"></i></a>
                                 </div>
