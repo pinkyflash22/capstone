@@ -42,16 +42,16 @@
     ];
     $mobileCenterItem = ['label' => 'Operations Room', 'route' => 'station-admin.dashboard', 'active' => 'dashboard', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 16a7 7 0 1 1 14 0"/><path d="M12 12l4-3"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>', 'mobile_icon' => 'dashboard'];
     $mobileCenterActions = [
-        ['label' => 'FSIC Records', 'route' => 'station-admin.fsic', 'active' => 'fsic', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14l-2-1-2 1-2-1-2 1-2-1-2 1V3z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg>', 'mobile_icon' => 'folder_open'],
-        ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
-        ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'mobile_icon' => 'task_alt'],
-        ['label' => 'Executive Reports', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>', 'mobile_icon' => 'description'],
-        ['label' => 'Resources', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>', 'mobile_icon' => 'inventory_2'],
-        ['label' => 'Barangays', 'route' => 'station-admin.barangays.index', 'active' => 'barangays', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.6 7-11a7 7 0 1 0-14 0c0 6.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>', 'mobile_icon' => 'location_city'],
-        ['label' => 'Station Management', 'route' => 'station-admin.management', 'active' => 'management', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 20V5l7-2v17"/><path d="M12 20V9h7v11"/><path d="M8 8h1M8 11h1M8 14h1M15 12h1M15 15h1"/></svg>', 'mobile_icon' => 'apartment'],
-        ['label' => 'Announcements', 'route' => 'station-admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>', 'mobile_icon' => 'campaign'],
-        ['label' => 'Course Checklists', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
-        ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
+        ['label' => 'FSIC Records', 'description' => 'Review inspection records and certification activity.', 'route' => 'station-admin.fsic', 'active' => 'fsic', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14l-2-1-2 1-2-1-2 1-2-1-2 1V3z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg>', 'mobile_icon' => 'folder_open'],
+        ['label' => 'Risk Reviews', 'description' => 'Verify risk and hazard submissions for your station.', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
+        ['label' => 'Mitigation Control', 'description' => 'Track prevention plans through completion.', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'mobile_icon' => 'task_alt'],
+        ['label' => 'Executive Reports', 'description' => 'Open station performance and executive reports.', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>', 'mobile_icon' => 'description'],
+        ['label' => 'Resources', 'description' => 'Manage personnel, apparatus, and equipment.', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>', 'mobile_icon' => 'inventory_2'],
+        ['label' => 'Barangays', 'description' => 'Review barangays covered by the station.', 'route' => 'station-admin.barangays.index', 'active' => 'barangays', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.6 7-11a7 7 0 1 0-14 0c0 6.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>', 'mobile_icon' => 'location_city'],
+        ['label' => 'Station Management', 'description' => 'Update station details and operating records.', 'route' => 'station-admin.management', 'active' => 'management', 'icon' => '<svg viewBox="0 0 24 24"><path d="M5 20V5l7-2v17"/><path d="M12 20V9h7v11"/><path d="M8 8h1M8 11h1M8 14h1M15 12h1M15 15h1"/></svg>', 'mobile_icon' => 'apartment'],
+        ['label' => 'Announcements', 'description' => 'Publish and review station announcements.', 'route' => 'station-admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>', 'mobile_icon' => 'campaign'],
+        ['label' => 'Course Checklists', 'description' => 'Review action plans and checklist progress.', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
+        ['label' => 'Weather Context', 'description' => 'Review recorded and historical weather conditions.', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
     ];
     $mobileIconSvgs = [
         'event' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></svg>',
@@ -252,10 +252,12 @@
             <p class="chief-mobile-panel__menu-label">Command navigation</p>
             @foreach ($mobileCenterActions as $action)
                 <a href="{{ route($action['route']) }}" class="chief-mobile-panel__action {{ $active === $action['active'] ? 'active' : '' }}">
-                    {!! $renderMobileIcon($action['mobile_icon'], 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
+                    <span class="chief-mobile-panel__action-icon">
+                        {!! $renderMobileIcon($action['mobile_icon'], 'chief-mobile-material-icon chief-mobile-panel__action-symbol') !!}
+                    </span>
                     <span class="chief-mobile-panel__action-copy">
                         <strong>{{ $action['label'] }}</strong>
-                        <small>Open {{ strtolower($action['label']) }}</small>
+                        <small>{{ $action['description'] }}</small>
                     </span>
                     {!! $renderMobileIcon('chevron_right', 'chief-mobile-material-icon chief-mobile-panel__action-trailing') !!}
                 </a>
@@ -263,7 +265,9 @@
             <div class="chief-mobile-panel__menu-divider" aria-hidden="true"></div>
             <p class="chief-mobile-panel__menu-label">Account</p>
             <button type="button" class="chief-mobile-panel__action" data-chief-open-logs>
-                {!! $renderMobileIcon('history', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
+                <span class="chief-mobile-panel__action-icon">
+                    {!! $renderMobileIcon('history', 'chief-mobile-material-icon chief-mobile-panel__action-symbol') !!}
+                </span>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Logs</strong>
                     <small>View your recent activity</small>
@@ -271,7 +275,9 @@
                 {!! $renderMobileIcon('chevron_right', 'chief-mobile-material-icon chief-mobile-panel__action-trailing') !!}
             </button>
             <a href="{{ route('station-admin.profile') }}" class="chief-mobile-panel__action">
-                {!! $renderMobileIcon('user', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
+                <span class="chief-mobile-panel__action-icon">
+                    {!! $renderMobileIcon('user', 'chief-mobile-material-icon chief-mobile-panel__action-symbol') !!}
+                </span>
                 <span class="chief-mobile-panel__action-copy">
                     <strong>Profile</strong>
                     <small>Manage your commander account</small>
@@ -281,7 +287,9 @@
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="chief-mobile-panel__action chief-mobile-panel__action--danger">
-                    {!! $renderMobileIcon('logout', 'chief-mobile-material-icon chief-mobile-panel__action-icon') !!}
+                    <span class="chief-mobile-panel__action-icon">
+                        {!! $renderMobileIcon('logout', 'chief-mobile-material-icon chief-mobile-panel__action-symbol') !!}
+                    </span>
                     <span class="chief-mobile-panel__action-copy">
                         <strong>Logout</strong>
                         <small>Sign out of Chief Command</small>

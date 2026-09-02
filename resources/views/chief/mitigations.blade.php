@@ -165,10 +165,10 @@
         .mitigation-dialog__head h3 { margin:0; color:#0f172a; font-size:1rem; font-weight:900; }
         .mitigation-dialog__head p { margin:4px 0 0; color:#64748b; font-size:.82rem; line-height:1.5; max-width:42ch; }
         .mitigation-dialog__close { width:42px; height:42px; border:1px solid rgba(226,232,240,.94); border-radius:14px; background:#fff; color:#334155; }
-        .mitigation-form-dialog form { display:flex; flex-direction:column; min-height:0; }
-        .mitigation-form-scroll { min-height:0; padding:20px 22px; overflow-y:auto; overscroll-behavior:contain; background:#f8fafc; }
+        .mitigation-form-dialog form { display:flex; flex:1 1 auto; flex-direction:column; width:100%; min-height:0; overflow:hidden; }
+        .mitigation-form-scroll { flex:1 1 auto; min-height:0; padding:20px 22px; overflow-y:auto; overscroll-behavior:contain; background:#f8fafc; }
         .form-actions { display:flex; justify-content:end; gap:12px; margin-top:20px; }
-        .mitigation-form-dialog .form-actions { margin:0; padding:15px 22px; border-top:1px solid #e2e8f0; background:#fff; box-shadow:0 -8px 22px rgba(15,23,42,.035); flex:0 0 auto; }
+        .mitigation-form-dialog .form-actions { position:relative; z-index:2; margin:0; padding:15px 22px; border-top:1px solid #e2e8f0; background:#fff; box-shadow:0 -8px 22px rgba(15,23,42,.06); flex:0 0 auto; }
         .user-dropdown { position:relative; }
         .user-dropdown-toggle { display:flex; align-items:center; gap:12px; padding:8px 16px; border-radius:999px; background:#fffbeb; border:1px solid #fef3c7; cursor:pointer; }
         .user-dropdown-menu { position:absolute; top:calc(100% + 12px); right:0; width:260px; background:white; border-radius:18px; box-shadow:0 24px 56px rgba(15,23,42,.14); border:1px solid rgba(226,232,240,.95); opacity:0; visibility:hidden; transform:translateY(10px); transition:all .2s ease; overflow:hidden; }
@@ -282,8 +282,9 @@
 
         @media (max-width: 768px) {
             body, body.chief-dashboard-page, .mitigation-shell, .mitigation-main, .dashboard-container, .mitigation-wrap { overflow: visible !important; }
-            .mitigation-main { margin-left: 0; width: 100%; }
-            .dashboard-container { width: min(100%, 760px); padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 92px); }
+            .mitigation-shell, .mitigation-main, .dashboard-container, .mitigation-wrap { min-width:0; max-width:100%; box-sizing:border-box; }
+            .mitigation-main { margin-left:0; width:100%; }
+            .dashboard-container { width:100%; padding:10px 10px calc(env(safe-area-inset-bottom, 0px) + 92px); }
             .top-bar { display:none; }
             .workflow-nav { width:100%; margin-bottom:8px; border-radius:16px; padding:5px; }
             .workflow-nav__step { min-height:32px; padding:0 10px; font-size:.62rem; }
@@ -298,7 +299,8 @@
             .mitigation-banner__meta-card { padding:7px 8px; border-radius:11px; }
             .mitigation-banner__meta-label { font-size:.5rem; }
             .mitigation-banner__meta-value { margin-top:2px; font-size:.64rem; line-height:1.28; }
-            .summary-grid, .filters-grid, .details-grid, .details-grid.two-col { grid-template-columns:1fr; gap:8px; }
+            .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+            .filters-grid, .details-grid, .details-grid.two-col { grid-template-columns:1fr; gap:8px; }
             .mitigation-stack { gap:8px; }
             .panel, .card { padding:10px; border-radius:15px; }
             .card-label { font-size:.58rem; }
@@ -324,7 +326,7 @@
             .attachments a, .note, .details-item span, .details-item div { font-size:.68rem; }
             .mitigation-dialog { align-items:flex-end; padding:8px; }
             .mitigation-dialog__card, .mitigation-dialog__card.wide { width:100%; max-width:100%; max-height:min(88dvh, 760px); border-radius:22px 22px 16px 16px; padding:11px; }
-            .mitigation-dialog__card.mitigation-form-dialog { width:100%; max-width:100%; max-height:92dvh; padding:0; border-radius:24px 24px 12px 12px; }
+            .mitigation-dialog__card.mitigation-form-dialog { width:100%; max-width:100%; height:min(92dvh,900px); max-height:92dvh; padding:0; border-radius:24px 24px 12px 12px; }
             .mitigation-dialog__card.mitigation-form-dialog::before { display:none; }
             .mitigation-form-dialog .mitigation-dialog__head { padding:14px 14px 12px; }
             .mitigation-dialog__title-icon { width:38px; height:38px; border-radius:12px; flex-basis:38px; }
@@ -347,7 +349,12 @@
             .mitigation-form-dialog .form-actions .cancel-btn, .mitigation-form-dialog .form-actions .submit-btn { width:100%; min-height:44px; }
             .mitigation-dialog__card::before { content:""; display:block; width:52px; height:5px; border-radius:999px; background:#cbd5e1; margin:4px auto 10px; }
             .form-actions { flex-direction:column; align-items:stretch; }
-            .hero-btn, .submit-btn, .cancel-btn, .filter-btn { width:100%; justify-content:center; min-height:38px; padding:0 12px; font-size:.72rem; }
+            .hero-btn, .submit-btn, .cancel-btn, .filter-btn { width:auto; justify-content:center; min-height:36px; padding:0 11px; font-size:.7rem; }
+            .mobile-icon-action { width:36px !important; min-width:36px; min-height:36px !important; padding:0 !important; border-radius:11px !important; box-shadow:none !important; }
+            .mobile-icon-action span { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+            .mitigation-attention { display:grid; grid-template-columns:repeat(5,36px); justify-content:start; gap:7px; overflow-x:auto; }
+            .filter-actions { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+            .filter-actions .filter-btn { width:100%; }
             .compact-draft-card { grid-template-columns:1fr; gap:9px; padding:11px; }
             .compact-draft-card__actions { justify-content:flex-end; }
             .compact-action { width:34px !important; min-height:34px; padding:0; }
@@ -467,7 +474,7 @@
                                         <h3>Draft Ready</h3>
                                         <p>Prefilled from <strong>{{ $mitigationDraft['source_title'] ?? ($mitigationDraft['title'] ?? 'the selected checklist') }}</strong>.</p>
                                     </div>
-                                    <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-wand-magic-sparkles"></i><span>Open Draft</span></button>
+                                    <button type="button" class="hero-btn mobile-icon-action" data-open-create-modal title="Open mitigation draft" aria-label="Open mitigation draft"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Open Draft</span></button>
                                 </div>
                             </section>
                         @endif
@@ -638,7 +645,7 @@
                                             </div>
                                             <p class="insight-card__summary">{{ \Illuminate\Support\Str::limit($draftChecklist->plan_description, 180) }}</p>
                                             <div class="insight-card__footer">
-                                                <button type="button" class="filter-btn secondary" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
+                                                <button type="button" class="filter-btn secondary insight-action" title="Review suggestion" aria-label="Review suggestion" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
                                                 <div class="insight-card__actions">
                                                     <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.approve', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="hero-btn insight-action" title="Approve suggestion" aria-label="Approve suggestion"><i class="fa-solid fa-check"></i><span>Approve</span></button></form>
                                                     <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="filter-btn secondary insight-action" title="Edit suggestion" aria-label="Edit suggestion"><i class="fa-solid fa-pen"></i><span>Edit</span></a>
@@ -660,12 +667,12 @@
                             <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $summary['completed'] }}</div><div class="card-copy">Finished and logged.</div></article>
                         </section>
 
-                        <nav class="chip-row" aria-label="Mitigation attention views" style="margin:0 0 14px;">
-                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'overdue' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
-                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'blocked' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
-                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'awaiting_review' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'awaiting_review']) }}"><i class="fa-solid fa-user-check"></i><span>Needs review</span></a>
-                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'missing_owner' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'missing_owner']) }}"><i class="fa-solid fa-user-slash"></i><span>No owner {{ $summary['missing_owner'] }}</span></a>
-                            <a class="filter-btn {{ ($filters['attention'] ?? '') === 'follow_up' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'follow_up']) }}"><i class="fa-solid fa-rotate"></i><span>Follow-up {{ $summary['follow_up'] }}</span></a>
+                        <nav class="chip-row mitigation-attention" aria-label="Mitigation attention views" style="margin:0 0 14px;">
+                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'overdue' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}" title="Overdue: {{ $summary['overdue'] }}" aria-label="Show overdue mitigations: {{ $summary['overdue'] }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
+                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'blocked' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}" title="Blocked: {{ $summary['blocked'] }}" aria-label="Show blocked mitigations: {{ $summary['blocked'] }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
+                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'awaiting_review' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'awaiting_review']) }}" title="Needs review" aria-label="Show mitigations needing review"><i class="fa-solid fa-user-check"></i><span>Needs review</span></a>
+                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'missing_owner' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'missing_owner']) }}" title="No owner: {{ $summary['missing_owner'] }}" aria-label="Show mitigations without an owner: {{ $summary['missing_owner'] }}"><i class="fa-solid fa-user-slash"></i><span>No owner {{ $summary['missing_owner'] }}</span></a>
+                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'follow_up' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'follow_up']) }}" title="Follow-up: {{ $summary['follow_up'] }}" aria-label="Show mitigations requiring follow-up: {{ $summary['follow_up'] }}"><i class="fa-solid fa-rotate"></i><span>Follow-up {{ $summary['follow_up'] }}</span></a>
                         </nav>
 
                         <section class="panel mitigation-register">
@@ -676,7 +683,7 @@
                                 </div>
                                 <div class="chip-row">
                                     <label class="register-sort" for="mitigationRegisterSort"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="sr-only">Sort mitigation register</span><select id="mitigationRegisterSort" data-mitigation-sort aria-label="Sort mitigation register"><option value="priority" @selected(($filters['sort'] ?? 'priority') === 'priority')>Priority</option><option value="due_date_asc" @selected(($filters['sort'] ?? '') === 'due_date_asc')>Due date: earliest</option><option value="due_date_desc" @selected(($filters['sort'] ?? '') === 'due_date_desc')>Due date: latest</option><option value="status" @selected(($filters['sort'] ?? '') === 'status')>Status</option></select></label>
-                                    <button type="button" class="hero-btn" data-open-create-modal><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
+                                    <button type="button" class="hero-btn mobile-icon-action" data-open-create-modal title="Add mitigation" aria-label="Add mitigation"><i class="fa-solid fa-plus"></i><span>Add Mitigation</span></button>
                                 </div>
                             </div>
 

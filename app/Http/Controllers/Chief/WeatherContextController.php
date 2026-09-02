@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class WeatherContextController extends Controller
@@ -19,7 +20,7 @@ class WeatherContextController extends Controller
     public function index(Request $request, DailyWeatherContextService $weatherService): View
     {
         $stationOfficer = StationOfficer::query()
-            ->with(['station', 'user'])
+            ->with(['station.marker', 'user'])
             ->where('user_id', Auth::user()?->user_id)
             ->firstOrFail();
         $stationId = (int) $stationOfficer->station_id;
@@ -32,6 +33,7 @@ class WeatherContextController extends Controller
             'quality' => ['nullable', 'in:all,complete,incomplete'],
             'source' => ['nullable', 'string', 'max:60'],
             'per_page' => ['nullable', 'integer', 'in:10,15,25'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $month = Carbon::createFromFormat('Y-m', $validated['month'] ?? now('Asia/Manila')->format('Y-m'), 'Asia/Manila')->startOfMonth();
@@ -41,6 +43,7 @@ class WeatherContextController extends Controller
         $quality = $validated['quality'] ?? 'all';
         $source = trim((string) ($validated['source'] ?? ''));
         $perPage = (int) ($validated['per_page'] ?? 15);
+        $selectedDate = $validated['date'] ?? null;
         $monthStart = $month->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
 
@@ -69,6 +72,7 @@ class WeatherContextController extends Controller
 
         $records = (clone $baseQuery)
             ->tap($qualityFilter)
+            ->when($selectedDate, fn ($query) => $query->whereDate('daily_weather_contexts.observation_date', $selectedDate))
             ->select('daily_weather_contexts.*', 'barangays.barangay_name')
             ->orderByDesc('daily_weather_contexts.observation_date')
             ->orderBy('barangays.barangay_name')
@@ -102,6 +106,75 @@ class WeatherContextController extends Controller
         $completeRows = $scopeRows->filter(fn ($row) => $this->isCompleteRow($row))->count();
 
         $summary = $weatherService->summarizeStoredRows($scopeRows);
+        $weatherCards = $scopeRows
+            ->groupBy(fn ($row) => Carbon::parse($row->observation_date)->toDateString())
+            ->map(function (Collection $rows, string $date) use ($weatherService) {
+                $daySummary = $weatherService->summarizeStoredRows($rows) ?? [];
+                $condition = trim((string) ($daySummary['dominant_condition'] ?? 'Unknown')) ?: 'Unknown';
+                $averageTemperatures = $rows->pluck('temperature_avg_c')->filter(fn ($value) => $value !== null);
+                $minimumTemperatures = $rows->pluck('temperature_min_c')->filter(fn ($value) => $value !== null);
+                $maximumTemperatures = $rows->pluck('temperature_max_c')->filter(fn ($value) => $value !== null);
+                $humidities = $rows->pluck('humidity_avg_percent')->filter(fn ($value) => $value !== null);
+                $windSpeeds = $rows->pluck('wind_avg_kph')->filter(fn ($value) => $value !== null);
+                $precipitation = $rows->pluck('precipitation_total_mm')->filter(fn ($value) => $value !== null);
+
+                return [
+                    'date' => $date,
+                    'day' => Carbon::parse($date)->format('D'),
+                    'date_label' => Carbon::parse($date)->format('M j'),
+                    'condition' => $condition,
+                    'visual' => $this->weatherVisualType($condition),
+                    'avg_temp_c' => $averageTemperatures->isEmpty() ? null : round((float) $averageTemperatures->avg(), 1),
+                    'min_temp_c' => $minimumTemperatures->isEmpty() ? null : round((float) $minimumTemperatures->min(), 1),
+                    'max_temp_c' => $maximumTemperatures->isEmpty() ? null : round((float) $maximumTemperatures->max(), 1),
+                    'humidity' => $humidities->isEmpty() ? null : round((float) $humidities->avg(), 1),
+                    'wind_kph' => $windSpeeds->isEmpty() ? null : round((float) $windSpeeds->avg(), 1),
+                    'precipitation_mm' => $precipitation->isEmpty() ? null : round((float) $precipitation->avg(), 1),
+                    'locations' => $rows->pluck('barangay_id')->unique()->count(),
+                ];
+            })
+            ->sortByDesc('date')
+            ->take(5)
+            ->sortBy('date')
+            ->values();
+
+        $selectedBarangay = $barangayId
+            ? $coveredBarangays->firstWhere('barangay_id', $barangayId)
+            : null;
+        $coordinateRow = $barangayId
+            ? $scopeRows->where('barangay_id', $barangayId)->sortByDesc('observation_date')->first()
+            : $scopeRows->sortByDesc('observation_date')->first();
+        $forecastLatitude = $barangayId
+            ? ($coordinateRow?->latitude ?? $stationOfficer->station?->marker?->lat)
+            : ($stationOfficer->station?->marker?->lat ?? $coordinateRow?->latitude);
+        $forecastLongitude = $barangayId
+            ? ($coordinateRow?->longitude ?? $stationOfficer->station?->marker?->lng)
+            : ($stationOfficer->station?->marker?->lng ?? $coordinateRow?->longitude);
+        $liveForecast = collect();
+        $liveForecastCurrent = [];
+        $liveForecastFetchedAt = null;
+        $liveForecastError = null;
+
+        if (is_numeric($forecastLatitude) && is_numeric($forecastLongitude)) {
+            try {
+                $forecastPayload = $weatherService->fetchForecast((float) $forecastLatitude, (float) $forecastLongitude, 5);
+                $liveForecast = collect($forecastPayload['cards'] ?? [])->map(function (array $card) {
+                    $card['visual'] = $this->weatherVisualType($card['condition'] ?? 'Unknown');
+
+                    return $card;
+                });
+                $liveForecastCurrent = $forecastPayload['current'] ?? [];
+                $liveForecastFetchedAt = $forecastPayload['fetched_at'] ?? null;
+            } catch (\Throwable $exception) {
+                $liveForecastError = 'Live forecast is temporarily unavailable.';
+                Log::warning('Weather Context live forecast failed.', [
+                    'station_id' => $stationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        } else {
+            $liveForecastError = 'Add a station map location to enable the live forecast.';
+        }
         $stats = [
             'covered_barangays' => $selectedCoverageCount,
             'observed_days' => $scopeRows->pluck('observation_date')->map(fn ($date) => Carbon::parse($date)->toDateString())->unique()->count(),
@@ -164,9 +237,16 @@ class WeatherContextController extends Controller
             'quality' => $quality,
             'selectedSource' => $source,
             'perPage' => $perPage,
+            'selectedDate' => $selectedDate,
             'sources' => $sources,
             'sourceSummaries' => $sourceSummaries,
             'summary' => $summary,
+            'weatherCards' => $weatherCards,
+            'liveForecast' => $liveForecast,
+            'liveForecastCurrent' => $liveForecastCurrent,
+            'liveForecastFetchedAt' => $liveForecastFetchedAt,
+            'liveForecastError' => $liveForecastError,
+            'forecastLocationLabel' => $selectedBarangay?->barangay_name ?? $stationOfficer->station?->station_name ?? 'Station location',
             'stats' => $stats,
             'barangaySummaries' => $barangaySummaries,
             'trainingReadyMonths' => $trainingReadyMonths,
@@ -209,5 +289,21 @@ class WeatherContextController extends Controller
             && $row->temperature_avg_c !== null
             && $row->humidity_avg_percent !== null
             && $row->wind_avg_kph !== null;
+    }
+
+    private function weatherVisualType(string $condition): string
+    {
+        $condition = strtolower($condition);
+
+        return match (true) {
+            str_contains($condition, 'thunder'), str_contains($condition, 'storm') => 'storm',
+            str_contains($condition, 'snow'), str_contains($condition, 'sleet') => 'snow',
+            str_contains($condition, 'rain'), str_contains($condition, 'drizzle'), str_contains($condition, 'shower') => 'rain',
+            str_contains($condition, 'fog'), str_contains($condition, 'mist'), str_contains($condition, 'haze') => 'fog',
+            str_contains($condition, 'partly'), str_contains($condition, 'mainly clear') => 'partly',
+            str_contains($condition, 'cloud'), str_contains($condition, 'overcast') => 'cloud',
+            str_contains($condition, 'clear'), str_contains($condition, 'sun') => 'sunny',
+            default => 'partly',
+        };
     }
 }

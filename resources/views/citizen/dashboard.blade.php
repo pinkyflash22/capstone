@@ -1523,20 +1523,18 @@
             .citizen-mobile-dock__burst {
                 position: absolute;
                 left: 50%;
-                bottom: 76px;
-                width: min(calc(100vw - 48px), 190px);
-                min-height: 76px;
-                display: grid;
-                grid-template-columns: minmax(0, 1fr);
+                bottom: 80px;
+                width: 154px;
+                min-height: 0;
+                display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 7px;
-                padding: 9px;
-                border-radius: 24px;
-                background: rgba(255, 253, 248, 0.96);
-                border: 1px solid rgba(198, 61, 38, 0.12);
-                box-shadow: 0 20px 44px rgba(88, 43, 20, 0.2);
-                backdrop-filter: blur(16px);
+                padding: 0;
+                border: 0;
+                border-radius: 0;
+                background: transparent;
+                box-shadow: none;
+                backdrop-filter: none;
                 opacity: 0;
                 transform: translate(-50%, 14px) scale(0.92);
                 pointer-events: none;
@@ -1557,31 +1555,24 @@
 
             .citizen-mobile-dock__burst-item {
                 position: relative;
-                width: 100%;
-                height: 58px;
+                width: 154px;
+                min-width: 154px;
+                height: 52px;
                 display: inline-flex;
                 align-items: center;
-                flex-direction: column;
+                flex-direction: row;
                 justify-content: center;
-                gap: 3px;
-                border-radius: 15px;
-                background: #fff7ed;
-                color: #c63d26;
-                border: 1px solid rgba(198, 61, 38, 0.12);
-                box-shadow: 0 12px 24px rgba(198, 61, 38, 0.12);
+                gap: 8px;
+                padding: 0 14px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, #c63d26 0%, #d18a16 100%);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.78);
+                box-shadow: 0 14px 28px rgba(126, 45, 18, 0.28);
                 text-decoration: none;
                 opacity: 0;
                 transform: translateY(12px) scale(0.9);
                 transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-                pointer-events: none;
-            }
-
-            .citizen-mobile-dock__burst-item::before {
-                content: '';
-                position: absolute;
-                inset: 6px;
-                border-radius: 11px;
-                border: 1px solid rgba(16, 185, 129, 0.12);
                 pointer-events: none;
             }
 
@@ -1614,11 +1605,11 @@
 
             .citizen-mobile-dock__burst-label {
                 display: block;
-                width: 100%;
+                width: auto;
                 overflow: hidden;
-                font-size: 9px;
+                font-size: 10px;
                 font-weight: 800;
-                line-height: 1.05;
+                line-height: 1.1;
                 text-align: center;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -2242,7 +2233,7 @@
                         <span class="citizen-mobile-dock__label">Map</span>
                     </button>
 
-                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--call" aria-label="Emergency calling options" data-citizen-sos-open>
+                    <button type="button" class="citizen-mobile-dock__item citizen-mobile-dock__item--call" aria-label="Emergency calling options" aria-haspopup="menu" aria-controls="citizenSosMenu" aria-expanded="false" data-citizen-sos-open>
                         <svg class="citizen-mobile-dock__icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3A19.2 19.2 0 0 1 5.4 13 19.6 19.6 0 0 1 2.4 4.5 2 2 0 0 1 4.4 2.3h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.8L8.1 10a15.5 15.5 0 0 0 5.9 5.9l1.2-1.2a2 2 0 0 1 1.8-.6l3 .5a2 2 0 0 1 2 2.3z"></path>
                         </svg>
@@ -4006,6 +3997,8 @@ initializeCitizenLocationIfGranted();
         // User Dropdown Toggle
         const citizenSosBtn = document.getElementById('citizenSosBtn');
         const citizenSosMenu = document.getElementById('citizenSosMenu');
+        const citizenSosMenuHome = citizenSosMenu?.parentElement || null;
+        const citizenSosMobileQuery = window.matchMedia('(max-width: 768px)');
         const citizenSosOpenButtons = document.querySelectorAll('[data-citizen-sos-open]');
         const userDropdownBtn = document.getElementById('userDropdownBtn');
         const userDropdownMenu = document.getElementById('userDropdownMenu');
@@ -4022,6 +4015,25 @@ initializeCitizenLocationIfGranted();
 
             citizenSosMenu.classList.add('hidden');
             citizenSosBtn.setAttribute('aria-expanded', 'false');
+            citizenSosOpenButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+        }
+
+        function mountCitizenSosMenuForViewport() {
+            if (!citizenSosMenu || !citizenSosMenuHome) {
+                return;
+            }
+
+            if (citizenSosMobileQuery.matches) {
+                if (citizenSosMenu.parentElement !== document.body) {
+                    document.body.appendChild(citizenSosMenu);
+                }
+
+                return;
+            }
+
+            if (citizenSosMenu.parentElement !== citizenSosMenuHome) {
+                citizenSosMenuHome.appendChild(citizenSosMenu);
+            }
         }
 
         function openCitizenSosMenu() {
@@ -4029,8 +4041,10 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
+            mountCitizenSosMenuForViewport();
             citizenSosMenu.classList.remove('hidden');
             citizenSosBtn.setAttribute('aria-expanded', 'true');
+            citizenSosOpenButtons.forEach((button) => button.setAttribute('aria-expanded', 'true'));
             userDropdownMenu?.classList.remove('show');
         }
 
@@ -4073,6 +4087,11 @@ initializeCitizenLocationIfGranted();
             node.addEventListener('click', () => {
                 closeCitizenSosMenu();
             });
+        });
+
+        citizenSosMobileQuery.addEventListener?.('change', () => {
+            closeCitizenSosMenu();
+            mountCitizenSosMenuForViewport();
         });
 
         document.addEventListener('click', (e) => {

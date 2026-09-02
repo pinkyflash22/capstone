@@ -23,6 +23,16 @@
             <span class="checklist-result-count"><i class="fa-solid fa-layer-group"></i> {{ $checklists->total() }} result(s)</span>
         </div>
 
+        @php
+            $mobileFiltersOpen = collect($filters ?? [])->contains(
+                fn ($value) => filled($value) && $value !== false && $value !== '0'
+            );
+        @endphp
+        <button type="button" class="mobile-checklist-filter-toggle" data-mobile-checklist-filters aria-controls="checklistFilterRegion" aria-expanded="{{ $mobileFiltersOpen ? 'true' : 'false' }}">
+            <span><i class="fa-solid fa-sliders"></i> Filter checklist data</span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div id="checklistFilterRegion" class="checklist-filter-region {{ $mobileFiltersOpen ? 'is-open' : '' }}">
         <form id="checklistFilters" method="GET" action="{{ route('station-admin.course-checklists') }}" class="checklist-filters">
             <label class="checklist-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
@@ -50,10 +60,11 @@
             <button type="button" class="icon-button" data-checklist-reset title="Clear filters" aria-label="Clear filters"><i class="fa-solid fa-rotate-left"></i></button>
         </form>
         <nav class="checklist-quick-filters" aria-label="Quick checklist views">
-            @foreach (['' => 'All', 'my_tasks' => 'My tasks', 'needs_review' => 'Needs review', 'overdue' => 'Overdue', 'unassigned' => 'No owner'] as $viewValue => $viewLabel)
-                <a href="{{ route('station-admin.course-checklists', array_filter(['view' => $viewValue])) }}" class="{{ ($filters['view'] ?? '') === $viewValue ? 'is-active' : '' }}">{{ $viewLabel }}</a>
+            @foreach (['' => ['All', 'fa-layer-group'], 'my_tasks' => ['My tasks', 'fa-user-check'], 'needs_review' => ['Needs review', 'fa-clipboard-question'], 'overdue' => ['Overdue', 'fa-clock'], 'unassigned' => ['No owner', 'fa-user-slash']] as $viewValue => [$viewLabel, $viewIcon])
+                <a href="{{ route('station-admin.course-checklists', array_filter(['view' => $viewValue])) }}" class="{{ ($filters['view'] ?? '') === $viewValue ? 'is-active' : '' }}" title="{{ $viewLabel }}" aria-label="Show {{ strtolower($viewLabel) }} checklists"><i class="fa-solid {{ $viewIcon }}"></i><span>{{ $viewLabel }}</span></a>
             @endforeach
         </nav>
+        </div>
 
         <div class="bulk-toolbar" data-bulk-toolbar>
             <span class="bulk-toolbar__count"><i class="fa-solid fa-check-double"></i> <b data-selected-count>0</b> selected</span>

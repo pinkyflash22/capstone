@@ -117,6 +117,67 @@ class DailyWeatherContextService
         return $totals;
     }
 
+    public function fetchForecast(float $latitude, float $longitude, int $days = 5): array
+    {
+        $days = max(1, min($days, 7));
+        $response = Http::retry(2, 300)
+            ->timeout(10)
+            ->get('https://api.open-meteo.com/v1/forecast', [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'current' => implode(',', [
+                    'temperature_2m',
+                    'relative_humidity_2m',
+                    'weather_code',
+                    'wind_speed_10m',
+                ]),
+                'daily' => implode(',', [
+                    'weather_code',
+                    'temperature_2m_max',
+                    'temperature_2m_min',
+                    'precipitation_sum',
+                    'wind_speed_10m_max',
+                ]),
+                'forecast_days' => $days,
+                'timezone' => 'Asia/Manila',
+            ]);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException("Open-Meteo returned HTTP {$response->status()}.");
+        }
+
+        $payload = $response->json();
+        $daily = is_array($payload['daily'] ?? null) ? $payload['daily'] : [];
+        $dates = is_array($daily['time'] ?? null) ? $daily['time'] : [];
+        if ($dates === []) {
+            throw new \RuntimeException('Open-Meteo returned no daily forecast data.');
+        }
+
+        $cards = collect($dates)->take($days)->map(function ($date, int $index) use ($daily) {
+            $code = is_numeric($daily['weather_code'][$index] ?? null)
+                ? (int) $daily['weather_code'][$index]
+                : null;
+
+            return [
+                'date' => Carbon::parse($date)->toDateString(),
+                'day' => Carbon::parse($date)->format('D'),
+                'date_label' => Carbon::parse($date)->format('M j'),
+                'condition' => $this->describeWeatherCode($code),
+                'weather_code' => $code,
+                'min_temp_c' => $this->numericOrNull($daily['temperature_2m_min'][$index] ?? null),
+                'max_temp_c' => $this->numericOrNull($daily['temperature_2m_max'][$index] ?? null),
+                'precipitation_mm' => $this->numericOrNull($daily['precipitation_sum'][$index] ?? null),
+                'wind_kph' => $this->numericOrNull($daily['wind_speed_10m_max'][$index] ?? null),
+            ];
+        })->values()->all();
+
+        return [
+            'cards' => $cards,
+            'current' => is_array($payload['current'] ?? null) ? $payload['current'] : [],
+            'fetched_at' => now('Asia/Manila'),
+        ];
+    }
+
     private function fetchCompletedDay(float $latitude, float $longitude, Carbon $date): array
     {
         $response = Http::retry(3, 750)
@@ -238,6 +299,11 @@ class DailyWeatherContextService
     private function roundedMaximum(Collection $values): ?float
     {
         return $values->isEmpty() ? null : round((float) $values->max(), 2);
+    }
+
+    private function numericOrNull(mixed $value): ?float
+    {
+        return is_numeric($value) ? round((float) $value, 1) : null;
     }
 
     private function describeWeatherCode(?int $code): string

@@ -2856,6 +2856,17 @@
         #editStationModal .modal-content {
             width: min(500px, calc(100vw - 32px));
             max-width: 500px !important;
+            height: min(82dvh, 680px);
+            padding: 0 !important;
+        }
+
+        #editStationModal .modal-content > form {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            width: 100%;
+            min-height: 0;
+            overflow: hidden;
         }
 
         #deleteModal .modal-content {
@@ -2930,6 +2941,21 @@
             padding: 10px 12px;
             border-radius: 12px;
             font-size: 0.82rem;
+        }
+
+        #editStationModal .modal-body {
+            margin: 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #editStationModal .modal-header,
+        #editStationModal .modal-footer {
+            margin: 0;
+        }
+
+        #editStationModal .modal-footer {
+            z-index: 2;
+            box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.06);
         }
 
         .management-delete-prompt {
@@ -3035,6 +3061,46 @@
                 border-radius: 11px;
                 font-size: 0.95rem !important;
                 margin: 0 !important;
+            }
+        }
+
+        @media (max-width: 640px), (display-mode: standalone) and (max-width: 1024px) {
+            #editStationModal.modal {
+                align-items: flex-end;
+                padding: max(8px, env(safe-area-inset-top, 0px)) 8px 0;
+            }
+
+            #editStationModal .modal-content {
+                width: 100%;
+                max-width: 100% !important;
+                height: min(92dvh, 760px);
+                max-height: calc(100dvh - max(8px, env(safe-area-inset-top, 0px)));
+                margin: 0;
+                border-radius: 20px 20px 0 0;
+            }
+
+            #editStationModal .modal-header {
+                padding: 12px 13px 10px;
+            }
+
+            #editStationModal .modal-body {
+                padding: 12px;
+            }
+
+            #editStationModal .modal-footer {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+                gap: 8px;
+                padding: 10px 12px max(12px, env(safe-area-inset-bottom, 0px));
+                background: #fff;
+            }
+
+            #editStationModal .modal-footer .btn-outline,
+            #editStationModal .modal-footer .btn-primary {
+                width: 100%;
+                min-width: 0;
+                min-height: 44px;
+                justify-content: center;
             }
         }
         </style>
