@@ -47,6 +47,17 @@ class BoundaryManagementScope
             return collect();
         }
 
+        $stationCity = $this->stationCityAssignments($user)->first();
+
+        if ($stationCity?->city_id) {
+            return Barangay::query()
+                ->where('city_id', (int) $stationCity->city_id)
+                ->pluck('barangay_id')
+                ->map(fn ($barangayId) => (int) $barangayId)
+                ->unique()
+                ->values();
+        }
+
         return StationBarangayCoverage::query()
             ->whereIn('station_id', $stationIds->all())
             ->where(function ($query) {
@@ -115,10 +126,39 @@ class BoundaryManagementScope
             ->first();
 
         if (! $coverage) {
-            throw new AuthorizationException('This barangay is outside your station\'s assigned coverage.');
+            $barangayCityId = Barangay::query()->whereKey($barangayId)->value('city_id');
+            $stationAssignment = $this->stationCityAssignments($user)
+                ->when(
+                    $requiredStationId,
+                    fn (Collection $assignments) => $assignments->where('station_id', $requiredStationId)
+                )
+                ->first(fn ($assignment) => (int) $assignment->city_id === (int) $barangayCityId);
+
+            if (! $stationAssignment) {
+                throw new AuthorizationException('This barangay is outside your station\'s assigned municipality.');
+            }
+
+            return (int) $stationAssignment->station_id;
         }
 
         return (int) $coverage->station_id;
+    }
+
+    protected function stationCityAssignments(User $user): Collection
+    {
+        return StationOfficer::query()
+            ->join('stations', 'station_officers.station_id', '=', 'stations.station_id')
+            ->join('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+            ->join('barangays', 'full_addresses.barangay_id', '=', 'barangays.barangay_id')
+            ->where('station_officers.user_id', $user->getKey())
+            ->whereNotNull('barangays.city_id')
+            ->orderBy('station_officers.station_officer_id')
+            ->get([
+                'station_officers.station_id',
+                'barangays.city_id',
+            ])
+            ->unique('station_id')
+            ->values();
     }
 
     public function stationForBoundary(User $user, BoundaryLocation $boundary): int

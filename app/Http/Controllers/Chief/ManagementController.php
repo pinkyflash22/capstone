@@ -32,6 +32,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use App\Support\UserActivityLogger;
 use App\Services\IncidentResponderSnapshotService;
+use App\Services\StationBarangayCoverageService;
 use Carbon\Carbon;
 
 class ManagementController extends Controller
@@ -299,6 +300,16 @@ class ManagementController extends Controller
                 'address_id' => $address->address_id,
             ]);
         });
+
+        try {
+            app(StationBarangayCoverageService::class)->syncStation((int) $station->station_id);
+        } catch (\Throwable $exception) {
+            // The station update is already valid. The municipality fallback in
+            // getManagedBarangays keeps station-scoped forms usable if coverage
+            // synchronization is temporarily unavailable.
+            report($exception);
+        }
+
         $this->forgetStationManagementCaches((int) $station->station_id);
         UserActivityLogger::log('updated station information', auth()->user()?->user_id, $request);
 
@@ -925,7 +936,7 @@ protected function getManagedBarangays(?int $stationId)
         return collect();
     }
 
-    return Barangay::query()
+    $coveredBarangays = Barangay::query()
         ->with('city.province')
         ->whereHas('stationCoverage', function ($query) use ($stationId) {
             $query->where('station_id', $stationId)
@@ -934,6 +945,30 @@ protected function getManagedBarangays(?int $stationId)
                         ->orWhere('is_active', true);
                 });
         })
+        ->orderBy('barangay_name')
+        ->get(['barangay_id', 'barangay_name', 'city_id']);
+
+    if ($coveredBarangays->isNotEmpty()) {
+        return $coveredBarangays;
+    }
+
+    // Older stations can have a complete address without generated coverage
+    // rows. In that case, use only the barangays from the assigned station's
+    // municipality instead of disabling historical incident entry.
+    $stationCityId = Station::query()
+        ->whereKey($stationId)
+        ->whereNotNull('stations.address_id')
+        ->join('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+        ->join('barangays as station_barangay', 'full_addresses.barangay_id', '=', 'station_barangay.barangay_id')
+        ->value('station_barangay.city_id');
+
+    if (! $stationCityId) {
+        return collect();
+    }
+
+    return Barangay::query()
+        ->with('city.province')
+        ->where('city_id', (int) $stationCityId)
         ->orderBy('barangay_name')
         ->get(['barangay_id', 'barangay_name', 'city_id']);
 }
@@ -954,6 +989,13 @@ protected function storeHistoricalFireIncident(Request $request)
         ->map(fn ($id) => (int) $id)
         ->all();
 
+    if (empty($managedBarangayIds)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No barangays could be resolved from the assigned station address. Update the station municipality and barangay first.',
+        ], 422);
+    }
+
     $validated = $request->validate([
         'entry_mode' => 'required|in:historical_fire_record',
         'title' => 'required|string|max:255',
@@ -963,9 +1005,7 @@ protected function storeHistoricalFireIncident(Request $request)
         'barangay_id' => [
             'required',
             'integer',
-            empty($managedBarangayIds)
-                ? 'exists:barangays,barangay_id'
-                : 'in:' . implode(',', $managedBarangayIds),
+            Rule::in($managedBarangayIds),
         ],
         'incident_location' => 'required|string|max:255',
         'fire_classification' => 'required|in:accidental,intentional,undetermined',
@@ -1499,6 +1539,13 @@ protected function storeHistoricalFireIncident(Request $request)
             ->map(fn ($value) => (int) $value)
             ->all();
 
+        if (empty($managedBarangayIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No barangays could be resolved from the assigned station address. Update the station municipality and barangay first.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'entry_mode' => 'nullable|in:historical_fire_record',
             'title' => 'sometimes|required|string|max:255',
@@ -1509,9 +1556,7 @@ protected function storeHistoricalFireIncident(Request $request)
                 'sometimes',
                 'required',
                 'integer',
-                empty($managedBarangayIds)
-                    ? 'exists:barangays,barangay_id'
-                    : 'in:' . implode(',', $managedBarangayIds),
+                Rule::in($managedBarangayIds),
             ],
             'incident_location' => 'sometimes|required|string|max:255',
             'fire_classification' => 'sometimes|required|in:accidental,intentional,undetermined',

@@ -161,7 +161,8 @@ class BoundaryLocationController extends Controller
             })
             ->values();
 
-        return response()->json($cities);
+        return response()->json($cities)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function editorContext(BoundaryManagementScope $scope): JsonResponse
@@ -181,7 +182,7 @@ class BoundaryLocationController extends Controller
             'city_source' => $stationOfficer?->station?->address?->barangay?->city ? 'station_address' : ($city ? 'station_coverage' : null),
             'station_id' => $stationOfficer?->station_id,
             'station_name' => $stationOfficer?->station?->station_name,
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function availableBarangays(int $cityId, BoundaryManagementScope $scope): JsonResponse
@@ -210,7 +211,8 @@ class BoundaryLocationController extends Controller
             ])
             ->values();
 
-        return response()->json($barangays);
+        return response()->json($barangays)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function importBarangayBoundary(

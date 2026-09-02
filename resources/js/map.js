@@ -1491,7 +1491,8 @@ async function fetchBoundaryCities() {
     }
 
     const response = await fetch('/api/boundaries/cities', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
     });
 
     if (!response.ok) {
@@ -1515,7 +1516,8 @@ async function fetchBoundaryBarangays(cityId) {
     }
 
     const response = await fetch(`/api/boundaries/barangays/${normalizedCityId}`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
     });
 
     if (!response.ok) {
@@ -1534,7 +1536,8 @@ async function fetchBoundaryEditorDefaults() {
     }
 
     const response = await fetch('/api/boundaries/editor-context', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
     });
 
     if (!response.ok) {
