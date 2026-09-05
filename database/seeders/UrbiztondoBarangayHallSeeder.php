@@ -21,7 +21,7 @@ class UrbiztondoBarangayHallSeeder extends Seeder
 
         $barangayCoordinates = [
             'Angatel' => ['lat' => 15.8117067, 'lng' => 120.3413576],
-            'Balangay Batangcaoa' => ['lat' => 15.8420825, 'lng' => 120.3691318],
+            'Balangay' => ['lat' => 15.8534484, 'lng' => 120.3634506],
             'Baug' => ['lat' => 15.8177662, 'lng' => 120.3694322],
             'Bayaoas' => ['lat' => 15.8329772, 'lng' => 120.3536367],
             'Bituag' => ['lat' => 15.8405726, 'lng' => 120.3829104],

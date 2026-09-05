@@ -42,7 +42,7 @@
                 <div class="empty-state">No barangay hall fire records are attached to this area yet.</div>
             @else
                 <div class="table-wrap">
-                    <table>
+                    <table class="mobile-card-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -54,10 +54,10 @@
                         <tbody>
                             @foreach($fireRecords->take(8) as $record)
                                 <tr>
-                                    <td>{{ optional($record->incident_date)->format('M d, Y') }}</td>
-                                    <td>{{ $record->fire_classification ?? 'N/A' }}</td>
-                                    <td>{{ $record->fire_cause ?? 'Pending' }}</td>
-                                    <td>{{ $record->notes ?? 'No field note' }}</td>
+                                    <td data-label="Date">{{ optional($record->incident_date)->format('M d, Y') }}</td>
+                                    <td data-label="Classification">{{ $record->fire_classification ?? 'N/A' }}</td>
+                                    <td data-label="Cause">{{ $record->fire_cause ?? 'Pending' }}</td>
+                                    <td data-label="Notes" data-mobile-wide>{{ $record->notes ?? 'No field note' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

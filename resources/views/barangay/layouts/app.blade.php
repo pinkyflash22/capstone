@@ -981,6 +981,10 @@
     <style data-barangay-mobile-guardrails>
         /* Final shared guardrails for the compact Barangay/PWA shell. The scoped
            selectors also take precedence over inline page-specific styles. */
+        .barangay-hero-toggle {
+            display: none;
+        }
+
         @media (max-width: 1024px) {
             :root {
                 --barangay-mobile-bottom-h: calc(72px + var(--barangay-safe-bottom));
@@ -1112,7 +1116,11 @@
             }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
+            body.barangay-portal-shell {
+                font-size: 14px;
+            }
+
             body.barangay-portal-shell .hero-card,
             body.barangay-portal-shell .panel-card,
             body.barangay-portal-shell .metric-card,
@@ -1123,6 +1131,7 @@
             }
 
             body.barangay-portal-shell .hero-card {
+                grid-template-columns: minmax(0, 1fr) !important;
                 gap: 12px !important;
             }
 
@@ -1143,16 +1152,637 @@
                 line-height: 1.2;
             }
 
+            body.barangay-portal-shell .panel-grid,
+            body.barangay-portal-shell .two-col {
+                gap: 10px !important;
+            }
+
+            body.barangay-portal-shell .empty-state {
+                min-height: 0 !important;
+                padding: 18px 12px !important;
+                font-size: 0.76rem !important;
+                line-height: 1.45;
+            }
+
             body.barangay-portal-shell .two-col,
             body.barangay-portal-shell .panel-grid.two,
             body.barangay-portal-shell .panel-grid.three,
-            body.barangay-portal-shell .metric-grid,
             body.barangay-portal-shell .fire-report-shell,
             body.barangay-portal-shell .fire-report-form__grid,
             body.barangay-portal-shell .fire-report-filterbar__grid,
             body.barangay-portal-shell .risk-form-grid,
             body.barangay-portal-shell form.list-stack > div[style*="grid-template-columns"] {
                 grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            body.barangay-portal-shell .metric-grid,
+            body.barangay-portal-shell .risk-status-metrics,
+            body.barangay-portal-shell .attention-grid,
+            body.barangay-portal-shell .checklist-summary-grid,
+            body.barangay-portal-shell .fire-report-summary-grid,
+            body.barangay-portal-shell .barangay-risk-metric-grid,
+            body.barangay-portal-shell .barangay-profile-stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 8px !important;
+            }
+
+            body.barangay-portal-shell .barangay-dashboard-stack,
+            body.barangay-portal-shell .barangay-risk-stack,
+            body.barangay-portal-shell .checklist-center-stack,
+            body.barangay-portal-shell .list-stack {
+                gap: 10px !important;
+            }
+
+            body.barangay-portal-shell .hero-badges,
+            body.barangay-portal-shell .tag-row,
+            body.barangay-portal-shell .barangay-profile-cover__chips {
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 6px !important;
+                max-width: 100%;
+                padding-bottom: 2px;
+                overflow-x: auto;
+                scrollbar-width: none;
+            }
+
+            body.barangay-portal-shell .hero-badges::-webkit-scrollbar,
+            body.barangay-portal-shell .tag-row::-webkit-scrollbar,
+            body.barangay-portal-shell .barangay-profile-cover__chips::-webkit-scrollbar {
+                display: none;
+            }
+
+            body.barangay-portal-shell .hero-badge,
+            body.barangay-portal-shell .tag,
+            body.barangay-portal-shell .barangay-profile-cover__chip,
+            body.barangay-portal-shell .hazards-pill {
+                flex: 0 0 auto;
+                min-height: 24px !important;
+                padding: 3px 8px !important;
+                font-size: 0.62rem !important;
+                line-height: 1.2;
+            }
+
+            body.barangay-portal-shell .panel-eyebrow,
+            body.barangay-portal-shell .tiny-label,
+            body.barangay-portal-shell .metric-label {
+                font-size: 0.62rem !important;
+                line-height: 1.25;
+                letter-spacing: 0.06em !important;
+            }
+
+            body.barangay-portal-shell .metric-card,
+            body.barangay-portal-shell .checklist-summary-card,
+            body.barangay-portal-shell .fire-report-summary-card,
+            body.barangay-portal-shell .barangay-profile-stat,
+            body.barangay-portal-shell .risk-status-metric,
+            body.barangay-portal-shell .attention-item {
+                min-width: 0 !important;
+                min-height: 66px !important;
+                padding: 10px !important;
+                border-radius: 13px !important;
+            }
+
+            body.barangay-portal-shell .metric-card-icon,
+            body.barangay-portal-shell .checklist-summary-icon {
+                width: 32px !important;
+                height: 32px !important;
+                flex-basis: 32px !important;
+                border-radius: 10px !important;
+                font-size: 0.82rem !important;
+            }
+
+            body.barangay-portal-shell .metric-card-number,
+            body.barangay-portal-shell .metric-value,
+            body.barangay-portal-shell .checklist-summary-value,
+            body.barangay-portal-shell .barangay-profile-stat__value,
+            body.barangay-portal-shell .risk-status-metric strong,
+            body.barangay-portal-shell .attention-value {
+                font-size: 1.12rem !important;
+                line-height: 1.05 !important;
+            }
+
+            body.barangay-portal-shell .metric-card-description,
+            body.barangay-portal-shell .checklist-summary-label,
+            body.barangay-portal-shell .barangay-profile-stat__label,
+            body.barangay-portal-shell .risk-status-label {
+                font-size: 0.62rem !important;
+                line-height: 1.3 !important;
+            }
+
+            body.barangay-portal-shell .hero-btn,
+            body.barangay-portal-shell .hero-action-btn,
+            body.barangay-portal-shell .portal-report-fire-btn,
+            body.barangay-portal-shell .barangay-risk-launch__button,
+            body.barangay-portal-shell .fire-report-primary-btn,
+            body.barangay-portal-shell .fire-report-secondary-btn,
+            body.barangay-portal-shell .fire-report-danger-btn,
+            body.barangay-portal-shell .fire-report-location-btn,
+            body.barangay-portal-shell .risk-form-submit {
+                min-height: 38px !important;
+                padding: 0 11px !important;
+                border-radius: 10px !important;
+                font-size: 0.72rem !important;
+                line-height: 1.2;
+            }
+
+            body.barangay-portal-shell .list-item {
+                gap: 8px !important;
+            }
+
+            body.barangay-portal-shell .table-wrap {
+                margin-inline: 0 !important;
+                padding-inline: 0 !important;
+                border-radius: 12px;
+            }
+
+            body.barangay-portal-shell .table-wrap table,
+            body.barangay-portal-shell .hazard-table,
+            body.barangay-portal-shell .hazards-table,
+            body.barangay-portal-shell .fire-report-table,
+            body.barangay-portal-shell .checklist-table {
+                min-width: 600px !important;
+            }
+
+            body.barangay-portal-shell table th,
+            body.barangay-portal-shell table td {
+                padding: 8px 9px !important;
+                font-size: 0.7rem !important;
+                line-height: 1.35;
+            }
+
+            body.barangay-portal-shell .table-wrap:has(.mobile-card-table),
+            body.barangay-portal-shell .checklist-table-wrap:has(.mobile-card-table) {
+                overflow: visible !important;
+            }
+
+            body.barangay-portal-shell .table-wrap table.mobile-card-table,
+            body.barangay-portal-shell .checklist-table-wrap table.mobile-card-table {
+                display: block !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                border: 0 !important;
+                background: transparent !important;
+            }
+
+            body.barangay-portal-shell .mobile-card-table thead {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody {
+                display: grid !important;
+                width: 100%;
+                gap: 8px;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody tr {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+                min-width: 0;
+                padding: 8px;
+                overflow: hidden;
+                border: 1px solid rgba(226, 232, 240, 0.92);
+                border-radius: 13px;
+                background: #fff;
+                box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04);
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody tr[hidden],
+            body.barangay-portal-shell .mobile-card-table tbody tr[style*="display: none"] {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody td {
+                display: block !important;
+                min-width: 0;
+                padding: 6px 7px !important;
+                overflow-wrap: anywhere;
+                white-space: normal !important;
+                border: 0 !important;
+                background: transparent !important;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 3px;
+                color: #94a3b8;
+                font-size: 0.56rem;
+                font-weight: 900;
+                line-height: 1.2;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody td[data-mobile-wide],
+            body.barangay-portal-shell .mobile-card-table tbody td[data-mobile-actions],
+            body.barangay-portal-shell .mobile-card-table .risk-table-empty-row td {
+                grid-column: 1 / -1;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody td[data-mobile-actions] {
+                margin-top: 2px;
+                padding-top: 8px !important;
+                border-top: 1px solid #f1f5f9 !important;
+            }
+
+            body.barangay-portal-shell .mobile-card-table tbody td[data-mobile-actions]::before {
+                display: none;
+            }
+
+            body.barangay-portal-shell .mobile-card-table .risk-table-empty-row td::before {
+                display: none;
+            }
+
+            body.barangay-portal-shell .mobile-card-table .fire-report-actions,
+            body.barangay-portal-shell .mobile-card-table .hazards-actions {
+                justify-content: flex-end;
+            }
+
+            body.barangay-portal-shell .mobile-card-table .checklist-view-button {
+                width: 100% !important;
+                min-height: 34px;
+            }
+
+            body.barangay-portal-shell .mobile-card-table td > small {
+                max-width: 100% !important;
+                white-space: normal !important;
+            }
+
+            body.barangay-portal-shell form label,
+            body.barangay-portal-shell .fire-report-form__field,
+            body.barangay-portal-shell .risk-form-field {
+                min-width: 0;
+                font-size: 0.72rem !important;
+            }
+
+            body.barangay-portal-shell input:not([type="checkbox"]):not([type="radio"]),
+            body.barangay-portal-shell select,
+            body.barangay-portal-shell textarea {
+                width: 100%;
+                min-width: 0;
+                min-height: 40px;
+                padding: 9px 10px !important;
+                border-radius: 10px !important;
+                font-size: 16px !important;
+            }
+
+            body.barangay-portal-shell textarea {
+                min-height: 76px;
+            }
+
+            body.barangay-portal-shell form button[type="submit"] {
+                scroll-margin-bottom: calc(var(--barangay-mobile-bottom-h) + 18px);
+            }
+
+            body.barangay-portal-shell .hero-card {
+                position: relative;
+            }
+
+            body.barangay-portal-shell .barangay-hero-toggle {
+                position: absolute;
+                top: 9px;
+                right: 9px;
+                z-index: 2;
+                display: inline-flex !important;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                padding: 0;
+                border: 1px solid rgba(245, 158, 11, 0.2);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.86);
+                color: #b45309;
+                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+            }
+
+            body.barangay-portal-shell .hero-card > div {
+                min-width: 0;
+                padding-right: 34px;
+            }
+
+            body.barangay-portal-shell .hero-card.is-collapsed {
+                padding-block: 10px !important;
+            }
+
+            body.barangay-portal-shell .hero-card.is-collapsed h1 {
+                max-width: calc(100% - 6px);
+                margin: 0 !important;
+                font-size: 1.05rem !important;
+                line-height: 1.2 !important;
+            }
+
+            body.barangay-portal-shell .hero-card.is-collapsed p,
+            body.barangay-portal-shell .hero-card.is-collapsed .hero-badges {
+                display: none !important;
+            }
+
+            body.barangay-portal-shell .hero-card.is-collapsed .hero-actions {
+                margin-top: 8px !important;
+            }
+
+            /* Dashboard */
+            body.barangay-portal-shell .risk-status-card,
+            body.barangay-portal-shell .decision-card,
+            body.barangay-portal-shell .compact-profile-card,
+            body.barangay-portal-shell .preparedness-card,
+            body.barangay-portal-shell .attention-card,
+            body.barangay-portal-shell .hazard-table-card,
+            body.barangay-portal-shell .map-monitoring-card {
+                padding: 12px !important;
+                border-radius: 16px !important;
+            }
+
+            body.barangay-portal-shell .risk-status-card h2,
+            body.barangay-portal-shell .preparedness-card h3,
+            body.barangay-portal-shell .barangay-section-heading h2 {
+                font-size: 1.05rem !important;
+                line-height: 1.2 !important;
+            }
+
+            body.barangay-portal-shell .preparedness-score {
+                font-size: 2rem !important;
+            }
+
+            body.barangay-portal-shell .compact-profile-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+                gap: 7px !important;
+            }
+
+            body.barangay-portal-shell .compact-profile-item,
+            body.barangay-portal-shell .next-action-item,
+            body.barangay-portal-shell .factor-item {
+                padding: 9px 10px !important;
+                border-radius: 11px !important;
+            }
+
+            body.barangay-portal-shell .map-monitoring-toolbar,
+            body.barangay-portal-shell .map-card-header,
+            body.barangay-portal-shell .barangay-section-heading {
+                gap: 8px !important;
+            }
+
+            body.barangay-portal-shell .map-filter-group {
+                display: flex;
+                width: 100%;
+                max-width: 100%;
+                padding-bottom: 2px;
+                overflow-x: auto;
+            }
+
+            body.barangay-portal-shell .map-filter-btn {
+                flex: 0 0 auto;
+                min-height: 32px !important;
+                padding: 0 9px !important;
+                font-size: 0.67rem !important;
+            }
+
+            /* Risk map and risk records */
+            body.barangay-portal-shell .barangay-risk-map-shell,
+            body.barangay-portal-shell .barangay-risk-feed-card,
+            body.barangay-portal-shell .barangay-risk-launch,
+            body.barangay-portal-shell .barangay-risk-review,
+            body.barangay-portal-shell .barangay-risk-map-panel {
+                padding: 11px !important;
+                border-radius: 15px !important;
+            }
+
+            body.barangay-portal-shell .barangay-risk-record-head,
+            body.barangay-portal-shell .barangay-risk-feed-card__header,
+            body.barangay-portal-shell .barangay-risk-section-heading {
+                gap: 7px !important;
+            }
+
+            body.barangay-portal-shell .barangay-risk-record-action {
+                min-width: 34px !important;
+                min-height: 32px !important;
+                padding: 0 9px !important;
+                font-size: 0.68rem !important;
+            }
+
+            body.barangay-portal-shell #barangayOperationsMap {
+                height: clamp(240px, 46svh, 350px) !important;
+                border-radius: 13px !important;
+            }
+
+            body.barangay-portal-shell #barangayRiskAreaMap,
+            body.barangay-portal-shell #hazardsRiskPickerMap {
+                height: clamp(220px, 40svh, 300px) !important;
+                border-radius: 12px !important;
+            }
+
+            body.barangay-portal-shell .leaflet-control-layers-expanded {
+                max-width: calc(100vw - 56px) !important;
+                max-height: 45svh !important;
+                padding: 8px !important;
+                font-size: 0.7rem !important;
+            }
+
+            /* Fire reports */
+            body.barangay-portal-shell .fire-report-shell__main,
+            body.barangay-portal-shell .fire-report-side-card,
+            body.barangay-portal-shell .fire-report-filterbar,
+            body.barangay-portal-shell .fire-report-form__section,
+            body.barangay-portal-shell .fire-report-location-panel {
+                padding: 10px !important;
+                border-radius: 14px !important;
+            }
+
+            body.barangay-portal-shell .fire-report-filterbar__actions,
+            body.barangay-portal-shell .fire-report-pagination {
+                gap: 7px !important;
+                margin-top: 9px !important;
+            }
+
+            /* Hazard and risk reporting */
+            body.barangay-portal-shell .hazards-command,
+            body.barangay-portal-shell .hazards-command__aside,
+            body.barangay-portal-shell .risk-form-card,
+            body.barangay-portal-shell .risk-review-card,
+            body.barangay-portal-shell .risk-mode-section {
+                padding: 11px !important;
+                border-radius: 15px !important;
+            }
+
+            body.barangay-portal-shell .hazards-command__copy {
+                gap: 8px !important;
+            }
+
+            body.barangay-portal-shell .hazards-command__copy h3 {
+                font-size: 1.2rem !important;
+                line-height: 1.15 !important;
+            }
+
+            body.barangay-portal-shell .hazards-command__copy p,
+            body.barangay-portal-shell .hazards-command__aside p,
+            body.barangay-portal-shell .risk-modal-copy {
+                font-size: 0.76rem !important;
+                line-height: 1.45 !important;
+            }
+
+            body.barangay-portal-shell .hazards-inline-tags {
+                flex-wrap: nowrap;
+                gap: 6px !important;
+                max-width: 100%;
+                overflow-x: auto;
+            }
+
+            body.barangay-portal-shell .hazards-inline-tag {
+                flex: 0 0 auto;
+                min-height: 28px !important;
+                padding: 0 9px !important;
+                font-size: 0.66rem !important;
+            }
+
+            body.barangay-portal-shell .risk-table-toolbar,
+            body.barangay-portal-shell .risk-table-filter-group,
+            body.barangay-portal-shell .hazards-actions {
+                gap: 7px !important;
+            }
+
+            body.barangay-portal-shell .risk-table-filter-group {
+                display: flex;
+                flex-wrap: nowrap;
+                max-width: 100%;
+                overflow-x: auto;
+            }
+
+            body.barangay-portal-shell .risk-table-filter {
+                flex: 0 0 auto;
+                min-height: 32px !important;
+                padding: 0 9px !important;
+                font-size: 0.67rem !important;
+            }
+
+            body.barangay-portal-shell .risk-photo-thumb,
+            body.barangay-portal-shell .hazards-photo-strip .risk-photo-thumb {
+                width: 48px !important;
+                min-width: 48px !important;
+                border-radius: 10px !important;
+            }
+
+            body.barangay-portal-shell .risk-modal-panel {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: calc(100dvh - max(8px, var(--barangay-safe-top))) !important;
+                margin: max(8px, var(--barangay-safe-top)) 0 0 !important;
+                border-radius: 20px 20px 0 0 !important;
+            }
+
+            body.barangay-portal-shell .risk-modal-header,
+            body.barangay-portal-shell .risk-modal-body {
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+            }
+
+            body.barangay-portal-shell .risk-modal-title {
+                font-size: 1.08rem !important;
+                line-height: 1.2 !important;
+            }
+
+            body.barangay-portal-shell .risk-modal-close {
+                width: 34px !important;
+                height: 34px !important;
+                flex: 0 0 34px;
+            }
+
+            /* Checklist center */
+            body.barangay-portal-shell .checklist-panel-card {
+                padding: 11px !important;
+                border-radius: 15px !important;
+            }
+
+            body.barangay-portal-shell .checklist-panel-heading {
+                gap: 7px !important;
+                margin-bottom: 8px !important;
+            }
+
+            body.barangay-portal-shell .checklist-step-controls,
+            body.barangay-portal-shell .barangay-signoff-form,
+            body.barangay-portal-shell .barangay-record-update-form {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            /* Profile */
+            body.barangay-portal-shell .barangay-profile-cover,
+            body.barangay-portal-shell .barangay-profile-pane {
+                border-radius: 16px !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-cover__banner {
+                min-height: 92px !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-cover__body,
+            body.barangay-portal-shell .barangay-profile-pane,
+            body.barangay-portal-shell .barangay-user-row {
+                padding: 11px !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-cover__content {
+                padding: 12px 0 3px !important;
+                gap: 10px !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-cover__title {
+                font-size: clamp(1.35rem, 6vw, 1.8rem) !important;
+                line-height: 1.08 !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-cover__copy,
+            body.barangay-portal-shell .barangay-user-row__meta {
+                font-size: 0.76rem !important;
+                line-height: 1.45 !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-pane__grid,
+            body.barangay-portal-shell .barangay-user-list {
+                gap: 8px !important;
+            }
+
+            body.barangay-portal-shell .barangay-profile-pane__item {
+                padding: 9px 10px !important;
+            }
+
+            /* Shared mobile/PWA menu */
+            body.barangay-portal-shell .chief-mobile-panel__sheet {
+                padding: calc(12px + var(--barangay-safe-top)) 12px calc(16px + var(--barangay-safe-bottom)) !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__header {
+                gap: 8px !important;
+                margin-bottom: 10px !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__title {
+                font-size: 1.15rem !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__eyebrow {
+                font-size: 0.6rem !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__action {
+                min-height: 50px !important;
+                padding: 9px 10px !important;
+                border-radius: 12px !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__action-icon {
+                width: 34px !important;
+                height: 34px !important;
+                flex: 0 0 34px !important;
+                border-radius: 10px !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__action-copy strong {
+                font-size: 0.78rem !important;
+            }
+
+            body.barangay-portal-shell .chief-mobile-panel__action-copy small {
+                font-size: 0.64rem !important;
+                line-height: 1.3 !important;
             }
 
             body.barangay-portal-shell .fire-report-modal {
@@ -1226,6 +1856,78 @@
             body.barangay-portal-shell .checklist-detail-modal__footer,
             body.barangay-portal-shell .dashboard-record-modal__footer {
                 padding-bottom: calc(12px + var(--barangay-safe-bottom)) !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            body.barangay-portal-shell .main-content {
+                padding-inline: 8px !important;
+            }
+
+            body.barangay-portal-shell .hero-card,
+            body.barangay-portal-shell .panel-card,
+            body.barangay-portal-shell .map-card,
+            body.barangay-portal-shell .risk-status-card,
+            body.barangay-portal-shell .decision-card,
+            body.barangay-portal-shell .compact-profile-card,
+            body.barangay-portal-shell .preparedness-card,
+            body.barangay-portal-shell .attention-card,
+            body.barangay-portal-shell .hazard-table-card,
+            body.barangay-portal-shell .map-monitoring-card {
+                padding: 10px !important;
+                border-radius: 14px !important;
+            }
+
+            body.barangay-portal-shell .hero-card h1 {
+                font-size: 1.3rem !important;
+            }
+
+            body.barangay-portal-shell .hero-card p {
+                display: -webkit-box;
+                overflow: hidden;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 3;
+            }
+
+            body.barangay-portal-shell .metric-grid,
+            body.barangay-portal-shell .risk-status-metrics,
+            body.barangay-portal-shell .attention-grid,
+            body.barangay-portal-shell .checklist-summary-grid,
+            body.barangay-portal-shell .fire-report-summary-grid,
+            body.barangay-portal-shell .barangay-risk-metric-grid,
+            body.barangay-portal-shell .barangay-profile-stats {
+                gap: 6px !important;
+            }
+
+            body.barangay-portal-shell .metric-card,
+            body.barangay-portal-shell .checklist-summary-card,
+            body.barangay-portal-shell .fire-report-summary-card,
+            body.barangay-portal-shell .barangay-profile-stat,
+            body.barangay-portal-shell .risk-status-metric,
+            body.barangay-portal-shell .attention-item {
+                min-height: 60px !important;
+                padding: 8px !important;
+            }
+
+            body.barangay-portal-shell .table-wrap table,
+            body.barangay-portal-shell .hazard-table,
+            body.barangay-portal-shell .hazards-table,
+            body.barangay-portal-shell .fire-report-table,
+            body.barangay-portal-shell .checklist-table {
+                min-width: 560px !important;
+            }
+
+            body.barangay-portal-shell .dashboard-record-detail-grid,
+            body.barangay-portal-shell .fire-report-detail-grid,
+            body.barangay-portal-shell .checklist-detail-grid,
+            body.barangay-portal-shell .barangay-risk-detail-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            body.barangay-portal-shell .fire-report-pagination,
+            body.barangay-portal-shell .dashboard-record-pagination {
+                align-items: flex-start !important;
+                flex-direction: column !important;
             }
         }
 
@@ -1386,7 +2088,17 @@
             <div id="barangayLiveAlertToast" class="barangay-live-alert-toast" role="alert" aria-live="assertive"></div>
 
             @if (! trim($__env->yieldContent('hide_hero')))
-                <section class="hero-card">
+                <section class="hero-card" data-barangay-hero>
+                    <button
+                        type="button"
+                        class="barangay-hero-toggle"
+                        data-barangay-hero-toggle
+                        aria-expanded="true"
+                        aria-label="Collapse page introduction"
+                        title="Collapse page introduction"
+                    >
+                        <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                    </button>
                     <div>
                         <h1>@yield('hero_title', 'Barangay safety operations in one place.')</h1>
                         <p>@yield('hero_copy', 'Monitor community hazards, review risk zones, and keep preparedness work aligned with the latest barangay-level records.')</p>
@@ -1412,6 +2124,8 @@
             const openBtn = document.getElementById('openSidebar');
             const quickReportStatus = document.getElementById('barangayQuickReportStatus');
             const quickReportButtons = document.querySelectorAll('[data-barangay-quick-report]');
+            const mobileHero = document.querySelector('[data-barangay-hero]');
+            const mobileHeroToggle = mobileHero?.querySelector('[data-barangay-hero-toggle]');
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
             const barangayLiveAlertToast = document.getElementById('barangayLiveAlertToast');
@@ -1425,6 +2139,39 @@
             let notificationRefreshTimer = null;
             let barangayLiveAlertTimer = null;
             let barangayIncidentAudioContext = null;
+
+            if (mobileHero && mobileHeroToggle) {
+                const storageKey = 'pyrosense:barangay:hero-collapsed';
+                let savedPreference = null;
+                try {
+                    savedPreference = window.localStorage.getItem(storageKey);
+                } catch (error) {
+                    savedPreference = null;
+                }
+                const setHeroCollapsed = (collapsed) => {
+                    mobileHero.classList.toggle('is-collapsed', collapsed);
+                    mobileHeroToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                    mobileHeroToggle.setAttribute('aria-label', collapsed ? 'Expand page introduction' : 'Collapse page introduction');
+                    mobileHeroToggle.setAttribute('title', collapsed ? 'Expand page introduction' : 'Collapse page introduction');
+                    const icon = mobileHeroToggle.querySelector('i');
+                    icon?.classList.toggle('fa-chevron-down', collapsed);
+                    icon?.classList.toggle('fa-chevron-up', ! collapsed);
+                };
+
+                setHeroCollapsed(savedPreference === null
+                    ? window.matchMedia('(max-width: 520px)').matches
+                    : savedPreference === '1');
+
+                mobileHeroToggle.addEventListener('click', () => {
+                    const collapsed = ! mobileHero.classList.contains('is-collapsed');
+                    setHeroCollapsed(collapsed);
+                    try {
+                        window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+                    } catch (error) {
+                        // The preference is optional when storage is unavailable.
+                    }
+                });
+            }
 
             openBtn?.addEventListener('click', function () {
                 sidebar?.classList.toggle('open');

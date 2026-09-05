@@ -83,7 +83,8 @@ class PangasinanSeeder extends Seeder
             $barangays = match ($city['city_name']) {
                 'Urbiztondo' => [
                     'Angatel',
-                    'Balangay Batangcaoa',
+                    'Balangay',
+                    'Batangcaoa',
                     'Baug',
                     'Bayaoas',
                     'Bituag',

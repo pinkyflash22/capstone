@@ -795,7 +795,7 @@
                     </div>
                 </div>
                 <div class="table-wrap">
-                    <table class="hazards-table">
+                    <table class="hazards-table mobile-card-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -824,15 +824,15 @@
                                     data-status="{{ $statusLabel }}"
                                     data-search="{{ strtolower(trim(($riskArea->marker?->title ?? 'Untitled entry') . ' ' . $typeLabel . ' ' . $statusLabel . ' ' . $reviewLabel . ' ' . $locationLabel)) }}"
                                 >
-                                    <td>{{ optional($riskArea->created_at)->format('M d, Y') }}</td>
-                                    <td>
+                                    <td data-label="Date">{{ optional($riskArea->created_at)->format('M d, Y') }}</td>
+                                    <td data-label="Record" data-mobile-wide>
                                         <div class="hazards-table__title">{{ $riskArea->marker?->title ?? 'Untitled entry' }}</div>
                                         <div class="hazards-table__meta">{{ $riskArea->assessment_level ? ucfirst($riskArea->assessment_level) . ' assessment' : 'Awaiting assessment' }}</div>
                                     </td>
-                                    <td><span class="hazards-pill hazards-pill--type">{{ $typeLabel }}</span></td>
-                                    <td><span class="hazards-pill hazards-pill--status">{{ $statusLabel }}</span></td>
-                                    <td><span class="hazards-pill hazards-pill--review">{{ $reviewLabel }}</span></td>
-                                    <td>
+                                    <td data-label="Type"><span class="hazards-pill hazards-pill--type">{{ $typeLabel }}</span></td>
+                                    <td data-label="Status"><span class="hazards-pill hazards-pill--status">{{ $statusLabel }}</span></td>
+                                    <td data-label="Review"><span class="hazards-pill hazards-pill--review">{{ $reviewLabel }}</span></td>
+                                    <td data-label="Location" data-mobile-wide>
                                         <div class="hazards-location">
                                             <div>{{ $locationLabel }}</div>
                                         @if($riskArea->photos->isNotEmpty())
@@ -846,7 +846,7 @@
                                         @endif
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Actions" data-mobile-actions>
                                         <div class="hazards-actions">
                                             @if(($riskArea->review_type ?? 'create') !== 'delete')
                                                 <button
@@ -887,7 +887,7 @@
                 <div class="empty-state">No historical hazard records are available yet for this barangay.</div>
             @else
                 <div class="table-wrap">
-                    <table>
+                    <table class="mobile-card-table">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -899,10 +899,10 @@
                         <tbody>
                             @foreach($historicalIncidents->take(8) as $incident)
                                 <tr>
-                                    <td>{{ optional($incident->incident_date)->format('M d, Y') }}</td>
-                                    <td>{{ $incident->fire_classification ?? 'N/A' }}</td>
-                                    <td>{{ $incident->fire_cause ?? 'Pending' }}</td>
-                                    <td>{{ $incident->incident_location ?? 'No note' }}</td>
+                                    <td data-label="Date">{{ optional($incident->incident_date)->format('M d, Y') }}</td>
+                                    <td data-label="Classification">{{ $incident->fire_classification ?? 'N/A' }}</td>
+                                    <td data-label="Cause">{{ $incident->fire_cause ?? 'Pending' }}</td>
+                                    <td data-label="Location" data-mobile-wide>{{ $incident->incident_location ?? 'No note' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -1424,16 +1424,16 @@
             const deleteLabel = record.delete_pending ? 'Delete Pending' : 'Delete';
 
             row.innerHTML = `
-                <td>${escapeHtml(record.date || '')}</td>
-                <td>${escapeHtml(record.title || 'Untitled entry')}</td>
-                <td>${escapeHtml(record.type_label || '')}</td>
-                <td>${escapeHtml(record.status_label || 'PENDING')}</td>
-                <td>${escapeHtml(record.review_label || 'CREATE / PENDING')}</td>
-                <td>
+                <td data-label="Date">${escapeHtml(record.date || '')}</td>
+                <td data-label="Record" data-mobile-wide>${escapeHtml(record.title || 'Untitled entry')}</td>
+                <td data-label="Type">${escapeHtml(record.type_label || '')}</td>
+                <td data-label="Status">${escapeHtml(record.status_label || 'PENDING')}</td>
+                <td data-label="Review">${escapeHtml(record.review_label || 'CREATE / PENDING')}</td>
+                <td data-label="Location" data-mobile-wide>
                     <div>${escapeHtml(record.location_label || 'General barangay area')}</div>
                     ${buildPhotoGridHtml(record.photos || [])}
                 </td>
-                <td>
+                <td data-label="Actions" data-mobile-actions>
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"

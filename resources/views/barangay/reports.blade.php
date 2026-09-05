@@ -89,7 +89,7 @@
 
         <div class="empty-state mt-6" id="fireReportsEmpty" @if(!$fireRecords->isEmpty()) hidden @endif>No fire records found.</div>
         <div class="table-wrap mt-6" id="fireReportsTableWrap" @if($fireRecords->isEmpty()) hidden @endif>
-                <table class="fire-report-table">
+                <table class="fire-report-table mobile-card-table">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -103,12 +103,12 @@
                     <tbody>
                         @foreach($fireRecords as $record)
                             <tr>
-                                <td>{{ $record['date'] }}</td>
-                                <td><strong>{{ $record['title'] }}</strong><small>{{ $record['cause'] }}</small></td>
-                                <td>{{ $record['classification'] }}</td>
-                                <td>{{ $record['location'] }}</td>
-                                <td><span class="fire-report-status">{{ $record['status'] }}</span></td>
-                                <td>
+                                <td data-label="Date">{{ $record['date'] }}</td>
+                                <td data-label="Report" data-mobile-wide><strong>{{ $record['title'] }}</strong><small>{{ $record['cause'] }}</small></td>
+                                <td data-label="Classification">{{ $record['classification'] }}</td>
+                                <td data-label="Location" data-mobile-wide>{{ $record['location'] }}</td>
+                                <td data-label="Status"><span class="fire-report-status">{{ $record['status'] }}</span></td>
+                                <td data-label="Actions" data-mobile-actions>
                                     <div class="fire-report-actions">
                                         <button type="button" data-view-fire-report="{{ $record['id'] }}" aria-label="View report"><i class="fa-solid fa-eye"></i></button>
                                         <button type="button" data-open-edit-fire-report="{{ $record['id'] }}" aria-label="Edit report"><i class="fa-solid fa-pen"></i></button>
@@ -715,12 +715,12 @@
 
             tableBody.innerHTML = items.map((record) => `
                 <tr>
-                    <td>${escapeHtml(record.date)}</td>
-                    <td><strong>${escapeHtml(record.title)}</strong><small>${escapeHtml(record.cause)}</small></td>
-                    <td>${escapeHtml(record.classification)}</td>
-                    <td>${escapeHtml(record.location)}</td>
-                    <td><span class="fire-report-status">${escapeHtml(record.status)}</span></td>
-                    <td><div class="fire-report-actions">
+                    <td data-label="Date">${escapeHtml(record.date)}</td>
+                    <td data-label="Report" data-mobile-wide><strong>${escapeHtml(record.title)}</strong><small>${escapeHtml(record.cause)}</small></td>
+                    <td data-label="Classification">${escapeHtml(record.classification)}</td>
+                    <td data-label="Location" data-mobile-wide>${escapeHtml(record.location)}</td>
+                    <td data-label="Status"><span class="fire-report-status">${escapeHtml(record.status)}</span></td>
+                    <td data-label="Actions" data-mobile-actions><div class="fire-report-actions">
                         <button type="button" data-view-fire-report="${Number(record.id)}" aria-label="View report"><i class="fa-solid fa-eye"></i></button>
                         <button type="button" data-open-edit-fire-report="${Number(record.id)}" aria-label="Edit report"><i class="fa-solid fa-pen"></i></button>
                         <button type="button" class="delete" data-delete-fire-report="${Number(record.id)}" aria-label="Delete report"><i class="fa-solid fa-trash"></i></button>
