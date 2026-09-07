@@ -28,6 +28,21 @@
         $stationStatusLabel = $officerStatus === 'available'
             ? 'On duty'
             : ucwords(str_replace('-', ' ', $officerStatus));
+        $currentOfficerInitials = collect(preg_split('/\s+/', trim($currentOfficerName)) ?: [])
+            ->filter()
+            ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
+            ->take(2)
+            ->join('') ?: 'FF';
+        $currentOfficerPayload = [
+            'name' => $currentOfficerName,
+            'rank' => $stationOfficer?->rank ?: 'Rank not recorded',
+            'role' => ucfirst($user?->role?->role ?? 'firefighter'),
+            'status' => ucwords(str_replace('-', ' ', strtolower($stationOfficer?->status ?: 'available'))),
+            'email' => $user?->email,
+            'contact' => $user?->contact_number,
+            'image' => $user?->profile_thumbnail_url ?: $user?->profile_image_url,
+            'initials' => $currentOfficerInitials,
+        ];
     @endphp
 
     @include('partials.pwa-head')
@@ -681,16 +696,7 @@
             csrfToken: @json(csrf_token()),
             activeReportTab: @json($activeReportTab),
             currentOfficerName: @json($currentOfficerName),
-            currentOfficer: @json([
-                'name' => $currentOfficerName,
-                'rank' => $stationOfficer?->rank ?: 'Rank not recorded',
-                'role' => ucfirst($user?->role?->role ?? 'firefighter'),
-                'status' => ucwords(str_replace('-', ' ', strtolower($stationOfficer?->status ?: 'available'))),
-                'email' => $user?->email,
-                'contact' => $user?->contact_number,
-                'image' => $user?->profile_thumbnail_url ?: $user?->profile_image_url,
-                'initials' => collect(preg_split('/\s+/', trim($currentOfficerName)) ?: [])->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->join('') ?: 'FF',
-            ]),
+            currentOfficer: @json($currentOfficerPayload),
             stationId: @json($stationId),
             readinessRefreshIntervalMs: 30000,
             routes: {

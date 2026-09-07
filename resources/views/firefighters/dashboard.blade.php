@@ -3037,6 +3037,23 @@
         const teamId = incident.team?.team_id;
         const reportedBy = incident.reported_by || 'Dispatch';
         const createdAt = incident.created_at ? new Date(incident.created_at).toLocaleString() : 'Unknown';
+        const accuracyMatch = description.match(/GPS accuracy\s*(?:±|Â±)\s*([0-9]+(?:\.[0-9]+)?)\s*m/i);
+        const capturedMatch = description.match(/captured\s+(\d{4}-\d{2}-\d{2}T[^;\s]+)/i);
+        const locationAccuracy = Number(incident.location_accuracy ?? accuracyMatch?.[1]);
+        const locationCapturedValue = incident.location_captured_at || capturedMatch?.[1]?.replace(/\.$/, '') || null;
+        const locationCapturedDate = locationCapturedValue ? new Date(locationCapturedValue) : null;
+        const locationCaptureAgeSeconds = locationCapturedDate && !Number.isNaN(locationCapturedDate.getTime())
+            ? Math.max(0, Math.round((Date.now() - locationCapturedDate.getTime()) / 1000))
+            : null;
+        const locationCaptureAge = locationCaptureAgeSeconds === null
+            ? 'Not recorded'
+            : locationCaptureAgeSeconds < 60
+                ? `${locationCaptureAgeSeconds}s ago`
+                : locationCaptureAgeSeconds < 3600
+                    ? `${Math.round(locationCaptureAgeSeconds / 60)}m ago`
+                    : locationCaptureAgeSeconds < 172800
+                        ? `${Math.round(locationCaptureAgeSeconds / 3600)}h ago`
+                        : `${Math.round(locationCaptureAgeSeconds / 86400)}d ago`;
         
         content.innerHTML = `
             <div class="professional-incident-details">
@@ -3079,6 +3096,17 @@
                     </div>
                 </div>
                 ` : '<div class="details-info-item"><label>COORDINATES</label><div class="details-info-value">Not available</div></div>'}
+
+                <div class="details-grid-2">
+                    <div class="details-info-item">
+                        <label><i class="fas fa-crosshairs"></i> GPS ACCURACY</label>
+                        <div class="details-info-value">${Number.isFinite(locationAccuracy) ? `±${Math.round(locationAccuracy)} m` : 'Not recorded'}</div>
+                    </div>
+                    <div class="details-info-item">
+                        <label><i class="far fa-clock"></i> LOCATION CAPTURED</label>
+                        <div class="details-info-value">${locationCapturedDate && !Number.isNaN(locationCapturedDate.getTime()) ? `${locationCapturedDate.toLocaleString()} (${locationCaptureAge})` : 'Not recorded'}</div>
+                    </div>
+                </div>
                 
                 <!-- Description Section -->
                 <div class="details-description">
@@ -3136,10 +3164,34 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
 
     const routeModeLabel = routeMode === 'demo' ? 'DEMO ROUTE' : 'LIVE GPS';
     if (!confirm(`Confirm responding to this incident? Your status will be updated to RESPONDING and navigation will use ${routeModeLabel}.`)) return;
+    let preparedRoute = null;
+
+    try {
+        if (typeof window.calculateRouteToIncident !== 'function') {
+            throw new Error('Navigation controls are unavailable on this page.');
+        }
+
+        showToast(routeMode === 'demo' ? 'Checking the demo route...' : 'Checking live GPS and road route...', 'info');
+        preparedRoute = await window.calculateRouteToIncident(incidentId, null, {
+            source: routeMode,
+            response: true,
+            preflight: true,
+        });
+
+        if (!preparedRoute) {
+            return;
+        }
+    } catch (error) {
+        console.error('Unable to prepare incident response route:', error);
+        showToast(error?.message || 'Your location or route is not ready. Incident status was not changed.', 'error');
+        return;
+    }
+
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Sending...',
         badgeLabel: 'RESPONDING...'
     });
+    let responseStatusUpdated = false;
     
     try {
         const newStatusId = 2;
@@ -3155,19 +3207,30 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         const result = await response.json();
         
         if (result.success) {
+            responseStatusUpdated = true;
             showToast(result.message || 'You are now responding to this incident!', 'success');
             await fetchAssignedIncidents(true);
             if (typeof window.calculateRouteToIncident === 'function') {
-                await window.calculateRouteToIncident(incidentId, null, { source: routeMode });
+                await window.calculateRouteToIncident(incidentId, null, {
+                    source: routeMode,
+                    response: true,
+                    origin: preparedRoute.origin,
+                    routeData: preparedRoute.routeData,
+                });
             }
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to update incident status', 'error');
         }
     } catch (error) {
-        restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error responding to incident:', error);
-        showToast('Failed to update incident status', 'error');
+        if (responseStatusUpdated) {
+            showToast('Response status was updated, but navigation could not start. Open Get Incident to retry the live route.', 'error');
+            await fetchAssignedIncidents(true).catch(() => {});
+        } else {
+            restoreIncidentActionPendingState(incidentId, pendingState);
+            showToast('Failed to update incident status', 'error');
+        }
     }
 }
 

@@ -932,6 +932,93 @@
             hideConnectionState();
         }
 
+        const STALE_LOCATION_CONFIRMATION_MS = 5 * 60 * 1000;
+
+        function queuedReportLocation(item) {
+            if (!item?.body || ![
+                'fire-report',
+                'barangay-one-tap-fire-report',
+                'citizen-mobile-fire-report'
+            ].includes(String(item.type || ''))) {
+                return null;
+            }
+
+            try {
+                const body = JSON.parse(item.body);
+                const capturedAt = new Date(body.location_captured_at || body.occurred_at || item.created_at);
+                const lat = Number(body.lat);
+                const lng = Number(body.lng);
+                const accuracy = Number(body.location_accuracy ?? body.accuracy);
+
+                if (!Number.isFinite(lat) || !Number.isFinite(lng) || Number.isNaN(capturedAt.getTime())) {
+                    return null;
+                }
+
+                return { lat, lng, accuracy, capturedAt };
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function queuedLocationDistanceMeters(first, second) {
+            const earthRadius = 6371000;
+            const radians = (degrees) => degrees * Math.PI / 180;
+            const latitudeDelta = radians(second.lat - first.lat);
+            const longitudeDelta = radians(second.lng - first.lng);
+            const value = Math.sin(latitudeDelta / 2) ** 2
+                + Math.cos(radians(first.lat)) * Math.cos(radians(second.lat))
+                * Math.sin(longitudeDelta / 2) ** 2;
+
+            return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+        }
+
+        async function confirmStaleQueuedLocation(item) {
+            const location = queuedReportLocation(item);
+            if (!location) {
+                return true;
+            }
+
+            const ageMs = Date.now() - location.capturedAt.getTime();
+            const reconfirmedAt = item.meta?.location_reconfirmed_at
+                ? new Date(item.meta.location_reconfirmed_at).getTime()
+                : Number.NaN;
+            const recentlyReconfirmed = Number.isFinite(reconfirmedAt)
+                && Date.now() - reconfirmedAt < STALE_LOCATION_CONFIRMATION_MS;
+            if (ageMs < STALE_LOCATION_CONFIRMATION_MS || recentlyReconfirmed) {
+                return true;
+            }
+
+            const ageMinutes = Math.max(1, Math.round(ageMs / 60000));
+            let comparison = '';
+
+            try {
+                if (typeof window.PyroLocation?.getReliableLocationFix === 'function') {
+                    const current = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
+                    const distance = queuedLocationDistanceMeters(location, current);
+                    comparison = ` Your current GPS is about ${Math.round(distance)} m from the saved incident point.`;
+                }
+            } catch (error) {
+                comparison = ' A fresh comparison location could not be obtained.';
+            }
+
+            const accuracyLabel = Number.isFinite(location.accuracy)
+                ? ` with reported accuracy of ±${Math.round(location.accuracy)} m`
+                : '';
+            const confirmed = window.confirm(
+                `This emergency report was captured about ${ageMinutes} minute${ageMinutes === 1 ? '' : 's'} ago${accuracyLabel}.${comparison}\n\n`
+                + 'Select OK to send the original saved incident location. Select Cancel to keep it pending for review.'
+            );
+
+            if (confirmed) {
+                item.meta = {
+                    ...(item.meta || {}),
+                    location_reconfirmed_at: new Date().toISOString(),
+                };
+            }
+
+            return confirmed;
+        }
+
         async function syncQueuedReports() {
             if (!window.navigator.onLine) {
                 updateConnectionState(true);
@@ -954,6 +1041,11 @@
             for (let index = 0; index < queue.length; index += 1) {
                 const item = queue[index];
                 try {
+                    if (!await confirmStaleQueuedLocation(item)) {
+                        remaining.push(item);
+                        continue;
+                    }
+
                     const syncHeaders = new Headers(item.headers || {});
                     syncHeaders.set('X-Pyro-Offline-Sync', '1');
                     const response = await pyroFetch(item.url, {

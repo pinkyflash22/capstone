@@ -7915,6 +7915,12 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
         marker.barangay_name
     );
     const jurisdictionMatch = formatJurisdictionMatch(incident);
+    const locationAccuracy = Number(incident?.location_accuracy ?? marker?.location_accuracy);
+    const locationCapturedAt = incident?.location_captured_at || marker?.location_captured_at || null;
+    const locationCapturedDate = locationCapturedAt ? new Date(locationCapturedAt) : null;
+    const locationCaptureAge = locationCapturedDate && !Number.isNaN(locationCapturedDate.getTime())
+        ? formatLocationCaptureAge(locationCapturedDate)
+        : '';
     const riskReviewStatus = compactValue(riskAreaPublic.review_status, marker.review_status);
     const riskClassification = compactValue(
         riskAreaPublic.condition_label,
@@ -7937,6 +7943,8 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             { label: 'Assigned team', value: assignedTeam },
             { label: 'Barangay', value: incidentBarangay },
             { label: 'Boundary match', value: jurisdictionMatch },
+            { label: 'GPS accuracy', value: Number.isFinite(locationAccuracy) ? `±${Math.round(locationAccuracy)} m` : 'Not recorded' },
+            { label: 'GPS captured', value: locationCapturedDate && !Number.isNaN(locationCapturedDate.getTime()) ? `${formatDateTime(locationCapturedAt)} (${locationCaptureAge})` : 'Not recorded' },
             { label: 'Location', value: locationValue }
         ]
         : ['risk', 'hazard'].includes(getMarkerCategoryKey(marker))
@@ -8113,6 +8121,16 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             <input type="hidden" value="${escapeHtml(String(marker.marker_id || ''))}" id="mid">
         </div>
     `;
+}
+
+function formatLocationCaptureAge(capturedDate) {
+    const ageSeconds = Math.max(0, Math.round((Date.now() - capturedDate.getTime()) / 1000));
+    if (ageSeconds < 60) return `${ageSeconds}s ago`;
+    const ageMinutes = Math.round(ageSeconds / 60);
+    if (ageMinutes < 60) return `${ageMinutes}m ago`;
+    const ageHours = Math.round(ageMinutes / 60);
+    if (ageHours < 48) return `${ageHours}h ago`;
+    return `${Math.round(ageHours / 24)}d ago`;
 }
 
 function findIncidentForMarker(marker, fallbackIncident = null) {
@@ -8559,7 +8577,7 @@ async function requestOsrmRoute(startLat, startLng, endLat, endLng) {
     return payload;
 }
 
-async function calculateRouteWithOsrm(origin, destination) {
+async function calculateRouteWithOsrm(origin, destination, options = {}) {
     if (!origin || !destination) {
         console.error('Missing route origin or destination');
         throw new Error('Missing route configuration.');
@@ -8568,7 +8586,7 @@ async function calculateRouteWithOsrm(origin, destination) {
     console.log('Generating destination:', destination);
     
     try {
-        const data = await requestOsrmRoute(
+        const data = options.routeData || await requestOsrmRoute(
             Number(origin.currentLatitude),
             Number(origin.currentLongitude),
             Number(destination.lat),
@@ -13272,7 +13290,7 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
     };
     
     console.log('Calculating route to incident:', destination);
-    const origin = await resolveRouteOrigin(preferredSource, destination);
+    const origin = options?.origin || await resolveRouteOrigin(preferredSource, destination);
 
     if (!origin?.ready) {
         if (preferredSource === 'demo') {
@@ -13283,9 +13301,22 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
         return;
     }
 
+    if (options?.preflight) {
+        const routeData = await requestOsrmRoute(
+            Number(origin.currentLatitude),
+            Number(origin.currentLongitude),
+            Number(destination.lat),
+            Number(destination.lng)
+        );
+        if (!Array.isArray(routeData?.features) || routeData.features.length === 0) {
+            throw new Error('No drivable road route was found from your current location.');
+        }
+        return { origin, destination, routeData };
+    }
+
     window.thisIncidents = resolvedIncidentId;
     console.log('thisincidents: ', window.thisIncidents);
-    return await calculateRouteWithOsrm(origin, destination);
+    return await calculateRouteWithOsrm(origin, destination, { routeData: options?.routeData });
 }
 
 

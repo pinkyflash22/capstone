@@ -168,6 +168,7 @@ class IncidentController extends Controller
     private function serializeIncident(Incident $incident): array
     {
         $dispatch = app(\App\Services\IncidentDispatchStateService::class)->describe($incident);
+        $locationMetadata = $this->incidentLocationMetadata($incident);
 
         return [
             ...$incident->toArray(),
@@ -188,6 +189,31 @@ class IncidentController extends Controller
                 : null,
             'barangay_name' => $this->supportsBarangayResolution() ? $incident->barangay?->barangay_name : null,
             'barangay_city_name' => $this->supportsBarangayResolution() ? $incident->barangay?->city?->city_name : null,
+            ...$locationMetadata,
+        ];
+    }
+
+    private function incidentLocationMetadata(Incident $incident): array
+    {
+        $description = (string) ($incident->marker?->description ?? '');
+        $accuracy = null;
+        $capturedAt = null;
+
+        if (preg_match('/GPS accuracy\s*(?:\\x{00B1}|\\x{00C2}\\x{00B1})\s*([0-9]+(?:\.[0-9]+)?)\s*m/iu', $description, $matches)) {
+            $accuracy = (float) $matches[1];
+        }
+
+        if (preg_match('/captured\s+(\d{4}-\d{2}-\d{2}T[0-9:.+\-Z]+)/i', $description, $matches)) {
+            try {
+                $capturedAt = \Illuminate\Support\Carbon::parse(rtrim($matches[1], '.'))->toIso8601String();
+            } catch (\Throwable) {
+                $capturedAt = null;
+            }
+        }
+
+        return [
+            'location_accuracy' => $accuracy,
+            'location_captured_at' => $capturedAt,
         ];
     }
 
