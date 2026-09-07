@@ -18,16 +18,16 @@
 
 /* The firefighter portal owns the outer navigation shell; announcements own
    the centered workspace within it, matching the station-chief feed. */
-body.firefighter-portal-shell.staff-announcements .announcements-shell {
+body.firefighter-portal-shell .staff-announcements .announcements-shell {
     width: 100%;
     min-width: 0;
 }
 
-body.firefighter-portal-shell.staff-announcements .staff-announcements__heading {
+body.firefighter-portal-shell .staff-announcements .staff-announcements__heading {
     display: flex !important;
 }
 
-body.firefighter-portal-shell.staff-announcements .composer-card {
+body.firefighter-portal-shell .staff-announcements .composer-card {
     border: 1px solid var(--staff-announcement-line) !important;
     border-radius: 18px !important;
     background: linear-gradient(145deg, #fffaf5 0%, #fff 48%) !important;

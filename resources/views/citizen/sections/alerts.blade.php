@@ -523,6 +523,46 @@
         -webkit-overflow-scrolling: touch;
     }
 
+    #citizenConcernDetailsModal .concern-details-actions {
+        display: flex;
+        flex: 0 0 auto;
+        justify-content: flex-end;
+        gap: 0.65rem;
+        border-top: 1px solid #e2e8f0;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 0.8rem 1rem max(0.8rem, env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    #citizenConcernDetailsModal .concern-details-action {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.9rem;
+        padding: 0.65rem 1rem;
+        font-size: 0.84rem;
+        font-weight: 800;
+    }
+
+    #citizenConcernDetailsModal .concern-details-action--close {
+        border: 1px solid #dbe3ec;
+        color: #475569;
+        background: #fff;
+    }
+
+    #citizenConcernDetailsModal .concern-details-action--map {
+        border: 1px solid #0f172a;
+        color: #fff;
+        background: #0f172a;
+    }
+
+    #citizenConcernDetailsModal .concern-details-action:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+    }
+
     body.citizen-aoc-modal-open #section-alerts.areas-concern-page {
         z-index: 1200;
     }
@@ -531,6 +571,10 @@
         opacity: 0 !important;
         visibility: hidden !important;
         pointer-events: none !important;
+    }
+
+    .citizen-mobile-dock[data-aoc-modal-hidden] {
+        display: none !important;
     }
 
     body.citizen-history-standalone {
@@ -911,36 +955,82 @@
 
         #citizenConcernDetailsModal {
             align-items: flex-end;
-            padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0.75rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+            padding: max(0.45rem, env(safe-area-inset-top, 0px)) 0.45rem max(0.45rem, env(safe-area-inset-bottom, 0px));
         }
 
         #citizenConcernDetailsModal .concern-details-panel {
             width: 100%;
-            max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top, 0px)) - max(0.75rem, env(safe-area-inset-bottom, 0px)));
-            border-radius: 1.6rem;
+            max-width: 30rem;
+            height: auto;
+            max-height: calc(100dvh - max(0.9rem, env(safe-area-inset-top, 0px)) - max(0.9rem, env(safe-area-inset-bottom, 0px)));
+            border-radius: 1.25rem;
         }
 
         #citizenConcernDetailsModal .concern-details-header {
-            align-items: flex-start;
-            padding: 1rem;
+            align-items: center;
+            padding: 0.8rem 0.9rem;
+        }
+
+        #citizenConcernDetailsModal #citizenConcernDetailsEyebrow {
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+        }
+
+        #citizenConcernDetailsModal #citizenConcernDetailsTitle {
+            margin-top: 0.15rem;
+            font-size: 1.08rem;
+            line-height: 1.18;
+        }
+
+        #citizenConcernDetailsModal [data-concern-details-close] {
+            width: 2.5rem;
+            height: 2.5rem;
+            flex: 0 0 2.5rem;
         }
 
         #citizenConcernDetailsModal .concern-details-body {
-            padding: 0.9rem 1rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+            max-height: none;
+            padding: 0.65rem 0.75rem 0.8rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-body > .grid {
+            gap: 0.6rem;
         }
 
         #citizenConcernDetailsModal .concern-details-body .rounded-3xl {
-            border-radius: 1.05rem;
-            padding: 1rem;
+            border-radius: 0.9rem;
+            padding: 0.75rem;
         }
 
-        #citizenConcernDetailsModal #citizenConcernDetailsViewMapBtn {
-            position: sticky;
-            bottom: 0;
-            z-index: 2;
+        #citizenConcernDetailsModal .concern-details-body .mt-4 {
+            margin-top: 0.6rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-body .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 0.55rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-body dl,
+        #citizenConcernDetailsModal .concern-details-body .text-sm {
+            font-size: 0.76rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-body dl > div {
+            gap: 0.65rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr);
+            gap: 0.55rem;
+            padding: 0.65rem 0.75rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #citizenConcernDetailsModal .concern-details-action {
             width: 100%;
-            justify-content: center;
-            min-height: 44px;
+            min-height: 42px;
+            padding: 0.58rem 0.7rem;
+            font-size: 0.78rem;
         }
 
         #citizenReportsHistoryModal .reports-history-table-wrap {
@@ -1294,10 +1384,6 @@
                         <div class="mt-4 space-y-3 text-sm text-slate-700">
                             <p id="citizenConcernDetailsLocation"></p>
                             <p id="citizenConcernDetailsCoordinates" class="text-xs text-slate-500"></p>
-                            <button type="button" id="citizenConcernDetailsViewMapBtn" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                                <i class="fa-solid fa-map-location-dot"></i>
-                                View on Map
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1309,6 +1395,16 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Image Preview</p>
                     <img id="citizenConcernDetailsImage" src="" alt="Risk or hazard report image preview" class="mt-4 max-h-80 w-full rounded-2xl object-cover">
                 </div>
+            </div>
+            <div class="concern-details-actions">
+                <button type="button" data-concern-details-close class="concern-details-action concern-details-action--close">
+                    <i class="fa-solid fa-xmark"></i>
+                    Close
+                </button>
+                <button type="button" id="citizenConcernDetailsViewMapBtn" class="concern-details-action concern-details-action--map">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    View on Map
+                </button>
             </div>
         </div>
     </div>
@@ -1335,6 +1431,12 @@
     let concernMap = null;
     let concernMapMarkersLayer = null;
     let activeConcernDetailRecord = null;
+
+    // Move the details sheet out of the section stacking context. Otherwise
+    // the fixed PWA dock can render above it even with a higher modal z-index.
+    if (concernDetailsModal && concernDetailsModal.parentElement !== document.body) {
+        document.body.appendChild(concernDetailsModal);
+    }
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -1801,6 +1903,9 @@
 
         document.body.classList.toggle('citizen-aoc-modal-open', hasOpenModal);
         document.body.style.overflow = hasOpenModal ? 'hidden' : '';
+        document.querySelectorAll('.citizen-mobile-dock').forEach((dock) => {
+            dock.toggleAttribute('data-aoc-modal-hidden', hasOpenModal);
+        });
     }
 
     function openConcernDetailsModal(record) {
@@ -1822,6 +1927,11 @@
         setText('citizenConcernDetailsLocation', readReportLocation(record));
         setText('citizenConcernDetailsCoordinates', record.lat && record.lng ? `${Number(record.lat).toFixed(6)}, ${Number(record.lng).toFixed(6)}` : 'Coordinates unavailable');
         setText('citizenConcernDetailsNotes', record.description || record.remarks || record.assessment_description || record.condition_label || 'No additional notes available.');
+
+        const mapButton = document.getElementById('citizenConcernDetailsViewMapBtn');
+        if (mapButton) {
+            mapButton.disabled = !(Number.isFinite(Number(record.lat)) && Number.isFinite(Number(record.lng)));
+        }
 
         const imageWrap = document.getElementById('citizenConcernDetailsImageWrap');
         const imageNode = document.getElementById('citizenConcernDetailsImage');

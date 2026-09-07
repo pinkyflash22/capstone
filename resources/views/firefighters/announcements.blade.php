@@ -24,7 +24,7 @@
 <body class="firefighter-portal-shell staff-announcements" data-staff-announcements="firefighter">
     @include('firefighters.partials.shell-sidebar', ['active' => 'announcements'])
 
-    <div data-ff-page-root="announcements">
+    <div data-ff-page-root="announcements" class="staff-announcements">
     <main class="main-content">
         <div class="announcements-shell">
         @include('firefighters.partials.shell-topbar', [
