@@ -19,7 +19,7 @@ class MarkerFeedBuilder
             'barangayHall.address.barangay.city',
             'barangayHall.barangay.city',
             'hydrants.station',
-            'incidents',
+            'incidents.team',
             'riskAreas.barangayHall.barangay.city',
             'riskAreas.reporter',
             'riskAreas.photos',
@@ -147,6 +147,24 @@ class MarkerFeedBuilder
             return false;
         }
 
+        if ($category === 'fire' && $viewer) {
+            $incident = $marker->incidents
+                ->sortByDesc(fn ($item) => optional($item->updated_at)->timestamp ?? optional($item->created_at)->timestamp ?? 0)
+                ->first();
+            $role = (string) ($visibility['role'] ?? '');
+
+            if (in_array($role, ['chief', 'chief station admin', 'station admin', 'firefighter'], true)) {
+                $incidentStationId = (int) ($incident?->station_id ?: $incident?->team?->station_id ?: 0);
+                if ($incidentStationId < 1 || ! in_array($incidentStationId, $visibility['station_ids'] ?? [], true)) {
+                    return false;
+                }
+            } elseif (in_array($role, ['barangay', 'barangay captain', 'barangay officer', 'barangay_officer'], true)) {
+                if (! in_array((int) ($incident?->barangay_id ?? 0), $visibility['barangay_ids'] ?? [], true)) {
+                    return false;
+                }
+            }
+        }
+
         if (! in_array($category, ['risk', 'hazard'], true)) {
             return strtolower(trim((string) ($marker->status ?? 'active'))) !== 'inactive';
         }
@@ -226,7 +244,9 @@ class MarkerFeedBuilder
             ? collect()
             : StationBarangayCoverage::query()
                 ->whereIn('station_id', $stationIds->all())
-                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->pluck('barangay_id')
                 ->map(fn ($id) => (int) $id)
                 ->unique()

@@ -2560,6 +2560,8 @@
                     button.disabled = true;
                 }
                 showQuickReportStatus('Getting a fresh, accurate GPS fix...', 'success');
+                let pendingReportBody = null;
+                const clientReportId = window.crypto?.randomUUID?.() || null;
 
                 try {
                     const coords = await getCurrentCoords();
@@ -2575,7 +2577,9 @@
                         lng: coords.lng,
                         accuracy: coords.accuracy,
                         location_captured_at: new Date(coords.timestamp).toISOString(),
+                        client_report_id: clientReportId,
                     };
+                    pendingReportBody = reportBody;
 
                     if (!window.navigator.onLine) {
                         if (typeof window.pyroPwa?.enqueueOfflineReport !== 'function') {
@@ -2616,6 +2620,24 @@
 
                     showQuickReportStatus(payload?.message || 'Fire report submitted successfully.', 'success');
                 } catch (error) {
+                    if ((!window.navigator.onLine || error instanceof TypeError)
+                        && pendingReportBody
+                        && typeof window.pyroPwa?.enqueueOfflineReport === 'function') {
+                        window.pyroPwa.enqueueOfflineReport({
+                            url: reportUrl,
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify(pendingReportBody),
+                            type: 'barangay-one-tap-fire-report',
+                            meta: { queued_at: new Date().toISOString() },
+                        });
+                        showQuickReportStatus('The connection failed, so the fire report was saved offline and will sync automatically.', 'success');
+                        return;
+                    }
                     showQuickReportStatus(error.message || 'Unable to submit the fire report right now.');
                 } finally {
                     button.classList.remove('is-loading');

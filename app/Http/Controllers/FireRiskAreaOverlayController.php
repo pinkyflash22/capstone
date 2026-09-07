@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Services\PredictedRiskAreaService;
+use App\Services\OperationalMapScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class FireRiskAreaOverlayController extends Controller
 {
     public function __construct(
-        protected PredictedRiskAreaService $predictedRiskAreaService
+        protected PredictedRiskAreaService $predictedRiskAreaService,
+        protected OperationalMapScope $operationalScope,
     ) {
     }
 
@@ -29,11 +31,13 @@ class FireRiskAreaOverlayController extends Controller
             $levels = collect(['low', 'medium', 'high']);
         }
 
-        $stationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
+        $requestedStationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
+        $stationId = $this->operationalScope->authorizeRequestedStation($request->user(), $requestedStationId);
         // Heat overlays must represent a saved analysis result. Approved risk/hazard
         // reports remain marker icons; they are used only as geographic evidence
         // positions for an analysis and are never emitted as an independent heatmap.
-        $analysisAreas = $this->predictedRiskAreaService->buildForecastAreas($stationId);
+        $overlay = $this->predictedRiskAreaService->buildForecastOverlay($stationId);
+        $analysisAreas = $overlay['areas'];
         $areas = $analysisAreas
             ->filter(fn (array $area) => $levels->contains($area['risk_level']))
             ->values()
@@ -47,6 +51,8 @@ class FireRiskAreaOverlayController extends Controller
                 'source' => 'saved_current_analysis_and_forecast_results',
                 'analysis_count' => $analysisAreas->count(),
                 'evidence_heatmaps' => 0,
+                'unmapped_count' => $overlay['unmapped']->count(),
+                'unmapped_forecasts' => $overlay['unmapped']->all(),
             ],
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }

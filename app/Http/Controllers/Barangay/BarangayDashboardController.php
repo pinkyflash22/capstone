@@ -32,10 +32,13 @@ use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use App\Services\BoundaryMatcherService;
+use App\Services\IncidentAutoAssignmentService;
 use App\Services\IncidentJurisdictionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -1607,13 +1610,38 @@ class BarangayDashboardController extends Controller
         ];
     }
 
-    public function storeFireReport(Request $request, IncidentJurisdictionService $jurisdictionService)
+    protected function safelyAutoAssignFireIncident(
+        Incident $incident,
+        IncidentAutoAssignmentService $autoAssignmentService
+    ): ?array {
+        try {
+            return $autoAssignmentService->assignSingleIncident($incident);
+        } catch (\Throwable $exception) {
+            Log::error('Immediate barangay incident auto-assignment failed.', [
+                'incident_id' => $incident->incident_id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    public function storeFireReport(
+        Request $request,
+        IncidentJurisdictionService $jurisdictionService,
+        IncidentAutoAssignmentService $autoAssignmentService
+    )
     {
         $validated = $request->validate($this->fireReportValidationRules());
 
         $context = $this->resolveBarangayContext();
         $hall = $context['hall'];
-        $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
+        $jurisdiction = $jurisdictionService->resolve(
+            (float) $validated['lat'],
+            (float) $validated['lng'],
+            null,
+            $hall ? [(int) $hall->barangay_id] : []
+        );
 
         if (! $hall || ! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
             throw ValidationException::withMessages([
@@ -1621,7 +1649,7 @@ class BarangayDashboardController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($validated, $hall, $jurisdiction, $request) {
+        $incident = DB::transaction(function () use ($validated, $hall, $jurisdiction, $request) {
             $marker = Marker::create([
                 'title' => $validated['title'],
                 'description' => $validated['location_description'],
@@ -1639,7 +1667,7 @@ class BarangayDashboardController extends Controller
                 'barangay_id' => $jurisdiction['barangay_id'],
                 'station_id' => $jurisdiction['station_id'],
                 'barangay_resolution_status' => 'matched',
-                'barangay_resolution_source' => 'saved_boundary',
+                'barangay_resolution_source' => $jurisdiction['resolution_source'],
                 'barangay_resolved_at' => now(),
             ]);
             IncidentContextDispatcher::dispatchFor($incident);
@@ -1658,14 +1686,21 @@ class BarangayDashboardController extends Controller
             }
 
             UserActivityLogger::log('submitted fire report', Auth::user()?->user_id, $request);
+
+            return $incident;
         });
+        $this->safelyAutoAssignFireIncident($incident, $autoAssignmentService);
 
         return redirect()
             ->route('barangay.reports')
             ->with('success', 'Fire report submitted successfully and forwarded into the system incident flow.');
     }
 
-    public function updateFireReport(Request $request, string $recordId)
+    public function updateFireReport(
+        Request $request,
+        string $recordId,
+        IncidentJurisdictionService $jurisdictionService
+    )
     {
         $validated = $request->validate($this->fireReportValidationRules(true));
 
@@ -1682,7 +1717,19 @@ class BarangayDashboardController extends Controller
             ->where('barangay_hall_id', $hall->barangay_hall_id)
             ->findOrFail($recordId);
 
-        DB::transaction(function () use ($record, $validated, $request) {
+        $jurisdiction = $jurisdictionService->resolve(
+            (float) $validated['lat'],
+            (float) $validated['lng'],
+            null,
+            [(int) $hall->barangay_id]
+        );
+        if (! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
+            throw ValidationException::withMessages([
+                'lat' => 'Place the fire incident marker inside your assigned barangay boundary.',
+            ]);
+        }
+
+        DB::transaction(function () use ($record, $validated, $request, $jurisdiction) {
             $record->incident?->marker?->update([
                 'title' => $validated['title'],
                 'description' => $validated['location_description'],
@@ -1697,6 +1744,14 @@ class BarangayDashboardController extends Controller
                 'fire_cause' => $validated['fire_cause'] ?? null,
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            $record->incident?->forceFill([
+                'barangay_id' => $jurisdiction['barangay_id'],
+                'station_id' => $jurisdiction['station_id'],
+                'barangay_resolution_status' => 'matched',
+                'barangay_resolution_source' => 'barangay_report_update:'.$jurisdiction['resolution_source'],
+                'barangay_resolved_at' => now(),
+            ])->save();
 
             HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $record->incident_id);
             UserActivityLogger::log('updated fire report record', Auth::user()?->user_id, $request);
@@ -1752,20 +1807,44 @@ class BarangayDashboardController extends Controller
             ->with('success', 'Fire record deleted successfully.');
     }
 
-    public function storeQuickFireReport(Request $request, IncidentJurisdictionService $jurisdictionService)
+    public function storeQuickFireReport(
+        Request $request,
+        IncidentJurisdictionService $jurisdictionService,
+        IncidentAutoAssignmentService $autoAssignmentService
+    )
     {
         $validated = $request->validate([
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:1', 'max:100000'],
-            'location_captured_at' => ['required', 'date', 'after_or_equal:'.now()->subMinute()->toIso8601String(), 'before_or_equal:'.now()->addMinute()->toIso8601String()],
+            'location_captured_at' => ['required', 'date', 'after_or_equal:'.now()->subDays(30)->toIso8601String(), 'before_or_equal:'.now()->addMinute()->toIso8601String()],
+            'client_report_id' => ['nullable', 'uuid'],
         ]);
 
         $context = $this->resolveBarangayContext();
         $hall = $context['hall'];
         $userId = Auth::user()?->user_id;
+        $clientReportId = $validated['client_report_id'] ?? null;
+        $idempotencyKey = $clientReportId ? 'barangay-incident-report:'.$userId.':'.$clientReportId : null;
+        if ($idempotencyKey && ($existingIncidentId = Cache::get($idempotencyKey))) {
+            $existingIncident = Incident::query()->find($existingIncidentId);
+            if ($existingIncident) {
+                $this->safelyAutoAssignFireIncident($existingIncident, $autoAssignmentService);
+            }
+            return response()->json([
+                'success' => true,
+                'message' => 'This fire report was already received.',
+                'data' => ['incident_id' => (int) $existingIncidentId],
+                'duplicate_request' => true,
+            ]);
+        }
         $timestamp = now();
-        $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
+        $jurisdiction = $jurisdictionService->resolve(
+            (float) $validated['lat'],
+            (float) $validated['lng'],
+            (float) $validated['accuracy'],
+            $hall ? [(int) $hall->barangay_id] : []
+        );
 
         $weakAccuracy = (float) $validated['accuracy'] > 100;
         if (! $hall || (! $weakAccuracy && (! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id))) {
@@ -1778,7 +1857,9 @@ class BarangayDashboardController extends Controller
             $jurisdiction['barangay_id'] = (int) $hall->barangay_id;
             $jurisdiction['station_id'] = DB::table('station_barangay_coverage')
                 ->where('barangay_id', $hall->barangay_id)
-                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->orderByRaw("CASE coverage_type WHEN 'primary' THEN 1 WHEN 'support' THEN 2 ELSE 3 END")
                 ->value('station_id') ?? $jurisdiction['station_id'];
         }
@@ -1803,7 +1884,9 @@ class BarangayDashboardController extends Controller
                 'barangay_id' => $jurisdiction['barangay_id'],
                 'station_id' => $jurisdiction['station_id'],
                 'barangay_resolution_status' => 'matched',
-                'barangay_resolution_source' => $accuracyMeters > 100 ? 'weak_gps_barangay_fallback' : 'saved_boundary',
+                'barangay_resolution_source' => $accuracyMeters > 100
+                    ? 'weak_gps_barangay_fallback'
+                    : $jurisdiction['resolution_source'],
                 'barangay_resolved_at' => now(),
             ]);
             IncidentContextDispatcher::dispatchFor($incident);
@@ -1825,13 +1908,21 @@ class BarangayDashboardController extends Controller
 
             return $incident;
         });
+        if ($idempotencyKey) {
+            Cache::put($idempotencyKey, (int) $incident->incident_id, now()->addDays(30));
+        }
+        $assignment = $this->safelyAutoAssignFireIncident($incident, $autoAssignmentService);
 
         return response()->json([
             'success' => true,
             'message' => 'Fire report submitted successfully.',
             'data' => [
                 'incident_id' => $incident->incident_id,
+                'barangay_id' => $incident->barangay_id,
+                'station_id' => $incident->station_id,
+                'team_id' => $incident->fresh()->team_id,
             ],
+            'assignment' => $assignment,
         ]);
     }
 

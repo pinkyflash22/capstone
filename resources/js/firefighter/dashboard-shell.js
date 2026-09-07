@@ -6,7 +6,6 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     window.mapInstanceConfig = config.mapInstanceConfig || { containerId: "firefighterDashboardMap", instanceKey: "firefighterDashboard" };
     window.deferPyroMapInit = true;
     window.__ffAllowDashboardPrefetch = false;
-    window.geoapifyKey = config.geoapifyKey || null;
     window.userId = config.userId ?? null;
     window.userTeamId = config.userTeamId ?? null;
     window.userStationId = config.userStationId ?? null;
@@ -1439,8 +1438,8 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     });
 
     try {
-        const response = await fetch(`/api/incidents/${incidentId}/false-alarm`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/false-alarm`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -1584,7 +1583,9 @@ async function publishDriverApparatusLocation(position) {
             renderActiveResponseUnits(activeResponseUnitsData);
         } catch (error) {
             console.warn('Apparatus telemetry update failed:', error);
-            if (!navigator.onLine || error.canQueue) queueApparatusTelemetry(unit.id, telemetryPayload);
+            if (!navigator.onLine || error.canQueue || error instanceof TypeError) {
+                queueApparatusTelemetry(unit.id, telemetryPayload);
+            }
         } finally {
             const latest = apparatusTelemetryState.get(unit.id) || {};
             apparatusTelemetryState.set(unit.id, { ...latest, pending: false });

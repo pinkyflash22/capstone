@@ -863,6 +863,17 @@ class AnalyticController extends Controller
 
         $stationId = $stationOfficer->station_id;
 
+        if ($selectedBarangayId) {
+            $coveredBarangayIds = $this->resolveStationBarangays((int) $stationId)
+                ->pluck('barangay_id')
+                ->map(fn ($id) => (int) $id);
+            if (! $coveredBarangayIds->contains((int) $selectedBarangayId)) {
+                throw ValidationException::withMessages([
+                    'barangay_id' => 'The selected barangay is outside your assigned station coverage.',
+                ]);
+            }
+        }
+
         // Get station name
         $station = DB::table('stations')->where('station_id', $stationId)->first();
         $locationName = $station ? $station->station_name : 'My Station';

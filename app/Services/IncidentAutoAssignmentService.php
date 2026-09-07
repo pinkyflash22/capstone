@@ -4,8 +4,12 @@ namespace App\Services;
 
 use App\Models\Incident;
 use App\Models\Station;
+use App\Models\StationOfficer;
+use App\Notifications\IncidentDispatchUnavailableNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class IncidentAutoAssignmentService
 {
@@ -122,6 +126,20 @@ class IncidentAutoAssignmentService
                     'response_unit_id' => null,
                     'created_at' => optional($lockedIncident->created_at)->toISOString(),
                 ];
+            }
+
+            if ($lockedIncident->barangay_id && $lockedIncident->station_id) {
+                $incidentId = (int) $lockedIncident->incident_id;
+                $stationId = (int) $lockedIncident->station_id;
+                $barangayId = (int) $lockedIncident->barangay_id;
+                $barangayName = $lockedIncident->barangay()->value('barangay_name');
+
+                DB::afterCommit(fn () => $this->notifyStationCommandOfUnavailableResources(
+                    $incidentId,
+                    $stationId,
+                    $barangayId,
+                    $barangayName
+                ));
             }
 
             return null;
@@ -305,6 +323,55 @@ class IncidentAutoAssignmentService
             ->unique(fn ($station) => (int) $station->station_id)
             ->take($stationLimit)
             ->values();
+    }
+
+    private function notifyStationCommandOfUnavailableResources(
+        int $incidentId,
+        int $stationId,
+        int $barangayId,
+        ?string $barangayName
+    ): void {
+        try {
+            $recipients = StationOfficer::query()
+                ->with('user.role')
+                ->where('station_id', $stationId)
+                ->get()
+                ->pluck('user')
+                ->filter(function ($user) {
+                    $role = strtolower(trim((string) $user?->role?->role));
+
+                    return in_array($role, ['chief', 'station admin', 'chief station admin'], true);
+                })
+                ->unique('user_id')
+                ->values();
+
+            foreach ($recipients as $recipient) {
+                $alreadyNotified = $recipient->notifications()
+                    ->where('type', IncidentDispatchUnavailableNotification::class)
+                    ->where('created_at', '>=', now()->subMinutes(15))
+                    ->latest('created_at')
+                    ->limit(50)
+                    ->get()
+                    ->contains(fn ($notification) =>
+                        (int) data_get($notification->data, 'meta.incident_id') === $incidentId
+                    );
+
+                if (! $alreadyNotified) {
+                    $recipient->notify(new IncidentDispatchUnavailableNotification(
+                        $incidentId,
+                        $stationId,
+                        $barangayId,
+                        $barangayName
+                    ));
+                }
+            }
+        } catch (Throwable $exception) {
+            Log::error('Unable to notify station command about unavailable incident resources.', [
+                'incident_id' => $incidentId,
+                'station_id' => $stationId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
 }

@@ -839,8 +839,9 @@
                 return;
             }
 
-            button.addEventListener('click', function () {
+            button.addEventListener('click', async function () {
                 if (!navigator.geolocation) {
+                    window.alert('Location is not supported by this browser. Enter the coordinates manually.');
                     return;
                 }
 
@@ -848,15 +849,24 @@
                 const previousLabel = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Getting location...';
 
-                navigator.geolocation.getCurrentPosition(function (position) {
-                    latInput.value = Number(position.coords.latitude).toFixed(7);
-                    lngInput.value = Number(position.coords.longitude).toFixed(7);
+                try {
+                    if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+                        throw new Error('Location service is still loading. Please try again.');
+                    }
+
+                    // Barangay personnel may still submit the best available fix in
+                    // weak-signal areas; the server keeps the reported accuracy.
+                    const fix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
+                    latInput.value = Number(fix.lat).toFixed(7);
+                    lngInput.value = Number(fix.lng).toFixed(7);
+                } catch (error) {
+                    if (error?.locationReason !== 'cancelled') {
+                        window.alert(error?.message || 'Unable to get your location. Enter the coordinates manually or try again.');
+                    }
+                } finally {
                     button.disabled = false;
                     button.innerHTML = previousLabel;
-                }, function () {
-                    button.disabled = false;
-                    button.innerHTML = previousLabel;
-                });
+                }
             });
         }
 

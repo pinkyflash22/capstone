@@ -9,6 +9,17 @@ class PredictedRiskAreaService
 {
     public function buildForecastAreas(?int $stationId): Collection
     {
+        return $this->buildForecastOverlay($stationId)['areas'];
+    }
+
+    /**
+     * Return both drawable forecasts and saved forecasts that cannot be placed
+     * without inventing a location.
+     *
+     * @return array{areas: Collection, unmapped: Collection}
+     */
+    public function buildForecastOverlay(?int $stationId): array
+    {
         $analyses = DB::table('analysis')
             ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
             ->orderByDesc('created_at')
@@ -30,6 +41,7 @@ class PredictedRiskAreaService
             ->filter(fn (array $point) => ! empty($point['barangay_id']))
             ->groupBy(fn (array $point) => (int) $point['barangay_id']);
         $areas = collect();
+        $unmapped = collect();
         $seen = [];
 
         foreach ($analyses as $analysis) {
@@ -46,9 +58,11 @@ class PredictedRiskAreaService
                 if (isset($seen[$dedupeKey])) {
                     continue;
                 }
+                $seen[$dedupeKey] = true;
 
                 $location = $locations->get($barangayId);
                 if (! $location) {
+                    $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, 'outside_station_coverage_or_missing_barangay'));
                     continue;
                 }
 
@@ -93,6 +107,7 @@ class PredictedRiskAreaService
                 if ($forecastEvidence->isEmpty()) {
                     // Neither a barangay boundary nor its hall is evidence of where
                     // fire risk is concentrated. Do not invent a geographic hotspot.
+                    $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, 'no_geolocated_approved_evidence'));
                     continue;
                 }
 
@@ -103,12 +118,14 @@ class PredictedRiskAreaService
                 $area['heat_basis'] = 'saved_analysis_result';
                 $area['location_basis'] = 'historical_fires_and_approved_field_evidence';
 
-                $seen[$dedupeKey] = true;
                 $areas->push($area);
             }
         }
 
-        return $areas->values();
+        return [
+            'areas' => $areas->values(),
+            'unmapped' => $unmapped->values(),
+        ];
     }
 
     public function buildPredictedAreas(?int $stationId, int $proximityMeters = 100): Collection
@@ -133,6 +150,8 @@ class PredictedRiskAreaService
 
     protected function riskEvidencePoints(?int $stationId): Collection
     {
+        $coveredBarangayIds = $this->coveredBarangayIds($stationId);
+
         return DB::table('risk_areas')
             ->join('markers', 'risk_areas.marker_id', '=', 'markers.marker_id')
             ->join('barangay_halls', 'risk_areas.barangay_hall_id', '=', 'barangay_halls.barangay_hall_id')
@@ -148,7 +167,17 @@ class PredictedRiskAreaService
                 $query->whereNull('risk_areas.review_type')
                     ->orWhere('risk_areas.review_type', '!=', 'delete');
             })
-            ->when($stationId, fn ($query) => $query->where('risk_areas.station_id', $stationId))
+            ->when($stationId, function ($query) use ($stationId, $coveredBarangayIds) {
+                $query->where(function ($scope) use ($stationId, $coveredBarangayIds) {
+                    $scope->where('risk_areas.station_id', $stationId);
+                    if ($coveredBarangayIds->isNotEmpty()) {
+                        $scope->orWhere(function ($legacy) use ($coveredBarangayIds) {
+                            $legacy->whereNull('risk_areas.station_id')
+                                ->whereIn('barangays.barangay_id', $coveredBarangayIds->all());
+                        });
+                    }
+                });
+            })
             ->select([
                 'risk_areas.risk_area_id',
                 'risk_areas.marker_id',
@@ -270,6 +299,7 @@ class PredictedRiskAreaService
 
     protected function forecastBarangayLocations(?int $stationId): Collection
     {
+        $coveredBarangayIds = $this->coveredBarangayIds($stationId);
         $rows = DB::table('barangays')
             ->leftJoin('cities', 'barangays.city_id', '=', 'cities.city_id')
             ->leftJoin('barangay_halls', 'barangays.barangay_id', '=', 'barangay_halls.barangay_id')
@@ -284,6 +314,8 @@ class PredictedRiskAreaService
                     });
                 }
             })
+            ->when($stationId && $coveredBarangayIds->isNotEmpty(), fn ($query) => $query->whereIn('barangays.barangay_id', $coveredBarangayIds->all()))
+            ->when($stationId && $coveredBarangayIds->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
             ->select([
                 'barangays.barangay_id',
                 'barangays.barangay_name',
@@ -307,6 +339,39 @@ class PredictedRiskAreaService
             ]);
 
         return $rows->unique('barangay_id')->keyBy(fn ($row) => (int) $row->barangay_id);
+    }
+
+    protected function coveredBarangayIds(?int $stationId): Collection
+    {
+        if (! $stationId) {
+            return collect();
+        }
+
+        return DB::table('station_barangay_coverage')
+            ->where('station_id', $stationId)
+            ->where(function ($query) {
+                $query->whereNull('is_active')->orWhere('is_active', true);
+            })
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    protected function unmappedForecast(object $analysis, array $prediction, string $overlayType, string $reason): array
+    {
+        return [
+            'analysis_id' => (int) $analysis->analysis_id,
+            'barangay_id' => (int) ($prediction['barangay_id'] ?? 0),
+            'barangay_name' => (string) ($prediction['barangay_name'] ?? 'Unknown barangay'),
+            'overlay_type' => $overlayType,
+            'risk_level' => $this->normalizeForecastRiskLevel($prediction['risk_level'] ?? $analysis->risk_level ?? 'low'),
+            'reason' => $reason,
+            'message' => $reason === 'no_geolocated_approved_evidence'
+                ? 'Forecast saved, but it has no geolocated approved risk report or linked historical fire to place on the heatmap.'
+                : 'Forecast saved, but its barangay is missing or outside the selected station coverage.',
+        ];
     }
 
     protected function decodeJsonArray(mixed $value): array

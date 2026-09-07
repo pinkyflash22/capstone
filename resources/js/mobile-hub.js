@@ -529,7 +529,7 @@ function scheduleResponderPrefetch(lat, lng) {
     window.setTimeout(run, 250);
 }
 
-async function createIncident(coords, stationId, teamId) {
+async function createIncident(coords, clientReportId) {
     const capturedAt = new Date(coords.timestamp).toISOString();
     const body = {
         lat: coords.lat,
@@ -541,15 +541,8 @@ async function createIncident(coords, stationId, teamId) {
         occurred_at: capturedAt,
         location_accuracy: coords.accuracy,
         location_captured_at: capturedAt,
+        client_report_id: clientReportId,
     };
-
-    if (stationId) {
-        body.station_id = stationId;
-    }
-
-    if (teamId) {
-        body.team_id = teamId;
-    }
 
     const response = await fetch('/citizen/incident', {
         method: 'POST',
@@ -573,34 +566,11 @@ async function createIncident(coords, stationId, teamId) {
     return response.json();
 }
 
-async function updateTeamStatus(teamId) {
-    if (!teamId) {
-        return;
-    }
-
-    await fetch(`/api/teams/${teamId}`, {
-        method: 'PUT',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-        body: JSON.stringify({
-            status: 'responding',
-        }),
-    });
-}
-
-function updateTeamStatusInBackground(teamId) {
-    updateTeamStatus(teamId).catch((error) => {
-        console.warn('Mobile hub team status update failed:', error);
-    });
-}
-
-async function sendMobileHubIncidentReport(coords) {
+async function sendMobileHubIncidentReport(coords, clientReportId) {
     const responder = await resolveNearestAvailableResponderForReport(coords.lat, coords.lng);
-    const incidentPayload = await createIncident(coords, responder.stationId, responder.teamId);
-    updateTeamStatusInBackground(responder.teamId);
+    // Station/team assignment is authoritative on the server. The lookup is
+    // presentation-only and must never let a modified client choose dispatch.
+    const incidentPayload = await createIncident(coords, clientReportId);
     clearCachedResponder();
 
     return { responder, incidentPayload };
@@ -616,6 +586,39 @@ async function submitMobileHubIncidentReport() {
     }
 
     let optimisticTimer = null;
+    let reportCoords = null;
+    const clientReportId = window.crypto?.randomUUID?.() || null;
+
+    const queueReport = (coords) => {
+        if (!coords || typeof window.pyroPwa?.enqueueOfflineReport !== 'function') {
+            return false;
+        }
+        const capturedAt = new Date(coords.timestamp).toISOString();
+        window.pyroPwa.enqueueOfflineReport({
+            url: '/citizen/incident',
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+                lat: coords.lat,
+                lng: coords.lng,
+                title: 'Citizen Fire Emergency',
+                description: 'One-tap fire emergency report queued from the mobile hub.',
+                status: 'reported',
+                reported_by: currentUserId,
+                occurred_at: capturedAt,
+                location_accuracy: coords.accuracy,
+                location_captured_at: capturedAt,
+                client_report_id: clientReportId,
+            }),
+            type: 'citizen-mobile-fire-report',
+            meta: { queued_at: capturedAt },
+        });
+        return true;
+    };
 
     try {
         setReportButtonLoading(true);
@@ -623,6 +626,7 @@ async function submitMobileHubIncidentReport() {
         showHubStatus('Getting a fresh, accurate GPS fix...', 'success');
 
         const coords = await getFreshCoords();
+        reportCoords = coords;
         showHubStatus(
             coords.accuracyWarning
                 ? `Weak GPS (±${Math.round(coords.accuracy)} m). Sending the report with this best available location...`
@@ -636,29 +640,7 @@ async function submitMobileHubIncidentReport() {
                 throw new Error('The offline report queue is not ready. Keep this page open and try again.');
             }
 
-            const capturedAt = new Date(coords.timestamp).toISOString();
-            window.pyroPwa.enqueueOfflineReport({
-                url: '/citizen/incident',
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({
-                    lat: coords.lat,
-                    lng: coords.lng,
-                    title: 'Citizen Fire Emergency',
-                    description: 'One-tap fire emergency report queued from the mobile hub.',
-                    status: 'reported',
-                    reported_by: currentUserId,
-                    alarmdatetime: capturedAt,
-                    location_accuracy: coords.accuracy,
-                    location_captured_at: capturedAt,
-                }),
-                type: 'citizen-mobile-fire-report',
-                meta: { queued_at: capturedAt },
-            });
+            queueReport(coords);
 
             showHubStatus('Fire report saved offline. It will sync after reconnecting.', 'success');
             showHubToast('Fire report queued for automatic sync.', 'success');
@@ -672,11 +654,12 @@ async function submitMobileHubIncidentReport() {
             showHubToast('Fire report queued.', 'success');
         }, 1200);
 
-        const { responder, incidentPayload } = await sendMobileHubIncidentReport(coords);
+        const { responder, incidentPayload } = await sendMobileHubIncidentReport(coords, clientReportId);
         window.clearTimeout(optimisticTimer);
 
-        const successMessage = responder.teamId
-            ? `Fire emergency report sent to ${responder.stationName}.`
+        const assignedStationName = incidentPayload?.data?.station?.station_name;
+        const successMessage = assignedStationName
+            ? `Fire emergency report sent to ${assignedStationName}.`
             : (incidentPayload?.message || 'Fire report sent. Dispatch matching is running.');
 
         showHubStatus(successMessage, 'success');
@@ -690,6 +673,11 @@ async function submitMobileHubIncidentReport() {
         );
     } catch (error) {
         console.error('Mobile hub report failed:', error);
+        if ((!window.navigator.onLine || error instanceof TypeError) && queueReport(reportCoords)) {
+            showHubStatus('The connection failed, so the fire report was saved offline and will sync automatically.', 'success');
+            showHubToast('Fire report queued for automatic sync.', 'success');
+            return;
+        }
         showHubStatus(error.message || 'Failed to send the report. Please try again.');
         showHubToast(error.message || 'Report failed. Please try again.', 'error');
     } finally {

@@ -188,9 +188,8 @@ Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,ch
         Route::get('/predictions/{runId}', [ChiefAnalyticController::class, 'predictionRunStatus']);
     });
 // Add to your routes/api.php or web.php
-Route::get('/firefighter/assigned-incidents/{firefighterId}', [IncidentController::class, 'getAssignedIncidents'])
-    ->middleware(['web', 'auth', 'role:station admin,chief,firefighter,provincial admin']);
-Route::get('/incidents/{incidentId}', [IncidentController::class, 'show'])
+Route::get('/incidents/{incident}', [IncidentController::class, 'show'])
+    ->whereNumber('incident')
     ->middleware(['web', 'auth']);
 //for displaying markers
 // Simple working endpoint for recent incidents
@@ -199,7 +198,8 @@ Route::get('/incidents/recent', function (Request $request) {
         $since = $request->get('since');
         
         // Simple query without relationships first to test
-        $query = DB::table('incidents');
+        $query = app(\App\Services\OperationalMapScope::class)
+            ->constrainIncidentQuery(\App\Models\Incident::query(), $request->user());
         
         if ($since) {
             $query->where('created_at', '>', $since);
@@ -217,7 +217,7 @@ Route::get('/incidents/recent', function (Request $request) {
         \Log::error('Incidents recent error: ' . $e->getMessage());
         return response()->json([
             'success' => false,
-            'message' => $e->getMessage()
+            'message' => 'Unable to load recent incidents.'
         ], 500);
     }
 })->middleware(['web', 'auth']);
@@ -262,34 +262,31 @@ Route::middleware(['web', 'auth', 'role:station admin,chief,firefighter,provinci
 
 // Route::put('/incidents/{incidentId}/complete', [IncidentController::class, 'complete']);
 
-Route::post('/incidents', [IncidentController::class, 'store'])->middleware('throttle:10,1');
+Route::post('/incidents', [IncidentController::class, 'store'])
+    ->middleware(['web', 'auth', 'throttle:10,1']);
 Route::middleware(['web', 'auth'])->group(function () {
     Route::put('/incidents/{incidentId}/citizen-update', [IncidentController::class, 'updateCitizenReport']);
     Route::get('/stations', [IncidentController::class, 'getStations']);
     Route::get('/incident-type', [IncidentTypeController::class, 'index']);
+    Route::get('/incidents/nearest-available-responder', [IncidentController::class, 'nearestAvailableResponder']);
 });
 Route::middleware(['web', 'auth', 'role:station admin,chief,firefighter,provincial admin'])->group(function () {
+    Route::post('/incidents/{incident}/accept', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'respond']);
+    Route::post('/incidents/{incident}/arrive', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'arrive']);
+    Route::post('/incidents/{incident}/complete', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'complete']);
+});
+Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->group(function () {
     Route::put('/incidents/{incidentId}/false-alarm', [IncidentController::class, 'markFalseAlarm']);
-    Route::get('/incidents/nearest-available-responder', [IncidentController::class, 'nearestAvailableResponder']);
     Route::put('/incidents/{incidentId}/{statusId}', [IncidentController::class, 'updateIncidentStatus']);
-    Route::get('/incidents/assigned', [IncidentController::class, 'getAssignedIncidents']);
-    Route::get('/incidents/with-markers', [IncidentController::class, 'getIncidentsWithMarkers']);
-    Route::get('/incidents/assigned/{userId}', [IncidentController::class, 'getAssignedIncidentForUser']);
-    Route::post('/incidents/{id}/accept', [IncidentController::class, 'acceptIncident']);
-    Route::post('/incidents/{id}/arrive', [IncidentController::class, 'arriveAtIncident']);
-    Route::post('/incidents/{id}/complete', [IncidentController::class, 'completeIncident']);
 });
 
 
     // Route::post('/firefighter/status', [FirefighterController::class, 'updateStatus']);
 
-Route::put('/api/incidents/{incidentId}', [IncidentController::class, 'cancelIncident'])
-    ->middleware(['web', 'auth']);
-Route::delete('/api/markers/{markerId}', [MarkerController::class, 'destroy'])
-    ->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
-Route::get('/api/markers', [MarkerController::class, 'index'])->middleware(['web', 'auth']);
-Route::post('/route', [RoutingController::class, 'route']);
-Route::post('/reverse', [RoutingController::class, 'reverse']);
+Route::middleware(['web', 'auth', 'throttle:60,1'])->group(function () {
+    Route::post('/routing/calculate', [RoutingController::class, 'route']);
+    Route::post('/reverse', [RoutingController::class, 'reverse']);
+});
 Route::post('/marker-categories', [MarkerCategoryController::class, 'store'])
     ->middleware(['web', 'auth', 'role:provincial admin'])->name('admin.marker-category.store');
 Route::get('/marker-categories', [MarkerCategoryController::class, 'categories'])->middleware(['web', 'auth'])->name('admin.marker.categories');
@@ -323,7 +320,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 });
 
 // Only responder/management roles can create, move, stop, or delete a shared route.
-Route::middleware(['web', 'auth', 'role:admin,station admin,chief,firefighter'])->group(function () {
+Route::middleware(['web', 'auth', 'role:admin,provincial admin,station admin,chief,firefighter'])->group(function () {
     Route::post('/route/clear-active', [RouteController::class, 'clearActive']);
     Route::put('/route/{id}/status', [RouteController::class, 'updateStatus']);
     Route::post('/route', [RouteController::class, 'store']);
@@ -337,8 +334,6 @@ Route::middleware(['web', 'auth', 'role:admin,station admin,chief,firefighter'])
 
 
 // Address API routes for station form
-Route::get('/api/cities/{provinceId}', [AdminController::class, 'getCities'])->name('api.admin.cities');
-Route::get('/api/barangays/{cityId}', [AdminController::class, 'getBarangays'])->name('api.admin.barangays');
 Route::post('/full-addresses', [AdminController::class, 'storeFullAddress'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->name('api.full-addresses');
 Route::delete('/markers/{id}', [MarkerController::class, 'destroy'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
 Route::get('/markers/latest', [MarkerController::class, 'latest'])->middleware(['web', 'auth']); //latest markers
@@ -376,10 +371,12 @@ Route::get('/hydrant-types', [HydrantTypeController::class, 'index'])->middlewar
 // Route::get('/stations/{stationId}/available-personnel', [PersonnelController::class, 'getAvailableByStation']);
 // Route::put('/personnel/{id}/availability', [PersonnelController::class, 'updateAvailability']);
 
-Route::get('/shapes', [BoundaryLocationController::class, 'index']); // fetch all shapes
-Route::get('/shapes/latest', [BoundaryLocationController::class, 'latest']);
-Route::get('/fire-risk-areas', [FireRiskAreaOverlayController::class, 'index']);
-Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/shapes', [BoundaryLocationController::class, 'index']);
+    Route::get('/shapes/latest', [BoundaryLocationController::class, 'latest']);
+    Route::get('/fire-risk-areas', [FireRiskAreaOverlayController::class, 'index']);
+    Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
+});
 
 Route::middleware(['web', 'auth', 'role:station admin,chief'])->group(function () {
     Route::put('/markers/{markerId}/location', [MarkerController::class, 'updateLocation']);
@@ -406,7 +403,7 @@ Route::prefix('personnel')->group(function () {
     // Route::delete('/{id}', [PersonnelController::class, 'destroy']);
 });
 
-Route::get('/incident/latest', [IncidentController::class, 'latest']);
+Route::get('/incident/latest', [IncidentController::class, 'latest'])->middleware(['web', 'auth']);
 Route::post('/incidents/{incidentId}/auto-assign', [IncidentController::class, 'autoAssignIncident'])
     ->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
 Route::post('/incidents/auto-assign-recent-unassigned', [IncidentController::class, 'autoAssignRecentUnassignedIncidents'])

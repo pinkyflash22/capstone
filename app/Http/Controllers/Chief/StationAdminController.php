@@ -1679,15 +1679,30 @@ class StationAdminController extends Controller
         // The shared map immediately revalidates from /map/markers/feed. Avoid
         // blocking the dashboard HTML on the much larger marker relationship graph.
         $mapmarker = [];
+        $thisperson = $this->getAuthenticatedStationOfficer();
+        abort_unless($thisperson?->station_id, 403, 'No station is linked to this commander account.');
+        $stationId = (int) $thisperson->station_id;
+        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
+            ->pluck('station_officer_id')
+            ->filter()
+            ->values();
+        $stationTeams = $this->getTeamsForStationOfficerIds($stationOfficerIds)
+            ->orderBy('team_id')
+            ->get();
+        $defaultTeam = $stationTeams->first();
+        $teamIds = $stationTeams->pluck('team_id')->filter()->values();
         $incidents = Incident::with(['marker:marker_id,category'])
+            ->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId);
+                if ($teamIds->isNotEmpty()) {
+                    $query->orWhereIn('team_id', $teamIds->all());
+                }
+            })
             ->orderBy('created_at')
             ->get(['incident_id', 'status', 'marker_id', 'team_id', 'station_id', 'created_at', 'occurred_at']);
         $alerts = $incidents;
         $stations = Station::all();
         $provinces = Province::orderBy('province_name')->get(['province_id', 'province_name']);
-        $thisperson = $this->getAuthenticatedStationOfficer();
-        abort_unless($thisperson?->station_id, 403, 'No station is linked to this commander account.');
-        $stationId = (int) $thisperson->station_id;
         $stationperson = StationOfficer::query()
             ->where('station_id', $stationId)
             ->with('station:station_id,station_name')
@@ -1704,15 +1719,6 @@ class StationAdminController extends Controller
             ->where('status', 'active')
             ->orderBy('position')
             ->get(['barangay_officer_id', 'barangay_id', 'user_id', 'position', 'status']);
-        $stationOfficerIds = StationOfficer::where('station_id', $stationId)
-            ->pluck('station_officer_id')
-            ->filter()
-            ->values();
-        $stationTeams = $this->getTeamsForStationOfficerIds($stationOfficerIds)
-            ->orderBy('team_id')
-            ->get();
-        $defaultTeam = $stationTeams->first();
-        $teamIds = $stationTeams->pluck('team_id')->filter()->values();
         $incidentTrendData = $this->buildIncidentTrendData($incidents);
         $stationReadiness = $this->buildStationReadinessData();
         $recentAnalyses = $stationId
@@ -1743,15 +1749,8 @@ class StationAdminController extends Controller
         $analysisTrendSeries = $this->buildDashboardMlTrendSeries($recentAnalyses, $stationId, $teamIds, $incidents);
         $analysisTrendRunCount = $recentAnalyses->count();
         $dashboardStatsSeed = [
-            'incident_total' => $teamIds->isNotEmpty()
-                ? $incidents->whereIn('team_id', $teamIds->all())->count()
-                : 0,
-            'active_responses' => $teamIds->isNotEmpty()
-                ? $incidents
-                    ->whereIn('team_id', $teamIds->all())
-                    ->whereIn('status', ['Responding', 'On Scene'])
-                    ->count()
-                : 0,
+            'incident_total' => $incidents->count(),
+            'active_responses' => $incidents->whereIn('status', ['Responding', 'On Scene'])->count(),
             'fsic_claims' => $stationOfficerIds->isNotEmpty()
                 ? FsicApproval::whereIn('approved_by', $stationOfficerIds)->whereNotNull('date_issued')->count()
                 : 0,
@@ -3240,6 +3239,7 @@ class StationAdminController extends Controller
                 'incident_id',
                 'marker_id',
                 'team_id',
+                'station_id',
                 'status',
                 'updated_at',
             ])
@@ -3251,11 +3251,29 @@ class StationAdminController extends Controller
                 $query->whereNotNull('lat')
                     ->whereNotNull('lng');
             })
+            ->where(function ($query) use ($stationId, $teamIds) {
+                $query->where('station_id', $stationId);
+                if ($teamIds->isNotEmpty()) {
+                    $query->orWhereIn('team_id', $teamIds->all());
+                }
+                $query->orWhere(function ($unassigned) {
+                    $unassigned->whereNull('station_id')->whereNull('team_id');
+                });
+            })
+            ->orderByDesc('updated_at')
             ->limit(500)
             ->get()
             ->filter(function (Incident $incident) use ($stationId, $teamIds, $stationMarkers) {
+                if ($incident->station_id !== null) {
+                    return (int) $incident->station_id === (int) $stationId;
+                }
+
                 if ($teamIds->isNotEmpty() && $incident->team_id && $teamIds->contains((int) $incident->team_id)) {
                     return true;
+                }
+
+                if ($incident->team_id !== null) {
+                    return false;
                 }
 
                 $nearestStationId = $this->resolveNearestStationIdForIncident($incident, $stationMarkers);

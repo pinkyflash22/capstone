@@ -171,6 +171,7 @@ let markerFeedFetchController = null;
 let markerFeedFetchSequence = 0;
 let riskAreaFetchController = null;
 let riskAreaFetchSequence = 0;
+let unmappedForecastControl = null;
 let dynamicMapRefreshPromise = null;
 let dynamicMapRefreshQueued = false;
 let mapPollingVisibilityHandler = null;
@@ -777,7 +778,7 @@ function getDistanceFromNavigationRoute(points = [], lat, lng) {
 
 async function maybeRerouteNavigation(routeId, location) {
     const truck = activeTrucks.get(routeId);
-    if (!truck || truck.rerouteInFlight || isDemoRouteSource(truck.routeSource) || !window.geoapifyKey) return false;
+    if (!truck || truck.rerouteInFlight || isDemoRouteSource(truck.routeSource)) return false;
     const destinationLat = Number(truck.routeDestination?.lat);
     const destinationLng = Number(truck.routeDestination?.lng);
     if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) return false;
@@ -788,10 +789,12 @@ async function maybeRerouteNavigation(routeId, location) {
     truck.rerouteInFlight = true;
     truck.lastRerouteAt = Date.now();
     try {
-        const waypoints = `${location.lat},${location.lng}|${destinationLat},${destinationLng}`;
-        const response = await fetch(`https://api.geoapify.com/v1/routing?waypoints=${waypoints}&mode=drive&apiKey=${window.geoapifyKey}`);
-        if (!response.ok) throw new Error(`Reroute request failed (${response.status}).`);
-        const payload = await response.json();
+        const payload = await requestOsrmRoute(
+            Number(location.lat),
+            Number(location.lng),
+            destinationLat,
+            destinationLng
+        );
         const points = extractRouteLatLngs(payload.features?.[0]);
         if (points.length < 2) throw new Error('Reroute returned no usable road geometry.');
 
@@ -2740,8 +2743,6 @@ function getMarkerCreateEndpoint() {
 
 const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
     || [2, 3, 4].includes(Number(roleToken));
-const apiKey = "83677a1086d44c4e82f903fd2fe2ea9b";
-window.geoapifyKey = apiKey;
 window.currentDisplayedRouteId = null;
 
 const INCIDENT_ALERT_FEED_STORAGE_KEY = `pyrosense_incident_alert_feed_${roleName || 'guest'}_${currentUserMetaId}`;
@@ -2774,7 +2775,8 @@ function safeWriteJsonToStorage(key, value) {
 }
 
 function getStaticMapCacheKey(scope) {
-    return `pyrosense_static_map_${scope}_${window.activeMapInstanceKey || 'default'}`;
+    const identity = `${roleName || 'guest'}_${currentUserMetaId}_${currentStationMetaId || 'none'}`;
+    return `pyrosense_static_map_${scope}_${identity}_${window.activeMapInstanceKey || 'default'}`;
 }
 
 function readStaticMapCache(scope, maxAgeMs = STATIC_MAP_CACHE_TTL_MS) {
@@ -7656,6 +7658,20 @@ function buildIncidentPopupLoadingMarkup(message = 'Loading latest incident deta
     `;
 }
 
+function formatJurisdictionMatch(incident) {
+    const match = incident?.jurisdiction_match || {};
+    const method = String(match.method || incident?.barangay_resolution_source || '').trim().toLowerCase();
+    const distance = Number(match.boundary_distance_meters);
+    const distanceLabel = Number.isFinite(distance) ? `${Math.round(distance)} m from boundary` : '';
+
+    if (method === 'saved_boundary') return 'Inside saved boundary';
+    if (method === 'saved_boundary_vicinity') return distanceLabel ? `Nearby boundary match (${distanceLabel})` : 'Nearby boundary match';
+    if (method === 'boundary_unavailable') return 'Boundary data unavailable';
+    if (method === 'boundary_unmatched') return 'Outside saved boundaries';
+
+    return method ? method.replaceAll('_', ' ') : '';
+}
+
 function buildIncidentCommandActionMarkup(incident, marker = null) {
     if (!isDispatchCommandMapContext()) return '';
     const incidentId = Number(incident?.incident_id ?? incident?.id ?? marker?.incident_id ?? 0);
@@ -7892,6 +7908,13 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
         marker.assigned_team,
         marker.station?.name
     );
+    const incidentBarangay = compactValue(
+        incident?.jurisdiction_match?.barangay_name,
+        incident?.barangay_name,
+        incident?.barangay?.barangay_name,
+        marker.barangay_name
+    );
+    const jurisdictionMatch = formatJurisdictionMatch(incident);
     const riskReviewStatus = compactValue(riskAreaPublic.review_status, marker.review_status);
     const riskClassification = compactValue(
         riskAreaPublic.condition_label,
@@ -7912,6 +7935,8 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             { label: 'Reported', value: reportedAt },
             { label: 'Reported by', value: reporterName },
             { label: 'Assigned team', value: assignedTeam },
+            { label: 'Barangay', value: incidentBarangay },
+            { label: 'Boundary match', value: jurisdictionMatch },
             { label: 'Location', value: locationValue }
         ]
         : ['risk', 'hazard'].includes(getMarkerCategoryKey(marker))
@@ -8506,38 +8531,53 @@ async function calculateRouteToStation(stationId, stationName = null, lat = null
     }
 
     window.thisIncidents = null;
-    return await calculateRouteWithGeoapify(origin, destination);
+    return await calculateRouteWithOsrm(origin, destination);
 }
 
-async function calculateRouteWithGeoapify(origin, destination) {
-    if (!origin || !destination || !window.geoapifyKey) {
-        console.error('Missing origin, destination, or API key');
+async function requestOsrmRoute(startLat, startLng, endLat, endLng) {
+    const response = await fetch('/api/routing/calculate', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            start_lat: startLat,
+            start_lng: startLng,
+            end_lat: endLat,
+            end_lng: endLng,
+            mode: 'driving'
+        })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload?.message || `Route request failed (${response.status}).`);
+    }
+
+    return payload;
+}
+
+async function calculateRouteWithOsrm(origin, destination) {
+    if (!origin || !destination) {
+        console.error('Missing route origin or destination');
         throw new Error('Missing route configuration.');
     }
     console.log('Generating origin:', origin);
     console.log('Generating destination:', destination);
     
-    const modeMap = {
-        'driving': 'drive',
-        'walking': 'walk',
-        'cycling': 'bike'
-    };
-    let travelMode = 'driving';
-    const mode = modeMap[travelMode] || 'drive';
-    console.log('Generating mode:', mode);
-    
-    const url = `https://api.geoapify.com/v1/routing?waypoints=${origin.currentLatitude},${origin.currentLongitude}|${destination.lat},${destination.lng}&mode=${mode}&apiKey=${window.geoapifyKey}`;
-    console.log('Generating url:', url);
-
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Route calculation failed');
-        
-        const data = await response.json();
+        const data = await requestOsrmRoute(
+            Number(origin.currentLatitude),
+            Number(origin.currentLongitude),
+            Number(destination.lat),
+            Number(destination.lng)
+        );
         console.log('Generating route data:', data);
         
         if (!data.features || data.features.length === 0) {
-            throw new Error('No route returned by Geoapify.');
+            throw new Error('No drivable road route was found.');
         }
 
         const route = data.features[0];
@@ -8606,7 +8646,7 @@ async function calculateRouteWithGeoapify(origin, destination) {
         return { ok: true, route, routeSource };
         
     } catch (error) {
-        console.error('Geoapify route calculation error:', error);
+        console.error('OSRM route calculation error:', error);
         console.log('error route data:', error);
         showToast(error.message || 'Route failed. Please try again.', 'error');
         throw error;
@@ -9424,21 +9464,22 @@ async function startSimulationForRoute(routeId) {
         return;
     }
     
-    try {
-        // Directions never dispatch resources or mutate the incident lifecycle.
-        await updateRouteStatus(
-            routeId,
-            'moving',
-            0,
-            startPoint[0],
-            startPoint[1],
-            0
-        );
-        console.log('Route status updated to moving with initial position');
-    } catch (error) {
-        console.error('Error starting route simulation:', error);
-        showToast(error.message || 'Failed to start route simulation', 'error');
-        return;
+    if (isDemoRouteSource(truck.routeSource)) {
+        try {
+            await updateRouteStatus(
+                routeId,
+                'moving',
+                0,
+                startPoint[0],
+                startPoint[1],
+                0
+            );
+            console.log('Demo route status updated to moving');
+        } catch (error) {
+            console.error('Error starting demo route simulation:', error);
+            showToast(error.message || 'Failed to start demo route simulation', 'error');
+            return;
+        }
     }
     
     truck.isSimulating = true;
@@ -9750,7 +9791,7 @@ function startRealTimeLocationUpdatesForTruck(routeId) {
             if (position) {
                 const locationDisplay = document.getElementById('userLocation');
                 if (locationDisplay) {
-                    const trackingLabel = realtimeLocation ? 'Live' : 'Moving';
+                    const trackingLabel = realtimeLocation ? 'Live' : 'Waiting for GPS';
                     locationDisplay.innerHTML = `<i class="fa-solid fa-location-arrow"></i> Navigation: ${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} (${trackingLabel})`;
                 }
             }
@@ -11485,6 +11526,39 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
     });
 }
 
+function renderUnmappedForecastStatus(meta = {}) {
+    if (!window.map || typeof L === 'undefined') return;
+
+    const count = Number(meta?.unmapped_count || 0);
+    if (!unmappedForecastControl) {
+        unmappedForecastControl = L.control({ position: 'bottomleft' });
+        unmappedForecastControl.onAdd = function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar');
+            container.style.cssText = 'display:none;max-width:300px;padding:10px 12px;background:#fff;border-left:4px solid #f59e0b;border-radius:8px;box-shadow:0 4px 18px rgba(15,23,42,.18);font:12px/1.4 system-ui,sans-serif;color:#334155;';
+            L.DomEvent.disableClickPropagation(container);
+            this._container = container;
+            return container;
+        };
+        unmappedForecastControl.addTo(window.map);
+    }
+
+    const container = unmappedForecastControl._container;
+    if (!container) return;
+    if (count < 1) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    const records = Array.isArray(meta?.unmapped_forecasts) ? meta.unmapped_forecasts : [];
+    const examples = records.slice(0, 3).map((item) => escapeHtml(item?.barangay_name || 'Unknown barangay')).join(', ');
+    const remainder = Math.max(0, count - 3);
+    container.innerHTML = `<strong>${count} saved forecast${count === 1 ? '' : 's'} not mapped</strong><br>`
+        + `No precise heatmap point is shown until approved geolocated evidence exists${examples ? ` for ${examples}${remainder ? ` and ${remainder} more` : ''}` : ''}.`;
+    container.title = records[0]?.message || 'Saved forecasts without reliable geographic evidence are intentionally not placed on the map.';
+    container.style.display = 'block';
+}
+
 async function loadFireRiskAreas() {
     if (!window.map || !fireRiskAreaLayerGroup) {
         return;
@@ -11518,6 +11592,7 @@ async function loadFireRiskAreas() {
             return;
         }
         const areas = Array.isArray(payload?.data) ? payload.data : [];
+        renderUnmappedForecastStatus(payload?.meta || {});
         fireRiskAreaLayerGroup.clearLayers();
         currentRiskAnalysisLayerGroup?.clearLayers();
         nextMonthForecastLayerGroup?.clearLayers();
@@ -13210,7 +13285,7 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
 
     window.thisIncidents = resolvedIncidentId;
     console.log('thisincidents: ', window.thisIncidents);
-    return await calculateRouteWithGeoapify(origin, destination);
+    return await calculateRouteWithOsrm(origin, destination);
 }
 
 
@@ -13369,7 +13444,9 @@ window.calculateRouteToIncident = calculateRouteToIncident;
 window.calculateDemoRouteToIncident = (incidentId, markerId = null) => calculateRouteToIncident(incidentId, markerId, { source: 'demo' });
 window.demoRespondToIncident = demoRespondToIncident;
 window.calculateRouteToStation = calculateRouteToStation;
-window.calculateRouteWithGeoapify = calculateRouteWithGeoapify;
+window.calculateRouteWithOsrm = calculateRouteWithOsrm;
+// Temporary alias for older inline callers while deployed views refresh.
+window.calculateRouteWithGeoapify = calculateRouteWithOsrm;
 window.displayAndStartRoute = displayAndStartRoute;
 window.startSimulationForRoute = startSimulationForRoute;
 window.stopSimulationForRoute = stopSimulationForRoute;

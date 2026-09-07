@@ -2172,11 +2172,24 @@ async function cancelReport(incidentId, markerId) {
 //     }
 // }
 // Show incident details modal
-function showIncidentDetailsModal(incidentId) {
+async function showIncidentDetailsModal(incidentId) {
     currentIncidentId = incidentId;
-    const incident = incidentsData.find(i => i.incident_id === incidentId);
+    let incident = incidentsData.find(i => i.incident_id === incidentId);
     
     if (!incident) return;
+
+    try {
+        const response = await fetch(`/api/incidents/${incidentId}`, {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload?.data) {
+            incident = { ...incident, ...payload.data };
+        }
+    } catch (error) {
+        console.warn('Unable to refresh incident jurisdiction details:', error);
+    }
     
     const typeInfo = incidentTypeMap[incident.incident_type_id] || { name: 'Other', icon: '⚠️', color: 'gray' };
     const statusInfo = statusMap[incident.incident_status_id] || { name: 'Unknown', class: 'bg-gray-100 text-gray-700', canCancel: false };
@@ -2192,6 +2205,19 @@ function showIncidentDetailsModal(incidentId) {
     const lat = incident.marker?.lat ? formatCoord(incident.marker.lat) : 'N/A';
     const lng = incident.marker?.lng ? formatCoord(incident.marker.lng) : 'N/A';
     const locationText = (lat !== 'N/A' && lng !== 'N/A') ? `${lat}, ${lng}` : 'Pending';
+    const matchMethod = String(incident.jurisdiction_match?.method || incident.barangay_resolution_source || '').toLowerCase();
+    const boundaryDistance = Number(incident.jurisdiction_match?.boundary_distance_meters);
+    const methodLabels = {
+        saved_boundary: 'Inside saved boundary',
+        saved_boundary_vicinity: Number.isFinite(boundaryDistance)
+            ? `Nearby boundary match (${Math.round(boundaryDistance)} m from boundary)`
+            : 'Nearby boundary match',
+        boundary_unmatched: 'Outside saved boundaries',
+        boundary_unavailable: 'Boundary data unavailable'
+    };
+    const barangayName = incident.jurisdiction_match?.barangay_name || incident.barangay_name || incident.barangay?.barangay_name || '';
+    const cityName = incident.jurisdiction_match?.city_name || incident.barangay_city_name || incident.barangay?.city?.city_name || '';
+    const jurisdictionLabel = methodLabels[matchMethod] || (matchMethod ? matchMethod.replaceAll('_', ' ') : 'Not resolved');
     
     // Build modal content
     let content = `
@@ -2229,6 +2255,12 @@ function showIncidentDetailsModal(incidentId) {
                     <p class="text-xs text-gray-500 mb-1">Reported By</p>
                     <p class="font-medium text-sm">${incident.reported_by || 'Anonymous'}</p>
                 </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">Jurisdiction match</p>
+                <p class="font-medium text-sm text-gray-800">${escapeHtml([barangayName, cityName].filter(Boolean).join(', ') || 'No barangay matched')}</p>
+                <p class="text-xs text-gray-600 mt-1">${escapeHtml(jurisdictionLabel)}</p>
             </div>
             
             ${incident.marker && incident.marker.description ? `

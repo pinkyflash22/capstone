@@ -11,6 +11,8 @@ use App\Models\StationOfficer;
 use App\Services\BoundaryMatcherService;
 use App\Services\BoundaryManagementScope;
 use App\Services\GeoapifyBoundaryService;
+use App\Services\OperationalMapScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +22,10 @@ use Illuminate\Validation\ValidationException;
 
 class BoundaryLocationController extends Controller
 {
+    public function __construct(private readonly OperationalMapScope $operationalScope)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -28,10 +34,18 @@ class BoundaryLocationController extends Controller
             'station_id' => ['nullable', 'exists:stations,station_id'],
         ]);
 
-        $cacheKey = 'map:shapes:index:' . BoundaryLocation::mapCacheVersion() . ':' . md5(json_encode($validated));
+        $user = $request->user();
+        $requestedStationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
+        $stationId = $this->operationalScope->authorizeRequestedStation($user, $requestedStationId);
+        $scopeKey = implode(':', [
+            $this->operationalScope->role($user) ?: 'guest',
+            $user?->getAuthIdentifier() ?: 'guest',
+            $stationId ?: 'all',
+        ]);
+        $cacheKey = 'map:shapes:index:' . BoundaryLocation::mapCacheVersion() . ':' . md5(json_encode([$validated, $scopeKey]));
 
-        $shapes = Cache::remember($cacheKey, now()->addMinutes(3), function () use ($validated) {
-            return BoundaryLocation::query()
+        $shapes = Cache::remember($cacheKey, now()->addMinutes(3), function () use ($validated, $user, $stationId) {
+            return $this->visibleBoundaryQuery($user, $stationId)
                 ->with([
                     'station:station_id,station_name,marker_id',
                     'barangay:barangay_id,barangay_name,city_id',
@@ -39,7 +53,7 @@ class BoundaryLocationController extends Controller
                 ])
                 ->when(! empty($validated['boundary_type']), fn ($query) => $query->where('boundary_type', $validated['boundary_type']))
                 ->when(! empty($validated['barangay_id']), fn ($query) => $query->where('barangay_id', $validated['barangay_id']))
-                ->when(! empty($validated['station_id']), fn ($query) => $query->where('station_id', $validated['station_id']))
+                ->when($stationId && $this->operationalScope->hasProvinceWideAccess($user), fn ($query) => $query->where('station_id', $stationId))
                 ->orderBy('name')
                 ->get()
                 ->map(fn (BoundaryLocation $shape) => $this->serializeBoundary($shape))
@@ -51,12 +65,18 @@ class BoundaryLocationController extends Controller
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
-    public function latest(): JsonResponse
+    public function latest(Request $request): JsonResponse
     {
+        $stationId = $this->operationalScope->authorizeRequestedStation(
+            $request->user(),
+            $request->filled('station_id') ? (int) $request->input('station_id') : null,
+        );
+        $query = $this->visibleBoundaryQuery($request->user(), $stationId);
+
         return response()->json([
             'signature' => BoundaryLocation::mapCacheVersion(),
-            'count' => BoundaryLocation::query()->count(),
-            'updated_at' => BoundaryLocation::query()->max('updated_at'),
+            'count' => (clone $query)->count(),
+            'updated_at' => (clone $query)->max('updated_at'),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
@@ -266,7 +286,8 @@ class BoundaryLocationController extends Controller
 
         $boundary = $boundaryMatcherService->locateBarangayBoundary(
             (float) $validated['lat'],
-            (float) $validated['lng']
+            (float) $validated['lng'],
+            $this->visibleBarangayIds($request->user()),
         );
 
         if (! $boundary) {
@@ -282,6 +303,47 @@ class BoundaryLocationController extends Controller
             'matched' => true,
             'boundary' => $this->serializeBoundary($boundary),
         ]);
+    }
+
+    protected function visibleBoundaryQuery($user, ?int $stationId = null): Builder
+    {
+        $query = BoundaryLocation::query();
+        if (! $user || $this->operationalScope->hasProvinceWideAccess($user)) {
+            return $query;
+        }
+
+        if ($this->operationalScope->isStationResponder($user)) {
+            $stationIds = $this->operationalScope->stationIds($user);
+            $barangayIds = $this->operationalScope->coveredBarangayIds($user);
+            if ($stationIds->isEmpty()) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(function ($scope) use ($stationIds, $barangayIds) {
+                $scope->whereIn('station_id', $stationIds->all());
+                if ($barangayIds->isNotEmpty()) {
+                    $scope->orWhereIn('barangay_id', $barangayIds->all());
+                }
+            });
+        }
+
+        $barangayIds = $this->operationalScope->barangayIds($user);
+        return $barangayIds->isEmpty()
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn('barangay_id', $barangayIds->all());
+    }
+
+    protected function visibleBarangayIds($user): ?array
+    {
+        if (! $user || $this->operationalScope->hasProvinceWideAccess($user)) {
+            return null;
+        }
+
+        $ids = $this->operationalScope->isStationResponder($user)
+            ? $this->operationalScope->coveredBarangayIds($user)
+            : $this->operationalScope->barangayIds($user);
+
+        return $ids->all();
     }
 
     protected function validateBoundaryPayload(Request $request, bool $isUpdate = false): array

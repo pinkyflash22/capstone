@@ -5370,64 +5370,65 @@ async function submitCitizenQuickReport(reportKind) {
         : Number(window.userCoords.currentLongitude);
     let optimisticFireMarkerId = null;
     let optimisticConcernMarkerId = null;
+    const clientReportId = window.crypto?.randomUUID?.() || null;
+
+    const firePayload = {
+        lat: fireLat,
+        lng: fireLng,
+        title: 'Citizen Fire Emergency',
+        description: description || 'Citizen-submitted fire emergency.',
+        status: 'reported',
+        reported_by: reporter,
+        alarmdatetime: new Date().toISOString(),
+        client_report_id: clientReportId,
+        ...(citizenFireDraft.mode === 'picked' ? {} : {
+            location_accuracy: freshLocationFix.accuracy,
+            location_captured_at: new Date(freshLocationFix.timestamp).toISOString(),
+        }),
+    };
+    const concernPayload = {
+        report_kind: reportKind,
+        concern_type: concernType,
+        condition_detail: concernDetail,
+        notes: concernNotes,
+        lat: concernLat,
+        lng: concernLng,
+        user_lat: Number(window.userCoords.currentLatitude),
+        user_lng: Number(window.userCoords.currentLongitude)
+    };
+    const queuePayload = reportKind === 'fire'
+        ? {
+            url: '/citizen/incident',
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(firePayload),
+            type: 'fire-report',
+            meta: { reportKind: 'fire' }
+        }
+        : {
+            url: '{{ route('citizen.risk-reports.store') }}',
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(concernPayload),
+            type: 'concern-report',
+            meta: { reportKind: 'concern' }
+        };
 
     if (window.pyroPwa?.isOffline?.()) {
         if (reportKind === 'concern' && concernPhotoState.files.length > 0) {
             showIncidentToast?.('Photo uploads for risk or hazard reports require an internet connection.', true, 4200);
             return;
         }
-
-        const firePayload = {
-            lat: fireLat,
-            lng: fireLng,
-            title: 'Citizen Fire Emergency',
-            description: description || 'Citizen-submitted fire emergency.',
-            status: 'reported',
-            reported_by: reporter,
-            alarmdatetime: new Date().toISOString(),
-            ...(citizenFireDraft.mode === 'picked' ? {} : {
-                location_accuracy: freshLocationFix.accuracy,
-                location_captured_at: new Date(freshLocationFix.timestamp).toISOString(),
-            }),
-        };
-        const concernPayload = {
-            report_kind: reportKind,
-            concern_type: concernType,
-            condition_detail: concernDetail,
-            notes: concernNotes,
-            lat: concernLat,
-            lng: concernLng,
-            user_lat: Number(window.userCoords.currentLatitude),
-            user_lng: Number(window.userCoords.currentLongitude)
-        };
-
-        const queuePayload = reportKind === 'fire'
-            ? {
-                url: '/citizen/incident',
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify(firePayload),
-                type: 'fire-report',
-                meta: { reportKind: 'fire' }
-            }
-            : {
-                url: '{{ route('citizen.risk-reports.store') }}',
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify(concernPayload),
-                type: 'concern-report',
-                meta: { reportKind: 'concern' }
-            };
 
         window.pyroPwa?.enqueueOfflineReport?.(queuePayload);
         addPendingCitizenOfflineReport(reportKind, reportKind === 'fire' ? firePayload : concernPayload);
@@ -5478,7 +5479,10 @@ async function submitCitizenQuickReport(reportKind) {
                 incidentTypeId,
                 null,
                 reporter,
-                citizenFireDraft.mode === 'picked' ? {} : freshLocationFix
+                {
+                    ...(citizenFireDraft.mode === 'picked' ? {} : freshLocationFix),
+                    clientReportId,
+                }
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
         } else {
@@ -5574,6 +5578,14 @@ async function submitCitizenQuickReport(reportKind) {
         
     } catch (error) {
         console.error('Error:', error);
+        const networkUnavailable = !window.navigator.onLine || error instanceof TypeError;
+        const canQueueWithoutFiles = reportKind === 'fire' || concernPhotoState.files.length === 0;
+        if (networkUnavailable && canQueueWithoutFiles && typeof window.pyroPwa?.enqueueOfflineReport === 'function') {
+            window.pyroPwa.enqueueOfflineReport(queuePayload);
+            addPendingCitizenOfflineReport(reportKind, reportKind === 'fire' ? firePayload : concernPayload);
+            showIncidentToast(`${reportLabels[reportKind] || 'Report'} saved offline after the connection failed. Pending sync.`, false, 4600);
+            return;
+        }
         if (reportKind === 'fire') {
             const stillProcessing = String(error?.message || '').toLowerCase().includes('still processing');
             if (!stillProcessing) {
@@ -6251,71 +6263,13 @@ window.addEventListener('pyrosense:report-synced', function() {
     }
 });
 
-window.runPendingIncidentAutoAssignment = async function() {
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    const incidentId = window.latestReportedIncidentId || null;
-
-    if (!token) {
-        return;
-    }
-
-    if (!incidentId) {
-        return;
-    }
-
-    let timeoutId = null;
-    try {
-        if (window.citizenAutoAssignRequest) {
-            await window.citizenAutoAssignRequest;
-            return;
-        }
-
-        const controller = new AbortController();
-        timeoutId = window.setTimeout(() => controller.abort(), 10000);
-        window.citizenAutoAssignRequest = fetch(`/api/incidents/${incidentId}/auto-assign`, {
-            method: 'POST',
-            cache: 'no-store',
-            signal: controller.signal,
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': token
-            }
-        });
-        const response = await window.citizenAutoAssignRequest;
-        window.clearTimeout(timeoutId);
-        const result = await response.json().catch(() => ({}));
-        if (result?.success && result.assigned) {
-            if (window.refreshCitizenOverviewData) {
-                window.refreshCitizenOverviewData();
-            }
-        }
-    } catch (error) {
-        if (error?.name === 'AbortError') {
-            return;
-        }
-        console.error(`Background incident auto-assignment failed for incident ${incidentId}:`, error);
-    } finally {
-        if (timeoutId) {
-            window.clearTimeout(timeoutId);
-        }
-        window.citizenAutoAssignRequest = null;
-    }
-};
-
 document.addEventListener('DOMContentLoaded', function() {
-    window.runPendingIncidentAutoAssignment();
     window.startCitizenDashboardLocationIntervals?.();
 
-    const CITIZEN_AUTO_ASSIGN_INTERVAL_MS = 60000;
     const CITIZEN_OVERVIEW_INTERVAL_MS = 30000;
-    let citizenAutoAssignInterval = null;
     let citizenOverviewInterval = null;
 
     function clearCitizenDashboardDataIntervals() {
-        if (citizenAutoAssignInterval) {
-            clearInterval(citizenAutoAssignInterval);
-            citizenAutoAssignInterval = null;
-        }
         if (citizenOverviewInterval) {
             clearInterval(citizenOverviewInterval);
             citizenOverviewInterval = null;
@@ -6324,11 +6278,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function startCitizenDashboardDataIntervals() {
         clearCitizenDashboardDataIntervals();
-
-        citizenAutoAssignInterval = window.setInterval(() => {
-            if (!citizenDashboardIsVisible()) return;
-            window.runPendingIncidentAutoAssignment();
-        }, CITIZEN_AUTO_ASSIGN_INTERVAL_MS);
 
         if (window.refreshCitizenOverviewData) {
             citizenOverviewInterval = window.setInterval(() => {

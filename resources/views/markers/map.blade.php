@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Leaflet + Geoapify Routing</title>
+    <title>Leaflet + OpenStreetMap Routing</title>
 
     {{-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> --}}
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -33,8 +33,6 @@
     let endMarker = null;
     let routeLayer = null;
 
-    const apiKey = "{{ env('GEOAPIFY_KEY') }}";
-
     map.on('click', function (e) {
 
         if (!startMarker) {
@@ -59,14 +57,7 @@
 
     function getRoute(start, end) {
 
-        const url =
-            "https://api.geoapify.com/v1/routing?" +
-            `waypoints=${start.lat},${start.lng}|${end.lat},${end.lng}&` +
-            "mode=drive&" +
-            "type=balanced&" +
-            `apiKey=${apiKey}`;
-
-            fetch('/api/route', { // now it’s /route, not /api/route
+            fetch('/api/routing/calculate', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/json',
@@ -74,8 +65,11 @@
         // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
     },
     body: JSON.stringify({
-        start: start.lat + "," + start.lng,
-        end: end.lat + "," + end.lng
+        start_lat: start.lat,
+        start_lng: start.lng,
+        end_lat: end.lat,
+        end_lng: end.lng,
+        mode: 'driving'
     })
 })
 .then(res => res.json())

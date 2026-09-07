@@ -12,10 +12,13 @@ class IncidentJurisdictionSemanticsTest extends TestCase
         $assignment = file_get_contents(__DIR__.'/../../app/Services/IncidentAutoAssignmentService.php');
         $barangay = file_get_contents(__DIR__.'/../../app/Http/Controllers/Barangay/BarangayDashboardController.php');
 
-        $this->assertStringContainsString('locateBarangayBoundary($lat, $lng)', $service);
-        $this->assertStringContainsString("->where('is_active', true)", $service);
+        $this->assertStringContainsString('locateBarangayBoundary($lat, $lng, $allowedBarangayIds)', $service);
+        $this->assertStringContainsString('locateNearbyBarangayBoundary(', $service);
+        $this->assertStringContainsString("->whereNull('is_active')->orWhere('is_active', true)", $service);
+        $this->assertStringContainsString("'saved_boundary_vicinity'", $service);
         $this->assertStringContainsString("WHEN 'primary' THEN 1", $service);
         $this->assertStringContainsString('$this->jurisdictionService->apply($lockedIncident)', $assignment);
+        $this->assertStringContainsString('safelyAutoAssignFireIncident', $barangay);
         $this->assertStringContainsString("'station_id' => \$jurisdiction['station_id']", $barangay);
     }
 }

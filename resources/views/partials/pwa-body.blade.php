@@ -464,12 +464,12 @@
 <script>
     (function () {
         const STORAGE_PREFIX = 'pyrosense-pwa';
-        const DATASET_KEY = `${STORAGE_PREFIX}:datasets`;
         const ACCOUNT_SCOPE = String(@json(auth()->id()) || 'guest');
+        const DATASET_KEY = `${STORAGE_PREFIX}:datasets:${ACCOUNT_SCOPE}`;
         const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue:${ACCOUNT_SCOPE}`;
-        const STATUS_KEY = `${STORAGE_PREFIX}:status`;
-        const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots`;
-        const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return`;
+        const STATUS_KEY = `${STORAGE_PREFIX}:status:${ACCOUNT_SCOPE}`;
+        const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots:${ACCOUNT_SCOPE}`;
+        const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return:${ACCOUNT_SCOPE}`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
         const AUTH_URL = @json(url('/auth'));
         const OFFLINE_PILL_AUTO_HIDE_MS = 2600;
@@ -951,16 +951,21 @@
             const remaining = [];
             let synced = 0;
 
-            for (const item of queue) {
+            for (let index = 0; index < queue.length; index += 1) {
+                const item = queue[index];
                 try {
+                    const syncHeaders = new Headers(item.headers || {});
+                    syncHeaders.set('X-Pyro-Offline-Sync', '1');
                     const response = await pyroFetch(item.url, {
                         method: item.method || 'POST',
-                        headers: item.headers || {},
+                        headers: syncHeaders,
                         body: item.body || null
                     });
 
                     if (response.status === 419) {
-                        remaining.push(item);
+                        // Preserve the current item and every unprocessed item.
+                        // Previously only the current report survived this break.
+                        remaining.push(...queue.slice(index));
                         break;
                     }
 

@@ -108,7 +108,8 @@ Route::get('/build/assets/map-{hash}.js', function () {
 Route::post('/register/send-otp', [RegisterController::class, 'sendOTP'])->middleware('throttle:5,1')->name('register.send-otp');
 Route::post('/register/verify-otp', [RegisterController::class, 'verifyOTPAndRegister'])->middleware('throttle:10,1')->name('register.verify-otp');
 Route::post('/register/resend-otp', [RegisterController::class, 'resendOTP'])->middleware('throttle:3,5')->name('register.resend-otp');
-Route::get('/api/recent-incidents',[IncidentController::class,'getRecentIncident']);
+Route::get('/api/recent-incidents', [IncidentController::class, 'getRecentIncident'])
+    ->middleware('auth');
 
 Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->get('/test-api-key', function() {
     abort_unless(app()->environment('local'), 404);
@@ -646,6 +647,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/incidents/{incident}/respond', [FirefighterIncidentResponseController::class, 'respond'])->name('incidents.respond');
         Route::post('/incidents/{incident}/arrive', [FirefighterIncidentResponseController::class, 'arrive'])->name('incidents.arrive');
         Route::post('/incidents/{incident}/complete', [FirefighterIncidentResponseController::class, 'complete'])->name('incidents.complete');
+        Route::post('/incidents/{incident}/false-alarm', [FirefighterIncidentResponseController::class, 'falseAlarm'])->name('incidents.false-alarm');
         Route::post('/incidents/{incident}/close', [FirefighterIncidentResponseController::class, 'close'])->name('incidents.close');
         Route::get('/incidents/{incident}/response-resources', [FirefighterIncidentResponseController::class, 'resources'])->name('incidents.response-resources');
         Route::post('/schedule/events', [FirefighterController::class, 'storeScheduleEvent'])->name('schedule.events.store');

@@ -18,7 +18,6 @@ export class FirefighterDashboard {
         this.userId = window.userId || null;
         this.teamId = window.teamId || null;
         this.travelMode = 'drive';
-        this.geoapifyKey = '83677a1086d44c4e82f903fd2fe2ea9b' || null;
         
         // Animation properties
         this.animatedVehicle = null;
@@ -513,28 +512,33 @@ export class FirefighterDashboard {
     }
 
     async calculateRouteWithGeoapify(origin, destination) {
-        if (!origin || !destination || !this.geoapifyKey) {
-            console.error('Missing origin, destination, or API key');
+        if (!origin || !destination) {
+            console.error('Missing origin or destination');
             this.showToast('Missing routing information', 'error');
             return;
         }
-        
-        const modeMap = {
-            'driving': 'drive',
-            'walking': 'walk',
-            'cycling': 'bike'
-        };
-        const mode = modeMap[this.travelMode] || 'drive';
-        
-        const url = `https://api.geoapify.com/v1/routing?waypoints=${origin.lat},${origin.lng}|${destination.lat},${destination.lng}&mode=${mode}&apiKey=${this.geoapifyKey}`;
-        
+
         try {
             this.showToast('Calculating route...', 'info');
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Route calculation failed');
-            
-            const data = await response.json();
+
+            const response = await fetch('/api/routing/calculate', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    start_lat: Number(origin.lat),
+                    start_lng: Number(origin.lng),
+                    end_lat: Number(destination.lat),
+                    end_lng: Number(destination.lng),
+                    mode: 'driving'
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data?.message || 'Route calculation failed');
             
             if (data.features && data.features.length > 0) {
                 const route = data.features[0];
@@ -550,7 +554,7 @@ export class FirefighterDashboard {
             }
             
         } catch (error) {
-            console.error('Geoapify route calculation error:', error);
+            console.error('OSRM route calculation error:', error);
             this.showToast('Failed to calculate route', 'error');
         }
     }

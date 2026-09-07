@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260901-4';
+const CACHE_VERSION = 'pyrosense-pwa-v20260906-1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
@@ -14,7 +14,9 @@ const CITIZEN_DASHBOARD_URL = '/citizen/dashboard';
 const NO_CACHE_HTML_PATTERNS = [
     /^\/auth(?:\/.*)?$/i,
     /^\/login$/i,
-    /^\/logout$/i
+    /^\/logout$/i,
+    /^\/(?:admin|chief|station-admin|firefighter|citizen|barangay)(?:\/.*)?$/i,
+    /^\/pwa(?:\/.*)?$/i
 ];
 
 const APP_SHELL_URLS = [
@@ -279,7 +281,9 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (isApiRequest && !isAuthRequest) {
-        event.respondWith(networkFirst(request, DYNAMIC_CACHE));
+        // Authenticated operational responses must never fall back to a cache
+        // populated by another account on the same browser profile.
+        event.respondWith(fetch(request, { cache: 'no-store', credentials: 'same-origin' }));
         return;
     }
 

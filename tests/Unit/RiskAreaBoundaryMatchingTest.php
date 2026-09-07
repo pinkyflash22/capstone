@@ -39,6 +39,18 @@ class RiskAreaBoundaryMatchingTest extends TestCase
         $this->assertNull(app(BoundaryMatcherService::class)->locateBarangayHall(10, 110));
     }
 
+    public function test_nearby_phone_fix_resolves_to_the_closest_boundary_edge_within_tolerance(): void
+    {
+        $matcher = app(BoundaryMatcherService::class);
+
+        $nearby = $matcher->locateNearbyBarangayBoundary(14.5, 121.0005, 100);
+        $tooFar = $matcher->locateNearbyBarangayBoundary(14.5, 121.01, 100);
+
+        $this->assertSame(7, $nearby?->barangay_id);
+        $this->assertLessThan(100, $nearby?->boundary_distance_meters);
+        $this->assertNull($tooFar);
+    }
+
     public function test_risk_marker_location_updates_reassign_related_records_by_boundary(): void
     {
         $controller = file_get_contents(app_path('Http/Controllers/MarkerController.php'));

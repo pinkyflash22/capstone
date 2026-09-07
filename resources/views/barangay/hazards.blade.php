@@ -1802,17 +1802,33 @@
             }
         });
 
-        currentLocationButton?.addEventListener('click', function () {
+        currentLocationButton?.addEventListener('click', async function () {
             if (!navigator.geolocation) {
+                window.alert('Location is not supported by this browser. Select the location on the map instead.');
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(function (position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
+            const previousLabel = currentLocationButton.innerHTML;
+            currentLocationButton.disabled = true;
+            currentLocationButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Locating...';
+
+            try {
+                if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+                    throw new Error('Location service is still loading. Please try again.');
+                }
+                const fix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
+                const lat = fix.lat;
+                const lng = fix.lng;
                 setCoordinates(lat, lng);
                 pickerMap?.setView([lat, lng], 16, { animate: true });
-            });
+            } catch (error) {
+                if (error?.locationReason !== 'cancelled') {
+                    window.alert(error?.message || 'Unable to get your location. Select it on the map or try again.');
+                }
+            } finally {
+                currentLocationButton.disabled = false;
+                currentLocationButton.innerHTML = previousLabel;
+            }
         });
 
         initPickerMap();

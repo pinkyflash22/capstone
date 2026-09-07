@@ -61,6 +61,18 @@ return [
         'boundary_sync_limit' => (int) env('GEOAPIFY_BOUNDARY_SYNC_LIMIT', 20),
     ],
 
+    'osrm' => [
+        'base_url' => env('OSRM_BASE_URL', 'https://router.project-osrm.org'),
+        'connect_timeout' => (int) env('OSRM_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('OSRM_TIMEOUT', 15),
+    ],
+
+    'nominatim' => [
+        'base_url' => env('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
+        'connect_timeout' => (int) env('NOMINATIM_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('NOMINATIM_TIMEOUT', 10),
+    ],
+
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_MODEL', 'deepseek/deepseek-r1-distill-llama-70b'),

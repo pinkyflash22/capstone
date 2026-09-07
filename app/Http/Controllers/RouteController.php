@@ -7,17 +7,20 @@ use App\Models\Route;
 use App\Models\StationOfficer;
 use App\Models\Team;
 use App\Models\Incident;
-use App\Models\Role;
-use App\Models\BarangayOfficer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use App\Services\OperationalMapScope;
 
 class RouteController extends Controller
 {
+    public function __construct(private readonly OperationalMapScope $operationalScope)
+    {
+    }
+
     /**
      * Display a listing of all routes.
      */
@@ -40,17 +43,18 @@ class RouteController extends Controller
         try {
             $validated = $request->validate([
                 'coordinates' => 'required|json',
-                'total_distance' => 'required|numeric',
-                'estimated_time' => 'required|numeric',
+                'total_distance' => 'required|numeric|min:0',
+                'estimated_time' => 'required|numeric|min:0',
                 'status' => 'required|in:active,moving,inactive',
                 'route_source' => 'nullable|in:real,demo',
                 'destination_title' => 'nullable|string|max:255',
-                'destination_lat' => 'nullable|numeric',
-                'destination_lng' => 'nullable|numeric',
-                'origin_lat' => 'nullable|numeric',
-                'origin_lng' => 'nullable|numeric',
+                'destination_lat' => 'nullable|numeric|between:-90,90',
+                'destination_lng' => 'nullable|numeric|between:-180,180',
+                'origin_lat' => 'nullable|numeric|between:-90,90',
+                'origin_lng' => 'nullable|numeric|between:-180,180',
                 'incident_id'=>'required|exists:incidents,incident_id'
             ]);
+            $this->validateRouteCoordinatesJson($validated['coordinates']);
 
             $supportsRouteSource = $this->routeColumnExists('route_source');
 
@@ -64,12 +68,6 @@ class RouteController extends Controller
                 ]);
             }
 
-            $existingRoute = Route::where('incident_id', $validated['incident_id'])
-                ->when($supportsRouteSource, fn ($query) => $query->where('route_source', $validated['route_source'] ?? 'real'))
-                ->whereIn('status', ['active', 'moving'])
-                ->latest('route_id')
-                ->first();
-
             $authenticatedTeam = $this->resolveAuthenticatedTeam();
             $requestedIncident = Incident::query()
                 ->with('team:team_id,station_id')
@@ -77,6 +75,7 @@ class RouteController extends Controller
                 ->find($validated['incident_id']);
 
             abort_unless($requestedIncident && $this->canAccessIncident($requestedIncident), 403, 'You cannot create a route for this incident.');
+            abort_unless($this->canMutateIncidentRoute($requestedIncident), 403, 'Only the assigned response team can start this route.');
 
             $requestedTeamId = $requestedIncident?->team_id ?? $authenticatedTeam?->team_id;
 
@@ -105,56 +104,69 @@ class RouteController extends Controller
             $validated['last_updated_at'] = now();
             $persistableRoute = $this->onlyExistingRouteColumns($validated);
 
-            if ($existingRoute) {
-                $existingRoute->update($this->onlyExistingRouteColumns([
-                    'coordinates' => $validated['coordinates'],
-                    'total_distance' => $validated['total_distance'],
-                    'estimated_time' => $validated['estimated_time'],
-                    'status' => 'active',
-                    'route_source' => $validated['route_source'] ?? $existingRoute->route_source ?? 'real',
-                    'destination_title' => $validated['destination_title'] ?? $existingRoute->destination_title,
-                    'destination_lat' => $validated['destination_lat'] ?? $existingRoute->destination_lat,
-                    'destination_lng' => $validated['destination_lng'] ?? $existingRoute->destination_lng,
-                    'origin_lat' => $validated['origin_lat'] ?? $existingRoute->origin_lat,
-                    'origin_lng' => $validated['origin_lng'] ?? $existingRoute->origin_lng,
-                    'current_position_index' => 0,
-                    'current_lat' => null,
-                    'current_lng' => null,
-                    'progress_percentage' => 0,
-                    'started_by' => $validated['started_by'],
-                    'started_at' => null,
-                    'last_updated_at' => now(),
-                ]));
+            $writeResult = Cache::lock(
+                'route-write:'.$validated['incident_id'].':'.$validated['route_source'],
+                15
+            )->block(5, function () use ($validated, $persistableRoute, $supportsRouteSource) {
+                $existingRoute = Route::where('incident_id', $validated['incident_id'])
+                    ->when($supportsRouteSource, fn ($query) => $query->where('route_source', $validated['route_source']))
+                    ->whereIn('status', ['active', 'moving'])
+                    ->latest('route_id')
+                    ->first();
 
-                $this->flushActiveRouteCaches($validated['incident_id']);
+                if ($existingRoute) {
+                    $existingRoute->update($this->onlyExistingRouteColumns([
+                        'coordinates' => $validated['coordinates'],
+                        'total_distance' => $validated['total_distance'],
+                        'estimated_time' => $validated['estimated_time'],
+                        'status' => 'active',
+                        'route_source' => $validated['route_source'],
+                        'destination_title' => $validated['destination_title'] ?? $existingRoute->destination_title,
+                        'destination_lat' => $validated['destination_lat'] ?? $existingRoute->destination_lat,
+                        'destination_lng' => $validated['destination_lng'] ?? $existingRoute->destination_lng,
+                        'origin_lat' => $validated['origin_lat'] ?? $existingRoute->origin_lat,
+                        'origin_lng' => $validated['origin_lng'] ?? $existingRoute->origin_lng,
+                        'current_position_index' => 0,
+                        'current_lat' => null,
+                        'current_lng' => null,
+                        'progress_percentage' => 0,
+                        'started_by' => $validated['started_by'],
+                        'started_at' => null,
+                        'last_updated_at' => now(),
+                    ]));
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Route updated successfully',
-                    'data' => $existingRoute->fresh()
-                ], 200);
-            }
+                    return ['route' => $existingRoute->fresh(), 'created' => false];
+                }
 
-            $route = Route::create($persistableRoute);
+                return ['route' => Route::create($persistableRoute), 'created' => true];
+            });
+
             $this->flushActiveRouteCaches($validated['incident_id']);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Route saved successfully',
-                'data' => $route
-            ], 201);
+                'message' => $writeResult['created'] ? 'Route saved successfully' : 'Route updated successfully',
+                'data' => $writeResult['route'],
+            ], $writeResult['created'] ? 201 : 200);
             
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'This route is already being updated. Please retry.',
+            ], 409);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'error' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Error saving route: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to save route: ' . $e->getMessage()
+                'error' => 'Failed to save route.'
             ], 500);
         }
     }
@@ -225,13 +237,13 @@ class RouteController extends Controller
     public function updateStatus(Request $request, $id)
     {
         try {
-            $route = $this->visibleRouteQuery()->findOrFail($id);
+            $route = $this->mutableRouteQuery()->findOrFail($id);
             
             $validated = $request->validate([
                 'status' => 'required|in:active,moving,inactive',
                 'current_position_index' => 'nullable|integer|min:0',
-                'current_lat' => 'nullable|numeric',
-                'current_lng' => 'nullable|numeric',
+                'current_lat' => 'nullable|numeric|between:-90,90',
+                'current_lng' => 'nullable|numeric|between:-180,180',
                 'progress_percentage' => 'nullable|numeric|min:0|max:100'
             ]);
             
@@ -276,6 +288,12 @@ class RouteController extends Controller
                 'data' => $route
             ]);
             
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
@@ -285,7 +303,7 @@ class RouteController extends Controller
             Log::error('Error updating route status: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to update route status: ' . $e->getMessage()
+                'error' => 'Failed to update route status.'
             ], 500);
         }
     }
@@ -296,7 +314,7 @@ class RouteController extends Controller
     public function clearActive()
     {
         try {
-            $updated = $this->visibleRouteQuery()->whereIn('status', ['active', 'moving'])
+            $updated = $this->mutableRouteQuery()->whereIn('status', ['active', 'moving'])
                 ->update(['status' => 'inactive']);
             $this->flushActiveRouteCaches();
             
@@ -420,24 +438,27 @@ class RouteController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $route = $this->visibleRouteQuery()->findOrFail($id);
+            $route = $this->mutableRouteQuery()->findOrFail($id);
             
             $validated = $request->validate([
                 'coordinates' => 'sometimes|json',
-                'total_distance' => 'sometimes|numeric',
-                'estimated_time' => 'sometimes|numeric',
+                'total_distance' => 'sometimes|numeric|min:0',
+                'estimated_time' => 'sometimes|numeric|min:0',
                 'status' => 'sometimes|in:active,moving,inactive',
                 'route_source' => 'nullable|in:real,demo',
                 'destination_title' => 'nullable|string|max:255',
-                'destination_lat' => 'nullable|numeric',
-                'destination_lng' => 'nullable|numeric',
-                'origin_lat' => 'nullable|numeric',
-                'origin_lng' => 'nullable|numeric',
+                'destination_lat' => 'nullable|numeric|between:-90,90',
+                'destination_lng' => 'nullable|numeric|between:-180,180',
+                'origin_lat' => 'nullable|numeric|between:-90,90',
+                'origin_lng' => 'nullable|numeric|between:-180,180',
                 'current_position_index' => 'nullable|integer|min:0',
-                'current_lat' => 'nullable|numeric',
-                'current_lng' => 'nullable|numeric',
+                'current_lat' => 'nullable|numeric|between:-90,90',
+                'current_lng' => 'nullable|numeric|between:-180,180',
                 'progress_percentage' => 'nullable|numeric|min:0|max:100'
             ]);
+            if (isset($validated['coordinates'])) {
+                $this->validateRouteCoordinatesJson($validated['coordinates']);
+            }
             
             $route->update($this->onlyExistingRouteColumns($validated));
             $route->last_updated_at = now();
@@ -449,6 +470,12 @@ class RouteController extends Controller
                 'data' => $route
             ]);
             
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
@@ -458,7 +485,7 @@ class RouteController extends Controller
             Log::error('Error updating route: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to update route: ' . $e->getMessage()
+                'error' => 'Failed to update route.'
             ], 500);
         }
     }
@@ -469,7 +496,7 @@ class RouteController extends Controller
     public function destroy($id)
     {
         try {
-            $route = $this->visibleRouteQuery()->findOrFail($id);
+            $route = $this->mutableRouteQuery()->findOrFail($id);
             $incidentId = $route->incident_id;
             $route->delete();
             $this->flushActiveRouteCaches($incidentId);
@@ -685,6 +712,79 @@ class RouteController extends Controller
         return $columns[$column] ??= Schema::hasColumn('routes', $column);
     }
 
+    private function validateRouteCoordinatesJson(string $coordinates): void
+    {
+        if (strlen($coordinates) > 2_000_000) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'coordinates' => 'Route geometry is too large.',
+            ]);
+        }
+
+        $decoded = json_decode($coordinates, true);
+        $pointCount = 0;
+        $invalid = false;
+        $walk = function ($value) use (&$walk, &$pointCount, &$invalid): void {
+            if (! is_array($value) || $invalid) {
+                return;
+            }
+
+            if (count($value) >= 2 && is_numeric($value[0] ?? null) && is_numeric($value[1] ?? null)) {
+                $lng = (float) $value[0];
+                $lat = (float) $value[1];
+                $pointCount++;
+                if ($lng < -180 || $lng > 180 || $lat < -90 || $lat > 90 || $pointCount > 20_000) {
+                    $invalid = true;
+                }
+                return;
+            }
+
+            foreach ($value as $child) {
+                $walk($child);
+            }
+        };
+        $walk($decoded);
+
+        if ($invalid || $pointCount < 2) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'coordinates' => 'Route geometry must contain 2 to 20,000 valid longitude/latitude points.',
+            ]);
+        }
+    }
+
+    private function mutableRouteQuery(): Builder
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return Route::query()->whereRaw('1 = 0');
+        }
+
+        if ($this->operationalScope->role($user) !== 'firefighter') {
+            return $this->visibleRouteQuery();
+        }
+
+        $team = $this->resolveAuthenticatedTeam();
+
+        return $team
+            ? Route::query()->whereHas('incident', fn ($query) => $query->where('team_id', $team->team_id))
+            : Route::query()->whereRaw('1 = 0');
+    }
+
+    private function canMutateIncidentRoute(Incident $incident): bool
+    {
+        $user = Auth::user();
+        if (! $user || ! $this->canAccessIncident($incident)) {
+            return false;
+        }
+
+        if ($this->operationalScope->role($user) !== 'firefighter') {
+            return true;
+        }
+
+        $team = $this->resolveAuthenticatedTeam();
+
+        return $team && (int) $incident->team_id === (int) $team->team_id;
+    }
+
     private function activeRouteFailureResponse(string $message, \Throwable $exception, array $context = [])
     {
         $errorId = (string) Str::uuid();
@@ -720,29 +820,29 @@ class RouteController extends Controller
             return $query->whereRaw('1 = 0');
         }
 
-        $role = Role::roleNameForId((int) $user->role_id);
-        if (in_array($role, ['admin', 'chief', 'chief station admin'], true)) {
+        $role = $this->operationalScope->role($user);
+        if ($this->operationalScope->hasProvinceWideAccess($user)) {
             return $query;
         }
 
-        if (in_array($role, ['firefighter', 'station admin'], true)) {
-            $stationId = StationOfficer::query()->where('user_id', $user->user_id)->value('station_id');
+        if ($this->operationalScope->isStationResponder($user)) {
+            $stationIds = $this->operationalScope->stationIds($user);
 
-            if (! $stationId) {
+            if ($stationIds->isEmpty()) {
                 return $query->whereRaw('1 = 0');
             }
 
-            return $query->whereHas('incident', function ($incidentQuery) use ($stationId) {
-                $incidentQuery->where('station_id', $stationId)
-                    ->orWhereHas('team', fn ($teamQuery) => $teamQuery->where('station_id', $stationId));
+            return $query->whereHas('incident', function ($incidentQuery) use ($stationIds) {
+                $incidentQuery->whereIn('station_id', $stationIds->all())
+                    ->orWhereHas('team', fn ($teamQuery) => $teamQuery->whereIn('station_id', $stationIds->all()));
             });
         }
 
         if (in_array($role, ['barangay', 'barangay captain', 'barangay officer', 'barangay_officer'], true)) {
-            $barangayId = $this->resolveViewerBarangayId((int) $user->user_id);
+            $barangayIds = $this->operationalScope->barangayIds($user);
 
-            return $barangayId
-                ? $query->whereHas('incident', fn ($incidentQuery) => $incidentQuery->where('barangay_id', $barangayId))
+            return $barangayIds->isNotEmpty()
+                ? $query->whereHas('incident', fn ($incidentQuery) => $incidentQuery->whereIn('barangay_id', $barangayIds->all()))
                 : $query->whereRaw('1 = 0');
         }
 
@@ -762,44 +862,25 @@ class RouteController extends Controller
             return false;
         }
 
-        $role = Role::roleNameForId((int) $user->role_id);
-        if (in_array($role, ['admin', 'chief', 'chief station admin'], true)) {
+        $role = $this->operationalScope->role($user);
+        if ($this->operationalScope->hasProvinceWideAccess($user)) {
             return true;
         }
 
-        if (in_array($role, ['firefighter', 'station admin'], true)) {
-            $stationId = StationOfficer::query()->where('user_id', $user->user_id)->value('station_id');
+        if ($this->operationalScope->isStationResponder($user)) {
+            $stationIds = $this->operationalScope->stationIds($user);
             $incidentStationId = $incident->station_id ?: $incident->team?->station_id;
 
-            return $stationId && (int) $stationId === (int) $incidentStationId;
+            return $incidentStationId && $stationIds->contains((int) $incidentStationId);
         }
 
         if (in_array($role, ['barangay', 'barangay captain', 'barangay officer', 'barangay_officer'], true)) {
-            $barangayId = $this->resolveViewerBarangayId((int) $user->user_id);
+            $barangayIds = $this->operationalScope->barangayIds($user);
 
-            return $barangayId && (int) $barangayId === (int) $incident->barangay_id;
+            return $incident->barangay_id && $barangayIds->contains((int) $incident->barangay_id);
         }
 
         return (int) $incident->reported_by === (int) $user->user_id;
     }
 
-    private function resolveViewerBarangayId(int $userId): ?int
-    {
-        if (Schema::hasTable('barangay_officers')) {
-            $barangayId = BarangayOfficer::query()->where('user_id', $userId)->value('barangay_id');
-            if ($barangayId) {
-                return (int) $barangayId;
-            }
-        }
-
-        if (Schema::hasTable('full_addresses') && Schema::hasColumn('full_addresses', 'user_id')) {
-            $barangayId = \Illuminate\Support\Facades\DB::table('full_addresses')
-                ->where('user_id', $userId)
-                ->value('barangay_id');
-
-            return $barangayId ? (int) $barangayId : null;
-        }
-
-        return null;
-    }
 }

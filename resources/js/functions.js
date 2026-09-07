@@ -147,19 +147,9 @@ export async function usersLocation(lat, lon){
     console.log('firefighter: ', lat, ' ', lon);
 }
 export function getRoute(centerLat, centerLng, endLat, endLng, typeOfMap) {
-const apiKey = "83677a1086d44c4e82f903fd2fe2ea9b";
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-        const url =
-            "https://api.geoapify.com/v1/routing?" +
-            `waypoints=${centerLat},${centerLng}|${endLat},${endLng}&` +
-            "mode=drive&" +
-            "type=balanced&" +
-            `apiKey=${apiKey}`;
-
-            // `apiKey=${apiKey}`;
-
-            fetch('/api/route', { // now it’s /route, not /api/route
+            fetch('/api/routing/calculate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -168,8 +158,11 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute
                 // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             },
             body: JSON.stringify({
-                start: centerLat + "," + centerLng,
-                end: endLat+ "," + endLng
+                start_lat: Number(centerLat),
+                start_lng: Number(centerLng),
+                end_lat: Number(endLat),
+                end_lng: Number(endLng),
+                mode: 'driving'
             })
         })
         .then(res => res.json())
@@ -313,6 +306,7 @@ export async function saveIncident(description, lat, lng, type, imageInput, repo
             status: 'reported',
             reported_by: reporter,
             alarmdatetime: new Date().toISOString(),
+            client_report_id: locationMetadata.clientReportId || undefined,
         };
 
         const locationAccuracy = Number(locationMetadata.accuracy);
@@ -1130,9 +1124,22 @@ function getDefaultStation() {
 }
 export async function getRouteDistance(startLat, startLng, endLat, endLng) {
     try {
-        const url = `https://api.geoapify.com/v1/routing?waypoints=${startLat},${startLng}|${endLat},${endLng}&mode=drive&apiKey=83677a1086d44c4e82f903fd2fe2ea9b`;
-
-        const response = await fetch(url);
+        const response = await fetch('/api/routing/calculate', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                start_lat: Number(startLat),
+                start_lng: Number(startLng),
+                end_lat: Number(endLat),
+                end_lng: Number(endLng),
+                mode: 'driving'
+            })
+        });
         const data = await response.json();
 
         if (!data.features || data.features.length === 0) {
@@ -1151,7 +1158,7 @@ export async function getRouteDistance(startLat, startLng, endLat, endLng) {
         return distance;
 
     } catch (error) {
-        console.error('Geoapify routing error:', error);
+        console.error('OSRM routing error:', error);
         return Infinity; // skip this route
     }
 }

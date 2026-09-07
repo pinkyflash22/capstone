@@ -2108,7 +2108,13 @@ public function updateLocation(Request $request)
         );
 
         Cache::put($locationCacheKey, $locationSignature, now()->addSeconds(90));
-        Cache::forget('firefighter:locations:active');
+        $stationId = StationOfficer::query()
+            ->where('user_id', $resolvedUserId)
+            ->value('station_id');
+        if ($stationId) {
+            Cache::forget('firefighter:locations:active:station-'.$stationId);
+        }
+        Cache::forget('firefighter:locations:active:province');
         
         return response()->json([
             'success' => true,

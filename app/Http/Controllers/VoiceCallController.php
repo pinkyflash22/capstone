@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Models\VoiceCall;
 use App\Models\VoiceResponderPresence;
 use App\Services\AgoraTokenService;
+use App\Services\IncidentAutoAssignmentService;
+use App\Services\IncidentJurisdictionService;
 use App\Support\IncidentContextDispatcher;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +21,7 @@ use Illuminate\Http\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -502,7 +505,12 @@ class VoiceCallController extends Controller
         ]);
     }
 
-    public function createIncident(Request $request, VoiceCall $voiceCall): JsonResponse
+    public function createIncident(
+        Request $request,
+        VoiceCall $voiceCall,
+        IncidentJurisdictionService $jurisdictionService,
+        IncidentAutoAssignmentService $autoAssignmentService
+    ): JsonResponse
     {
         $user = $request->user();
         abort_unless($this->isStationResponder($user), 403);
@@ -512,7 +520,7 @@ class VoiceCallController extends Controller
             'title' => ['nullable', 'string', 'max:120'],
         ]);
 
-        $call = DB::transaction(function () use ($voiceCall, $user, $data) {
+        $call = DB::transaction(function () use ($voiceCall, $user, $data, $jurisdictionService) {
             $call = VoiceCall::query()->whereKey($voiceCall->id)->lockForUpdate()->firstOrFail();
             $this->authorizeResponderForCall($call, $user);
 
@@ -537,6 +545,11 @@ class VoiceCallController extends Controller
             $call->loadMissing(['caller']);
             $callerName = $this->callerName($call);
             $title = trim($data['title'] ?? '') ?: 'Fire emergency from voice call';
+            $jurisdiction = $jurisdictionService->resolve(
+                (float) $call->caller_latitude,
+                (float) $call->caller_longitude,
+                $call->caller_accuracy !== null ? (float) $call->caller_accuracy : null
+            );
 
             $marker = Marker::create([
                 'title' => $title,
@@ -551,6 +564,11 @@ class VoiceCallController extends Controller
                 'marker_id' => $marker->marker_id,
                 'status' => 'Reported',
                 'reported_by' => $call->caller_id,
+                'barangay_id' => $jurisdiction['barangay_id'],
+                'station_id' => $jurisdiction['station_id'] ?: ($call->station_id ?: $this->adminStationId($user)),
+                'barangay_resolution_status' => $jurisdiction['barangay_id'] ? 'matched' : 'unmatched',
+                'barangay_resolution_source' => 'voice_call:'.$jurisdiction['resolution_source'],
+                'barangay_resolved_at' => now(),
             ]);
 
             $call->forceFill([
@@ -564,6 +582,15 @@ class VoiceCallController extends Controller
 
         if ($call->createdIncident) {
             IncidentContextDispatcher::dispatchFor($call->createdIncident);
+            try {
+                $autoAssignmentService->assignSingleIncident($call->createdIncident);
+                $call->load('createdIncident');
+            } catch (\Throwable $exception) {
+                Log::error('Voice-call incident auto-assignment failed.', [
+                    'incident_id' => $call->createdIncident->incident_id,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
         }
 
         $this->logCallForParticipants($call, $request, 'station created incident from voice call', 'created incident from voice call');

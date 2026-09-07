@@ -2025,7 +2025,6 @@
     <script>
         window.firefighterDashboardConfig = {
             csrfToken: @json(csrf_token()),
-            geoapifyKey: @json(env('GEOAPIFY_KEY')),
             userId: @json(auth()->user()->user_id ?? null),
             currentFirefighterId: @json(auth()->user()->user_id ?? null),
             currentUserId: @json(auth()->user()->user_id ?? null),
@@ -2156,7 +2155,6 @@
     };
     window.deferPyroMapInit = true;
     window.__ffAllowDashboardPrefetch = false;
-    window.geoapifyKey = '{{ env("GEOAPIFY_KEY") }}';
     window.userId = {{ auth()->user()->user_id ?? 'null' }};
     window.userTeamId = {{ isset($userTeam) ? $userTeam->team_id : 'null' }};
     window.userStationId = {{ isset($thisStation) ? $thisStation : 'null' }};
@@ -3186,9 +3184,8 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
     });
     
     try {
-        const newStatusId = 4;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/complete`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -3225,9 +3222,8 @@ async function closeCase(incidentId, currentStatusId, triggerButton = null) {
     });
     
     try {
-        const newStatusId = 5;
-        const response = await fetch(`/api/incidents/${incidentId}/${newStatusId}`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/close`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -3265,8 +3261,8 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     });
 
     try {
-        const response = await fetch(`/api/incidents/${incidentId}/false-alarm`, {
-            method: 'PUT',
+        const response = await fetch(`/firefighter/incidents/${incidentId}/false-alarm`, {
+            method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',

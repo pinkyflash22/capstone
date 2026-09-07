@@ -114,6 +114,31 @@ class FirefighterIncidentResponseController extends Controller
         return response()->json(['success' => true, 'message' => 'Incident completed. Team, personnel, and apparatus are available again.']);
     }
 
+    public function falseAlarm(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    {
+        $closed = DB::transaction(function () use ($incident) {
+            $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            $officer = $this->currentOfficer();
+            abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident response.');
+            abort_unless(
+                in_array(strtolower(trim((string) $locked->status)), ['reported', 'responding'], true),
+                409,
+                'Only an active report can be marked as a false alarm.'
+            );
+
+            $locked->forceFill(['status' => 'Closed'])->save();
+            if ($locked->marker) {
+                $locked->marker->forceFill(['status' => 'inactive'])->save();
+            }
+
+            return $locked;
+        });
+
+        $resources->releaseIncidentUnits($closed);
+
+        return response()->json(['success' => true, 'message' => 'Incident marked as a false alarm and closed.']);
+    }
+
     public function close(Incident $incident): JsonResponse
     {
         DB::transaction(function () use ($incident) {

@@ -10,11 +10,12 @@ use App\Models\Team;
 use App\Models\StationOfficer;
 use App\Models\Station;
 use App\Models\User;
-use App\Services\BoundaryMatcherService;
 use App\Support\IncidentContextDispatcher;
 use App\Support\IncidentFollowUpDispatcher;
 use App\Support\UserActivityLogger;
 use App\Services\IncidentAutoAssignmentService;
+use App\Services\IncidentJurisdictionService;
+use App\Services\OperationalMapScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -556,8 +557,15 @@ class IncidentController extends Controller
             'incidentTypes', 'teams', 'reporters'));
     }
 
-    public function store(Request $request, BoundaryMatcherService $boundaryMatcherService)
+    public function store(
+        Request $request,
+        IncidentJurisdictionService $jurisdictionService,
+        OperationalMapScope $operationalScope,
+        IncidentAutoAssignmentService $autoAssignmentService
+    )
     {
+        abort_unless($request->user(), 401, 'Authentication is required to submit an incident.');
+
         $validated = $request->validate([
             'marker_id' => 'nullable|exists:markers,marker_id',
             'lat' => 'required_without:marker_id|numeric|between:-90,90',
@@ -568,15 +576,74 @@ class IncidentController extends Controller
             'occurred_at' => 'nullable|date',
             'station_id' => 'nullable|exists:stations,station_id',
             'team_id' => 'nullable|exists:teams,team_id',
-            'reported_by' => 'required|exists:users,user_id',
+            'reported_by' => 'nullable|exists:users,user_id',
             'dispatch_priority' => 'nullable|in:low,medium,high,critical',
             'location_accuracy' => 'nullable|numeric|min:1|max:100000',
-            'location_captured_at' => 'nullable|date|after_or_equal:'.now()->subMinute()->toIso8601String().'|before_or_equal:'.now()->addMinute()->toIso8601String(),
+            'location_captured_at' => 'nullable|date|after_or_equal:'.now()->subDays(30)->toIso8601String().'|before_or_equal:'.now()->addMinute()->toIso8601String(),
+            'client_report_id' => 'nullable|uuid',
         ]);
+
+        // The authenticated session is authoritative. Never allow callers to
+        // impersonate another reporter through a modified request body.
+        $validated['reported_by'] = (int) $request->user()->getAuthIdentifier();
+        $clientReportId = $validated['client_report_id'] ?? null;
+        unset($validated['client_report_id']);
+        $idempotencyKey = $clientReportId
+            ? 'incident-report:'.$validated['reported_by'].':'.$clientReportId
+            : null;
+        if ($idempotencyKey && ($existingIncidentId = Cache::get($idempotencyKey))) {
+            $existingIncident = Incident::with($this->getIncidentRelations())->find($existingIncidentId);
+            if ($existingIncident) {
+                $assignment = $this->safelyAutoAssignIncident($existingIncident, $autoAssignmentService);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'This fire report was already received.',
+                    'data' => $this->serializeIncident($existingIncident->fresh($this->getIncidentRelations())),
+                    'assignment' => $assignment,
+                    'duplicate_request' => true,
+                ]);
+            }
+        }
+        $role = $operationalScope->role($request->user());
+        $isPublicReporter = in_array($role, [
+            'citizen',
+            'barangay',
+            'barangay captain',
+            'barangay officer',
+            'barangay_officer',
+        ], true);
+
+        if ($isPublicReporter) {
+            abort_unless(
+                isset($validated['lat'], $validated['lng']),
+                422,
+                'Your current coordinates are required for a public fire report.'
+            );
+            unset($validated['marker_id']);
+            unset($validated['station_id'], $validated['team_id']);
+            $validated['status'] = self::STATUS_DB_REPORTED;
+        } elseif (! $operationalScope->hasProvinceWideAccess($request->user())) {
+            $allowedStationIds = $operationalScope->stationIds($request->user());
+            if (! empty($validated['station_id'])) {
+                abort_unless(
+                    $allowedStationIds->contains((int) $validated['station_id']),
+                    403,
+                    'That station is outside your operational assignment.'
+                );
+            }
+            if (! empty($validated['team_id'])) {
+                $teamStationId = Team::query()->whereKey($validated['team_id'])->value('station_id');
+                abort_unless(
+                    $teamStationId && $allowedStationIds->contains((int) $teamStationId),
+                    403,
+                    'That response team is outside your operational assignment.'
+                );
+            }
+        }
 
         $markerId = $validated['marker_id'] ?? null;
 
-        $data = DB::transaction(function () use ($validated, $markerId, $boundaryMatcherService) {
+        $data = DB::transaction(function () use ($validated, $markerId, $jurisdictionService) {
             $createdMarker = null;
 
             if (! $markerId) {
@@ -619,6 +686,10 @@ class IncidentController extends Controller
                 $validated['marker_id'] = $markerId;
             }
 
+            $reportedAccuracy = isset($validated['location_accuracy'])
+                ? (float) $validated['location_accuracy']
+                : null;
+
             unset(
                 $validated['lat'],
                 $validated['lng'],
@@ -630,6 +701,11 @@ class IncidentController extends Controller
 
             $resolvedLat = $createdMarker?->lat ?? null;
             $resolvedLng = $createdMarker?->lng ?? null;
+            $jurisdiction = [
+                'barangay_id' => null,
+                'station_id' => null,
+                'resolution_source' => 'boundary_unmatched',
+            ];
 
             if (($resolvedLat === null || $resolvedLng === null) && ! empty($validated['marker_id'])) {
                 $existingMarker = Marker::query()
@@ -647,19 +723,20 @@ class IncidentController extends Controller
                 $validated['barangay_resolved_at'] = null;
 
                 if ($resolvedLat !== null && $resolvedLng !== null) {
-                    $matchedBoundary = $boundaryMatcherService->locateBarangayBoundary(
+                    $jurisdiction = $jurisdictionService->resolve(
                         (float) $resolvedLat,
-                        (float) $resolvedLng
+                        (float) $resolvedLng,
+                        $reportedAccuracy
                     );
 
-                    if ($matchedBoundary?->barangay_id) {
-                        $validated['barangay_id'] = (int) $matchedBoundary->barangay_id;
+                    if ($jurisdiction['barangay_id']) {
+                        $validated['barangay_id'] = (int) $jurisdiction['barangay_id'];
                         $validated['barangay_resolution_status'] = 'matched';
-                        $validated['barangay_resolution_source'] = $matchedBoundary->source ?: 'boundary-location';
+                        $validated['barangay_resolution_source'] = $jurisdiction['resolution_source'];
                         $validated['barangay_resolved_at'] = now();
                     } else {
                         $validated['barangay_resolution_status'] = 'unmatched';
-                        $validated['barangay_resolution_source'] = 'boundary-location';
+                        $validated['barangay_resolution_source'] = $jurisdiction['resolution_source'];
                         $validated['barangay_resolved_at'] = now();
                     }
                 }
@@ -667,21 +744,27 @@ class IncidentController extends Controller
 
             if ($this->supportsIncidentStationColumn()) {
                 if (empty($validated['station_id'])) {
-                    $validated['station_id'] = $this->resolveJurisdictionStationIdOrDefault(
-                        isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
-                        $resolvedLat !== null ? (float) $resolvedLat : null,
-                        $resolvedLng !== null ? (float) $resolvedLng : null
-                    );
+                    $validated['station_id'] = $jurisdiction['station_id']
+                        ?? $this->resolveJurisdictionStationIdOrDefault(
+                            isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
+                            $resolvedLat !== null ? (float) $resolvedLat : null,
+                            $resolvedLng !== null ? (float) $resolvedLng : null
+                        );
                 }
             } else {
                 if (empty($validated['team_id'])) {
                     $fallbackStationId = ! empty($validated['station_id'])
                         ? (int) $validated['station_id']
-                        : 1;
+                        : $this->resolveJurisdictionStationIdOrDefault(
+                            isset($validated['barangay_id']) ? (int) ($validated['barangay_id'] ?? 0) : null,
+                            $resolvedLat !== null ? (float) $resolvedLat : null,
+                            $resolvedLng !== null ? (float) $resolvedLng : null
+                        );
 
-                    $fallbackTeam = $this->findAvailableTeamForStation($fallbackStationId)
-                        ?? $this->findAnyTeamForStation($fallbackStationId)
-                        ?? Team::query()->find(1);
+                    $fallbackTeam = $fallbackStationId
+                        ? ($this->findAvailableTeamForStation($fallbackStationId)
+                            ?? $this->findAnyTeamForStation($fallbackStationId))
+                        : null;
 
                     if ($fallbackTeam?->team_id) {
                         $validated['team_id'] = (int) $fallbackTeam->team_id;
@@ -712,6 +795,10 @@ class IncidentController extends Controller
         });
         IncidentContextDispatcher::dispatchFor($data);
         IncidentFollowUpDispatcher::dispatchFor($data);
+        $assignment = $this->safelyAutoAssignIncident($data, $autoAssignmentService);
+        if ($idempotencyKey) {
+            Cache::put($idempotencyKey, (int) $data->incident_id, now()->addDays(30));
+        }
 
         $logUserId = (int) ($validated['reported_by'] ?? Auth::id() ?? 0);
         if ($logUserId > 0) {
@@ -722,15 +809,36 @@ class IncidentController extends Controller
             'success' => true,
             'message' => 'Fire report submitted. BFP processing has started.',
             'data' => $this->serializeIncident($data->fresh($this->getIncidentRelations())),
+            'assignment' => $assignment,
         ]);
     }
 
-    private function resolveJurisdictionStationIdOrDefault(?int $barangayId, ?float $lat, ?float $lng): int
+    private function safelyAutoAssignIncident(
+        Incident $incident,
+        IncidentAutoAssignmentService $autoAssignmentService
+    ): ?array {
+        try {
+            return $autoAssignmentService->assignSingleIncident($incident);
+        } catch (\Throwable $exception) {
+            Log::error('Immediate incident auto-assignment failed.', [
+                'incident_id' => $incident->incident_id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            // The report itself remains saved and the periodic dispatcher can
+            // retry it after station resources become available.
+            return null;
+        }
+    }
+
+    private function resolveJurisdictionStationIdOrDefault(?int $barangayId, ?float $lat, ?float $lng): ?int
     {
         if ($barangayId) {
             $coveredStationId = DB::table('station_barangay_coverage')
                 ->where('barangay_id', $barangayId)
-                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->orderByRaw("CASE WHEN LOWER(COALESCE(coverage_type, '')) = 'primary' THEN 0 ELSE 1 END")
                 ->orderBy('station_barangay_coverage_id')
                 ->value('station_id');
@@ -763,7 +871,9 @@ class IncidentController extends Controller
             }
         }
 
-        return 1;
+        // Leave the incident explicitly unassigned so dispatchers can see and
+        // resolve missing coverage instead of silently sending it to station 1.
+        return null;
     }
 
     public function nearestAvailableResponder(Request $request)
@@ -825,18 +935,76 @@ class IncidentController extends Controller
         ]);
     }
 
-    public function show(Incident $incident)
+    public function show(
+        Incident $incident,
+        OperationalMapScope $operationalScope,
+        IncidentJurisdictionService $jurisdictionService
+    )
     {
+        $visible = $operationalScope->constrainIncidentQuery(Incident::query(), request()->user())
+            ->whereKey($incident->getKey())
+            ->exists();
+        abort_unless($visible, 403, 'This incident is outside your operational coverage.');
         $incident->load($this->getIncidentRelations());
 
         if (request()->expectsJson()) {
+            $serialized = $this->serializeIncident($incident);
+            $jurisdiction = null;
+
+            if ($incident->marker?->lat !== null && $incident->marker?->lng !== null) {
+                $jurisdiction = $jurisdictionService->resolve(
+                    (float) $incident->marker->lat,
+                    (float) $incident->marker->lng
+                );
+            }
+
+            $matchedBarangay = $incident->barangay;
+            if (($jurisdiction['barangay_id'] ?? null)
+                && (int) $matchedBarangay?->barangay_id !== (int) $jurisdiction['barangay_id']) {
+                $matchedBarangay = \App\Models\Barangay::with('city')->find($jurisdiction['barangay_id']);
+            }
+
+            $serialized['jurisdiction_match'] = [
+                'method' => $jurisdiction['resolution_source']
+                    ?? $serialized['barangay_resolution_source']
+                    ?? 'boundary_unmatched',
+                'recorded_source' => $serialized['barangay_resolution_source'] ?? null,
+                'boundary_distance_meters' => $jurisdiction['boundary_distance_meters'] ?? null,
+                'barangay_id' => $jurisdiction['barangay_id'] ?? $incident->barangay_id,
+                'barangay_name' => $matchedBarangay?->barangay_name,
+                'city_name' => $matchedBarangay?->city?->city_name,
+                'station_id' => $jurisdiction['station_id'] ?? $incident->station_id,
+            ];
+
             return response()->json([
                 'success' => true,
-                'data' => $this->serializeIncident($incident),
+                'data' => $serialized,
             ]);
         }
 
         return view('admin.incidents.show', compact('incident'));
+    }
+
+    private function authorizeIncidentResponseMutation(
+        Incident $incident,
+        Request $request,
+        OperationalMapScope $operationalScope
+    ): void {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        if ($operationalScope->hasProvinceWideAccess($user)) {
+            return;
+        }
+
+        $allowedStationIds = $operationalScope->stationIds($user);
+        $incidentStationId = $incident->station_id ?: $incident->team?->station_id;
+
+        abort_unless(
+            $incidentStationId && $allowedStationIds->contains((int) $incidentStationId),
+            403,
+            'This incident is outside your operational assignment.'
+        );
     }
 
     public function edit(Incident $incident)
@@ -881,7 +1049,11 @@ class IncidentController extends Controller
       return response()->json(['success'=>true, 'thisdata'=>$data]);
     }
 
-   public function updateCitizenReport(Request $request, string $incidentId)
+   public function updateCitizenReport(
+       Request $request,
+       string $incidentId,
+       IncidentJurisdictionService $jurisdictionService
+   )
    {
         $incident = Incident::with('marker')->findOrFail($incidentId);
 
@@ -899,6 +1071,37 @@ class IncidentController extends Controller
             ], 422);
         }
 
+        $validated = $request->validate([
+            'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'lat' => ['nullable', 'required_with:lng', 'numeric', 'between:-90,90'],
+            'lng' => ['nullable', 'required_with:lat', 'numeric', 'between:-180,180'],
+        ]);
+
+        DB::transaction(function () use ($incident, $validated, $jurisdictionService) {
+            $markerUpdates = array_filter([
+                'title' => $validated['title'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'lat' => $validated['lat'] ?? null,
+                'lng' => $validated['lng'] ?? null,
+            ], static fn ($value) => $value !== null);
+
+            if ($markerUpdates !== [] && $incident->marker) {
+                $incident->marker->update($markerUpdates);
+            }
+
+            if (array_key_exists('lat', $validated) && array_key_exists('lng', $validated)) {
+                $jurisdiction = $jurisdictionService->resolve((float) $validated['lat'], (float) $validated['lng']);
+                $incident->forceFill([
+                    'barangay_id' => $jurisdiction['barangay_id'],
+                    'station_id' => $jurisdiction['station_id'],
+                    'barangay_resolution_status' => $jurisdiction['barangay_id'] ? 'matched' : 'unmatched',
+                    'barangay_resolution_source' => 'citizen_location_update',
+                    'barangay_resolved_at' => now(),
+                ])->save();
+            }
+        });
+
         UserActivityLogger::log('updated incident', Auth::id(), $request);
 
         return response()->json([
@@ -908,11 +1111,12 @@ class IncidentController extends Controller
         ]);
    }
 
-   public function updateIncidentStatus(Request $request, string $incidentId, string $statusId)
+   public function updateIncidentStatus(Request $request, string $incidentId, string $statusId, OperationalMapScope $operationalScope)
 {
     try {
         // Find the incident
-        $incident = Incident::findOrFail($incidentId);
+        $incident = Incident::with('team')->findOrFail($incidentId);
+        $this->authorizeIncidentResponseMutation($incident, $request, $operationalScope);
         
         $validStatuses = [
             self::STATUS_REPORTED,
@@ -950,19 +1154,22 @@ class IncidentController extends Controller
             'message' => 'Incident status updated to ' . $statusNames[(int)$statusId]
         ]);
         
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+        throw $e;
     } catch (\Exception $e) {
         Log::error('Error updating incident status: ' . $e->getMessage());
         return response()->json([
             'success' => false,
-            'message' => 'Failed to update incident status: ' . $e->getMessage()
+            'message' => 'Failed to update incident status.'
         ], 500);
     }
 }
 
-    public function markFalseAlarm($incidentId)
+    public function markFalseAlarm(Request $request, $incidentId, OperationalMapScope $operationalScope)
     {
         try {
-            $incident = Incident::findOrFail($incidentId);
+            $incident = Incident::with('team')->findOrFail($incidentId);
+            $this->authorizeIncidentResponseMutation($incident, $request, $operationalScope);
             $incident->status = self::STATUS_DB_CLOSED;
             $incident->updated_at = now();
             $incident->save();
@@ -982,6 +1189,8 @@ class IncidentController extends Controller
                 'message' => 'Incident marked as false alarm and closed',
                 'data' => $incident
             ]);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Error marking incident as false alarm: ' . $e->getMessage(), [
                 'incident_id' => $incidentId,
@@ -1051,9 +1260,14 @@ class IncidentController extends Controller
             ->with('success', 'Incident deleted successfully.');
     }
     
-    public function latest()
+    public function latest(Request $request, OperationalMapScope $operationalScope)
     {
-        $coord = Cache::remember('incident:latest:v2', now()->addSeconds(self::LATEST_INCIDENTS_CACHE_SECONDS), function () {
+        $user = $request->user();
+        $cacheScope = implode(':', [
+            $operationalScope->role($user) ?: 'guest',
+            $user?->getAuthIdentifier() ?: 'guest',
+        ]);
+        $coord = Cache::remember('incident:latest:v3:'.$cacheScope, now()->addSeconds(self::LATEST_INCIDENTS_CACHE_SECONDS), function () use ($user, $operationalScope) {
             $stationMarkers = Cache::remember('incident:latest:station-markers:v1', now()->addMinutes(5), function () {
                 return Station::query()
                     ->select(['station_id', 'station_name', 'marker_id'])
@@ -1063,7 +1277,9 @@ class IncidentController extends Controller
                     ->values();
             });
 
-            return Incident::query()
+            $query = $operationalScope->constrainIncidentQuery(Incident::query(), $user);
+
+            return $query
                 ->select([
                     'incident_id',
                     'marker_id',
@@ -1337,12 +1553,16 @@ class IncidentController extends Controller
 
     // In app/Http/Controllers/IncidentController.php
 
-public function getRecentIncident(Request $request)
+public function getRecentIncident(Request $request, OperationalMapScope $operationalScope)
 {
     try {
         $minutes = $request->input('minutes', 30);
         
-        $recentIncidents = Incident::with($this->getIncidentRelations())
+        $recentQuery = $operationalScope->constrainIncidentQuery(
+            Incident::with($this->getIncidentRelations()),
+            $request->user(),
+        );
+        $recentIncidents = $recentQuery
             ->where('created_at', '>=', now()->subMinutes($minutes))
             ->orderBy('created_at', 'desc')
             ->get()
