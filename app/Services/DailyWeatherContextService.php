@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DailyWeatherContext;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Log;
 class DailyWeatherContextService
 {
     public const SOURCE = 'open-meteo-recent-history';
+    private const FORECAST_CACHE_HOURS = 6;
+    private const FORECAST_STALE_HOURS = 72;
 
     /**
      * Collect one completed calendar day for every actively covered barangay.
@@ -120,68 +123,152 @@ class DailyWeatherContextService
     public function fetchForecast(float $latitude, float $longitude, int $days = 5): array
     {
         $days = max(1, min($days, 7));
-        $response = Http::retry(2, 300)
-            ->timeout(10)
-            ->get('https://api.open-meteo.com/v1/forecast', [
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'current' => implode(',', [
-                    'temperature_2m',
-                    'relative_humidity_2m',
-                    'weather_code',
-                    'wind_speed_10m',
-                ]),
-                'daily' => implode(',', [
-                    'weather_code',
-                    'temperature_2m_max',
-                    'temperature_2m_min',
-                    'precipitation_sum',
-                    'wind_speed_10m_max',
-                ]),
-                'forecast_days' => $days,
-                'timezone' => 'Asia/Manila',
+        $coordinateKey = number_format($latitude, 3, '.', '').':'.number_format($longitude, 3, '.', '');
+        $freshKey = "weather:forecast:v2:{$coordinateKey}:{$days}:fresh";
+        $staleKey = "weather:forecast:v2:{$coordinateKey}:{$days}:last-success";
+        $cached = $this->readForecastCache($freshKey);
+
+        if ($this->isUsableForecast($cached)) {
+            return array_merge($cached, [
+                'cache_status' => 'fresh',
+                'is_stale' => false,
+                'warning' => null,
+            ]);
+        }
+
+        try {
+            // One provider request only. In particular, HTTP 429 must never be
+            // retried immediately because every retry consumes more quota.
+            $response = Http::timeout(10)
+                ->get('https://api.open-meteo.com/v1/forecast', [
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'current' => implode(',', [
+                        'temperature_2m',
+                        'relative_humidity_2m',
+                        'weather_code',
+                        'wind_speed_10m',
+                    ]),
+                    'daily' => implode(',', [
+                        'weather_code',
+                        'temperature_2m_max',
+                        'temperature_2m_min',
+                        'precipitation_sum',
+                        'wind_speed_10m_max',
+                    ]),
+                    'forecast_days' => $days,
+                    'timezone' => 'Asia/Manila',
+                ]);
+
+            if (! $response->successful()) {
+                $message = $response->status() === 429
+                    ? 'Open-Meteo daily request limit was reached (HTTP 429).'
+                    : "Open-Meteo returned HTTP {$response->status()}.";
+
+                throw new \RuntimeException($message);
+            }
+
+            $payload = $response->json();
+            $daily = is_array($payload['daily'] ?? null) ? $payload['daily'] : [];
+            $dates = is_array($daily['time'] ?? null) ? $daily['time'] : [];
+            if ($dates === []) {
+                throw new \RuntimeException('Open-Meteo returned no daily forecast data.');
+            }
+
+            $cards = collect($dates)->take($days)->map(function ($date, int $index) use ($daily) {
+                $code = is_numeric($daily['weather_code'][$index] ?? null)
+                    ? (int) $daily['weather_code'][$index]
+                    : null;
+
+                return [
+                    'date' => Carbon::parse($date)->toDateString(),
+                    'day' => Carbon::parse($date)->format('D'),
+                    'date_label' => Carbon::parse($date)->format('M j'),
+                    'condition' => $this->describeWeatherCode($code),
+                    'weather_code' => $code,
+                    'min_temp_c' => $this->numericOrNull($daily['temperature_2m_min'][$index] ?? null),
+                    'max_temp_c' => $this->numericOrNull($daily['temperature_2m_max'][$index] ?? null),
+                    'precipitation_mm' => $this->numericOrNull($daily['precipitation_sum'][$index] ?? null),
+                    'wind_kph' => $this->numericOrNull($daily['wind_speed_10m_max'][$index] ?? null),
+                ];
+            })->values()->all();
+
+            $forecast = [
+                'cards' => $cards,
+                'current' => is_array($payload['current'] ?? null) ? $payload['current'] : [],
+                'fetched_at' => now('Asia/Manila')->toIso8601String(),
+            ];
+
+            $this->writeForecastCache($freshKey, $forecast, now()->addHours(self::FORECAST_CACHE_HOURS));
+            $this->writeForecastCache($staleKey, $forecast, now()->addHours(self::FORECAST_STALE_HOURS));
+
+            return array_merge($forecast, [
+                'cache_status' => 'refreshed',
+                'is_stale' => false,
+                'warning' => null,
+            ]);
+        } catch (\Throwable $exception) {
+            $lastSuccessful = $this->readForecastCache($staleKey);
+            if ($this->isUsableForecast($lastSuccessful)) {
+                Log::warning('Using the last successful Open-Meteo forecast.', [
+                    'coordinates' => $coordinateKey,
+                    'fetched_at' => $lastSuccessful['fetched_at'] ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return array_merge($lastSuccessful, [
+                    'cache_status' => 'stale',
+                    'is_stale' => true,
+                    'warning' => 'Open-Meteo is temporarily unavailable or rate-limited. Showing the last successful forecast.',
+                ]);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function readForecastCache(string $key): ?array
+    {
+        try {
+            $value = Cache::get($key);
+
+            return is_array($value) ? $value : null;
+        } catch (\Throwable $exception) {
+            Log::warning('Weather forecast cache read failed.', [
+                'key' => $key,
+                'error' => $exception->getMessage(),
             ]);
 
-        if (! $response->successful()) {
-            throw new \RuntimeException("Open-Meteo returned HTTP {$response->status()}.");
+            return null;
         }
+    }
 
-        $payload = $response->json();
-        $daily = is_array($payload['daily'] ?? null) ? $payload['daily'] : [];
-        $dates = is_array($daily['time'] ?? null) ? $daily['time'] : [];
-        if ($dates === []) {
-            throw new \RuntimeException('Open-Meteo returned no daily forecast data.');
+    private function writeForecastCache(string $key, array $forecast, Carbon $expiresAt): void
+    {
+        try {
+            Cache::put($key, $forecast, $expiresAt);
+        } catch (\Throwable $exception) {
+            // A cache filesystem/database issue must not discard a forecast
+            // that was fetched successfully from the provider.
+            Log::warning('Weather forecast cache write failed.', [
+                'key' => $key,
+                'error' => $exception->getMessage(),
+            ]);
         }
+    }
 
-        $cards = collect($dates)->take($days)->map(function ($date, int $index) use ($daily) {
-            $code = is_numeric($daily['weather_code'][$index] ?? null)
-                ? (int) $daily['weather_code'][$index]
-                : null;
-
-            return [
-                'date' => Carbon::parse($date)->toDateString(),
-                'day' => Carbon::parse($date)->format('D'),
-                'date_label' => Carbon::parse($date)->format('M j'),
-                'condition' => $this->describeWeatherCode($code),
-                'weather_code' => $code,
-                'min_temp_c' => $this->numericOrNull($daily['temperature_2m_min'][$index] ?? null),
-                'max_temp_c' => $this->numericOrNull($daily['temperature_2m_max'][$index] ?? null),
-                'precipitation_mm' => $this->numericOrNull($daily['precipitation_sum'][$index] ?? null),
-                'wind_kph' => $this->numericOrNull($daily['wind_speed_10m_max'][$index] ?? null),
-            ];
-        })->values()->all();
-
-        return [
-            'cards' => $cards,
-            'current' => is_array($payload['current'] ?? null) ? $payload['current'] : [],
-            'fetched_at' => now('Asia/Manila'),
-        ];
+    private function isUsableForecast(?array $forecast): bool
+    {
+        return is_array($forecast)
+            && is_array($forecast['cards'] ?? null)
+            && $forecast['cards'] !== [];
     }
 
     private function fetchCompletedDay(float $latitude, float $longitude, Carbon $date): array
     {
-        $response = Http::retry(3, 750)
-            ->timeout(25)
+        // Do not automatically retry quota failures. The next scheduled run
+        // can recover missing rows without multiplying provider requests.
+        $response = Http::timeout(25)
             ->get('https://api.open-meteo.com/v1/forecast', [
                 'latitude' => $latitude,
                 'longitude' => $longitude,

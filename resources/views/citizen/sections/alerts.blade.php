@@ -483,6 +483,8 @@
     }
 
     #citizenReportsHistoryModal .reports-history-panel {
+        display: flex;
+        flex-direction: column;
         width: min(100%, 58rem);
         max-width: 58rem;
         max-height: min(78vh, 46rem);
@@ -492,7 +494,43 @@
     }
 
     #citizenReportsHistoryModal .reports-history-body {
+        flex: 1 1 auto;
+        min-height: 0;
         max-height: calc(min(78vh, 46rem) - 10.5rem);
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #citizenReportsHistoryModal .reports-history-header,
+    #citizenReportsHistoryModal .reports-history-toolbar {
+        flex: 0 0 auto;
+    }
+
+    #citizenConcernDetailsModal .concern-details-panel {
+        display: flex;
+        flex-direction: column;
+        max-height: min(82dvh, 48rem);
+    }
+
+    #citizenConcernDetailsModal .concern-details-header {
+        flex: 0 0 auto;
+    }
+
+    #citizenConcernDetailsModal .concern-details-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.citizen-aoc-modal-open #section-alerts.areas-concern-page {
+        z-index: 1200;
+    }
+
+    body.citizen-aoc-modal-open .citizen-mobile-dock {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
 
     body.citizen-history-standalone {
@@ -812,7 +850,7 @@
         #citizenReportsHistoryModal .reports-history-panel {
             width: 100%;
             max-width: 27rem;
-            max-height: 86vh;
+            max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top, 0px)) - max(0.75rem, env(safe-area-inset-bottom, 0px)));
             border-radius: 1.6rem;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
         }
@@ -867,8 +905,42 @@
         }
 
         #citizenReportsHistoryModal .reports-history-body {
-            max-height: calc(86vh - 10.75rem);
+            max-height: none;
             padding: 0.85rem 1rem 1rem;
+        }
+
+        #citizenConcernDetailsModal {
+            align-items: flex-end;
+            padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0.75rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+        }
+
+        #citizenConcernDetailsModal .concern-details-panel {
+            width: 100%;
+            max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top, 0px)) - max(0.75rem, env(safe-area-inset-bottom, 0px)));
+            border-radius: 1.6rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-header {
+            align-items: flex-start;
+            padding: 1rem;
+        }
+
+        #citizenConcernDetailsModal .concern-details-body {
+            padding: 0.9rem 1rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        #citizenConcernDetailsModal .concern-details-body .rounded-3xl {
+            border-radius: 1.05rem;
+            padding: 1rem;
+        }
+
+        #citizenConcernDetailsModal #citizenConcernDetailsViewMapBtn {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            width: 100%;
+            justify-content: center;
+            min-height: 44px;
         }
 
         #citizenReportsHistoryModal .reports-history-table-wrap {
@@ -1180,8 +1252,8 @@
     </div>
 
     <div id="citizenConcernDetailsModal" class="fixed inset-0 z-[4300] hidden items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4">
-        <div class="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
-            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+        <div class="concern-details-panel w-full max-w-3xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+            <div class="concern-details-header flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
                 <div>
                     <p id="citizenConcernDetailsEyebrow" class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Report details</p>
                     <h3 id="citizenConcernDetailsTitle" class="mt-1 text-xl font-bold text-slate-900">Report details</h3>
@@ -1190,7 +1262,7 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div class="max-h-[75vh] overflow-auto px-6 py-6">
+            <div class="concern-details-body max-h-[75vh] overflow-auto px-6 py-6">
                 <div class="grid gap-4 md:grid-cols-2">
                     <div class="rounded-3xl border border-slate-200 bg-white p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Summary</p>
@@ -1709,7 +1781,7 @@
         }
         reportHistoryModal.classList.remove('hidden');
         reportHistoryModal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
+        syncAreasConcernModalState();
         renderReportsHistoryTable();
     }
 
@@ -1717,10 +1789,18 @@
         if (!reportHistoryModal) return;
         reportHistoryModal.classList.add('hidden');
         reportHistoryModal.classList.remove('flex');
-        document.body.style.overflow = '';
         if (reportsHistoryStandalone) {
             document.body.classList.remove('citizen-history-standalone');
         }
+        syncAreasConcernModalState();
+    }
+
+    function syncAreasConcernModalState() {
+        const hasOpenModal = [reportHistoryModal, concernDetailsModal]
+            .some((modal) => modal && !modal.classList.contains('hidden'));
+
+        document.body.classList.toggle('citizen-aoc-modal-open', hasOpenModal);
+        document.body.style.overflow = hasOpenModal ? 'hidden' : '';
     }
 
     function openConcernDetailsModal(record) {
@@ -1756,14 +1836,14 @@
 
         concernDetailsModal.classList.remove('hidden');
         concernDetailsModal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
+        syncAreasConcernModalState();
     }
 
     function closeConcernDetailsModal() {
         if (!concernDetailsModal) return;
         concernDetailsModal.classList.add('hidden');
         concernDetailsModal.classList.remove('flex');
-        document.body.style.overflow = '';
+        syncAreasConcernModalState();
     }
 
     function findReportRecord(id, kind) {
@@ -1840,6 +1920,9 @@
     document.getElementById('citizenConcernDetailsViewMapBtn')?.addEventListener('click', () => {
         if (activeConcernDetailRecord?.lat && activeConcernDetailRecord?.lng) {
             closeConcernDetailsModal();
+            if (reportHistoryModal && !reportHistoryModal.classList.contains('hidden')) {
+                closeReportsHistoryModal();
+            }
             viewOnMap(activeConcernDetailRecord.lat, activeConcernDetailRecord.lng);
         }
     });

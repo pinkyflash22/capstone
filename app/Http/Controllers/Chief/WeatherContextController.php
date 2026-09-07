@@ -154,6 +154,8 @@ class WeatherContextController extends Controller
         $liveForecastCurrent = [];
         $liveForecastFetchedAt = null;
         $liveForecastError = null;
+        $liveForecastIsStale = false;
+        $liveForecastWarning = null;
 
         if (is_numeric($forecastLatitude) && is_numeric($forecastLongitude)) {
             try {
@@ -165,6 +167,8 @@ class WeatherContextController extends Controller
                 });
                 $liveForecastCurrent = $forecastPayload['current'] ?? [];
                 $liveForecastFetchedAt = $forecastPayload['fetched_at'] ?? null;
+                $liveForecastIsStale = (bool) ($forecastPayload['is_stale'] ?? false);
+                $liveForecastWarning = $forecastPayload['warning'] ?? null;
             } catch (\Throwable $exception) {
                 $liveForecastError = 'Live forecast is temporarily unavailable.';
                 Log::warning('Weather Context live forecast failed.', [
@@ -246,6 +250,8 @@ class WeatherContextController extends Controller
             'liveForecastCurrent' => $liveForecastCurrent,
             'liveForecastFetchedAt' => $liveForecastFetchedAt,
             'liveForecastError' => $liveForecastError,
+            'liveForecastIsStale' => $liveForecastIsStale,
+            'liveForecastWarning' => $liveForecastWarning,
             'forecastLocationLabel' => $selectedBarangay?->barangay_name ?? $stationOfficer->station?->station_name ?? 'Station location',
             'stats' => $stats,
             'barangaySummaries' => $barangaySummaries,
