@@ -310,6 +310,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'mitigations'])->name('mitigations');
+        Route::post('/mitigations/suggestions/refresh', [App\Http\Controllers\Chief\StationAdminController::class, 'refreshGeneratedMitigationDraftRecommendations'])->name('mitigations.suggestions.refresh');
+        Route::post('/mitigations/checklist-draft', [App\Http\Controllers\Chief\StationAdminController::class, 'generateMitigationDraftFromChecklist'])->name('mitigations.checklist-draft');
         Route::post('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [App\Http\Controllers\Chief\StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [App\Http\Controllers\Chief\StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
@@ -447,6 +449,8 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::get('/mitigations/table', [StationAdminController::class, 'mitigationTable'])->name('mitigations.table');
+        Route::post('/mitigations/suggestions/refresh', [StationAdminController::class, 'refreshGeneratedMitigationDraftRecommendations'])->name('mitigations.suggestions.refresh');
+        Route::post('/mitigations/checklist-draft', [StationAdminController::class, 'generateMitigationDraftFromChecklist'])->name('mitigations.checklist-draft');
         Route::post('/mitigations', [StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');

@@ -36,7 +36,7 @@
         .mitigation-banner__meta-label, .card-label, .section-label, th { color:#64748b; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
         .mitigation-banner__meta-value { margin-top:3px; color:#1f2937; font-size:.82rem; font-weight:800; }
         .mitigation-stack { display:flex; flex-direction:column; gap:14px; }
-        .summary-grid { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:8px; }
+        .summary-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; }
         .summary-grid .card { min-height:72px; }
         .card-value { margin-top:7px; color:#0f172a; font-size:1.35rem; font-weight:900; line-height:1; }
         .card-copy { display:none; }
@@ -237,6 +237,7 @@
         .details-dialog { display:flex; flex-direction:column; width:min(900px,calc(100vw - 48px)) !important; max-width:900px !important; max-height:min(90vh,820px) !important; padding:0 !important; overflow:hidden !important; }
         .details-dialog .mitigation-dialog__head { align-items:center; margin:0; padding:18px 20px; background:#fff; flex:0 0 auto; }
         .details-dialog__body { min-height:0; padding:18px 20px 22px; overflow-y:auto; background:#f8fafc; }
+        .details-dialog__actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid #e2e8f0; background:#fff; }
         .detail-hero { padding:18px; border:1px solid #fed7aa; border-radius:18px; background:linear-gradient(135deg,#fff7ed,#fff 72%); }
         .detail-hero__badges { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
         .detail-hero__copy { margin:0; color:#334155; font-size:.82rem; line-height:1.6; white-space:pre-line; }
@@ -268,7 +269,7 @@
         }
 
         @media (max-width: 1400px) {
-            .summary-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
+            .summary-grid { grid-template-columns:repeat(4, minmax(0,1fr)); }
             .filters-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
         }
 
@@ -322,7 +323,9 @@
             td[data-label="Actions"] { display:block; padding-top:6px; }
             td[data-label="Actions"]::before { display:none; }
             .row-actions { justify-content:flex-end; gap:5px; }
-            .row-btn { width:30px; min-height:30px; font-size:.62rem; }
+            .row-actions > :not(.primary-view) { display:none !important; }
+            .row-btn.primary-view { width:auto; min-height:38px; padding:0 12px; gap:6px; }
+            .row-btn.primary-view span { display:inline; }
             .attachments a, .note, .details-item span, .details-item div { font-size:.68rem; }
             .mitigation-dialog { align-items:flex-end; padding:8px; }
             .mitigation-dialog__card, .mitigation-dialog__card.wide { width:100%; max-width:100%; max-height:min(88dvh, 760px); border-radius:22px 22px 16px 16px; padding:11px; }
@@ -367,6 +370,9 @@
             .details-dialog { width:100% !important; max-width:100% !important; max-height:92dvh !important; border-radius:24px 24px 12px 12px !important; }
             .details-dialog .mitigation-dialog__head { padding:14px; }
             .details-dialog__body { padding:10px; }
+            .details-dialog__actions { display:grid; grid-template-columns:1fr 1fr; padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)); }
+            .details-dialog__actions .filter-btn { width:100%; min-height:42px; }
+            .details-dialog__actions #detailsChecklistLink[hidden] + #detailsEditButton { grid-column:1 / -1; }
             .detail-hero { padding:13px; border-radius:15px; }
             .detail-facts { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
             .detail-content-grid { grid-template-columns:1fr; gap:10px; }
@@ -379,6 +385,7 @@
     </style>
     <style>
         .mitigation-form-errors{margin:12px 18px 0;padding:11px 13px;border:1px solid #fecaca;border-radius:12px;background:#fef2f2;color:#991b1b;font-size:.78rem;line-height:1.45}.mitigation-form-errors strong{display:block;margin-bottom:4px}.mitigation-form-errors ul{margin:0;padding-left:18px}
+        .mitigation-page-notice{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;padding:10px 12px;border:1px solid #bbf7d0;border-radius:13px;background:#f0fdf4;color:#166534;font-size:.74rem;font-weight:750;line-height:1.45}.mitigation-page-notice.is-error{border-color:#fecaca;background:#fef2f2;color:#991b1b}.mitigation-page-notice i{margin-top:2px}.suggestion-scan-help{margin-top:6px!important;font-size:.68rem!important}.suggestion-scan-form button:disabled{opacity:.6;cursor:wait}
     </style>
 </head>
 <body class="chief-dashboard-page">
@@ -470,6 +477,12 @@
                     </section>
 
                     <div class="mitigation-stack">
+                        @if(session('success'))
+                            <div class="mitigation-page-notice" role="status"><i class="fa-solid fa-circle-check"></i><span>{{ session('success') }}</span></div>
+                        @endif
+                        @error('mitigation_suggestions')
+                            <div class="mitigation-page-notice is-error" role="alert"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ $message }}</span></div>
+                        @enderror
                         @if(!empty($mitigationDraft))
                             <section class="panel mitigation-draft-ready" style="border:1px solid rgba(249,115,22,.18); background:linear-gradient(135deg, rgba(255,247,237,.96), rgba(255,255,255,.98));">
                                 <div class="panel-head">
@@ -598,8 +611,15 @@
                             <div class="panel-head">
                                 <div>
                                     <h3>Checklist Suggestions</h3>
-                                    <p>AI suggestions not yet added to the register.</p>
+                                    <p>Rule-based risk suggestions not yet added to the register.</p>
+                                    <p class="suggestion-scan-help">Opening this page does not generate or rewrite records. A scan only adds new suggestions and preserves existing progress.</p>
                                 </div>
+                                @if(!empty($canRefreshMitigationSuggestions))
+                                    <form method="POST" action="{{ request()->routeIs('admin.*') ? route('admin.mitigations.suggestions.refresh') : route('station-admin.mitigations.suggestions.refresh') }}" class="suggestion-scan-form" data-suggestion-scan-form>
+                                        @csrf
+                                        <button type="submit" class="filter-btn secondary" title="Scan current station risk evidence for new suggestions"><i class="fa-solid fa-rotate"></i><span>Scan Risk Suggestions</span></button>
+                                    </form>
+                                @endif
                             </div>
                             @if(($generatedMitigationDrafts ?? collect())->isEmpty())
                                 <div class="empty">No pending system-generated mitigation drafts right now.</div>
@@ -650,8 +670,7 @@
                                             <div class="insight-card__footer">
                                                 <button type="button" class="filter-btn secondary insight-action" title="Review suggestion" aria-label="Review suggestion" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
                                                 <div class="insight-card__actions">
-                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.approve', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="hero-btn insight-action" title="Approve suggestion" aria-label="Approve suggestion"><i class="fa-solid fa-check"></i><span>Approve</span></button></form>
-                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="filter-btn secondary insight-action" title="Edit suggestion" aria-label="Edit suggestion"><i class="fa-solid fa-pen"></i><span>Edit</span></a>
+                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="hero-btn insight-action" title="Create mitigation plan from checklist" aria-label="Create mitigation plan from checklist"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Create Mitigation Plan</span></a>
                                                     <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="filter-btn secondary insight-action" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5" title="Reject suggestion" aria-label="Reject suggestion"><i class="fa-solid fa-ban"></i><span>Reject</span></button></form>
                                                 </div>
                                             </div>
@@ -662,10 +681,8 @@
                         </section>
 
                         <section class="summary-grid mitigation-summary">
-                            <article class="card"><div class="card-label">Total Mitigations</div><div class="card-value">{{ $summary['total'] }}</div><div class="card-copy">All official mitigation plans.</div></article>
-                            <article class="card"><div class="card-label">Awaiting Approval</div><div class="card-value">{{ $summary['awaiting_approval'] }}</div><div class="card-copy">Draft and planned items.</div></article>
-                            <article class="card"><div class="card-label">In Progress</div><div class="card-value">{{ $summary['in_progress'] }}</div><div class="card-copy">Approved and active work.</div></article>
-                            <article class="card"><div class="card-label">Overdue</div><div class="card-value">{{ $summary['overdue'] }}</div><div class="card-copy">Past target date, not closed.</div></article>
+                            <article class="card"><div class="card-label">Active Plans</div><div class="card-value">{{ $summary['in_progress'] }}</div><div class="card-copy">Approved and active work.</div></article>
+                            <article class="card"><div class="card-label">Pending Review</div><div class="card-value">{{ $summary['awaiting_approval'] }}</div><div class="card-copy">Draft and planned items.</div></article>
                             <article class="card"><div class="card-label">High Priority</div><div class="card-value">{{ $summary['high_priority'] }}</div><div class="card-copy">High or critical severity.</div></article>
                             <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $summary['completed'] }}</div><div class="card-copy">Finished and logged.</div></article>
                         </section>
@@ -894,6 +911,7 @@
                                                         'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
                                                         'requires_revision_review' => (bool) $action->requires_revision_review,
                                                         'analysis_revision' => $action->analysis_revision,
+                                                        'checklist_url' => $action->ai_action_plan_checklist_id ? route('station-admin.course-checklists', ['checklist' => $action->ai_action_plan_checklist_id]) : null,
                                                     ];
                                                     $isOverdue = $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true);
                                                 @endphp
@@ -931,7 +949,7 @@
                                                     </td>
                                                     <td data-label="Actions">
                                                         <div class="row-actions">
-                                                            <button type="button" class="row-btn view" title="View details" aria-label="View details" data-open-details-modal data-payload='@json($payload)'><i class="fa-solid fa-eye"></i></button>
+                                                            <button type="button" class="row-btn view primary-view" title="View details" aria-label="View details" data-open-details-modal data-payload='@json($payload)'><i class="fa-solid fa-eye"></i><span>View</span></button>
                                                             <button type="button" class="row-btn edit" title="Edit action" aria-label="Edit action" data-open-edit-modal data-payload='@json($payload)'><i class="fa-solid fa-pen"></i></button>
                                                             @if($action->completion_approval_status === 'pending')
                                                                 <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="approved"><button type="submit" class="row-btn view" title="Approve completion" aria-label="Approve completion"><i class="fa-solid fa-check"></i></button></form>
@@ -965,6 +983,10 @@
                 <button type="button" class="mitigation-dialog__close" data-close-modal aria-label="Close mitigation details"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="details-dialog__body" id="detailsContent"></div>
+            <div class="details-dialog__actions">
+                <a href="#" class="filter-btn secondary" id="detailsChecklistLink" hidden><i class="fa-solid fa-list-check"></i><span>View Checklist</span></a>
+                <button type="button" class="filter-btn primary" id="detailsEditButton" hidden><i class="fa-solid fa-pen"></i><span>Edit / Update</span></button>
+            </div>
         </div>
     </div>
 
@@ -978,10 +1000,10 @@
     <div class="mitigation-dialog" id="createModal" aria-hidden="true">
         <div class="mitigation-dialog__card mitigation-form-dialog" role="dialog" aria-modal="true" aria-labelledby="createMitigationTitle">
             <div class="mitigation-dialog__head">
-                <div class="mitigation-dialog__title"><span class="mitigation-dialog__title-icon"><i class="fa-solid fa-shield-halved"></i></span><div><h3 id="createMitigationTitle">Create mitigation plan</h3><p>Start with the plan and owner. Delivery details can be completed as work progresses.</p></div></div>
+                <div class="mitigation-dialog__title"><span class="mitigation-dialog__title-icon"><i class="fa-solid fa-shield-halved"></i></span><div><h3 id="createMitigationTitle">Create mitigation plan</h3><p id="createMitigationSubtitle">Start manually or generate an editable draft from an existing checklist.</p></div></div>
                 <button type="button" class="mitigation-dialog__close" data-close-modal aria-label="Close create mitigation"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <form method="POST" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
+            <form method="POST" id="createForm" action="{{ route('station-admin.mitigations.store') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="mitigation_form_context" value="create">
                 @if($errors->any() && old('mitigation_form_context') === 'create')
@@ -1040,6 +1062,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const createModal = document.getElementById('createModal');
+            const createForm = document.getElementById('createForm');
             const editModal = document.getElementById('editModal');
             const deleteModal = document.getElementById('deleteModal');
             const detailsModal = document.getElementById('detailsModal');
@@ -1049,15 +1072,27 @@
             const detailsTitle = document.getElementById('detailsTitle');
             const detailsSubtitle = document.getElementById('detailsSubtitle');
             const detailsContent = document.getElementById('detailsContent');
+            const detailsChecklistLink = document.getElementById('detailsChecklistLink');
+            const detailsEditButton = document.getElementById('detailsEditButton');
             const attachmentLightbox = document.getElementById('mitigationAttachmentLightbox');
             const lightboxImage = attachmentLightbox?.querySelector('[data-lightbox-image]');
             const lightboxCaption = attachmentLightbox?.querySelector('[data-lightbox-caption]');
             let lightboxItems = [];
             let lightboxIndex = 0;
+            let currentDetailsPayload = null;
             const updateBaseUrl = @json(route('station-admin.mitigations.update', ['mitigationActionId' => '__ID__']));
             const deleteBaseUrl = @json(route('station-admin.mitigations.destroy', ['mitigationActionId' => '__ID__']));
+            const checklistDraftUrl = @json(request()->routeIs('admin.*')
+                ? route('admin.mitigations.checklist-draft')
+                : route('station-admin.mitigations.checklist-draft'));
             const menuToggle = document.getElementById('mitigationUserMenuToggle');
             const menu = document.getElementById('mitigationUserMenu');
+            document.querySelector('[data-suggestion-scan-form]')?.addEventListener('submit', (event) => {
+                const button = event.currentTarget.querySelector('button[type="submit"]');
+                if (!button || button.disabled) return;
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Scanning...</span>';
+            });
 
             const captureOptions = (select) => Array.from(select?.options || []).map((option) => ({
                 value: option.value,
@@ -1131,6 +1166,142 @@
                 .replace(/'/g, '&#039;');
 
             const renderBadge = (label, className) => `<span class="tag ${escapeHtml(className)}">${escapeHtml(label)}</span>`;
+
+            const checklistDraftBuilder = createForm?.querySelector('[data-checklist-draft-builder]');
+            const checklistDraftSource = checklistDraftBuilder?.querySelector('[data-checklist-draft-source]');
+            const checklistDraftItems = checklistDraftBuilder?.querySelector('[data-checklist-draft-items]');
+            const checklistDraftButton = checklistDraftBuilder?.querySelector('[data-generate-checklist-draft]');
+            const checklistDraftStatus = checklistDraftBuilder?.querySelector('[data-checklist-draft-status]');
+            const recommendedActionsPreview = createForm?.querySelector('[data-recommended-actions-preview]');
+            const createMitigationTitle = document.getElementById('createMitigationTitle');
+            const createMitigationSubtitle = document.getElementById('createMitigationSubtitle');
+
+            const setCreateField = (name, value, fallback = '') => {
+                const field = createForm?.querySelector(`[name="${name}"]`);
+                if (field) field.value = value ?? fallback;
+            };
+
+            const requestChecklistDraft = async (checklistId, itemIds = null) => {
+                const response = await fetch(checklistDraftUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({
+                        checklist_id: Number(checklistId),
+                        ...(Array.isArray(itemIds) ? { item_ids: itemIds } : {}),
+                    }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload?.success) {
+                    const validationMessage = payload?.errors
+                        ? Object.values(payload.errors).flat().find(Boolean)
+                        : null;
+                    throw new Error(validationMessage || payload?.message || 'Unable to generate the mitigation draft.');
+                }
+
+                return payload.data;
+            };
+
+            const renderChecklistDraftItems = (items) => {
+                if (!checklistDraftItems) return;
+                if (!Array.isArray(items) || !items.length) {
+                    checklistDraftItems.innerHTML = '<small>No stored checklist items are available for this recommendation.</small>';
+                    checklistDraftItems.hidden = false;
+                    checklistDraftButton.disabled = true;
+                    return;
+                }
+
+                checklistDraftItems.innerHTML = `
+                    <label><i class="fa-solid fa-square-check"></i><span>Select recommended actions</span><em>${items.length} available</em></label>
+                    <div class="task-list">
+                        ${items.map((item) => `
+                            <label class="task-item">
+                                <input type="checkbox" value="${escapeHtml(item.id)}" data-checklist-draft-item checked>
+                                <span><strong>${escapeHtml(item.text)}</strong><small>${escapeHtml(String(item.status || 'pending').replace('_', ' '))}</small></span>
+                            </label>
+                        `).join('')}
+                    </div>
+                    <small>Only selected items will be used to structure the draft. The original checklist will not be changed.</small>
+                `;
+                checklistDraftItems.hidden = false;
+                checklistDraftButton.disabled = false;
+            };
+
+            const renderRecommendedActionsPreview = (actions) => {
+                if (!recommendedActionsPreview) return;
+                recommendedActionsPreview.innerHTML = `
+                    <div class="mitigation-workflow-note" style="margin-top:10px;">
+                        <span class="mitigation-workflow-note__icon"><i class="fa-solid fa-list-check"></i></span>
+                        <div><strong>Recommended actions used</strong><ul style="margin:6px 0 0;padding-left:18px;">${actions.map((action) => `<li>${escapeHtml(action)}</li>`).join('')}</ul></div>
+                    </div>
+                `;
+                recommendedActionsPreview.hidden = false;
+            };
+
+            checklistDraftSource?.addEventListener('change', async () => {
+                const checklistId = checklistDraftSource.value;
+                checklistDraftItems.hidden = true;
+                checklistDraftItems.innerHTML = '';
+                checklistDraftButton.disabled = true;
+                if (!checklistId) {
+                    checklistDraftStatus.textContent = 'Choose a checklist to begin. Nothing will be saved until you submit this form.';
+                    return;
+                }
+
+                checklistDraftStatus.textContent = 'Loading stored checklist items...';
+                try {
+                    const draft = await requestChecklistDraft(checklistId);
+                    renderChecklistDraftItems(draft.available_items);
+                    checklistDraftStatus.textContent = 'Select the actions to include, then generate the editable draft.';
+                } catch (error) {
+                    checklistDraftStatus.textContent = error.message;
+                }
+            });
+
+            checklistDraftButton?.addEventListener('click', async () => {
+                const checklistId = checklistDraftSource?.value;
+                const itemIds = Array.from(checklistDraftItems?.querySelectorAll('[data-checklist-draft-item]:checked') || [])
+                    .map((input) => Number(input.value))
+                    .filter(Number.isFinite);
+                if (!checklistId || !itemIds.length) {
+                    checklistDraftStatus.textContent = 'Select at least one recommended checklist action.';
+                    return;
+                }
+
+                checklistDraftButton.disabled = true;
+                checklistDraftStatus.textContent = 'Structuring the selected recommendations into a professional mitigation draft...';
+                try {
+                    const draft = await requestChecklistDraft(checklistId, itemIds);
+                    setCreateField('scope_type', draft.scope_type, 'barangay');
+                    setCreateField('barangay_id', draft.barangay_id);
+                    createForm?.querySelector('[name="barangay_id"]')?.dispatchEvent(new Event('change'));
+                    setCreateField('title', draft.title);
+                    setCreateField('category', draft.category, 'other');
+                    setCreateField('priority_level', draft.priority_level, 'medium');
+                    setCreateField('status', 'draft');
+                    setCreateField('target_date', draft.target_date);
+                    setCreateField('description', draft.description);
+                    setCreateField('baseline_condition', draft.baseline_condition);
+                    setCreateField('expected_result', draft.expected_result);
+                    setCreateField('remarks', draft.remarks);
+                    setCreateField('source_type', 'ai_action_plan');
+                    setCreateField('risk_area_id', draft.risk_area_id);
+                    setCreateField('ai_action_plan_checklist_id', draft.ai_action_plan_checklist_id);
+                    renderRecommendedActionsPreview(draft.recommended_actions || []);
+                    createMitigationTitle.textContent = draft.label || 'AI-Assisted Mitigation Draft';
+                    createMitigationSubtitle.textContent = draft.helper_text || 'Generated from the recommended checklist. Review and edit before saving.';
+                    checklistDraftStatus.textContent = 'Draft generated. Review and edit every field before selecting Save mitigation.';
+                    createForm?.querySelector('[name="title"]')?.focus({ preventScroll: true });
+                } catch (error) {
+                    checklistDraftStatus.textContent = error.message;
+                } finally {
+                    checklistDraftButton.disabled = false;
+                }
+            });
 
             const renderList = (items, emptyText) => {
                 if (!Array.isArray(items) || !items.length) {
@@ -1290,11 +1461,17 @@
             `;
 
             const renderDetails = (payload) => {
+                currentDetailsPayload = payload;
                 detailsTitle.textContent = payload.title || 'Mitigation Details';
                 const followUpText = payload.follow_up_required ? 'Yes' : 'No';
                 detailsSubtitle.textContent = [payload.scope_label || 'Barangay', payload.barangay_label || 'Unknown barangay', payload.location_label].filter(Boolean).join(' · ');
 
                 detailsContent.innerHTML = renderCompactDetails(payload, followUpText);
+                if (detailsChecklistLink) {
+                    detailsChecklistLink.hidden = !payload.checklist_url;
+                    detailsChecklistLink.href = payload.checklist_url || '#';
+                }
+                if (detailsEditButton) detailsEditButton.hidden = !payload.id;
                 return;
 
                 detailsContent.innerHTML = `
@@ -1381,6 +1558,9 @@
 
             wireBarangayScopedSelectors(createModal?.querySelector('form'));
             wireBarangayScopedSelectors(editForm);
+            if (checklistDraftSource?.value) {
+                checklistDraftSource.dispatchEvent(new Event('change'));
+            }
 
             document.querySelectorAll('[data-open-create-modal]').forEach((button) => {
                 button.addEventListener('click', () => openModal(createModal));
@@ -1484,6 +1664,17 @@
             });
             };
 
+            detailsEditButton?.addEventListener('click', () => {
+                if (!currentDetailsPayload?.id) return;
+                const matchingEdit = Array.from(document.querySelectorAll('#mitigationTableData [data-open-edit-modal]')).find((button) => {
+                    try { return String(JSON.parse(button.getAttribute('data-payload') || '{}').id) === String(currentDetailsPayload.id); }
+                    catch (error) { return false; }
+                });
+                if (!matchingEdit) return;
+                closeModal(detailsModal);
+                matchingEdit.click();
+            });
+
             const loadMitigationTable = async (url) => {
                 const table = document.getElementById('mitigationTableData');
                 if (!table) return;
@@ -1503,7 +1694,7 @@
                         <div class="table-wrap"><table class="mitigation-register-table"><thead><tr><th class="register-plan-col">Plan and coverage</th><th class="register-status-col">Status</th><th class="register-owner-col">Owner and due date</th><th class="register-actions-col">Open</th></tr></thead><tbody>
                         ${rows.map((item) => {
                             const editPayload = {...item, target_date:item.target_date_value};
-                            return `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Actions"><div class="row-actions"><a class="row-btn view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-eye"></i></a><button type="button" class="row-btn edit" data-open-edit-modal data-payload="${escapeHtml(JSON.stringify(editPayload))}" title="Edit mitigation" aria-label="Edit mitigation"><i class="fa-solid fa-pen"></i></button><button type="button" class="row-btn delete" data-open-delete-modal data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title || 'this mitigation')}" title="Delete mitigation" aria-label="Delete mitigation"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;
+                            return `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Actions"><div class="row-actions"><a class="row-btn view primary-view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-eye"></i><span>View</span></a><button type="button" class="row-btn edit" data-open-edit-modal data-payload="${escapeHtml(JSON.stringify(editPayload))}" title="Edit mitigation" aria-label="Edit mitigation"><i class="fa-solid fa-pen"></i></button><button type="button" class="row-btn delete" data-open-delete-modal data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title || 'this mitigation')}" title="Delete mitigation" aria-label="Delete mitigation"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;
                         }).join('')}
                         </tbody></table></div>
                         <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
@@ -1551,6 +1742,10 @@
                 loadMitigationTable(link.href);
             });
             bindMitigationTableActions();
+            const requestedMitigationId = new URLSearchParams(window.location.search).get('mitigation_action_id');
+            if (requestedMitigationId) {
+                document.querySelector(`#mitigation-row-${CSS.escape(requestedMitigationId)} [data-open-details-modal]`)?.click();
+            }
 
             if (menuToggle && menu) {
                 menuToggle.addEventListener('click', () => menu.classList.toggle('show'));

@@ -12,6 +12,33 @@
     </div>
 @endif
 
+@if($formMode === 'create')
+    <section class="mitigation-form-block" data-checklist-draft-builder>
+        <header class="mitigation-form-block__head">
+            <span class="mitigation-form-block__icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+            <div><h4>Generate Mitigation from Checklist</h4><p>Reuse an existing recommended checklist without making another AI request.</p></div>
+            <span class="mitigation-form-block__step">AI</span>
+        </header>
+        <div class="mitigation-form-block__grid">
+            <div class="mitigation-field mitigation-field--full">
+                <label for="{{ $fieldId('draftChecklistSource') }}"><i class="fa-solid fa-list-check"></i><span>Existing checklist</span></label>
+                <select id="{{ $fieldId('draftChecklistSource') }}" data-checklist-draft-source>
+                    <option value="">Select a generated checklist</option>
+                    @foreach($aiActionPlanOptions as $item)
+                        <option value="{{ $item->ai_action_plan_checklist_id }}" @selected((string) ($draft['ai_action_plan_checklist_id'] ?? '') === (string) $item->ai_action_plan_checklist_id)>{{ collect($managedBarangays)->firstWhere('barangay_id', $item->barangay_id)?->barangay_name ?? 'Barangay' }} - {{ $item->plan_title }}</option>
+                    @endforeach
+                </select>
+                <small>Selecting a checklist loads its already stored recommended actions.</small>
+            </div>
+            <div class="mitigation-field mitigation-field--full" data-checklist-draft-items hidden></div>
+            <div class="mitigation-field mitigation-field--full">
+                <button type="button" class="hero-btn" data-generate-checklist-draft disabled><i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate AI-Assisted Mitigation Draft</span></button>
+                <small data-checklist-draft-status>Choose a checklist to begin. Nothing will be saved until you submit this form.</small>
+            </div>
+        </div>
+    </section>
+@endif
+
 <section class="mitigation-form-block" aria-labelledby="{{ $fieldId('planningHeading') }}">
     <header class="mitigation-form-block__head">
         <span class="mitigation-form-block__icon"><i class="fa-solid fa-clipboard-check"></i></span>
@@ -61,6 +88,9 @@
         <div class="mitigation-field mitigation-field--full">
             <label for="{{ $fieldId('description') }}"><i class="fa-solid fa-bullseye"></i><span>Objective and mitigation plan</span></label>
             <textarea id="{{ $fieldId('description') }}" name="description" rows="5" placeholder="Describe the intended risk reduction and the action to be carried out" required>{{ old('description', $draft['description'] ?? '') }}</textarea>
+            @if($formMode === 'create')
+                <div data-recommended-actions-preview hidden></div>
+            @endif
         </div>
         <div class="mitigation-field mitigation-field--full">
             <label for="{{ $fieldId('baselineCondition') }}"><i class="fa-solid fa-camera-retro"></i><span>Condition before work</span><em>Optional for drafts</em></label>

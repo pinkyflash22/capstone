@@ -77,13 +77,16 @@
         .coop-empty span { display: block; margin-top: 4px; font-size: .7rem; }
 
         .coop-modal[hidden] { display: none; }
-        .coop-modal { position: fixed; inset: 0; z-index: var(--ff-layer-modal,7000); display: grid; place-items: center; padding: 16px; background: rgba(15,23,42,.54); backdrop-filter: blur(7px); }
+        .coop-modal { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 16px; background: rgba(15,23,42,.54); backdrop-filter: blur(7px); }
         .coop-modal__card { display: flex; flex-direction: column; width: min(700px,100%); max-height: min(86dvh,760px); overflow: hidden; border: 1px solid rgba(255,255,255,.7); border-radius: 22px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.26); }
         .coop-modal__head { display: flex; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid #edf2f7; }
         .coop-modal__eyebrow { margin: 0 0 3px; color: #b45309; font-size: .6rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
         .coop-modal__head h2 { margin: 0; color: #172033; font-size: 1rem; font-weight: 900; }
         .coop-modal__close { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #64748b; }
         .coop-modal__body { min-height: 0; overflow-y: auto; padding: 16px 18px 20px; }
+        .coop-modal__foot { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 18px; border-top:1px solid #edf2f7; background:#fff; }
+        .coop-modal__foot small { color:#64748b; font-size:.62rem; line-height:1.4; }
+        .coop-modal__foot button { min-height:38px; padding:0 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#475569; font-size:.7rem; font-weight:850; }
         .coop-detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
         .coop-detail { padding: 10px 11px; border: 1px solid #edf2f7; border-radius: 12px; background: #f8fafc; }
         .coop-detail.wide { grid-column: 1/-1; }
@@ -92,6 +95,7 @@
         .coop-detail strong { color: #334155; font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
         .coop-steps-title { margin: 18px 0 9px; color: #172033; font-size: .82rem; font-weight: 900; }
         .coop-step { display: grid; gap: 9px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 13px; background: #fff; }
+        .coop-step.is-dirty { border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.08); }
         .coop-step + .coop-step { margin-top: 9px; }
         .coop-step__title { display: flex; align-items: flex-start; gap: 9px; color: #334155; font-size: .75rem; line-height: 1.45; font-weight: 800; }
         .coop-step__number { display: grid; width: 23px; height: 23px; flex: 0 0 23px; place-items: center; border-radius: 8px; background: #fff7ed; color: #b45309; font-size: .62rem; }
@@ -167,6 +171,8 @@
             .coop-modal { align-items: end; padding: 0; }
             .coop-modal__card { width: 100%; max-height: calc(92dvh - env(safe-area-inset-top,0px)); border-radius: 22px 22px 0 0; }
             .coop-modal__body { padding: 13px 14px calc(18px + env(safe-area-inset-bottom,0px)); }
+            .coop-modal__foot { padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px)); }
+            .coop-modal__foot button { min-height:44px; }
             .coop-detail-grid { grid-template-columns: 1fr; }
             .coop-detail.wide { grid-column: auto; }
             .coop-step__controls { grid-template-columns: 1fr; }
@@ -231,18 +237,18 @@
                             @forelse($checklists as $checklist)
                                 @php $progress = $checklist->checklist_progress; @endphp
                                 <article class="coop-card" data-coop-record data-kind="checklist" data-barangay="{{ $checklist->barangay_id }}" data-status="{{ $checklist->status }}" data-search="{{ strtolower(($checklist->barangay?->barangay_name ?? '').' '.$checklist->plan_title.' '.$checklist->plan_description) }}" data-checklist-card="{{ $checklist->getKey() }}">
-                                    <div><div class="coop-card__top"><span class="coop-chip">{{ $checklist->barangay?->barangay_name ?? 'Barangay' }}</span><span class="coop-chip priority-{{ $checklist->priority_level }}">{{ $checklist->priority_level }}</span><span class="coop-chip status-{{ $checklist->status }}" data-checklist-status>{{ str_replace('_',' ',$checklist->status) }}</span></div><h3>{{ $checklist->plan_title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $checklist->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-list-check"></i><b data-progress-count>{{ $progress['followed'] }}/{{ $progress['total'] }}</b> followed</span></div><div class="coop-progress"><div class="coop-progress__track"><span data-progress-bar style="width:{{ $progress['percent'] }}%"></span></div><strong data-progress-percent>{{ $progress['percent'] }}%</strong></div></div>
+                                    <div><div class="coop-card__top"><span class="coop-chip">{{ $checklist->barangay?->barangay_name ?? 'Barangay' }}</span><span class="coop-chip priority-{{ $checklist->priority_level }}">{{ $checklist->priority_level }}</span><span class="coop-chip status-{{ $checklist->status }}" data-checklist-status>{{ str_replace('_',' ',$checklist->status) }}</span></div><h3>{{ $checklist->plan_title }}</h3><div class="coop-card__meta"><span><i class="fa-regular fa-calendar"></i>{{ $checklist->target_date?->format('M d, Y') ?? 'No target date' }}</span><span><i class="fa-solid fa-list-check"></i><b data-progress-count>{{ $progress['followed'] }}/{{ $progress['total'] }}</b> completed</span></div><div class="coop-progress"><div class="coop-progress__track"><span data-progress-bar style="width:{{ $progress['percent'] }}%"></span></div><strong data-progress-percent>{{ $progress['percent'] }}%</strong></div></div>
                                     <button type="button" class="coop-open" data-open-coop-detail="checklist-{{ $checklist->getKey() }}" aria-label="View {{ $checklist->plan_title }}"><i class="fa-solid fa-eye" aria-hidden="true"></i><span>View</span></button>
                                 </article>
 
                                 <template id="checklist-{{ $checklist->getKey() }}">
                                     <div class="coop-detail-grid"><div class="coop-detail wide"><span>Plan</span><strong>{{ $checklist->plan_title }}</strong></div><div class="coop-detail wide"><span>Guidance</span><strong>{{ $checklist->plan_description ?: $checklist->source_description ?: 'No additional guidance recorded.' }}</strong></div><div class="coop-detail"><span>Barangay</span><strong>{{ $checklist->barangay?->barangay_name ?? 'Not assigned' }}</strong></div><div class="coop-detail"><span>Priority</span><strong>{{ strtoupper($checklist->priority_level) }}</strong></div><div class="coop-detail"><span>Target date</span><strong>{{ $checklist->target_date?->format('M d, Y') ?? 'No target date' }}</strong></div><div class="coop-detail"><span>Assigned to</span><strong>{{ $checklist->assignee?->full_name ?? 'Station and barangay partners' }}</strong></div><div class="coop-detail wide"><span>Success indicator</span><strong>{{ $checklist->success_indicator ?: 'Complete and verify every assigned step.' }}</strong></div></div>
-                                    <h3 class="coop-steps-title">Visit checklist · {{ $progress['followed'] }} of {{ $progress['total'] }} followed</h3>
+                                    <h3 class="coop-steps-title">Field actions · {{ $progress['followed'] }} of {{ $progress['total'] }} completed</h3>
                                     <div data-modal-steps>
                                         @foreach($checklist->items as $step)
                                             <form class="coop-step" data-checklist-step data-item-id="{{ $step->getKey() }}" data-checklist-id="{{ $checklist->getKey() }}" data-saved-status="{{ $step->status }}" action="{{ route('firefighter.barangay-cooperation.checklists.items.update', [$checklist->getKey(), $step->getKey()]) }}">
                                                 <div class="coop-step__title"><span class="coop-step__number">{{ $step->item_order }}</span><span>{{ $step->item_text }}</span></div>
-                                                <div class="coop-step__controls"><select name="status" aria-label="Checklist status"><option value="pending" @selected($step->status === 'pending')>Pending</option><option value="followed" @selected($step->status === 'followed')>Followed</option><option value="not_followed" @selected($step->status === 'not_followed')>Not followed</option></select><input name="review_notes" value="{{ $step->review_notes }}" maxlength="1000" placeholder="Visit note (optional)" aria-label="Visit note"><button type="submit">Save step</button></div>
+                                                <div class="coop-step__controls"><select name="status" aria-label="Checklist status"><option value="pending" @selected($step->status === 'pending')>Pending</option><option value="followed" @selected($step->status === 'followed')>Completed</option><option value="not_followed" @selected($step->status === 'not_followed')>Needs attention</option></select><input name="review_notes" value="{{ $step->review_notes }}" maxlength="1000" placeholder="Field note (optional)" aria-label="Field note"><button type="submit">Save action</button></div>
                                                 <label class="coop-proof-picker"><span><i class="fa-regular fa-image"></i> Visit proof photos</span><input type="file" name="visit_photos[]" accept="image/jpeg,image/png,image/webp" multiple data-visit-proof-input><small>Optional · up to 5 JPG, PNG, or WebP photos · 15 MB combined</small><div class="coop-proof-preview" data-visit-proof-preview></div></label>
                                                 <div class="coop-step__review" data-step-review>@if($step->reviewed_at)Last verified {{ $step->reviewed_at->format('M d, Y h:i A') }} by {{ $step->reviewer?->full_name ?? 'authorized user' }}@elseNot yet verified during a visit.@endif</div>
                                             </form>
@@ -304,13 +310,14 @@
             </div>
         </main>
 
-        <div class="coop-modal" id="coopDetailModal" role="dialog" aria-modal="true" aria-labelledby="coopDetailTitle" hidden><div class="coop-modal__card"><header class="coop-modal__head"><div><p class="coop-modal__eyebrow" id="coopDetailType">Cooperation record</p><h2 id="coopDetailTitle">Plan details</h2></div><button type="button" class="coop-modal__close" data-close-coop-modal aria-label="Close details"><i class="fa-solid fa-xmark"></i></button></header><div class="coop-modal__body" id="coopDetailBody"></div></div></div>
+        <div class="coop-modal" id="coopDetailModal" role="dialog" aria-modal="true" aria-labelledby="coopDetailTitle" hidden><div class="coop-modal__card"><header class="coop-modal__head"><div><p class="coop-modal__eyebrow" id="coopDetailType">Cooperation record</p><h2 id="coopDetailTitle">Plan details</h2></div><button type="button" class="coop-modal__close" data-close-coop-modal aria-label="Close details"><i class="fa-solid fa-xmark"></i></button></header><div class="coop-modal__body" id="coopDetailBody"></div><footer class="coop-modal__foot"><small id="coopModalHelp">Save each changed field action before closing.</small><button type="button" data-close-coop-modal>Close</button></footer></div></div>
 
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 const workspace = document.getElementById('barangayCooperationWorkspace');
                 const modal = document.getElementById('coopDetailModal');
                 const modalBody = document.getElementById('coopDetailBody');
+                const modalHelp = document.getElementById('coopModalHelp');
                 if (!workspace || !modal || !modalBody || workspace.dataset.bound === 'true') return;
                 workspace.dataset.bound = 'true';
                 const search = document.getElementById('coopSearch');
@@ -397,14 +404,15 @@
                 search?.addEventListener('input', filterRecords);
                 status?.addEventListener('change', filterRecords);
 
-                const closeModal = () => {
+                const closeModal = (force = false) => {
+                    if (!force && modalBody.querySelector('.is-dirty') && !window.confirm('Discard unsaved changes?')) return;
                     clearProofPreviews();
                     modal.hidden = true;
                     modalBody.innerHTML = '';
                     document.body.style.overflow = '';
                     lastFocused?.focus?.();
                 };
-                modal.querySelector('[data-close-coop-modal]')?.addEventListener('click', closeModal);
+                modal.querySelectorAll('[data-close-coop-modal]').forEach((button) => button.addEventListener('click', () => closeModal()));
                 modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
                 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) closeModal(); });
 
@@ -416,6 +424,7 @@
                     lastFocused = button;
                     modalBody.replaceChildren(template.content.cloneNode(true));
                     document.getElementById('coopDetailType').textContent = button.dataset.openCoopDetail.startsWith('checklist-') ? 'Barangay visit checklist' : 'BFP mitigation plan';
+                    if (modalHelp) modalHelp.textContent = button.dataset.openCoopDetail.startsWith('checklist-') ? 'Save each changed field action before closing.' : 'Save mitigation progress before closing.';
                     document.getElementById('coopDetailTitle').textContent = button.closest('.coop-card')?.querySelector('h3')?.textContent?.trim() || 'Plan details';
                     modal.hidden = false;
                     document.body.style.overflow = 'hidden';
@@ -423,6 +432,8 @@
                 });
 
                 modalBody.addEventListener('change', (event) => {
+                    event.target.closest('[data-checklist-step]')?.classList.add('is-dirty');
+                    event.target.closest('[data-mitigation-update]')?.classList.add('is-dirty');
                     const input = event.target.closest('[data-visit-proof-input]');
                     if (!input) return;
                     const files = Array.from(input.files || []);
@@ -448,6 +459,10 @@
                         figure.append(image, caption);
                         preview?.appendChild(figure);
                     });
+                });
+                modalBody.addEventListener('input', (event) => {
+                    event.target.closest('[data-checklist-step]')?.classList.add('is-dirty');
+                    event.target.closest('[data-mitigation-update]')?.classList.add('is-dirty');
                 });
 
                 modalBody.addEventListener('submit', async (event) => {
@@ -527,6 +542,7 @@
                                 if (summary) summary.textContent = String(Number(summary.textContent || 0) + 1);
                             }
                             filterRecords();
+                            mitigationForm.classList.remove('is-dirty');
                             toast(result.message || 'Mitigation progress updated.');
                         } catch (error) {
                             toast(error.message || 'Unable to update mitigation progress.', 'error');
@@ -552,6 +568,7 @@
                         const result = await response.json();
                         if (!response.ok || result.success === false) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to update the checklist step.');
                         form.dataset.savedStatus = newStatus;
+                        form.classList.remove('is-dirty');
                         const review = form.querySelector('[data-step-review]');
                         if (review) review.textContent = newStatus === 'pending' ? 'Not yet verified during a visit.' : `Verified just now by ${result.data.reviewed_by || 'firefighter'}.`;
 
@@ -569,7 +586,7 @@
                             if (sourceReview) sourceReview.textContent = review?.textContent || '';
                         }
 
-                        const progressTitle = `Visit checklist · ${result.data.progress.followed} of ${result.data.progress.total} followed`;
+                        const progressTitle = `Field actions · ${result.data.progress.followed} of ${result.data.progress.total} completed`;
                         const modalProgressTitle = modalBody.querySelector('.coop-steps-title');
                         const templateProgressTitle = template?.content.querySelector('.coop-steps-title');
                         if (modalProgressTitle) modalProgressTitle.textContent = progressTitle;
@@ -607,7 +624,7 @@
                         toast(error.message || 'Unable to update the checklist step.', 'error');
                     } finally {
                         button.disabled = false;
-                        button.textContent = 'Save step';
+                        button.textContent = 'Save action';
                     }
                 });
             });

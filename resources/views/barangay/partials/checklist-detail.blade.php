@@ -6,14 +6,15 @@
     <div><span>Assigned to</span><strong>{{ $item->assignee }}</strong></div>
     <div><span>Reviewer</span><strong>{{ $item->reviewer }}</strong></div>
     <div><span>Target</span><strong>{{ $item->target?->format('M d, Y') ?? 'No target date' }}</strong></div>
-    <div><span>Progress</span><strong>{{ $item->progress }}%</strong></div>
+    <div><span>Progress</span><strong data-community-progress>{{ $item->progress }}%</strong></div>
 
     @if($item->steps->isNotEmpty())
         <div class="wide">
-            <span>Steps assigned to your barangay</span>
+            <span>Community safety actions</span>
+            <strong class="checklist-community-help">Update the actions your barangay oversees. BFP verification remains visible below each action.</strong>
             <ol class="checklist-detail-steps">
                 @foreach($item->steps as $step)
-                    <li>
+                    <li data-community-step-status="{{ $step->status === 'followed' ? 'completed' : 'pending' }}">
                         <form method="POST" action="{{ route('barangay.checklists.items.update', [$item->checklist_id, $step->getKey()]) }}" class="checklist-step-form">
                             @csrf
                             @method('PATCH')
@@ -21,11 +22,11 @@
                             <div class="checklist-step-controls">
                                 <select name="status" aria-label="Status for {{ $step->item_text }}">
                                     <option value="pending" @selected($step->status === 'pending')>Pending</option>
-                                    <option value="followed" @selected($step->status === 'followed')>Followed</option>
-                                    <option value="not_followed" @selected($step->status === 'not_followed')>Not followed</option>
+                                    <option value="followed" @selected($step->status === 'followed')>Completed</option>
+                                    <option value="not_followed" @selected($step->status === 'not_followed')>Needs BFP follow-up</option>
                                 </select>
                                 <input type="text" name="review_notes" value="{{ $step->review_notes }}" maxlength="1000" placeholder="Optional note" aria-label="Note for {{ $step->item_text }}">
-                                <button type="submit">Save</button>
+                                <button type="submit">Save action</button>
                             </div>
                         </form>
 

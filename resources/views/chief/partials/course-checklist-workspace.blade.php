@@ -148,7 +148,7 @@
                                     <button type="button" class="icon-button icon-button--primary" data-open-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Review checklist" aria-label="Review {{ $checklist->plan_title }}"><i class="fa-solid fa-eye"></i></button>
                                     <button type="button" class="icon-button" data-edit-checklist='@json($checklistEditPayload)' title="Edit checklist" aria-label="Edit {{ $checklist->plan_title }}"><i class="fa-solid fa-pen"></i></button>
                                     <button type="button" class="icon-button" data-delete-checklist="{{ $checklist->ai_action_plan_checklist_id }}" data-checklist-title="{{ $checklist->plan_title }}" title="Delete checklist" aria-label="Delete {{ $checklist->plan_title }}"><i class="fa-solid fa-trash"></i></button>
-                                    <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create mitigation draft' }}" aria-label="Open mitigation"><i class="fa-solid fa-shield-halved"></i></a>
+                                    <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create Mitigation Plan' }}" aria-label="{{ $mitigation ? 'Open linked mitigation' : 'Create Mitigation Plan from checklist' }}"><i class="fa-solid fa-shield-halved"></i></a>
                                 </div>
                             </td>
                         </tr>
@@ -172,8 +172,8 @@
                             </div>
 
                             <div class="modal-progress-card">
-                                <div><span>Field progress</span><strong>{{ $progress['followed'] }} of {{ $progress['total'] }} steps followed</strong></div>
-                                <div class="modal-progress-card__bar"><span style="width:{{ $progress['percent'] }}%"></span></div>
+                                <div><span>Overall completion</span><strong data-modal-progress-count>{{ $progress['followed'] }} of {{ $progress['total'] }} steps completed</strong></div>
+                                <div class="modal-progress-card__bar"><span data-modal-progress-bar style="width:{{ $progress['percent'] }}%"></span></div>
                             </div>
 
                             @if (is_array($evidence) && ! empty($evidence))
@@ -190,19 +190,19 @@
                             @endif
 
                             <section class="modal-section">
-                                <div class="modal-section__head"><h4><i class="fa-solid fa-shoe-prints"></i> Checklist steps</h4><span>{{ $progress['pending'] }} pending</span></div>
+                                <div class="modal-section__head"><h4><i class="fa-solid fa-shoe-prints"></i> Recommended action items</h4><span data-modal-pending-count>{{ $progress['pending'] }} pending</span></div>
                                 <div class="modal-steps">
                                     @forelse ($checklist->items as $item)
-                                        <article class="modal-step modal-step--{{ $item->status }}">
+                                        <article class="modal-step modal-step--{{ $item->status }}" data-selected-status="{{ $item->status }}" data-review-notes="{{ $item->review_notes }}">
                                             <span class="modal-step__number">{{ $item->item_order }}</span>
                                             <div class="modal-step__copy">
                                                 <strong>{{ $item->item_text }}</strong>
-                                                <small><i class="fa-solid fa-circle-info"></i> {{ ucfirst(str_replace('_', ' ', $item->status)) }}@if($item->reviewer) · {{ trim(($item->reviewer->first_name ?? '') . ' ' . ($item->reviewer->last_name ?? '')) }}@endif</small>
+                                                <small><i class="fa-solid fa-circle-info"></i> <span data-step-state>{{ $item->status === 'followed' ? 'Completed' : ($item->status === 'not_followed' ? 'Needs attention' : 'Pending') }}</span>@if($item->reviewer) · {{ trim(($item->reviewer->first_name ?? '') . ' ' . ($item->reviewer->last_name ?? '')) }}@endif</small>
                                             </div>
                                             <div class="modal-step__actions">
-                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="followed" class="step-icon step-icon--done" title="Mark followed" aria-label="Mark step {{ $item->item_order }} followed"><i class="fa-solid fa-check"></i></button>
-                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="not_followed" class="step-icon step-icon--missed" title="Mark not followed" aria-label="Mark step {{ $item->item_order }} not followed"><i class="fa-solid fa-xmark"></i></button>
-                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="pending" class="step-icon" title="Reset step" aria-label="Reset step {{ $item->item_order }}"><i class="fa-solid fa-rotate-left"></i></button>
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="followed" class="step-icon step-icon--done {{ $item->status === 'followed' ? 'is-active' : '' }}" aria-label="Mark step {{ $item->item_order }} completed"><i class="fa-solid fa-check"></i><span>Completed</span></button>
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="not_followed" class="step-icon step-icon--missed {{ $item->status === 'not_followed' ? 'is-active' : '' }}" aria-label="Mark step {{ $item->item_order }} as needing attention"><i class="fa-solid fa-triangle-exclamation"></i><span>Attention</span></button>
+                                                <button type="button" data-step-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-item-id="{{ $item->ai_action_plan_checklist_item_id }}" data-status="pending" class="step-icon {{ $item->status === 'pending' ? 'is-active' : '' }}" aria-label="Mark step {{ $item->item_order }} pending"><i class="fa-regular fa-clock"></i><span>Pending</span></button>
                                             </div>
                                         </article>
                                     @empty
@@ -211,6 +211,8 @@
                                 </div>
                             </section>
 
+                            <details class="modal-review-disclosure">
+                                <summary><i class="fa-solid fa-user-shield"></i><span>Chief review and checklist status</span><i class="fa-solid fa-chevron-down"></i></summary>
                             <section class="modal-section modal-review">
                                 <div class="modal-section__head"><h4><i class="fa-solid fa-pen-to-square"></i> Chief review</h4><span>{{ $checklist->source_title ?: 'AI recommendation' }}</span></div>
                                 <label for="notes-{{ $checklist->ai_action_plan_checklist_id }}">Review notes</label>
@@ -221,7 +223,7 @@
                                     <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="confirmed" class="action-button action-button--confirmed"><i class="fa-solid fa-circle-check"></i><span>Confirm</span></button>
                                     <button type="button" data-checklist-status data-checklist-id="{{ $checklist->ai_action_plan_checklist_id }}" data-status="rejected" class="action-button action-button--rejected"><i class="fa-solid fa-ban"></i><span>Reject</span></button>
                                 </div>
-                            </section>
+                            </section></details>
 
                             <section class="modal-section">
                                 <div class="modal-section__head"><h4><i class="fa-solid fa-clock-rotate-left"></i> Activity history</h4><span>Newest first</span></div>
@@ -230,7 +232,7 @@
 
                             <div class="modal-links">
                                 <a href="{{ route('station-admin.analytics') }}"><i class="fa-solid fa-chart-line"></i><span>Forecast source</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                                <a href="{{ $mitigationUrl }}"><i class="fa-solid fa-shield-halved"></i><span>{{ $mitigation ? 'Linked mitigation (' . $checklist->mitigation_actions_count . ')' : 'Create mitigation draft' }}</span><i class="fa-solid fa-arrow-right"></i></a>
+                                <a href="{{ $mitigationUrl }}" data-checklist-mitigation-link data-linked="{{ $mitigation ? '1' : '0' }}"><i class="fa-solid fa-shield-halved"></i><span>{{ $mitigation ? 'Linked mitigation (' . $checklist->mitigation_actions_count . ')' : 'Create Mitigation Plan' }}</span><i class="fa-solid fa-arrow-right"></i></a>
                             </div>
                         </template>
                     @empty

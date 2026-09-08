@@ -235,6 +235,8 @@
             .checklist-metric strong { font-size: 16px; }
             .checklist-result-count { max-width: 78px; white-space: normal; line-height: 1.25; text-align: center; }
         }
+        .checklist-modal__foot{align-items:center;justify-content:space-between;gap:10px}.checklist-modal__foot-actions{display:flex;align-items:center;gap:8px}.checklist-save-state{margin-right:auto;color:#7b8797;font-size:10px;font-weight:750}.checklist-save-state.is-dirty{color:#a94a1e}.checklist-save-state.is-saved{color:#147653}.action-button--primary{min-height:38px;background:linear-gradient(135deg,#cf3f24,#e88313);color:#fff;box-shadow:0 7px 16px rgba(207,63,36,.18)}.action-button:disabled{cursor:not-allowed;opacity:.48}.modal-step.is-selected{border-color:#ef9a5a;box-shadow:0 0 0 2px rgba(232,111,38,.1)}.step-icon{width:auto;min-width:76px;padding:0 9px;display:inline-flex;gap:6px;font-size:9px;font-weight:850}.step-icon.is-active{background:#172235;border-color:#172235;color:#fff}.modal-review-disclosure{margin-top:14px;border:1px solid #e9e4de;border-radius:18px;background:#fff;overflow:hidden}.modal-review-disclosure>summary{display:flex;align-items:center;gap:9px;padding:13px 15px;cursor:pointer;color:#344055;font-size:12px;font-weight:850;list-style:none}.modal-review-disclosure>summary::-webkit-details-marker{display:none}.modal-review-disclosure>summary i:last-child{margin-left:auto;transition:transform .18s}.modal-review-disclosure[open]>summary i:last-child{transform:rotate(180deg)}.modal-review-disclosure>.modal-section{margin:0;border:0;border-top:1px solid #eee7df;border-radius:0}
+        @media(max-width:767px){.checklist-modal__foot{align-items:stretch;flex-direction:column;padding-bottom:calc(11px + env(safe-area-inset-bottom,0px))}.checklist-modal__foot-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.checklist-modal__foot-actions .action-button{justify-content:center;min-height:44px}.checklist-modal__foot-actions #saveChecklistProgress{grid-column:1/-1}.checklist-save-state{width:100%;text-align:center}.step-icon{min-height:42px;min-width:0;justify-content:center}.modal-section__head{align-items:flex-start}.modal-evidence-grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body class="chief-legacy-layout">
@@ -270,7 +272,14 @@
     <div class="checklist-modal__card">
         <header class="checklist-modal__head"><div><strong id="checklistModalTitle">Checklist review</strong><small>Verify steps and record operational progress.</small></div><button id="closeChecklistModal" type="button" class="close-button" aria-label="Close checklist"><i class="fa-solid fa-xmark"></i></button></header>
         <div id="checklistModalBody" class="checklist-modal__body"></div>
-        <footer class="checklist-modal__foot"><button type="button" class="action-button" data-close-checklist><i class="fa-solid fa-arrow-left"></i><span>Back to register</span></button></footer>
+        <footer class="checklist-modal__foot">
+            <span class="checklist-save-state" id="checklistSaveState" aria-live="polite">No unsaved changes</span>
+            <div class="checklist-modal__foot-actions">
+                <button type="button" class="action-button" data-close-checklist><i class="fa-solid fa-xmark"></i><span>Close</span></button>
+                <a class="action-button action-button--progress" id="checklistMitigationAction" href="#" hidden><i class="fa-solid fa-shield-halved"></i><span>Create mitigation</span></a>
+                <button type="button" class="action-button action-button--primary" id="saveChecklistProgress" disabled><i class="fa-solid fa-floppy-disk"></i><span>Save Progress</span></button>
+            </div>
+        </footer>
     </div>
 </div>
 <div id="checklistEditor" class="checklist-editor" role="dialog" aria-modal="true" aria-labelledby="checklistEditorTitle" hidden>
@@ -313,6 +322,9 @@
     let checklistTrigger = null;
     let checklistSearchTimer = null;
     let editingChecklistId = null;
+    let activeChecklistId = null;
+    let checklistPendingItems = new Map();
+    let checklistProgressSaving = false;
 
     function checklistEndpoint(type, checklistId = null) {
         const endpoint = checklistEndpoints[type] || '';
@@ -436,19 +448,112 @@
         const planTitle = checklistTrigger?.closest('[data-checklist-row]')?.querySelector('.plan-cell strong')?.textContent?.trim();
         document.getElementById('checklistModalTitle').textContent = planTitle || 'Checklist review';
         document.getElementById('checklistModalBody').replaceChildren(template.content.cloneNode(true));
+        activeChecklistId = String(id);
+        checklistPendingItems = new Map();
+        checklistProgressSaving = false;
+        updateChecklistSaveState();
+        const mitigationLink = document.getElementById('checklistModalBody').querySelector('[data-checklist-mitigation-link]');
+        const footerMitigation = document.getElementById('checklistMitigationAction');
+        if (footerMitigation && mitigationLink) {
+            footerMitigation.href = mitigationLink.href;
+            footerMitigation.querySelector('span').textContent = mitigationLink.dataset.linked === '1' ? 'View mitigation' : 'Create mitigation';
+            footerMitigation.hidden = false;
+        } else if (footerMitigation) {
+            footerMitigation.hidden = true;
+        }
         modal.hidden = false;
         document.body.style.overflow = 'hidden';
         document.getElementById('closeChecklistModal').focus();
         loadChecklistHistory(id);
     }
 
-    function closeChecklistModal() {
+    function closeChecklistModal(force = false) {
         const modal = document.getElementById('checklistModal');
         if (modal.hidden) return;
+        if (!force && checklistPendingItems.size && !window.confirm('Discard your unsaved checklist progress?')) return;
         modal.hidden = true;
         document.getElementById('checklistModalBody').replaceChildren();
         document.body.style.overflow = '';
+        activeChecklistId = null;
+        checklistPendingItems = new Map();
         checklistTrigger?.focus?.();
+    }
+
+    function updateChecklistSaveState(message = null, state = null) {
+        const save = document.getElementById('saveChecklistProgress');
+        const label = document.getElementById('checklistSaveState');
+        const dirty = checklistPendingItems.size > 0;
+        if (save) save.disabled = !dirty || checklistProgressSaving;
+        if (!label) return;
+        label.className = `checklist-save-state${state ? ` is-${state}` : (dirty ? ' is-dirty' : '')}`;
+        label.textContent = message || (dirty ? `${checklistPendingItems.size} unsaved change${checklistPendingItems.size === 1 ? '' : 's'}` : 'No unsaved changes');
+    }
+
+    function selectChecklistStepStatus(button) {
+        const row = button.closest('.modal-step');
+        if (!row) return;
+        let reviewNotes = row.dataset.reviewNotes || '';
+        if (button.dataset.status === 'not_followed') {
+            reviewNotes = window.prompt('Why does this step need attention? Add a short note.', reviewNotes)?.trim() || '';
+            if (!reviewNotes) { showChecklistToast('A short reason is required.', 'error'); return; }
+        }
+        row.dataset.reviewNotes = reviewNotes;
+        row.dataset.selectedStatus = button.dataset.status;
+        row.classList.remove('modal-step--pending','modal-step--followed','modal-step--not_followed');
+        row.classList.add(`modal-step--${button.dataset.status}`,'is-selected');
+        row.querySelectorAll('[data-step-status]').forEach((control) => control.classList.toggle('is-active', control.dataset.status === button.dataset.status));
+        const state = row.querySelector('[data-step-state]');
+        if (state) state.textContent = `${button.dataset.status.replaceAll('_',' ')} - not saved`;
+        checklistPendingItems.set(String(button.dataset.itemId), {item_id:Number(button.dataset.itemId),status:button.dataset.status,review_notes:reviewNotes});
+        updateChecklistModalProgress();
+        updateChecklistSaveState();
+    }
+
+    function updateChecklistModalProgress() {
+        const rows = [...document.querySelectorAll('#checklistModalBody .modal-step[data-selected-status]')];
+        const total = rows.length;
+        const followed = rows.filter((row) => row.dataset.selectedStatus === 'followed').length;
+        const pending = rows.filter((row) => row.dataset.selectedStatus === 'pending').length;
+        const percent = total ? Math.round((followed / total) * 100) : 0;
+        const count = document.querySelector('#checklistModalBody [data-modal-progress-count]');
+        const bar = document.querySelector('#checklistModalBody [data-modal-progress-bar]');
+        const pendingLabel = document.querySelector('#checklistModalBody [data-modal-pending-count]');
+        if (count) count.textContent = `${followed} of ${total} steps completed`;
+        if (bar) bar.style.width = `${percent}%`;
+        if (pendingLabel) pendingLabel.textContent = `${pending} pending`;
+    }
+
+    async function saveChecklistProgress() {
+        if (!activeChecklistId || !checklistPendingItems.size || checklistProgressSaving) return;
+        const button = document.getElementById('saveChecklistProgress');
+        const original = button.innerHTML;
+        checklistProgressSaving = true;
+        button.disabled = true;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Saving...</span>';
+        updateChecklistSaveState('Saving checklist progress...');
+        try {
+            for (const [itemKey, payload] of [...checklistPendingItems.entries()]) {
+                const response = await checklistFetch(checklistEndpoint('items', activeChecklistId), {method:'PATCH',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload)});
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success === false) throw new Error(checklistErrorMessage(result, 'The checklist update failed.'));
+                checklistPendingItems.delete(itemKey);
+                const row = document.querySelector(`#checklistModalBody .modal-step [data-item-id="${CSS.escape(itemKey)}"]`)?.closest('.modal-step');
+                row?.classList.remove('is-selected');
+                const state = row?.querySelector('[data-step-state]');
+                if (state) state.textContent = row.dataset.selectedStatus.replaceAll('_',' ');
+            }
+            await loadChecklistWorkspace(window.location.href, {push:false});
+            await loadChecklistHistory(activeChecklistId);
+            updateChecklistSaveState('Progress saved', 'saved');
+            showChecklistToast('Checklist progress saved.');
+        } catch (error) {
+            updateChecklistSaveState('Changes not saved - retry', 'dirty');
+            showChecklistToast(error.message || 'The checklist update failed.', 'error');
+        } finally {
+            checklistProgressSaving = false;
+            button.innerHTML = original;
+            button.disabled = checklistPendingItems.size === 0;
+        }
     }
 
     function openChecklistEditor(payload = null) {
@@ -641,6 +746,7 @@
         const open = event.target.closest('[data-open-checklist]');
         if (open) { openChecklistModal(open.dataset.openChecklist, open); return; }
         if (event.target.closest('#closeChecklistModal,[data-close-checklist]') || event.target.id === 'checklistModal') { closeChecklistModal(); return; }
+        if (event.target.closest('#saveChecklistProgress')) { saveChecklistProgress(); return; }
         const reset = event.target.closest('[data-checklist-reset]');
         if (reset) { loadChecklistWorkspace(checklistPageUrl); return; }
         const pageLink = event.target.closest('.checklist-pagination a');
@@ -651,16 +757,12 @@
         if (bulk) { applyBulkChecklistUpdate(bulk); return; }
         const step = event.target.closest('[data-step-status]');
         if (step) {
-            let reviewNotes = '';
-            if (step.dataset.status === 'not_followed') {
-                reviewNotes = window.prompt('Why was this step not followed? Use a short reason.')?.trim() || '';
-                if (!reviewNotes) { showChecklistToast('A short reason is required.', 'error'); return; }
-            }
-            patchChecklist(checklistEndpoint('items', step.dataset.checklistId), {item_id:Number(step.dataset.itemId),status:step.dataset.status,review_notes:reviewNotes}, step, step.dataset.checklistId);
+            selectChecklistStepStatus(step);
             return;
         }
         const status = event.target.closest('[data-checklist-status]');
         if (status) {
+            if (checklistPendingItems.size) { showChecklistToast('Save item progress before changing the overall checklist status.', 'error'); return; }
             const notes = document.getElementById(`notes-${status.dataset.checklistId}`)?.value || '';
             patchChecklist(checklistEndpoint('confirm', status.dataset.checklistId), {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
         }
@@ -698,6 +800,10 @@
     window.addEventListener('popstate', () => loadChecklistWorkspace(window.location.href, {push:false}));
     document.getElementById('openSidebar')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.add('open'); document.getElementById('sidebarBackdrop')?.classList.remove('hidden'); });
     document.getElementById('sidebarBackdrop')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarBackdrop')?.classList.add('hidden'); });
+    const requestedChecklistId = new URLSearchParams(window.location.search).get('checklist');
+    if (requestedChecklistId && document.getElementById(`checklistDetail-${requestedChecklistId}`)) {
+        openChecklistModal(requestedChecklistId);
+    }
 </script>
 @include('chief.partials.logs-modal')
 @include('chief.partials.logs-script')

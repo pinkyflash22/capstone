@@ -1379,6 +1379,10 @@ class BarangayDashboardController extends Controller
 
         UserActivityLogger::log('updated assigned barangay prediction checklist from '.$oldStatus.' to '.$validated['status'], Auth::id(), $request);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Checklist updated successfully.']);
+        }
+
         return redirect()->route('barangay.checklists', ['checklist' => 'prediction-checklist-'.$checklist->getKey()])
             ->with('success', 'Checklist updated successfully.');
     }

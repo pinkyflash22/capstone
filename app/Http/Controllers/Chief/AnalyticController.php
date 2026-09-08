@@ -173,6 +173,10 @@ class AnalyticController extends Controller
             ])
             ->withCount('mitigationActions');
 
+        if ($request->integer('checklist') > 0) {
+            $query->where('ai_action_plan_checklist_id', $request->integer('checklist'));
+        }
+
         if ($request->filled('barangay_id')) {
             $query->where('barangay_id', $request->integer('barangay_id'));
         }
@@ -501,15 +505,8 @@ class AnalyticController extends Controller
                         $structuredAnalysis['suggestion_debug'],
                         $suggestionGeneration['debug']
                     );
-                    $structuredAnalysis['mitigation_debug']['attempted'] = true;
                     $structuredAnalysis['mitigation_debug']['analysis_id'] = $analysisId;
-                    $mitigationDraftGeneration = $this->syncMitigationDraftActionsForAnalysis(
-                        $structuredAnalysis['action_plan_checklists'] ?? []
-                    );
-                    $structuredAnalysis['mitigation_debug'] = array_merge(
-                        $structuredAnalysis['mitigation_debug'],
-                        $mitigationDraftGeneration
-                    );
+                    $structuredAnalysis['mitigation_debug']['warning'] = 'Mitigation drafts are generated on demand from stored checklist items and are not saved during analysis.';
                     $structuredAnalysis['workflow_context'] = $this->buildWorkflowContext($structuredAnalysis, $analysisData);
                     $this->updateStoredAnalysisArtifacts($analysisId, $structuredAnalysis, $analysisData);
                 }
@@ -5163,7 +5160,6 @@ class AnalyticController extends Controller
                 $structured['action_plan_checklists']
             );
             $structured['recommendation_suggestions'] = $suggestionGeneration['suggestions'];
-            $this->syncMitigationDraftActionsForAnalysis($structured['action_plan_checklists']);
             $this->updateStoredAnalysisArtifacts($restored->analysis_id, $structured, $rawData);
 
             return response()->json([

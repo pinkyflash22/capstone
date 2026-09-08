@@ -30,6 +30,7 @@ use App\Models\User;
 use App\Models\UserLog;
 use App\Services\PredictedRiskAreaService;
 use App\Services\ProfileImageService;
+use App\Services\ChecklistMitigationDraftService;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
@@ -776,11 +777,11 @@ class StationAdminController extends Controller
             ->findOrFail($mitigationActionId);
     }
 
-    protected function buildMitigationDraftFromActionPlanChecklist(int $checklistId, array $allowedBarangayIds): ?array
+    protected function buildMitigationDraftFromActionPlanChecklist(int $checklistId, array $allowedBarangayIds, array $selectedItemIds = []): ?array
     {
         $stationId = $this->getAuthenticatedStationOfficer()?->station_id;
         $checklist = AiActionPlanChecklist::query()
-            ->with(['analysis', 'barangay', 'riskArea.marker', 'suggestions'])
+            ->with(['analysis', 'barangay', 'riskArea.marker', 'suggestions', 'items'])
             ->where('ai_action_plan_checklist_id', $checklistId)
             ->where(function ($query) use ($allowedBarangayIds, $stationId) {
                 if (! empty($allowedBarangayIds)) {
@@ -811,53 +812,38 @@ class StationAdminController extends Controller
             return null;
         }
 
-        $firstSuggestion = $checklist->suggestions->sortByDesc('created_at')->first();
-        $steps = collect($firstSuggestion?->steps ?: $checklist->checklist_items ?: [])
-            ->filter()
-            ->map(fn ($step) => '- '.trim((string) $step))
-            ->values()
-            ->all();
+        return app(ChecklistMitigationDraftService::class)->transform($checklist, $selectedItemIds);
+    }
 
-        $resources = collect($firstSuggestion?->resources_needed ?: [])
-            ->filter()
-            ->map(fn ($resource) => '- '.trim((string) $resource))
-            ->values()
-            ->all();
-
-        $descriptionParts = array_filter([
-            $checklist->plan_description ?: $checklist->source_description,
-            ! empty($steps) ? "Suggested steps:\n".implode("\n", $steps) : null,
-            ! empty($resources) ? "Resources needed:\n".implode("\n", $resources) : null,
-            $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
+    public function generateMitigationDraftFromChecklist(Request $request)
+    {
+        $validated = $request->validate([
+            'checklist_id' => ['required', 'integer'],
+            'item_ids' => ['nullable', 'array', 'min:1'],
+            'item_ids.*' => ['integer', 'distinct'],
         ]);
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $draft = $this->buildMitigationDraftFromActionPlanChecklist(
+            (int) $validated['checklist_id'],
+            $allowedBarangayIds,
+            $validated['item_ids'] ?? []
+        );
 
-        return [
-            'barangay_id' => $checklist->barangay_id,
-            'title' => $checklist->plan_title,
-            'category' => $this->inferMitigationCategoryFromChecklist($checklist),
-            'priority_level' => $checklist->priority_level ?: 'medium',
-            'status' => 'draft',
-            'source_type' => 'ai_action_plan',
-            'target_date' => optional($checklist->target_date)->format('Y-m-d'),
-            'description' => implode("\n\n", $descriptionParts),
-            'remarks' => $firstSuggestion?->estimated_timeline
-                ? 'Drafted from AI action-plan checklist. Timeline suggestion: '.$firstSuggestion->estimated_timeline
-                : 'Drafted from AI action-plan checklist.',
-            'implementation_notes' => null,
-            'completion_notes' => null,
-            'outcome_result' => null,
-            'effectiveness' => 'pending_evaluation',
-            'follow_up_required' => false,
-            'follow_up_notes' => null,
-            'responsible_team_id' => null,
-            'responsible_user_id' => null,
-            'risk_area_id' => $checklist->risk_area_id,
-            'ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
-            'source_title' => $checklist->source_title,
-            'workflow_note' => $this->isGeneratedMitigationDraftChecklist($checklist)
-                ? 'Prediction / Risk Area -> System Recommendation Draft -> Human Review -> Mitigation Action Plan'
-                : 'Prediction -> Recommendation -> Checklist -> Mitigation Action Plan',
-        ];
+        abort_unless($draft, 404, 'The selected checklist is not available for this station.');
+        if (empty($draft['recommended_actions'])) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Select at least one stored checklist item for the mitigation draft.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'AI-assisted mitigation draft generated from the stored checklist. Nothing has been saved yet.',
+            'data' => $draft,
+        ]);
     }
 
     protected function inferMitigationCategoryFromChecklist(AiActionPlanChecklist $checklist): string
@@ -1108,10 +1094,17 @@ class StationAdminController extends Controller
         )));
     }
 
-    protected function syncGeneratedMitigationDraftRecommendations(?int $stationId, array $allowedBarangayIds): void
+    /**
+     * Discover new rule-based mitigation suggestions without mutating an
+     * existing checklist. Existing suggestions may already contain review
+     * progress, notes, visits, assignments, or a deliberately chosen due date.
+     *
+     * @return array{created:int, existing:int, covered_areas:int}
+     */
+    protected function syncGeneratedMitigationDraftRecommendations(?int $stationId, array $allowedBarangayIds): array
     {
         if (! $stationId || empty($allowedBarangayIds)) {
-            return;
+            return ['created' => 0, 'existing' => 0, 'covered_areas' => 0];
         }
 
         $resourceContext = $this->buildMitigationResourceContext($stationId);
@@ -1119,6 +1112,7 @@ class StationAdminController extends Controller
             ->buildPredictedAreas($stationId)
             ->filter(fn (array $area) => in_array((int) ($area['barangay_id'] ?? 0), $allowedBarangayIds, true))
             ->values();
+        $result = ['created' => 0, 'existing' => 0, 'covered_areas' => $predictedAreas->count()];
 
         foreach ($predictedAreas as $predictedArea) {
             $payload = $this->buildSystemMitigationRecommendationPayload($predictedArea, $resourceContext);
@@ -1137,49 +1131,89 @@ class StationAdminController extends Controller
             }
 
             $existingDraft = AiActionPlanChecklist::query()
+                ->where('station_id', $stationId)
                 ->where('source_signature', $payload['source_signature'])
                 ->first();
 
             if ($existingDraft) {
-                if ($existingDraft->status === 'rejected') {
-                    continue;
-                }
-
-                if ($existingDraft->status === 'confirmed') {
-                    $hasLinkedMitigation = MitigationAction::query()
-                        ->where('ai_action_plan_checklist_id', $existingDraft->ai_action_plan_checklist_id)
-                        ->exists();
-
-                    if ($hasLinkedMitigation) {
-                        continue;
-                    }
-                }
-
-                $existingDraft->update([
-                    'analysis_id' => $payload['analysis_id'],
-                    'station_id' => $payload['station_id'],
-                    'barangay_id' => $payload['barangay_id'],
-                    'risk_area_id' => $payload['risk_area_id'],
-                    'source_type' => $payload['source_type'],
-                    'source_title' => $payload['source_title'],
-                    'source_description' => $payload['source_description'],
-                    'plan_title' => $payload['plan_title'],
-                    'plan_description' => $payload['plan_description'],
-                    'checklist_items' => $payload['checklist_items'],
-                    'success_indicator' => $payload['success_indicator'],
-                    'priority_level' => $payload['priority_level'],
-                    'target_date' => $payload['target_date'],
-                    'ai_payload' => $payload['ai_payload'],
-                    'is_ai_generated' => $payload['is_ai_generated'],
-                ]);
-
-                $this->syncChecklistItems($existingDraft, $payload['checklist_items']);
-
+                // Never rewrite an existing suggestion here. In particular,
+                // Replacing child rows would erase operational progress and
+                // its reviewer/audit references.
+                $result['existing']++;
                 continue;
             }
 
-            $draft = AiActionPlanChecklist::create($payload);
-            $this->syncChecklistItems($draft, $payload['checklist_items']);
+            $created = DB::transaction(function () use ($payload, $stationId) {
+                // Serialize scans for the same risk area so two chiefs/tabs
+                // cannot create the same suggestion at the same time.
+                RiskArea::query()
+                    ->whereKey($payload['risk_area_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                $alreadyExists = AiActionPlanChecklist::query()
+                    ->where('station_id', $stationId)
+                    ->where('source_signature', $payload['source_signature'])
+                    ->exists();
+                $mitigationNowExists = MitigationAction::query()
+                    ->where('risk_area_id', $payload['risk_area_id'])
+                    ->where('category', data_get($payload, 'ai_payload.recommended_category', 'other'))
+                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->exists();
+
+                if ($alreadyExists || $mitigationNowExists) {
+                    return false;
+                }
+
+                $draft = AiActionPlanChecklist::create($payload);
+                $this->createChecklistItems($draft, $payload['checklist_items']);
+                return true;
+            });
+            $result[$created ? 'created' : 'existing']++;
+        }
+
+        return $result;
+    }
+
+    public function refreshGeneratedMitigationDraftRecommendations(Request $request)
+    {
+        $stationOfficer = $this->getAuthenticatedStationOfficer();
+        $stationId = $stationOfficer?->station_id;
+        abort_if(! $stationId, 403, 'Your account is not assigned to a station.');
+
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+
+        try {
+            $result = $this->syncGeneratedMitigationDraftRecommendations((int) $stationId, $allowedBarangayIds);
+            UserActivityLogger::log('scanned for new mitigation checklist suggestions', Auth::id(), $request);
+
+            $message = $result['created'] > 0
+                ? $result['created'].' new risk suggestion(s) added for review. Existing checklists were preserved.'
+                : 'Risk suggestion scan completed. No new suggestions were found; existing checklists were preserved.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => $message, 'data' => $result]);
+            }
+
+            return redirect()->route($request->routeIs('admin.*') ? 'admin.mitigations' : 'station-admin.mitigations')
+                ->with('success', $message);
+        } catch (\Throwable $e) {
+            Log::error('Manual mitigation suggestion scan failed.', [
+                'station_id' => $stationId,
+                'user_id' => Auth::id(),
+                'message' => $e->getMessage(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Risk suggestions could not be refreshed right now.'], 500);
+            }
+
+            return back()->withErrors(['mitigation_suggestions' => 'Risk suggestions could not be refreshed right now.']);
         }
     }
 
@@ -1305,10 +1339,9 @@ class StationAdminController extends Controller
         }
     }
 
-    protected function syncChecklistItems(AiActionPlanChecklist $checklist, array $items): void
+    /** Create item rows for a brand-new generated suggestion only. */
+    protected function createChecklistItems(AiActionPlanChecklist $checklist, array $items): void
     {
-        $checklist->items()->delete();
-
         $rows = collect($items)
             ->filter(fn ($item) => trim((string) $item) !== '')
             ->values()
@@ -1943,15 +1976,6 @@ class StationAdminController extends Controller
                     : 'priority',
             ];
 
-            try {
-                $this->syncGeneratedMitigationDraftRecommendations($stationId, $barangayIds);
-            } catch (\Throwable $e) {
-                Log::warning('Generated mitigation draft sync failed while loading mitigation page.', [
-                    'station_id' => $stationId,
-                    'message' => $e->getMessage(),
-                ]);
-            }
-
             $mitigationBaseQuery = MitigationAction::query()
                 ->select([
                     'mitigation_action_id',
@@ -2281,6 +2305,7 @@ class StationAdminController extends Controller
                 'mitigationSourceOptions' => $this->mitigationSourceOptions(),
                 'stationTeams' => $stationTeams,
                 'stationUsers' => $stationUsers,
+                'canRefreshMitigationSuggestions' => (bool) $stationId,
                 'filters' => $filters,
             ]);
         } catch (\Throwable $e) {
@@ -2318,6 +2343,7 @@ class StationAdminController extends Controller
                 'mitigationSourceOptions' => $this->mitigationSourceOptions(),
                 'stationTeams' => collect(),
                 'stationUsers' => collect(),
+                'canRefreshMitigationSuggestions' => false,
                 'filters' => [],
             ])->withErrors([
                 'mitigations' => 'Mitigation data could not be loaded right now. The page was opened in safe mode instead of returning a server error.',
@@ -2429,56 +2455,11 @@ class StationAdminController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
         $checklist = $this->resolveMitigationDraftChecklist($checklistId, $allowedBarangayIds);
-        $draft = $this->buildMitigationDraftFromActionPlanChecklist($checklistId, $allowedBarangayIds);
 
-        if (! $draft) {
-            return redirect()->route('station-admin.mitigations')
-                ->with('error', 'Unable to load the mitigation draft.');
-        }
-
-        $existingAction = MitigationAction::query()
-            ->where('ai_action_plan_checklist_id', $checklist->ai_action_plan_checklist_id)
-            ->first();
-
-        if ($existingAction) {
-            $this->markGeneratedMitigationDraftApproved($checklist, Auth::user()?->user_id, (int) $existingAction->mitigation_action_id);
-
-            return redirect()->route('station-admin.mitigations')
-                ->with('success', 'This AI mitigation draft was already converted into an official mitigation action.');
-        }
-
-        DB::transaction(function () use ($draft, $checklist, $request) {
-            $action = MitigationAction::create([
-                'barangay_id' => $draft['barangay_id'],
-                'risk_area_id' => $draft['risk_area_id'] ?? null,
-                'barangay_prediction_checklist_id' => $draft['barangay_prediction_checklist_id'] ?? null,
-                'ai_action_plan_checklist_id' => $draft['ai_action_plan_checklist_id'] ?? null,
-                'responsible_team_id' => $draft['responsible_team_id'] ?? null,
-                'responsible_user_id' => $draft['responsible_user_id'] ?? null,
-                'title' => $draft['title'],
-                'category' => $this->normalizeMitigationCategory($draft['category'] ?? null),
-                'priority_level' => $draft['priority_level'],
-                'status' => 'planned',
-                'source_type' => $this->resolveMitigationSourceType($draft),
-                'target_date' => $draft['target_date'] ?? null,
-                'completed_at' => null,
-                'description' => $draft['description'],
-                'remarks' => $draft['remarks'] ?? null,
-                'implementation_notes' => $draft['implementation_notes'] ?? null,
-                'completion_notes' => $draft['completion_notes'] ?? null,
-                'outcome_result' => $draft['outcome_result'] ?? null,
-                'effectiveness' => $draft['effectiveness'] ?? 'pending_evaluation',
-                'follow_up_required' => (bool) ($draft['follow_up_required'] ?? false),
-                'follow_up_notes' => $draft['follow_up_notes'] ?? null,
-                'created_by' => Auth::user()?->user_id,
-            ]);
-
-            $this->markGeneratedMitigationDraftApproved($checklist, Auth::user()?->user_id, (int) $action->mitigation_action_id);
-            UserActivityLogger::log('approved generated mitigation draft', Auth::user()?->user_id, $request);
-        });
-
-        return redirect()->route('station-admin.mitigations')
-            ->with('success', 'AI mitigation draft approved and saved as an official mitigation action.');
+        return redirect()->route('station-admin.mitigations', [
+            'draft_ai_action_plan_checklist_id' => $checklist->ai_action_plan_checklist_id,
+            'analysis_id' => $checklist->analysis_id,
+        ])->with('success', 'Draft prepared from the checklist. Review and edit it before saving.');
     }
 
     public function rejectGeneratedMitigationDraft(Request $request, int $checklistId)

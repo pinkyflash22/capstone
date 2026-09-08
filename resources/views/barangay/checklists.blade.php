@@ -277,14 +277,17 @@
         .checklist-page-button:disabled { opacity: .45; cursor: not-allowed; }
 
         .checklist-detail-modal[hidden] { display: none; }
-        .checklist-detail-modal { position: fixed; inset: 0; z-index: 5000; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(15,23,42,.5); backdrop-filter: blur(6px); }
-        .checklist-detail-modal__card { display: flex; flex-direction: column; width: min(480px, 100%); max-height: min(78dvh, 590px); overflow: hidden; border: 1px solid rgba(245,158,11,.18); border-radius: 20px; background: #fff; box-shadow: 0 28px 70px rgba(15,23,42,.22); }
+        .checklist-detail-modal { position: fixed; inset: 0; z-index: 12000; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(15,23,42,.5); backdrop-filter: blur(6px); }
+        .checklist-detail-modal__card { display: flex; flex-direction: column; width: min(680px, 100%); max-height: min(88dvh, 760px); overflow: hidden; border: 1px solid rgba(245,158,11,.18); border-radius: 20px; background: #fff; box-shadow: 0 28px 70px rgba(15,23,42,.22); }
         .checklist-detail-modal__header, .checklist-detail-modal__footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: 0 0 auto; padding: 12px 14px; }
         .checklist-detail-modal__header { border-bottom: 1px solid #f1f5f9; }
         .checklist-detail-modal__header h3 { margin: 0; color: #0f172a; font-size: .95rem; font-weight: 900; }
         .checklist-detail-modal__header button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #64748b; }
         .checklist-detail-modal__body { min-height: 0; overflow-y: auto; padding: 12px 14px; }
         .checklist-detail-modal__footer { justify-content: flex-end; border-top: 1px solid #f1f5f9; }
+        .checklist-detail-modal__footer [data-checklist-save-state] { margin-right:auto; color:#64748b; font-size:.65rem; font-weight:750; }
+        .checklist-detail-modal__footer [data-checklist-save-state].is-saving { color:#b45309; }
+        .checklist-detail-modal__footer [data-checklist-save-state].is-saved { color:#047857; }
         .checklist-detail-modal__footer button { min-height: 32px; padding: 0 13px; border: 1px solid rgba(217,119,6,.2); border-radius: 9px; background: #fff7ed; color: #b45309; font-size: .72rem; font-weight: 800; }
         .checklist-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
         .checklist-detail-grid > div { padding: 9px 10px; border: 1px solid #f1f5f9; border-radius: 11px; background: #f8fafc; }
@@ -294,8 +297,11 @@
         .checklist-detail-grid strong { color: #334155; font-size: .76rem; line-height: 1.45; overflow-wrap: anywhere; }
         .checklist-detail-steps { margin: 5px 0 0; padding-left: 18px; color: #334155; font-size: .74rem; }
         .checklist-detail-steps li { margin: 8px 0; }
+        .checklist-detail-steps .checklist-step-group { margin:13px 0 5px; list-style:none; color:#475569; font-size:.62rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+        .checklist-community-help { margin:2px 0 10px; color:#64748b !important; font-size:.68rem !important; font-weight:600 !important; }
         .checklist-detail-steps em { color: #b45309; font-size: .6rem; font-style: normal; font-weight: 900; }
-        .checklist-step-form { display: grid; gap: 7px; padding: 9px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+        .checklist-step-form { display: grid; gap: 7px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; }
+        .checklist-step-form.is-dirty { border-color:#f59e0b; box-shadow:0 0 0 2px rgba(245,158,11,.08); }
         .checklist-step-text { font-size: .73rem !important; }
         .checklist-step-controls { display: grid; grid-template-columns: minmax(105px,.7fr) minmax(130px,1.3fr) auto; gap: 6px; }
         .checklist-step-controls select, .checklist-step-controls input { min-width: 0; height: 34px; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font-size: .7rem; }
@@ -330,8 +336,11 @@
             .checklist-summary-label { font-size: .56rem; }
             .checklist-summary-value { font-size: 1.15rem; }
             .checklist-panel-card { padding: 12px; border-radius: 16px; }
-            .checklist-detail-modal { padding: 9px; }
-            .checklist-detail-modal__card { max-height: calc(100dvh - 18px); border-radius: 16px; }
+            .checklist-detail-modal { align-items:flex-end; padding:0; }
+            .checklist-detail-modal__card { max-height: calc(94dvh - env(safe-area-inset-top,0px)); border-radius: 20px 20px 0 0; }
+            .checklist-detail-modal__body { padding:11px 12px; }
+            .checklist-detail-modal__footer { padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px)); }
+            .checklist-detail-modal__footer button { min-height:44px; }
             .checklist-detail-grid { grid-template-columns: 1fr; }
             .checklist-detail-grid > .wide { grid-column: auto; }
             .checklist-step-controls { grid-template-columns: 1fr; }
@@ -354,7 +363,7 @@
                 <button type="button" data-checklist-modal-close aria-label="Close details"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="checklist-detail-modal__body" id="checklistDetailBody"></div>
-            <div class="checklist-detail-modal__footer"><button type="button" data-checklist-modal-close>Close</button></div>
+            <div class="checklist-detail-modal__footer"><span data-checklist-save-state aria-live="polite">Changes save without closing this window.</span><button type="button" data-checklist-modal-close>Close</button></div>
         </div>
     </div>
 
@@ -375,6 +384,7 @@
             let isRefreshing = false;
             let lastFocusedElement = null;
             const pageState = {};
+            const saveState = modal.querySelector('[data-checklist-save-state]');
 
             const initializePagination = () => {
                 container.querySelectorAll('[data-compact-list]').forEach((table) => {
@@ -404,7 +414,30 @@
                 });
             };
 
-            const closeModal = () => {
+            const setSaveState = (message, state = '') => {
+                if (!saveState) return;
+                saveState.textContent = message;
+                saveState.className = state ? `is-${state}` : '';
+            };
+
+            const organizeCommunitySteps = (root) => {
+                root.querySelectorAll('.checklist-detail-steps').forEach((list) => {
+                    const steps = [...list.querySelectorAll(':scope > li[data-community-step-status]')];
+                    if (!steps.length) return;
+                    list.replaceChildren();
+                    [['pending','Pending community actions'],['completed','Completed community actions']].forEach(([status, label]) => {
+                        const matching = steps.filter((step) => step.dataset.communityStepStatus === status);
+                        if (!matching.length) return;
+                        const heading = document.createElement('li');
+                        heading.className = 'checklist-step-group';
+                        heading.textContent = `${label} (${matching.length})`;
+                        list.append(heading, ...matching);
+                    });
+                });
+            };
+
+            const closeModal = (force = false) => {
+                if (!force && modalBody.querySelector('.is-dirty') && !window.confirm('Discard unsaved checklist changes?')) return;
                 modal.hidden = true;
                 modalBody.innerHTML = '';
                 document.body.style.overflow = '';
@@ -427,17 +460,56 @@
 
                 lastFocusedElement = detailButton;
                 modalBody.replaceChildren(template.content.cloneNode(true));
+                organizeCommunitySteps(modalBody);
+                setSaveState('Changes save without closing this window.');
                 modal.hidden = false;
                 document.body.style.overflow = 'hidden';
                 modal.querySelector('[data-checklist-modal-close]')?.focus();
             });
 
-            modal.querySelectorAll('[data-checklist-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
+            modal.querySelectorAll('[data-checklist-modal-close]').forEach((button) => button.addEventListener('click', () => closeModal()));
             modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
             document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) closeModal(); });
 
-            const refreshChecklistContent = async () => {
-                if (isRefreshing || document.hidden || !modal.hidden) {
+            modalBody.addEventListener('input', (event) => event.target.closest('.checklist-step-form,.barangay-record-update-form')?.classList.add('is-dirty'));
+            modalBody.addEventListener('change', (event) => event.target.closest('.checklist-step-form,.barangay-record-update-form')?.classList.add('is-dirty'));
+            modalBody.addEventListener('submit', async (event) => {
+                const form = event.target.closest('.checklist-step-form,.barangay-record-update-form');
+                if (!form) return;
+                event.preventDefault();
+                const button = form.querySelector('button[type="submit"]');
+                const original = button?.innerHTML || '';
+                if (button) { button.disabled = true; button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Saving...'; }
+                setSaveState('Saving checklist progress...', 'saving');
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content || ''},
+                        body: new FormData(form),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || result.success === false) throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Checklist progress could not be saved.');
+                    form.classList.remove('is-dirty');
+                    if (form.classList.contains('checklist-step-form')) {
+                        const step = form.closest('[data-community-step-status]');
+                        if (step) step.dataset.communityStepStatus = form.elements.status?.value === 'followed' ? 'completed' : 'pending';
+                        organizeCommunitySteps(modalBody);
+                        const forms = [...modalBody.querySelectorAll('.checklist-step-form')];
+                        const completed = forms.filter((item) => item.elements.status?.value === 'followed').length;
+                        const progress = modalBody.querySelector('[data-community-progress]');
+                        if (progress) progress.textContent = `${forms.length ? Math.round((completed / forms.length) * 100) : 0}%`;
+                    }
+                    setSaveState('Progress saved', 'saved');
+                    await refreshChecklistContent(true);
+                } catch (error) {
+                    setSaveState(error.message || 'Changes were not saved.', 'saving');
+                } finally {
+                    if (button) { button.disabled = false; button.innerHTML = original; }
+                }
+            });
+
+            const refreshChecklistContent = async (force = false) => {
+                if (isRefreshing || document.hidden || (!force && !modal.hidden)) {
                     return;
                 }
 
