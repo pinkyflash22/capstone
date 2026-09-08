@@ -124,8 +124,8 @@ class DailyWeatherContextService
     {
         $days = max(1, min($days, 7));
         $coordinateKey = number_format($latitude, 3, '.', '').':'.number_format($longitude, 3, '.', '');
-        $freshKey = "weather:forecast:v2:{$coordinateKey}:{$days}:fresh";
-        $staleKey = "weather:forecast:v2:{$coordinateKey}:{$days}:last-success";
+        $freshKey = "weather:forecast:v3:{$coordinateKey}:{$days}:fresh";
+        $staleKey = "weather:forecast:v3:{$coordinateKey}:{$days}:last-success";
         $cached = $this->readForecastCache($freshKey);
 
         if ($this->isUsableForecast($cached)) {
@@ -153,8 +153,15 @@ class DailyWeatherContextService
                         'weather_code',
                         'temperature_2m_max',
                         'temperature_2m_min',
+                        'precipitation_probability_max',
                         'precipitation_sum',
                         'wind_speed_10m_max',
+                    ]),
+                    'hourly' => implode(',', [
+                        'temperature_2m',
+                        'relative_humidity_2m',
+                        'precipitation_probability',
+                        'wind_speed_10m',
                     ]),
                     'forecast_days' => $days,
                     'timezone' => 'Asia/Manila',
@@ -175,21 +182,38 @@ class DailyWeatherContextService
                 throw new \RuntimeException('Open-Meteo returned no daily forecast data.');
             }
 
-            $cards = collect($dates)->take($days)->map(function ($date, int $index) use ($daily) {
+            $hourly = is_array($payload['hourly'] ?? null) ? $payload['hourly'] : [];
+            $hourlyTimes = is_array($hourly['time'] ?? null) ? $hourly['time'] : [];
+            $humidityByDate = [];
+            foreach ($hourlyTimes as $hourlyIndex => $time) {
+                $humidity = $this->numericOrNull($hourly['relative_humidity_2m'][$hourlyIndex] ?? null);
+                if ($humidity === null) {
+                    continue;
+                }
+
+                $dateKey = substr((string) $time, 0, 10);
+                $humidityByDate[$dateKey][] = $humidity;
+            }
+
+            $cards = collect($dates)->take($days)->map(function ($date, int $index) use ($daily, $humidityByDate) {
                 $code = is_numeric($daily['weather_code'][$index] ?? null)
                     ? (int) $daily['weather_code'][$index]
                     : null;
+                $dateKey = Carbon::parse($date)->toDateString();
+                $dailyHumidity = collect($humidityByDate[$dateKey] ?? []);
 
                 return [
-                    'date' => Carbon::parse($date)->toDateString(),
+                    'date' => $dateKey,
                     'day' => Carbon::parse($date)->format('D'),
                     'date_label' => Carbon::parse($date)->format('M j'),
                     'condition' => $this->describeWeatherCode($code),
                     'weather_code' => $code,
                     'min_temp_c' => $this->numericOrNull($daily['temperature_2m_min'][$index] ?? null),
                     'max_temp_c' => $this->numericOrNull($daily['temperature_2m_max'][$index] ?? null),
+                    'precipitation_probability_percent' => $this->numericOrNull($daily['precipitation_probability_max'][$index] ?? null),
                     'precipitation_mm' => $this->numericOrNull($daily['precipitation_sum'][$index] ?? null),
                     'wind_kph' => $this->numericOrNull($daily['wind_speed_10m_max'][$index] ?? null),
+                    'humidity_percent' => $dailyHumidity->isEmpty() ? null : round((float) $dailyHumidity->avg(), 1),
                 ];
             })->values()->all();
 

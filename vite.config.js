@@ -53,6 +53,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/barangay/dashboard.js',
                 'resources/js/chief/announcements.js',
+                'resources/js/chief/form-safety.js',
                 'resources/js/chief/management.js',
                 'resources/js/citizen/safety.js',
                 'resources/js/firefighter/announcements.js',

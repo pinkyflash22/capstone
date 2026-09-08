@@ -20,16 +20,21 @@ class RoutingController extends Controller
             'mode' => ['nullable', 'in:driving'],
         ]);
 
-        $baseUrl = rtrim((string) config('services.osrm.base_url', 'https://router.project-osrm.org'), '/');
-        $coordinates = sprintf(
-            '%F,%F;%F,%F',
-            (float) $validated['start_lng'],
+        $apiKey = trim((string) config('services.geoapify.key'));
+        if ($apiKey === '') {
+            return response()->json(['message' => 'Geoapify routing is not configured.'], 503);
+        }
+
+        $baseUrl = rtrim((string) config('services.geoapify.routing_base_url', 'https://api.geoapify.com/v1/routing'), '/');
+        $waypoints = sprintf(
+            '%F,%F|%F,%F',
             (float) $validated['start_lat'],
-            (float) $validated['end_lng'],
+            (float) $validated['start_lng'],
             (float) $validated['end_lat'],
+            (float) $validated['end_lng'],
         );
         $routeCacheKey = sprintf(
-            'osm:route:v1:%0.5f:%0.5f:%0.5f:%0.5f',
+            'geoapify:route:v1:%0.5f:%0.5f:%0.5f:%0.5f',
             (float) $validated['start_lat'],
             (float) $validated['start_lng'],
             (float) $validated['end_lat'],
@@ -37,56 +42,59 @@ class RoutingController extends Controller
         );
 
         try {
-            $response = Http::connectTimeout((int) config('services.osrm.connect_timeout', 5))
-                ->timeout((int) config('services.osrm.timeout', 15))
+            $response = Http::connectTimeout((int) config('services.geoapify.connect_timeout', 5))
+                ->timeout((int) config('services.geoapify.timeout', 15))
                 ->retry(1, 200)
                 ->acceptJson()
-                ->get("{$baseUrl}/route/v1/driving/{$coordinates}", [
-                    'overview' => 'full',
-                    'geometries' => 'geojson',
-                    'steps' => 'false',
-                    'alternatives' => 'false',
+                ->get($baseUrl, [
+                    'waypoints' => $waypoints,
+                    'mode' => 'drive',
+                    'format' => 'geojson',
+                    'details' => 'instruction_details',
+                    'apiKey' => $apiKey,
                 ]);
 
             if (! $response->successful()) {
-                Log::warning('OSRM route request failed.', ['status' => $response->status()]);
+                Log::warning('Geoapify route request failed.', ['status' => $response->status()]);
 
                 if ($cached = Cache::get($routeCacheKey)) {
-                    return response()->json($cached)->header('X-Route-Cache', 'STALE');
+                    return response()->json($cached)
+                        ->header('X-Route-Cache', 'STALE')
+                        ->header('X-Route-Provider', 'geoapify');
                 }
-                return response()->json(['message' => 'The road routing service is temporarily unavailable.'], 502);
+                return response()->json(['message' => 'Geoapify routing is temporarily unavailable.'], 502);
             }
 
-            $route = data_get($response->json(), 'routes.0');
-            if (! is_array($route) || empty($route['geometry']['coordinates'])) {
+            $payload = $response->json();
+            $route = data_get($payload, 'features.0');
+            if (! is_array($payload) || ! is_array($route) || empty($route['geometry']['coordinates'])) {
                 if ($cached = Cache::get($routeCacheKey)) {
-                    return response()->json($cached)->header('X-Route-Cache', 'STALE');
+                    return response()->json($cached)
+                        ->header('X-Route-Cache', 'STALE')
+                        ->header('X-Route-Provider', 'geoapify');
                 }
                 return response()->json(['message' => 'No drivable road route was found for those locations.'], 422);
             }
 
-            $payload = [
-                'features' => [[
-                    'type' => 'Feature',
-                    'geometry' => $route['geometry'],
-                    'properties' => [
-                        'distance' => (float) ($route['distance'] ?? 0),
-                        'time' => (float) ($route['duration'] ?? 0),
-                        'provider' => 'osrm',
-                    ],
-                ]],
-                'provider' => 'osrm',
-            ];
+            $payload['features'][0]['properties'] = array_replace(
+                (array) ($payload['features'][0]['properties'] ?? []),
+                ['provider' => 'geoapify']
+            );
+            $payload['provider'] = 'geoapify';
             Cache::put($routeCacheKey, $payload, now()->addDays(7));
 
-            return response()->json($payload)->header('X-Route-Cache', 'MISS');
+            return response()->json($payload)
+                ->header('X-Route-Cache', 'MISS')
+                ->header('X-Route-Provider', 'geoapify');
         } catch (\Throwable $e) {
-            Log::error('OSRM route request failed.', ['error' => $e->getMessage()]);
+            Log::error('Geoapify route request failed.', ['error' => $e->getMessage()]);
 
             if ($cached = Cache::get($routeCacheKey)) {
-                return response()->json($cached)->header('X-Route-Cache', 'STALE');
+                return response()->json($cached)
+                    ->header('X-Route-Cache', 'STALE')
+                    ->header('X-Route-Provider', 'geoapify');
             }
-            return response()->json(['message' => 'The road routing service is temporarily unavailable.'], 502);
+            return response()->json(['message' => 'Geoapify routing is temporarily unavailable.'], 502);
         }
     }
 

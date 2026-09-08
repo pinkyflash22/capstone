@@ -54,17 +54,14 @@ return [
 
     'geoapify' => [
         'key' => env('GEOAPIFY_KEY'),
+        'routing_base_url' => env('GEOAPIFY_ROUTING_BASE_URL', 'https://api.geoapify.com/v1/routing'),
+        'connect_timeout' => (int) env('GEOAPIFY_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('GEOAPIFY_TIMEOUT', 15),
         'country_code' => env('GEOAPIFY_COUNTRY_CODE', 'ph'),
         'country' => env('GEOAPIFY_COUNTRY', 'Philippines'),
         'region' => env('GEOAPIFY_REGION', 'Ilocos Region'),
         'boundary_geometry' => env('GEOAPIFY_BOUNDARY_GEOMETRY', 'geometry_1000'),
         'boundary_sync_limit' => (int) env('GEOAPIFY_BOUNDARY_SYNC_LIMIT', 20),
-    ],
-
-    'osrm' => [
-        'base_url' => env('OSRM_BASE_URL', 'https://router.project-osrm.org'),
-        'connect_timeout' => (int) env('OSRM_CONNECT_TIMEOUT', 5),
-        'timeout' => (int) env('OSRM_TIMEOUT', 15),
     ],
 
     'nominatim' => [

@@ -2983,8 +2983,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-outline" onclick="closeNewRequestModal()">Cancel</button>
-                <button class="btn-primary" onclick="submitNewRequest()">Submit Request</button>
+                <button type="button" class="btn-outline" onclick="closeNewRequestModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="submitNewRequest()">Submit Request</button>
             </div>
         </div>
     </div>
@@ -3163,6 +3163,11 @@
         }
 
         async function createNewApplicant() {
+            const applicantForm = document.getElementById('applicantForm');
+            if (window.ChiefFormSafety && !window.ChiefFormSafety.validate(applicantForm, { report: true })) {
+                return;
+            }
+
             const firstName = document.getElementById('new_first_name').value.trim();
             const middleName = document.getElementById('new_middle_name').value.trim();
             const lastName = document.getElementById('new_last_name').value.trim();
@@ -3973,6 +3978,10 @@
 
         async function submitNewRequest() {
             const form = document.getElementById('newRequestForm');
+            if (window.ChiefFormSafety && !window.ChiefFormSafety.validate(form, { report: true })) {
+                return;
+            }
+
             const formData = new FormData(form);
             const data = {};
             formData.forEach((value, key) => data[key] = value);

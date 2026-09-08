@@ -141,15 +141,37 @@ class WeatherContextController extends Controller
         $selectedBarangay = $barangayId
             ? $coveredBarangays->firstWhere('barangay_id', $barangayId)
             : null;
+        $barangayForecastLocation = $this->resolveBarangayForecastLocation(
+            $barangayId,
+            $coveredBarangayIds
+        );
         $coordinateRow = $barangayId
             ? $scopeRows->where('barangay_id', $barangayId)->sortByDesc('observation_date')->first()
             : $scopeRows->sortByDesc('observation_date')->first();
-        $forecastLatitude = $barangayId
-            ? ($coordinateRow?->latitude ?? $stationOfficer->station?->marker?->lat)
-            : ($stationOfficer->station?->marker?->lat ?? $coordinateRow?->latitude);
-        $forecastLongitude = $barangayId
-            ? ($coordinateRow?->longitude ?? $stationOfficer->station?->marker?->lng)
-            : ($stationOfficer->station?->marker?->lng ?? $coordinateRow?->longitude);
+        $stationLatitude = $stationOfficer->station?->marker?->lat;
+        $stationLongitude = $stationOfficer->station?->marker?->lng;
+
+        if ($barangayId && $barangayForecastLocation) {
+            $forecastLatitude = $barangayForecastLocation->lat;
+            $forecastLongitude = $barangayForecastLocation->lng;
+            $forecastCoordinateSource = 'Selected barangay hall marker';
+            $forecastLocationLabel = $selectedBarangay?->barangay_name ?? $barangayForecastLocation->barangay_name;
+        } elseif (is_numeric($stationLatitude) && is_numeric($stationLongitude)) {
+            $forecastLatitude = $stationLatitude;
+            $forecastLongitude = $stationLongitude;
+            $forecastCoordinateSource = 'Assigned station marker';
+            $forecastLocationLabel = $stationOfficer->station?->station_name ?? 'Assigned station';
+        } elseif ($barangayForecastLocation) {
+            $forecastLatitude = $barangayForecastLocation->lat;
+            $forecastLongitude = $barangayForecastLocation->lng;
+            $forecastCoordinateSource = 'Covered barangay hall marker';
+            $forecastLocationLabel = $barangayForecastLocation->barangay_name ?? 'Covered barangay';
+        } else {
+            $forecastLatitude = $coordinateRow?->latitude;
+            $forecastLongitude = $coordinateRow?->longitude;
+            $forecastCoordinateSource = $coordinateRow ? 'Latest saved weather observation' : null;
+            $forecastLocationLabel = $coordinateRow?->barangay_name ?? 'Station location';
+        }
         $liveForecast = collect();
         $liveForecastCurrent = [];
         $liveForecastFetchedAt = null;
@@ -159,7 +181,7 @@ class WeatherContextController extends Controller
 
         if (is_numeric($forecastLatitude) && is_numeric($forecastLongitude)) {
             try {
-                $forecastPayload = $weatherService->fetchForecast((float) $forecastLatitude, (float) $forecastLongitude, 5);
+                $forecastPayload = $weatherService->fetchForecast((float) $forecastLatitude, (float) $forecastLongitude, 7);
                 $liveForecast = collect($forecastPayload['cards'] ?? [])->map(function (array $card) {
                     $card['visual'] = $this->weatherVisualType($card['condition'] ?? 'Unknown');
 
@@ -170,14 +192,14 @@ class WeatherContextController extends Controller
                 $liveForecastIsStale = (bool) ($forecastPayload['is_stale'] ?? false);
                 $liveForecastWarning = $forecastPayload['warning'] ?? null;
             } catch (\Throwable $exception) {
-                $liveForecastError = 'Live forecast is temporarily unavailable.';
+                $liveForecastError = 'Open-Meteo forecast failed: '.$exception->getMessage();
                 Log::warning('Weather Context live forecast failed.', [
                     'station_id' => $stationId,
                     'error' => $exception->getMessage(),
                 ]);
             }
         } else {
-            $liveForecastError = 'Add a station map location to enable the live forecast.';
+            $liveForecastError = 'Add coordinates to the assigned station or one of its covered barangay halls to enable the live forecast.';
         }
         $stats = [
             'covered_barangays' => $selectedCoverageCount,
@@ -252,7 +274,10 @@ class WeatherContextController extends Controller
             'liveForecastError' => $liveForecastError,
             'liveForecastIsStale' => $liveForecastIsStale,
             'liveForecastWarning' => $liveForecastWarning,
-            'forecastLocationLabel' => $selectedBarangay?->barangay_name ?? $stationOfficer->station?->station_name ?? 'Station location',
+            'forecastLatitude' => is_numeric($forecastLatitude) ? (float) $forecastLatitude : null,
+            'forecastLongitude' => is_numeric($forecastLongitude) ? (float) $forecastLongitude : null,
+            'forecastCoordinateSource' => $forecastCoordinateSource,
+            'forecastLocationLabel' => $forecastLocationLabel,
             'stats' => $stats,
             'barangaySummaries' => $barangaySummaries,
             'trainingReadyMonths' => $trainingReadyMonths,
@@ -287,6 +312,24 @@ class WeatherContextController extends Controller
             ->get()
             ->unique('barangay_id')
             ->values();
+    }
+
+    private function resolveBarangayForecastLocation(?int $barangayId, array $coveredBarangayIds): ?object
+    {
+        if ($barangayId === null && $coveredBarangayIds === []) {
+            return null;
+        }
+
+        return DB::table('barangay_halls')
+            ->join('markers', 'barangay_halls.marker_id', '=', 'markers.marker_id')
+            ->join('barangays', 'barangay_halls.barangay_id', '=', 'barangays.barangay_id')
+            ->whereIn('barangay_halls.barangay_id', $barangayId ? [$barangayId] : $coveredBarangayIds)
+            ->whereNotNull('markers.lat')
+            ->whereNotNull('markers.lng')
+            ->when($barangayId, fn ($query) => $query->where('barangay_halls.barangay_id', $barangayId))
+            ->orderBy('barangay_halls.barangay_id')
+            ->select('barangay_halls.barangay_id', 'barangays.barangay_name', 'markers.lat', 'markers.lng')
+            ->first();
     }
 
     private function isCompleteRow(object $row): bool

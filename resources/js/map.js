@@ -789,7 +789,7 @@ async function maybeRerouteNavigation(routeId, location) {
     truck.rerouteInFlight = true;
     truck.lastRerouteAt = Date.now();
     try {
-        const payload = await requestOsrmRoute(
+        const payload = await requestGeoapifyRoute(
             Number(location.lat),
             Number(location.lng),
             destinationLat,
@@ -8549,10 +8549,10 @@ async function calculateRouteToStation(stationId, stationName = null, lat = null
     }
 
     window.thisIncidents = null;
-    return await calculateRouteWithOsrm(origin, destination);
+    return await calculateRouteWithGeoapify(origin, destination);
 }
 
-async function requestOsrmRoute(startLat, startLng, endLat, endLng) {
+async function requestGeoapifyRoute(startLat, startLng, endLat, endLng) {
     const response = await fetch('/api/routing/calculate', {
         method: 'POST',
         headers: {
@@ -8577,7 +8577,7 @@ async function requestOsrmRoute(startLat, startLng, endLat, endLng) {
     return payload;
 }
 
-async function calculateRouteWithOsrm(origin, destination, options = {}) {
+async function calculateRouteWithGeoapify(origin, destination, options = {}) {
     if (!origin || !destination) {
         console.error('Missing route origin or destination');
         throw new Error('Missing route configuration.');
@@ -8586,7 +8586,7 @@ async function calculateRouteWithOsrm(origin, destination, options = {}) {
     console.log('Generating destination:', destination);
     
     try {
-        const data = options.routeData || await requestOsrmRoute(
+        const data = options.routeData || await requestGeoapifyRoute(
             Number(origin.currentLatitude),
             Number(origin.currentLongitude),
             Number(destination.lat),
@@ -8664,7 +8664,7 @@ async function calculateRouteWithOsrm(origin, destination, options = {}) {
         return { ok: true, route, routeSource };
         
     } catch (error) {
-        console.error('OSRM route calculation error:', error);
+        console.error('Geoapify route calculation error:', error);
         console.log('error route data:', error);
         showToast(error.message || 'Route failed. Please try again.', 'error');
         throw error;
@@ -10143,6 +10143,12 @@ function startRoutePolling() {
             }
 
             for (const existingRouteId of Array.from(activeTrucks.keys())) {
+                const existingRoute = activeTrucks.get(existingRouteId);
+                // Directions-only routes are intentionally local and will never be
+                // returned by the persisted active-route endpoint.
+                if (existingRoute?.persisted === false) {
+                    continue;
+                }
                 if (!visibleRouteIds.has(existingRouteId)) {
                     await stopSimulationForRoute(existingRouteId, false, false);
                 }
@@ -13302,7 +13308,7 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
     }
 
     if (options?.preflight) {
-        const routeData = await requestOsrmRoute(
+        const routeData = await requestGeoapifyRoute(
             Number(origin.currentLatitude),
             Number(origin.currentLongitude),
             Number(destination.lat),
@@ -13316,7 +13322,7 @@ async function calculateRouteToIncident(incidentId, markerId = null, options = {
 
     window.thisIncidents = resolvedIncidentId;
     console.log('thisincidents: ', window.thisIncidents);
-    return await calculateRouteWithOsrm(origin, destination, { routeData: options?.routeData });
+    return await calculateRouteWithGeoapify(origin, destination, { routeData: options?.routeData });
 }
 
 
@@ -13475,9 +13481,7 @@ window.calculateRouteToIncident = calculateRouteToIncident;
 window.calculateDemoRouteToIncident = (incidentId, markerId = null) => calculateRouteToIncident(incidentId, markerId, { source: 'demo' });
 window.demoRespondToIncident = demoRespondToIncident;
 window.calculateRouteToStation = calculateRouteToStation;
-window.calculateRouteWithOsrm = calculateRouteWithOsrm;
-// Temporary alias for older inline callers while deployed views refresh.
-window.calculateRouteWithGeoapify = calculateRouteWithOsrm;
+window.calculateRouteWithGeoapify = calculateRouteWithGeoapify;
 window.displayAndStartRoute = displayAndStartRoute;
 window.startSimulationForRoute = startSimulationForRoute;
 window.stopSimulationForRoute = stopSimulationForRoute;
