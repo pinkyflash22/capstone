@@ -9,12 +9,17 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 def load_payload(source: str) -> dict:
-    input_path = Path(source)
+    try:
+        return json.loads(source)
+    except json.JSONDecodeError as json_error:
+        try:
+            input_path = Path(source)
+            if input_path.is_file():
+                return json.loads(input_path.read_text(encoding="utf-8"))
+        except OSError as path_error:
+            raise ValueError("Input must be valid JSON or a readable JSON file path.") from path_error
 
-    if input_path.exists():
-        return json.loads(input_path.read_text(encoding="utf-8"))
-
-    return json.loads(source)
+        raise ValueError("Input must be valid JSON or a readable JSON file path.") from json_error
 
 
 def build_prompt_payload(model_input: dict, model_output: dict) -> dict:

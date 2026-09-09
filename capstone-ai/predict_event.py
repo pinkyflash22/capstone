@@ -511,14 +511,24 @@ def predict(payload: dict, bundle: dict | None = None) -> dict:
     return append_regression_outputs(bundle, request_frame, response)
 
 
+def load_input_payload(source: str):
+    """Decode inline/stdin JSON first, then fall back to a JSON file path."""
+    try:
+        return json.loads(source)
+    except json.JSONDecodeError as json_error:
+        try:
+            input_path = Path(source)
+            if input_path.is_file():
+                return json.loads(input_path.read_text(encoding="utf-8"))
+        except OSError as path_error:
+            raise ValueError("Prediction input must be valid JSON or a readable JSON file path.") from path_error
+
+        raise ValueError("Prediction input must be valid JSON or a readable JSON file path.") from json_error
+
+
 if __name__ == "__main__":
     raw_input = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
-    input_path = Path(raw_input)
-
-    if input_path.exists():
-        payload = json.loads(input_path.read_text(encoding="utf-8"))
-    else:
-        payload = json.loads(raw_input)
+    payload = load_input_payload(raw_input)
 
     if isinstance(payload, list):
         shared_bundle = joblib.load(MODEL_PATH)
