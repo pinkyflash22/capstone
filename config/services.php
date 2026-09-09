@@ -78,7 +78,7 @@ return [
             explode(',', (string) env('OPENROUTER_FALLBACK_MODELS', 'openai/gpt-4.1-mini,openai/gpt-4o-mini,deepseek/deepseek-r1-distill-qwen-32b'))
         ))),
         'connect_timeout' => (int) env('OPENROUTER_CONNECT_TIMEOUT', 8),
-        'timeout' => (int) env('OPENROUTER_TIMEOUT', 20),
+        'timeout' => (int) env('OPENROUTER_TIMEOUT', 90),
         'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 450),
     ],
 
