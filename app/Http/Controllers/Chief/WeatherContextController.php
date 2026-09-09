@@ -79,6 +79,14 @@ class WeatherContextController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $selectedDateDetails = $selectedDate
+            ? (clone $baseQuery)
+                ->whereDate('daily_weather_contexts.observation_date', $selectedDate)
+                ->select('daily_weather_contexts.*', 'barangays.barangay_name')
+                ->orderBy('barangays.barangay_name')
+                ->get()
+            : collect();
+
         $monthRows = DailyWeatherContext::query()
             ->join('barangays', 'daily_weather_contexts.barangay_id', '=', 'barangays.barangay_id')
             ->whereIn('daily_weather_contexts.barangay_id', $coveredBarangayIds ?: [0])
@@ -106,9 +114,43 @@ class WeatherContextController extends Controller
         $completeRows = $scopeRows->filter(fn ($row) => $this->isCompleteRow($row))->count();
 
         $summary = $weatherService->summarizeStoredRows($scopeRows);
-        $weatherCards = $scopeRows
-            ->groupBy(fn ($row) => Carbon::parse($row->observation_date)->toDateString())
-            ->map(function (Collection $rows, string $date) use ($weatherService) {
+        $previousDayEnd = Carbon::now('Asia/Manila')->subDay()->startOfDay();
+        $previousDayStart = $previousDayEnd->copy()->subDays(6);
+        $previousWeatherRows = DailyWeatherContext::query()
+            ->join('barangays', 'daily_weather_contexts.barangay_id', '=', 'barangays.barangay_id')
+            ->whereIn('daily_weather_contexts.barangay_id', $coveredBarangayIds ?: [0])
+            ->whereBetween('daily_weather_contexts.observation_date', [
+                $previousDayStart->toDateString(),
+                $previousDayEnd->toDateString(),
+            ])
+            ->when($barangayId, fn ($query) => $query->where('daily_weather_contexts.barangay_id', $barangayId))
+            ->when($source !== '', fn ($query) => $query->where('daily_weather_contexts.source', $source))
+            ->get(['daily_weather_contexts.*', 'barangays.barangay_name'])
+            ->groupBy(fn ($row) => Carbon::parse($row->observation_date)->toDateString());
+
+        $weatherCards = collect(range(6, 0))->map(function (int $offset) use ($previousDayEnd, $previousWeatherRows, $weatherService) {
+                $date = $previousDayEnd->copy()->subDays($offset)->toDateString();
+                $rows = $previousWeatherRows->get($date, collect());
+                if ($rows->isEmpty()) {
+                    return [
+                        'date' => $date,
+                        'day' => Carbon::parse($date)->format('D'),
+                        'date_label' => Carbon::parse($date)->format('M j'),
+                        'condition' => 'Not collected',
+                        'visual' => 'cloud',
+                        'avg_temp_c' => null,
+                        'min_temp_c' => null,
+                        'max_temp_c' => null,
+                        'humidity' => null,
+                        'wind_kph' => null,
+                        'precipitation_mm' => null,
+                        'locations' => 0,
+                        'has_data' => false,
+                        'risk_flags' => [],
+                        'attention_level' => 'none',
+                    ];
+                }
+
                 $daySummary = $weatherService->summarizeStoredRows($rows) ?? [];
                 $condition = trim((string) ($daySummary['dominant_condition'] ?? 'Unknown')) ?: 'Unknown';
                 $averageTemperatures = $rows->pluck('temperature_avg_c')->filter(fn ($value) => $value !== null);
@@ -118,6 +160,20 @@ class WeatherContextController extends Controller
                 $windSpeeds = $rows->pluck('wind_avg_kph')->filter(fn ($value) => $value !== null);
                 $precipitation = $rows->pluck('precipitation_total_mm')->filter(fn ($value) => $value !== null);
 
+                $maximumTemperature = $maximumTemperatures->isEmpty() ? null : round((float) $maximumTemperatures->max(), 1);
+                $averageWind = $windSpeeds->isEmpty() ? null : round((float) $windSpeeds->avg(), 1);
+                $averagePrecipitation = $precipitation->isEmpty() ? null : round((float) $precipitation->avg(), 1);
+                $riskFlags = [];
+                if ($maximumTemperature !== null && $maximumTemperature >= 32) {
+                    $riskFlags[] = 'Hot';
+                }
+                if ($averagePrecipitation !== null && $averagePrecipitation <= 0) {
+                    $riskFlags[] = 'Dry';
+                }
+                if ($averageWind !== null && $averageWind >= 20) {
+                    $riskFlags[] = 'Windy';
+                }
+
                 return [
                     'date' => $date,
                     'day' => Carbon::parse($date)->format('D'),
@@ -126,16 +182,16 @@ class WeatherContextController extends Controller
                     'visual' => $this->weatherVisualType($condition),
                     'avg_temp_c' => $averageTemperatures->isEmpty() ? null : round((float) $averageTemperatures->avg(), 1),
                     'min_temp_c' => $minimumTemperatures->isEmpty() ? null : round((float) $minimumTemperatures->min(), 1),
-                    'max_temp_c' => $maximumTemperatures->isEmpty() ? null : round((float) $maximumTemperatures->max(), 1),
+                    'max_temp_c' => $maximumTemperature,
                     'humidity' => $humidities->isEmpty() ? null : round((float) $humidities->avg(), 1),
-                    'wind_kph' => $windSpeeds->isEmpty() ? null : round((float) $windSpeeds->avg(), 1),
-                    'precipitation_mm' => $precipitation->isEmpty() ? null : round((float) $precipitation->avg(), 1),
+                    'wind_kph' => $averageWind,
+                    'precipitation_mm' => $averagePrecipitation,
                     'locations' => $rows->pluck('barangay_id')->unique()->count(),
+                    'has_data' => true,
+                    'risk_flags' => $riskFlags,
+                    'attention_level' => count($riskFlags) >= 2 ? 'attention' : (count($riskFlags) === 1 ? 'watch' : 'normal'),
                 ];
             })
-            ->sortByDesc('date')
-            ->take(5)
-            ->sortBy('date')
             ->values();
 
         $selectedBarangay = $barangayId
@@ -201,6 +257,29 @@ class WeatherContextController extends Controller
         } else {
             $liveForecastError = 'Add coordinates to the assigned station or one of its covered barangay halls to enable the live forecast.';
         }
+
+        $yesterdayObservation = $weatherCards->last();
+        $todayForecast = $liveForecast->first();
+        $weatherComparison = null;
+        if (($yesterdayObservation['has_data'] ?? false) && is_array($todayForecast)) {
+            $comparisonMetrics = [
+                ['label' => 'Maximum temperature', 'icon' => 'fa-temperature-high', 'observed' => $yesterdayObservation['max_temp_c'], 'forecast' => $todayForecast['max_temp_c'] ?? null, 'unit' => '°C'],
+                ['label' => 'Humidity', 'icon' => 'fa-droplet', 'observed' => $yesterdayObservation['humidity'], 'forecast' => $todayForecast['humidity_percent'] ?? null, 'unit' => '%'],
+                ['label' => 'Wind speed', 'icon' => 'fa-wind', 'observed' => $yesterdayObservation['wind_kph'], 'forecast' => $todayForecast['wind_kph'] ?? null, 'unit' => ' km/h'],
+                ['label' => 'Precipitation', 'icon' => 'fa-cloud-rain', 'observed' => $yesterdayObservation['precipitation_mm'], 'forecast' => $todayForecast['precipitation_mm'] ?? null, 'unit' => ' mm'],
+            ];
+            $weatherComparison = [
+                'yesterday_date' => $yesterdayObservation['date_label'],
+                'today_date' => $todayForecast['date_label'] ?? Carbon::now('Asia/Manila')->format('M j'),
+                'metrics' => collect($comparisonMetrics)->map(function (array $metric) {
+                    $metric['delta'] = $metric['observed'] !== null && $metric['forecast'] !== null
+                        ? round((float) $metric['forecast'] - (float) $metric['observed'], 1)
+                        : null;
+
+                    return $metric;
+                })->all(),
+            ];
+        }
         $stats = [
             'covered_barangays' => $selectedCoverageCount,
             'observed_days' => $scopeRows->pluck('observation_date')->map(fn ($date) => Carbon::parse($date)->toDateString())->unique()->count(),
@@ -258,6 +337,7 @@ class WeatherContextController extends Controller
             'station' => $stationOfficer->station,
             'coveredBarangays' => $coveredBarangays,
             'records' => $records,
+            'selectedDateDetails' => $selectedDateDetails,
             'month' => $month,
             'selectedBarangayId' => $barangayId,
             'quality' => $quality,
@@ -268,6 +348,7 @@ class WeatherContextController extends Controller
             'sourceSummaries' => $sourceSummaries,
             'summary' => $summary,
             'weatherCards' => $weatherCards,
+            'weatherComparison' => $weatherComparison,
             'liveForecast' => $liveForecast,
             'liveForecastCurrent' => $liveForecastCurrent,
             'liveForecastFetchedAt' => $liveForecastFetchedAt,
@@ -292,12 +373,28 @@ class WeatherContextController extends Controller
             ->value('station_id');
         abort_unless($stationId > 0, 403, 'No station assignment was found.');
 
-        $validated = $request->validate(['days' => ['required', 'integer', 'min:1', 'max:31']]);
-        $summary = $service->collectMissingRecentDays((int) $validated['days'], $stationId);
+        $today = Carbon::now('Asia/Manila')->startOfDay();
+        $validated = $request->validate([
+            'days' => ['nullable', 'required_without:date', 'integer', 'min:1', 'max:31'],
+            'date' => [
+                'nullable',
+                'required_without:days',
+                'date_format:Y-m-d',
+                'after_or_equal:'.$today->copy()->subDays(31)->toDateString(),
+                'before_or_equal:'.$today->copy()->subDay()->toDateString(),
+            ],
+        ]);
+
+        $summary = isset($validated['date'])
+            ? $service->collectDate(Carbon::createFromFormat('Y-m-d', $validated['date'], 'Asia/Manila'), $stationId, true)
+            : $service->collectMissingRecentDays((int) $validated['days'], $stationId);
+        $scopeLabel = isset($validated['date'])
+            ? Carbon::parse($validated['date'])->format('M j, Y')
+            : "the last {$validated['days']} days";
 
         return back()->with(
             $summary['failed'] > 0 ? 'warning' : 'success',
-            "Weather backfill saved {$summary['saved']} missing row(s); {$summary['failed']} failed."
+            "Weather backfill for {$scopeLabel} saved {$summary['saved']} missing row(s); {$summary['failed']} failed."
         );
     }
 

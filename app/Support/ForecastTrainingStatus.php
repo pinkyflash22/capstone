@@ -18,6 +18,7 @@ class ForecastTrainingStatus
         ], $extra);
 
         self::store()->put(self::key($jobId), $payload, now()->addDay());
+        self::recordHistory($payload);
 
         return $payload;
     }
@@ -29,9 +30,43 @@ class ForecastTrainingStatus
         return is_array($value) ? $value : null;
     }
 
+    public static function history(int $userId, int $limit = 10): array
+    {
+        $value = self::store()->get(self::historyKey($userId), []);
+
+        return collect(is_array($value) ? $value : [])
+            ->sortByDesc('updated_at')
+            ->take(max(1, min(25, $limit)))
+            ->values()
+            ->all();
+    }
+
     private static function key(string $jobId): string
     {
         return 'forecast-training:'.$jobId;
+    }
+
+    private static function historyKey(int $userId): string
+    {
+        return 'forecast-training-history:'.$userId;
+    }
+
+    private static function recordHistory(array $payload): void
+    {
+        $userId = (int) ($payload['user_id'] ?? 0);
+        if ($userId <= 0) {
+            return;
+        }
+
+        $history = collect(self::store()->get(self::historyKey($userId), []))
+            ->reject(fn ($entry) => ($entry['job_id'] ?? null) === ($payload['job_id'] ?? null))
+            ->prepend($payload)
+            ->sortByDesc('updated_at')
+            ->take(25)
+            ->values()
+            ->all();
+
+        self::store()->put(self::historyKey($userId), $history, now()->addDays(30));
     }
 
     private static function store()

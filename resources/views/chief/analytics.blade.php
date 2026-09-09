@@ -2616,6 +2616,137 @@
             word-break: break-word;
         }
 
+        .analytics-training-progress {
+            display: none;
+            margin-top: 16px;
+            padding: 18px;
+            border: 1px solid #99f6e4;
+            border-radius: 18px;
+            background: linear-gradient(145deg, #f0fdfa, #f8fafc 58%, #ecfeff);
+            box-shadow: 0 16px 38px rgba(13, 148, 136, 0.11);
+            overflow: hidden;
+        }
+
+        .analytics-training-progress.is-visible { display: block; animation: analyticsTrainingReveal .32s ease-out; }
+        .analytics-training-progress.is-complete { border-color: #86efac; background: linear-gradient(145deg, #f0fdf4, #f8fafc); }
+        .analytics-training-progress.is-failed { border-color: #fca5a5; background: linear-gradient(145deg, #fef2f2, #fff); }
+
+        .analytics-training-progress__head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .analytics-training-progress__title { margin: 0; color: #0f172a; font-size: 15px; font-weight: 900; }
+        .analytics-training-progress__message { margin: 4px 0 0; color: #475569; font-size: 12px; line-height: 1.45; }
+        .analytics-training-progress__percent { color: #0f766e; font-size: 24px; font-weight: 950; line-height: 1; }
+        .analytics-training-progress.is-failed .analytics-training-progress__percent { color: #b91c1c; }
+
+        .analytics-training-progress__track {
+            position: relative;
+            height: 12px;
+            margin-top: 14px;
+            border-radius: 999px;
+            background: #ccfbf1;
+            overflow: hidden;
+        }
+
+        .analytics-training-progress__bar {
+            position: relative;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #0f766e, #14b8a6, #06b6d4);
+            transition: width .55s cubic-bezier(.22, 1, .36, 1);
+            overflow: hidden;
+        }
+
+        .analytics-training-progress__bar::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            width: 45%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+            transform: translateX(-120%);
+            animation: analyticsTrainingShimmer 1.25s linear infinite;
+        }
+
+        .analytics-training-progress.is-complete .analytics-training-progress__bar { background: linear-gradient(90deg, #15803d, #22c55e); }
+        .analytics-training-progress.is-failed .analytics-training-progress__bar { background: linear-gradient(90deg, #b91c1c, #ef4444); }
+        .analytics-training-progress.is-complete .analytics-training-progress__bar::after,
+        .analytics-training-progress.is-failed .analytics-training-progress__bar::after { animation: none; }
+
+        .analytics-training-history {
+            margin-top: 16px;
+            padding: 16px 18px;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        .analytics-training-history__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .analytics-training-history__title { margin: 0; color: #0f172a; font-size: 14px; font-weight: 900; }
+        .analytics-training-history__caption { margin: 3px 0 0; color: #64748b; font-size: 11px; }
+        .analytics-training-history__list { display: grid; gap: 9px; margin-top: 12px; }
+        .analytics-training-history__empty { padding: 14px; border-radius: 12px; background: #f8fafc; color: #64748b; font-size: 12px; text-align: center; }
+        .analytics-training-history__item {
+            display: grid;
+            grid-template-columns: minmax(145px, 1.35fr) repeat(4, minmax(75px, .7fr));
+            align-items: center;
+            gap: 10px;
+            padding: 11px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 13px;
+            background: #f8fafc;
+        }
+        .analytics-training-history__item strong { display: block; color: #0f172a; font-size: 11px; }
+        .analytics-training-history__item span { display: block; margin-top: 2px; color: #64748b; font-size: 10px; }
+        .analytics-training-history__status { display: inline-flex !important; width: fit-content; padding: 4px 8px; border-radius: 999px; font-weight: 900; text-transform: capitalize; }
+        .analytics-training-history__status--completed { background: #dcfce7; color: #166534 !important; }
+        .analytics-training-history__status--failed { background: #fee2e2; color: #991b1b !important; }
+        .analytics-training-history__status--running,
+        .analytics-training-history__status--queued { background: #ccfbf1; color: #0f766e !important; }
+
+        .analytics-training-progress__stages {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .analytics-training-stage { color: #94a3b8; font-size: 10px; font-weight: 800; text-align: center; transition: color .25s ease, transform .25s ease; }
+        .analytics-training-stage::before {
+            content: '';
+            display: block;
+            width: 9px;
+            height: 9px;
+            margin: 0 auto 5px;
+            border: 2px solid #cbd5e1;
+            border-radius: 50%;
+            background: #fff;
+            transition: all .25s ease;
+        }
+        .analytics-training-stage.is-active { color: #0f766e; transform: translateY(-1px); }
+        .analytics-training-stage.is-active::before { border-color: #14b8a6; background: #14b8a6; box-shadow: 0 0 0 5px rgba(20,184,166,.13); }
+        .analytics-training-stage.is-done { color: #334155; }
+        .analytics-training-stage.is-done::before { border-color: #0f766e; background: #0f766e; }
+
+        @keyframes analyticsTrainingShimmer { to { transform: translateX(280%); } }
+        @keyframes analyticsTrainingReveal { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 640px) {
+            .analytics-training-progress { padding: 15px; }
+            .analytics-training-progress__stages { grid-template-columns: repeat(5, 1fr); gap: 3px; }
+            .analytics-training-stage { font-size: 8px; }
+            .analytics-training-history__item { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .analytics-training-history__item > div:first-child { grid-column: 1 / -1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .analytics-training-progress, .analytics-training-progress__bar, .analytics-training-progress__bar::after { animation: none !important; transition: none !important; }
+        }
+
         .analytics-model-chip-list {
             display: flex;
             flex-wrap: wrap;
@@ -2962,6 +3093,39 @@
                                 </div>
                                 <i class="fa-solid fa-magnifying-glass-chart"></i>
                             </button>
+                        </div>
+                        <div id="trainingProgressPanel" class="analytics-training-progress" role="status" aria-live="polite" aria-hidden="true">
+                            <div class="analytics-training-progress__head">
+                                <div>
+                                    <p id="trainingProgressTitle" class="analytics-training-progress__title">Preparing model retraining</p>
+                                    <p id="trainingProgressMessage" class="analytics-training-progress__message">Connecting to the background training worker…</p>
+                                </div>
+                                <div id="trainingProgressPercent" class="analytics-training-progress__percent">0%</div>
+                            </div>
+                            <div class="analytics-training-progress__track" role="progressbar" aria-label="Forecast model retraining progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                                <div id="trainingProgressBar" class="analytics-training-progress__bar"></div>
+                            </div>
+                            <div class="analytics-training-progress__stages" aria-hidden="true">
+                                <div class="analytics-training-stage" data-training-stage="queued">Queued</div>
+                                <div class="analytics-training-stage" data-training-stage="validating">Validate</div>
+                                <div class="analytics-training-stage" data-training-stage="training">Train</div>
+                                <div class="analytics-training-stage" data-training-stage="persisting">Save</div>
+                                <div class="analytics-training-stage" data-training-stage="completed">Complete</div>
+                            </div>
+                        </div>
+                        <div class="analytics-training-history" aria-labelledby="trainingHistoryTitle">
+                            <div class="analytics-training-history__head">
+                                <div>
+                                    <h3 id="trainingHistoryTitle" class="analytics-training-history__title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Retraining history</h3>
+                                    <p class="analytics-training-history__caption">Your latest attempts from the last 30 days, including dataset and validation results.</p>
+                                </div>
+                                <button type="button" class="analytics-btn analytics-btn--secondary" style="width:auto; padding:8px 11px;" onclick="loadForecastTrainingHistory()" aria-label="Refresh retraining history">
+                                    <i class="fa-solid fa-rotate"></i>
+                                </button>
+                            </div>
+                            <div id="trainingHistoryList" class="analytics-training-history__list">
+                                <div class="analytics-training-history__empty">No retraining attempts have been recorded yet.</div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -8011,6 +8175,9 @@
                         <div style="padding:14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe;">
                             <div style="font-size:11px; font-weight:800; color:#1d4ed8; text-transform:uppercase;">Estimated Damage</div>
                             <div style="font-size:22px; font-weight:900; color:#1e3a8a; margin-top:6px;">${prediction?.predicted_damage !== undefined && prediction?.predicted_damage !== null ? `PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}` : 'N/A'}</div>
+                            ${prediction?.model_prediction?.damage_forecast_quality?.available === false ? `
+                                <div style="font-size:11px; color:#475569; line-height:1.4; margin-top:6px;">Withheld because the latest damage regression did not pass validation.</div>
+                            ` : ''}
                         </div>
                         <div style="padding:14px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
                             <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase;">Peak Hours</div>
@@ -8296,8 +8463,76 @@
             }
         }
 
+        async function loadForecastTrainingHistory() {
+            const list = document.getElementById('trainingHistoryList');
+            if (!list) return;
+
+            try {
+                const commandPrefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '/station-admin';
+                const response = await fetch(`${commandPrefix}/api/retrain-forecast-model-history`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.message || 'Unable to load retraining history.');
+                }
+
+                const entries = Array.isArray(payload.data) ? payload.data : [];
+                if (!entries.length) {
+                    list.innerHTML = '<div class="analytics-training-history__empty">No retraining attempts have been recorded yet.</div>';
+                    return;
+                }
+
+                const metricPercent = (value) => {
+                    const numeric = Number(value);
+                    return Number.isFinite(numeric) ? `${(numeric * 100).toFixed(1)}%` : 'N/A';
+                };
+                const metricNumber = (value, digits = 3) => {
+                    const numeric = Number(value);
+                    return Number.isFinite(numeric) ? numeric.toFixed(digits) : 'N/A';
+                };
+
+                list.innerHTML = entries.map((entry) => {
+                    const status = String(entry.status || 'unknown').toLowerCase();
+                    const metadata = entry.model_metadata || {};
+                    const metrics = metadata.metrics || {};
+                    const dataset = entry.dataset_quality || {};
+                    const damageMetrics = metadata.regression_metrics?.predicted_estimated_damage || {};
+                    const date = entry.updated_at ? new Date(entry.updated_at) : null;
+                    const dateLabel = date && !Number.isNaN(date.getTime())
+                        ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                        : 'Unknown time';
+                    const records = dataset.record_count ?? metadata.records_used ?? 'N/A';
+
+                    return `
+                        <article class="analytics-training-history__item">
+                            <div>
+                                <span class="analytics-training-history__status analytics-training-history__status--${escapeHtml(status)}">${escapeHtml(status.replace('_', ' '))}</span>
+                                <strong style="margin-top:5px;">${escapeHtml(String(entry.message || 'Training attempt'))}</strong>
+                                <span>${escapeHtml(dateLabel)}</span>
+                            </div>
+                            <div><strong>${escapeHtml(String(records))}</strong><span>Dataset rows</span></div>
+                            <div><strong>${metricPercent(metrics.accuracy)}</strong><span>Accuracy</span></div>
+                            <div><strong>${metricNumber(metrics.roc_auc)}</strong><span>ROC AUC</span></div>
+                            <div><strong>${metricNumber(damageMetrics.r2_score)}</strong><span>Damage R²</span></div>
+                        </article>`;
+                }).join('');
+            } catch (error) {
+                list.innerHTML = `<div class="analytics-training-history__empty">${escapeHtml(error.message || 'Unable to load retraining history.')}</div>`;
+            }
+        }
+
+        window.loadForecastTrainingHistory = loadForecastTrainingHistory;
+
         async function retrainForecastModel() {
             const button = document.getElementById('retrainModelBtn');
+            const panel = document.getElementById('trainingProgressPanel');
+            const title = document.getElementById('trainingProgressTitle');
+            const message = document.getElementById('trainingProgressMessage');
+            const percent = document.getElementById('trainingProgressPercent');
+            const bar = document.getElementById('trainingProgressBar');
+            const track = panel?.querySelector('[role="progressbar"]');
+            const stageNodes = [...document.querySelectorAll('[data-training-stage]')];
             const confirmed = await showAnalyticsConfirm({
                 eyebrow: 'Model training',
                 title: 'Retrain forecast model?',
@@ -8311,6 +8546,65 @@
             }
 
             const originalHtml = button?.innerHTML;
+            const stageOrder = ['queued', 'validating', 'training', 'persisting', 'completed'];
+            let displayedProgress = 1;
+            let currentStage = 'queued';
+            let currentStatus = 'queued';
+            let currentMessage = 'Connecting to the background training worker…';
+
+            const normalizedStage = (stage, status) => {
+                if (status === 'completed') return 'completed';
+                if (stage === 'validating_output') return 'persisting';
+                if (['validating', 'exporting', 'dataset_ready'].includes(stage)) return 'validating';
+                if (['persisting', 'saving_model', 'saving_metadata', 'python_complete'].includes(stage)) return 'persisting';
+                return stageOrder.includes(stage) ? stage : (status === 'queued' ? 'queued' : 'training');
+            };
+
+            const drawProgress = () => {
+                if (!panel) return;
+                const failed = currentStatus === 'failed';
+                const complete = currentStatus === 'completed';
+                const roundedProgress = Math.max(0, Math.min(100, Math.round(displayedProgress)));
+                const activeStage = normalizedStage(currentStage, currentStatus);
+                const activeIndex = stageOrder.indexOf(activeStage);
+
+                panel.classList.add('is-visible');
+                panel.classList.toggle('is-complete', complete);
+                panel.classList.toggle('is-failed', failed);
+                panel.setAttribute('aria-hidden', 'false');
+                if (title) title.textContent = failed ? 'Model retraining stopped' : (complete ? 'Model retraining complete' : 'Retraining forecast model');
+                if (message) message.textContent = (failed || complete)
+                    ? currentMessage
+                    : `${currentMessage} Progress is reported by the active training pipeline.`;
+                if (percent) percent.textContent = failed ? 'Stopped' : `${roundedProgress}%`;
+                if (bar) bar.style.width = `${roundedProgress}%`;
+                if (track) track.setAttribute('aria-valuenow', String(roundedProgress));
+                stageNodes.forEach((node, index) => {
+                    node.classList.toggle('is-done', complete || index < activeIndex);
+                    node.classList.toggle('is-active', !failed && !complete && index === activeIndex);
+                });
+            };
+
+            const acceptCheckpoint = (payload) => {
+                const serverProgress = Number(payload?.progress);
+                if (Number.isFinite(serverProgress)) {
+                    displayedProgress = Math.max(displayedProgress, Math.max(0, Math.min(100, serverProgress)));
+                }
+                currentStage = String(payload?.stage || currentStage);
+                currentStatus = String(payload?.status || currentStatus);
+                currentMessage = String(payload?.message || currentMessage);
+
+                if (currentStatus === 'completed') {
+                    displayedProgress = 100;
+                }
+                drawProgress();
+            };
+
+            if (panel) {
+                panel.classList.remove('is-complete', 'is-failed');
+                acceptCheckpoint({ status: 'queued', stage: 'queued', progress: 2, message: currentMessage });
+            }
+
             if (button) {
                 button.disabled = true;
                 button.style.opacity = '0.7';
@@ -8344,6 +8638,9 @@
                     throw new Error('The server did not return a retraining status URL.');
                 }
 
+                acceptCheckpoint(result);
+                loadForecastTrainingHistory().catch(() => {});
+
                 let trainingResult = result;
                 let pollAttempts = 0;
                 while (!['completed', 'failed'].includes(trainingResult.status) && pollAttempts < 180) {
@@ -8362,6 +8659,7 @@
                     const progress = Number.isFinite(Number(trainingResult.progress))
                         ? Math.max(0, Math.min(100, Number(trainingResult.progress)))
                         : 0;
+                    acceptCheckpoint(trainingResult);
                     if (button) {
                         button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${escapeHtml(String(trainingResult.message || 'Retraining...'))} ${progress}%`;
                         button.setAttribute('aria-label', `${trainingResult.message || 'Retraining'} ${progress}%`);
@@ -8387,6 +8685,9 @@
                     : '';
                 showAnalyticsToast(`${trainingResult.message || 'Forecast model retrained successfully.'}${trainedAt}`, 'success');
             } catch (error) {
+                currentStatus = 'failed';
+                currentMessage = error.message || 'Unable to retrain the forecast model.';
+                drawProgress();
                 showAnalyticsToast(error.message || 'Unable to retrain the forecast model.', 'error');
             } finally {
                 if (button) {
@@ -8395,6 +8696,7 @@
                     button.innerHTML = originalHtml;
                     button.removeAttribute('aria-label');
                 }
+                loadForecastTrainingHistory().catch(() => {});
             }
         }
 
@@ -8411,6 +8713,7 @@
         });
 
         document.getElementById('retrainModelBtn')?.addEventListener('click', retrainForecastModel);
+        loadForecastTrainingHistory().catch(() => {});
         document.querySelectorAll('[data-forecast-view-scope]').forEach((button) => {
             button.addEventListener('click', () => {
                 loadLatestAnalysisSnapshot(button.dataset.forecastViewScope || 'current_month', true)

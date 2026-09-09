@@ -109,9 +109,16 @@ class ForecastModelService
         return $environment;
     }
 
-    public function retrain(bool $exportDataset = true): array
+    public function retrain(bool $exportDataset = true, ?callable $progress = null): array
     {
-        $runTraining = function () use ($exportDataset) {
+        $notify = static function (int $percentage, string $stage, string $message, array $extra = []) use ($progress): void {
+            if ($progress !== null) {
+                $progress($percentage, $stage, $message, $extra);
+            }
+        };
+
+        $runTraining = function () use ($exportDataset, $notify) {
+            $notify(12, 'validating', 'Checking the training script and writable model workspace.');
             if (! File::exists($this->trainingScriptPath)) {
                 return $this->recordTrainingReport(false, 'training_script_missing', 'Forecast training script is missing.');
             }
@@ -136,6 +143,7 @@ class ForecastModelService
             }
 
             try {
+                $notify(18, 'validating', 'Validating the configured Python runtime and model dependencies.');
                 $runtimeProbe = Process::path(base_path())
                     ->env($this->pythonEnvironment())
                     ->timeout(15)
@@ -164,16 +172,57 @@ class ForecastModelService
                 return $this->recordTrainingReport(false, 'dataset_missing', 'Forecast dataset is missing.');
             }
 
-            $parameters = ['--dataset' => $this->datasetOption];
             if ($exportDataset) {
-                $parameters['--export'] = true;
+                $notify(24, 'exporting', 'Exporting all currently available station, incident, verified-risk, weather, checklist, and mitigation records.');
+                $exportExitCode = Artisan::call('ml:export-station-barangay-dataset', [
+                    '--path' => $this->datasetOption,
+                ]);
+                $exportOutput = trim(Artisan::output());
+
+                if ($exportExitCode !== 0) {
+                    return $this->recordTrainingReport(false, 'dataset_export_failed', 'Live forecast dataset export failed.', [
+                        'exit_code' => $exportExitCode,
+                        'failure_summary' => $exportOutput,
+                    ]);
+                }
             }
 
-            try {
-                $exitCode = Artisan::call('ai:train-forecast-model', $parameters);
-                $output = trim(Artisan::output());
+            $datasetQuality = $this->readDatasetQualitySummary();
+            $notify(30, 'dataset_ready', 'The latest real database export is ready for model training.', [
+                'dataset_quality' => $datasetQuality,
+            ]);
 
-                if ($exitCode !== 0) {
+            try {
+                $progressBuffer = '';
+                $trainProcess = Process::path(base_path())
+                    ->env($this->pythonEnvironment())
+                    ->timeout(max(60, (int) config('services.ai_prediction.training_timeout_seconds', 240)))
+                    ->run([$this->pythonBinary, $this->trainingScriptPath, $this->datasetPath], function (string $type, string $output) use (&$progressBuffer, $notify): void {
+                        $progressBuffer .= $output;
+                        while (($newline = strpos($progressBuffer, "\n")) !== false) {
+                            $line = trim(substr($progressBuffer, 0, $newline));
+                            $progressBuffer = substr($progressBuffer, $newline + 1);
+                            if (! str_starts_with($line, 'PYROSENSE_PROGRESS ')) {
+                                continue;
+                            }
+
+                            $payload = json_decode(substr($line, strlen('PYROSENSE_PROGRESS ')), true);
+                            if (! is_array($payload)) {
+                                continue;
+                            }
+
+                            $notify(
+                                (int) ($payload['progress'] ?? 30),
+                                (string) ($payload['stage'] ?? 'training'),
+                                (string) ($payload['message'] ?? 'Training the forecast model.'),
+                                ['python_progress' => true]
+                            );
+                        }
+                    });
+                $exitCode = $trainProcess->exitCode();
+                $output = trim($trainProcess->output()."\n".$trainProcess->errorOutput());
+
+                if ($trainProcess->failed()) {
                     Log::warning('Forecast model training command failed.', [
                         'exit_code' => $exitCode,
                         'output' => $output,
@@ -199,7 +248,7 @@ class ForecastModelService
                     $ready
                         ? 'Forecast model retrained successfully.'
                         : 'Training finished, but model output files were not created.',
-                    ['exit_code' => $exitCode]
+                    ['exit_code' => $exitCode, 'dataset_quality' => $datasetQuality]
                 );
             } catch (\Throwable $e) {
                 Log::warning('Unable to prepare forecast model automatically.', [
@@ -242,6 +291,35 @@ class ForecastModelService
         } finally {
             $lock->release();
         }
+    }
+
+    private function readDatasetQualitySummary(): array
+    {
+        if (! File::exists($this->datasetPath)) {
+            return ['record_count' => 0, 'source' => null, 'generated_at' => null];
+        }
+
+        $decoded = json_decode((string) File::get($this->datasetPath), true);
+        if (! is_array($decoded)) {
+            return ['record_count' => 0, 'source' => null, 'generated_at' => null];
+        }
+
+        $records = is_array($decoded['records'] ?? null) ? $decoded['records'] : $decoded;
+        $years = collect($records)->pluck('year')->filter(fn ($year) => is_numeric($year))->map(fn ($year) => (int) $year);
+        $barangays = collect($records)->pluck('barangay_id')->filter()->unique()->count();
+        $positiveIncidentRows = collect($records)->filter(fn ($row) => (float) ($row['incident_count'] ?? 0) > 0)->count();
+        $damageRows = collect($records)->filter(fn ($row) => is_numeric($row['estimated_damage'] ?? null) && (float) $row['estimated_damage'] > 0)->count();
+
+        return [
+            'source' => $decoded['source'] ?? 'database',
+            'record_count' => count($records),
+            'barangay_count' => $barangays,
+            'year_from' => $years->isNotEmpty() ? $years->min() : null,
+            'year_to' => $years->isNotEmpty() ? $years->max() : null,
+            'positive_incident_rows' => $positiveIncidentRows,
+            'positive_damage_rows' => $damageRows,
+            'generated_at' => $decoded['generated_at'] ?? null,
+        ];
     }
 
     public function lastTrainingReport(): array

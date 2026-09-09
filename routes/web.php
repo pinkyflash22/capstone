@@ -354,6 +354,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/historical-weather-save', [App\Http\Controllers\Chief\AnalyticController::class, 'saveHistoricalWeatherArchive']);
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
+        Route::get('/api/retrain-forecast-model-history', [App\Http\Controllers\Chief\AnalyticController::class, 'forecastModelTrainingHistory']);
         Route::get('/api/retrain-forecast-model/{trainingId}', [App\Http\Controllers\Chief\AnalyticController::class, 'forecastModelTrainingStatus']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
         Route::get('/api/analyses/{id}/revisions', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysisRevisions']);
@@ -514,6 +515,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/api/historical-weather-save', [App\Http\Controllers\Chief\AnalyticController::class, 'saveHistoricalWeatherArchive']);
         Route::post('/api/ai-predictive-analysis', [App\Http\Controllers\Chief\AnalyticController::class, 'runAIPredictiveAnalysis']);
         Route::post('/api/retrain-forecast-model', [App\Http\Controllers\Chief\AnalyticController::class, 'retrainForecastModel']);
+        Route::get('/api/retrain-forecast-model-history', [App\Http\Controllers\Chief\AnalyticController::class, 'forecastModelTrainingHistory']);
         Route::get('/api/retrain-forecast-model/{trainingId}', [App\Http\Controllers\Chief\AnalyticController::class, 'forecastModelTrainingStatus']);
         Route::get('/api/analyses/history', [App\Http\Controllers\Chief\AnalyticController::class, 'getHistoricalAnalyses']);
         Route::get('/api/analyses/{id}/revisions', [App\Http\Controllers\Chief\AnalyticController::class, 'getAnalysisRevisions']);

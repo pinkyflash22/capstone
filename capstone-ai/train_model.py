@@ -22,6 +22,15 @@ MODEL_PATH = BASE_DIR / "fire_model.pkl"
 METADATA_PATH = BASE_DIR / "fire_model_metadata.json"
 
 
+def emit_progress(progress: int, stage: str, message: str):
+    """Emit one machine-readable, immediately flushed training checkpoint."""
+    print(
+        "PYROSENSE_PROGRESS "
+        + json.dumps({"progress": progress, "stage": stage, "message": message}),
+        flush=True,
+    )
+
+
 LEGACY_TARGET_COLUMN = "fire_occurred"
 LEGACY_RAW_FEATURE_COLUMNS = [
     "avg_temp",
@@ -961,10 +970,12 @@ def build_calibration_summary(y_true: pd.Series, probabilities) -> dict:
 
 
 def train(data_path: Path = DEFAULT_DATA_PATH):
+    emit_progress(32, "loading_dataset", "Loading the exported database training records.")
     print(f"1. Loading JSON dataset from {data_path.name}...")
     records = load_json_records(data_path)
     dataset_kind = infer_dataset_kind(records)
 
+    emit_progress(36, "preparing_features", "Cleaning records and preparing model features.")
     if dataset_kind == "historical_data":
         X, y, feature_columns, metadata = prepare_historical_dataframe(records)
     elif dataset_kind == "station_barangay_monthly":
@@ -978,6 +989,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     print(f"3. Prepared {len(X)} clean records with {len(feature_columns)} model features.")
     print(f"4. Class distribution: {y.value_counts().to_dict()}")
 
+    emit_progress(42, "splitting_dataset", "Creating stratified training and validation partitions.")
     stratify_target = y if y.nunique() > 1 and y.value_counts().min() >= 2 else None
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -988,9 +1000,11 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     )
 
     print("5. Training probability-aware event model...")
+    emit_progress(48, "training_classifier", "Training the barangay high-risk probability classifier.")
     model = build_model(y_train, metadata["categorical_features"])
     model.fit(X_train, y_train)
 
+    emit_progress(60, "validating_classifier", "Evaluating classifier predictions and probability calibration.")
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1] if len(set(y)) > 1 else [0.0] * len(y_test)
     cv_scores = cross_val_score(
@@ -1002,6 +1016,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     ) if y.nunique() > 1 and y.value_counts().min() >= 2 else []
 
     global_feature_importance = aggregate_global_feature_importance(model, feature_columns)
+    emit_progress(69, "building_explanations", "Calculating validation metrics and feature importance.")
     reference_profile = build_reference_profile(X, metadata["categorical_features"], metadata["numeric_features"])
     example_profiles = build_example_profiles(X, y)
     regression_models: dict[str, object] = {}
@@ -1009,7 +1024,13 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
 
     regression_targets = metadata.get("regression_targets", {})
     if regression_targets:
-        for output_name, target_column in regression_targets.items():
+        target_total = max(1, len(regression_targets))
+        for target_index, (output_name, target_column) in enumerate(regression_targets.items()):
+            emit_progress(
+                72 + int((target_index / target_total) * 9),
+                "training_regressions",
+                f"Training and validating regression output: {output_name}.",
+            )
             if target_column not in pd.DataFrame(records).columns:
                 continue
 
@@ -1057,6 +1078,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     }
     calibration = build_calibration_summary(y_test, y_prob)
 
+    emit_progress(82, "saving_model", "Packaging and saving the trained model artifact.")
     model_bundle = {
         "model": model,
         "regression_models": regression_models,
@@ -1075,6 +1097,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     }
     joblib.dump(model_bundle, MODEL_PATH)
 
+    emit_progress(85, "saving_metadata", "Saving model metrics, calibration, and dataset metadata.")
     metadata_payload = {
         "dataset_path": str(data_path.name),
         "model_path": str(MODEL_PATH.name),
@@ -1099,6 +1122,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     }
     METADATA_PATH.write_text(json.dumps(metadata_payload, indent=2), encoding="utf-8")
 
+    emit_progress(86, "python_complete", "Python training completed; verifying generated artifacts.")
     print("6. Model saved to", MODEL_PATH.name)
     print("7. Metadata saved to", METADATA_PATH.name)
     print(json.dumps(metrics, indent=2))

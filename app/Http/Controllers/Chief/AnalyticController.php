@@ -651,13 +651,16 @@ class AnalyticController extends Controller
         try {
             $trainingId = (string) Str::uuid();
             $userId = (int) $request->user()->user_id;
-            ForecastTrainingStatus::put($trainingId, $userId, 'queued', 5, 'Forecast retraining is queued.');
+            ForecastTrainingStatus::put($trainingId, $userId, 'queued', 5, 'Forecast retraining is queued.', [
+                'stage' => 'queued',
+            ]);
             RetrainForecastModelJob::dispatch($trainingId, $userId);
 
             return response()->json([
                 'success' => true,
                 'status' => 'queued',
                 'progress' => 5,
+                'stage' => 'queued',
                 'message' => 'Forecast retraining started in the background.',
                 'training_id' => $trainingId,
                 // Keep polling same-origin. Render terminates HTTPS at its proxy,
@@ -689,6 +692,23 @@ class AnalyticController extends Controller
         unset($status['user_id']);
 
         return response()->json(array_merge(['success' => ($status['status'] ?? null) !== 'failed'], $status));
+    }
+
+    public function forecastModelTrainingHistory(Request $request)
+    {
+        $history = collect(ForecastTrainingStatus::history((int) $request->user()->user_id, 10))
+            ->map(function (array $entry): array {
+                unset($entry['user_id'], $entry['diagnostics'], $entry['persistence']);
+
+                return $entry;
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'success' => true,
+            'data' => $history,
+        ]);
     }
 
     /**
@@ -1723,9 +1743,17 @@ class AnalyticController extends Controller
                 $predictedIncidentCount
             );
             $calibratedIncidentCount = (int) $incidentCalibration['calibrated_midpoint'];
-            $predictedDamage = round((float) collect($barangayPredictions)->sum(function ($item) {
+            $rawPredictedDamage = round((float) collect($barangayPredictions)->sum(function ($item) {
                 return (float) ($item['predicted_estimated_damage'] ?? 0);
             }), 2);
+            $damageMetrics = data_get(
+                $this->forecastModelService->readMetadataSummary(),
+                'regression_metrics.predicted_estimated_damage',
+                []
+            );
+            $damageR2 = data_get($damageMetrics, 'r2_score');
+            $damageForecastReliable = is_numeric($damageR2) && (float) $damageR2 >= 0.2;
+            $predictedDamage = $damageForecastReliable ? $rawPredictedDamage : null;
 
             $maxProbability = (float) ($probabilities->max() ?? 0);
             $averageProbability = (float) ($probabilities->avg() ?? 0);
@@ -1735,9 +1763,9 @@ class AnalyticController extends Controller
                 : $calibratedIncidentCount;
 
             $riskLevel = 'low';
-            if ($stationProbability >= 65 || $riskIncidentCount >= 6 || $predictedDamage >= 500000) {
+            if ($stationProbability >= 65 || $riskIncidentCount >= 6 || ($damageForecastReliable && $predictedDamage >= 500000)) {
                 $riskLevel = 'high';
-            } elseif ($stationProbability >= 35 || $riskIncidentCount >= 3 || $predictedDamage >= 150000) {
+            } elseif ($stationProbability >= 35 || $riskIncidentCount >= 3 || ($damageForecastReliable && $predictedDamage >= 150000)) {
                 $riskLevel = 'moderate';
             }
 
@@ -1789,6 +1817,15 @@ class AnalyticController extends Controller
                 'incident_count_range' => $incidentCalibration['range'],
                 'forecast_calibration' => $incidentCalibration,
                 'predicted_estimated_damage' => $predictedDamage,
+                'damage_forecast_quality' => [
+                    'available' => $damageForecastReliable,
+                    'status' => $damageForecastReliable ? 'available' : 'withheld_low_validation_quality',
+                    'r2_score' => is_numeric($damageR2) ? round((float) $damageR2, 4) : null,
+                    'minimum_r2' => 0.2,
+                    'meaning' => $damageForecastReliable
+                        ? 'The damage regression passed the minimum validation threshold.'
+                        : 'Damage output is withheld because the latest regression did not pass the minimum validation threshold.',
+                ],
                 'drivers' => array_merge(
                     array_map(fn ($summary) => ['summary' => $summary], $driverSummaries),
                     [[
@@ -6253,50 +6290,52 @@ class AnalyticController extends Controller
             return $storedDailyContext;
         }
 
-        $apiKey = env('WEATHER_API_KEY', '1432615e15a14140963113518261203');
-
-        if (! $apiKey || ! $station) {
+        if (! $station) {
             return null;
         }
 
         try {
-            $locationQuery = $this->resolveWeatherLocationQuery($station, $fallbackLocationName);
-            $forecastDays = max(1, min((int) $days, 14));
-
-            $response = Http::timeout(20)->get('http://api.weatherapi.com/v1/forecast.json', [
-                'key' => $apiKey,
-                'q' => $locationQuery,
-                'days' => $forecastDays,
-                'aqi' => 'no',
-                'alerts' => 'no',
-            ]);
-
-            if (! $response->successful()) {
-                Log::warning('Weather forecast request failed for analytics', [
-                    'status' => $response->status(),
-                    'location' => $locationQuery,
+            $coordinates = $this->resolveWeatherCoordinates($station);
+            if ($coordinates === null) {
+                Log::warning('Open-Meteo analytics fallback has no station or covered-barangay coordinates.', [
+                    'station_id' => $station->station_id ?? null,
                 ]);
-
                 return null;
             }
 
-            $payload = $response->json();
-            $forecastDaysData = $payload['forecast']['forecastday'] ?? [];
-            $current = $payload['current'] ?? [];
+            $forecastDays = max(1, min((int) $days, 7));
+            $forecast = app(DailyWeatherContextService::class)->fetchForecast(
+                $coordinates['latitude'],
+                $coordinates['longitude'],
+                $forecastDays
+            );
+            $cards = collect($forecast['cards'] ?? []);
+            if ($cards->isEmpty()) {
+                return null;
+            }
 
-            $dayCount = count($forecastDaysData);
-            $avgTemp = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['avgtemp_c'] ?? null), 1) : ($current['temp_c'] ?? null);
-            $avgHumidity = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['avghumidity'] ?? null)) : ($current['humidity'] ?? null);
-            $avgWind = $dayCount > 0 ? round(collect($forecastDaysData)->avg(fn ($day) => $day['day']['maxwind_kph'] ?? null), 1) : ($current['wind_kph'] ?? null);
-            $rainyDays = collect($forecastDaysData)->filter(fn ($day) => ($day['day']['daily_chance_of_rain'] ?? 0) >= 50 || ($day['day']['totalprecip_mm'] ?? 0) > 0)->count();
-            $hotDays = collect($forecastDaysData)->filter(fn ($day) => ($day['day']['maxtemp_c'] ?? 0) >= 32)->count();
-            $dominantCondition = collect($forecastDaysData)
-                ->map(fn ($day) => $day['day']['condition']['text'] ?? null)
+            $dayCount = $cards->count();
+            $temperatures = $cards->map(function (array $day) {
+                $minimum = is_numeric($day['min_temp_c'] ?? null) ? (float) $day['min_temp_c'] : null;
+                $maximum = is_numeric($day['max_temp_c'] ?? null) ? (float) $day['max_temp_c'] : null;
+
+                return $minimum !== null && $maximum !== null ? ($minimum + $maximum) / 2 : ($maximum ?? $minimum);
+            })->filter(fn ($value) => is_numeric($value));
+            $avgTemp = $temperatures->isNotEmpty() ? round((float) $temperatures->avg(), 1) : null;
+            $humidities = $cards->pluck('humidity_percent')->filter(fn ($value) => is_numeric($value));
+            $avgHumidity = $humidities->isNotEmpty() ? round((float) $humidities->avg()) : null;
+            $winds = $cards->pluck('wind_kph')->filter(fn ($value) => is_numeric($value));
+            $avgWind = $winds->isNotEmpty() ? round((float) $winds->avg(), 1) : null;
+            $rainyDays = $cards->filter(fn (array $day) => (float) ($day['precipitation_probability_percent'] ?? 0) >= 50
+                || (float) ($day['precipitation_mm'] ?? 0) > 0)->count();
+            $hotDays = $cards->filter(fn (array $day) => (float) ($day['max_temp_c'] ?? 0) >= 32)->count();
+            $dominantCondition = $cards
+                ->pluck('condition')
                 ->filter()
                 ->countBy()
                 ->sortDesc()
                 ->keys()
-                ->first() ?? ($current['condition']['text'] ?? 'Unknown');
+                ->first() ?? 'Unknown';
 
             $weatherRiskScore = 0;
             if (($avgTemp ?? 0) >= 31) {
@@ -6320,8 +6359,11 @@ class AnalyticController extends Controller
             }
 
             return [
-                'query_location' => $locationQuery,
-                'coverage' => 'Current month context using available '.max($dayCount, 1).'-day weather sample',
+                'source' => 'open-meteo-forecast',
+                'query_location' => $this->resolveWeatherLocationQuery($station, $fallbackLocationName),
+                'latitude' => $coordinates['latitude'],
+                'longitude' => $coordinates['longitude'],
+                'coverage' => 'Current month context using available '.$dayCount.'-day Open-Meteo forecast sample',
                 'avg_temp_c' => $avgTemp,
                 'avg_humidity' => $avgHumidity,
                 'avg_wind_kph' => $avgWind,
@@ -6330,13 +6372,51 @@ class AnalyticController extends Controller
                 'dominant_condition' => $dominantCondition,
                 'weather_risk_score' => $weatherRiskScore,
                 'weather_risk_label' => $weatherRiskLabel,
+                'fetched_at' => $forecast['fetched_at'] ?? null,
+                'cache_status' => $forecast['cache_status'] ?? null,
+                'is_stale' => (bool) ($forecast['is_stale'] ?? false),
+                'warning' => $forecast['warning'] ?? null,
                 'summary' => $this->buildWeatherSummary($avgTemp, $avgHumidity, $avgWind, $rainyDays, $hotDays, $dominantCondition, $weatherRiskLabel),
             ];
         } catch (\Throwable $e) {
-            Log::warning('Failed to fetch weather context for analytics: '.$e->getMessage());
+            Log::warning('Failed to fetch Open-Meteo weather context for analytics: '.$e->getMessage());
 
             return null;
         }
+    }
+
+    private function resolveWeatherCoordinates($station): ?array
+    {
+        $coordinates = null;
+
+        if (! empty($station->marker_id)) {
+            $coordinates = DB::table('markers')
+                ->where('marker_id', $station->marker_id)
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->first(['lat', 'lng']);
+        }
+
+        if (! $coordinates && ! empty($station->station_id)) {
+            $coordinates = DB::table('station_barangay_coverage')
+                ->join('barangay_halls', 'station_barangay_coverage.barangay_id', '=', 'barangay_halls.barangay_id')
+                ->join('markers', 'barangay_halls.marker_id', '=', 'markers.marker_id')
+                ->where('station_barangay_coverage.station_id', $station->station_id)
+                ->where('station_barangay_coverage.is_active', true)
+                ->whereNotNull('markers.lat')
+                ->whereNotNull('markers.lng')
+                ->orderByRaw("CASE WHEN station_barangay_coverage.coverage_type = 'primary' THEN 0 ELSE 1 END")
+                ->first(['markers.lat', 'markers.lng']);
+        }
+
+        if (! $coordinates || ! is_numeric($coordinates->lat) || ! is_numeric($coordinates->lng)) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $coordinates->lat,
+            'longitude' => (float) $coordinates->lng,
+        ];
     }
 
     private function fetchStoredDailyWeatherContext($station, int $days, string $fallbackLocationName): ?array

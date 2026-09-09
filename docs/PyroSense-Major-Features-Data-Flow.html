@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>PyroSense Major Features: Data Flow, Generation, and Outputs</title>
+    <style>
+        @page { margin: 20mm 16mm 18mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #172033; font: 9.6pt/1.43 "DejaVu Sans", Arial, sans-serif; }
+        h1, h2, h3, h4 { color: #7c2d12; page-break-after: avoid; }
+        h1 { margin: 0 0 12px; font-size: 27pt; line-height: 1.13; }
+        h2 { margin: 19px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #fdba74; font-size: 16pt; }
+        h3 { margin: 14px 0 6px; font-size: 11.5pt; }
+        h4 { margin: 10px 0 4px; font-size: 9.8pt; }
+        p { margin: 5px 0 8px; }
+        ul, ol { margin: 5px 0 10px 20px; padding: 0; }
+        li { margin: 2px 0; }
+        table { width: 100%; margin: 8px 0 12px; border-collapse: collapse; font-size: 8.1pt; }
+        th { padding: 6px; border: 1px solid #fb923c; background: #fff7ed; color: #7c2d12; text-align: left; }
+        td { padding: 6px; border: 1px solid #d9dee8; vertical-align: top; }
+        tr { page-break-inside: avoid; }
+        code, .formula { font-family: "DejaVu Sans Mono", monospace; }
+        .cover { min-height: 258mm; margin: -20mm -16mm -18mm; padding: 37mm 20mm 20mm; background: #fffaf5; page-break-after: always; }
+        .kicker { color: #ea580c; font-size: 10pt; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; }
+        .subtitle { max-width: 155mm; margin: 12px 0 18px; color: #475569; font-size: 13.5pt; }
+        .meta { margin-top: 25px; padding: 13px 15px; border-left: 5px solid #ea580c; background: #fff; line-height: 1.65; }
+        .badge { display: inline-block; margin: 3px 4px 0 0; padding: 4px 8px; border-radius: 12px; background: #ffedd5; color: #9a3412; font-size: 8.2pt; font-weight: bold; }
+        .callout { margin: 10px 0; padding: 10px 12px; border-left: 4px solid #f97316; background: #fff7ed; page-break-inside: avoid; }
+        .callout.blue { border-color: #0284c7; background: #f0f9ff; }
+        .callout.green { border-color: #16a34a; background: #f0fdf4; }
+        .callout.red { border-color: #dc2626; background: #fef2f2; }
+        .callout.gray { border-color: #64748b; background: #f8fafc; }
+        .formula { margin: 7px 0 10px; padding: 9px 11px; border: 1px solid #fdba74; background: #fffaf5; font-size: 7.9pt; line-height: 1.55; page-break-inside: avoid; }
+        .flow { width: 100%; margin: 10px 0 13px; text-align: center; page-break-inside: avoid; }
+        .box { display: inline-block; width: 27%; min-height: 52px; padding: 8px 6px; border: 1px solid #fb923c; border-radius: 5px; background: #fff7ed; vertical-align: middle; font-size: 8pt; }
+        .box.wide { width: 44%; }
+        .arrow { display: inline-block; width: 6%; color: #ea580c; font-size: 14pt; vertical-align: middle; }
+        .small { color: #526078; font-size: 7.8pt; }
+        .muted { color: #64748b; }
+        .page-break { page-break-before: always; }
+        .keep { page-break-inside: avoid; }
+        .footer { position: fixed; right: 0; bottom: -11mm; left: 0; color: #94a3b8; font-size: 7pt; text-align: center; }
+        .toc td:first-child { width: 35%; font-weight: bold; color: #7c2d12; }
+        .term { width: 27%; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="footer">PyroSense major-feature data flow • Implementation review • 8 September 2026</div>
+
+<section class="cover">
+    <div class="kicker">PyroSense System Documentation</div>
+    <h1>How Data Moves, Generates, and Produces Outputs</h1>
+    <p class="subtitle">A detailed implementation-based explanation of the system's three major features: fire-risk prediction, action-plan checklists, and mitigation management.</p>
+    <div>
+        <span class="badge">1. Prediction</span>
+        <span class="badge">2. Checklist</span>
+        <span class="badge">3. Mitigation</span>
+        <span class="badge">Closed feedback loop</span>
+    </div>
+    <div class="meta">
+        <strong>Prepared:</strong> 8 September 2026<br>
+        <strong>Code snapshot reviewed:</strong> Git commit <code>0ec2a5c</code>, including current workspace implementation<br>
+        <strong>System stack:</strong> Laravel application, relational database, Python prediction runtime, OpenRouter narrative generation, and external weather services<br>
+        <strong>Primary readers:</strong> capstone evaluators, BFP Chief/Station Admin, firefighters, barangay users, and developers<br>
+        <strong>Purpose:</strong> explain where data comes from, how it is validated and transformed, what is saved, what users see, and how operational results become future prediction inputs.
+    </div>
+    <div class="callout red" style="margin-top:25px">
+        <strong>Central interpretation rule:</strong> the prediction percentage is a barangay-month high-risk classification probability. It is not a guarantee that a fire will happen, and it is not the probability that a specific building will ignite.
+    </div>
+</section>
+
+<h2>1. Executive summary</h2>
+<p>PyroSense is designed as a decision-support cycle. The prediction module consolidates station-scoped incident records, historical barangay fire records, verified risk and hazard assessments, weather, environmental exposure, access and water conditions, and prior prevention work. A Python model produces barangay-level forecasts when available; a deterministic formula provides a safe fallback. The application then aggregates those barangay results into a station outlook and may use a language model to explain the result and propose operational recommendations.</p>
+<p>Recommendations become stored action-plan checklists. Each checklist gives personnel a concrete sequence of tasks, owner, priority, deadline, expected result, and review state. Users review each checklist item as followed or not followed. A checklist can then be transformed into a mitigation draft. That draft is reviewed and edited by the Chief/Station Admin before it becomes an official mitigation action.</p>
+<p>Mitigation actions carry assignment, schedule, progress, blockers, proof attachments, outcomes, effectiveness, verification, and follow-up. Firefighter or barangay completion is not immediately treated as final: it becomes a pending completion request, and the Chief/Station Admin approves or rejects it. Confirmed checklist and mitigation activity is summarized into readiness features for later prediction runs, completing the feedback loop.</p>
+
+<div class="flow">
+    <div class="box">Operational and historical data<br><span class="small">incidents, weather, hazards, risk areas, staffing, equipment</span></div>
+    <div class="arrow">→</div>
+    <div class="box">Prediction processing<br><span class="small">features, Python model or fallback, calibration, narrative</span></div>
+    <div class="arrow">→</div>
+    <div class="box">Saved outputs<br><span class="small">probability, counts, drivers, risk level, recommendations</span></div>
+</div>
+<div class="flow">
+    <div class="box">Recommendation</div><div class="arrow">→</div>
+    <div class="box">Action-plan checklist</div><div class="arrow">→</div>
+    <div class="box">Reviewed mitigation action</div>
+</div>
+<div class="flow">
+    <div class="box">Field work and proof</div><div class="arrow">→</div>
+    <div class="box">Chief completion review</div><div class="arrow">→</div>
+    <div class="box">Future readiness signals</div>
+</div>
+
+<h3>1.1 The three major features and their responsibility</h3>
+<table>
+    <thead><tr><th>Feature</th><th>Question answered</th><th>Main output</th><th>Human responsibility</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Prediction</strong></td><td>Which covered barangays and periods require the most attention, and why?</td><td>Probability, risk band, expected fire count/range, drivers, evidence quality, station outlook, recommendations.</td><td>Interpret evidence and choose priorities; do not treat a model value as certainty.</td></tr>
+    <tr><td><strong>Checklist</strong></td><td>What specific actions should be reviewed and carried out?</td><td>Stored plan, ordered tasks, priority, deadline, assignment, item results, confirmation status, audit history.</td><td>Assign, execute, record exceptions, submit, confirm, or reject.</td></tr>
+    <tr><td><strong>Mitigation</strong></td><td>How is a preventive action owned, implemented, proven, evaluated, and followed up?</td><td>Official action record, status, responsible team/person, proof, outcome, effectiveness, verification and follow-up.</td><td>Review the draft, execute the work, attach proof, evaluate outcome, approve completion.</td></tr>
+    </tbody>
+</table>
+
+<h2>2. Reading the prediction correctly</h2>
+<table>
+    <thead><tr><th>Displayed concept</th><th>Meaning</th><th>What it is not</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Observed fires to date</strong></td><td>Closed/completed fire incidents already recorded for the target period.</td><td>Not a prediction.</td></tr>
+    <tr><td><strong>Predicted additional fires</strong></td><td>Expected month total minus fires already observed, never below zero.</td><td>Not the total number already recorded.</td></tr>
+    <tr><td><strong>Expected month total</strong></td><td>A calibrated midpoint combining model output, current pace, and historical same-month evidence; never below observed fires for current-month analysis.</td><td>Not a guaranteed final count.</td></tr>
+    <tr><td><strong>High-risk probability</strong></td><td>The model's probability that a barangay-month matches the learned high-risk target definition.</td><td>Not ignition probability for an address.</td></tr>
+    <tr><td><strong>Operational risk score</strong></td><td>A separate 0–100 station summary derived from recent incident rate, fire rate/share, and recent spikes.</td><td>Not the Python model probability.</td></tr>
+    <tr><td><strong>Evidence quality / confidence</strong></td><td>How complete the supporting evidence and model coverage are.</td><td>Not model accuracy and not fire probability.</td></tr>
+    </tbody>
+</table>
+<div class="callout blue"><strong>Why the distinction matters:</strong> a barangay can have a high predicted risk but only medium evidence quality. That means it deserves attention, but the result should be field-validated before strong operational conclusions are made.</div>
+
+<h2 class="page-break">3. Prediction: complete input-to-output flow</h2>
+<h3>3.1 User request and scope</h3>
+<p>The Chief/Station Admin starts a prediction from Analytics. The request supplies a station/location scope, optional barangay, day window, current-month or next-month scope, historical window, and analysis kind. The authenticated user's <code>station_officers</code> record determines the station. A selected barangay must be within that station's active coverage.</p>
+<ol>
+    <li>Normalize the requested scope and selected barangay.</li>
+    <li>Resolve the Chief's station, station teams, and covered barangays.</li>
+    <li>Read and aggregate source data only within that authorized scope.</li>
+    <li>Build one model payload per selected/covered barangay.</li>
+    <li>Run the Python model in a batch; if unavailable, use deterministic fallback values.</li>
+    <li>Calibrate incident counts and aggregate barangay forecasts into the station result.</li>
+    <li>Generate an explanatory prediction narrative and recommendations; fall back to application-generated text if the narrative service fails.</li>
+    <li>Save the analysis, generated checklist records, checklist item rows, and recommendation suggestion records in one transaction.</li>
+    <li>Return JSON to the frontend, which displays the analysis and later polls an asynchronous run when the API path is used.</li>
+</ol>
+
+<h3>3.2 Data-source map</h3>
+<table>
+    <thead><tr><th>Source</th><th>Selection rule</th><th>Factors produced</th><th>Used for</th></tr></thead>
+    <tbody>
+    <tr><td><code>incidents</code></td><td>Station/team scoped; analysis counts normally use closed/completed incidents in the chosen window; fire type is normalized as the fire incident category.</td><td>Total/fire counts, incident types, 24-hour and 7-day patterns, peak hour, average response time, recent 7/30/60-day and current/previous-month activity.</td><td>Operational score, recent momentum, calibration, evidence, narrative.</td></tr>
+    <tr><td>Historical fire records</td><td>Barangay-linked positive incident rows; weather-only rows with zero/null incident count are excluded from fire totals.</td><td>Same-calendar-month and recent-12-month counts, causes, peak time, density/material/occupancy/access context, historical damage.</td><td>Model features, count baseline, explanations.</td></tr>
+    <tr><td><code>risk_areas</code> and assessments</td><td>Approved/verified records only; deletion-review records excluded; must belong to the target barangay.</td><td>Risk/hazard counts, high assessments, condition, density, affected households, informal settlements, cooking activity, combustible material, waste, prior fire-prone area, poor access, hydrant/water signals.</td><td>Model features, field-pressure score, local drivers, mitigation suggestions.</td></tr>
+    <tr><td><code>daily_weather_contexts</code></td><td>Stored Open-Meteo completed-day rows for the station, current-month/day window, requiring at least three completed calendar days.</td><td>Average temperature/humidity/wind, max wind, rain/hot days, dominant condition, observation dates.</td><td>Preferred analytics weather context and model weather features.</td></tr>
+    <tr><td>Live weather fallback</td><td>If fewer than three stored days exist, Analytics requests up to seven days from Open-Meteo using station-marker coordinates or the first actively covered barangay marker.</td><td>Average temperature/humidity/wind, rainy/hot days, dominant condition, cache and stale-result metadata.</td><td>Fallback analytics context.</td></tr>
+    <tr><td><code>station_officers</code>, <code>teams</code></td><td>Authenticated station only.</td><td>Total and available personnel, team/resource counts.</td><td>Operational context and recommendations.</td></tr>
+    <tr><td>Station equipment assignment</td><td>Equipment assigned to the station.</td><td>Available, damaged, maintenance, and total counts.</td><td>Operational context and recommendations.</td></tr>
+    <tr><td>Checklists and mitigation actions</td><td>Current revision, station/barangay scoped.</td><td>Confirmed weighted ratio, item-followed ratio, completed/open/blocked actions, completion ratio/time, readiness signal.</td><td>Future prediction features and readiness explanation.</td></tr>
+    </tbody>
+</table>
+
+<div class="callout green"><strong>Current provider detail:</strong> both Weather Preview and Analytics weather context now use Open-Meteo. Analytics prefers stored completed-day Open-Meteo observations and falls back to the cached Open-Meteo forecast when fewer than three observed days are available.</div>
+
+<h3>3.3 Open-Meteo collection and forecast fields</h3>
+<p>For completed-day collection, the service resolves coordinates from active station–barangay coverage and barangay-hall markers. It calls Open-Meteo for a completed date in <code>Asia/Manila</code>, collects hourly temperature, relative humidity, precipitation, rain, weather code, wind speed and wind gust, summarizes them, and upserts one row per barangay/date/source. Retries are safe because the key is stable and existing rows are updated.</p>
+<p>The visible forecast request uses current temperature/humidity/weather code/wind; daily weather code, maximum/minimum temperature, maximum precipitation probability, precipitation sum and maximum wind; and hourly temperature, humidity, precipitation probability and wind. Fresh results are cached for six hours and the last successful result may be retained for up to 72 hours. HTTP 429 is not immediately retried.</p>
+
+<h2>4. Prediction factor engineering</h2>
+<h3>4.1 Historical fire baseline</h3>
+<p>For each barangay, the system distinguishes positive fire-incident history from rows that contain weather observations only. The incident baseline uses the larger available count:</p>
+<div class="formula">historical_fire_baseline = max(
+sum of positive incident_count for the same calendar month in the historical window,
+sum of positive incident_count for the most recent 12 months
+)</div>
+<p>This avoids counting imported monthly weather as if it were a fire. Historical risk context is labeled high at eight or more incidents, medium at four to seven, and low below four.</p>
+
+<h3>4.2 Recent fire momentum</h3>
+<div class="formula">recent_fire_momentum =
+2.00 × fires_last_7_days
++ 0.65 × max(0, fires_last_30_days − fires_last_7_days)
++ 0.80 × fires_current_month
+− 0.35 × fires_previous_month</div>
+<p>The signal emphasizes new acceleration. Station momentum is allocated across covered barangays instead of copying the full station total into every barangay.</p>
+
+<h3>4.3 Verified field-pressure signal</h3>
+<div class="formula">risk_area_pressure =
+0.8 × verified risk-area count
++ 1.1 × verified hazard count
++ 2.5 × high assessments
++ 1.8 × blocked hydrants
++ 1.6 × combustible-material findings
++ 1.3 × informal-settlement findings
++ 1.2 × cooking-fire-prone findings
++ 0.8 × poor-waste findings
++ 1.6 × previous-fire-prone findings
++ 1.4 × difficult-access findings
++ min(affected households ÷ 25, 5)</div>
+<p>Only approved/verified field evidence contributes to these localized signals. Descriptive values also become categorical model inputs.</p>
+
+<h3>4.4 Prevention/readiness feedback</h3>
+<p>Checklist priorities are weighted low=1, medium=2, high=3, and critical=4. The station analysis calculates confirmed checklist weight, item-followed ratio, mitigation completion ratio, blocked actions, and average completion days.</p>
+<div class="formula">displayed readiness improvement = min(35,
+18 × weighted checklist completion ratio
++ 12 × mitigation completion ratio
++ 5 × checklist item-followed ratio)</div>
+<div class="callout green"><strong>Important safeguard:</strong> this implementation does not automatically lower the hazard score merely because work was marked complete. <code>risk_reduction_percent</code> remains zero without measured and verified outcome evidence. Completion improves readiness reporting and future model features; it is not proof that the physical hazard disappeared.</div>
+
+<h3>4.5 Deterministic fallback probability</h3>
+<p>If the Python model cannot run, the analysis still produces an explainable fallback. The score starts at 12, rises with historical incidents, heat, low humidity, wind, verified risk pressure, and recent/station momentum, and falls with readiness and mitigation completion. It is clamped from 5 to 95.</p>
+<div class="formula">fallback score = clamp(5, 95,
+12
++ 7 × historical incident count
++ 1.8 × max(temperature − 27, 0)
++ 0.35 × max(65 − humidity, 0)
++ 0.45 × wind
++ 2.4 × risk pressure
++ 2.2 × recent momentum
++ 0.55 × station momentum
+− 3 × mitigation readiness
+− 12 × mitigation completion ratio)</div>
+<p>Fallback bands are Low below 35, Moderate from 35 to 64.99, and High at 65 or above. The row is explicitly marked <code>deterministic_fallback</code>, so it is not misrepresented as a trained-model result.</p>
+
+<h2 class="page-break">5. Trained model: inputs, target, and output</h2>
+<h3>5.1 Model snapshot</h3>
+<table>
+    <tbody>
+    <tr><td class="term">Dataset</td><td><code>station_barangay_monthly_db.json</code>; 960 barangay-month records in the reviewed metadata.</td></tr>
+    <tr><td class="term">Target</td><td>Binary <code>target_high_risk_barangay_month</code>, derived from monthly risk level and incident count.</td></tr>
+    <tr><td class="term">Identity protection</td><td>Station ID, barangay ID and barangay name are excluded from learned features.</td></tr>
+    <tr><td class="term">Primary classification output</td><td>High-risk probability plus Low/Moderate/High label and local drivers.</td></tr>
+    <tr><td class="term">Secondary regression outputs</td><td>Predicted incident count and estimated damage; these are later calibrated/aggregated by the application.</td></tr>
+    <tr><td class="term">Failure behavior</td><td>Python/runtime/model failure degrades to deterministic fallback instead of failing the entire analysis.</td></tr>
+    </tbody>
+</table>
+
+<h3>5.2 Feature groups</h3>
+<table>
+    <thead><tr><th>Group</th><th>Examples in the model payload</th></tr></thead>
+    <tbody>
+    <tr><td>Time and season</td><td>Year, month sine/cosine, dry-season flag, season.</td></tr>
+    <tr><td>Weather</td><td>Average temperature, humidity, wind, weather condition, engineered temperature/humidity/wind signals.</td></tr>
+    <tr><td>Historical pattern</td><td>Historical fire count, incident type/cause context, peak hours, occupancy, density, materials and accessibility.</td></tr>
+    <tr><td>Verified hazard/exposure</td><td>Risk/hazard/high-assessment counts, condition label, population/building density, affected households, informal settlement, cooking activity, combustible materials, waste, prior fire-prone area, poor access.</td></tr>
+    <tr><td>Suppression/access</td><td>Water-access flag and blocked-hydrant count.</td></tr>
+    <tr><td>Workflow feedback</td><td>Checklist total/confirmed/active/completion ratio, item total/followed ratio, mitigation total/completed/blocked/open, completion ratio/time, readiness signal.</td></tr>
+    <tr><td>Combined pressure</td><td>Risk-area pressure and barangay-pressure signals that summarize multiple observations.</td></tr>
+    </tbody>
+</table>
+
+<h3>5.3 Most influential features in the reviewed model metadata</h3>
+<table>
+    <thead><tr><th>Rank</th><th>Feature</th><th>Global importance</th><th>Interpretation</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>Barangay pressure signal</td><td>0.1187</td><td>Combined historical, weather, field-risk, momentum, and readiness pressure.</td></tr>
+    <tr><td>2</td><td>Condition label</td><td>0.1028</td><td>Dominant verified local condition.</td></tr>
+    <tr><td>3</td><td>Population density</td><td>0.0784</td><td>Exposure/concentration context.</td></tr>
+    <tr><td>4</td><td>Combustible material count</td><td>0.0619</td><td>Verified combustible-material findings.</td></tr>
+    <tr><td>5</td><td>Risk-area pressure</td><td>0.0575</td><td>Explicit weighted field-evidence score.</td></tr>
+    <tr><td>6–10</td><td>Verified risks, road access, affected households, water access, building density</td><td>0.0567–0.0510</td><td>Localized hazard, exposure, and response constraints.</td></tr>
+    </tbody>
+</table>
+<p>Global importance explains the trained model as a whole; it does not mean the same feature caused every individual forecast. Each barangay result should be read with its local drivers and evidence provenance.</p>
+
+<h3>5.4 Evaluation caution</h3>
+<p>The metadata reports test accuracy 0.975, ROC AUC 0.9704, precision 1.0, recall 0.625, F1 0.7692, and Brier score 0.0219. The incident-count regression reports MAE 0.0151 and R² 0.4797. The damage regression reports R² −1134.9025, which is not reliable for decision-making. PyroSense now withholds the station damage output and excludes it from risk-band thresholds whenever the latest damage-regression R² is below 0.20. A later retraining run can restore the output automatically if the regression passes that threshold.</p>
+<div class="callout red"><strong>Operational conclusion:</strong> use probability, drivers, count range, evidence quality, and field validation together. Do not present the reported test metrics as guaranteed live accuracy. A weak damage estimate is displayed as unavailable instead of being treated as evidence.</div>
+
+<h2>6. Post-processing, station aggregation, and saved prediction outputs</h2>
+<h3>6.1 Count calibration</h3>
+<p>The model count is calibrated using current observed pace and the same calendar month from up to three prior years. For current-month analysis, expected total is never allowed below observed-to-date fires. The saved/output structure separates observed fires, predicted additional fires, expected month total, and a planning range.</p>
+
+<h3>6.2 Station aggregation</h3>
+<p>Barangay predicted counts and damage estimates are summed. Station probability is a blend of the most urgent barangay and overall coverage:</p>
+<div class="formula">station probability = 55% × highest barangay probability + 45% × average barangay probability</div>
+<p>The station risk band is High if probability is at least 65%, predicted count at least 6, or estimated damage at least PHP 500,000. It is Moderate if probability is at least 35%, count at least 3, or damage at least PHP 150,000; otherwise Low.</p>
+
+<h3>6.3 Separate operational score</h3>
+<p>The recent station score uses incident rate (up to 30 points), fire rate (up to 30), fire share (up to 20), and a 20-point recent-spike condition, capped at 100. Bands are Low below 30, Medium 30–49, High 50–69, and Critical 70+. Current code keeps this base hazard score unchanged by mitigation completion.</p>
+
+<h3>6.4 Evidence-quality confidence</h3>
+<p>The maximum raw score is 65 points: historical years up to 15; scoped incidents up to 10; barangay forecast coverage up to 12; trained model availability 8; weather context 6; verified risk findings up to 6; current/previous fire trend 5; and successfully parsed prediction/recommendation narratives 3. The percentage is High at 75+, Medium at 45–74, and Low below 45.</p>
+
+<h3>6.5 Narrative AI versus numerical model</h3>
+<p>The application makes separate OpenRouter calls for the forecast explanation and operational recommendations. These calls explain and organize the supplied evidence. The Python/deterministic prediction values remain the grounded numerical source. If either narrative call fails, the application produces a data-driven analysis and records a warning; a narrative outage does not silently replace the numerical provenance.</p>
+
+<h3>6.6 Persistence and frontend output</h3>
+<table>
+    <thead><tr><th>Stored/output item</th><th>Examples</th><th>Destination</th></tr></thead>
+    <tbody>
+    <tr><td>Analysis identity and scope</td><td>Station, period, analysis kind, revision, barangay scope.</td><td><code>analysis</code> record.</td></tr>
+    <tr><td>Prediction</td><td>Probability, risk level, expected count/range, observed/additional count semantics, drivers, model source.</td><td>Prediction JSON and frontend cards/charts.</td></tr>
+    <tr><td>Evidence</td><td>Historical baseline, weather rows, verified finding counts, freshness timestamps, per-barangay provenance.</td><td>Analysis JSON and explanation panels.</td></tr>
+    <tr><td>Recommendations</td><td>Prioritized recommendation text, steps, resources, timelines, linked checklist IDs.</td><td>Recommendations JSON and suggestion rows.</td></tr>
+    <tr><td>Workflow outputs</td><td>Generated action plans and normalized child items.</td><td>Checklist tables, loaded by Checklist and Mitigation pages.</td></tr>
+    </tbody>
+</table>
+
+<h2 class="page-break">7. Checklist: generation, movement, and output</h2>
+<h3>7.1 Where checklist content comes from</h3>
+<p>After an analysis is saved, the application processes up to ten recommendations. If <code>AI_GENERATE_ACTION_PLAN_CHECKLISTS=true</code>, it may request structured checklist JSON. Otherwise—or when that response is missing or invalid—it creates deterministic recommendation-backed plans. A fallback plan uses the recommendation's title, description and steps; if steps are absent, it creates practical review, assignment, coordination and documentation tasks.</p>
+<p>For station-wide analysis spanning multiple barangays, the system can localize the leading recommendation into one plan per barangay. This prevents a generic station plan from losing barangay ownership.</p>
+
+<h3>7.2 Stored checklist structure</h3>
+<table>
+    <thead><tr><th>Layer</th><th>Important data</th><th>Purpose</th></tr></thead>
+    <tbody>
+    <tr><td>Checklist header</td><td>Analysis/station/barangay/risk links, source, plan title/description, success indicator, priority, status, target date, assignee, confirmation metadata, revision/source signature.</td><td>Planning, ownership, due date, provenance, revision protection.</td></tr>
+    <tr><td>Checklist items</td><td>Ordered item text, pending/followed/not-followed status, reason, notes, reviewer and review time.</td><td>Step-level execution evidence and exceptions.</td></tr>
+    <tr><td>Suggestions</td><td>Recommendation title/description, steps, resources and estimated timeline.</td><td>Preserve the recommendation that originated the plan.</td></tr>
+    <tr><td>Activity/history</td><td>Actor, event, old/new status, notes, timestamps.</td><td>Audit trail and accountability.</td></tr>
+    <tr><td>Links</td><td>Mitigation actions and visits.</td><td>Connect planning to operational work and field confirmation.</td></tr>
+    </tbody>
+</table>
+
+<h3>7.3 Status lifecycle</h3>
+<div class="flow">
+    <div class="box">Pending<br><span class="small">created and awaiting work</span></div><div class="arrow">→</div>
+    <div class="box">In progress<br><span class="small">at least one item reviewed</span></div><div class="arrow">→</div>
+    <div class="box">Submitted<br><span class="small">all items reviewed</span></div>
+</div>
+<div class="flow">
+    <div class="box wide">Confirmed<br><span class="small">accepted as completed/reviewed</span></div><div class="arrow">or</div>
+    <div class="box wide">Rejected<br><span class="small">returned or not accepted</span></div>
+</div>
+<p>Updating items can automatically move a pending checklist to in progress and, when every item has been reviewed, to submitted. A user may explicitly confirm, reject, return to in progress, or submit when validation requirements are satisfied.</p>
+
+<h3>7.4 Validation and governance</h3>
+<ul>
+    <li>Manual create/edit requires a plan title, description, success indicator, priority, valid status, target date and 1–50 checklist items.</li>
+    <li>Barangay, risk area and assignee must belong to the authorized station scope.</li>
+    <li>Every item must be reviewed before submitted/confirmed.</li>
+    <li>An item marked not followed must have a reason.</li>
+    <li>Submission/confirmation requires assignment and a target date.</li>
+    <li>If the linked analysis evidence score is below 45, confirmation requires a note explaining why approval is safe.</li>
+    <li>Editing a previously submitted, confirmed or rejected checklist resets review metadata and returns it to pending.</li>
+    <li>Regeneration reconciles by source signature. Operationally used records are protected and can be flagged for revision review instead of being overwritten.</li>
+</ul>
+
+<h3>7.5 Checklist outputs</h3>
+<p>The Chief/Station Admin sees status counts, priorities, overdue items, assignment, item progress, confirmation controls and history. Barangay and firefighter workflows can review assigned items. The Mitigation page can select checklist items and generate an editable mitigation draft. Later prediction runs receive aggregate checklist totals, confirmed weighted completion and followed-item ratios.</p>
+
+<h2 class="page-break">8. Mitigation: generation, approval, execution, and verification</h2>
+<h3>8.1 Four entry paths</h3>
+<table>
+    <thead><tr><th>Entry path</th><th>How the draft is produced</th><th>Saved immediately?</th></tr></thead>
+    <tbody>
+    <tr><td>Checklist transformation</td><td>Selected stored checklist items are transformed into title, category, priority, description, baseline, expected result, remarks and recommended actions.</td><td>No. JSON explicitly says nothing has been saved yet.</td></tr>
+    <tr><td>System risk suggestion</td><td>Rule-based scan of predicted risk clusters, approved hazard/risk evidence, historical incidents and station resource context creates a reviewable checklist-style suggestion.</td><td>Suggestion is saved; no official mitigation action exists until approval/conversion.</td></tr>
+    <tr><td>Direct linked creation</td><td>Chief creates an action linked to a prediction checklist or risk/hazard record.</td><td>Yes, after validation.</td></tr>
+    <tr><td>Manual creation</td><td>Chief enters a plan without upstream links.</td><td>Yes, after validation.</td></tr>
+    </tbody>
+</table>
+<div class="callout blue"><strong>Terminology note:</strong> the checklist transformation is labeled “AI-Assisted,” but the current service performs a deterministic transformation of stored text and explicitly makes no additional AI request. The Chief/Station Admin must review and edit the result before saving.</div>
+
+<h3>8.2 System-generated mitigation suggestions</h3>
+<p>A manual refresh scans predicted risk areas in station coverage. A suggestion requires a primary risk area and barangay. Category is inferred from factors such as blocked hydrant, poor access, electrical/wiring condition, LPG/gas condition, combustible material, informal settlement or cooking activity. It includes local drivers, verified-record and historical-incident counts, support points, team/personnel/crew/hydrant/active-incident resource context, operational tasks, and a target date: seven days for high, fourteen for medium, and thirty otherwise.</p>
+<p>Duplicate protection uses a stable signature combining risk area and category, locks the risk area during creation, preserves existing suggestions, and skips creation when an open action for that risk/category already exists.</p>
+
+<h3>8.3 Official mitigation record</h3>
+<table>
+    <thead><tr><th>Information group</th><th>Examples</th></tr></thead>
+    <tbody>
+    <tr><td>Scope and provenance</td><td>Barangay/stationwide/citywide, station and city ownership, risk area, prediction checklist, AI action-plan checklist, source type.</td></tr>
+    <tr><td>Plan definition</td><td>Title, category, priority, description, baseline condition, expected result, target date, remarks.</td></tr>
+    <tr><td>Ownership</td><td>Responsible team and/or user, creator, approver, reviewer.</td></tr>
+    <tr><td>Execution</td><td>Status, implementation notes, blocked reason, progress snapshot.</td></tr>
+    <tr><td>Proof and result</td><td>Attachments, completion notes, actual outcome, effectiveness, completion request/decision.</td></tr>
+    <tr><td>Verification and continuation</td><td>Verification date/person, follow-up flag/date/notes.</td></tr>
+    <tr><td>Governance</td><td>Activities, revision number/review flag, manually edited flag, timestamps.</td></tr>
+    </tbody>
+</table>
+
+<h3>8.4 Categories and priorities</h3>
+<p>Categories are Electrical Safety, Water Supply, Response Readiness, Access &amp; Routing, Inspection &amp; Enforcement, Community Prevention, Evacuation &amp; Life Safety, High-Risk Area Monitoring, Environmental Preparedness, and Other. Priorities are Critical, High, Medium and Low.</p>
+
+<h3>8.5 Status and completion lifecycle</h3>
+<div class="flow">
+    <div class="box">Draft / Planned</div><div class="arrow">→</div>
+    <div class="box">Approved</div><div class="arrow">→</div>
+    <div class="box">In progress</div>
+</div>
+<div class="flow">
+    <div class="box">Blocked<br><span class="small">reason required</span></div><div class="arrow">↔</div>
+    <div class="box">Completion requested<br><span class="small">remains in progress pending review</span></div><div class="arrow">→</div>
+    <div class="box">Completed<br><span class="small">Chief approved</span></div>
+</div>
+<p>Cancelled is also available to station command. To reach approved, in progress, blocked or completed, the action needs a responsible team/person and target date. Blocked requires a reason. Direct Chief completion requires completion notes, an actual outcome, a non-pending effectiveness evaluation, and at least one proof attachment.</p>
+
+<h3>8.6 Firefighter/barangay completion review</h3>
+<ol>
+    <li>The assigned firefighter or barangay user records implementation notes and chooses in progress, blocked, or completed.</li>
+    <li>Blocked requires a blocker. Completion requires completion notes, outcome, effectiveness and proof.</li>
+    <li>A “completed” submission is stored as <code>in_progress</code> with <code>completion_approval_status=pending</code>; it does not close itself.</li>
+    <li>The Chief/Station Admin verifies proof and outcome, then approves or rejects.</li>
+    <li>Approval changes status to completed and stores decision/verification metadata. Rejection returns the action to in progress.</li>
+</ol>
+
+<h3>8.7 Files and audit output</h3>
+<p>Up to five attachments per request are accepted: JPG/JPEG, PNG, WebP, PDF, DOC or DOCX, up to 10 MB each. Files are stored on the configured Supabase disk; metadata records filename, MIME type, size and photo/proof type. Every create, progress update, command edit, completion request, approval or rejection writes activity data and user activity logs.</p>
+
+<h2 class="page-break">9. How the three modules connect</h2>
+<table>
+    <thead><tr><th>From</th><th>Connection key/data</th><th>To</th><th>Result</th></tr></thead>
+    <tbody>
+    <tr><td>Prediction</td><td><code>analysis_id</code>, recommendation index/signature, station/barangay/risk scope</td><td>Checklist</td><td>Recommendation becomes a stored, assignable plan.</td></tr>
+    <tr><td>Checklist</td><td><code>ai_action_plan_checklist_id</code> and selected item IDs</td><td>Mitigation draft</td><td>Task text becomes an editable official-action proposal.</td></tr>
+    <tr><td>Risk/hazard evidence</td><td><code>risk_area_id</code> and predicted risk cluster</td><td>Mitigation suggestion/action</td><td>Plan remains traceable to field conditions.</td></tr>
+    <tr><td>Mitigation action</td><td>Linked checklist ID and status</td><td>Checklist</td><td>Approved/in-progress/blocked actions move pending checklists to in progress; completed action can move an unfinished checklist to submitted.</td></tr>
+    <tr><td>Checklist/mitigation results</td><td>Confirmed/followed/completed/open/blocked ratios and duration</td><td>Next prediction payload</td><td>Operational readiness and workflow feedback become future features.</td></tr>
+    </tbody>
+</table>
+
+<h3>9.1 Closed-loop sequence</h3>
+<ol>
+    <li><strong>Observe:</strong> incidents, weather and verified field conditions enter the database.</li>
+    <li><strong>Predict:</strong> records are scoped, transformed into features and evaluated by the model or fallback.</li>
+    <li><strong>Explain:</strong> results expose probability, counts, drivers, provenance and evidence quality.</li>
+    <li><strong>Plan:</strong> recommendations become assigned, dated checklists.</li>
+    <li><strong>Act:</strong> selected tasks become reviewed mitigation actions.</li>
+    <li><strong>Prove:</strong> personnel record progress, blockers, attachments, outcome and effectiveness.</li>
+    <li><strong>Approve:</strong> station command accepts or returns completion.</li>
+    <li><strong>Learn operationally:</strong> summarized completion/readiness features enter later prediction payloads.</li>
+</ol>
+<div class="callout gray"><strong>This is feedback, not automatic causality.</strong> The model can use completion history as a preparedness signal, but a completed record alone does not prove that a specific hazard was eliminated or that the next forecast must fall.</div>
+
+<h2>10. Failure and fallback behavior</h2>
+<table>
+    <thead><tr><th>Failure</th><th>System behavior</th><th>Visible/audit consequence</th></tr></thead>
+    <tbody>
+    <tr><td>Python model/runtime unavailable</td><td>Use deterministic barangay fallback.</td><td>Prediction source is marked fallback; model confidence is lower.</td></tr>
+    <tr><td>OpenRouter prediction/recommendation unavailable</td><td>Use data-driven analysis/recommendations.</td><td><code>ai_source=false</code> and warning/failure message are stored in the result.</td></tr>
+    <tr><td>Insufficient stored daily weather</td><td>Analytics uses the live/cached Open-Meteo forecast from station or coverage coordinates.</td><td>Weather remains Open-Meteo sourced, with cache/staleness metadata.</td></tr>
+    <tr><td>Open-Meteo forecast temporarily fails</td><td>Forecast service may use the last successful cached result for up to 72 hours.</td><td>Cache/staleness metadata and warning are available.</td></tr>
+    <tr><td>Checklist AI JSON invalid/disabled</td><td>Create deterministic recommendation-backed tasks.</td><td>Checklist records still exist and debug metadata records fallback use.</td></tr>
+    <tr><td>Analysis/checklist persistence fails</td><td>Roll back the transaction and return an error.</td><td>The frontend is told the analysis could not be saved; partial workflow artifacts are avoided.</td></tr>
+    <tr><td>Mitigation draft generated from checklist</td><td>Return editable JSON only.</td><td>No official action exists until the user reviews and submits the form.</td></tr>
+    <tr><td>Completion lacks proof/outcome/evaluation</td><td>Reject validation or Chief approval.</td><td>Action remains open/pending correction.</td></tr>
+    </tbody>
+</table>
+
+<h2 class="page-break">11. Illustrative end-to-end example</h2>
+<p class="muted">The values below are hypothetical and explain movement only; they are not a live forecast.</p>
+<ol>
+    <li><strong>Input:</strong> Barangay A has historical positive fire rows, two recent closed fires, a verified blocked hydrant, combustible materials, difficult road access, hot/dry weather, and one incomplete high-priority checklist.</li>
+    <li><strong>Feature construction:</strong> historical count, recent momentum, blocked-hydrant count, combustible count, poor-access count, weather features and incomplete readiness all enter the barangay payload. Weather-only historical rows contribute weather but zero fires.</li>
+    <li><strong>Prediction:</strong> the model returns a high-risk probability, predicted incident count, possible damage estimate and local drivers. If the model cannot run, the deterministic formula uses the same evidence groups and marks the result as fallback.</li>
+    <li><strong>Calibration:</strong> current observed fires and prior same-month counts constrain the expected total. The UI shows observed-to-date, additional expected fires and the month planning range separately.</li>
+    <li><strong>Recommendation:</strong> the narrative recommends restoring water access, clearing emergency routes and inspecting combustible storage, grounded in the supplied drivers.</li>
+    <li><strong>Checklist:</strong> a high-priority plan is stored for Barangay A with ordered tasks, owner, target date and success indicator. Personnel mark each item followed/not followed and explain exceptions.</li>
+    <li><strong>Mitigation draft:</strong> selected hydrant/access tasks are transformed into an editable Water Supply or Access &amp; Routing plan. Nothing is saved until the Chief approves the form.</li>
+    <li><strong>Execution:</strong> the assigned team records inspection, repairs/coordination, implementation notes and proof photos/documents. If work is blocked, it records the reason.</li>
+    <li><strong>Completion:</strong> firefighter/barangay submission requests completion. Chief verifies proof and actual outcome, evaluates effectiveness, then approves or returns it.</li>
+    <li><strong>Next run:</strong> checklist confirmation, followed-item ratio, mitigation completion/open/blocked state and completion duration become readiness features. The underlying hazard score is not automatically reduced without measured evidence.</li>
+</ol>
+
+<h2>12. Roles, scoping, validation, and accountability</h2>
+<table>
+    <thead><tr><th>Control</th><th>Implementation effect</th></tr></thead>
+    <tbody>
+    <tr><td>Authentication</td><td>Prediction and management operations derive the user's station from station-officer membership.</td></tr>
+    <tr><td>Jurisdiction</td><td>Barangays must be in station coverage; risk/checklist links must belong to the chosen barangay.</td></tr>
+    <tr><td>Assignment</td><td>Responsible team/person must belong to the station.</td></tr>
+    <tr><td>Input validation</td><td>Enumerated statuses/categories/priorities, lengths, dates, booleans, file types/sizes, and relationship IDs are server-validated.</td></tr>
+    <tr><td>Evidence controls</td><td>Prediction uses approved/verified field records; completion requires proof and actual outcome/effectiveness.</td></tr>
+    <tr><td>Revision controls</td><td>Current revision is shown by default; regeneration protects records that already contain operational work.</td></tr>
+    <tr><td>Auditability</td><td>Checklist and mitigation activities preserve actor, state transition, notes and timestamps; user activity logging records command actions.</td></tr>
+    </tbody>
+</table>
+
+<h2>13. Data lineage and principal records</h2>
+<table>
+    <thead><tr><th>Record/service</th><th>Role in the pipeline</th></tr></thead>
+    <tbody>
+    <tr><td><code>analysis</code> / <code>Analysis</code></td><td>Saved prediction scope, risk, confidence/evidence, raw analysis, recommendations, predictions, incident count, probability and revision.</td></tr>
+    <tr><td><code>ai_action_plan_checklists</code></td><td>Plan header and links from analysis/recommendation to station/barangay/risk.</td></tr>
+    <tr><td><code>ai_action_plan_checklist_items</code></td><td>Normalized ordered work steps and review outcomes.</td></tr>
+    <tr><td>Recommendation suggestion rows</td><td>Recommendation detail, steps, resources and timeline linked to the plan.</td></tr>
+    <tr><td><code>mitigation_actions</code></td><td>Official mitigation ownership, lifecycle, outcomes, approvals, verification, follow-up and upstream links.</td></tr>
+    <tr><td>Mitigation attachments/activities</td><td>Proof metadata and status/action audit history.</td></tr>
+    <tr><td><code>daily_weather_contexts</code></td><td>Stored, completed-day Open-Meteo summaries used before live fallback.</td></tr>
+    <tr><td><code>PredictionFeedbackSignalService</code></td><td>Converts checklist and mitigation history into per-barangay model features.</td></tr>
+    <tr><td><code>ChecklistMitigationDraftService</code></td><td>Deterministically transforms selected stored checklist items into an editable mitigation draft.</td></tr>
+    </tbody>
+</table>
+
+<h2 class="page-break">14. Technical reference</h2>
+<table>
+    <thead><tr><th>Concern</th><th>Primary implementation</th></tr></thead>
+    <tbody>
+    <tr><td>Prediction orchestration, feature assembly, calibration, confidence, analysis persistence, checklist generation</td><td><code>app/Http/Controllers/Chief/AnalyticController.php</code></td></tr>
+    <tr><td>Barangay model runtime</td><td><code>app/Services/BarangayPredictionService.php</code> and <code>capstone-ai</code> runtime/model artifacts.</td></tr>
+    <tr><td>Model metadata</td><td><code>capstone-ai/fire_model_metadata.json</code></td></tr>
+    <tr><td>Weather collection/forecast/cache</td><td><code>app/Services/DailyWeatherContextService.php</code></td></tr>
+    <tr><td>Checklist/mitigation feedback features</td><td><code>app/Services/PredictionFeedbackSignalService.php</code></td></tr>
+    <tr><td>Checklist-to-mitigation transformation</td><td><code>app/Services/ChecklistMitigationDraftService.php</code></td></tr>
+    <tr><td>Chief mitigation page, validation, suggestion scan, CRUD, completion review</td><td><code>app/Http/Controllers/Chief/StationAdminController.php</code></td></tr>
+    <tr><td>Firefighter mitigation progress</td><td><code>app/Http/Controllers/Firefighter/BarangayCooperationController.php</code></td></tr>
+    <tr><td>Barangay checklist and mitigation progress</td><td><code>app/Http/Controllers/Barangay/BarangayDashboardController.php</code></td></tr>
+    <tr><td>Chief screens</td><td><code>resources/views/chief/analytics.blade.php</code>, <code>course-checklists.blade.php</code>, and <code>mitigations.blade.php</code></td></tr>
+    </tbody>
+</table>
+
+<h3>14.1 Principal routes</h3>
+<ul>
+    <li>Prediction: <code>POST /api/station-admin/predictions</code>, then <code>GET /api/station-admin/predictions/{runId}</code>.</li>
+    <li>Retraining: <code>POST /api/retrain-forecast-model</code>, then poll <code>GET /api/retrain-forecast-model/{trainingId}</code>. Python emits exact machine-readable checkpoints for loading, feature preparation, splitting, classification, validation, regression and artifact writing; the frontend animates the progress bar between those reported values.</li>
+    <li>Training history: <code>GET /api/retrain-forecast-model-history</code> returns the authenticated user's latest attempts retained for 30 days, with status, dataset size, accuracy, ROC AUC and damage-regression R² when available.</li>
+    <li>Checklist page and CRUD/review: <code>/course-checklists</code> and <code>/api/action-plan-checklists...</code>.</li>
+    <li>Mitigation page, suggestion refresh, checklist draft, save/update and completion review: <code>/mitigations...</code> within Chief/Station Admin route groups.</li>
+    <li>Barangay and firefighter progress routes are separately role-protected and scope-filtered.</li>
+</ul>
+
+<h2>15. Glossary</h2>
+<table>
+    <tbody>
+    <tr><td class="term">Analysis</td><td>A saved prediction run with scope, evidence, outputs and revision.</td></tr>
+    <tr><td class="term">Barangay-month</td><td>One barangay evaluated for one calendar month; the unit of the trained classification target.</td></tr>
+    <tr><td class="term">Driver</td><td>A factor used to explain why a particular forecast rose or fell.</td></tr>
+    <tr><td class="term">Evidence provenance</td><td>Trace information showing which historical, weather, incident and verified-field records supported the result.</td></tr>
+    <tr><td class="term">Fallback</td><td>A deterministic, marked calculation used when the trained model or narrative AI is unavailable.</td></tr>
+    <tr><td class="term">Mitigation</td><td>A controlled preventive or preparedness action with owner, deadline, proof, outcome and review.</td></tr>
+    <tr><td class="term">Readiness signal</td><td>Summary of checklist/mitigation execution used as operational context and future model input.</td></tr>
+    <tr><td class="term">Risk area</td><td>A verified/approved field record describing a localized risk or hazard and its conditions.</td></tr>
+    <tr><td class="term">Source signature</td><td>A stable identifier used to reconcile generated plans and avoid duplicates/overwrites.</td></tr>
+    </tbody>
+</table>
+
+<h2>16. Final interpretation checklist for evaluators</h2>
+<ul>
+    <li>Was the analysis station/barangay and time scope stated?</li>
+    <li>Were observed fires kept separate from forecast additions?</li>
+    <li>Was the prediction source identified as trained model or deterministic fallback?</li>
+    <li>Were probability, operational score and evidence quality treated as different measures?</li>
+    <li>Were local drivers and evidence freshness/provenance reviewed?</li>
+    <li>Was the recommendation converted into owned, dated, reviewable tasks?</li>
+    <li>Was mitigation saved only after human review?</li>
+    <li>Did completion include proof, outcome, effectiveness and command approval?</li>
+    <li>Was readiness feedback treated as context—not automatic proof of hazard reduction?</li>
+</ul>
+
+<div class="callout green"><strong>One-sentence system explanation:</strong> PyroSense turns authorized operational, historical, environmental and field evidence into a traceable barangay risk outlook, converts that outlook into assignable checklists, governs preventive work through evidence-based mitigation approval, and returns verified workflow results as readiness context for the next prediction cycle.</div>
+
+</body>
+</html>
