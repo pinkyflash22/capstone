@@ -862,6 +862,26 @@ function updateTruckMarkerFromRealtimeLocation(routeId, location) {
     updateTruckTraveledPath(truck, location.lat, location.lng);
     maybeRerouteNavigation(routeId, location).catch(error => console.warn('Navigation reroute failed:', error));
 
+    const distanceToIncident = truck.routeDestination
+        ? calculateDistanceBetweenPoints(
+            location.lat,
+            location.lng,
+            truck.routeDestination.lat,
+            truck.routeDestination.lng
+        )
+        : Infinity;
+
+    // Do not queue another "moving" write once the GPS position is already
+    // within the arrival radius. That late write could otherwise race the
+    // completion request and make the route appear active again.
+    if (truck.persisted !== false && distanceToIncident <= 50) {
+        finalizeTruckArrival(routeId, location.lat, location.lng).catch((error) => {
+            console.error('Failed to sync realtime truck arrival status:', error);
+        });
+        updateRouteInfoCard();
+        return true;
+    }
+
     const progressPercent = truck.simulationPoints?.length
         ? Math.min((truck.currentPointIndex / Math.max(truck.simulationPoints.length - 1, 1)) * 100, 100)
         : 0;
@@ -9079,12 +9099,12 @@ async function finalizeTruckArrival(routeId, lat = null, lng = null) {
     truck.onSceneStatusSent = true;
     truck.routeStatusSyncInFlight = true;
 
-    const progress = truck.simulationPoints?.length
-        ? (truck.currentPointIndex / truck.simulationPoints.length) * 100
-        : 100;
+    if (truck.simulationPoints?.length) {
+        truck.currentPointIndex = truck.simulationPoints.length - 1;
+    }
 
     try {
-        await updateRouteStatus(routeId, 'inactive', truck.currentPointIndex, finalLat, finalLng, progress);
+        await updateRouteStatus(routeId, 'inactive', truck.currentPointIndex, finalLat, finalLng, 100);
     } catch (error) {
         truck.arrivalHandled = false;
         truck.onSceneStatusSent = false;

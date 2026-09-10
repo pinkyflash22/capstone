@@ -114,25 +114,9 @@
                     <i class="fa-solid fa-fire-hydrant"></i>
                     Hydrants
                 </button>
-                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="incidents">
-                    <i class="fa-solid fa-fire-flame-curved"></i>
-                    Incidents
-                </button>
-                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="barangay">
-                    <i class="fa-solid fa-people-roof"></i>
-                    Barangay
-                </button>
-                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="risks">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    Risk areas
-                </button>
-                <button type="button" class="mobile-map-modal__chip" data-mobile-map-filter="other">
-                    <i class="fa-solid fa-location-dot"></i>
-                    Other
-                </button>
             </div>
             <div id="mobileMapPreview" class="mobile-map-modal__map"></div>
-            <p class="mobile-map-modal__hint">Preview only: resources, incidents, boundaries, and fire-risk areas. No firefighter routes shown.</p>
+            <p class="mobile-map-modal__hint">Public preview of station and hydrant records. Operational incident details remain available only to authorized users.</p>
         </section>
     </div>
 
@@ -170,18 +154,18 @@
             <div class="hero-grid">
                 <div class="hero-content reveal-on-scroll" data-reveal="left">
                     <div class="hero-badge reveal-on-scroll" data-reveal="up" data-reveal-delay="0">
-                        <i class="fa-solid fa-shield"></i>
-                        Trusted by 25+ Municipalities
+                        <span class="live-dot" aria-hidden="true"></span>
+                        Live PyroSense operational map
                     </div>
                     
                     <h1 class="hero-title reveal-on-scroll" data-reveal="up" data-reveal-delay="120">
-                        Find Your Nearest<br>
-                        <span>Fire Station</span> Instantly
+                        Fire response data,<br>
+                        <span>grounded in your community.</span>
                     </h1>
                     
                     <p class="hero-description reveal-on-scroll" data-reveal="up" data-reveal-delay="200">
-                        Real-time location tracking, emergency alerts, and quick access 
-                        to fire stations and hydrants in Pangasinan. Your safety is our priority.
+                        Explore verified records already stored in PyroSense—from mapped stations and hydrants
+                        to reported incidents—then find the closest available public resource.
                     </p>
 
                     <div class="hero-actions reveal-on-scroll" data-reveal="up" data-reveal-delay="240">
@@ -226,25 +210,65 @@
                     <!-- Stats -->
                     <div class="stats-grid">
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="340">
-                            <div class="stat-value" id="totalStations">{{ $totalStations ?? 0 }}</div>
-                            <div class="stat-label">Active Stations</div>
+                            <div class="stat-icon"><i class="fa-solid fa-building-shield"></i></div>
+                            <div><div class="stat-value" id="totalStations">{{ number_format($totalStations ?? 0) }}</div>
+                            <div class="stat-label">Mapped stations</div></div>
                         </div>
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="420">
-                            <div class="stat-value" id="totalHydrants">{{ $totalHydrants ?? 0 }}</div>
-                            <div class="stat-label">Fire Hydrants</div>
+                            <div class="stat-icon"><i class="fa-solid fa-fire-hydrant"></i></div>
+                            <div><div class="stat-value" id="totalHydrants">{{ number_format($totalHydrants ?? 0) }}</div>
+                            <div class="stat-label">Mapped hydrants</div></div>
                         </div>
                         <div class="stat-card reveal-on-scroll" data-reveal="up" data-reveal-delay="500">
-                            <div class="stat-value">24/7</div>
-                            <div class="stat-label">Emergency</div>
+                            <div class="stat-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                            <div><div class="stat-value">{{ number_format($totalIncidents ?? 0) }}</div>
+                            <div class="stat-label">Incident records</div></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="hero-image reveal-on-scroll hero-parallax-target" data-reveal="right">
-                    <img src="https://images.unsplash.com/photo-1582139329536-e7284fece509?w=800" alt="Firefighter">
+                <div class="hero-image reveal-on-scroll hero-parallax-target" data-reveal="right" data-parallax data-parallax-speed="0.075">
+                    <span class="hero-orbit hero-orbit--one" data-parallax data-parallax-speed="-0.04" aria-hidden="true"></span>
+                    <span class="hero-orbit hero-orbit--two" data-parallax data-parallax-speed="0.12" aria-hidden="true"></span>
+                    <div class="landing-slider" data-landing-slider aria-label="Featured BFP media">
+                        <div class="landing-slider__track">
+                            @forelse($landingSlides ?? [] as $slide)
+                                <article class="landing-slider__slide {{ $loop->first ? 'is-active' : '' }}" data-landing-slide aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
+                                    @if($slide->type === 'video')
+                                        <video class="landing-slider__media" src="{{ $slide->media_url }}" @if($slide->poster_url) poster="{{ $slide->poster_url }}" @endif muted playsinline controls preload="metadata"></video>
+                                        <span class="landing-slider__kind"><i class="fa-solid fa-play"></i> Featured video</span>
+                                    @else
+                                        <img class="landing-slider__media" src="{{ $slide->media_url }}" alt="{{ $slide->title }}" {{ $loop->first ? 'fetchpriority=high' : 'loading=lazy' }}>
+                                    @endif
+                                    <div class="landing-slider__caption">
+                                        <h2>{{ $slide->title }}</h2>
+                                        @if($slide->subtitle)<p>{{ $slide->subtitle }}</p>@endif
+                                        @if($slide->button_label && $slide->button_url)
+                                            <a href="{{ $slide->button_url }}" class="landing-slider__link" @if(str_starts_with($slide->button_url, 'http')) target="_blank" rel="noopener noreferrer" @endif>{{ $slide->button_label }} <i class="fa-solid fa-arrow-right"></i></a>
+                                        @endif
+                                    </div>
+                                </article>
+                            @empty
+                                <article class="landing-slider__slide is-active" data-landing-slide aria-hidden="false">
+                                    <img class="landing-slider__media" src="https://images.unsplash.com/photo-1582139329536-e7284fece509?w=800" alt="Firefighter" fetchpriority="high">
+                                    <div class="landing-slider__caption"><h2>Prepared when every second matters.</h2><p>Public safety resources, connected through PyroSense.</p></div>
+                                </article>
+                            @endforelse
+                        </div>
+                        @if(($landingSlides ?? collect())->count() > 1)
+                            <button type="button" class="landing-slider__arrow landing-slider__arrow--prev" data-slider-prev aria-label="Previous slide"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button type="button" class="landing-slider__arrow landing-slider__arrow--next" data-slider-next aria-label="Next slide"><i class="fa-solid fa-chevron-right"></i></button>
+                            <div class="landing-slider__dots" role="tablist" aria-label="Choose featured media">
+                                @foreach($landingSlides as $slide)<button type="button" class="landing-slider__dot {{ $loop->first ? 'is-active' : '' }}" data-slider-dot="{{ $loop->index }}" aria-label="Show slide {{ $loop->iteration }}"></button>@endforeach
+                            </div>
+                        @endif
+                    </div>
                     <div class="hero-image-badge">
-                        <p><i class="fa-solid fa-check-circle" style="color: #dc2626;"></i> 4.2min Average Response</p>
-                        <small>Across all stations</small>
+                        <span class="hero-image-badge__icon"><i class="fa-solid fa-database"></i></span>
+                        <span>
+                            <p>Connected to system records</p>
+                            <small>{{ $latestRecordAt ? 'Latest update '.\Illuminate\Support\Carbon::parse($latestRecordAt)->diffForHumans() : 'Waiting for the first record' }}</small>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -257,8 +281,7 @@
             <div class="section-header reveal-on-scroll" data-reveal="up">
                 <h2 class="section-title">Emergency Resources Locator</h2>
                 <p class="section-subtitle">
-                    Interactive map showing stations, hydrants, incidents, barangay halls, risk areas, boundaries, and other resources. 
-                    Click on any marker for details.
+                    Browse current public station and hydrant records from PyroSense. Click any marker for the details available in its source record.
                 </p>
             </div>
 
@@ -275,22 +298,6 @@
                 <button class="map-toggle-btn" type="button" data-landing-map-filter="hydrants">
                     <i class="fa-solid fa-fire-hydrant"></i>
                     Hydrants
-                </button>
-                <button class="map-toggle-btn" type="button" data-landing-map-filter="incidents">
-                    <i class="fa-solid fa-fire-flame-curved"></i>
-                    Incidents
-                </button>
-                <button class="map-toggle-btn" type="button" data-landing-map-filter="barangay">
-                    <i class="fa-solid fa-people-roof"></i>
-                    Barangay
-                </button>
-                <button class="map-toggle-btn" type="button" data-landing-map-filter="risks">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    Risk areas
-                </button>
-                <button class="map-toggle-btn" type="button" data-landing-map-filter="other">
-                    <i class="fa-solid fa-location-dot"></i>
-                    Other
                 </button>
             </div>
 
@@ -319,50 +326,51 @@
     <section class="features">
         <div class="container">
             <div class="section-header reveal-on-scroll" data-reveal="up">
-                <h2 class="section-title">Our Services</h2>
+                <span class="section-kicker">Built from operational records</span>
+                <h2 class="section-title">What you can do in PyroSense</h2>
                 <p class="section-subtitle">
-                    Comprehensive fire protection and emergency response services
+                    These tools use the same mapped resources and reports maintained inside the platform.
                 </p>
             </div>
 
             <div class="features-grid">
-                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="0" onclick="openAboutModal('rapidResponse')">
+                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="0" data-parallax data-parallax-speed="0.018">
                     <div class="feature-icon">
                         <i class="fa-solid fa-truck"></i>
                     </div>
-                    <h3 class="feature-title">Rapid Response</h3>
+                    <h3 class="feature-title">Report an incident</h3>
                     <p class="feature-description">
-                        Emergency dispatch within minutes with real-time tracking and optimized routing.
+                        Send a fire report anonymously with a map location and supporting details.
                     </p>
                 </div>
 
-                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="100" onclick="openAboutModal('prevention')">
+                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="100" data-parallax data-parallax-speed="-0.014">
                     <div class="feature-icon">
-                        <i class="fa-solid fa-user"></i>
+                        <i class="fa-solid fa-map-location-dot"></i>
                     </div>
-                    <h3 class="feature-title">Fire Prevention</h3>
+                    <h3 class="feature-title">Locate resources</h3>
                     <p class="feature-description">
-                        Regular inspections, safety audits, and community education programs.
+                        Browse the station and hydrant records approved for the public map.
                     </p>
                 </div>
 
-                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="180" onclick="openAboutModal('medical')">
+                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="180" data-parallax data-parallax-speed="0.012">
                     <div class="feature-icon">
-                        <i class="fa-solid fa-kit-medical"></i>
+                        <i class="fa-solid fa-location-crosshairs"></i>
                     </div>
-                    <h3 class="feature-title">Emergency Medical</h3>
+                    <h3 class="feature-title">Find the nearest station</h3>
                     <p class="feature-description">
-                        First response medical assistance and rescue operations.
+                        Use your location to sort real station records by straight-line distance.
                     </p>
                 </div>
 
-                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="260" onclick="openAboutModal('training')">
+                <div class="feature-card reveal-on-scroll" data-reveal="up" data-reveal-delay="260" data-parallax data-parallax-speed="-0.018">
                     <div class="feature-icon">
-                        <i class="fa-solid fa-graduation-cap"></i>
+                        <i class="fa-solid fa-shield-halved"></i>
                     </div>
-                    <h3 class="feature-title">Safety Training</h3>
+                    <h3 class="feature-title">Access your dashboard</h3>
                     <p class="feature-description">
-                        Fire safety seminars and certification programs for communities.
+                        Sign in to view the tools and records available for your assigned role.
                     </p>
                 </div>
             </div>
@@ -372,9 +380,9 @@
     <!-- CTA Section -->
     <section class="cta">
         <div class="container reveal-on-scroll" data-reveal="up">
-            <h2 class="cta-title">Ready to Ensure Your Safety?</h2>
+            <h2 class="cta-title">One map. Real records. Faster context.</h2>
             <p class="cta-description">
-                Join thousands of residents using PyroSense for real-time fire alerts and emergency response.
+                Open the public resource map now, or sign in to continue to your PyroSense workspace.
             </p>
             <div class="cta-buttons">
                 <a href="{{ route('auth.login') }}" class="btn-primary">
@@ -393,51 +401,39 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-grid reveal-on-scroll" data-reveal="up">
-                <!-- Emergency Contact -->
                 <div class="footer-col">
                     <h4>Emergency</h4>
                     <ul class="footer-links">
                         <li><a href="tel:911" data-emergency-call data-pyro-landing-agora-call><i class="fa-solid fa-phone-alt"></i> 911 (Emergency)</a></li>
-                        <li><a href="tel:+63253091234"><i class="fa-solid fa-phone"></i> (075) 530-1234</a></li>
-                        <li><a href="mailto:emergency@pyrosense.gov"><i class="fa-solid fa-envelope"></i> emergency@pyrosense.gov</a></li>
+                        <li><a href="tel:09171891611"><i class="fa-solid fa-phone"></i> 0917-189-1611 (Urbiztondo FS)</a></li>
                     </ul>
                 </div>
 
-                <!-- About -->
                 <div class="footer-col">
-                    <h4>About</h4>
+                    <h4>Platform</h4>
                     <ul class="footer-links">
-                        <li><a href="#" onclick="openAboutModal('history'); return false;"><i class="fa-solid fa-timeline"></i> Our History</a></li>
-                        <li><a href="#" onclick="openAboutModal('mission'); return false;"><i class="fa-solid fa-bullseye"></i> Mission & Vision</a></li>
-                        <li><a href="#" onclick="openAboutModal('leadership'); return false;"><i class="fa-solid fa-users"></i> Leadership</a></li>
-                        <li><a href="#" onclick="openAboutModal('careers'); return false;"><i class="fa-solid fa-briefcase"></i> Careers</a></li>
+                        <li><a href="#map"><i class="fa-solid fa-map"></i> Resource map</a></li>
+                        <li><a href="{{ route('auth.login') }}"><i class="fa-solid fa-right-to-bracket"></i> Sign in</a></li>
                         <li><a href="#" onclick="openAboutModal('faq'); return false;"><i class="fa-solid fa-question-circle"></i> FAQ</a></li>
                     </ul>
                 </div>
 
-                <!-- Connect -->
                 <div class="footer-col">
-                    <h4>Connect</h4>
-                    <div class="social-links">
-                        <a href="#" class="social-link"><i class="fa-brands fa-facebook-f"></i></a>
-                        <a href="#" class="social-link"><i class="fa-brands fa-twitter"></i></a>
-                        <a href="#" class="social-link"><i class="fa-brands fa-instagram"></i></a>
-                        <a href="#" class="social-link"><i class="fa-brands fa-linkedin-in"></i></a>
-                    </div>
+                    <h4>Data shown</h4>
+                    <p class="footer-copy">Counts come from PyroSense records. The public map shows current station and hydrant entries without exposing protected operational layers.</p>
                 </div>
 
-                <!-- Locations -->
                 <div class="footer-col">
-                    <h4>Headquarters</h4>
+                    <h4>Public reference</h4>
                     <ul class="footer-links">
-                        <li><i class="fa-solid fa-location-dot"></i> Lingayen, Pangasinan</li>
-                        <li><i class="fa-solid fa-clock"></i> 24/7 Operations</li>
+                        <li><i class="fa-solid fa-location-dot"></i> Urbiztondo, Pangasinan</li>
+                        <li><a href="https://region1.bfp.gov.ph/contact-us/" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> BFP Region 1 directory</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="footer-bottom">
-                <p>© {{ date('Y') }} PyroSense Emergency Response System. All Rights Reserved.</p>
+                <p>&copy; {{ date('Y') }} PyroSense Emergency Response System. Data reflects the latest records available to the platform.</p>
             </div>
         </div>
     </footer>
@@ -457,6 +453,7 @@
                 incoming: @json(route('voice-calls.incoming')),
                 stream: @json(route('voice-calls.stream')),
                 show: @json(url('/voice-calls/__CALL__')),
+                seen: @json(url('/voice-calls/__CALL__/seen')),
                 accept: @json(url('/voice-calls/__CALL__/accept')),
                 reject: @json(url('/voice-calls/__CALL__/reject')),
                 end: @json(url('/voice-calls/__CALL__/end')),

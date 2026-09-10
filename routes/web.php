@@ -47,6 +47,7 @@ use App\Http\Controllers\FsicRequestController;
 
 use App\Http\Controllers\MarkerCategoryController;
 use App\Http\Controllers\LandingPageController;
+use App\Http\Controllers\LandingMediaController;
 use App\Http\Controllers\ResourceManagementController;
 use App\Http\Controllers\RiskAreaReviewController;
 
@@ -139,6 +140,17 @@ Route::get('/api/default-postal/{cityId}', [RegisterController::class, 'getDefau
 Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'bootstrapAnonymousSession'])
     ->middleware('throttle:20,1')
     ->name('voice-calls.anonymous-session');
+
+Route::middleware(['auth', 'prevent.back.history', 'role:station admin,chief,provincial admin'])
+    ->prefix('landing-content')
+    ->name('landing-media.')
+    ->group(function () {
+        Route::get('/', [LandingMediaController::class, 'index'])->name('index');
+        Route::post('/', [LandingMediaController::class, 'store'])->name('store');
+        Route::put('/{landingMedia}', [LandingMediaController::class, 'update'])->name('update');
+        Route::patch('/{landingMedia}/visibility', [LandingMediaController::class, 'toggle'])->name('toggle');
+        Route::delete('/{landingMedia}', [LandingMediaController::class, 'destroy'])->name('destroy');
+    });
 
     //locations based
 Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations'])
@@ -269,6 +281,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/callbacks', [VoiceCallController::class, 'callback'])->name('callback');
         Route::get('/callbacks/incoming', [VoiceCallController::class, 'incomingCallback'])->name('callbacks.incoming');
         Route::get('/{voiceCall}', [VoiceCallController::class, 'show'])->name('show');
+        Route::post('/{voiceCall}/seen', [VoiceCallController::class, 'markSeen'])->name('seen');
         Route::post('/{voiceCall}/accept', [VoiceCallController::class, 'accept'])->name('accept');
         Route::post('/{voiceCall}/accept-callback', [VoiceCallController::class, 'acceptCallback'])->name('accept-callback');
         Route::post('/{voiceCall}/reject-callback', [VoiceCallController::class, 'rejectCallback'])->name('reject-callback');

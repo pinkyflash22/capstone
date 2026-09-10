@@ -39,6 +39,12 @@ class OperationalHealth
         $checks['queue'] = $this->queueStatus();
         $checks['workers'] = $this->workerStatus();
         $checks['backups'] = $this->backupStatus();
+        $applicationFailures = OperationalFailureMonitor::status();
+        $checks['application_failures'] = [
+            'ok' => $applicationFailures['ok'],
+            'latency_ms' => 0,
+            'details' => $applicationFailures,
+        ];
 
         $hasDegradation = collect($checks)->contains(fn ($check) => ! $check['ok']);
 

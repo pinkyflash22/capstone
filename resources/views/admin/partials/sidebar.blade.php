@@ -18,6 +18,7 @@
             'title' => 'Strategic Assets',
             'items' => [
                 ['label' => 'Resources', 'route' => 'admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>'],
+                ['label' => 'Landing Media', 'route' => 'landing-media.index', 'active' => 'landing-media', 'icon' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15l3-3 2 2 3-4 3 5M8 9h.01"/></svg>'],
                 ['label' => 'Barangays', 'route' => 'admin.barangays.index', 'active' => 'barangays', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.6 7-11a7 7 0 1 0-14 0c0 6.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'],
                 ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
                 ['label' => 'Mitigation Control', 'route' => 'admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
@@ -46,6 +47,7 @@
         ['label' => 'Announcements', 'route' => 'admin.announcements', 'active' => 'announcements', 'mobile_icon' => 'campaign'],
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'active' => 'dashboard', 'mobile_icon' => 'dashboard'],
         ['label' => 'Course Checklists', 'route' => 'admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
+        ['label' => 'Landing Media', 'route' => 'landing-media.index', 'active' => 'landing-media', 'mobile_icon' => 'photo_library'],
     ];
 @endphp
 

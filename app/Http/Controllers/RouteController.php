@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Services\OperationalMapScope;
+use App\Support\OperationalFailureMonitor;
 
 class RouteController extends Controller
 {
@@ -177,7 +178,7 @@ class RouteController extends Controller
     public function getActive()
     {
         try {
-            $activeRoutes = $this->visibleRouteQuery()
+            $routes = $this->visibleRouteQuery()
                     ->select($this->activeRouteSelectColumns())
                     ->with([
                         'incident:incident_id,station_id,team_id,status',
@@ -185,7 +186,12 @@ class RouteController extends Controller
                     ])
                     ->whereIn('status', ['active', 'moving'])
                     ->orderBy('created_at', 'desc')
-                    ->get()
+                    ->get();
+
+            $this->reconcileDemoRouteProgress($routes);
+
+            $activeRoutes = $routes
+                    ->filter(fn (Route $route) => $route->isActive())
                     ->map(fn ($route) => $this->transformRouteForFrontend($route))
                     ->values()
                     ->all();
@@ -207,7 +213,7 @@ class RouteController extends Controller
     public function getActiveByIncident($incidentId)
     {
         try {
-            $activeRoutes = $this->visibleRouteQuery()
+            $routes = $this->visibleRouteQuery()
                     ->select($this->activeRouteSelectColumns())
                     ->with([
                         'incident:incident_id,station_id,team_id,status',
@@ -216,7 +222,12 @@ class RouteController extends Controller
                     ->where('incident_id', $incidentId)
                     ->whereIn('status', ['active', 'moving'])
                     ->orderBy('created_at', 'desc')
-                    ->get()
+                    ->get();
+
+            $this->reconcileDemoRouteProgress($routes);
+
+            $activeRoutes = $routes
+                    ->filter(fn (Route $route) => $route->isActive())
                     ->map(fn ($route) => $this->transformRouteForFrontend($route))
                     ->values()
                     ->all();
@@ -246,6 +257,16 @@ class RouteController extends Controller
                 'current_lng' => 'nullable|numeric|between:-180,180',
                 'progress_percentage' => 'nullable|numeric|min:0|max:100'
             ]);
+
+            // Arrival is terminal for a persisted route. A delayed "moving"
+            // request must never reactivate a route that already arrived.
+            if ($route->status === 'inactive' && $validated['status'] !== 'inactive') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Route is already complete',
+                    'data' => $route,
+                ]);
+            }
             
             // Update status
             $route->status = $validated['status'];
@@ -265,6 +286,10 @@ class RouteController extends Controller
             if (isset($validated['progress_percentage'])) {
                 $route->progress_percentage = $validated['progress_percentage'];
             }
+
+            if ($validated['status'] === 'inactive') {
+                $this->setRouteAtDestination($route);
+            }
             
             // Set started_at when first moving
             if ($validated['status'] === 'moving' && !$route->started_at) {
@@ -276,10 +301,22 @@ class RouteController extends Controller
             
             // If completed, mark as inactive
             if ($route->progress_percentage >= 99.9) {
-                $route->status = 'inactive';
+                $this->setRouteAtDestination($route);
             }
             
-            $route->save();
+            if ($route->status === 'inactive') {
+                $route->save();
+            } else {
+                // Make non-terminal updates conditional at the database level.
+                // This closes the small race where an older moving request was
+                // loaded before, but saved after, the arrival request.
+                $updated = Route::query()
+                    ->whereKey($route->getKey())
+                    ->whereIn('status', ['active', 'moving'])
+                    ->update($route->getDirty());
+
+                $route = $route->fresh();
+            }
             $this->flushActiveRouteCaches($route->incident_id);
             
             return response()->json([
@@ -692,6 +729,8 @@ class RouteController extends Controller
             'route_id',
             'incident_id',
             'coordinates',
+            'total_distance',
+            'estimated_time',
             'status',
             $this->routeColumnExists('route_source') ? 'route_source' : null,
             'destination_title',
@@ -703,10 +742,86 @@ class RouteController extends Controller
             'current_lat',
             'current_lng',
             'progress_percentage',
+            'started_at',
             'created_at',
             'updated_at',
             'last_updated_at',
         ]));
+    }
+
+    /**
+     * Keep presentation/demo routes moving from server time instead of a
+     * browser tab's animation clock. This lets every dashboard observe the
+     * same position and completes the route even after the chief navigates
+     * away from the map page.
+     */
+    private function reconcileDemoRouteProgress($routes): void
+    {
+        foreach ($routes as $route) {
+            if (($route->getAttribute('route_source') ?: 'real') !== 'demo'
+                || $route->status !== 'moving'
+                || ! $route->started_at
+                || (float) $route->total_distance <= 0) {
+                continue;
+            }
+
+            $points = $route->getLeafletPoints();
+            if (count($points) < 2) {
+                continue;
+            }
+
+            $durationSeconds = max((float) $route->total_distance / 13.89, 1.0);
+            $elapsedSeconds = max(0, $route->started_at->diffInMilliseconds(now()) / 1000);
+            $progress = min($elapsedSeconds / $durationSeconds, 1.0);
+            $lastIndex = count($points) - 1;
+            $positionIndex = min((int) floor($progress * $lastIndex), $lastIndex);
+            $position = $points[$positionIndex];
+            $progressPercentage = $progress * 100;
+
+            if ($progress >= 1) {
+                $this->setRouteAtDestination($route);
+            } elseif ($progressPercentage > ((float) $route->progress_percentage + 0.5)) {
+                $route->current_position_index = $positionIndex;
+                $route->current_lat = $position[0];
+                $route->current_lng = $position[1];
+                $route->progress_percentage = $progressPercentage;
+                $route->last_updated_at = now();
+            } else {
+                continue;
+            }
+
+            $updateQuery = Route::query()
+                ->whereKey($route->getKey())
+                ->where('status', 'moving');
+
+            if ($route->status !== 'inactive') {
+                $updateQuery->where('progress_percentage', '<', $route->progress_percentage);
+            }
+
+            $updated = $updateQuery->update($route->getDirty());
+
+            if ($updated > 0) {
+                $this->flushActiveRouteCaches($route->incident_id);
+            } else {
+                $route->refresh();
+            }
+        }
+    }
+
+    private function setRouteAtDestination(Route $route): void
+    {
+        $points = $route->getLeafletPoints();
+        $lastIndex = count($points) - 1;
+        $lastPoint = $lastIndex >= 0 ? $points[$lastIndex] : null;
+
+        $route->status = 'inactive';
+        $route->progress_percentage = 100;
+        if ($lastPoint) {
+            $route->current_position_index = $lastIndex;
+            $route->current_lat = $lastPoint[0];
+            $route->current_lng = $lastPoint[1];
+        }
+        $route->last_updated_at = now();
     }
 
     private function onlyExistingRouteColumns(array $attributes): array
@@ -799,6 +914,8 @@ class RouteController extends Controller
     private function activeRouteFailureResponse(string $message, \Throwable $exception, array $context = [])
     {
         $errorId = (string) Str::uuid();
+
+        OperationalFailureMonitor::record('active_routes', $exception->getMessage());
 
         Log::error($message, array_merge($context, [
             'error_id' => $errorId,

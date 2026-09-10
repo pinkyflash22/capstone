@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initEventListeners();
     initMobileEntryPage();
     primeVisitorLocation();
+    initLandingMediaSlider();
     initScrollAnimations();
 });
 
@@ -72,12 +73,9 @@ function loadStations() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                stations = (Array.isArray(data.data) ? data.data : []).map((station) => ({
-                    personnel: station.personnel ?? 'N/A',
-                    equipment: station.equipment ?? 'Station resources available',
-                    captain: station.captain ?? 'Officer on duty',
-                    ...station,
-                }));
+                stations = Array.isArray(data.data) ? data.data : [];
+                syncPublicDirectoryResources('station', stations);
+                updateLandingCount('totalStations', stations.length);
                 cacheLandingStationDirectory(stations);
                 updateNearbyStations(stations.slice(0, 5));
                 renderLandingMapResources();
@@ -86,7 +84,9 @@ function loadStations() {
         })
         .catch(error => {
             console.error('Error loading stations:', error);
-            useSampleStations();
+            stations = [];
+            updateNearbyStations([]);
+            showLandingToast('Station records are temporarily unavailable.', true, 4200);
         })
         .finally(() => {
             hideLoading('stations');
@@ -99,10 +99,10 @@ function loadHydrants() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                hydrants = (Array.isArray(data.data) ? data.data : []).map((hydrant) => ({
-                    status: hydrant.status ?? 'operational',
-                    ...hydrant,
-                }));
+                hydrants = Array.isArray(data.data) ? data.data : [];
+                syncPublicDirectoryResources('hydrant', hydrants);
+                updateLandingCount('totalHydrants', hydrants.length);
+                renderLandingMapResources();
                 renderMobilePreviewMarkers();
             }
         })
@@ -111,69 +111,6 @@ function loadHydrants() {
         });
 }
 
-// Use sample stations if database fails
-function useSampleStations() {
-    stations = [
-        {
-            id: 1,
-            name: 'Urbiztondo Fire Station',
-            address: 'Urbiztondo, Pangasinan',
-            lat: 15.8233,
-            lng: 120.3294,
-            phone: '(075) 123-4567',
-            personnel: 25,
-            equipment: '3 fire trucks',
-            captain: 'Capt. Reyes'
-        },
-        {
-            id: 2,
-            name: 'Mangatarem Fire Station',
-            address: 'Mangatarem, Pangasinan',
-            lat: 15.7875,
-            lng: 120.2922,
-            phone: '(075) 234-5678',
-            personnel: 20,
-            equipment: '2 fire trucks',
-            captain: 'Capt. Santos'
-        },
-        {
-            id: 3,
-            name: 'San Carlos Fire Station',
-            address: 'San Carlos City, Pangasinan',
-            lat: 15.9281,
-            lng: 120.3489,
-            phone: '(075) 345-6789',
-            personnel: 30,
-            equipment: '4 fire trucks',
-            captain: 'Capt. Villanueva'
-        },
-        {
-            id: 4,
-            name: 'Lingayen Fire Station HQ',
-            address: 'Lingayen, Pangasinan',
-            lat: 16.0215,
-            lng: 120.2319,
-            phone: '(075) 456-7890',
-            personnel: 35,
-            equipment: '5 fire trucks',
-            captain: 'Capt. Mendoza'
-        },
-        {
-            id: 5,
-            name: 'Dagupan Fire Station',
-            address: 'Dagupan City, Pangasinan',
-            lat: 16.0433,
-            lng: 120.3333,
-            phone: '(075) 567-8901',
-            personnel: 28,
-            equipment: '3 fire trucks',
-            captain: 'Capt. Fernandez'
-        }
-    ];
-    
-    addStationMarkers();
-    updateNearbyStations(stations.slice(0, 5));
-}
 const stationIcon = L.divIcon({
     className: 'station-marker',
     html: `
@@ -290,30 +227,16 @@ function addStationMarkers() {
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div style="margin-bottom: 1rem;">
                     <div style="background: #f9fafb; padding: 0.5rem; border-radius: 8px; text-align: center;">
                         <i class="fa-solid fa-phone" style="color: #dc2626;"></i>
-                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">${station.phone}</div>
-                    </div>
-                    <div style="background: #f9fafb; padding: 0.5rem; border-radius: 8px; text-align: center;">
-                        <i class="fa-solid fa-users" style="color: #dc2626;"></i>
-                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">${station.personnel}</div>
+                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">${station.phone || 'Not listed'}</div>
                     </div>
                 </div>
                 
                 <div style="margin-bottom: 0.75rem; padding: 0.5rem; background: #f9fafb; border-radius: 8px;">
                     <i class="fa-solid fa-location-dot" style="color: #dc2626; width: 20px;"></i>
                     <span style="font-size: 0.9rem;">${station.address}</span>
-                </div>
-                
-                <div style="margin-bottom: 0.75rem; padding: 0.5rem; background: #f9fafb; border-radius: 8px;">
-                    <i class="fa-solid fa-truck" style="color: #dc2626; width: 20px;"></i>
-                    <span style="font-size: 0.9rem;">${station.equipment}</span>
-                </div>
-                
-                <div style="margin-bottom: 1rem; padding: 0.5rem; background: #f9fafb; border-radius: 8px;">
-                    <i class="fa-solid fa-user-tie" style="color: #dc2626; width: 20px;"></i>
-                    <span style="font-size: 0.9rem;">${station.captain}</span>
                 </div>
                 
                 <button onclick="openStationModal(${station.id})" 
@@ -347,7 +270,8 @@ function addHydrantMarkers() {
     hydrantMarkers = [];
     
     hydrants.forEach(hydrant => {
-        const icon = hydrant.status === 'operational' ? hydrantIcon : hydrantIconWarning;
+        const isActive = String(hydrant.status).toLowerCase() === 'active';
+        const icon = isActive ? hydrantIcon : hydrantIconWarning;
         
         const marker = L.marker([hydrant.lat, hydrant.lng], {
             icon: icon,
@@ -373,9 +297,9 @@ function addHydrantMarkers() {
                     <span style="font-size: 0.9rem; text-transform: capitalize;">Status: ${hydrant.status}</span>
                 </div>
                 
-                <div style="background: ${hydrant.status === 'operational' ? '#10b981' : '#f59e0b'}; color: white; padding: 0.5rem; border-radius: 8px; text-align: center; font-size: 0.9rem;">
-                    <i class="fa-solid fa-${hydrant.status === 'operational' ? 'check-circle' : 'exclamation-triangle'}"></i>
-                    ${hydrant.status === 'operational' ? 'Operational' : 'Under Maintenance'}
+                <div style="background: ${isActive ? '#10b981' : '#f59e0b'}; color: white; padding: 0.5rem; border-radius: 8px; text-align: center; font-size: 0.9rem;">
+                    <i class="fa-solid fa-${isActive ? 'check-circle' : 'circle-info'}"></i>
+                    ${hydrant.status ? hydrant.status.replace(/_/g, ' ') : 'Status not recorded'}
                 </div>
             </div>
         `);
@@ -404,6 +328,39 @@ function addStationMarkersWithCluster() {
     map.addLayer(stationCluster);
 }
 
+function updateLandingCount(elementId, count) {
+    const element = document.getElementById(elementId);
+    if (element && Number.isFinite(count)) {
+        element.textContent = new Intl.NumberFormat().format(count);
+    }
+}
+
+function syncPublicDirectoryResources(category, records) {
+    const otherResources = landingResourceMarkers.filter(
+        (marker) => normalizeLandingCategory(marker) !== category
+    );
+    const directoryResources = records.map((record) => ({
+        marker_id: record.marker_id ?? record.id,
+        title: record.name,
+        description: record.address,
+        lat: record.lat,
+        lng: record.lng,
+        status: record.status,
+        updated_at: record.updated_at,
+        category,
+        ...(category === 'station' ? {
+            station_public: {
+                id: record.station_id,
+                name: record.name,
+                address: record.address,
+                contact_number: record.phone,
+            },
+        } : {}),
+    }));
+
+    landingResourceMarkers = [...otherResources, ...directoryResources];
+}
+
 function addHydrantMarkersWithCluster() {
     if (!hydrantCluster) {
         addHydrantMarkers();
@@ -412,7 +369,7 @@ function addHydrantMarkersWithCluster() {
 
     hydrants.forEach(hydrant => {
         const marker = L.marker([hydrant.lat, hydrant.lng], { 
-            icon: hydrant.status === 'operational' ? hydrantIcon : hydrantIconWarning 
+            icon: String(hydrant.status).toLowerCase() === 'active' ? hydrantIcon : hydrantIconWarning
         });
         marker.bindPopup(`...`); // Your popup content
         hydrantCluster.addLayer(marker);
@@ -914,39 +871,12 @@ async function loadMobilePreviewResources() {
 
     mobilePreviewResourcesLoading = true;
 
-    try {
-        const [markersResult, shapesResult, risksResult] = await Promise.allSettled([
-            fetch('/api/markers', {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
-            fetch('/api/shapes', {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
-            fetch('/api/fire-risk-areas?levels=medium,high', {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            }).then((response) => response.ok ? response.json() : Promise.reject(response)),
-        ]);
-
-        if (markersResult.status === 'fulfilled') {
-            landingResourceMarkers = normalizeLandingResourcePayload(markersResult.value);
-        }
-
-        if (shapesResult.status === 'fulfilled') {
-            landingBoundaryShapes = Array.isArray(shapesResult.value) ? shapesResult.value : [];
-        }
-
-        if (risksResult.status === 'fulfilled') {
-            landingRiskAreas = Array.isArray(risksResult.value?.data) ? risksResult.value.data : [];
-        }
-
-        mobilePreviewResourcesLoaded = true;
-    } catch (error) {
-        console.warn('Unable to load mobile map preview resources:', error);
-    } finally {
-        mobilePreviewResourcesLoading = false;
-        renderLandingMapResources();
-        renderMobilePreviewMarkers();
-    }
+    // Public station and hydrant feeds are loaded by loadStations/loadHydrants.
+    // Detailed incident, boundary, and risk layers remain behind role-based auth.
+    mobilePreviewResourcesLoaded = true;
+    mobilePreviewResourcesLoading = false;
+    renderLandingMapResources();
+    renderMobilePreviewMarkers();
 }
 
 function normalizeLandingResourcePayload(payload) {
@@ -2103,19 +2033,7 @@ window.openStationModal = function(stationId) {
                 </div>
                 <div style="margin-bottom: 1rem;">
                     <i class="fa-solid fa-phone" style="color: #dc2626; width: 20px;"></i>
-                    ${station.phone}
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <i class="fa-solid fa-users" style="color: #dc2626; width: 20px;"></i>
-                    ${station.personnel} Personnel
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <i class="fa-solid fa-truck" style="color: #dc2626; width: 20px;"></i>
-                    ${station.equipment}
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <i class="fa-solid fa-user-tie" style="color: #dc2626; width: 20px;"></i>
-                    ${station.captain}
+                    ${station.phone || 'Not listed in this station record'}
                 </div>
                 <button type="button" onclick="startLandingStationCall(this, event, ${Number(station.id) || 0})"
                         style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 8px; width: 100%; margin-top: 1rem; cursor: pointer;">
@@ -2375,7 +2293,7 @@ const aboutContent = {
         content: `
             <div style="margin-bottom: 1rem;">
                 <strong style="color: #dc2626;">How do I report a fire?</strong>
-                <p>Call 911 immediately. Our dispatchers will alert the nearest station while you're on the phone.</p>
+                <p>Call 911 for an active emergency. You can also use Report Anonymously to submit a mapped report to PyroSense.</p>
             </div>
             
             <div style="margin-bottom: 1rem;">
@@ -2384,13 +2302,13 @@ const aboutContent = {
             </div>
             
             <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">Is PyroSense free to use?</strong>
-                <p>Yes, all emergency services and station location features are completely free for the public.</p>
+                <strong style="color: #dc2626;">Where does the map data come from?</strong>
+                <p>Station and hydrant entries are loaded from current PyroSense marker records. Public map tiles are provided by OpenStreetMap.</p>
             </div>
             
             <div style="margin-bottom: 1rem;">
                 <strong style="color: #dc2626;">How can I request fire safety training?</strong>
-                <p>Contact your local fire station or email training@pyrosense.gov to schedule a session.</p>
+                <p>Contact your local fire station directly. The BFP Region 1 directory linked on this page is the official public contact reference.</p>
             </div>
             
             <div style="margin-bottom: 1rem;">
@@ -2471,25 +2389,50 @@ window.openAboutModal = function(type) {
 
 function initScrollAnimations() {
     const revealItems = document.querySelectorAll('.reveal-on-scroll');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     revealItems.forEach((item) => {
         const delay = item.dataset.revealDelay;
         if (delay) {
             item.style.setProperty('--reveal-delay', `${delay}ms`);
         }
-        item.classList.add('is-visible');
     });
 
-    const heroParallaxTarget = document.querySelector('.hero-parallax-target');
-    if (!heroParallaxTarget || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (reduceMotion || !('IntersectionObserver' in window)) {
+        revealItems.forEach((item) => item.classList.add('is-visible'));
         return;
     }
 
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+        });
+    }, {
+        rootMargin: '0px 0px -8% 0px',
+        threshold: 0.12,
+    });
+
+    revealItems.forEach((item) => revealObserver.observe(item));
+
+    const parallaxItems = [...document.querySelectorAll('[data-parallax]')];
+    if (!parallaxItems.length) return;
+
     let ticking = false;
     const applyParallax = () => {
-        const scrollY = window.scrollY || window.pageYOffset || 0;
-        const offset = Math.min(scrollY * 0.08, 26);
-        heroParallaxTarget.style.transform = `translate3d(0, ${offset}px, 0)`;
+        const viewportCenter = window.innerHeight / 2;
+
+        parallaxItems.forEach((item) => {
+            const rect = item.getBoundingClientRect();
+            if (rect.bottom < -120 || rect.top > window.innerHeight + 120) return;
+
+            const speed = Number.parseFloat(item.dataset.parallaxSpeed || '0.04');
+            const itemCenter = rect.top + rect.height / 2;
+            const offset = Math.max(-32, Math.min(32, (viewportCenter - itemCenter) * speed));
+            item.style.setProperty('--parallax-y', `${offset.toFixed(2)}px`);
+        });
+
         ticking = false;
     };
 
@@ -2499,4 +2442,82 @@ function initScrollAnimations() {
             ticking = true;
         }
     }, { passive: true });
+
+    window.addEventListener('resize', applyParallax, { passive: true });
+    applyParallax();
+}
+
+function initLandingMediaSlider() {
+    const slider = document.querySelector('[data-landing-slider]');
+    if (!slider) return;
+
+    const slides = [...slider.querySelectorAll('[data-landing-slide]')];
+    const dots = [...slider.querySelectorAll('[data-slider-dot]')];
+    const previous = slider.querySelector('[data-slider-prev]');
+    const next = slider.querySelector('[data-slider-next]');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let activeIndex = Math.max(0, slides.findIndex((slide) => slide.classList.contains('is-active')));
+    let timer = null;
+    let touchStartX = null;
+
+    const syncVideo = (slide, shouldPlay) => {
+        const video = slide?.querySelector('video');
+        if (!video) return;
+        if (!shouldPlay) {
+            video.pause();
+            video.currentTime = 0;
+            return;
+        }
+        video.play().catch(() => {});
+    };
+
+    const show = (index) => {
+        const nextIndex = (index + slides.length) % slides.length;
+        slides.forEach((slide, slideIndex) => {
+            const active = slideIndex === nextIndex;
+            slide.classList.toggle('is-active', active);
+            slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+            slide.toggleAttribute('inert', !active);
+            syncVideo(slide, active);
+        });
+        dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === nextIndex));
+        activeIndex = nextIndex;
+    };
+
+    const stop = () => {
+        if (timer) window.clearInterval(timer);
+        timer = null;
+    };
+    const start = () => {
+        stop();
+        const activeVideo = slides[activeIndex]?.querySelector('video');
+        if (slides.length > 1 && !activeVideo && !reduceMotion && document.visibilityState === 'visible') {
+            timer = window.setInterval(() => show(activeIndex + 1), 6500);
+        }
+    };
+
+    previous?.addEventListener('click', () => { show(activeIndex - 1); start(); });
+    next?.addEventListener('click', () => { show(activeIndex + 1); start(); });
+    dots.forEach((dot) => dot.addEventListener('click', () => { show(Number(dot.dataset.sliderDot)); start(); }));
+    slider.addEventListener('mouseenter', stop);
+    slider.addEventListener('mouseleave', start);
+    slider.addEventListener('focusin', stop);
+    slider.addEventListener('focusout', start);
+    slider.addEventListener('touchstart', (event) => { touchStartX = event.touches[0]?.clientX ?? null; }, { passive: true });
+    slider.addEventListener('touchend', (event) => {
+        if (touchStartX === null) return;
+        const distance = (event.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+        if (Math.abs(distance) > 45) show(activeIndex + (distance < 0 ? 1 : -1));
+        touchStartX = null;
+        start();
+    }, { passive: true });
+    document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+
+    slides.forEach((slide) => slide.querySelector('video')?.addEventListener('ended', () => {
+        show(activeIndex + 1);
+        start();
+    }));
+
+    show(activeIndex);
+    start();
 }

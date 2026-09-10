@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DailyWeatherContext;
+use App\Support\OperationalFailureMonitor;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -251,6 +252,7 @@ class DailyWeatherContextService
                 'warning' => null,
             ]);
         } catch (\Throwable $exception) {
+            OperationalFailureMonitor::record('open_meteo', $exception->getMessage());
             $lastSuccessful = $this->readForecastCache($staleKey);
             if ($this->isUsableForecast($lastSuccessful)) {
                 Log::warning('Using the last successful Open-Meteo forecast.', [
@@ -339,28 +341,34 @@ class DailyWeatherContextService
 
         // Do not automatically retry quota failures. The next scheduled run
         // can recover missing rows without multiplying provider requests.
-        $response = Http::timeout(25)
-            ->get('https://api.open-meteo.com/v1/forecast', [
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'start_date' => $date->toDateString(),
-                'end_date' => $date->toDateString(),
-                'hourly' => implode(',', [
-                    'temperature_2m',
-                    'relative_humidity_2m',
-                    'precipitation',
-                    'rain',
-                    'weather_code',
-                    'wind_speed_10m',
-                    'wind_gusts_10m',
-                ]),
-                'timezone' => 'Asia/Manila',
-            ]);
+        try {
+            $response = Http::timeout(25)
+                ->get('https://api.open-meteo.com/v1/forecast', [
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'start_date' => $date->toDateString(),
+                    'end_date' => $date->toDateString(),
+                    'hourly' => implode(',', [
+                        'temperature_2m',
+                        'relative_humidity_2m',
+                        'precipitation',
+                        'rain',
+                        'weather_code',
+                        'wind_speed_10m',
+                        'wind_gusts_10m',
+                    ]),
+                    'timezone' => 'Asia/Manila',
+                ]);
+        } catch (\Throwable $exception) {
+            OperationalFailureMonitor::record('open_meteo', $exception->getMessage());
+            throw $exception;
+        }
 
         if (! $response->successful()) {
             if ($response->status() === 429) {
                 $this->startOpenMeteoRateLimitCooldown();
             }
+            OperationalFailureMonitor::record('open_meteo', "Historical collection returned HTTP {$response->status()}.");
             throw new \RuntimeException("Open-Meteo returned HTTP {$response->status()}.");
         }
 
@@ -422,6 +430,12 @@ class DailyWeatherContextService
 
         return [
             'coverage' => 'Observed daily context from '.$rows->min('observation_date').' through '.$rows->max('observation_date'),
+            'latest_observation_date' => Carbon::parse($rows->max('observation_date'))->toDateString(),
+            'fetched_at' => $rows->max('fetched_at')
+                ? Carbon::parse($rows->max('fetched_at'), 'Asia/Manila')->toIso8601String()
+                : null,
+            'cache_status' => 'stored-history',
+            'is_stale' => false,
             'avg_temp_c' => round((float) $rows->avg('temperature_avg_c'), 1),
             'min_temp_c' => round((float) $rows->min('temperature_min_c'), 1),
             'max_temp_c' => round((float) $rows->max('temperature_max_c'), 1),

@@ -32,6 +32,7 @@
             'title' => 'Communication',
             'items' => [
                 ['label' => 'Announcements', 'route' => 'station-admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>'],
+                ['label' => 'Landing Media', 'route' => 'landing-media.index', 'active' => 'landing-media', 'icon' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15l3-3 2 2 3-4 3 5M8 9h.01"/></svg>'],
             ],
         ],
     ];
@@ -53,6 +54,7 @@
         ['label' => 'Announcements', 'description' => 'Publish and review station announcements.', 'route' => 'station-admin.announcements', 'active' => 'announcements', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 11v2"/><path d="M6 10h3l7-4v12l-7-4H6z"/><path d="M9 14l1.5 4"/></svg>', 'mobile_icon' => 'campaign'],
         ['label' => 'Course Checklists', 'description' => 'Review action plans and checklist progress.', 'route' => 'station-admin.course-checklists', 'active' => 'course-checklists', 'mobile_icon' => 'checklist'],
         ['label' => 'Weather Context', 'description' => 'Review recorded and historical weather conditions.', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'mobile_icon' => 'cloud'],
+        ['label' => 'Landing Media', 'description' => 'Publish image and video slides on the public landing page.', 'route' => 'landing-media.index', 'active' => 'landing-media', 'mobile_icon' => 'photo_library'],
     ];
     $mobileIconSvgs = [
         'event' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></svg>',
@@ -68,6 +70,7 @@
         'location_city' => '<svg viewBox="0 0 24 24"><path d="M3 21V8l7-4v17M10 21V11l5-3v13M15 21v-7h6v7M6 11h1M6 15h1M12 14h1M12 17h1M18 17h1"/></svg>',
         'apartment' => '<svg viewBox="0 0 24 24"><path d="M5 21V3h10v18M15 9h4v12M8 7h2M8 11h2M8 15h2M8 19h2M17 13h1M17 17h1M3 21h18"/></svg>',
         'campaign' => '<svg viewBox="0 0 24 24"><path d="M4 10v4h4l8 4V6l-8 4zM8 14l2 5M19 9a4 4 0 0 1 0 6"/></svg>',
+        'photo_library' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15l3-3 2 2 3-4 3 5M8 9h.01"/></svg>',
         'checklist' => '<svg viewBox="0 0 24 24"><path d="M4 6l2 2 3-3M11 7h9M4 13l2 2 3-3M11 14h9M4 20l2 2 3-3M11 21h9"/></svg>',
         'cloud' => '<svg viewBox="0 0 24 24"><path d="M6 18a4 4 0 1 1 1-7.9A6 6 0 0 1 18.7 12H19a3 3 0 0 1 0 6z"/></svg>',
         'close' => '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',

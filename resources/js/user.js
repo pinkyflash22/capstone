@@ -3989,7 +3989,8 @@ async function userDisplayAndStartRoute(routeId, route, destination, incidentId)
         routeLayer: null,
         traveledLayer: null,
         animatedVehicle: null,
-        animationFrame: null
+        animationFrame: null,
+        awaitingServerCompletion: false
     };
     
     userActiveTrucks.set(routeId, truckData);
@@ -4185,7 +4186,7 @@ function userStartSmoothAnimationForTruck(routeId) {
     // If already at destination
     if (startIndex >= truck.simulationPoints.length - 1) {
         console.log('Truck already at destination');
-        userStopSimulationForRoute(routeId);
+        userHoldTruckAtDestination(routeId);
         userShowRouteNotification(`Emergency vehicle has arrived at the incident location!`, 'success');
         return;
     }
@@ -4234,7 +4235,7 @@ function userStartSmoothAnimationForTruck(routeId) {
         
         if (progress >= 1) {
             console.log(`User truck ${routeId} arrived at destination!`);
-            userStopSimulationForRoute(routeId);
+            userHoldTruckAtDestination(routeId);
             userShowRouteNotification(`Emergency vehicle has arrived at the incident location!`, 'success');
             return;
         }
@@ -4320,6 +4321,27 @@ function userStartSmoothAnimationForTruck(routeId) {
     };
     
     truck.animationFrame = requestAnimationFrame(animate);
+}
+
+function userHoldTruckAtDestination(routeId) {
+    routeId = normalizeUserRouteId(routeId);
+    const truck = userActiveTrucks.get(routeId);
+    if (!truck) return;
+
+    if (truck.animationFrame) {
+        cancelAnimationFrame(truck.animationFrame);
+        truck.animationFrame = null;
+    }
+
+    const finalPoint = truck.simulationPoints?.[truck.simulationPoints.length - 1];
+    if (finalPoint && truck.animatedVehicle) {
+        truck.animatedVehicle.setLatLng(finalPoint);
+    }
+
+    truck.currentPointIndex = Math.max((truck.simulationPoints?.length || 1) - 1, 0);
+    truck.isSimulating = false;
+    truck.awaitingServerCompletion = true;
+    userUpdateRouteInfoCard();
 }
 
 function userStopSimulationForRoute(routeId) {
@@ -4693,7 +4715,9 @@ function userStartRoutePollingForIncident(incidentId) {
                     existingTruck.routeSource = primaryRoute.route_source || existingTruck.routeSource || 'real';
                     if (String(existingTruck.routeSource).toLowerCase() !== 'demo') {
                         userUpdateLiveTruckPosition(normalizedRouteId, primaryRoute);
-                    } else if (primaryRoute.status === 'moving' && !existingTruck.isSimulating) {
+                    } else if (primaryRoute.status === 'moving'
+                        && !existingTruck.isSimulating
+                        && !existingTruck.awaitingServerCompletion) {
                         const dbIndex = primaryRoute.current_position_index || 0;
                         console.log(`Restarting stopped truck from DB position: ${dbIndex}`);
                         await userStartSimulationFromPosition(normalizedRouteId, dbIndex);

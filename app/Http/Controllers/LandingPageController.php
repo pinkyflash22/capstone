@@ -17,7 +17,7 @@ class LandingPageController extends Controller
     {
         $stations = Marker::where('category', 'station')
             ->with(['stations:station_id,station_name,contact_number,marker_id'])
-            ->select('marker_id', 'title', 'description', 'lat', 'lng')
+            ->select('marker_id', 'title', 'description', 'lat', 'lng', 'status', 'updated_at')
             ->get()
             ->map(function ($station) {
                 $stationRecord = $station->stations->first();
@@ -30,9 +30,8 @@ class LandingPageController extends Controller
                     'lat' => (float) $station->lat,
                     'lng' => (float) $station->lng,
                     'phone' => $stationRecord?->contact_number,
-                    // 'personnel' => $station->personnel ?? rand(20, 35),
-                    // 'equipment' => $station->equipment ?? rand(2, 5) . ' fire trucks',
-                    // 'captain' => $station->captain ?? 'Capt. ' . ['Reyes', 'Santos', 'Villanueva', 'Mendoza', 'Fernandez'][rand(0,4)]
+                    'status' => $station->status,
+                    'updated_at' => optional($station->updated_at)->toISOString(),
                 ];
             });
 
@@ -45,7 +44,7 @@ class LandingPageController extends Controller
     public function getHydrants()
     {
         $hydrants = Marker::where('category', 'hydrant')
-            ->select('marker_id', 'title', 'description', 'lat', 'lng',)
+            ->select('marker_id', 'title', 'description', 'lat', 'lng', 'status', 'updated_at')
             ->get()
             ->map(function ($hydrant) {
                 return [
@@ -53,8 +52,9 @@ class LandingPageController extends Controller
                     'name' => $hydrant->title,
                     'address' => $hydrant->description ?? $hydrant->title,
                     'lat' => (float) $hydrant->lat,
-                    'lng' => (float) $hydrant->lng
-                    // 'status' => $hydrant->status ?? 'operational'
+                    'lng' => (float) $hydrant->lng,
+                    'status' => $hydrant->status,
+                    'updated_at' => optional($hydrant->updated_at)->toISOString(),
                 ];
             });
 

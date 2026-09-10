@@ -9,6 +9,7 @@ use App\Models\CommunityActivityRequest;
 use App\Models\FsicRequest;
 use App\Models\FullAddress;
 use App\Models\Incident;
+use App\Models\LandingMedia;
 use App\Models\Marker;
 use App\Models\Province;
 use App\Models\RiskArea;
@@ -1103,6 +1104,9 @@ class PublicController extends Controller
         $anonymousUserId = null;
         $totalStations = 0;
         $totalHydrants = 0;
+        $totalIncidents = 0;
+        $latestRecordAt = null;
+        $landingSlides = collect();
 
         try {
             $anonymousUserId = User::resolveAnonymousUserId();
@@ -1111,13 +1115,39 @@ class PublicController extends Controller
         }
 
         try {
-            $totalStations = Marker::query()->where('category', 'station')->count();
-            $totalHydrants = Marker::query()->where('category', 'hydrant')->count();
+            if (Schema::hasTable('landing_media')) {
+                $landingSlides = LandingMedia::query()
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->get();
+            }
         } catch (\Throwable $exception) {
             report($exception);
         }
 
-        return view('dashboard', compact('anonymousUserId', 'totalStations', 'totalHydrants'));
+        try {
+            $totalStations = Marker::query()->where('category', 'station')->count();
+            $totalHydrants = Marker::query()->where('category', 'hydrant')->count();
+            $totalIncidents = Incident::query()->count();
+
+            $latestRecordAt = collect([
+                Marker::query()->max('updated_at'),
+                Incident::query()->max('updated_at'),
+                $landingSlides->max('updated_at'),
+            ])->filter()->max();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return view('dashboard', compact(
+            'anonymousUserId',
+            'totalStations',
+            'totalHydrants',
+            'totalIncidents',
+            'latestRecordAt',
+            'landingSlides',
+        ));
     }
     //     public function dashboard()
     // {

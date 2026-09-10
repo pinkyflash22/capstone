@@ -17,6 +17,9 @@ return [
 
     'monitoring' => [
         'webhook_url' => env('MONITORING_WEBHOOK_URL'),
+        'failure_window_minutes' => (int) env('MONITOR_FAILURE_WINDOW_MINUTES', 15),
+        'failure_threshold' => (int) env('MONITOR_FAILURE_THRESHOLD', 3),
+        'alert_cooldown_minutes' => (int) env('MONITOR_ALERT_COOLDOWN_MINUTES', 30),
     ],
 
     'rollout' => [

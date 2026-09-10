@@ -199,6 +199,7 @@ Artisan::command('incidents:dispatch-queue {--timeout=2}', function (IncidentAut
 })->purpose('Expire unanswered incident assignments and rematch the dispatch queue.');
 
 Schedule::command('incidents:dispatch-queue --timeout=2')->everyMinute()->withoutOverlapping();
+Schedule::command('ops:monitor')->everyFiveMinutes()->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

@@ -27,6 +27,7 @@
             callback: @json(route('voice-calls.callback')),
             incomingCallback: @json(route('voice-calls.callbacks.incoming')),
             show: @json(url('/voice-calls/__CALL__')),
+            seen: @json(url('/voice-calls/__CALL__/seen')),
             accept: @json(url('/voice-calls/__CALL__/accept')),
             acceptCallback: @json(url('/voice-calls/__CALL__/accept-callback')),
             rejectCallback: @json(url('/voice-calls/__CALL__/reject-callback')),

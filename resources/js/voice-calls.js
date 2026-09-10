@@ -30,6 +30,7 @@ let knownMissedIds = new Set();
 let knownCallbackId = null;
 let isSpeakerEnabled = true;
 const remoteAudioTracks = new Map();
+const displayedCallNotifications = new Map();
 const responderSessions = new Map();
 let activeResponderCalls = new Map();
 let responderPanelOpen = false;
@@ -37,6 +38,7 @@ let responderPanelTotal = 0;
 let responderCallSearch = '';
 let responderCallFilter = 'all';
 let responderCallSort = 'newest';
+let responderHistoryLimit = 8;
 let latestResponderPayload = null;
 let agoraSdkPromise = null;
 let agoraSdkLoadStartedAt = null;
@@ -622,6 +624,7 @@ function ensureIncomingPanel() {
     `;
     document.body.appendChild(panel);
     panel.addEventListener('click', handleIncomingClick);
+    enableResponderPanelSwipe(panel);
     panel.querySelector('[data-pyro-voice-search]')?.addEventListener('input', (event) => {
         responderCallSearch = event.target.value.trim().toLowerCase();
         if (latestResponderPayload) renderIncoming(latestResponderPayload);
@@ -668,6 +671,71 @@ function ensureResponderLauncher() {
     return launcher;
 }
 
+function enableResponderPanelSwipe(panel) {
+    const header = panel.querySelector('.pyro-voice-panel__header');
+    if (!header || header.dataset.pyroSwipeReady) return;
+    header.dataset.pyroSwipeReady = 'true';
+
+    let startY = null;
+    let currentY = null;
+
+    header.addEventListener('touchstart', (event) => {
+        if (event.target.closest('button') || event.touches.length !== 1) return;
+        startY = event.touches[0].clientY;
+        currentY = startY;
+        panel.classList.add('is-dragging');
+    }, { passive: true });
+
+    header.addEventListener('touchmove', (event) => {
+        if (startY === null || event.touches.length !== 1) return;
+        currentY = event.touches[0].clientY;
+        const distance = Math.max(0, currentY - startY);
+        panel.style.transform = `translateY(${Math.min(distance, 180)}px)`;
+        if (distance > 0) event.preventDefault();
+    }, { passive: false });
+
+    const finishSwipe = () => {
+        if (startY === null) return;
+        const distance = Math.max(0, (currentY ?? startY) - startY);
+        panel.classList.remove('is-dragging');
+        panel.style.transform = '';
+        startY = null;
+        currentY = null;
+        if (distance >= 80) setResponderPanelOpen(false);
+    };
+
+    header.addEventListener('touchend', finishSwipe, { passive: true });
+    header.addEventListener('touchcancel', finishSwipe, { passive: true });
+}
+
+async function closeMissedCallNotification(callId) {
+    const displayedNotification = displayedCallNotifications.get(Number(callId));
+    if (displayedNotification) {
+        displayedNotification.close();
+        displayedCallNotifications.delete(Number(callId));
+    }
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const notifications = await registration.getNotifications({ tag: `voice-call-${callId}` });
+        notifications.forEach((notification) => notification.close());
+    } catch {}
+}
+
+async function markMissedCallsSeen(calls = []) {
+    const unseenCalls = calls.filter((call) => call?.id && !call.is_seen);
+    if (!unseenCalls.length) return;
+
+    unseenCalls.forEach((call) => {
+        call.is_seen = true;
+        void closeMissedCallNotification(call.id);
+    });
+
+    await Promise.allSettled(unseenCalls.map((call) => jsonFetch(routeFor('seen', call.id), {
+        method: 'POST',
+    })));
+}
+
 function setResponderPanelOpen(open) {
     if (!isResponder) return;
     const panel = ensureIncomingPanel();
@@ -682,6 +750,11 @@ function setResponderPanelOpen(open) {
     if (backdrop) backdrop.hidden = !responderPanelOpen;
     document.body.classList.toggle('pyro-voice-panel-open', responderPanelOpen);
     if (responderPanelOpen) {
+        if (latestResponderPayload?.missed_calls?.length) {
+            void markMissedCallsSeen(latestResponderPayload.missed_calls).then(() => {
+                if (latestResponderPayload) renderIncoming(latestResponderPayload);
+            });
+        }
         void prepareAgoraForCallInterface('responder-panel');
         window.setTimeout(() => panel.querySelector('[data-pyro-voice-panel-close]')?.focus(), 0);
     }
@@ -830,20 +903,43 @@ function responderQualityLabel(session) {
     return { label: 'Poor connection', tone: 'poor' };
 }
 
+function formatCallDateTime(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return 'Time unavailable';
+
+    const now = new Date();
+    const sameDay = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+        === now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    const time = date.toLocaleTimeString('en-PH', {
+        timeZone: 'Asia/Manila',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+
+    if (sameDay) return `Today, ${time}`;
+    return date.toLocaleString('en-PH', {
+        timeZone: 'Asia/Manila',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
 function renderMissedCallCard(call) {
     const callerName = call?.caller?.name || 'Anonymous caller';
     const location = callLocation(call);
     const locationText = callerLocationDisplay(location);
     const hasIncident = Boolean(call.created_incident_id || call.incident_id);
     return `
-        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card pyro-voice-call-card--missed" data-call-id="${call.id}" tabindex="-1">
+        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card pyro-voice-call-card--missed ${call.is_seen ? 'is-seen' : 'is-unseen'}" data-call-id="${call.id}" tabindex="-1">
             <div class="pyro-voice-call-card__top">
                 <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
                 <div>
                     <p class="pyro-voice-call-card__name">${escapeHtml(callerName)}</p>
-                    <p class="pyro-voice-call-card__meta">${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Citizen')} • Missed ${formatSeconds(callAge(call))} ago</p>
+                    <p class="pyro-voice-call-card__meta">${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Citizen')} • ${escapeHtml(formatCallDateTime(call.ended_at || call.updated_at))}</p>
                 </div>
-                <span class="pyro-voice-badge">Missed</span>
+                <span class="pyro-voice-badge">${call.is_seen ? 'Seen' : 'New missed'}</span>
             </div>
             <div class="pyro-voice-call-card__location">
                 <span class="pyro-voice-call-card__location-icon" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
@@ -866,21 +962,21 @@ function renderRecentContactCard(call) {
     const callerName = call?.caller?.name || 'Citizen';
     const statusLabel = call.status === 'rejected' ? 'Declined' : 'Completed';
     return `
-        <article id="pyro-voice-call-${call.id}" class="pyro-voice-call-card" data-call-id="${call.id}" tabindex="-1">
-            <div class="pyro-voice-call-card__top">
+        <details id="pyro-voice-call-${call.id}" class="pyro-voice-call-card pyro-voice-call-card--collapsible" data-call-id="${call.id}">
+            <summary class="pyro-voice-call-card__top">
                 <div class="pyro-voice-avatar">${escapeHtml(initials(callerName))}</div>
                 <div>
                     <p class="pyro-voice-call-card__name">${escapeHtml(callerName)}</p>
-                    <p class="pyro-voice-call-card__meta">User #${escapeHtml(call.caller?.id || '—')} · ${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Registered citizen')}</p>
+                    <p class="pyro-voice-call-card__meta">${escapeHtml(formatCallDateTime(call.ended_at || call.updated_at))} • ${escapeHtml(call.caller?.contact_number || call.caller?.email || 'Registered citizen')}</p>
                 </div>
-                <span class="pyro-voice-badge">${statusLabel}</span>
-            </div>
-            <div class="pyro-voice-actions">
+                <span class="pyro-voice-card-summary-state"><span class="pyro-voice-badge">${statusLabel}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+            </summary>
+            <div class="pyro-voice-actions pyro-voice-call-card__expanded-actions">
                 <button type="button" class="pyro-voice-btn pyro-voice-btn--primary pyro-voice-btn--wide" data-pyro-voice-callback ${call.can_callback ? '' : 'disabled'}>
                     <i class="fa-solid fa-phone"></i> Call citizen back
                 </button>
             </div>
-        </article>
+        </details>
     `;
 }
 
@@ -933,6 +1029,8 @@ function renderIncoming(payload) {
     const calls = payload.incoming_calls || [];
     const missedCalls = payload.missed_calls || [];
     const recentContacts = payload.recent_contacts || [];
+    if (responderPanelOpen) void markMissedCallsSeen(missedCalls);
+    const unseenMissedCalls = missedCalls.filter((call) => !call.is_seen);
     const activeCalls = payload.active_calls || (payload.active_call ? [payload.active_call] : []);
     const outgoingCalls = payload.outgoing_calls || [];
     const liveCalls = [...activeCalls, ...outgoingCalls];
@@ -957,7 +1055,7 @@ function renderIncoming(payload) {
         const badge = panel.querySelector(`[data-pyro-voice-filter-count="${category}"]`);
         if (badge) badge.textContent = String(value);
     });
-    updateResponderLauncher(calls.length + liveCalls.length + missedCalls.length, calls.length);
+    updateResponderLauncher(calls.length + liveCalls.length + unseenMissedCalls.length, calls.length);
 
     if (!total) {
         list.innerHTML = '<div class="pyro-voice-panel__empty"><i class="fa-solid fa-phone-volume"></i><strong>No calls waiting</strong><span>Incoming and active calls will appear here.</span></div>';
@@ -984,7 +1082,7 @@ function renderIncoming(payload) {
     });
 
     const newIds = calls.map((call) => call.id).filter((id) => !knownIncomingIds.has(id));
-    const newMissedIds = missedCalls.map((call) => call.id).filter((id) => !knownMissedIds.has(id));
+    const newMissedIds = unseenMissedCalls.map((call) => call.id).filter((id) => !knownMissedIds.has(id));
     knownIncomingIds = new Set(calls.map((call) => call.id));
     knownMissedIds = new Set(missedCalls.map((call) => call.id));
     if (newIds.length) {
@@ -1035,8 +1133,14 @@ function renderIncoming(payload) {
         `);
     }
 
+    const history = payload.history || {};
+    const canLoadMore = Boolean(history.has_more) && responderHistoryLimit < Number(history.maximum_limit || 40);
+    const historyAction = canLoadMore
+        ? `<button type="button" class="pyro-voice-history-more" data-pyro-voice-load-more><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Load older calls</span></button>`
+        : '';
+
     list.innerHTML = sections.length
-        ? sections.join('')
+        ? sections.join('') + historyAction
         : '<div class="pyro-voice-panel__empty"><i class="fa-solid fa-filter-circle-xmark"></i><strong>No matching calls</strong><span>Try another search, filter, or sorting option.</span></div>';
 
     if (pendingNotificationCallId) {
@@ -1053,7 +1157,9 @@ async function pollIncoming() {
 
     incomingPollInFlight = (async () => {
         try {
-            const payload = await jsonFetch(routes.incoming);
+            const incomingUrl = new URL(routes.incoming, window.location.origin);
+            incomingUrl.searchParams.set('history_limit', String(responderHistoryLimit));
+            const payload = await jsonFetch(incomingUrl.toString());
             incomingPollFailureCount = 0;
             renderIncoming(payload);
         } catch (error) {
@@ -1109,6 +1215,14 @@ function getResponderVoiceBootDelay() {
 async function handleIncomingClick(event) {
     if (event.target.closest('[data-pyro-voice-panel-close]')) {
         setResponderPanelOpen(false);
+        return;
+    }
+    if (event.target.closest('[data-pyro-voice-load-more]')) {
+        const button = event.target.closest('button');
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        responderHistoryLimit = Math.min(40, responderHistoryLimit + 8);
+        await pollIncoming();
         return;
     }
     const card = event.target.closest('[data-call-id]');
@@ -1928,6 +2042,8 @@ async function notifyIncoming(call, title = 'Incoming PyroSense voice call') {
     } catch {}
     try {
         const notification = new Notification(title, options);
+        displayedCallNotifications.set(Number(call.id), notification);
+        notification.onclose = () => displayedCallNotifications.delete(Number(call.id));
         notification.onclick = () => {
             window.focus();
             focusResponderCall(call.id);

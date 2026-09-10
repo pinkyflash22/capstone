@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -142,7 +143,11 @@ class VoiceCallController extends Controller
             $this->distributeWaitingCalls($user, $stationId);
             $this->expireStaleCalls($request);
 
-            return response()->json($this->responderPayload($user, $stationId));
+            return response()->json($this->responderPayload(
+                $user,
+                $stationId,
+                max(8, min(40, $request->integer('history_limit', 8)))
+            ));
         } catch (\Throwable $error) {
             report($error);
 
@@ -176,7 +181,11 @@ class VoiceCallController extends Controller
                     $this->touchResponderPresence($user, $stationId);
                     $this->distributeWaitingCalls($user, $stationId);
                     $this->expireStaleCalls($request);
-                    $payload = $this->responderPayload($user, $stationId);
+                    $payload = $this->responderPayload(
+                        $user,
+                        $stationId,
+                        max(8, min(40, $request->integer('history_limit', 8)))
+                    );
                 } catch (\Throwable $error) {
                     report($error);
 
@@ -221,6 +230,21 @@ class VoiceCallController extends Controller
             'success' => true,
             'call' => $this->serializeCall($voiceCall, $request->user()),
             'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
+        ]);
+    }
+
+    public function markSeen(Request $request, VoiceCall $voiceCall): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($this->isStationResponder($user), 403);
+        $this->authorizeResponderForCall($voiceCall, $user);
+
+        Cache::put($this->seenCacheKey($user, $voiceCall), true, now()->addDays(30));
+
+        return response()->json([
+            'success' => true,
+            'call_id' => (int) $voiceCall->id,
+            'seen' => true,
         ]);
     }
 
@@ -650,7 +674,12 @@ class VoiceCallController extends Controller
         ]);
     }
 
-    private function serializeCall(VoiceCall $call, ?User $viewer = null, ?bool $responderHasCapacity = null): array
+    private function serializeCall(
+        VoiceCall $call,
+        ?User $viewer = null,
+        ?bool $responderHasCapacity = null,
+        ?bool $seen = null
+    ): array
     {
         $createdAt = $call->created_at ?: now();
         $caller = $call->caller;
@@ -700,6 +729,9 @@ class VoiceCallController extends Controller
                 'status' => $call->createdIncident->status,
             ] : null,
             'is_flagged_prank' => filled($call->flagged_at),
+            'is_seen' => $viewer && $this->isStationResponder($viewer)
+                ? ($seen ?? $this->hasSeenCall($viewer, $call))
+                : false,
             'flag_reason' => $call->flag_reason,
             'created_at' => $call->created_at?->toIso8601String(),
             'queued_at' => $call->queued_at?->toIso8601String(),
@@ -786,7 +818,7 @@ class VoiceCallController extends Controller
             ->get();
     }
 
-    private function responderPayload(User $user, ?int $stationId): array
+    private function responderPayload(User $user, ?int $stationId, int $historyLimit = 8): array
     {
         if (! $this->voiceCallsStorageReady()) {
             return [
@@ -831,8 +863,10 @@ class VoiceCallController extends Controller
                 $inner->where('station_id', $stationId)->orWhereNull('station_id');
             }))
             ->latest('ended_at')
-            ->limit(8)
+            ->limit($historyLimit + 1)
             ->get();
+        $hasMoreMissedCalls = $missedCalls->count() > $historyLimit;
+        $missedCalls = $missedCalls->take($historyLimit)->values();
 
         $recentContacts = VoiceCall::query()
             ->whereIn('status', [VoiceCall::STATUS_ENDED, VoiceCall::STATUS_REJECTED])
@@ -843,8 +877,10 @@ class VoiceCallController extends Controller
                 $inner->where('station_id', $stationId)->orWhereNull('station_id');
             }))
             ->latest('ended_at')
-            ->limit(8)
+            ->limit($historyLimit + 1)
             ->get();
+        $hasMoreRecentContacts = $recentContacts->count() > $historyLimit;
+        $recentContacts = $recentContacts->take($historyLimit)->values();
 
         (new VoiceCall)->newCollection(
             $activeCalls
@@ -858,7 +894,13 @@ class VoiceCallController extends Controller
         )->loadMissing($this->payloadRelations());
 
         $responderHasCapacity = $this->occupiedResponderCallCount($user) < $this->maxConcurrentResponderCalls();
-        $serialize = fn (VoiceCall $call) => $this->serializeCall($call, $user, $responderHasCapacity);
+        $seenCallIds = $this->seenCallIds($user, $missedCalls);
+        $serialize = fn (VoiceCall $call) => $this->serializeCall(
+            $call,
+            $user,
+            $responderHasCapacity,
+            isset($seenCallIds[(int) $call->id])
+        );
 
         return [
             'success' => true,
@@ -868,9 +910,49 @@ class VoiceCallController extends Controller
             'incoming_calls' => $incoming->map($serialize)->values(),
             'missed_calls' => $missedCalls->map($serialize)->values(),
             'recent_contacts' => $recentContacts->map($serialize)->values(),
+            'history' => [
+                'limit' => $historyLimit,
+                'maximum_limit' => 40,
+                'has_more' => $hasMoreMissedCalls || $hasMoreRecentContacts,
+            ],
             'poll_interval_ms' => (int) config('services.voice_calls.poll_interval_ms', 2000),
             'server_time' => now()->toIso8601String(),
         ];
+    }
+
+    private function seenCacheKey(User $user, VoiceCall $call): string
+    {
+        return 'voice-calls:seen:'.(int) $user->user_id.':'.(int) $call->id;
+    }
+
+    private function hasSeenCall(User $user, VoiceCall $call): bool
+    {
+        try {
+            return (bool) Cache::get($this->seenCacheKey($user, $call), false);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function seenCallIds(User $user, $calls): array
+    {
+        $keysById = collect($calls)->mapWithKeys(
+            fn (VoiceCall $call) => [(int) $call->id => $this->seenCacheKey($user, $call)]
+        );
+        if ($keysById->isEmpty()) {
+            return [];
+        }
+
+        try {
+            $values = Cache::many($keysById->values()->all());
+
+            return $keysById
+                ->filter(fn (string $key) => (bool) ($values[$key] ?? false))
+                ->mapWithKeys(fn (string $key, int $callId) => [$callId => true])
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function authorizeCallVisibility(VoiceCall $call, User $user): void

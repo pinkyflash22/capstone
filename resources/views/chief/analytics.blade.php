@@ -5318,7 +5318,7 @@
             }
 
             try {
-                const response = await fetch(`/station-admin/api/action-plan-checklists?analysis_id=${encodeURIComponent(normalizedId)}`, {
+                const response = await fetch(`/station-admin/api/action-plan-checklists?analysis_id=${encodeURIComponent(normalizedId)}&per_page=25&page=1`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -6428,6 +6428,19 @@
             const monthlyPattern = chartContext.monthly_pattern || {};
             const mlTrendAnalysis = chartContext.ml_trend_analysis || {};
             const weatherPattern = chartContext.weather_pattern || {};
+            const weatherContext = analysisData.weather_context || {};
+            const weatherFetchedAt = weatherContext.fetched_at || null;
+            const weatherFetchedDate = weatherFetchedAt ? new Date(weatherFetchedAt) : null;
+            const weatherFetchedLabel = weatherFetchedDate && !Number.isNaN(weatherFetchedDate.getTime())
+                ? weatherFetchedDate.toLocaleString('en-PH', {
+                    timeZone: 'Asia/Manila',
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                })
+                : weatherFetchedAt;
+            const weatherFreshnessInsight = weatherFetchedLabel
+                ? `${weatherContext.is_stale ? 'Cached' : 'Open-Meteo'} weather fetched ${weatherFetchedLabel}${weatherContext.cache_status ? ` (${weatherContext.cache_status})` : ''}.`
+                : null;
             const dayOfWeekPattern = chartContext.day_of_week_pattern || {};
             const historicalVsPredicted = chartContext.historical_vs_predicted || {};
             const compactChart = isAnalyticsMobile();
@@ -7120,6 +7133,8 @@
             setInsightList(
                 'weatherPatternInsights',
                 [
+                    weatherFreshnessInsight,
+                    weatherContext.warning || null,
                     weatherPattern?.missing?.actual_incidents ? 'Historical incident-weather records are unavailable for the current scope.' : null,
                     weatherPattern?.missing?.temperature_2m ? 'temperature_2m history is missing from the available incident-weather records.' : null,
                     weatherPattern?.missing?.relative_humidity_2m ? 'relative_humidity_2m history is missing from the available incident-weather records.' : null,
@@ -8264,14 +8279,18 @@
             modal.classList.add('show');
         }
 
-        async function loadActionPlanChecklistPanel(analysisId = null) {
+        async function loadActionPlanChecklistPanel(analysisId = null, page = 1) {
             const panel = document.getElementById('actionPlanChecklistPanel');
             if (!panel) return;
 
             try {
-                const url = analysisId
-                    ? `/station-admin/api/action-plan-checklists?analysis_id=${encodeURIComponent(analysisId)}`
-                    : '/station-admin/api/action-plan-checklists';
+                const normalizedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+                const query = new URLSearchParams({
+                    per_page: '10',
+                    page: String(normalizedPage),
+                });
+                if (analysisId) query.set('analysis_id', String(analysisId));
+                const url = `/station-admin/api/action-plan-checklists?${query.toString()}`;
                 const response = await fetch(url, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
@@ -8282,13 +8301,14 @@
 
                 const result = await response.json();
                 const checklists = Array.isArray(result.data) ? result.data : [];
+                const pagination = result.pagination || {};
 
                 if (!checklists.length) {
                     panel.innerHTML = '<div class="text-center py-8 text-gray-500">No saved checklist rows yet for this analysis.</div>';
                     return;
                 }
 
-                panel.innerHTML = checklists.map((item) => {
+                const checklistCards = checklists.map((item) => {
                     const status = item.status || 'pending';
                     const checklistItems = Array.isArray(item.checklist_items) ? item.checklist_items : [];
                     const suggestions = Array.isArray(item.suggestions) ? item.suggestions : [];
@@ -8355,6 +8375,18 @@
                         </div>
                     `;
                 }).join('');
+                const currentPage = Number(pagination.current_page || 1);
+                const lastPage = Number(pagination.last_page || 1);
+                const safeAnalysisId = Number.isFinite(Number(analysisId)) ? Number(analysisId) : null;
+                panel.innerHTML = checklistCards + `
+                    <div style="margin-top:12px; padding:10px 12px; border-radius:12px; background:#f8fafc; color:#64748b; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                        <span>Showing ${escapeHtml(String(checklists.length))} of ${escapeHtml(String(pagination.total ?? checklists.length))} checklist row(s). Page ${escapeHtml(String(currentPage))} of ${escapeHtml(String(lastPage))}.</span>
+                        <span style="display:flex; gap:8px;">
+                            <button type="button" ${currentPage <= 1 ? 'disabled' : ''} onclick="loadActionPlanChecklistPanel(${safeAnalysisId ?? 'null'}, ${Math.max(1, currentPage - 1)})" style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-weight:700; color:#334155; ${currentPage <= 1 ? 'opacity:.45; cursor:not-allowed;' : 'cursor:pointer;'}">Previous</button>
+                            <button type="button" ${currentPage >= lastPage ? 'disabled' : ''} onclick="loadActionPlanChecklistPanel(${safeAnalysisId ?? 'null'}, ${Math.min(lastPage, currentPage + 1)})" style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-weight:700; color:#334155; ${currentPage >= lastPage ? 'opacity:.45; cursor:not-allowed;' : 'cursor:pointer;'}">Next</button>
+                        </span>
+                    </div>
+                `;
             } catch (error) {
                 console.error('Checklist panel load error:', error);
                 panel.innerHTML = `

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\PythonRuntime;
+use App\Support\OperationalFailureMonitor;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -522,6 +523,7 @@ class ForecastModelService
                 ]);
 
             if ($process->failed()) {
+                OperationalFailureMonitor::record('model_evaluation', $process->errorOutput() ?: 'Evaluation process failed.');
                 Log::warning('Forecast model evaluation artifact generation failed.', array_merge(
                     PythonRuntime::failureContext($process, $this->pythonBinary),
                     [
@@ -545,6 +547,7 @@ class ForecastModelService
             try {
                 Cache::put($this->evaluationRuntimeCacheKey($metadata), $generated, now()->addHours(6));
             } catch (\Throwable $runtimeCacheException) {
+                OperationalFailureMonitor::record('model_evaluation_cache', $runtimeCacheException->getMessage());
                 Log::info('Unable to retain runtime model-evaluation cache.', [
                     'message' => $runtimeCacheException->getMessage(),
                 ]);
@@ -557,8 +560,17 @@ class ForecastModelService
                         $this->evaluationCachePath,
                         json_encode($generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
                     );
+                } else {
+                    OperationalFailureMonitor::record(
+                        'model_evaluation_cache',
+                        'Filesystem evaluation-cache directory is not writable.'
+                    );
+                    Log::info('Skipping filesystem model-evaluation cache; directory is not writable.', [
+                        'evaluation_cache' => $this->evaluationCachePath,
+                    ]);
                 }
             } catch (\Throwable $cacheWriteException) {
+                OperationalFailureMonitor::record('model_evaluation_cache', $cacheWriteException->getMessage());
                 Log::info('Skipping filesystem model-evaluation cache; runtime cache remains available.', [
                     'message' => $cacheWriteException->getMessage(),
                 ]);
@@ -566,6 +578,7 @@ class ForecastModelService
 
             return array_replace_recursive($fallback, $generated);
         } catch (\Throwable $e) {
+            OperationalFailureMonitor::record('model_evaluation', $e->getMessage());
             Log::warning('Forecast model evaluation artifact generation threw an exception.', [
                 'message' => $e->getMessage(),
             ]);
@@ -623,6 +636,7 @@ class ForecastModelService
                 return $runtimeCached;
             }
         } catch (\Throwable $e) {
+            OperationalFailureMonitor::record('model_evaluation_cache', $e->getMessage());
             Log::info('Runtime model-evaluation cache is unavailable.', [
                 'message' => $e->getMessage(),
             ]);
@@ -635,6 +649,7 @@ class ForecastModelService
         try {
             $decoded = json_decode(File::get($this->evaluationCachePath), true, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable $e) {
+            OperationalFailureMonitor::record('model_evaluation_cache', $e->getMessage());
             Log::warning('Unable to read cached forecast model evaluation artifact.', [
                 'message' => $e->getMessage(),
             ]);

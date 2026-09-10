@@ -5323,7 +5323,53 @@ class AnalyticController extends Controller
             $stationId = $stationOfficer?->station_id;
 
             $query = AiActionPlanChecklist::query()
-                ->with(['analysis', 'barangay', 'assignee', 'confirmer', 'suggestions', 'items.reviewer'])
+                ->select([
+                    'ai_action_plan_checklist_id',
+                    'analysis_id',
+                    'station_id',
+                    'barangay_id',
+                    'risk_area_id',
+                    'source_type',
+                    'source_title',
+                    'source_description',
+                    'plan_title',
+                    'plan_description',
+                    'checklist_items',
+                    'success_indicator',
+                    'priority_level',
+                    'status',
+                    'target_date',
+                    'assigned_to',
+                    'confirmed_by',
+                    'confirmed_at',
+                    'confirmation_notes',
+                    'is_ai_generated',
+                    'analysis_revision',
+                    'requires_revision_review',
+                    'created_at',
+                    'updated_at',
+                ])
+                ->with([
+                    'suggestions' => fn ($suggestions) => $suggestions
+                        ->select([
+                            'ai_recommendation_suggestion_id',
+                            'ai_action_plan_checklist_id',
+                            'recommendation_title',
+                            'priority_level',
+                            'estimated_timeline',
+                            'created_at',
+                        ])
+                        ->latest('created_at'),
+                    'items' => fn ($items) => $items->select([
+                        'ai_action_plan_checklist_item_id',
+                        'ai_action_plan_checklist_id',
+                        'item_order',
+                        'item_text',
+                        'status',
+                        'reviewed_at',
+                        'review_notes',
+                    ]),
+                ])
                 ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
                 ->orderByRaw("
                     CASE priority_level
@@ -5352,7 +5398,22 @@ class AnalyticController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => collect($checklists->items())->map(function (AiActionPlanChecklist $item) use ($linkedMitigationCounts) {
-                    $payload = $item->toArray();
+                    $payload = $item->attributesToArray();
+                    $payload['items'] = $item->items->map(fn (AiActionPlanChecklistItem $checklistItem) => [
+                        'ai_action_plan_checklist_item_id' => $checklistItem->ai_action_plan_checklist_item_id,
+                        'item_order' => $checklistItem->item_order,
+                        'item_text' => $checklistItem->item_text,
+                        'status' => $checklistItem->status,
+                        'reviewed_at' => optional($checklistItem->reviewed_at)?->toISOString(),
+                        'review_notes' => $checklistItem->review_notes,
+                    ])->values();
+                    $payload['suggestions'] = $item->suggestions->take(3)->map(fn (AiRecommendationSuggestion $suggestion) => [
+                        'ai_recommendation_suggestion_id' => $suggestion->ai_recommendation_suggestion_id,
+                        'recommendation_title' => $suggestion->recommendation_title,
+                        'priority_level' => $suggestion->priority_level,
+                        'estimated_timeline' => $suggestion->estimated_timeline,
+                        'generated_at' => optional($suggestion->created_at)?->toISOString(),
+                    ])->values();
                     $linkedMitigation = $linkedMitigationCounts->get($item->ai_action_plan_checklist_id);
                     $payload['checklist_progress'] = $item->checklist_progress;
                     $payload['linked_mitigation_count'] = (int) ($linkedMitigation->aggregate_count ?? 0);
@@ -5379,6 +5440,11 @@ class AnalyticController extends Controller
 
                     return $payload;
                 })->values(),
+                'summary' => [
+                    'returned_count' => count($checklists->items()),
+                    'total_count' => $checklists->total(),
+                    'has_more' => $checklists->hasMorePages(),
+                ],
                 'pagination' => [
                     'current_page' => $checklists->currentPage(),
                     'last_page' => max(1, $checklists->lastPage()),
