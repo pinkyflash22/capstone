@@ -47,7 +47,6 @@
     .forecast-priorities > .analytics-section__head { padding-bottom: 14px; border-bottom: 1px solid #f1f5f9; }
     .forecast-priorities .analytics-section__title { font-size: 19px; }
     .forecast-priorities .recommendation-run-group { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: none; overflow: hidden; transition: border-color .2s, box-shadow .2s, transform .2s; }
-    .forecast-priorities .recommendation-run-group:hover { border-color: #fca5a5; box-shadow: 0 6px 18px #991b1b09; transform: translateY(-2px); }
     .forecast-priorities .recommendation-run-toggle { padding: 16px; background: transparent; }
     .forecast-priorities .recommendation-run-title { font-size: 14px; }
     .forecast-priorities .recommendation-run-subtitle { line-height: 1.55; }
@@ -107,6 +106,66 @@
         .forecast-priorities .analytics-section__title { font-size: 17px; }
         .forecast-priorities > .analytics-section__head .analytics-section__copy { display: block; font-size: 11px; }
     }
+    /* Let nested grids and long generated content shrink to the available
+       viewport instead of enlarging the page in mobile/standalone mode. */
+    .chief-theme-shell .analytics-stack :where(div, section, article, header, details, summary, button, label, span, p) { min-width: 0; overflow-wrap: anywhere; }
+    .chief-theme-shell :is(.analytics-dual-grid, .analytics-panel-grid, .analytics-pattern-group, .analytics-priority-grid) > * { min-width: 0; max-width: 100%; }
+    .chief-theme-shell .analytics-section__head { flex-wrap: wrap; }
+    .chief-theme-shell .analytics-section__actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+    .chief-theme-shell :is(.analytics-empty-pill, .recommendation-run-chip, .prediction-driver-chip, .analytics-btn, .analysis-evidence-trigger) { max-width: 100%; white-space: normal; }
+    .chief-theme-shell .analytics-chart-canvas { min-width: 0; max-width: 100%; }
+    .chief-theme-shell .analytics-chart-canvas canvas { max-width: 100%; }
+    .chief-theme-shell .forecast-context__intro { min-width: 0; }
+    .chief-theme-shell .forecast-context__facts { min-width: 0; }
+    .chief-theme-shell .analytics-scope-loading { max-width: 100%; white-space: normal; }
+    .chief-theme-shell .analytics-training-history__head { flex-wrap: wrap; }
+    .chief-theme-shell :is(.analytics-shell-card, .prediction-card, .command-decision-card, .analytics-ops-card, .analytics-mini-stat, .analytics-metric-card, .forecast-narrative-card, .recommendation-run-group) {
+        transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+    }
+    .chief-theme-shell :is(.analytics-shell-card, .prediction-card, .command-decision-card, .analytics-ops-card, .analytics-mini-stat, .analytics-metric-card, .forecast-narrative-card, .recommendation-run-group):focus-within {
+        border-color: #fb923c;
+        box-shadow: 0 0 0 3px #fb923c24, 0 8px 24px #9a34120a;
+    }
+    @media (hover: hover) and (pointer: fine) {
+        .chief-theme-shell :is(.prediction-card, .command-decision-card, .analytics-ops-card, .analytics-mini-stat, .analytics-metric-card, .forecast-narrative-card, .recommendation-run-group):hover {
+            transform: translateY(-3px);
+            border-color: #fdba74;
+            box-shadow: 0 8px 22px #9a341212;
+        }
+        .chief-theme-shell .analytics-shell-card:hover { border-color: #fed7aa; box-shadow: 0 8px 26px #9a34120a; }
+    }
+    @media (max-width: 1024px) {
+        .chief-theme-shell .analytics-dual-grid { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell .analytics-pattern-group { min-width: 0; max-width: 100%; }
+    }
+    @media (max-width: 640px) {
+        .chief-theme-shell .forecast-tools .analytics-control-grid { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell .forecast-tools .analytics-control-field { grid-column: 1 / -1; }
+        .chief-theme-shell .forecast-tools .analytics-actions { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell :is(.analytics-metric-grid, .analytics-model-training-grid, .analytics-run-modal__grid) { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell .recommendation-run-toggle { width: 100%; gap: 8px; }
+        .chief-theme-shell .recommendation-run-meta { flex: 1; min-width: 0; }
+        .chief-theme-shell .analytics-training-progress__stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .chief-theme-shell .analytics-training-history__item { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell .analytics-empty-state { padding: 14px; }
+    }
+    @media (max-width: 380px) {
+        .chief-theme-shell :is(.prediction-summary-grid, .analytics-ops-grid, .command-decision-strip, .forecast-context__facts) { grid-template-columns: minmax(0, 1fr); }
+        .chief-theme-shell .prediction-card { grid-column: 1 / -1; }
+    }
+    @media (display-mode: standalone) {
+        .chief-theme-shell { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+    }
+    .analytics-collapse-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .analytics-collapse-toggle i { transition: transform .2s ease; }
+    .analytics-collapse-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
+    .analytics-collapsible.is-collapsed > .analytics-section__head { margin-bottom: 0; }
+    .analytics-collapsible.is-collapsed > .analytics-section__head .analytics-section__copy { display: none; }
+    .analytics-collapsible-body[hidden] { display: none !important; }
+    .analytics-collapsible-body:not([hidden]) { animation: forecast-enter .2s ease-out; }
+    .analytics-checklist-details > summary { cursor: pointer; padding: 4px 0; }
+    .analytics-checklist-details > summary::marker { color: #ea580c; }
+    .analytics-checklist-details[open] > summary { margin-bottom: 12px; }
     @media (prefers-reduced-motion: reduce) {
         .chief-theme-shell *, .analytics-loading-card * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
     }
@@ -116,6 +175,41 @@
         const stack = document.querySelector('.analytics-stack');
         const priorities = document.querySelector('.forecast-priorities');
         if (!stack || !priorities) return;
+
+        // Move existing nodes rather than recreating them so chart canvases,
+        // loaded data, control IDs and attached handlers are preserved.
+        stack.querySelectorAll('.analytics-shell-card').forEach((card, index) => {
+            if (card.matches('.forecast-tools, .forecast-priorities, .prediction-summary-section')) return;
+            const head = card.querySelector(':scope > .analytics-section__head');
+            if (!head) return;
+            const title = head.querySelector('.analytics-section__title')?.textContent.trim() || 'Section';
+            const body = document.createElement('div');
+            body.id = `analyticsCollapsibleBody${index}`;
+            body.className = 'analytics-collapsible-body';
+            body.hidden = true;
+            while (head.nextSibling) body.appendChild(head.nextSibling);
+            card.appendChild(body);
+            card.classList.add('analytics-collapsible', 'is-collapsed');
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'analytics-collapse-toggle';
+            toggle.setAttribute('aria-controls', body.id);
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', `Expand ${title}`);
+            toggle.innerHTML = '<span>Expand</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+            head.appendChild(toggle);
+            toggle.addEventListener('click', () => {
+                const open = body.hidden;
+                body.hidden = !open;
+                card.classList.toggle('is-collapsed', !open);
+                toggle.setAttribute('aria-expanded', String(open));
+                toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${title}`);
+                toggle.querySelector('span').textContent = open ? 'Collapse' : 'Expand';
+                if (open) requestAnimationFrame(() => {
+                    body.querySelectorAll('canvas').forEach(canvas => window.Chart?.getChart?.(canvas)?.resize());
+                });
+            });
+        });
 
         // Reflect the page's existing request state; this adds no polling or requests.
         const skeleton = document.createElement('div');

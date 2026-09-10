@@ -6407,6 +6407,27 @@
             }
         }
 
+        // Reorder only the presentation copy, keeping every series aligned to
+        // its original label and leaving the response/calculations untouched.
+        function chronologicalYearComparison(source, seriesKeys) {
+            const labels = Array.isArray(source.labels) ? source.labels : [];
+            const yearOf = label => {
+                const text = String(label);
+                if (/current|forecast|predicted|baseline|average/i.test(text)) return Infinity;
+                return Number(text.match(/\b(?:19|20)\d{2}\b/)?.[0]) || Infinity;
+            };
+            const order = labels.map((label, index) => ({ index, year: yearOf(label) }))
+                .sort((a, b) => a.year === b.year ? a.index - b.index : a.year - b.year)
+                .map(item => item.index);
+            const result = { ...source, labels: order.map(index => labels[index]) };
+            seriesKeys.forEach(key => {
+                if (Array.isArray(source[key]) && source[key].length === labels.length) {
+                    result[key] = order.map(index => source[key][index]);
+                }
+            });
+            return result;
+        }
+
         function renderCharts(analysisData) {
             const chartContext = analysisData.chart_context || {};
             const daily = chartContext.daily || {};
@@ -6415,7 +6436,8 @@
             const seasonalPattern = chartContext.seasonal_pattern || {};
             const monthlyPattern = chartContext.monthly_pattern || {};
             const mlTrendAnalysis = chartContext.ml_trend_analysis || {};
-            const weatherPattern = chartContext.weather_pattern || {};
+            const weatherPattern = chronologicalYearComparison(chartContext.weather_pattern || {},
+                ['actual_incidents', 'temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 'wind_gusts_10m', 'precipitation', 'rain']);
             const weatherContext = analysisData.weather_context || {};
             const weatherFetchedAt = weatherContext.fetched_at || null;
             const weatherFetchedDate = weatherFetchedAt ? new Date(weatherFetchedAt) : null;
@@ -6430,7 +6452,8 @@
                 ? `${weatherContext.is_stale ? 'Cached' : 'Open-Meteo'} weather fetched ${weatherFetchedLabel}${weatherContext.cache_status ? ` (${weatherContext.cache_status})` : ''}.`
                 : null;
             const dayOfWeekPattern = chartContext.day_of_week_pattern || {};
-            const historicalVsPredicted = chartContext.historical_vs_predicted || {};
+            const historicalVsPredicted = chronologicalYearComparison(chartContext.historical_vs_predicted || {},
+                ['historical_values', 'historical_baseline', 'current_actual', 'forecast_incidents', 'forecast_probability']);
             const compactChart = isAnalyticsMobile();
             const chartFontSize = compactChart ? 10 : 12;
             const chartPointRadius = compactChart ? 2 : 4;
@@ -6466,6 +6489,18 @@
                 data: {
                     labels: historicalTrend.labels || [],
                     datasets: [
+                        ...([...(historicalTrend.historical_years || [])]
+                            .sort((a, b) => Number(a.year || String(a.label).match(/\d{4}/)?.[0] || 0) - Number(b.year || String(b.label).match(/\d{4}/)?.[0] || 0))
+                            .map((yearSeries, index) => ({
+                                label: `Historical ${yearSeries.label || yearSeries.year}`,
+                                data: yearSeries.values || [],
+                                borderColor: ['#94a3b8', '#64748b', '#475569'][index % 3],
+                                backgroundColor: 'rgba(148,163,184,0.05)',
+                                pointRadius: compactChart ? 1 : 2,
+                                tension: 0.2,
+                                borderDash: [3, 5],
+                                fill: false,
+                            }))),
                         {
                             label: 'Current Actual',
                             data: historicalTrend.current_actual || [],
@@ -6486,16 +6521,6 @@
                             tension: 0.25,
                             fill: false,
                         },
-                        ...((historicalTrend.historical_years || []).map((yearSeries, index) => ({
-                            label: `Historical ${yearSeries.label || yearSeries.year}`,
-                            data: yearSeries.values || [],
-                            borderColor: ['#94a3b8', '#64748b', '#475569'][index % 3],
-                            backgroundColor: 'rgba(148,163,184,0.05)',
-                            pointRadius: compactChart ? 1 : 2,
-                            tension: 0.2,
-                            borderDash: [3, 5],
-                            fill: false,
-                        })))
                     ],
                 },
                 options: {
@@ -8304,7 +8329,8 @@
                     const linkedMitigationCount = Number(item.linked_mitigation_count || 0);
 
                     return `
-                        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-bottom: 14px; background: #fff;">
+                        <details class="analytics-checklist-details" style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-bottom: 14px; background: #fff;">
+                            <summary>
                             <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 15px; font-weight: 800; color:#0f172a;">${escapeHtml(item.plan_title || item.source_title || 'Action Plan')}</div>
@@ -8315,6 +8341,7 @@
                                     ${escapeHtml(status)}
                                 </span>
                             </div>
+                            </summary>
                             ${item.plan_description ? `<p style="margin-top:10px; font-size:13px; color:#475569;">${escapeHtml(item.plan_description)}</p>` : ''}
                             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-top:12px;">
                                 <div style="padding:12px; border-radius:12px; background:#fff7ed; border:1px solid #fed7aa;">
@@ -8360,7 +8387,7 @@
                                     ${escapeHtml(item.effectiveness_hint || 'Ready for workflow handoff.')}
                                 </span>
                             </div>
-                        </div>
+                        </details>
                     `;
                 }).join('');
                 const currentPage = Number(pagination.current_page || 1);

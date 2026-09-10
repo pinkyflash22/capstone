@@ -2700,6 +2700,9 @@
 
                     <!-- right side -->
                     <div class="flex items-center space-x-6">
+                        <button type="button" id="citizenTourReplay" class="text-sm font-semibold text-orange-700 hover:text-orange-900" aria-label="Open getting started guide">
+                            <i class="fa-regular fa-circle-question" aria-hidden="true"></i> Guide
+                        </button>
                         <div class="relative">
                             <button id="citizenSosBtn" type="button" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition flex items-center gap-2" aria-expanded="false" aria-haspopup="true" aria-controls="citizenSosMenu">
                                 <i class="fa-solid fa-phone-alt"></i>
@@ -6355,6 +6358,7 @@ document.addEventListener('click', function(event) {
     
 @include('partials.user-activity-logger')
 @include('citizen.partials.logout-confirmation')
+@include('citizen.partials.getting-started-tour')
 @include('firefighters.partials.icon-fallback')
 @include('partials.pwa-body')
 <script>

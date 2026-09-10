@@ -1656,6 +1656,7 @@
             }
         }
     </style>
+    @include('chief.partials.resources-presentation')
 </head>
 <body class="chief-legacy-layout resource-management-page">
     <!-- Side Navigation -->

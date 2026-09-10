@@ -1,4 +1,6 @@
-const DEFAULT_MAX_ACCURACY_METERS = 100;
+// Match the citizen map's accepted GPS radius, including weak 137 m fixes.
+const DEFAULT_MAX_ACCURACY_METERS = 150;
+const ACCURACY_WARNING_METERS = 100;
 const DEFAULT_TARGET_ACCURACY_METERS = 35;
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_FIX_AGE_MS = 15000;
@@ -210,7 +212,7 @@ function collectReliableFix(options = {}) {
             if (bestFix && (bestFix.accuracy <= maxAccuracyMeters || acceptBestAvailable)) {
                 resolve({
                     ...bestFix,
-                    accuracyWarning: bestFix.accuracy > maxAccuracyMeters,
+                    accuracyWarning: bestFix.accuracy > Math.min(ACCURACY_WARNING_METERS, maxAccuracyMeters),
                     accuracyLimit: maxAccuracyMeters,
                 });
                 return;
