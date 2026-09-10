@@ -164,8 +164,8 @@ def prepare_station_barangay_request_frame(payload: dict, feature_columns: list[
     ]:
         df[column] = df[column].fillna(0)
     df["barangay_pressure_signal"] = (
-        df["incident_count"].fillna(0) * 1.2
-        + df["average_temperature"] * 0.35
+        df["average_temperature"] * 0.35
+        + df["previous_month_fire_incidents"] * 1.2
         + df["high_density_flag"] * 2.5
         - df["water_access_flag"] * 0.75
         + df["average_wind_speed"].fillna(0) * 0.15
@@ -413,6 +413,7 @@ def format_prediction_response(model, request_frame: pd.DataFrame, dataset_kind:
 
 def append_regression_outputs(bundle: dict, request_frame: pd.DataFrame, response: dict) -> dict:
     regression_models = bundle.get("regression_models", {}) or {}
+    regression_uncertainty = bundle.get("regression_uncertainty", {}) or {}
 
     for output_name, model in regression_models.items():
         try:
@@ -423,7 +424,16 @@ def append_regression_outputs(bundle: dict, request_frame: pd.DataFrame, respons
         if output_name == "predicted_incident_count":
             response[output_name] = max(0, int(round(prediction_value)))
         elif output_name == "predicted_estimated_damage":
-            response[output_name] = round(max(0.0, prediction_value), 2)
+            predicted_damage = round(max(0.0, prediction_value), 2)
+            response[output_name] = predicted_damage
+            uncertainty = regression_uncertainty.get(output_name, {}) or {}
+            margin = float(uncertainty.get("absolute_error_margin", 0) or 0)
+            if margin > 0:
+                response["predicted_estimated_damage_range"] = {
+                    "lower": round(max(0.0, predicted_damage - margin), 2),
+                    "upper": round(predicted_damage + margin, 2),
+                    "method": uncertainty.get("method", "held_out_absolute_error_margin"),
+                }
         else:
             response[output_name] = round(prediction_value, 4)
 

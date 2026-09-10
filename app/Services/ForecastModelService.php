@@ -417,6 +417,7 @@ class ForecastModelService
                 'brier_score' => Arr::get($metrics, 'brier_score'),
                 'cross_val_roc_auc_mean' => Arr::get($metrics, 'cross_val_roc_auc_mean'),
                 'cross_val_roc_auc_scores' => Arr::get($metrics, 'cross_val_roc_auc_scores', []),
+                'validation' => Arr::get($metrics, 'validation', []),
                 'classification_report' => Arr::get($metrics, 'classification_report', []),
             ],
             'regression_metrics' => Arr::get($metrics, 'regression_metrics', []),
@@ -510,7 +511,6 @@ class ForecastModelService
         }
 
         try {
-            File::ensureDirectoryExists(dirname($this->evaluationCachePath));
             $process = Process::path(base_path())
                 ->env($this->pythonEnvironment())
                 ->timeout(60)
@@ -519,8 +519,6 @@ class ForecastModelService
                     $this->relativeEvaluationScriptPath(),
                     '--dataset',
                     $this->datasetOption,
-                    '--output',
-                    $this->evaluationCachePath,
                 ]);
 
             if ($process->failed()) {
@@ -535,6 +533,38 @@ class ForecastModelService
 
                 return $fallback;
             }
+
+            $generated = json_decode(trim($process->output()), true, 512, JSON_THROW_ON_ERROR);
+            if (! is_array($generated)
+                || ($generated['trained_at'] ?? null) !== Arr::get($metadata, 'trained_at')) {
+                Log::warning('Forecast model evaluation returned an invalid or stale payload.');
+
+                return $fallback;
+            }
+
+            try {
+                Cache::put($this->evaluationRuntimeCacheKey($metadata), $generated, now()->addHours(6));
+            } catch (\Throwable $runtimeCacheException) {
+                Log::info('Unable to retain runtime model-evaluation cache.', [
+                    'message' => $runtimeCacheException->getMessage(),
+                ]);
+            }
+
+            try {
+                File::ensureDirectoryExists(dirname($this->evaluationCachePath));
+                if (is_writable(dirname($this->evaluationCachePath))) {
+                    File::put(
+                        $this->evaluationCachePath,
+                        json_encode($generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                    );
+                }
+            } catch (\Throwable $cacheWriteException) {
+                Log::info('Skipping filesystem model-evaluation cache; runtime cache remains available.', [
+                    'message' => $cacheWriteException->getMessage(),
+                ]);
+            }
+
+            return array_replace_recursive($fallback, $generated);
         } catch (\Throwable $e) {
             Log::warning('Forecast model evaluation artifact generation threw an exception.', [
                 'message' => $e->getMessage(),
@@ -543,7 +573,7 @@ class ForecastModelService
             return $fallback;
         }
 
-        return $this->readCachedEvaluationPayload($metadata) ?? $fallback;
+        return $fallback;
     }
 
     private function buildLearningPerformanceFallback(array $metadata): array
@@ -586,6 +616,18 @@ class ForecastModelService
 
     private function readCachedEvaluationPayload(array $metadata): ?array
     {
+        try {
+            $runtimeCached = Cache::get($this->evaluationRuntimeCacheKey($metadata));
+            if (is_array($runtimeCached)
+                && ($runtimeCached['trained_at'] ?? null) === Arr::get($metadata, 'trained_at')) {
+                return $runtimeCached;
+            }
+        } catch (\Throwable $e) {
+            Log::info('Runtime model-evaluation cache is unavailable.', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+
         if (! File::exists($this->evaluationCachePath)) {
             return null;
         }
@@ -609,6 +651,11 @@ class ForecastModelService
         }
 
         return $decoded;
+    }
+
+    private function evaluationRuntimeCacheKey(array $metadata): string
+    {
+        return 'forecast-model:evaluation:'.hash('sha256', (string) Arr::get($metadata, 'trained_at', 'unknown'));
     }
 
     private function relativeEvaluationScriptPath(): string

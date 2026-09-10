@@ -5,8 +5,6 @@ from typing import Optional
 
 import joblib
 import pandas as pd
-from sklearn.model_selection import train_test_split
-
 from train_model import (
     DEFAULT_DATA_PATH,
     METADATA_PATH,
@@ -17,6 +15,7 @@ from train_model import (
     prepare_legacy_dataframe,
     prepare_merged_incident_dataframe,
     prepare_station_barangay_monthly_dataframe,
+    split_for_validation,
 )
 
 
@@ -108,15 +107,9 @@ def main():
 
     labels = build_point_labels(records, dataset_kind)
 
-    stratify_target = y if y.nunique() > 1 and y.value_counts().min() >= 2 else None
-    X_train, X_test, y_train, y_test, labels_train, labels_test = train_test_split(
-        X,
-        y,
-        labels,
-        test_size=0.25,
-        random_state=42,
-        stratify=stratify_target,
-    )
+    time_periods = prep_metadata.pop("_time_periods", None)
+    X_train, X_test, y_train, y_test, _validation = split_for_validation(X, y, time_periods)
+    labels_test = labels.loc[X_test.index] if len(labels) == len(X) else pd.Series([f"Test record {index + 1}" for index in range(len(X_test))])
 
     model = bundle["model"]
     y_pred = model.predict(X_test)
@@ -155,13 +148,11 @@ def main():
             y_reg = target_values.loc[valid_mask].reset_index(drop=True)
             labels_reg = labels.loc[valid_mask].reset_index(drop=True)
 
-            X_reg_train, X_reg_test, y_reg_train, y_reg_test, labels_reg_train, labels_reg_test = train_test_split(
-                X_reg,
-                y_reg,
-                labels_reg,
-                test_size=0.25,
-                random_state=42,
+            regression_periods = pd.Series(time_periods).loc[valid_mask].reset_index(drop=True).tolist() if time_periods is not None and len(time_periods) == len(X) else None
+            X_reg_train, X_reg_test, y_reg_train, y_reg_test, _regression_validation = split_for_validation(
+                X_reg, y_reg, regression_periods,
             )
+            labels_reg_test = labels_reg.loc[X_reg_test.index] if len(labels_reg) == len(X_reg) else pd.Series([f"Test record {index + 1}" for index in range(len(X_reg_test))])
 
             regression_predictions = incident_model.predict(X_reg_test)
             result_rows = pd.DataFrame(
@@ -180,13 +171,7 @@ def main():
 
             if dataset_kind == "station_barangay_monthly":
                 raw_valid = raw_frame.loc[valid_mask].reset_index(drop=True)
-                _, _, _, _, raw_train, raw_test = train_test_split(
-                    X_reg,
-                    y_reg,
-                    raw_valid,
-                    test_size=0.25,
-                    random_state=42,
-                )
+                raw_test = raw_valid.loc[X_reg_test.index]
                 result_rows["year"] = pd.to_numeric(raw_test["year"], errors="coerce").fillna(0)
                 result_rows["month_number"] = raw_test["month"].map(month_order).fillna(0)
                 result_rows["barangay_name"] = raw_test["barangay_name"].fillna("Unknown")

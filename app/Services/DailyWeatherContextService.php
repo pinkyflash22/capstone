@@ -13,8 +13,10 @@ use Illuminate\Support\Facades\Log;
 class DailyWeatherContextService
 {
     public const SOURCE = 'open-meteo-recent-history';
-    private const FORECAST_CACHE_HOURS = 6;
-    private const FORECAST_STALE_HOURS = 72;
+    private const FORECAST_CACHE_HOURS = 12;
+    private const FORECAST_STALE_HOURS = 168;
+    private const FORECAST_RATE_LIMIT_COOLDOWN_HOURS = 6;
+    private const FORECAST_RATE_LIMIT_KEY = 'weather:forecast:open-meteo:rate-limited-until';
 
     /**
      * Collect one completed calendar day for every actively covered barangay.
@@ -136,6 +138,20 @@ class DailyWeatherContextService
             ]);
         }
 
+        $rateLimitUntil = $this->openMeteoRateLimitUntil();
+        if ($rateLimitUntil?->isFuture()) {
+            $lastSuccessful = $this->readForecastCache($staleKey);
+            if ($this->isUsableForecast($lastSuccessful)) {
+                return array_merge($lastSuccessful, [
+                    'cache_status' => 'stale-rate-limit-cooldown',
+                    'is_stale' => true,
+                    'warning' => 'Open-Meteo is rate-limited. Showing the last successful forecast while requests are paused.',
+                ]);
+            }
+
+            throw new \RuntimeException('Open-Meteo requests are temporarily paused after HTTP 429 until '.$rateLimitUntil->toIso8601String().'.');
+        }
+
         try {
             // One provider request only. In particular, HTTP 429 must never be
             // retried immediately because every retry consumes more quota.
@@ -168,6 +184,9 @@ class DailyWeatherContextService
                 ]);
 
             if (! $response->successful()) {
+                if ($response->status() === 429) {
+                    $this->startOpenMeteoRateLimitCooldown();
+                }
                 $message = $response->status() === 429
                     ? 'Open-Meteo daily request limit was reached (HTTP 429).'
                     : "Open-Meteo returned HTTP {$response->status()}.";
@@ -288,8 +307,36 @@ class DailyWeatherContextService
             && $forecast['cards'] !== [];
     }
 
+    private function openMeteoRateLimitUntil(): ?Carbon
+    {
+        try {
+            $value = Cache::get(self::FORECAST_RATE_LIMIT_KEY);
+
+            return filled($value) ? Carbon::parse((string) $value) : null;
+        } catch (\Throwable $exception) {
+            return null;
+        }
+    }
+
+    private function startOpenMeteoRateLimitCooldown(): void
+    {
+        try {
+            $until = now()->addHours(self::FORECAST_RATE_LIMIT_COOLDOWN_HOURS);
+            Cache::put(self::FORECAST_RATE_LIMIT_KEY, $until->toIso8601String(), $until);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to store the Open-Meteo rate-limit cooldown.', [
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     private function fetchCompletedDay(float $latitude, float $longitude, Carbon $date): array
     {
+        $rateLimitUntil = $this->openMeteoRateLimitUntil();
+        if ($rateLimitUntil?->isFuture()) {
+            throw new \RuntimeException('Open-Meteo requests are temporarily paused after HTTP 429 until '.$rateLimitUntil->toIso8601String().'.');
+        }
+
         // Do not automatically retry quota failures. The next scheduled run
         // can recover missing rows without multiplying provider requests.
         $response = Http::timeout(25)
@@ -311,6 +358,9 @@ class DailyWeatherContextService
             ]);
 
         if (! $response->successful()) {
+            if ($response->status() === 429) {
+                $this->startOpenMeteoRateLimitCooldown();
+            }
             throw new \RuntimeException("Open-Meteo returned HTTP {$response->status()}.");
         }
 

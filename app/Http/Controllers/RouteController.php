@@ -180,7 +180,7 @@ class RouteController extends Controller
             $activeRoutes = $this->visibleRouteQuery()
                     ->select($this->activeRouteSelectColumns())
                     ->with([
-                        'incident:incident_id,station_id,team_id,incident_status_id',
+                        'incident:incident_id,station_id,team_id,status',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->whereIn('status', ['active', 'moving'])
@@ -210,7 +210,7 @@ class RouteController extends Controller
             $activeRoutes = $this->visibleRouteQuery()
                     ->select($this->activeRouteSelectColumns())
                     ->with([
-                        'incident:incident_id,station_id,team_id,incident_status_id',
+                        'incident:incident_id,station_id,team_id,status',
                         'incident.team:team_id,commander_driver,pumper,team_leader,firefighter_officer_1,firefighter_officer_2,firefighter_officer_3,rescue_radio',
                     ])
                     ->where('incident_id', $incidentId)
@@ -531,7 +531,7 @@ class RouteController extends Controller
             'remaining_points' => $route->getRemainingPoints(),
             'status' => $route->status,
             'route_source' => $route->getAttribute('route_source') ?: 'real',
-            'incident_status_id' => $route->incident?->incident_status_id,
+            'incident_status_id' => $this->mapIncidentStatusToId($route->incident?->status),
             'destination_title' => $route->destination_title,
             'destination_lat' => $route->destination_lat,
             'destination_lng' => $route->destination_lng,
@@ -549,6 +549,17 @@ class RouteController extends Controller
             'updated_at' => optional($route->updated_at)->toISOString(),
             'last_updated_at' => optional($route->last_updated_at)->toISOString(),
         ];
+    }
+
+    private function mapIncidentStatusToId(?string $status): int
+    {
+        return match (strtolower(trim((string) $status))) {
+            'responding', 'en-route', 'en route' => 2,
+            'on scene', 'on-scene' => 3,
+            'controlled', 'completed' => 4,
+            'closed' => 5,
+            default => 1,
+        };
     }
 
     private function resolveRouteStationId(?Team $team, ?int $incidentStationId = null): ?int

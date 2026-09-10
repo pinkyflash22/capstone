@@ -1746,6 +1746,12 @@ class AnalyticController extends Controller
             $rawPredictedDamage = round((float) collect($barangayPredictions)->sum(function ($item) {
                 return (float) ($item['predicted_estimated_damage'] ?? 0);
             }), 2);
+            $damageRanges = collect($barangayPredictions)
+                ->pluck('predicted_estimated_damage_range')
+                ->filter(fn ($range) => is_array($range) && is_numeric($range['lower'] ?? null) && is_numeric($range['upper'] ?? null));
+            $damagePredictionCount = collect($barangayPredictions)
+                ->filter(fn ($item) => is_numeric($item['predicted_estimated_damage'] ?? null))
+                ->count();
             $damageMetrics = data_get(
                 $this->forecastModelService->readMetadataSummary(),
                 'regression_metrics.predicted_estimated_damage',
@@ -1754,6 +1760,15 @@ class AnalyticController extends Controller
             $damageR2 = data_get($damageMetrics, 'r2_score');
             $damageForecastReliable = is_numeric($damageR2) && (float) $damageR2 >= 0.2;
             $predictedDamage = $damageForecastReliable ? $rawPredictedDamage : null;
+            $predictedDamageRange = $damageForecastReliable
+                && $damagePredictionCount > 0
+                && $damageRanges->count() === $damagePredictionCount
+                ? [
+                    'lower' => round((float) $damageRanges->sum(fn ($range) => (float) $range['lower']), 2),
+                    'upper' => round((float) $damageRanges->sum(fn ($range) => (float) $range['upper']), 2),
+                    'method' => 'aggregated_held_out_absolute_error_80th_percentile',
+                ]
+                : null;
 
             $maxProbability = (float) ($probabilities->max() ?? 0);
             $averageProbability = (float) ($probabilities->avg() ?? 0);
@@ -1817,6 +1832,7 @@ class AnalyticController extends Controller
                 'incident_count_range' => $incidentCalibration['range'],
                 'forecast_calibration' => $incidentCalibration,
                 'predicted_estimated_damage' => $predictedDamage,
+                'predicted_estimated_damage_range' => $predictedDamageRange,
                 'damage_forecast_quality' => [
                     'available' => $damageForecastReliable,
                     'status' => $damageForecastReliable ? 'available' : 'withheld_low_validation_quality',
@@ -2861,6 +2877,10 @@ class AnalyticController extends Controller
             $prompt .= '- Predicted Additional Incidents: '.($modelPrediction['predicted_additional_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
             $prompt .= '- Expected Month-End Total: '.($modelPrediction['expected_month_total_fire_incidents'] ?? $modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
             $prompt .= '- Predicted Damage Exposure: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
+            if (is_array($modelPrediction['predicted_estimated_damage_range'] ?? null)) {
+                $prompt .= '- Damage Error Range: PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['lower'], 2)
+                    .' to PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['upper'], 2)."\n";
+            }
             $prompt .= '- Watch Items: '.implode(', ', $modelPrediction['watch_items'] ?? ['None'])."\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (! empty($driver['summary'])) {
@@ -2951,6 +2971,10 @@ class AnalyticController extends Controller
             $prompt .= '- Confidence: '.strtoupper($modelPrediction['confidence_band'] ?? 'unknown')."\n";
             $prompt .= '- Predicted incidents: '.($modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
             $prompt .= '- Predicted damage: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
+            if (is_array($modelPrediction['predicted_estimated_damage_range'] ?? null)) {
+                $prompt .= '- Damage error range: PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['lower'], 2)
+                    .' to PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['upper'], 2)."\n";
+            }
             $prompt .= '- Watch items: '.implode(', ', $modelPrediction['watch_items'] ?? ['None'])."\n";
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (! empty($driver['summary'])) {
@@ -2995,6 +3019,10 @@ class AnalyticController extends Controller
             $prompt .= 'MODEL RISK LEVEL: '.strtoupper($modelPrediction['risk_level'] ?? 'unknown')."\n";
             $prompt .= 'MODEL PREDICTED INCIDENT COUNT: '.($modelPrediction['predicted_incident_count'] ?? 'N/A')."\n";
             $prompt .= 'MODEL PREDICTED DAMAGE: '.(isset($modelPrediction['predicted_estimated_damage']) ? 'PHP '.number_format((float) $modelPrediction['predicted_estimated_damage'], 2) : 'N/A')."\n";
+            if (is_array($modelPrediction['predicted_estimated_damage_range'] ?? null)) {
+                $prompt .= 'MODEL DAMAGE ERROR RANGE: PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['lower'], 2)
+                    .' to PHP '.number_format((float) $modelPrediction['predicted_estimated_damage_range']['upper'], 2)."\n";
+            }
             foreach (array_slice($modelPrediction['drivers'] ?? [], 0, 3) as $driver) {
                 if (! empty($driver['summary'])) {
                     $prompt .= "MODEL DRIVER: {$driver['summary']}\n";
@@ -6694,6 +6722,7 @@ class AnalyticController extends Controller
             ((($data['available_personnel'] ?? 0) / max(1, ($data['total_personnel'] ?? 1))) < 0.6 ? 1 : 0));
         $predictedFireCount = max($baseFireCount, $predictedFireCount);
         $predictedDamage = null;
+        $predictedDamageRange = null;
 
         $likelyPeakHours = $predictionContext['likely_peak_hours'] ?? [];
         if (empty($likelyPeakHours)
@@ -6712,6 +6741,9 @@ class AnalyticController extends Controller
             $predictedDamage = isset($modelPrediction['predicted_estimated_damage'])
                 ? (float) $modelPrediction['predicted_estimated_damage']
                 : null;
+            $predictedDamageRange = is_array($modelPrediction['predicted_estimated_damage_range'] ?? null)
+                ? $modelPrediction['predicted_estimated_damage_range']
+                : null;
             if ($predictedProbability !== null) {
                 $summary .= " The Random Forest model currently estimates a {$predictedProbability}% probability for {$modelPrediction['target']}.";
             }
@@ -6729,6 +6761,10 @@ class AnalyticController extends Controller
 
         if (! is_null($predictedDamage)) {
             $summary .= ' Estimated possible damage exposure for the forecast window is around PHP '.number_format($predictedDamage, 2).'.';
+            if ($predictedDamageRange) {
+                $summary .= ' The held-out error range is PHP '.number_format((float) $predictedDamageRange['lower'], 2)
+                    .' to PHP '.number_format((float) $predictedDamageRange['upper'], 2).'.';
+            }
         }
 
         return [
@@ -6737,6 +6773,7 @@ class AnalyticController extends Controller
             'outlook' => $outlook,
             'predicted_fire_incidents' => $predictedFireCount,
             'predicted_damage' => $predictedDamage,
+            'predicted_damage_range' => $predictedDamageRange,
             'likely_peak_hours' => $likelyPeakHours,
             'likely_peak_hours_label' => $predictionContext['peak_hour_evidence']['label']
                 ?? (empty($likelyPeakHours) ? 'No clear peak yet' : implode(', ', $likelyPeakHours)),

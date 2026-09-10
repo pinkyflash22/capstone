@@ -5978,6 +5978,10 @@
                         <div class="analytics-model-training-card__value">${escapeHtml(String(recordsUsed))}</div>
                     </div>
                     <div class="analytics-model-training-card">
+                        <div class="analytics-model-training-card__label">Validation method</div>
+                        <div class="analytics-model-training-card__value">${escapeHtml(String(modelMetadata.metrics?.validation?.method || 'Unavailable').replaceAll('_', ' '))}</div>
+                    </div>
+                    <div class="analytics-model-training-card">
                         <div class="analytics-model-training-card__label">Input features</div>
                         <div class="analytics-model-training-card__value">${escapeHtml(String(featureCount))} feature${Number(featureCount) === 1 ? '' : 's'}</div>
                     </div>
@@ -7481,15 +7485,16 @@
                 console.log('AI Analysis Result:', result);
 
                 if (response.status === 202 && result.status_url) {
+                    const analysisStatusUrl = result.status_url;
                     window.localStorage.setItem('pyrosense-active-analysis-run', JSON.stringify({
-                        statusUrl: result.status_url,
+                        statusUrl: analysisStatusUrl,
                         predictionScope,
                         startedAt: Date.now(),
                     }));
                     let pollAttempts = 0;
                     while (!['completed', 'failed'].includes(result.status) && pollAttempts < 180) {
                         await new Promise((resolve) => window.setTimeout(resolve, 2000));
-                        const statusResponse = await fetch(result.status_url, {
+                        const statusResponse = await fetch(analysisStatusUrl, {
                             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                         });
                         result = await statusResponse.json().catch(() => ({}));
@@ -8175,6 +8180,9 @@
                         <div style="padding:14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe;">
                             <div style="font-size:11px; font-weight:800; color:#1d4ed8; text-transform:uppercase;">Estimated Damage</div>
                             <div style="font-size:22px; font-weight:900; color:#1e3a8a; margin-top:6px;">${prediction?.predicted_damage !== undefined && prediction?.predicted_damage !== null ? `PHP ${escapeHtml(Number(prediction.predicted_damage).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}` : 'N/A'}</div>
+                            ${prediction?.predicted_damage_range ? `
+                                <div style="font-size:11px; color:#475569; line-height:1.4; margin-top:6px;">Expected error range: PHP ${escapeHtml(Number(prediction.predicted_damage_range.lower).toLocaleString(undefined, { maximumFractionDigits: 2 }))}–${escapeHtml(Number(prediction.predicted_damage_range.upper).toLocaleString(undefined, { maximumFractionDigits: 2 }))}</div>
+                            ` : ''}
                             ${prediction?.model_prediction?.damage_forecast_quality?.available === false ? `
                                 <div style="font-size:11px; color:#475569; line-height:1.4; margin-top:6px;">Withheld because the latest damage regression did not pass validation.</div>
                             ` : ''}

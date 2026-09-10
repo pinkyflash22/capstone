@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
@@ -14,6 +15,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import TransformedTargetRegressor
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -311,6 +313,7 @@ def prepare_historical_dataframe(records: list[dict]) -> tuple[pd.DataFrame, pd.
         "categorical_features": ["season", "density", "materials", "peak_hours", "accesibility", "type_incident", "occupancy"],
         "numeric_features": ["station_id", "year", "average_temperature", "water_access_flag", "month_sin", "month_cos", "is_dry_season", "high_density_flag"],
         "target_description": "Binary high-risk month/event target derived from historical_data.risk_level and incident_count.",
+        "_time_periods": (df["year"].astype(int) * 100 + df["month_number"].astype(int)).tolist(),
     }
     return df[feature_columns], df["target_high_risk_event"], feature_columns, metadata
 
@@ -440,9 +443,13 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
     df["temperature_signal"] = df["average_temperature"].fillna(0)
     df["humidity_signal"] = df["average_humidity"].fillna(df["average_humidity"].median() if not df["average_humidity"].dropna().empty else 0)
     df["wind_signal"] = df["average_wind_speed"].fillna(df["average_wind_speed"].median() if not df["average_wind_speed"].dropna().empty else 0)
+    chronological_rows = df.sort_values(["barangay_id", "year", "month_number"])
+    df["previous_month_fire_incidents"] = (
+        chronological_rows.groupby("barangay_id")["incident_count"].shift(1).reindex(df.index).fillna(0)
+    )
     df["barangay_pressure_signal"] = (
-        df["incident_count"] * 1.2
-        + df["average_temperature"] * 0.35
+        df["average_temperature"] * 0.35
+        + df["previous_month_fire_incidents"] * 1.2
         + df["high_density_flag"] * 2.5
         - df["water_access_flag"] * 0.75
         + df["average_wind_speed"].fillna(0) * 0.15
@@ -523,6 +530,7 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
         "temperature_signal",
         "humidity_signal",
         "wind_signal",
+        "previous_month_fire_incidents",
         "barangay_pressure_signal",
         "weather_condition",
         "season",
@@ -601,15 +609,18 @@ def prepare_station_barangay_monthly_dataframe(records: list[dict]) -> tuple[pd.
             "temperature_signal",
             "humidity_signal",
             "wind_signal",
+            "previous_month_fire_incidents",
             "barangay_pressure_signal",
         ],
-        "target_description": "Binary high-risk barangay-month target derived from barangay-level monthly risk_level and incident_count.",
+        "target_description": "Binary high-risk barangay-month target derived from risk level, incident count, and estimated damage; predictions use only information available before or during the forecast window.",
         "target_policy": {
             "risk_level": "high, or medium with corroborating evidence",
             "incident_count_threshold": incident_threshold,
             "estimated_damage_threshold": round(damage_threshold, 2),
             "identity_features_excluded": ["station_id", "barangay_id", "barangay_name"],
+            "current_outcome_features_excluded": ["incident_count", "estimated_damage", "injured_count", "death_count"],
         },
+        "_time_periods": (df["year"].astype(int) * 100 + df["month_number"].astype(int)).tolist(),
         "regression_targets": {
             "predicted_incident_count": "incident_count",
             "predicted_estimated_damage": "estimated_damage",
@@ -804,6 +815,7 @@ def prepare_merged_incident_dataframe(records: list[dict]) -> tuple[pd.DataFrame
             "damage_pressure_signal",
         ],
         "target_description": "Binary high-impact incident target derived from casualties, final damage, or confirmed responsible arson indicators.",
+        "_time_periods": (df["incident_year"].astype(int) * 100 + df["incident_month_number"].astype(int)).tolist(),
     }
     return df[feature_columns], df["target_high_impact_incident"], feature_columns, metadata
 
@@ -838,13 +850,19 @@ def build_model(y_train: pd.Series, categorical_features: list[str]) -> Pipeline
     ])
 
 
-def build_regression_model(categorical_features: list[str]) -> Pipeline | RandomForestRegressor:
-    estimator = RandomForestRegressor(
+def build_regression_model(categorical_features: list[str], log_target: bool = False):
+    base_estimator = RandomForestRegressor(
         n_estimators=250,
         max_depth=12,
         min_samples_leaf=2,
         random_state=42,
     )
+    estimator = TransformedTargetRegressor(
+        regressor=base_estimator,
+        func=np.log1p,
+        inverse_func=np.expm1,
+        check_inverse=False,
+    ) if log_target else base_estimator
 
     if not categorical_features:
         return estimator
@@ -860,6 +878,64 @@ def build_regression_model(categorical_features: list[str]) -> Pipeline | Random
         ("preprocessor", preprocessor),
         ("model", estimator),
     ])
+
+
+def split_for_validation(X: pd.DataFrame, y: pd.Series, time_periods=None):
+    """Keep the newest complete periods out of training whenever dates are available."""
+    if time_periods is not None and len(time_periods) == len(X):
+        periods = pd.Series(time_periods, index=X.index)
+        unique_periods = sorted(periods.dropna().unique().tolist())
+        if len(unique_periods) >= 4:
+            test_period_count = max(1, int(math.ceil(len(unique_periods) * 0.25)))
+            test_periods = set(unique_periods[-test_period_count:])
+            test_mask = periods.isin(test_periods)
+            train_indices = X.index[~test_mask]
+            test_indices = X.index[test_mask]
+            if len(train_indices) >= 2 and len(test_indices) >= 2 and y.loc[train_indices].nunique() >= 2:
+                return (
+                    X.loc[train_indices],
+                    X.loc[test_indices],
+                    y.loc[train_indices],
+                    y.loc[test_indices],
+                    {
+                        "method": "chronological_holdout",
+                        "train_period_end": str(max(periods.loc[train_indices])),
+                        "test_period_start": str(min(periods.loc[test_indices])),
+                        "test_period_end": str(max(periods.loc[test_indices])),
+                    },
+                )
+
+    stratify_target = y if y.nunique() > 1 and y.value_counts().min() >= 2 else None
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42, stratify=stratify_target,
+    )
+    return X_train, X_test, y_train, y_test, {"method": "random_holdout_fallback"}
+
+
+def chronological_cross_validation_splits(y: pd.Series, time_periods, max_splits: int = 5):
+    if time_periods is None or len(time_periods) != len(y):
+        return []
+
+    periods = pd.Series(time_periods).reset_index(drop=True)
+    unique_periods = sorted(periods.dropna().unique().tolist())
+    if len(unique_periods) < 4:
+        return []
+
+    candidate_test_periods = unique_periods[-min(max_splits, len(unique_periods) - 2):]
+    folds = []
+    normalized_y = y.reset_index(drop=True)
+    for test_period in candidate_test_periods:
+        train_indices = np.flatnonzero((periods < test_period).to_numpy())
+        test_indices = np.flatnonzero((periods == test_period).to_numpy())
+        if len(train_indices) < 2 or len(test_indices) < 2:
+            continue
+        train_class_counts = normalized_y.iloc[train_indices].value_counts()
+        if (len(train_class_counts) < 2 or train_class_counts.min() < 3
+                or normalized_y.iloc[test_indices].nunique() < 2):
+            continue
+        folds.append((train_indices, test_indices))
+
+    return folds
 
 
 def get_fitted_estimator(model):
@@ -989,15 +1065,9 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     print(f"3. Prepared {len(X)} clean records with {len(feature_columns)} model features.")
     print(f"4. Class distribution: {y.value_counts().to_dict()}")
 
-    emit_progress(42, "splitting_dataset", "Creating stratified training and validation partitions.")
-    stratify_target = y if y.nunique() > 1 and y.value_counts().min() >= 2 else None
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.25,
-        random_state=42,
-        stratify=stratify_target,
-    )
+    emit_progress(42, "splitting_dataset", "Holding out the newest periods for validation when dated records are available.")
+    time_periods = metadata.pop("_time_periods", None)
+    X_train, X_test, y_train, y_test, validation = split_for_validation(X, y, time_periods)
 
     print("5. Training probability-aware event model...")
     emit_progress(48, "training_classifier", "Training the barangay high-risk probability classifier.")
@@ -1007,13 +1077,30 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     emit_progress(60, "validating_classifier", "Evaluating classifier predictions and probability calibration.")
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1] if len(set(y)) > 1 else [0.0] * len(y_test)
-    cv_scores = cross_val_score(
-        build_model(y_train, metadata["categorical_features"]),
-        X,
-        y,
-        cv=min(5, max(2, len(X) // 20)),
-        scoring="roc_auc",
-    ) if y.nunique() > 1 and y.value_counts().min() >= 2 else []
+    chronological_folds = chronological_cross_validation_splits(y, time_periods)
+    if chronological_folds:
+        raw_cv_scores = cross_val_score(
+            build_model(y_train, metadata["categorical_features"]),
+            X.reset_index(drop=True),
+            y.reset_index(drop=True),
+            cv=chronological_folds,
+            scoring="roc_auc",
+            error_score=np.nan,
+        )
+        cv_scores = [float(score) for score in raw_cv_scores if not np.isnan(score)]
+        validation["cross_validation_method"] = "expanding_window_chronological"
+    elif validation["method"] == "random_holdout_fallback" and y.nunique() > 1 and y.value_counts().min() >= 2:
+        cv_scores = cross_val_score(
+            build_model(y_train, metadata["categorical_features"]),
+            X,
+            y,
+            cv=min(5, max(2, len(X) // 20)),
+            scoring="roc_auc",
+        )
+        validation["cross_validation_method"] = "stratified_random_folds"
+    else:
+        cv_scores = []
+        validation["cross_validation_method"] = "unavailable"
 
     global_feature_importance = aggregate_global_feature_importance(model, feature_columns)
     emit_progress(69, "building_explanations", "Calculating validation metrics and feature importance.")
@@ -1021,6 +1108,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     example_profiles = build_example_profiles(X, y)
     regression_models: dict[str, object] = {}
     regression_metrics: dict[str, dict] = {}
+    regression_uncertainty: dict[str, dict] = {}
 
     regression_targets = metadata.get("regression_targets", {})
     if regression_targets:
@@ -1041,18 +1129,23 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
 
             X_reg = X.loc[valid_mask].reset_index(drop=True)
             y_reg = target_values.loc[valid_mask].reset_index(drop=True)
-            X_reg_train, X_reg_test, y_reg_train, y_reg_test = train_test_split(
-                X_reg,
-                y_reg,
-                test_size=0.25,
-                random_state=42,
+            regression_periods = pd.Series(time_periods).loc[valid_mask].reset_index(drop=True).tolist() if time_periods is not None and len(time_periods) == len(X) else None
+            X_reg_train, X_reg_test, y_reg_train, y_reg_test, regression_validation = split_for_validation(
+                X_reg, y_reg, regression_periods,
             )
 
-            regression_model = build_regression_model(metadata["categorical_features"])
+            log_target = output_name == "predicted_estimated_damage"
+            regression_model = build_regression_model(metadata["categorical_features"], log_target=log_target)
             regression_model.fit(X_reg_train, y_reg_train)
             y_reg_pred = regression_model.predict(X_reg_test)
+            absolute_errors = np.abs(np.asarray(y_reg_test) - np.asarray(y_reg_pred))
+            error_quantile_80 = float(np.quantile(absolute_errors, 0.80)) if len(absolute_errors) else 0.0
 
             regression_models[output_name] = regression_model
+            regression_uncertainty[output_name] = {
+                "method": "held_out_absolute_error_80th_percentile",
+                "absolute_error_margin": round(error_quantile_80, 4),
+            }
             regression_metrics[output_name] = {
                 "target_column": target_column,
                 "train_rows": int(len(X_reg_train)),
@@ -1060,6 +1153,9 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
                 "mae": float(round(mean_absolute_error(y_reg_test, y_reg_pred), 4)),
                 "rmse": float(round(math.sqrt(mean_squared_error(y_reg_test, y_reg_pred)), 4)),
                 "r2_score": float(round(r2_score(y_reg_test, y_reg_pred), 4)) if len(y_reg_test) > 1 else None,
+                "validation": regression_validation,
+                "target_transform": "log1p" if log_target else "none",
+                "absolute_error_margin_80": round(error_quantile_80, 4),
             }
 
     metrics = {
@@ -1073,6 +1169,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "brier_score": float(round(brier_score_loss(y_test, y_prob), 4)) if len(set(y_test)) > 1 else None,
         "cross_val_roc_auc_mean": float(round(sum(cv_scores) / len(cv_scores), 4)) if len(cv_scores) else None,
         "cross_val_roc_auc_scores": [float(round(score, 4)) for score in cv_scores] if len(cv_scores) else [],
+        "validation": validation,
         "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
         "regression_metrics": regression_metrics,
     }
@@ -1082,6 +1179,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
     model_bundle = {
         "model": model,
         "regression_models": regression_models,
+        "regression_uncertainty": regression_uncertainty,
         "feature_columns": feature_columns,
         "dataset_kind": metadata["dataset_kind"],
         "target_column": metadata["target_column"],
@@ -1094,6 +1192,7 @@ def train(data_path: Path = DEFAULT_DATA_PATH):
         "regression_targets": regression_targets,
         "calibration": calibration,
         "target_policy": metadata.get("target_policy", {}),
+        "validation": validation,
     }
     joblib.dump(model_bundle, MODEL_PATH)
 
