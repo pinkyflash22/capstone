@@ -44,6 +44,9 @@
     .management-container .resource-is-collapsed > :is(.section-header, .boundary-control-header) { border-bottom: 0; margin-bottom: 0; }
     .management-container .resource-is-collapsed > .boundary-control-header p { display: none; }
     .resource-collapse-body:not([hidden]) { animation: resource-reveal .22s ease-out; }
+    .management-container .resource-tier[aria-busy="true"] > :is(.section-header, .boundary-control-header)::after { content: 'Updating records…'; color: #9a3412; font-size: 11px; padding: 6px 10px; border-radius: 7px; background: linear-gradient(100deg, #fff7ed 25%, #fed7aa 50%, #fff7ed 75%); background-size: 200% 100%; animation: resource-loading 1.6s linear infinite; }
+    .management-container .resource-tier[aria-busy="true"] .resource-collapse-body { opacity: .6; }
+    @keyframes resource-loading { from { background-position: 200% 0; } to { background-position: -200% 0; } }
     @keyframes resource-reveal { from { opacity: .35; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @media (hover: hover) and (pointer: fine) {
         .management-container .resource-tier:hover { border-color: #fed7aa; box-shadow: 0 8px 24px #9a34120a; }
@@ -78,7 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const shell = document.querySelector('.management-container');
     if (!shell) return;
     const expanders = new Map();
-    shell.querySelectorAll('.station-grid.resource-tier, .boundary-control-card.resource-tier').forEach((card, index) => {
+    const openStates = new Map();
+    const enhanceCard = (card, index) => {
+        if (card.querySelector(':scope > .resource-collapse-body')) return;
         const head = card.querySelector(':scope > .section-header, :scope > .boundary-control-header');
         if (!head) return;
         const title = head.querySelector('h3')?.textContent.trim() || 'Resources';
@@ -93,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggle.setAttribute('aria-controls', body.id);
         toggle.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
         const setOpen = open => {
+            openStates.set(card.id, open);
             body.hidden = !open;
             card.classList.toggle('resource-is-collapsed', !open);
             toggle.setAttribute('aria-expanded', String(open));
@@ -101,10 +107,16 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         // Keep operational readiness visible, and preserve visibility on paginated visits.
         const paginated = Array.from(new URLSearchParams(location.search).keys()).some(key => key.includes('page'));
-        setOpen(paginated || card.matches('.resource-tier--operations, .resource-tier--teams, .resource-tier--apparatus'));
+        setOpen(openStates.get(card.id) ?? (paginated || card.matches('.resource-tier--operations, .resource-tier--teams, .resource-tier--apparatus')));
         head.appendChild(toggle);
         toggle.addEventListener('click', () => setOpen(body.hidden));
         expanders.set(card.id, () => setOpen(true));
+    };
+    shell.querySelectorAll('.station-grid.resource-tier, .boundary-control-card.resource-tier').forEach((card, index) => {
+        enhanceCard(card, index);
+        // Existing AJAX handlers replace each card's innerHTML. Reattach only
+        // presentation controls, preserving its open state and the fresh rows.
+        new MutationObserver(() => enhanceCard(card, index)).observe(card, { childList: true });
     });
     const revealHash = () => {
         const expand = expanders.get(location.hash.slice(1));

@@ -518,6 +518,7 @@
             .row-actions .row-btn, .row-btn.primary-view { width: 30px; min-width: 30px; min-height: 30px; }
         }
     </style>
+    @include('chief.partials.workflow-presentation')
 </head>
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
