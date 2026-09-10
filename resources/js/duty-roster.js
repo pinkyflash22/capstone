@@ -89,11 +89,25 @@ if (app) {
             .filter(Boolean);
 
         personnelSelects.forEach(select => {
+            const reasonFor = id => availabilityReason(id, form.elements.starts_at.value, form.elements.ends_at.value, select.name.startsWith('station_duty'));
             [...select.options].forEach(option => {
                 if (!option.value) return;
-                option.disabled = option.value !== String(select.value || '') && selectedValues.includes(option.value);
+                const reason = reasonFor(option.value);
+                option.disabled = option.value !== String(select.value || '') && (selectedValues.includes(option.value) || !!reason);
+                option.title = reason;
             });
+            select.setCustomValidity(select.value ? reasonFor(select.value) : '');
         });
+    }
+
+    function availabilityReason(id, startValue, endValue, command = false) {
+        if (!state.data || !startValue || !endValue) return '';
+        const start = new Date(startValue), end = new Date(endValue);
+        const recovery = new Date(end.getTime() + Math.min(86400000, Math.max(0, end - start)));
+        if (state.data.exceptions.some(item => Number(item.station_officer_id) === Number(id) && parse(item.starts_at) < end && parse(item.ends_at) > start)) return 'Rest day or leave overlaps this duty period.';
+        if (!command && (state.data.availability_shifts || []).some(item => Number(item.id) !== Number(state.editingShift?.id)
+            && item.officer_ids.map(Number).includes(Number(id)) && parse(item.starts_at) < recovery && parse(item.recovery_ends_at) > start)) return 'Another duty shift or its recovery period conflicts with this assignment.';
+        return '';
     }
 
     function duplicateAssignmentName(form) {
@@ -105,6 +119,7 @@ if (app) {
         const seen = new Set();
 
         for (const select of selects) {
+            if (select.disabled) continue;
             const value = String(select.value || '');
             if (!value) continue;
             if (seen.has(value)) return select.selectedOptions[0]?.textContent?.trim() || 'Selected personnel';
@@ -124,7 +139,10 @@ if (app) {
         const next = state.data.shifts.filter(shift => parse(shift.starts_at) > now).sort((a, b) => parse(a.starts_at) - parse(b.starts_at))[0];
         $('#dutyMetricDeployable').textContent = deployable.size;
         $('#dutyMetricCommand').textContent = command.size;
-        $('#dutyMetricExceptions').textContent = activeExceptions.length;
+        const restingIds = new Set(activeExceptions.map(item => Number(item.station_officer_id)));
+        (state.data.availability_shifts || []).filter(shift => parse(shift.ends_at) <= now && parse(shift.recovery_ends_at) > now)
+            .forEach(shift => shift.officer_ids.forEach(id => restingIds.add(Number(id))));
+        $('#dutyMetricExceptions').textContent = restingIds.size;
         $('#dutyMetricHandoff').textContent = next ? fmt(next.starts_at).split(',').slice(-1)[0].trim() : '—';
         $('#dutyMetricHandoffLabel').textContent = next ? `${next.label} · ${fmt(next.starts_at)}` : 'No upcoming shift';
     }
@@ -156,6 +174,18 @@ if (app) {
         $('#dutyExceptionList').innerHTML = items.length ? items.map(item => `<article class="duty-roster__exception"><span class="duty-roster__exception-icon"><i class="fa-solid ${item.type === 'leave' ? 'fa-plane-departure' : 'fa-bed'}"></i></span><div><strong>${escapeHtml(item.officer.name)} · ${item.type === 'leave' ? 'Leave' : 'Rest day'}</strong><small>${fmt(item.starts_at)} → ${fmt(item.ends_at)}</small></div><button class="duty-roster__delete" type="button" data-delete-exception="${item.id}" title="Remove"><i class="fa-solid fa-xmark"></i></button></article>`).join('') : '<div class="duty-roster__empty">No rest days or leave in this window.</div>';
     }
 
+    function renderRecovery() {
+        const now = new Date();
+        const recovering = (state.data.availability_shifts || []).filter(shift => parse(shift.ends_at) <= now && parse(shift.recovery_ends_at) > now);
+        const seen = new Set();
+        const rows = recovering.flatMap(shift => shift.officer_ids.map(id => {
+            if (seen.has(Number(id))) return '';
+            seen.add(Number(id));
+            return `<article class="duty-roster__exception"><span class="duty-roster__exception-icon"><i class="fa-solid fa-bed"></i></span><div><strong>${escapeHtml(officerById(id)?.name || 'Firefighter')} · Shift recovery</strong><small>Rest until ${fmt(shift.recovery_ends_at)}</small></div></article>`;
+        })).join('');
+        if (rows) $('#dutyExceptionList').insertAdjacentHTML('afterbegin', rows);
+    }
+
     function updateTeamTable() {
         const active = state.data.shifts.filter(shift => isActive(shift));
         const exceptions = state.data.exceptions.filter(item => isActive(item));
@@ -178,7 +208,8 @@ if (app) {
     async function refresh(silent = false) {
         try {
             state.data = await request('');
-            hydrateForms(); renderMetrics(); renderTimeline(); renderExceptions(); updateTeamTable();
+            if (!$('#dutyShiftDialog').open && !$('#dutyExceptionDialog').open) hydrateForms();
+            renderMetrics(); renderTimeline(); renderExceptions(); renderRecovery(); updateTeamTable();
         } catch (error) {
             if (!silent) toast(error.message, true);
         }
@@ -191,6 +222,9 @@ if (app) {
         form.querySelector('[data-repeat-until]').hidden = !isRecurring;
         form.querySelector('[data-weekday-picker]').hidden = !usesSelectedWeekdays;
         form.elements.recurrence_until.required = isRecurring;
+        const interval = form.querySelector('[data-rotation-interval]');
+        if (interval) interval.hidden = recurrence !== 'rotation' || form.elements.schedule_template.value !== 'single';
+        if (recurrence === 'rotation' && !form.elements.rotation_interval_days.value) form.elements.rotation_interval_days.value = '2';
         form.querySelectorAll('[name="weekdays[]"]').forEach(input => {
             input.disabled = !usesSelectedWeekdays;
         });
@@ -198,9 +232,10 @@ if (app) {
 
     function setPlanEndTime(form) {
         const plan = form.elements.schedule_template?.value || 'single';
-        if (plan === 'single' || !form.elements.starts_at.value) return;
+        if (!form.elements.starts_at.value) return;
+        if (plan === 'single' && form.elements.shift_duration?.value === 'custom') return;
         const end = new Date(form.elements.starts_at.value);
-        end.setHours(end.getHours() + (plan === 'two_team_12' ? 12 : 24));
+        end.setHours(end.getHours() + (plan === 'single' ? Number(form.elements.shift_duration?.value || 24) : plan === 'two_team_12' ? 12 : 24));
         form.elements.ends_at.value = localInput(end);
     }
 
@@ -210,10 +245,12 @@ if (app) {
         const list = form.querySelector('[data-turn-preview-list]');
         const rotating = plan !== 'single';
         preview.hidden = !rotating;
-        if (!rotating) return;
+        if (!rotating) { list.innerHTML = ''; return; }
+
+        const previous = Object.fromEntries([...list.querySelectorAll('select')].map(select => [select.name, select.value]));
 
         const teamIds = [...form.querySelectorAll('[name="rotation_team_ids[]"]:checked')].map(input => Number(input.value));
-        const neededTeams = plan === 'two_team_12' ? 2 : 3;
+        const neededTeams = plan === 'three_team_24' ? 3 : 2;
         if (teamIds.length !== neededTeams || !form.elements.starts_at.value) {
             list.textContent = `Choose ${neededTeams} teams to see their turns.`;
             return;
@@ -229,14 +266,23 @@ if (app) {
             if (plan === 'two_team_12') start.setHours(start.getHours() + (index * 12));
             else start.setDate(start.getDate() + index);
             const end = new Date(start); end.setHours(end.getHours() + hours);
-            return `<article><span>${index + 1}</span><div><strong>Team ${teamId}</strong><small>${escapeHtml(format(start))} to ${escapeHtml(format(end))}</small></div></article>`;
+            const team = state.data.teams.find(item => Number(item.team_id) === teamId);
+            const firefighters = state.data.officers.filter(officer => String(officer.role).toLowerCase() === 'firefighter');
+            return `<fieldset class="duty-roster__rotation-crew"><legend>Run ${index + 1} · Team ${teamId}</legend><p>${escapeHtml(format(start))} to ${escapeHtml(format(end))}</p><div class="duty-roster__form-grid">${roles.map(([key, label, required]) => {
+                const name = `run_${teamId}_${key}`;
+                const selected = previous[name] ?? String(team?.[key] || '');
+                return `<label>${label}<select name="${name}" data-run-team="${teamId}" data-run-role="${key}" ${required ? 'required' : ''}><option value="">${required ? 'Select available firefighter' : 'Optional'}</option>${firefighters.map(officer => {
+                    const reason = availabilityReason(officer.id, start, end);
+                    return `<option value="${officer.id}" ${String(officer.id) === selected ? 'selected' : ''} ${reason ? 'disabled' : ''}>${escapeHtml(officer.name)}${reason ? ' — unavailable / recovery' : ''}</option>`;
+                }).join('')}</select></label>`;
+            }).join('')}</div></fieldset>`;
         }).join('');
     }
 
     function toggleScheduleTemplate(form) {
         const plan = form.elements.schedule_template?.value || 'single';
         const rotating = plan !== 'single';
-        const neededTeams = plan === 'two_team_12' ? 2 : 3;
+        const neededTeams = plan === 'three_team_24' ? 3 : 2;
         form.querySelector('[data-rotation-picker]').hidden = !rotating;
         form.querySelector('[data-single-team]').hidden = rotating;
         form.elements.team_id.disabled = rotating;
@@ -247,15 +293,16 @@ if (app) {
             form.elements[key].disabled = rotating;
         });
         form.querySelectorAll('[name="rotation_team_ids[]"]').forEach(input => {
-            input.disabled = !rotating || input.dataset.teamReady !== 'true';
+            input.disabled = !rotating;
         });
         if (rotating) {
             form.elements.recurrence.value = plan === 'two_team_12' ? 'daily' : 'rotation';
-            form.elements.rotation_interval_days.value = plan === 'three_team_24' ? '3' : '';
-            form.querySelector('[data-rotation-help]').textContent = `Choose ${neededTeams} teams. Their saved members will be used.`;
+            form.elements.rotation_interval_days.value = plan === 'three_team_24' ? '3' : plan === 'two_team_24' ? '2' : '';
+            form.querySelector('[data-rotation-help]').textContent = `Choose ${neededTeams} teams, then assign available firefighters to each run below. Saved members are suggestions; rest and leave are checked before saving.`;
             setPlanEndTime(form);
         } else {
-            form.elements.rotation_interval_days.value = '';
+            form.elements.rotation_interval_days.value ||= '2';
+            if (!state.editingShift) setPlanEndTime(form);
         }
         toggleRecurrenceFields(form);
         renderTurnPreview(form);
@@ -264,7 +311,7 @@ if (app) {
     function openDialog(id) {
         const dialog = $(id);
         const start = new Date(); start.setMinutes(0, 0, 0); start.setHours(start.getHours() + 1);
-        const end = new Date(start); end.setHours(end.getHours() + 11);
+        const end = new Date(start); end.setHours(end.getHours() + 24);
         if (id === '#dutyShiftDialog') {
             state.editingShift = null;
             const form = $('#dutyShiftForm');
@@ -279,6 +326,10 @@ if (app) {
             $('[data-edit-scope]', form).hidden = true;
             $('#dutyShiftDialogTitle').textContent = 'Schedule a shift';
             toggleScheduleTemplate(form);
+            form.elements.recurrence.value = 'rotation';
+            form.elements.rotation_interval_days.value = '2';
+            toggleRecurrenceFields(form);
+            syncAssignmentAvailability();
         } else {
             dialog.querySelector('[name="starts_at"]').value = localInput(start);
             dialog.querySelector('[name="ends_at"]').value = localInput(end);
@@ -296,6 +347,7 @@ if (app) {
         form.elements.team_id.value = shift.team_id;
         form.elements.starts_at.value = inputFromIso(shift.starts_at);
         form.elements.ends_at.value = inputFromIso(shift.ends_at);
+        if (form.elements.shift_duration) form.elements.shift_duration.value = 'custom';
         form.elements.notes.value = shift.notes || '';
         shift.assignments.filter(item => item.team_role !== 'station_duty').forEach(item => {
             if (form.elements[item.team_role]) form.elements[item.team_role].value = item.station_officer_id;
@@ -382,7 +434,9 @@ if (app) {
         renderTurnPreview(event.currentTarget.form);
     });
     $('#dutyShiftForm').addEventListener('change', event => {
-        if (event.target.matches('select[name]')) syncAssignmentAvailability();
+        if (event.target.name === 'shift_duration') setPlanEndTime(event.currentTarget);
+        if (event.target.name === 'ends_at') event.currentTarget.elements.shift_duration.value = 'custom';
+        if (event.target.matches('select[name], [name="starts_at"], [name="ends_at"]')) syncAssignmentAvailability();
         if (event.target.matches('[name="rotation_team_ids[]"]')) renderTurnPreview(event.currentTarget);
     });
 
@@ -391,7 +445,7 @@ if (app) {
         const form = event.currentTarget; const data = new FormData(form);
         const scheduleTemplate = data.get('schedule_template') || 'single';
         const rotationTeamIds = data.getAll('rotation_team_ids[]').map(Number);
-        const neededTeams = scheduleTemplate === 'two_team_12' ? 2 : scheduleTemplate === 'three_team_24' ? 3 : 0;
+        const neededTeams = scheduleTemplate === 'three_team_24' ? 3 : scheduleTemplate === 'single' ? 0 : 2;
         if (neededTeams && rotationTeamIds.length !== neededTeams) {
             form.querySelector('[data-form-error]').textContent = `Choose ${neededTeams} teams.`;
             return;
@@ -406,6 +460,11 @@ if (app) {
         if (data.get('station_duty_backup')) assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty_backup') });
         const editing = state.editingShift;
         const payload = { schedule_template: scheduleTemplate, rotation_team_ids: rotationTeamIds, team_id: data.get('team_id') || rotationTeamIds[0], label: data.get('label'), starts_at: data.get('starts_at'), ends_at: data.get('ends_at'), notes: data.get('notes'), recurrence: data.get('recurrence') || (editing?.is_recurring ? (editing.recurrence_type || 'weekly') : 'none'), recurrence_until: data.get('recurrence_until'), rotation_interval_days: data.get('rotation_interval_days') || editing?.rotation_interval_days, weekdays: data.getAll('weekdays[]').map(Number), edit_scope: data.get('edit_scope') || 'this', assignments };
+        if (neededTeams) {
+            payload.rotation_assignments = Object.fromEntries(rotationTeamIds.map(teamId => [teamId,
+                roles.map(([role]) => ({ team_role: role, station_officer_id: data.get(`run_${teamId}_${role}`) })).filter(item => item.station_officer_id)
+            ]));
+        }
         try { await request(editing ? `/shifts/${editing.id}` : '/shifts', { method: editing ? 'PUT' : 'POST', body: JSON.stringify(payload) }); form.closest('dialog').close(); form.reset(); state.editingShift = null; toast(editing ? 'Duty schedule updated.' : (payload.recurrence !== 'none' ? 'Recurring duty schedule created.' : 'Duty shift scheduled.')); await refresh(true); }
         catch (error) { form.querySelector('[data-form-error]').textContent = error.message; }
     });

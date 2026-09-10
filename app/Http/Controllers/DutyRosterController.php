@@ -10,6 +10,7 @@ use App\Models\StationOfficer;
 use App\Models\Station;
 use App\Models\Team;
 use App\Services\DutyRosterService;
+use App\Services\DutyAvailabilityService;
 use App\Services\DutyRosterRecurrenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,6 +62,17 @@ class DutyRosterController extends Controller
             'officers' => $officers->map(fn ($officer) => $this->serializeOfficer($officer))->values(),
             'shifts' => $shifts->map(fn ($shift) => $this->serializeShift($shift))->values(),
             'exceptions' => $exceptions->map(fn ($exception) => $this->serializeException($exception))->values(),
+            'availability_shifts' => DutyShift::query()->with('assignments')
+                ->where('station_id', $stationId)->where('status', 'scheduled')
+                ->where('starts_at', '<', $to->copy()->addDay())
+                ->where('ends_at', '>', $from->copy()->subDay())->get()
+                ->map(fn ($shift) => [
+                    'id' => $shift->duty_shift_id,
+                    'starts_at' => $shift->starts_at->toIso8601String(),
+                    'ends_at' => $shift->ends_at->toIso8601String(),
+                    'recovery_ends_at' => DutyAvailabilityService::recoveryEnd($shift)->toIso8601String(),
+                    'officer_ids' => $shift->assignments->where('team_role', '!=', 'station_duty')->pluck('station_officer_id')->values(),
+                ])->values(),
         ]);
     }
 
@@ -70,7 +82,7 @@ class DutyRosterController extends Controller
         $data = $this->validateShift($request);
         $team = Team::query()->where('station_id', $stationId)->findOrFail($data['team_id']);
         [$startsAt, $endsAt] = $this->window($data['starts_at'], $data['ends_at']);
-        if (in_array($data['schedule_template'] ?? 'single', ['two_team_12', 'three_team_24'], true)) {
+        if (in_array($data['schedule_template'] ?? 'single', ['two_team_12', 'two_team_24', 'three_team_24'], true)) {
             return $this->storeTeamRotation($data, $stationId, $startsAt, $endsAt, $service, $recurrence);
         }
         if (($data['recurrence'] ?? 'none') !== 'none') {
@@ -79,6 +91,7 @@ class DutyRosterController extends Controller
             if ($startsAt->diffInDays($until) > 366) throw ValidationException::withMessages(['recurrence_until' => 'Recurring schedules can be created for up to one year.']);
             $prototype = $this->templatePrototype($data, $team, $stationId, $startsAt, $endsAt, $until);
             $occurrences = $recurrence->occurrences($prototype, $startsAt, $until);
+            $this->validateRecoveryBetweenOccurrences($occurrences);
             if ($occurrences === []) throw ValidationException::withMessages(['weekdays' => 'Select a weekday that occurs before the repeat-until date.']);
             foreach ($occurrences as [, $occurrenceStart, $occurrenceEnd]) {
                 $this->validateTeamWindow((int) $team->team_id, $occurrenceStart, $occurrenceEnd);
@@ -137,6 +150,7 @@ class DutyRosterController extends Controller
             $oldTemplate = $dutyShift->template()->firstOrFail();
             $cutoverDate = $dutyShift->occurrence_date?->copy() ?? $dutyShift->starts_at->copy()->startOfDay();
             $newPrototype = $this->templatePrototype($data, $team, $stationId, $startsAt, $endsAt, $until);
+            $this->validateRecoveryBetweenOccurrences($recurrence->occurrences($newPrototype, $startsAt, $until));
             if ($recurrence->occurrences($newPrototype, $startsAt, $until) === []) throw ValidationException::withMessages(['weekdays' => 'Select a weekday that occurs before the repeat-until date.']);
 
             $newShift = DB::transaction(function () use ($oldTemplate, $cutoverDate, $dutyShift, $data, $team, $stationId, $startsAt, $until, $recurrence, $newPrototype) {
@@ -258,11 +272,15 @@ class DutyRosterController extends Controller
         return $request->validate([
             'team_id' => ['required', 'integer', 'exists:teams,team_id'], 'label' => ['required', 'string', 'max:100'],
             'starts_at' => ['required', 'date'], 'ends_at' => ['required', 'date'], 'notes' => ['nullable', 'string', 'max:1000'],
-            'schedule_template' => ['nullable', Rule::in(['single', 'two_team_12', 'three_team_24'])],
+            'schedule_template' => ['nullable', Rule::in(['single', 'two_team_12', 'two_team_24', 'three_team_24'])],
             'rotation_team_ids' => ['nullable', 'array'],
             'rotation_team_ids.*' => ['integer', 'distinct', 'exists:teams,team_id'],
+            'rotation_assignments' => ['nullable', 'array'],
+            'rotation_assignments.*' => ['array'],
+            'rotation_assignments.*.*.station_officer_id' => ['required', 'integer', 'exists:station_officers,station_officer_id'],
+            'rotation_assignments.*.*.team_role' => ['required', Rule::in(DutyRosterService::DEPLOYABLE_ROLES)],
             'recurrence' => ['nullable', Rule::in(['none', 'daily', 'weekly', 'weekdays', 'rotation'])],
-            'recurrence_until' => ['nullable', 'required_if:recurrence,daily,weekly,weekdays,rotation', 'date'],
+            'recurrence_until' => ['nullable', 'required_if:recurrence,daily,weekly,weekdays,rotation', 'required_if:schedule_template,two_team_12,two_team_24,three_team_24', 'date'],
             'rotation_interval_days' => ['nullable', 'required_if:recurrence,rotation', 'integer', 'between:2,31'],
             'weekdays' => ['nullable', 'required_if:recurrence,weekdays', 'array', 'min:1'],
             'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
@@ -276,7 +294,7 @@ class DutyRosterController extends Controller
     private function storeTeamRotation(array $data, int $stationId, Carbon $startsAt, Carbon $endsAt, DutyRosterService $service, DutyRosterRecurrenceService $recurrence): JsonResponse
     {
         $plan = $data['schedule_template'];
-        $neededTeams = $plan === 'two_team_12' ? 2 : 3;
+        $neededTeams = $plan === 'three_team_24' ? 3 : 2;
         $hoursPerTurn = $plan === 'two_team_12' ? 12 : 24;
         $teamIds = collect($data['rotation_team_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
 
@@ -323,6 +341,9 @@ class DutyRosterController extends Controller
                 ->unique('station_officer_id')
                 ->values()
                 ->all();
+            if (array_key_exists($teamId, $data['rotation_assignments'] ?? [])) {
+                $teamAssignments = $data['rotation_assignments'][$teamId];
+            }
             if (count($teamAssignments) < 2) {
                 throw ValidationException::withMessages(['rotation_team_ids' => "Team {$teamId} needs at least two saved members."]);
             }
@@ -335,7 +356,7 @@ class DutyRosterController extends Controller
                 'weekday' => $turnStart->dayOfWeekIso,
                 'recurrence_type' => $plan === 'two_team_12' ? 'daily' : 'rotation',
                 'weekdays' => null,
-                'rotation_interval_days' => $plan === 'three_team_24' ? 3 : null,
+                'rotation_interval_days' => $plan === 'two_team_12' ? null : $neededTeams,
                 'rotation_group' => $rotationGroup,
                 'starts_time' => $turnStart->format('H:i:s'),
                 'ends_time' => $turnEnd->format('H:i:s'),
@@ -346,7 +367,17 @@ class DutyRosterController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            foreach ($recurrence->occurrences($prototype, $turnStart, $until) as [, $occurrenceStart, $occurrenceEnd]) {
+            $occurrences = $recurrence->occurrences($prototype, $turnStart, $until);
+            $this->validateRecoveryBetweenOccurrences($occurrences);
+            // Proposed runs are not yet saved, so database overlap checks alone
+            // cannot catch a firefighter appearing in both rotating crews.
+            foreach ($plans as [, , $previousAssignments]) {
+                $previousIds = collect($previousAssignments)->where('team_role', '!=', 'station_duty')->pluck('station_officer_id');
+                if ($previousIds->intersect(collect($teamAssignments)->pluck('station_officer_id'))->isNotEmpty()) {
+                    throw ValidationException::withMessages(['assignments' => 'Rotating runs must use different firefighters so each crew can rest after its shift.']);
+                }
+            }
+            foreach ($occurrences as [, $occurrenceStart, $occurrenceEnd]) {
                 $this->validateTeamWindow((int) $teamId, $occurrenceStart, $occurrenceEnd);
                 $this->validateAssignments($assignments, $stationId, $occurrenceStart, $occurrenceEnd);
             }
@@ -408,9 +439,25 @@ class DutyRosterController extends Controller
             $hasException = DutyException::query()->where('station_officer_id', $officerId)->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)->exists();
             if ($hasException) throw ValidationException::withMessages(['assignments' => "Officer {$officerId} has rest day or leave during this shift."]);
             if ($assignment['team_role'] === 'station_duty') continue;
+            $recoveryConflict = app(DutyAvailabilityService::class)->conflict($officerId, $startsAt, $endsAt, $exceptShiftId);
+            if ($recoveryConflict) {
+                $name = trim(($officers->get($officerId)?->user?->first_name ?? '').' '.($officers->get($officerId)?->user?->last_name ?? ''));
+                throw ValidationException::withMessages(['assignments' => "{$name} has duty or required recovery time conflicting with this shift. Allow rest equal to the shift length, or select another available firefighter."]);
+            }
             $overlap = DutyShiftAssignment::query()->where('station_officer_id', $officerId)->where('team_role', '!=', 'station_duty')
                 ->whereHas('shift', fn ($query) => $query->where('status', 'scheduled')->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)->when($exceptShiftId, fn ($q) => $q->where('duty_shift_id', '!=', $exceptShiftId)))->exists();
             if ($overlap) throw ValidationException::withMessages(['assignments' => "Officer {$officerId} already has an overlapping deployment shift."]);
+        }
+    }
+
+    private function validateRecoveryBetweenOccurrences(array $occurrences): void
+    {
+        $availableAt = null;
+        foreach ($occurrences as [, $start, $end]) {
+            if ($availableAt && $start->lt($availableAt)) {
+                throw ValidationException::withMessages(['recurrence' => 'This repeat pattern does not allow recovery between shifts. For 24-hour duty, repeat every 2 days (24 hours on / 24 hours rest).']);
+            }
+            $availableAt = $end->copy()->addMinutes(DutyAvailabilityService::recoveryMinutes($start, $end));
         }
     }
 

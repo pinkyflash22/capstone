@@ -126,6 +126,10 @@ class FirefighterController extends Controller
             default => 'Weekly',
         };
         $details = ["Assigned as {$roleLabel}", $shift->duty_roster_template_id ? "{$recurrenceLabel} recurring shift" : 'One-time duty shift'];
+        if ($assignment?->team_role !== 'station_duty') {
+            $recoveryEnd = \App\Services\DutyAvailabilityService::recoveryEnd($shift);
+            $details[] = 'Recovery until '.$recoveryEnd->format('M j, Y g:i A');
+        }
         if ($exception?->reason) $details[] = $exception->reason;
         if ($shift->notes) $details[] = $shift->notes;
 

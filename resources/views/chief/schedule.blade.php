@@ -1136,6 +1136,7 @@
                 <div>
                     <h1>Station Schedule</h1>
                     <p>Tap a day to view its timeline or add an activity.</p>
+                    <a class="schedule-badge" href="{{ route('station-admin.resource-management.index') }}#dutyRosterApp"><i class="fa-solid fa-user-clock"></i> Plan firefighter availability &amp; run shifts</a>
                     <div class="schedule-badges">
                         <span class="schedule-badge"><i class="fa-solid fa-building-shield"></i> {{ $stationName ?: 'Station calendar' }}</span>
                         <span class="schedule-badge"><i class="fa-solid fa-hand-pointer"></i> Select a day for its timeline</span>

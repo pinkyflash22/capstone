@@ -99,7 +99,7 @@ class DutyRosterService
             ->reject(fn ($assignment) => in_array((int) $assignment->station_officer_id, $unavailableIds, true));
         $hasCommandCoverage = $assignments->contains(fn ($assignment) => $assignment->team_role === 'station_duty');
 
-        if (! $hasCommandCoverage) {
+        if (! $hasCommandCoverage || $assignments->whereIn('team_role', self::DEPLOYABLE_ROLES)->count() < 2) {
             $this->applyRoster($team, $shift, [], $at);
             return 'off_duty';
         }
@@ -134,6 +134,14 @@ class DutyRosterService
 
             $newIds = collect($roster)->filter()->unique();
             $releasedIds = $previousIds->diff($newIds);
+            // Handoffs between runs must not mark personnel off-duty after
+            // another team's current shift has already activated them.
+            $otherActiveIds = \App\Models\DutyShiftAssignment::query()
+                ->whereIn('station_officer_id', $releasedIds->all())
+                ->whereHas('shift', fn ($query) => $query->where('team_id', '!=', $locked->team_id)
+                    ->where('status', 'scheduled')->where('starts_at', '<=', $at)->where('ends_at', '>', $at))
+                ->pluck('station_officer_id');
+            $releasedIds = $releasedIds->diff($otherActiveIds);
             if ($releasedIds->isNotEmpty()) {
                 StationOfficer::query()
                     ->whereIn('station_officer_id', $releasedIds->all())

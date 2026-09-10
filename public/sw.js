@@ -1,4 +1,6 @@
 const CACHE_VERSION = 'pyrosense-pwa-v20260906-1';
+// Offline screen revision: 2026-09-11. Reinstall the updated shell while
+// retaining the existing caches for saved pages, maps, and reports.
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;

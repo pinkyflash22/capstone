@@ -2021,7 +2021,7 @@
                     <div>
                         <span class="duty-roster__eyebrow"><i class="fa-solid fa-clock-rotate-left"></i> Live station staffing</span>
                         <h3 id="dutyRosterTitle">Dynamic Duty Roster</h3>
-                        <p>Schedule handoffs, protect station command coverage, and keep deployed teams current automatically.</p>
+                        <p>1. Record availability and rest days. 2. Assign available firefighters to a run. 3. Set duty hours and recovery. A 24-hour shift includes 24 hours of recovery; 12-hour shifts include 12 hours.</p>
                     </div>
                     <div class="duty-roster__actions">
                         @if($isProvincialRosterAdmin)
@@ -2069,6 +2069,7 @@
                             <label>Quick plan<select name="schedule_template">
                                 <option value="single">One team</option>
                                 <option value="two_team_12">Two teams, 12-hour turns</option>
+                                <option value="two_team_24">1st / 2nd run, 24 hours on / 24 hours rest</option>
                                 <option value="three_team_24">Three teams, 24-hour turns</option>
                             </select><small>Pick a plan or set one shift.</small></label>
                         </div>
@@ -2083,14 +2084,15 @@
                         </section>
                         <div class="duty-roster__form-grid">
                             <label>Shift name<input name="label" required maxlength="100" placeholder="e.g. Team 1 Night Shift"></label>
-                            <label data-single-team>Response team<select name="team_id" required></select></label>
                             <label>Starts<input name="starts_at" type="datetime-local" required></label>
                             <label>Ends<input name="ends_at" type="datetime-local" required><small>For overnight duty, select the following date.</small></label>
+                            <label>Duty duration<select name="shift_duration"><option value="24">24 hours + 24 hours recovery</option><option value="12">12 hours + 12 hours recovery</option><option value="custom">Custom start / end times</option></select><small>Recovery equals duty duration, up to 24 hours. Add Rest / Leave for longer time off.</small></label>
+                            <label data-single-team>Assign to response run / team<select name="team_id" required></select></label>
                         </div>
                         <div class="duty-roster__form-grid duty-roster__recurrence" data-recurrence-fields>
                             <label data-repeat-choice>Repeats<select name="recurrence"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="weekdays">Selected weekdays</option><option value="rotation">Team turns</option></select></label>
                             <label data-repeat-until hidden>End date<input name="recurrence_until" type="date"><small>Up to one year. You can change one day later.</small></label>
-                            <input name="rotation_interval_days" type="hidden">
+                            <label data-rotation-interval hidden>Repeat every (days)<input name="rotation_interval_days" type="number" min="2" max="31" value="2"><small>Use 2 for 24-hour duty followed by 24-hour rest.</small></label>
                         </div>
                         <fieldset class="duty-roster__weekday-picker" data-weekday-picker hidden>
                             <legend>Repeat on</legend>
