@@ -2889,6 +2889,7 @@
             }
         }
     </style>
+    @include('chief.partials.analytics-presentation')
 </head>
 <body class="chief-legacy-layout">
 
@@ -2990,38 +2991,24 @@
                 <span id="analyticsScopeLoadingLabel">Loading scoped forecast…</span>
             </div>
             <div class="analytics-stack">
-                <section class="analytics-hero chief-theme-hero">
-                    <div>
-                        <div class="analytics-hero__eyebrow chief-theme-hero__eyebrow">
-                            <i class="fa-solid fa-microchip"></i>
-                            <span>Command Forecasting Suite</span>
-                        </div>
-                        <h1 class="analytics-hero__title chief-theme-hero__title">Fire Risk Forecast</h1>
-                        <p class="analytics-hero__subtitle chief-theme-hero__copy">Compare historical incidents, current station conditions, and predicted fire-risk outlooks in one command-ready dashboard built for station-level decision making.</p>
+                <header class="forecast-context" aria-label="Forecast context">
+                    <div class="forecast-context__intro">
+                        <span class="forecast-context__eyebrow">Station intelligence</span>
+                        <h2>Turn insight into action.</h2>
+                        <p>Review priorities, understand the risk, and plan your station's response.</p>
                     </div>
-                    <div class="analytics-hero__meta chief-theme-summary-grid">
-                        <div class="analytics-hero__meta-card">
-                            <div class="analytics-hero__meta-label">Analysis Scope</div>
-                            <div class="analytics-hero__meta-value" id="analyticsHeroScope">Waiting for station context</div>
-                        </div>
-                        <div class="analytics-hero__meta-card">
-                            <div class="analytics-hero__meta-label">Forecast Target</div>
-                            <div class="analytics-hero__meta-value" id="analyticsHeroTarget">Current month</div>
-                        </div>
-                        <div class="analytics-hero__meta-card">
-                            <div class="analytics-hero__meta-label">Active Model</div>
-                            <div class="analytics-hero__meta-value" id="analyticsHeroModel">Loading latest saved model</div>
-                        </div>
-                    </div>
-                </section>
+                    <dl class="forecast-context__facts">
+                        <div><dt>Analysis scope</dt><dd id="analyticsHeroScope">Waiting for station context</dd></div>
+                        <div><dt>Forecast target</dt><dd id="analyticsHeroTarget">Current month</dd></div>
+                        <div><dt>Active model</dt><dd id="analyticsHeroModel">Loading latest saved model</dd></div>
+                    </dl>
+                </header>
 
-                <section class="analytics-shell-card analytics-section chief-theme-panel analytics-focus-card">
-                    <div class="analytics-section__head">
-                        <div>
-                            <div class="analytics-section__title"><i class="fa-solid fa-sliders"></i> Filter and AI Actions</div>
-                            <p class="analytics-section__copy">Choose the station context, narrow to a barangay when needed, set the comparison range, and then decide whether to run a fresh analysis, generate a next-month forecast, or retrain the model on the latest database export.</p>
-                        </div>
-                    </div>
+                <details class="analytics-shell-card analytics-section chief-theme-panel analytics-focus-card forecast-tools">
+                    <summary class="forecast-tools__summary">
+                        <span><i class="fa-solid fa-sliders" aria-hidden="true"></i> Filters &amp; AI tools</span>
+                        <span class="forecast-tools__hint">Change scope or run an analysis <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                    </summary>
                     <div class="analytics-control-grid">
                         <div class="analytics-control-field">
                             <label class="analytics-control-label" for="stationSelect">Station</label>
@@ -3113,7 +3100,8 @@
                                 <div class="analytics-training-stage" data-training-stage="completed">Complete</div>
                             </div>
                         </div>
-                        <div class="analytics-training-history" aria-labelledby="trainingHistoryTitle">
+                        <details class="analytics-training-history forecast-history" aria-labelledby="trainingHistoryTitle">
+                            <summary>Model retraining history</summary>
                             <div class="analytics-training-history__head">
                                 <div>
                                     <h3 id="trainingHistoryTitle" class="analytics-training-history__title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Retraining history</h3>
@@ -3126,9 +3114,9 @@
                             <div id="trainingHistoryList" class="analytics-training-history__list">
                                 <div class="analytics-training-history__empty">No retraining attempts have been recorded yet.</div>
                             </div>
-                        </div>
+                        </details>
                     </div>
-                </section>
+                </details>
 
                 <section class="analytics-shell-card analytics-section chief-theme-panel prediction-summary-section">
                     <div class="analytics-section__head">
@@ -3255,7 +3243,23 @@
                 </section>
 
                 <section class="analytics-priority-grid">
-                    <div class="analytics-shell-card analytics-section">
+                    <div class="analytics-shell-card analytics-section forecast-priorities" id="priorityActions">
+                        <div class="analytics-section__head">
+                            <div>
+                                <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> Prioritized recommendations</div>
+                                <p class="analytics-section__copy">Review recommended station actions and their supporting evidence. Showing the 3 latest saved analysis and prediction runs.</p>
+                            </div>
+                            <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
+                        </div>
+                        <div id="recommendations">
+                            <div class="analytics-empty-state">
+                                <div class="analytics-empty-state__title">No AI recommendations yet.</div>
+                                <p class="analytics-empty-state__copy">Run the station analysis first to generate recommendation cards and workflow-ready action items.</p>
+                            </div>
+                        </div>
+                        <div id="aiExplanation" style="margin-top: 20px; padding: 14px 16px; background: #f8fafc; border-radius: 16px; font-size: 13px; color: #475569; display: none;"></div>
+                    </div>
+                    <div class="analytics-shell-card analytics-section forecast-narrative">
                         <div class="analytics-section__head">
                             <div>
                                 <div class="analytics-section__title"><i class="fa-solid fa-wand-magic-sparkles"></i> Forecast Narrative</div>
@@ -3273,22 +3277,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="analytics-shell-card analytics-section">
-                        <div class="analytics-section__head">
-                            <div>
-                                <div class="analytics-section__title"><i class="fa-solid fa-lightbulb"></i> AI Recommendations</div>
-                                <p class="analytics-section__copy">Operational recommendations prioritized for station action based on the current forecast response, hotspot context, and field findings. Only the 3 latest saved analysis and prediction runs are shown here.</p>
-                            </div>
-                            <div id="recommendationScopeLabel" class="analytics-empty-pill" style="display:none;">Recommendation scope</div>
-                        </div>
-                        <div id="recommendations">
-                            <div class="analytics-empty-state">
-                                <div class="analytics-empty-state__title">No AI recommendations yet.</div>
-                                <p class="analytics-empty-state__copy">Run the station analysis first to generate recommendation cards and workflow-ready action items.</p>
-                            </div>
-                        </div>
-                        <div id="aiExplanation" style="margin-top: 20px; padding: 14px 16px; background: #f8fafc; border-radius: 16px; font-size: 13px; color: #475569; display: none;"></div>
                     </div>
                 </section>
 
