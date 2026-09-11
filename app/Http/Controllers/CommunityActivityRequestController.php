@@ -66,6 +66,56 @@ class CommunityActivityRequestController extends Controller
             ->with('success', 'Community activity request sent to the assigned station for review.');
     }
 
+    public function updateCitizen(Request $request, int $requestId): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless(CommunityActivityRequest::isAvailable(), 404);
+
+        $activityRequest = CommunityActivityRequest::query()
+            ->where('requester_user_id', $user->user_id)
+            ->where('submitted_from', 'citizen')
+            ->findOrFail($requestId);
+
+        if (! $activityRequest->canCitizenEdit()) {
+            return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
+                ->with('error', 'BFP has already reviewed this request. It can no longer be edited.');
+        }
+
+        $validated = $request->validateWithBag('communityRequestEdit', [
+            'request_type' => ['required', Rule::in(['orientation', 'seminar', 'drill', 'inspection', 'community_meeting', 'other'])],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string', 'max:2000'],
+            'preferred_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'preferred_start_time' => ['nullable', 'date_format:H:i', 'required_with:preferred_end_time'],
+            'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
+            'contact_name' => ['nullable', 'string', 'max:255'],
+            'contact_number' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        // Recheck in the UPDATE itself, so an already-reviewed request cannot
+        // be changed by an old browser tab. Review and routing fields are never editable.
+        $updated = CommunityActivityRequest::query()
+            ->whereKey($activityRequest->getKey())
+            ->where('requester_user_id', $user->user_id)
+            ->where('submitted_from', 'citizen')
+            ->where('status', 'pending')
+            ->whereNull('reviewed_at')
+            ->whereNull('reviewed_by')
+            ->whereNull('converted_event_id')
+            ->update($validated);
+
+        if (! $updated) {
+            return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
+                ->with('error', 'This request could not be updated. Refresh to check whether BFP has reviewed it.');
+        }
+
+        UserActivityLogger::log('updated pending community activity request', $user->user_id, $request);
+
+        return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
+            ->with('success', 'Your changes were saved. The request is still awaiting BFP review.');
+    }
+
     public function approve(Request $request, int $requestId): RedirectResponse
     {
         $user = Auth::user();

@@ -731,6 +731,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
             ->where('section', implode('|', PublicController::citizenDashboardSections()))
             ->name('dashboard');
         Route::post('/community-activity-requests', [App\Http\Controllers\CommunityActivityRequestController::class, 'storeCitizen'])->name('community-activity-requests.store');
+        Route::patch('/community-activity-requests/{requestId}', [App\Http\Controllers\CommunityActivityRequestController::class, 'updateCitizen'])->whereNumber('requestId')->name('community-activity-requests.update');
         Route::post('/risk-reports', [PublicController::class, 'storeCitizenRiskReport'])->name('risk-reports.store');
         Route::put('/incidents/{incidentId}/update', [IncidentController::class, 'updateCitizenReport'])->name('incidents.update-report');
         Route::put('/profile', [PublicController::class, 'updateProfile'])->name('profile.update');

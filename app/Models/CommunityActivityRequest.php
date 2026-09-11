@@ -46,6 +46,15 @@ class CommunityActivityRequest extends Model
         return $this->belongsTo(User::class, 'requester_user_id', 'user_id');
     }
 
+    public function canCitizenEdit(): bool
+    {
+        return $this->submitted_from === 'citizen'
+            && $this->status === 'pending'
+            && $this->reviewed_at === null
+            && $this->reviewed_by === null
+            && $this->converted_event_id === null;
+    }
+
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewed_by', 'user_id');

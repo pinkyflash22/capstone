@@ -126,6 +126,7 @@
                             @elseif($requestItem->review_notes)
                                 <p class="citizen-request-note">Review note: {{ $requestItem->review_notes }}</p>
                             @endif
+                            @include('citizen.partials.community-request-review', ['activityRequest' => $requestItem])
                         </div>
                     @empty
                         <div class="citizen-announcements-empty">

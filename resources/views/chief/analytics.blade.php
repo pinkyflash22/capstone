@@ -2890,6 +2890,7 @@
         }
     </style>
     @include('chief.partials.analytics-presentation')
+    @include('chief.partials.recommendation-modal-presentation')
 </head>
 <body class="chief-legacy-layout">
 
@@ -3765,11 +3766,11 @@
     </main>
 
     <!-- Enhanced Explore Recommendation Modal -->
-    <div id="exploreModal" class="modal">
+    <div id="exploreModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="implementationPlanTitle">
         <div class="modal-content analytics-forecast-modal">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-lightbulb" style="color: #f59e0b;"></i> AI Implementation Plan</h3>
-                <button class="modal-close" onclick="closeExploreModal()"><i class="fa-solid fa-times"></i></button>
+                <div><span class="recommendation-modal-eyebrow">Suggested next steps</span><h3 id="implementationPlanTitle">Implementation plan</h3></div>
+                <button type="button" class="modal-close" onclick="closeExploreModal()" aria-label="Close implementation plan"><i class="fa-solid fa-times" aria-hidden="true"></i></button>
             </div>
             <div class="modal-body" id="exploreModalBody">
                 <div class="text-center py-8">
@@ -3778,8 +3779,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-outline" onclick="closeExploreModal()" style="padding: 8px 20px; background: #f1f5f9; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Close</button>
-                <button class="btn-primary" onclick="closeExploreModal()" style="padding: 8px 20px; background: #dc2626; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 500;">Got it</button>
+                <p class="recommendation-modal-note">Review AI suggestions before assigning or carrying out work.</p>
+                <button type="button" class="btn-primary" onclick="closeExploreModal()">Done</button>
             </div>
         </div>
     </div>
@@ -3814,11 +3815,11 @@
         </div>
     </div>
 
-    <div id="recommendationRunModal" class="modal">
+    <div id="recommendationRunModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="recommendationRunTitle">
         <div class="modal-content analytics-forecast-modal analytics-run-modal">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-layer-group" style="color: #dc2626;"></i> Clustered Recommendation Details</h3>
-                <button class="modal-close" onclick="closeRecommendationRunModal()"><i class="fa-solid fa-times"></i></button>
+                <div><span class="recommendation-modal-eyebrow">Saved forecast</span><h3 id="recommendationRunTitle">Recommendations & checklists</h3></div>
+                <button type="button" class="modal-close" onclick="closeRecommendationRunModal()" aria-label="Close recommendations"><i class="fa-solid fa-times" aria-hidden="true"></i></button>
             </div>
             <div class="modal-body" id="recommendationRunModalBody">
                 <div class="text-center py-8 text-gray-500">No clustered recommendation details available.</div>
@@ -5459,7 +5460,7 @@
                                             </div>
                                             <span class="priority-badge priority-${priorityClass}">${priorityLabel} PRIORITY</span>
                                             <button class="explore-btn" onclick="openRecommendationFromRun(${group.id}, ${idx})">
-                                                <i class="fa-solid fa-chart-simple"></i> Explore & Get Detailed Suggestions
+                                                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> View implementation plan
                                             </button>
                                         </div>
                                     </div>
@@ -5487,21 +5488,31 @@
                 return;
             }
 
+            body.dataset.state = 'loading';
+            body.dataset.analysisId = String(normalizedId);
             body.innerHTML = `
                 <div class="text-center py-8">
                     <div class="loading-spinner" style="width: 34px; height: 34px;"></div>
-                    <p class="mt-3 text-gray-500">Loading clustered recommendation details...</p>
+                    <p class="mt-3 text-gray-500" role="status">Loading recommendations and checklists…</p>
                 </div>
             `;
             modal.classList.add('show');
 
-            const detailedGroup = await fetchRecommendationRunDetail(normalizedId, existingGroup.detail ? existingGroup : existingGroup);
+            try {
+            const detailedGroup = await fetchRecommendationRunDetail(normalizedId, existingGroup);
             const checklists = await loadRecommendationRunChecklists(normalizedId);
+            if (body.dataset.analysisId !== String(normalizedId)) return;
             currentRecommendationRunGroup = detailedGroup;
             recommendationRunGroups = recommendationRunGroups.map((group) =>
                 Number(group.id) === normalizedId ? { ...group, ...detailedGroup } : group
             );
             body.innerHTML = renderRecommendationRunModalBody(detailedGroup, checklists);
+            body.dataset.state = 'ready';
+            } catch (error) {
+                if (body.dataset.analysisId !== String(normalizedId)) return;
+                body.dataset.state = 'error';
+                body.innerHTML = `<div class="analytics-empty-state" role="alert"><div class="analytics-empty-state__title">Recommendations could not load</div><p class="analytics-empty-state__copy">Check your connection and try again. Your saved analysis has not changed.</p><button type="button" class="explore-btn" onclick="openRecommendationRunModal(${normalizedId})">Try again</button></div>`;
+            }
         }
 
         function closeRecommendationRunModal() {
