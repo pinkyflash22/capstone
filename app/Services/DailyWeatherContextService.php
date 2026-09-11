@@ -141,11 +141,14 @@ class DailyWeatherContextService
 
         $rateLimitUntil = $this->openMeteoRateLimitUntil();
         if ($rateLimitUntil?->isFuture()) {
+            $backup = $this->fetchBackupForecast($latitude, $longitude, $days);
+            if ($backup !== null) return $backup;
             $lastSuccessful = $this->readForecastCache($staleKey);
             if ($this->isUsableForecast($lastSuccessful)) {
                 return array_merge($lastSuccessful, [
                     'cache_status' => 'stale-rate-limit-cooldown',
                     'is_stale' => true,
+                    'current' => [],
                     'warning' => 'Open-Meteo is rate-limited. Showing the last successful forecast while requests are paused.',
                 ]);
             }
@@ -238,10 +241,16 @@ class DailyWeatherContextService
             })->values()->all();
 
             $forecast = [
+                'provider' => 'Open-Meteo',
+                'provider_url' => 'https://open-meteo.com/',
                 'cards' => $cards,
                 'current' => is_array($payload['current'] ?? null) ? $payload['current'] : [],
                 'fetched_at' => now('Asia/Manila')->toIso8601String(),
             ];
+
+            if (!$this->isUsableForecast($forecast)) {
+                throw new \RuntimeException('Open-Meteo returned an unusable forecast.');
+            }
 
             $this->writeForecastCache($freshKey, $forecast, now()->addHours(self::FORECAST_CACHE_HOURS));
             $this->writeForecastCache($staleKey, $forecast, now()->addHours(self::FORECAST_STALE_HOURS));
@@ -253,6 +262,8 @@ class DailyWeatherContextService
             ]);
         } catch (\Throwable $exception) {
             OperationalFailureMonitor::record('open_meteo', $exception->getMessage());
+            $backup = $this->fetchBackupForecast($latitude, $longitude, $days);
+            if ($backup !== null) return $backup;
             $lastSuccessful = $this->readForecastCache($staleKey);
             if ($this->isUsableForecast($lastSuccessful)) {
                 Log::warning('Using the last successful Open-Meteo forecast.', [
@@ -264,6 +275,7 @@ class DailyWeatherContextService
                 return array_merge($lastSuccessful, [
                     'cache_status' => 'stale',
                     'is_stale' => true,
+                    'current' => [],
                     'warning' => 'Open-Meteo is temporarily unavailable or rate-limited. Showing the last successful forecast.',
                 ]);
             }
@@ -272,10 +284,46 @@ class DailyWeatherContextService
         }
     }
 
+    private function fetchBackupForecast(float $latitude, float $longitude, int $days): ?array
+    {
+        $key = 'weather:forecast:met-norway:v1:'.number_format($latitude, 3, '.', '').':'.number_format($longitude, 3, '.', '').':'.$days;
+        $cached = $this->readForecastCache($key.':fresh');
+        if ($this->isUsableForecast($cached)) {
+            return array_merge($cached, ['cache_status' => 'backup-fresh', 'is_stale' => false]);
+        }
+        try {
+            if ($this->readForecastCache($key.':paused') !== null) throw new \RuntimeException('Backup requests temporarily paused.');
+            $forecast = app(MetNorwayForecastService::class)->fetch($latitude, $longitude, $days);
+            $this->writeForecastCache($key.':fresh', $forecast, now()->addHour());
+            $this->writeForecastCache($key.':last-success', $forecast, now()->addDay());
+            return array_merge($forecast, ['cache_status' => 'backup-refreshed', 'is_stale' => false]);
+        } catch (\Throwable $exception) {
+            // Do not repeatedly hit a failing backup provider on page refreshes.
+            if ($this->readForecastCache($key.':paused') === null) {
+                $this->writeForecastCache($key.':paused', ['paused' => true], now()->addMinutes(5));
+                Log::warning('Backup weather forecast unavailable.', ['error' => $exception->getMessage()]);
+            }
+            $stale = $this->readForecastCache($key.':last-success');
+            if ($this->isUsableForecast($stale)) {
+                return array_merge($stale, [
+                    'cache_status' => 'backup-stale', 'is_stale' => true, 'current' => [],
+                    'warning' => 'Both weather providers are unavailable. Showing the last saved MET Norway forecast, not live conditions. Daily rain totals and probabilities are unavailable.',
+                ]);
+            }
+            return null;
+        }
+    }
+
     private function readForecastCache(string $key): ?array
     {
         try {
             $value = Cache::get($key);
+
+            if (is_array($value['cards'] ?? null)) {
+                $today = now('Asia/Manila')->toDateString();
+                $value['cards'] = array_values(array_filter($value['cards'], fn ($card) => is_array($card) && ($card['date'] ?? '') >= $today));
+                if (substr((string) ($value['fetched_at'] ?? ''), 0, 10) !== $today) $value['current'] = [];
+            }
 
             return is_array($value) ? $value : null;
         } catch (\Throwable $exception) {
@@ -306,7 +354,9 @@ class DailyWeatherContextService
     {
         return is_array($forecast)
             && is_array($forecast['cards'] ?? null)
-            && $forecast['cards'] !== [];
+            && $forecast['cards'] !== []
+            && ($forecast['cards'][0]['date'] ?? '') === now('Asia/Manila')->toDateString()
+            && is_numeric($forecast['cards'][0]['max_temp_c'] ?? null);
     }
 
     private function openMeteoRateLimitUntil(): ?Carbon

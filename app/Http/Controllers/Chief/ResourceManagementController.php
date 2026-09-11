@@ -43,6 +43,11 @@ class ResourceManagementController extends Controller
      */
     public function index(Request $request)
     {
+        if ($request->boolean('_resource_refresh')) {
+            $stationId = StationOfficer::where('user_id', Auth::id())->value('station_id');
+            $key = $this->isProvincialAdmin() ? 'resource-management:provincial:v4' : "resource-management:station:{$stationId}:v4";
+            foreach (['equipment', 'officers', 'stations', 'teams', 'users', 'boundaries'] as $part) Cache::forget("{$key}:{$part}");
+        }
         if ($this->isProvincialAdmin()) {
             $cacheKey = 'resource-management:provincial:v4';
             $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
@@ -58,15 +63,16 @@ class ResourceManagementController extends Controller
 
             $teamRelations = $this->teamRelations();
             $allTeam = Cache::remember("{$cacheKey}:teams", now()->addSeconds(45), fn () => Team::with($teamRelations)->orderByDesc('team_id')->get());
-            $allusers = Cache::remember("{$cacheKey}:users", now()->addSeconds(45), fn () => User::with('role', 'address')->orderBy('last_name')->orderBy('first_name')->get());
+            $allusers = User::with('role', 'address.barangay.city.province', 'barangayOfficer')->orderBy('last_name')->orderBy('first_name')->get();
             $users = $allusers->where('role_id', '!=', $citizenRoleId)->values();
             $citizens = $allusers->where('role_id', $citizenRoleId)->values();
             $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
             $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
             $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList(null));
-            $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->orderBy('barangay_id')->orderBy('position')->get();
+            $barangayOfficers = BarangayOfficer::with(['user.role', 'user.address', 'barangay.city'])->orderBy('barangay_id')->orderBy('position')->get();
             $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))->orderBy('last_name')->get();
             $systemUsers = $allusers;
+            $systemUsers->each(fn ($user) => $user->setAttribute('can_manage_resources', true));
             $teamData = $this->serializeTeams($allTeam);
             [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus] = $this->filterTableCollections(
                 $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays, $barangayOfficers, $apparatusRecords
@@ -160,9 +166,16 @@ class ResourceManagementController extends Controller
         
 
         //dit osa all team dapat ung belong lang sa station nato dadaan ulit kay team to station offcier to get station_id
-        $allusers = Cache::remember("{$cacheKey}:users", now()->addSeconds(45), fn () => User::where(function ($query) use ($stationUserIds, $citizenRoleId) {
-            $query->whereIn('user_id', $stationUserIds)->orWhere('role_id', $citizenRoleId);
-        })->with('role', 'address')->orderBy('last_name')->orderBy('first_name')->get());
+        $accountBarangayIds = app(\App\Services\BoundaryManagementScope::class)->coveredBarangayIds($loggedInChief);
+        $allusers = User::where(function ($query) use ($stationUserIds, $citizenRoleId, $accountBarangayIds) {
+            $query->whereIn('user_id', $stationUserIds)->orWhere('role_id', $citizenRoleId)
+                ->orWhereHas('barangayOfficer', fn ($officer) => $officer->whereIn('barangay_id', $accountBarangayIds))
+                ->orWhere(function ($account) use ($accountBarangayIds) {
+                    $account->whereDoesntHave('barangayOfficer')
+                        ->whereHas('role', fn ($role) => $role->whereIn(DB::raw('LOWER(role)'), ['barangay', 'barangay officer', 'barangay captain', 'barangay_officer']))
+                        ->whereHas('address', fn ($address) => $address->whereIn('barangay_id', $accountBarangayIds));
+                });
+        })->with('role', 'address.barangay.city.province', 'barangayOfficer')->orderBy('last_name')->orderBy('first_name')->get();
         $users = $allusers->where('role_id', '!=', $citizenRoleId)->values();
         // $userOfficer = StationOfficer::where('s', $all);
         $citizens = $allusers->where('role_id', $citizenRoleId)->values();
@@ -172,13 +185,21 @@ class ResourceManagementController extends Controller
         $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
         $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList($stationExact));
         $coveredBarangayIds = collect($boundaryBarangays)->pluck('barangay_id')->filter()->map(fn ($id) => (int) $id);
-        $barangayOfficers = BarangayOfficer::with(['user.role', 'barangay.city'])->whereIn('barangay_id', $coveredBarangayIds)->orderBy('barangay_id')->orderBy('position')->get();
+        $barangayOfficers = BarangayOfficer::with(['user.role', 'user.address', 'barangay.city'])->whereIn('barangay_id', $coveredBarangayIds)->orderBy('barangay_id')->orderBy('position')->get();
         $eligibleBarangayOfficerUsers = User::with(['role', 'address.barangay'])->whereDoesntHave('barangayOfficer')
             ->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))
             ->where(function ($query) use ($coveredBarangayIds) {
                 $query->whereNull('address_id')->orWhereHas('address', fn ($address) => $address->whereIn('barangay_id', $coveredBarangayIds));
             })->orderBy('last_name')->orderBy('first_name')->get();
         $systemUsers = $allusers->concat($citizens)->unique('user_id')->values();
+        $systemUsers->each(function ($user) use ($stationUserIds, $accountBarangayIds) {
+            $role = strtolower(trim((string) $user->role?->role));
+            $inScope = $stationUserIds->contains($user->user_id)
+                || ($role === 'citizen' && $accountBarangayIds->contains((int) $user->address?->barangay_id))
+                || (in_array($role, ['barangay', 'barangay officer', 'barangay captain', 'barangay_officer'], true)
+                    && $accountBarangayIds->contains((int) ($user->barangayOfficer?->barangay_id ?? $user->address?->barangay_id)));
+            $user->setAttribute('can_manage_resources', $inScope);
+        });
         $teamData = $this->serializeTeams($allTeam);
         [$filteredOfficers, $filteredTeams, $filteredUsers, $filteredEquipment, $filteredBoundaries, $filteredBarangayOfficers, $filteredApparatus] = $this->filterTableCollections(
             $request, $stationOfficers, $allTeam, $systemUsers, $equipments, $boundaryBarangays, $barangayOfficers, $apparatusRecords

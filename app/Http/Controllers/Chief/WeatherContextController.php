@@ -234,6 +234,8 @@ class WeatherContextController extends Controller
         $liveForecastError = null;
         $liveForecastIsStale = false;
         $liveForecastWarning = null;
+        $liveForecastProvider = 'Open-Meteo';
+        $liveForecastProviderUrl = 'https://open-meteo.com/';
 
         if (is_numeric($forecastLatitude) && is_numeric($forecastLongitude)) {
             try {
@@ -247,8 +249,10 @@ class WeatherContextController extends Controller
                 $liveForecastFetchedAt = $forecastPayload['fetched_at'] ?? null;
                 $liveForecastIsStale = (bool) ($forecastPayload['is_stale'] ?? false);
                 $liveForecastWarning = $forecastPayload['warning'] ?? null;
+                $liveForecastProvider = $forecastPayload['provider'] ?? 'Open-Meteo';
+                $liveForecastProviderUrl = $forecastPayload['provider_url'] ?? 'https://open-meteo.com/';
             } catch (\Throwable $exception) {
-                $liveForecastError = 'Open-Meteo forecast failed: '.$exception->getMessage();
+                $liveForecastError = 'Weather providers are temporarily unavailable and no usable cached forecast was found. Please try again later.';
                 Log::warning('Weather Context live forecast failed.', [
                     'station_id' => $stationId,
                     'error' => $exception->getMessage(),
@@ -355,6 +359,8 @@ class WeatherContextController extends Controller
             'liveForecastError' => $liveForecastError,
             'liveForecastIsStale' => $liveForecastIsStale,
             'liveForecastWarning' => $liveForecastWarning,
+            'liveForecastProvider' => $liveForecastProvider,
+            'liveForecastProviderUrl' => $liveForecastProviderUrl,
             'forecastLatitude' => is_numeric($forecastLatitude) ? (float) $forecastLatitude : null,
             'forecastLongitude' => is_numeric($forecastLongitude) ? (float) $forecastLongitude : null,
             'forecastCoordinateSource' => $forecastCoordinateSource,

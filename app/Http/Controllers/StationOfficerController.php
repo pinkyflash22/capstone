@@ -116,6 +116,10 @@ public function updateUser(Request $request, string $id)
     
     $validated = $request->validate($rules);
 
+    if (isset($validated['role_id']) && (int) $validated['role_id'] !== (int) $user->role_id && $user->barangayOfficer()->exists()) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['role_id' => 'Remove the barangay officer assignment before changing this account role.']);
+    }
+
     if (isset($validated['role_id']) && ! $this->isProvincialAdmin()) {
         $requestedRole = Role::roleNameForId((int) $validated['role_id']);
         abort_if(in_array($requestedRole, ['admin', 'provincial admin'], true), 403, 'You cannot assign a province-wide role.');
@@ -123,7 +127,7 @@ public function updateUser(Request $request, string $id)
     
     // Update fields only if they exist in validated data
     if (isset($validated['first_name'])) $user->first_name = $validated['first_name'];
-    if (isset($validated['middle_name'])) $user->middle_name = $validated['middle_name'];
+    if (array_key_exists('middle_name', $validated)) $user->middle_name = $validated['middle_name'];
     if (isset($validated['last_name'])) $user->last_name = $validated['last_name'];
     if (isset($validated['contact_number'])) $user->contact_number = $validated['contact_number'];
     if (isset($validated['email'])) $user->email = $validated['email'];
@@ -210,6 +214,10 @@ public function destroyUser(string $id)
         return response()->json(['success' => false, 'message' => 'You cannot delete your own account'], 422);
     }
 
+    if ($user->barangayOfficer()->exists()) {
+        return response()->json(['success' => false, 'message' => 'Remove the barangay officer assignment before deleting this account.'], 422);
+    }
+
     if (
         $user->incidentsReported()->count() > 0 ||
         $user->posts()->count() > 0 ||
@@ -245,8 +253,10 @@ public function destroyUser(string $id)
 
         return response()->json([
             'success' => false,
-            'message' => 'Failed to delete user.',
-        ], 500);
+            'message' => $e instanceof \Illuminate\Database\QueryException && in_array((string) $e->getCode(), ['23000', '23503'], true)
+                ? 'This account is linked to existing records and cannot be deleted safely.'
+                : 'Failed to delete user.',
+        ], $e instanceof \Illuminate\Database\QueryException && in_array((string) $e->getCode(), ['23000', '23503'], true) ? 422 : 500);
     }
 }
     /**
@@ -292,6 +302,18 @@ public function destroyUser(string $id)
     private function assertUserAccess(User $user): void
     {
         if ($this->isProvincialAdmin()) {
+            return;
+        }
+
+        $role = strtolower(trim((string) $user->role?->role));
+        if ($user->barangayOfficer && in_array($role, ['barangay', 'barangay officer', 'barangay captain', 'barangay_officer'], true)) {
+            $scope = app(\App\Services\BoundaryManagementScope::class);
+            $scope->stationForBarangay($scope->assertManager(Auth::user()), (int) $user->barangayOfficer->barangay_id);
+            return;
+        }
+        if (in_array($role, ['citizen', 'barangay', 'barangay officer', 'barangay captain', 'barangay_officer'], true) && $user->address?->barangay_id) {
+            $scope = app(\App\Services\BoundaryManagementScope::class);
+            $scope->stationForBarangay($scope->assertManager(Auth::user()), (int) $user->address->barangay_id);
             return;
         }
 

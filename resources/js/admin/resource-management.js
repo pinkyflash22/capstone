@@ -672,7 +672,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-   document.getElementById('eform').addEventListener('submit', function(e){
+   document.getElementById('eform')?.addEventListener('submit', function(e){
+    // The current resource workspace owns its submit handler and in-place refresh.
+    if (document.getElementById('resourceRegistryPayload')) return;
     e.preventDefault(); // stop reload
 
     let formData = new FormData(this);

@@ -43,7 +43,7 @@ class BarangayOfficerController extends Controller
             'password' => ['nullable', 'string', 'min:8', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.!\-]+$/'],
         ]);
 
-        $scope->stationForBarangay($scope->assertManager(Auth::user()), (int) $validated['barangay_id']);
+        $this->assertOfficerAccess($scope, (int) $validated['barangay_id']);
         $this->assertCaptainAvailable((int) $validated['barangay_id'], $validated['position'], $validated['status']);
         $portalRole = $this->barangayPortalRole();
 
@@ -95,13 +95,30 @@ class BarangayOfficerController extends Controller
 
     public function update(Request $request, BarangayOfficer $barangayOfficer, BoundaryManagementScope $scope): JsonResponse
     {
-        $scope->stationForBarangay($scope->assertManager(Auth::user()), (int) $barangayOfficer->barangay_id);
+        $this->assertOfficerAccess($scope, (int) $barangayOfficer->barangay_id);
+        $user = $barangayOfficer->user;
+        abort_unless($user, 422, 'This officer has no linked account.');
         $validated = $request->validate([
             'position' => ['required', Rule::in(array_keys(self::POSITIONS))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'first_name' => ['sometimes', 'required', 'string', 'max:100'],
+            'middle_name' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:100'],
+            'email' => ['sometimes', 'required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
+            'contact_number' => ['sometimes', 'required', 'regex:/^09\d{9}$/', Rule::unique('users', 'contact_number')->ignore($user->user_id, 'user_id')],
+            'street' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
         $this->assertCaptainAvailable((int) $barangayOfficer->barangay_id, $validated['position'], $validated['status'], $barangayOfficer->barangay_officer_id);
-        DB::transaction(function () use ($barangayOfficer, $validated) {
+        DB::transaction(function () use ($barangayOfficer, $validated, $user) {
+            $details = \Illuminate\Support\Arr::only($validated, ['first_name', 'middle_name', 'last_name', 'email', 'contact_number']);
+            if (!empty($validated['password'])) $details['password'] = Hash::make($validated['password']);
+            if (array_key_exists('street', $validated) && $validated['street'] !== $user->address?->street) {
+                // Use a separate address record so a shared station/household address is not edited.
+                $address = FullAddress::create(['street' => $validated['street'], 'barangay_id' => $user->address?->barangay_id ?? $barangayOfficer->barangay_id]);
+                $details['address_id'] = $address->address_id;
+            }
+            $user->update($details);
             $barangayOfficer->update(['position' => self::POSITIONS[$validated['position']], 'status' => $validated['status']]);
             $this->syncCaptain($barangayOfficer->fresh());
         });
@@ -110,7 +127,7 @@ class BarangayOfficerController extends Controller
 
     public function destroy(BarangayOfficer $barangayOfficer, BoundaryManagementScope $scope): JsonResponse
     {
-        $scope->stationForBarangay($scope->assertManager(Auth::user()), (int) $barangayOfficer->barangay_id);
+        $this->assertOfficerAccess($scope, (int) $barangayOfficer->barangay_id);
         DB::transaction(function () use ($barangayOfficer) {
             BarangayHall::query()->where('captain_user_id', $barangayOfficer->barangay_officer_id)->update(['captain_user_id' => null]);
             $user = $barangayOfficer->user;
@@ -119,6 +136,12 @@ class BarangayOfficerController extends Controller
             if ($user && $previousRoleId) $user->update(['role_id' => $previousRoleId]);
         });
         return response()->json(['success' => true, 'message' => 'Barangay officer assignment removed.']);
+    }
+
+    private function assertOfficerAccess(BoundaryManagementScope $scope, int $barangayId): void
+    {
+        if (strtolower(trim((string) Auth::user()?->role?->role)) === 'provincial admin') return;
+        $scope->stationForBarangay($scope->assertManager(Auth::user()), $barangayId);
     }
 
     private function barangayPortalRole(): Role

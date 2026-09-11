@@ -3107,6 +3107,7 @@
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
     @vite(['resources/css/admin/resource-management.css'])
 
+    @include('chief.partials.station-management-presentation')
 </head>
 @php
     $currentStation = ($stations ?? collect())->first();
@@ -3244,7 +3245,7 @@
         </nav>
 
         <!-- MANAGEMENT CONTENT -->
-        <div class="management-container chief-theme-shell">
+        <div class="management-container chief-theme-shell station-management-workspace">
             @if(session('success'))
                 <div class="station-flash success">{{ session('success') }}</div>
             @endif
@@ -3272,9 +3273,9 @@
                 </div>
                 <div class="chief-theme-summary-grid">
                     <article class="chief-theme-summary-card">
-                        <div class="chief-theme-summary-label">Station Status</div>
-                        <div class="chief-theme-summary-value">Operational</div>
-                        <div class="chief-theme-summary-copy">Profile, contact details, media, and roster are managed here.</div>
+                        <div class="chief-theme-summary-label">Gallery photos</div>
+                        <div class="chief-theme-summary-value">{{ $currentStationGallery->count() }}</div>
+                        <div class="chief-theme-summary-copy">Photos saved for this station.</div>
                     </article>
                     @if($currentRoleName === 'chief' && $currentStation)
                         <article class="chief-theme-summary-card">
@@ -3291,18 +3292,18 @@
             </section>
 
             @if($currentStation && in_array($currentRoleName, ['chief', 'station admin'], true))
-                <section class="station-media-panel">
-                    <div class="station-media-profile">
-                        @if($currentStationProfileUrl)
-                            <img src="{{ $currentStationProfileUrl }}" alt="{{ $currentStation->station_name }}">
-                        @else
-                            <i class="fa-solid fa-building-shield"></i>
-                        @endif
-                    </div>
+                <section class="station-media-panel" aria-label="Station profile and gallery">
                     <div class="station-media-tools">
-                        <div class="station-media-card">
-                            <h3>Station Profile Image</h3>
-                            <p>Upload one main image for the station. This becomes the hero image shown on firefighter My Station.</p>
+                        <div class="station-media-card station-profile-card">
+                            <h3>Station profile</h3>
+                            <p>The main photo shown on the firefighter station page.</p>
+                            <div class="station-media-profile">
+                                @if($currentStationProfileUrl)
+                                    <img src="{{ $currentStationProfileUrl }}" alt="{{ $currentStation->station_name }}" decoding="async">
+                                @else
+                                    <div class="station-photo-empty"><i class="fa-solid fa-building-shield" aria-hidden="true"></i><span>No profile photo yet</span></div>
+                                @endif
+                            </div>
                             <form method="POST" action="{{ route('station-admin.stations.media.profile', $currentStation->station_id) }}" enctype="multipart/form-data" class="station-upload-form" data-upload-label="Profile image">
                                 @csrf
                                 <div class="station-upload-field">
@@ -3311,8 +3312,8 @@
                                         Choose profile image
                                     </label>
                                     <div class="station-upload-box">
-                                        <input id="profileImageUpload" type="file" name="profile_image" accept="image/*" required>
-                                        <span class="station-upload-help">Use a clear landscape or front-facing station photo. PNG, JPG, or WEBP works best.</span>
+                                        <input id="profileImageUpload" type="file" name="profile_image" accept="image/jpeg,image/png,image/webp" required>
+                                        <span class="station-upload-help">JPG, PNG, or WEBP · Up to 5 MB. Choose a clear station photo.</span>
                                     </div>
                                 </div>
                                 <div class="station-upload-progress" data-upload-progress>
@@ -3332,9 +3333,9 @@
                             </form>
                         </div>
 
-                        <div class="station-media-card">
-                            <h3>Station Gallery</h3>
-                            <p>Add supporting photos for the station grounds, apparatus bay, office, or other station-related visuals.</p>
+                        <div class="station-media-card station-gallery-upload-card">
+                            <h3>Add gallery photos</h3>
+                            <p>Show the station grounds, apparatus bay, and facilities.</p>
                             <form method="POST" action="{{ route('station-admin.stations.media.gallery', $currentStation->station_id) }}" enctype="multipart/form-data" class="station-upload-form" data-upload-label="Gallery photos">
                                 @csrf
                                 <div class="station-upload-field">
@@ -3343,11 +3344,12 @@
                                         Choose gallery photos
                                     </label>
                                     <div class="station-upload-box">
-                                        <input id="galleryImagesUpload" type="file" name="gallery_images[]" accept="image/*" multiple required>
-                                        <span class="station-upload-help">You can select multiple images in one upload batch for faster station gallery updates.</span>
+                                        <input id="galleryImagesUpload" type="file" name="gallery_images[]" accept="image/jpeg,image/png,image/webp" multiple required>
+                                        <span class="station-upload-help">Up to 6 photos per upload · JPG, PNG, or WEBP · 5 MB each.</span>
                                     </div>
                                 </div>
-                                <input type="text" name="caption" placeholder="Optional caption for this upload batch">
+                                <label class="station-upload-label" for="stationGalleryCaption">Caption <span>(optional)</span></label>
+                                <input id="stationGalleryCaption" type="text" name="caption" maxlength="255" placeholder="Describe these photos">
                                 <div class="station-upload-progress" data-upload-progress>
                                     <div class="station-upload-progress-head">
                                         <span class="station-upload-progress-label"><i class="fa-solid fa-images"></i> Uploading gallery photos</span>
@@ -3365,11 +3367,11 @@
                             </form>
                         </div>
 
-                        <div class="station-media-card">
-                            <h3>Current Gallery</h3>
-                            <p>These images are visible to firefighters when they open the station page.</p>
+                        <div class="station-media-card station-gallery-library">
+                            <h3>Photo gallery <span class="station-gallery-count">{{ $currentStationGallery->count() }}</span></h3>
+                            <p>Open a photo to view it in full. Use its menu to edit the caption or delete it.</p>
                             @if($currentStationGallery->isEmpty())
-                                <p>No gallery images uploaded yet.</p>
+                                <div class="station-photo-empty"><i class="fa-solid fa-images" aria-hidden="true"></i><strong>Your station gallery starts here</strong><span>Add photos using the upload form above.</span></div>
                             @else
                                 <div class="station-gallery-grid">
                                     @foreach($currentStationGallery as $photo)
@@ -3382,9 +3384,10 @@
                                                 data-gallery-caption="{{ e($photo['caption'] ?: 'No caption added.') }}"
                                                 data-gallery-name="{{ e($photo['file_name']) }}"
                                             >
-                                                <img src="{{ $photo['url'] }}" alt="Station photo {{ $loop->iteration }}">
+                                                <img src="{{ $photo['url'] }}" alt="{{ $photo['caption'] ?: 'Station photo '.$loop->iteration }}" loading="lazy" decoding="async">
                                                 <div class="station-gallery-meta">
-                                                    <span class="station-gallery-meta-title">{{ $photo['file_name'] }}</span>
+                                                    <span class="station-gallery-meta-title">{{ $photo['caption'] ?: 'Station photo '.$loop->iteration }}</span>
+                                                    <small>{{ $photo['file_name'] }}</small>
                                                 </div>
                                             </button>
                                             <div class="station-gallery-menu" data-gallery-menu>

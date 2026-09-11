@@ -1891,7 +1891,7 @@
                         <option value="busy">Busy</option>
                         <option value="off-duty">Off Duty</option>
                         <option value="on-leave">On Leave</option>
-                        <option value="unavailable">Unavailable</option>
+                        <option value="unavailable">--</option>
                         <option value="training">Training</option>
                         <option value="resigned">Resigned</option>
                     </select>
@@ -1966,10 +1966,10 @@
                                 elseif ($statusClass == 'resigned') { $bgColor = '#78716c20'; $textColor = '#44403c'; }
                             @endphp
                             <tr class="personnel-row" data-officer-id="{{ $officer->station_officer_id }}" data-station-id="{{ $officer->station_id }}" data-status="{{ $statusClass }}">
-                                <td class="plain-sight-hidden" aria-hidden="true">{{ $officer->user?->user_id ?? 'N/A' }}</td>
+                                <td class="plain-sight-hidden" aria-hidden="true">{{ $officer->user?->user_id ?? '--' }}</td>
                                 <td class="personnel-name" data-label="Officer Name"><strong>{{ $officer->user?->first_name ?? '' }} {{ $officer->user?->middle_name ?? '' }} {{ $officer->user?->last_name ?? '' }}</strong></td>
-                                <td data-label="Station">{{ $officer->station?->station_name ?? 'N/A' }}</td>
-                                <td data-label="Rank">{{ $officer->rank ?? 'N/A' }}</td>
+                                <td data-label="Station">{{ $officer->station?->station_name ?? '--' }}</td>
+                                <td data-label="Rank">{{ $officer->rank ?? '--' }}</td>
                                 <td data-label="Status">
                                     <select class="status-select" data-officer-id="{{ $officer->station_officer_id }}" style="background: {{ $bgColor }}; color: {{ $textColor }}; border-color: {{ $textColor }}40;">
                                         <option value="available" {{ $officer->status == 'available' ? 'selected' : '' }}>Available</option>
@@ -1978,7 +1978,7 @@
                                         <option value="busy" {{ $officer->status == 'busy' ? 'selected' : '' }}>Busy</option>
                                         <option value="off-duty" {{ $officer->status == 'off-duty' ? 'selected' : '' }}>Off Duty</option>
                                         <option value="on-leave" {{ $officer->status == 'on-leave' ? 'selected' : '' }}>On Leave</option>
-                                        <option value="unavailable" {{ $officer->status == 'unavailable' ? 'selected' : '' }}>Unavailable</option>
+                                        <option value="unavailable" {{ $officer->status == 'unavailable' ? 'selected' : '' }}>--</option>
                                         <option value="training" {{ $officer->status == 'training' ? 'selected' : '' }}>Training</option>
                                         <option value="resigned" {{ $officer->status == 'resigned' ? 'selected' : '' }}>Resigned</option>
                                     </select>
@@ -2182,14 +2182,14 @@
                                 elseif ($teamStatusClass == 'training') { $teamBgColor = '#14b8a620'; $teamTextColor = '#0f766e'; }
                             @endphp
                             <tr class="team-row" data-team-id="{{ $team->team_id }}" data-status="{{ $teamStatusClass }}" data-station-id="{{ $team->station_id ?? $team->teamLeader?->station_id ?? '' }}">
-                                <td class="plain-sight-hidden" aria-hidden="true"><strong>{{ $team->team_id ?? 'N/A' }}</strong></td>
-                                <td data-label="Team Leader"><strong>{{ trim(($team->teamLeader?->user?->first_name ?? '').' '.($team->teamLeader?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->teamLeader?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Driver"><strong>{{ trim(($team->commander?->user?->first_name ?? '').' '.($team->commander?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->commander?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Pumper"><strong>{{ trim(($team->pumpers?->user?->first_name ?? '').' '.($team->pumpers?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->pumpers?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Officer 1"><strong>{{ trim(($team->officer1?->user?->first_name ?? '').' '.($team->officer1?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer1?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Officer 2"><strong>{{ trim(($team->officer2?->user?->first_name ?? '').' '.($team->officer2?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer2?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Officer 3"><strong>{{ trim(($team->officer3?->user?->first_name ?? '').' '.($team->officer3?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->officer3?->user?->account_code ?? 'No account' }}</small></td>
-                                <td data-label="Rescue/Radio"><strong>{{ trim(($team->rescueRadio?->user?->first_name ?? '').' '.($team->rescueRadio?->user?->last_name ?? '')) ?: 'Unassigned' }}</strong><br><small>{{ $team->rescueRadio?->user?->account_code ?? 'No account' }}</small></td>
+                                <td class="plain-sight-hidden" aria-hidden="true"><strong>{{ $team->team_id ?? '--' }}</strong></td>
+                                <td data-label="Team Leader"><strong>{{ trim(($team->teamLeader?->user?->first_name ?? '').' '.($team->teamLeader?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->teamLeader?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Driver"><strong>{{ trim(($team->commander?->user?->first_name ?? '').' '.($team->commander?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->commander?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Pumper"><strong>{{ trim(($team->pumpers?->user?->first_name ?? '').' '.($team->pumpers?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->pumpers?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Officer 1"><strong>{{ trim(($team->officer1?->user?->first_name ?? '').' '.($team->officer1?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->officer1?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Officer 2"><strong>{{ trim(($team->officer2?->user?->first_name ?? '').' '.($team->officer2?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->officer2?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Officer 3"><strong>{{ trim(($team->officer3?->user?->first_name ?? '').' '.($team->officer3?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->officer3?->user?->account_code ?? '--' }}</small></td>
+                                <td data-label="Rescue/Radio"><strong>{{ trim(($team->rescueRadio?->user?->first_name ?? '').' '.($team->rescueRadio?->user?->last_name ?? '')) ?: '--' }}</strong><br><small>{{ $team->rescueRadio?->user?->account_code ?? '--' }}</small></td>
                                 <td data-label="Status">
                                     <select class="status-select" data-team-id="{{ $team->team_id }}" style="background: {{ $teamBgColor }}; color: {{ $teamTextColor }}; border-color: {{ $teamTextColor }}40;">
                                         <option value="available" {{ $team->status == 'available' ? 'selected' : '' }}>Available</option>
@@ -2229,7 +2229,7 @@
                                     <td data-label="Officer"><strong>{{ trim(($officer->user?->first_name ?? '').' '.($officer->user?->middle_name ?? '').' '.($officer->user?->last_name ?? '')) ?: 'Unlinked officer' }}</strong><small style="display:block;color:#64748b">{{ $officer->user?->contact_number ?? 'No contact number' }}</small></td>
                                     <td data-label="Barangay">{{ $officer->barangay?->barangay_name ?? 'Unknown' }}</td>
                                     <td data-label="Position"><span class="status" style="background:#fff7ed;color:#9a3412">{{ $officer->position }}</span></td>
-                                    <td data-label="Portal Account">{{ $officer->user?->account_code ?? 'N/A' }}<small style="display:block;color:#64748b">{{ $officer->user?->email }}</small></td>
+                                    <td data-label="Portal Account">{{ $officer->user?->account_code ?? '--' }}<small style="display:block;color:#64748b">{{ $officer->user?->email }}</small></td>
                                     <td data-label="Status"><span class="status" style="background:{{ $officer->status === 'active' ? '#dcfce7' : '#f1f5f9' }};color:{{ $officer->status === 'active' ? '#166534' : '#475569' }}">{{ ucfirst($officer->status) }}</span></td>
                                     <td data-label="Actions"><button type="button" class="action-btn" onclick="openBarangayOfficerModal({{ $officer->barangay_officer_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button><button type="button" class="action-btn delete-resource" onclick="deleteBarangayOfficer({{ $officer->barangay_officer_id }})" title="Remove assignment"><i class="fa-solid fa-user-minus"></i></button></td>
                                 </tr>
@@ -2256,6 +2256,9 @@
                             <option value="provincial admin">Provincial Admin</option>
                             <option value="station admin">Station Admin</option>
                             <option value="citizen">Citizen</option>
+                            @foreach($roles->filter(fn ($role) => str_starts_with(strtolower($role->role), 'barangay')) as $barangayRole)
+                                <option value="{{ strtolower($barangayRole->role) }}">{{ ucfirst($barangayRole->role) }}</option>
+                            @endforeach
                         </select>
                         <select id="userSortFilter" class="filter-select-sm" onchange="sortUsers()">
                             <option value="name_asc">Name (A-Z)</option>
@@ -2287,10 +2290,10 @@
                             @foreach ($usersPage as $user)
                             <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
-                                <td data-label="Account Code"><strong>{{ $user->account_code ?? 'N/A' }}</strong></td>
+                                <td data-label="Account Code"><strong>{{ $user->account_code ?? '--' }}</strong></td>
                                 <td data-label="Full Name">{{ $user->first_name ?? '' }} {{ $user->middle_name ?? '' }} {{ $user->last_name ?? '' }}</td>
-                                <td data-label="Email">{{ $user->email ?? 'N/A' }}</td>
-                                <td data-label="Contact Number">{{ $user->contact_number ?? 'N/A' }}</td>
+                                <td data-label="Email">{{ $user->email ?? '--' }}</td>
+                                <td data-label="Contact Number">{{ $user->contact_number ?? '--' }}</td>
                                 <td data-label="Role">
                                     <span class="status" style="background: {{ 
                                         ($user->role->role ?? '') == 'admin' ? '#dc2626' : 
@@ -2311,9 +2314,13 @@
                                 <td data-label="Date Modified"><small>{{ \Carbon\Carbon::parse($user->updated_at ?? $user->created_at)->format('Y-m-d H:i') }}</small></td>
                                 <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewUser({{ $user->user_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @if($user->can_manage_resources)
                                     <button class="action-btn edit-resource" onclick="openEditUserModal({{ $user->user_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                     @if((int) ($user->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
                                     <button class="action-btn delete-resource" onclick="deleteUser({{ $user->user_id }})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endif
+                                    @else
+                                    <small title="This account is outside your station coverage or has no linked barangay.">View only</small>
                                     @endif
                                 </td>
                             </tr>
@@ -2378,7 +2385,7 @@
                                 @endphp
                                 <tr>
                                     <td data-label="Unit"><strong>{{ $apparatus->unit_number }}</strong><br><small>{{ $apparatus->equipment?->equipment_name ?? 'Fire apparatus' }}</small></td>
-                                    <td data-label="Station">{{ $apparatus->station?->station_name ?? 'Unassigned' }}</td>
+                                    <td data-label="Station">{{ $apparatus->station?->station_name ?? '--' }}</td>
                                     <td data-label="Plate / Type"><strong>{{ $apparatus->plate_number ?: 'No plate' }}</strong><br><small>{{ ucwords(str_replace('_', ' ', $apparatus->apparatus_type)) }}</small></td>
                                     <td data-label="Capacity">{{ $apparatus->water_capacity_liters ? number_format($apparatus->water_capacity_liters).' L' : 'Not set' }}</td>
                                     <td data-label="Readiness"><span class="status-badge" style="background:{{ $ready ? '#dcfce7' : '#fee2e2' }};color:{{ $ready ? '#166534' : '#991b1b' }};padding:5px 10px;border-radius:999px;">{{ $ready ? 'Ready' : ucwords(str_replace('_', ' ', $apparatus->maintenance_status === 'operational' ? $apparatus->status : $apparatus->maintenance_status)) }}</span></td>
@@ -2993,7 +3000,7 @@
                                 <option value="busy">Busy</option>
                                 <option value="off-duty">Off Duty</option>
                                 <option value="on-leave">On Leave</option>
-                                <option value="unavailable">Unavailable</option>
+                                <option value="unavailable">--</option>
                                 <option value="training">Training</option>
                                 <option value="resigned">Resigned</option>
                             </select>
@@ -3087,7 +3094,7 @@
                             <option value="busy">Busy</option>
                             <option value="off-duty">Off Duty</option>
                             <option value="on-leave">On Leave</option>
-                            <option value="unavailable">Unavailable</option>
+                            <option value="unavailable">--</option>
                             <option value="training">Training</option>
                             <option value="resigned">Resigned</option>
                         </select>
@@ -3205,7 +3212,7 @@
                             <option value="busy">Busy</option>
                             <option value="off-duty">Off Duty</option>
                             <option value="on-leave">On Leave</option>
-                            <option value="unavailable">Unavailable</option>
+                            <option value="unavailable">--</option>
                             <option value="training">Training</option>
                             <option value="resigned">Resigned</option>
                         </select>
@@ -3267,7 +3274,7 @@
                         <option value="busy">Busy</option>
                         <option value="off-duty">Off Duty</option>
                         <option value="on-leave">On Leave</option>
-                        <option value="unavailable">Unavailable</option>
+                        <option value="unavailable">--</option>
                         <option value="training">Training</option>
                         <option value="resigned">Resigned</option>
                     </select>
@@ -3520,6 +3527,10 @@
         </div>
     </div>
 
+    @php
+        $resourceRegistryPayload = ['stationOfficers' => $stationOfficers, 'allTeam' => $teamData, 'equipments' => $equipments, 'activeStations' => $activeStations, 'users' => $users, 'allUsers' => $systemUsers, 'barangayOfficers' => $barangayOfficers, 'apparatus' => $apparatusRecords];
+    @endphp
+    <script id="resourceRegistryPayload" type="application/json">@json($resourceRegistryPayload)</script>
     <script>
         window.resourcesData = {
             stationOfficers: @json($stationOfficers),
@@ -3601,7 +3612,7 @@ if (officerForm) {
             if (data.success) {
                 showToast('Officer added successfully!');
                 closeModal('officerModal');
-                setTimeout(() => location.reload(), 1500);
+                window.refreshResourceWorkspace();
             } else {
                 showToast(data.message || 'Error adding officer', 'error');
                 if (submitBtn) {
@@ -3919,16 +3930,18 @@ if (officerForm) {
         function openEditUserModal(userId) {
             const user = window.resourcesData.allUsers.find(u => u.user_id == userId);
             if (!user) return;
+            if (!user.can_manage_resources) { showToast('This account is outside your station editing scope.', 'error'); return; }
             
             currentUserId = userId;
             document.getElementById('editUserId').value = user.user_id;
-            document.getElementById('editAccountCode').value = user.account_code || 'N/A';
+            document.getElementById('editAccountCode').value = user.account_code || '--';
             document.getElementById('editFirstName').value = user.first_name || '';
             document.getElementById('editMiddleName').value = user.middle_name || '';
             document.getElementById('editLastName').value = user.last_name || '';
             document.getElementById('editContactNumber').value = user.contact_number || '';
             document.getElementById('editEmail').value = user.email || '';
             document.getElementById('editRoleId').value = user.role_id || '';
+            document.getElementById('editRoleId').disabled = Boolean(user.barangay_officer);
             document.getElementById('editVerifiedStatus').value = user.email_verified_at ? 'verified' : 'pending';
             document.getElementById('editPassword').value = '';
             
@@ -3936,15 +3949,10 @@ if (officerForm) {
             if (user.address) {
                 document.getElementById('editStreet').value = user.address.street || '';
                 // Set province and cascade load city/barangay
-                if (user.address.province_id) {
-                    document.getElementById('editProvince').value = user.address.province_id;
-                    loadCitiesForEdit(user.address.province_id, user.address.city_id);
-                }
-                if (user.address.city_id) {
-                    setTimeout(() => {
-                        loadBarangaysForEdit(user.address.city_id, user.address.barangay_id);
-                    }, 100);
-                }
+                const cityId = user.address.barangay?.city_id;
+                const provinceId = user.address.barangay?.city?.province_id;
+                document.getElementById('editProvince').value = provinceId || '';
+                loadCitiesForEdit(provinceId, cityId, user.address.barangay_id);
             } else {
                 document.getElementById('editStreet').value = '';
                 document.getElementById('editProvince').value = '';
@@ -3958,7 +3966,7 @@ if (officerForm) {
             document.getElementById('editUserModal').classList.add('active');
         }
 
-        function loadCitiesForEdit(provinceId, selectedCityId = null) {
+        function loadCitiesForEdit(provinceId, selectedCityId = null, selectedBarangayId = null) {
             const allowedProvinceId = getAllowedChiefProvinceId();
             const allowedCityId = getAllowedChiefCityId();
             const citySelect = document.getElementById('editCity');
@@ -3989,7 +3997,7 @@ if (officerForm) {
                     }
 
                     if (selectedCityId) {
-                        loadBarangaysForEdit(selectedCityId);
+                        loadBarangaysForEdit(selectedCityId, selectedBarangayId);
                     }
                 });
         }
@@ -4018,9 +4026,9 @@ if (officerForm) {
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Account Information</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">Account Code</div><div class="detail-value">${user.account_code || 'N/A'}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Email Address</div><div class="detail-value">${user.email || 'N/A'}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Contact Number</div><div class="detail-value">${user.contact_number || 'N/A'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Account Code</div><div class="detail-value">${user.account_code || '--'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Email Address</div><div class="detail-value">${user.email || '--'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Contact Number</div><div class="detail-value">${user.contact_number || '--'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Role</div><div class="detail-value"><span class="status" style="background: ${(user.role?.role ?? '') == 'admin' ? '#dc2626' : ((user.role?.role ?? '') == 'firefighter' ? '#3b82f6' : ((user.role?.role ?? '') == 'chief' ? '#8b5cf6' : '#6b7280'))}; color: white;">${ucfirst(user.role?.role ?? 'Unknown')}</span></div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Verification</div><div class="detail-value"><span class="status" style="background: ${user.email_verified_at ? '#10b981' : '#ef4444'}; color: white;">${user.email_verified_at ? 'Verified' : 'Pending'}</span></div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Registered On</div><div class="detail-value">${new Date(user.created_at).toLocaleString()}</div></div>
@@ -4100,7 +4108,7 @@ if (officerForm) {
             .then(data => {
                 if (data.success) {
                     showToast('User deleted successfully');
-                    setTimeout(() => location.reload(), 1500);
+                    window.refreshResourceWorkspace();
                 } else {
                     throw new Error(data.message || 'Error deleting user');
                 }
@@ -4318,17 +4326,17 @@ function escapeResourceHtml(value) {
         .replaceAll("'", '&#039;');
 }
 
-function formatTeamMemberLabel(user, emptyLabel = 'Unassigned') {
+function formatTeamMemberLabel(user, emptyLabel = '--') {
     if (!user) {
         return escapeResourceHtml(emptyLabel);
     }
 
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.replace(/\s+/g, ' ').trim();
-    return `${escapeResourceHtml(fullName || emptyLabel)} (${escapeResourceHtml(user.account_code || 'N/A')})`;
+    return `${escapeResourceHtml(fullName || emptyLabel)} (${escapeResourceHtml(user.account_code || '--')})`;
 }
 
 function buildEditTeamOptionLabel(user) {
-    return `${user.first_name || ''} ${user.last_name || ''}`.replace(/\s+/g, ' ').trim() + ` (${user.account_code || 'N/A'})`;
+    return `${user.first_name || ''} ${user.last_name || ''}`.replace(/\s+/g, ' ').trim() + ` (${user.account_code || '--'})`;
 }
 
 function getTeamMemberSelectionValue(team, relationKey, fieldKey) {
@@ -4473,7 +4481,7 @@ function attachEditTeamSelectSync() {
     const officer1 = resolveTeamMemberUser(team, 'officer1', 'firefighter_officer_1');
     const officer2 = resolveTeamMemberUser(team, 'officer2', 'firefighter_officer_2');
     const officer3 = resolveTeamMemberUser(team, 'officer3', 'firefighter_officer_3');
-    const teamLeaderName = `${teamLeader?.first_name || ''} ${teamLeader?.last_name || ''}`.replace(/\s+/g, ' ').trim() || 'Unassigned Leader';
+    const teamLeaderName = `${teamLeader?.first_name || ''} ${teamLeader?.last_name || ''}`.replace(/\s+/g, ' ').trim() || '--';
     const teamInitials = teamLeaderName.split(' ').filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'TM';
     
     let content = `
@@ -4554,26 +4562,26 @@ function attachEditTeamSelectSync() {
                         </div>
                         <div class="resource-detail-card">
                             <div class="detail-label">Current Team Leader</div>
-                            <div class="detail-value">${formatTeamMemberLabel(teamLeader, 'Unassigned Leader')}</div>
+                            <div class="detail-value">${formatTeamMemberLabel(teamLeader, '--')}</div>
                         </div>
                         <div class="resource-detail-card">
                             <div class="detail-label">Current Driver</div>
-                            <div class="detail-value">${formatTeamMemberLabel(commander, 'Unassigned Driver')}</div>
+                            <div class="detail-value">${formatTeamMemberLabel(commander, '--')}</div>
                         </div>
                         <div class="resource-detail-card">
                             <div class="detail-label">Current Pumper</div>
-                            <div class="detail-value">${formatTeamMemberLabel(pumper, 'Unassigned Pumper')}</div>
+                            <div class="detail-value">${formatTeamMemberLabel(pumper, '--')}</div>
                         </div>
                         <div class="resource-detail-card">
                             <div class="detail-label">Current Rescue / Radio</div>
-                            <div class="detail-value">${formatTeamMemberLabel(rescueRadio, 'Unassigned Rescue / Radio')}</div>
+                            <div class="detail-value">${formatTeamMemberLabel(rescueRadio, '--')}</div>
                         </div>
                         <div class="resource-detail-card">
                             <div class="detail-label">Current Officers</div>
                             <div class="detail-value">${[
-                                formatTeamMemberLabel(officer1, 'Officer 1: Unassigned'),
-                                formatTeamMemberLabel(officer2, 'Officer 2: Unassigned'),
-                                formatTeamMemberLabel(officer3, 'Officer 3: Unassigned')
+                                formatTeamMemberLabel(officer1, '--'),
+                                formatTeamMemberLabel(officer2, '--'),
+                                formatTeamMemberLabel(officer3, '--')
                             ].join('<br>')}</div>
                         </div>
                     </div>
@@ -4691,7 +4699,7 @@ function submitTeamUpdate() {
     .then(data => {
         if (data.success) {
             showToast('Team updated successfully');
-            setTimeout(() => location.reload(), 1500);
+            window.refreshResourceWorkspace();
         } else {
             showToast(data.message || 'Error updating team', 'error');
         }
@@ -4810,11 +4818,11 @@ function validateTeamMembers(formData) {
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Personnel Information</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">Rank</div><div class="detail-value">${officer.rank || 'N/A'}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Station</div><div class="detail-value">${officer.station?.station_name || 'N/A'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Rank</div><div class="detail-value">${officer.rank || '--'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Station</div><div class="detail-value">${officer.station?.station_name || '--'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${officer.status?.toLowerCase()}">${officer.status || 'Unknown'}</span></div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Email</div><div class="detail-value">${officer.user?.email || 'N/A'}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Contact</div><div class="detail-value">${officer.user?.contact_number || 'N/A'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Email</div><div class="detail-value">${officer.user?.email || '--'}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Contact</div><div class="detail-value">${officer.user?.contact_number || '--'}</div></div>
                             </div>
                         </div>
                     </div>
@@ -4836,7 +4844,7 @@ function validateTeamMembers(formData) {
                 const officer1 = resolveTeamMemberUser(team, 'officer1', 'firefighter_officer_1');
                 const officer2 = resolveTeamMemberUser(team, 'officer2', 'firefighter_officer_2');
                 const officer3 = resolveTeamMemberUser(team, 'officer3', 'firefighter_officer_3');
-                const teamLeaderName = `${teamLeader?.first_name || ''} ${teamLeader?.last_name || ''}`.replace(/\s+/g, ' ').trim() || 'Unassigned Leader';
+                const teamLeaderName = `${teamLeader?.first_name || ''} ${teamLeader?.last_name || ''}`.replace(/\s+/g, ' ').trim() || '--';
                 const teamInitials = teamLeaderName.split(' ').filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'TM';
                 const content = `
                     <div class="resource-profile-card">
@@ -4851,18 +4859,18 @@ function validateTeamMembers(formData) {
                             <div class="resource-detail-section-title">Team Overview</div>
                             <div class="resource-detail-grid">
                                 <div class="resource-detail-card"><div class="detail-label">Status</div><div class="detail-value"><span class="status ${escapeResourceHtml(team.status?.toLowerCase())}">${escapeResourceHtml(team.status || 'Unknown')}</span></div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Team Leader</div><div class="detail-value">${formatTeamMemberLabel(teamLeader, 'Unassigned Leader')}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Driver</div><div class="detail-value">${formatTeamMemberLabel(commander, 'Unassigned Driver')}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Pumper</div><div class="detail-value">${formatTeamMemberLabel(pumper, 'Unassigned Pumper')}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Rescue / Radio</div><div class="detail-value">${formatTeamMemberLabel(rescueRadio, 'Unassigned Rescue / Radio')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Team Leader</div><div class="detail-value">${formatTeamMemberLabel(teamLeader, '--')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Driver</div><div class="detail-value">${formatTeamMemberLabel(commander, '--')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Pumper</div><div class="detail-value">${formatTeamMemberLabel(pumper, '--')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Rescue / Radio</div><div class="detail-value">${formatTeamMemberLabel(rescueRadio, '--')}</div></div>
                             </div>
                         </div>
                         <div class="resource-detail-section">
                             <div class="resource-detail-section-title">Assigned Officers</div>
                             <div class="resource-detail-grid">
-                                <div class="resource-detail-card"><div class="detail-label">Officer 1</div><div class="detail-value">${formatTeamMemberLabel(officer1, 'Unassigned Officer')}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Officer 2</div><div class="detail-value">${formatTeamMemberLabel(officer2, 'Unassigned Officer')}</div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Officer 3</div><div class="detail-value">${formatTeamMemberLabel(officer3, 'Unassigned Officer')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Officer 1</div><div class="detail-value">${formatTeamMemberLabel(officer1, '--')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Officer 2</div><div class="detail-value">${formatTeamMemberLabel(officer2, '--')}</div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Officer 3</div><div class="detail-value">${formatTeamMemberLabel(officer3, '--')}</div></div>
                             </div>
                         </div>
                     </div>
@@ -4906,7 +4914,7 @@ function validateTeamMembers(formData) {
         //     if (officer) { 
         //         document.getElementById('editOfficerId').value = officer.station_officer_id;
         //         document.getElementById('editUserId').value = officer.user_id;
-        //         document.getElementById('editBfpId').value = officer.user?.user_id || 'N/A';
+        //         document.getElementById('editBfpId').value = officer.user?.user_id || '--';
         //         document.getElementById('editFirstName').value = officer.user?.first_name || '';
         //         document.getElementById('editMiddleName').value = officer.user?.middle_name || '';
         //         document.getElementById('editLastName').value = officer.user?.last_name || '';
@@ -4996,7 +5004,7 @@ function validateTeamMembers(formData) {
             .then(data => {
                 showToast(data.message || 'Equipment deleted successfully.', 'success');
                 closeModal('deleteEquipmentModal');
-                setTimeout(() => location.reload(), 900);
+                window.refreshResourceWorkspace();
             })
             .catch(error => {
                 showToast(error.message || 'Unable to delete equipment.', 'error');
@@ -5051,7 +5059,7 @@ function validateTeamMembers(formData) {
             .then(d => { 
                 if (d.success) { 
                     showToast('Officer deleted'); 
-                    setTimeout(() => location.reload(), 500); 
+                    window.refreshResourceWorkspace();
                 } else { 
                     showToast(d.message || 'Error', 'error'); 
                 } 
@@ -5225,7 +5233,7 @@ function validateTeamMembers(formData) {
     .then(data => {
         if (data && data.success) {
             showToast('Officer updated successfully');
-            setTimeout(() => location.reload(), 1500);
+            window.refreshResourceWorkspace();
         } else if (data) {
             showToast(data.message || 'Error updating officer', 'error');
         }
@@ -5273,20 +5281,23 @@ function validateTeamMembers(formData) {
                 },
                 body: JSON.stringify(userData)
             })
-            .then(response => response.json())
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(Object.values(data.errors || {}).flat()[0] || data.message || 'Unable to update user.');
+                return data;
+            })
             .then(data => {
                 if (data.success) {
+                    closeEditUserModal();
                     showToast('User updated successfully');
-                    setTimeout(() => location.reload(), 1500);
+                    window.refreshResourceWorkspace();
                 } else {
                     showToast(data.message || 'Error updating user', 'error');
                 }
             })
             .catch(error => {
-                showToast('Error updating user', 'error');
+                showToast(error.message || 'Error updating user', 'error');
             });
-            
-            closeEditUserModal();
         });
 
         document.getElementById('eform')?.addEventListener('submit', function(e) {
@@ -5316,7 +5327,7 @@ function validateTeamMembers(formData) {
             .then(d => { 
                 showToast(d.message || 'Equipment added successfully.', 'success');
                 closeModal('equipmentItemModal');
-                setTimeout(() => location.reload(), 900); 
+                window.refreshResourceWorkspace();
             })
             .catch(error => {
                 showToast(error.message || 'Unable to add equipment.', 'error');
@@ -5358,7 +5369,7 @@ function validateTeamMembers(formData) {
             .then(d => { 
                 showToast(d.message || 'Category added successfully.', 'success');
                 closeModal('equipmentCategoryModal');
-                setTimeout(() => location.reload(), 900); 
+                window.refreshResourceWorkspace();
             })
             .catch(error => {
                 showToast(error.message || 'Unable to add category.', 'error');
@@ -5398,7 +5409,7 @@ function validateTeamMembers(formData) {
             .then(d => { 
                 showToast(d.message || 'Equipment assigned successfully.', 'success');
                 closeModal('stationEquipmentModal');
-                setTimeout(() => location.reload(), 900); 
+                window.refreshResourceWorkspace();
             })
             .catch(error => {
                 showToast(error.message || 'Unable to assign equipment.', 'error');
@@ -5439,7 +5450,7 @@ function validateTeamMembers(formData) {
             .then(d => {
                 showToast(d.message || 'Equipment updated successfully.', 'success');
                 closeModal('editEquipmentModal');
-                setTimeout(() => location.reload(), 900);
+                window.refreshResourceWorkspace();
             })
             .catch(error => {
                 showToast(error.message || 'Unable to update equipment.', 'error');
@@ -5487,7 +5498,7 @@ function validateTeamMembers(formData) {
                     form.reset();
                     toggleRegisterUserRankField();
                     closeModal('registerUserModal');
-                    setTimeout(() => location.reload(), 1200);
+                    window.refreshResourceWorkspace();
                 } else {
                     throw new Error(d.message || 'Error registering user');
                 } 
@@ -5605,7 +5616,9 @@ function validateTeamMembers(formData) {
                 });
             };
 
+            let resourceLoadSequence = 0;
             const loadResourceTables = async (targetUrl = window.location.href, resetPages = false) => {
+                const sequence = ++resourceLoadSequence;
                 const url = new URL(targetUrl, window.location.origin);
                 url.searchParams.set('resource_search', search?.value.trim() || '');
                 url.searchParams.set('resource_status', status?.value || '');
@@ -5617,22 +5630,54 @@ function validateTeamMembers(formData) {
 
                 resourceSectionIds.forEach((id) => document.getElementById(id)?.setAttribute('aria-busy', 'true'));
                 try {
-                    const response = await fetch(url.toString(), { headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+                    const fetchUrl = new URL(url);
+                    fetchUrl.searchParams.set('_resource_refresh', '1');
+                    const response = await fetch(fetchUrl.toString(), { cache: 'no-store', headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
                     if (!response.ok) throw new Error('Unable to load resource records.');
                     const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    if (sequence !== resourceLoadSequence) return;
+                    const registry = documentCopy.getElementById('resourceRegistryPayload');
+                    if (!registry) throw new Error('Your session may have expired. Please sign in again.');
+                    const freshData = JSON.parse(registry.textContent);
+                    Object.assign(window.resourcesData, freshData);
+                    barangayOfficerRegistry.splice(0, barangayOfficerRegistry.length, ...freshData.barangayOfficers);
+                    apparatusRegistry.splice(0, apparatusRegistry.length, ...freshData.apparatus);
                     resourceSectionIds.forEach((id) => {
                         const current = document.getElementById(id);
                         const replacement = documentCopy.getElementById(id);
-                        if (current && replacement) current.innerHTML = replacement.innerHTML;
+                        if (current && replacement) {
+                            ['userRoleFilter', 'userSortFilter'].forEach(controlId => {
+                                const control = current.querySelector('#' + controlId);
+                                const placeholder = replacement.querySelector('#' + controlId);
+                                if (control && placeholder) placeholder.replaceWith(control);
+                            });
+                            current.replaceChildren(...replacement.childNodes);
+                        }
                     });
                     window.history.replaceState({}, '', url.toString());
+                    ['.chief-theme-summary-grid', '.stats-grid'].forEach(selector => {
+                        const current = document.querySelector('.management-container ' + selector);
+                        const replacement = documentCopy.querySelector('.management-container ' + selector);
+                        if (current && replacement) current.innerHTML = replacement.innerHTML;
+                    });
+                    document.querySelectorAll('.modal select[id]').forEach(select => {
+                        const replacement = documentCopy.getElementById(select.id);
+                        if (!replacement || select.closest('.modal.active')) return;
+                        const value = select.value;
+                        select.innerHTML = replacement.innerHTML;
+                        select.value = value;
+                    });
                     bindDynamicStatusControls();
                     applyResourceTextLimits();
                 } catch (error) {
                     showToast(error.message || 'Unable to load resource records.', 'error');
                 } finally {
-                    resourceSectionIds.forEach((id) => document.getElementById(id)?.removeAttribute('aria-busy'));
+                    if (sequence === resourceLoadSequence) resourceSectionIds.forEach((id) => document.getElementById(id)?.removeAttribute('aria-busy'));
                 }
+            };
+            window.refreshResourceWorkspace = () => {
+                document.querySelectorAll('.modal.active').forEach(modal => closeModal(modal.id));
+                return loadResourceTables(window.location.href);
             };
 
             if (search) search.addEventListener('input', () => {
@@ -5880,7 +5925,7 @@ let currentTeamOfficers = {
 //             account_code: userData.account_code || '',
 //             rank: officer.rank || '',
 //             full_name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
-//             display_name: `${userData.first_name || ''} ${userData.last_name || ''} (${userData.account_code || 'N/A'}) - ${officer.rank || 'No Rank'}`
+//             display_name: `${userData.first_name || ''} ${userData.last_name || ''} (${userData.account_code || '--'}) - ${officer.rank || 'No Rank'}`
 //         };
         
 //         if (officerData.user_id) {
@@ -5946,7 +5991,7 @@ function loadOfficersData() {
             account_code: userData.account_code || '',
             rank: officer.rank || '',
             full_name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
-            display_name: `${userData.first_name || ''} ${userData.last_name || ''} (${userData.account_code || 'N/A'})`
+            display_name: `${userData.first_name || ''} ${userData.last_name || ''} (${userData.account_code || '--'})`
         };
         
         if (officerData.user_id) {
@@ -6508,7 +6553,7 @@ document.getElementById('createTeamForm')?.addEventListener('submit', function(e
     .then(data => {
         if (data.success) {
             showToast('Team created successfully');
-            setTimeout(() => location.reload(), 600);
+            window.refreshResourceWorkspace();
         } else {
             showToast(data.message || 'Error creating team', 'error');
             submitBtn.innerHTML = originalText;
@@ -6536,12 +6581,13 @@ function syncBarangayOfficerMode() {
     const existing = document.getElementById('barangayOfficerExistingFields');
     const newFields = document.getElementById('barangayOfficerNewFields');
     if (existing) existing.style.display = !editing && mode === 'existing' ? '' : 'none';
-    if (newFields) newFields.style.display = !editing && mode === 'new' ? 'grid' : 'none';
+    if (newFields) newFields.style.display = editing || mode === 'new' ? 'grid' : 'none';
+    newFields?.querySelectorAll('input').forEach(input => { input.disabled = !editing && mode !== 'new'; });
     const userSelect = document.getElementById('barangayOfficerUser');
     if (userSelect) userSelect.required = !editing && mode === 'existing';
     ['first_name', 'last_name', 'email', 'contact_number'].forEach(name => {
         const input = form.elements[name];
-        if (input) input.required = !editing && mode === 'new';
+        if (input) input.required = editing || mode === 'new';
     });
 }
 
@@ -6558,6 +6604,8 @@ function openBarangayOfficerModal(officerId = null) {
     const barangaySelect = document.getElementById('barangayOfficerBarangay');
     barangaySelect.disabled = editing;
     if (editing) {
+        ['first_name', 'middle_name', 'last_name', 'email', 'contact_number'].forEach(name => { form.elements[name].value = officer.user?.[name] || ''; });
+        form.elements.street.value = officer.user?.address?.street || '';
         barangaySelect.value = officer.barangay_id;
         document.getElementById('barangayOfficerPosition').value = String(officer.position || 'officer').toLowerCase();
         document.getElementById('barangayOfficerStatus').value = officer.status || 'active';
@@ -6567,6 +6615,7 @@ function openBarangayOfficerModal(officerId = null) {
         document.getElementById('barangayOfficerStatus').value = 'active';
     }
     syncBarangayOfficerMode();
+    form.elements.password.placeholder = editing ? 'Leave blank to keep password' : 'Leave blank to generate';
     document.getElementById('barangayOfficerModal').style.display = 'flex';
     document.getElementById('barangayOfficerModal').classList.add('active');
 }
@@ -6585,7 +6634,7 @@ document.getElementById('barangayOfficerForm')?.addEventListener('submit', async
         if (!response.ok) throw new Error(validationMessage || payload.message || 'Unable to save barangay officer.');
         if (payload.temporary_password) window.alert(`Officer account created. Temporary password: ${payload.temporary_password}\n\nCopy this now and ask the officer to change it after signing in.`);
         showToast(payload.message || 'Barangay officer saved.', 'success');
-        setTimeout(() => location.reload(), 700);
+        window.refreshResourceWorkspace();
     } catch (error) {
         showToast(error.message || 'Unable to save barangay officer.', 'error');
     } finally {
@@ -6601,7 +6650,7 @@ async function deleteBarangayOfficer(officerId) {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Unable to remove barangay officer.');
         showToast(payload.message, 'success');
-        setTimeout(() => location.reload(), 700);
+        window.refreshResourceWorkspace();
     } catch (error) {
         showToast(error.message || 'Unable to remove barangay officer.', 'error');
     }
@@ -6667,7 +6716,7 @@ async function deleteApparatus(apparatusId) {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Unable to remove apparatus.');
         showToast(payload.message || 'Apparatus removed.', 'success');
-        setTimeout(() => location.reload(), 700);
+        window.refreshResourceWorkspace();
     } catch (error) {
         showToast(error.message || 'Unable to remove apparatus.', 'error');
     }
@@ -6685,7 +6734,7 @@ document.getElementById('apparatusForm')?.addEventListener('submit', async funct
         if (!response.ok) throw new Error(validationMessage || payload.message || 'Unable to save apparatus.');
         showToast(payload.message || 'Apparatus saved.', 'success');
         closeModal('apparatusModal');
-        setTimeout(() => location.reload(), 700);
+        window.refreshResourceWorkspace();
     } catch (error) {
         showToast(error.message || 'Unable to save apparatus.', 'error');
     } finally {
@@ -6697,8 +6746,9 @@ document.getElementById('apparatusForm')?.addEventListener('submit', async funct
 document.addEventListener('DOMContentLoaded', function() {
     initTeamModal();
 
-    document.querySelectorAll('.boundary-sync-form').forEach((form) => {
-        form.addEventListener('submit', async function (event) {
+    document.addEventListener('submit', async function (event) {
+            const form = event.target.closest('.boundary-sync-form');
+            if (!form) return;
             event.preventDefault();
 
             const button = form.querySelector('.boundary-sync-btn');
@@ -6725,7 +6775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 showToast(payload.message || 'Boundary synced successfully.');
-                window.setTimeout(() => window.location.reload(), 700);
+                window.refreshResourceWorkspace();
             } catch (error) {
                 showToast(error.message || 'Boundary sync failed.', 'error');
 
@@ -6734,7 +6784,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     button.innerHTML = originalHtml;
                 }
             }
-        });
     });
 });
     </script>

@@ -102,6 +102,11 @@ return [
         'max_concurrent_responder_calls' => (int) env('VOICE_CALL_MAX_CONCURRENT_RESPONDER_CALLS', 4),
     ],
 
+    'met_norway' => [
+        // MET Norway requires an identifiable application and contact URL.
+        'user_agent' => env('MET_NORWAY_USER_AGENT', 'PyroSense/1.0 (+https://pyro-sense.onrender.com)'),
+    ],
+
     'ai_prediction' => [
         'python_binary' => $aiPythonBinary,
         'python_path' => env('AI_PYTHONPATH', ''),
