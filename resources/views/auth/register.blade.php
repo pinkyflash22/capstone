@@ -1035,6 +1035,7 @@
         }
     </style>
     @include('partials.pwa-head')
+    @include('partials.help-center-styles')
 </head>
 <body>
     <nav class="navbar">
@@ -1375,18 +1376,7 @@
                 <p>Please review the service rules before creating your PyroSense account.</p>
             </div>
             <div class="policy-modal-body">
-                <section>
-                    <h4>Authorized use</h4>
-                    <p>PyroSense is intended for emergency coordination, reporting, and safety-related communication. You agree to provide accurate registration details and use the platform only for lawful and authorized public safety activity.</p>
-                </section>
-                <section>
-                    <h4>Account responsibility</h4>
-                    <p>You are responsible for keeping your login credentials secure and for activity that happens under your account. Any suspected misuse, unauthorized access, or inaccurate responder information should be reported immediately.</p>
-                </section>
-                <section>
-                    <h4>Operational expectations</h4>
-                    <p>You agree not to submit false incidents, disrupt response workflows, or misuse emergency features. PyroSense may suspend or remove access when activity threatens responders, the public, or system reliability.</p>
-                </section>
+                @include('partials.policies.terms')
             </div>
             <div class="policy-modal-footer">
                 <div class="checkbox-group">
@@ -1412,18 +1402,7 @@
                 <p>This explains how PyroSense collects and uses your registration and emergency-response information.</p>
             </div>
             <div class="policy-modal-body">
-                <section>
-                    <h4>Information collected</h4>
-                    <p>We collect the profile, contact, role, and location details you provide during registration, along with verification and security metadata needed to protect the platform and support account recovery.</p>
-                </section>
-                <section>
-                    <h4>How data is used</h4>
-                    <p>Your data is used to verify identity, support emergency communications, improve dispatch and response workflows, and maintain system security, auditing, and compliance requirements.</p>
-                </section>
-                <section>
-                    <h4>Protection and disclosure</h4>
-                    <p>Access to your data is limited to authorized personnel and system processes. Information may be disclosed when required for incident response, legal compliance, or protection of life, safety, and service integrity.</p>
-                </section>
+                @include('partials.policies.privacy')
             </div>
             <div class="policy-modal-footer">
                 <div class="checkbox-group">
@@ -1580,6 +1559,51 @@ document.getElementById('acceptPoliciesBtn').addEventListener('click', () => {
         if (event.target === overlay) {
             closeTermsModal();
             closePrivacyModal();
+        }
+    });
+});
+
+// Keep keyboard navigation inside the existing two-step policy flow.
+let policyReturnFocus = null;
+let policyBodyOverflow = '';
+let activePolicyOverlay = null;
+const policyOverlays = [termsModalOverlay, privacyModalOverlay];
+const syncPolicyFocus = () => {
+    const visible = policyOverlays.find(overlay => overlay.style.display === 'flex');
+    if (visible) {
+        if (!activePolicyOverlay) {
+            policyReturnFocus = document.activeElement;
+            policyBodyOverflow = document.body.style.overflow;
+        }
+        if (visible !== activePolicyOverlay) {
+            visible.querySelector('.policy-modal-body').scrollTop = 0;
+            const heading = visible.querySelector('h3');
+            heading.tabIndex = -1;
+            heading.focus();
+        }
+        document.body.style.overflow = 'hidden';
+    } else if (activePolicyOverlay) {
+        document.body.style.overflow = policyBodyOverflow;
+        if (policyReturnFocus?.isConnected) policyReturnFocus.focus();
+    }
+    activePolicyOverlay = visible || null;
+};
+const policyObserver = new MutationObserver(syncPolicyFocus);
+policyOverlays.forEach(overlay => {
+    policyObserver.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+    overlay.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeTermsModal();
+            closePrivacyModal();
+        }
+        if (event.key !== 'Tab') return;
+        const controls = [...overlay.querySelectorAll('a[href], input, button')].filter(el => !el.disabled && el.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement.matches('h3'))) {
+            event.preventDefault(); last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault(); first?.focus();
         }
     });
 });

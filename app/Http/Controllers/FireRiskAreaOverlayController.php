@@ -50,6 +50,7 @@ class FireRiskAreaOverlayController extends Controller
                 'count' => count($areas),
                 'source' => 'saved_current_analysis_and_forecast_results',
                 'analysis_count' => $analysisAreas->count(),
+                'boundary_forecast_count' => collect($areas)->where('geometry_precision', 'barangay_boundary')->count(),
                 'evidence_heatmaps' => 0,
                 'unmapped_count' => $overlay['unmapped']->count(),
                 'unmapped_forecasts' => $overlay['unmapped']->all(),

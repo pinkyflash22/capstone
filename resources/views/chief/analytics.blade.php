@@ -3141,8 +3141,7 @@
                         <article class="command-decision-card"><small>Evidence quality</small><strong id="decisionEvidence">--</strong><span id="decisionEvidenceCopy">Coverage of trusted inputs</span></article>
                         <article class="command-decision-card"><small>Next action</small><strong id="decisionNextAction">Run analysis</strong><span>Recommended command step</span></article>
                     </div>
-                    <details class="supporting-analysis">
-                        <summary><i class="fa-solid fa-chevron-down"></i> View supporting analysis</summary>
+                    <div class="supporting-analysis">
                     <div class="prediction-summary-grid">
                         <article class="prediction-card">
                             <div class="prediction-card__head">
@@ -3237,7 +3236,7 @@
                             <div id="summaryDrivers" class="prediction-drivers"></div>
                         </article>
                     </div>
-                    </details>
+                    </div>
                     <div id="riskScore" style="display:none;">--</div>
                     <div id="riskFactors" style="display:none;"></div>
                 </section>

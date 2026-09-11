@@ -6668,7 +6668,7 @@ async function pollBoundaryStateChanges() {
     boundaryStatePollingInFlight = true;
 
     try {
-        const response = await fetchLiveResponseOnce('boundaries-poll', '/api/shapes/latest', {
+        const response = await fetchLiveResponseOnce('boundaries-poll', isCitizenDashboardMapContext() ? '/api/public-map-resources?version=1' : '/api/shapes/latest', {
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
@@ -11066,7 +11066,8 @@ async function loadShapes(options = {}) {
 
         if (shapeFeatureGroup) shapeFeatureGroup.clearLayers();
         shapeLayers = {};
-        const cachedShapes = readStaticMapCache('shapes');
+        const shapesCacheKey = isCitizenDashboardMapContext() ? 'public-barangay-shapes' : 'shapes';
+        const cachedShapes = readStaticMapCache(shapesCacheKey);
 
         if (Array.isArray(cachedShapes) && cachedShapes.length > 0) {
             cachedShapes.forEach((shape, index) => {
@@ -11076,9 +11077,10 @@ async function loadShapes(options = {}) {
                 }
                 try {
                     const layer = L.geoJSON(geojson, {
-                        style: { color: colors[index % colors.length], weight: 3, fillOpacity: 0.2, fillColor: colors[index % colors.length] },
+                        style: { color: colors[index % colors.length], weight: 3, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: colors[index % colors.length] },
                         interactive: true, pane: 'overlayPane'
                     });
+                    enableCitizenBoundaryHighlight(layer);
                     layer.shapeId = shape.id;
                     layer.shapeName = shape.name;
                     layer.shapeBarangayId = shape.barangay_id || null;
@@ -11099,7 +11101,7 @@ async function loadShapes(options = {}) {
             }
         }
 
-        const response = await fetch('/api/shapes', {
+        const response = await fetch(isCitizenDashboardMapContext() ? '/api/public-map-resources' : '/api/shapes', {
             cache: 'no-store',
             headers: { 'Accept': 'application/json' },
             signal: fetchController.signal
@@ -11109,8 +11111,10 @@ async function loadShapes(options = {}) {
         if (fetchSequence !== shapeFetchSequence) {
             return;
         }
-        const shapes = Array.isArray(shapesPayload?.data) ? shapesPayload.data : (Array.isArray(shapesPayload) ? shapesPayload : []);
-        writeStaticMapCache('shapes', shapes);
+        const shapes = isCitizenDashboardMapContext()
+            ? (Array.isArray(shapesPayload?.boundaries) ? shapesPayload.boundaries : [])
+            : (Array.isArray(shapesPayload?.data) ? shapesPayload.data : (Array.isArray(shapesPayload) ? shapesPayload : []));
+        writeStaticMapCache(shapesCacheKey, shapes);
         if (shapeFeatureGroup) {
             shapeFeatureGroup.clearLayers();
         }
@@ -11122,9 +11126,10 @@ async function loadShapes(options = {}) {
             }
             try {
                 const layer = L.geoJSON(geojson, {
-                    style: { color: colors[index % colors.length], weight: 3, fillOpacity: 0.2, fillColor: colors[index % colors.length] },
+                    style: { color: colors[index % colors.length], weight: 3, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: colors[index % colors.length] },
                     interactive: true, pane: 'overlayPane'
                 });
+                enableCitizenBoundaryHighlight(layer);
                 layer.shapeId = shape.id;
                 layer.shapeName = shape.name;
                 layer.shapeBarangayId = shape.barangay_id || null;
@@ -11151,6 +11156,23 @@ async function loadShapes(options = {}) {
             shapeFetchController = null;
         }
     }
+}
+
+function enableCitizenBoundaryHighlight(layer) {
+    if (!isCitizenDashboardMapContext()) return;
+    layer.eachLayer(child => {
+        child.bindPopup(() => {
+            const label = document.createElement('strong');
+            label.textContent = layer.shapeName || 'Barangay boundary';
+            return label;
+        });
+        const highlight = () => child.setStyle({ fillOpacity: 0.18 });
+        const reset = () => child.setStyle({ fillOpacity: 0 });
+        child.on('mouseover', highlight);
+        child.on('mouseout', () => { if (!child.isPopupOpen()) reset(); });
+        child.on('popupopen', highlight);
+        child.on('popupclose', reset);
+    });
 }
 
 function normalizeFireRiskAreaGeojson(rawGeojson) {
@@ -11343,6 +11365,10 @@ function createFireRiskHeatLayer(points = []) {
 
 function getFireRiskAreaStyle(area = {}) {
     const level = String(area.risk_level || '').toLowerCase();
+    if (area.geometry_precision === 'barangay_boundary') {
+        const color = level === 'high' ? '#b91c1c' : level === 'low' ? '#15803d' : '#d97706';
+        return { color, fillColor: color, fillOpacity: 0.1, opacity: 0.8, weight: 2, dashArray: '6 5', pane: 'overlayPane' };
+    }
     const overlayType = String(area.overlay_type || 'verified_evidence').toLowerCase();
     const timelineStyle = overlayType === 'next_month_forecast'
         ? { dashArray: '8 7', fillOpacity: 0.14, weight: 3 }
@@ -11399,7 +11425,7 @@ function buildFireRiskAreaPopup(area = {}) {
     const precisionLabel = area.geometry_precision === 'barangay_hall_reference'
         ? 'Barangay hall reference only; no geographic risk footprint is implied'
         : area.geometry_precision === 'barangay_boundary'
-            ? 'Synced barangay boundary'
+            ? 'Barangay-level forecast only — not a precise hotspot or a prediction for every location inside this boundary'
             : area.geometry_precision === 'original_evidence_points'
                 ? 'Heat intensity at original report and incident positions'
                 : area.geometry_precision === 'supporting_evidence_positions'
@@ -11574,12 +11600,14 @@ function renderUnmappedForecastStatus(meta = {}) {
     if (!window.map || typeof L === 'undefined') return;
 
     const count = Number(meta?.unmapped_count || 0);
+    const boundaryCount = Number(meta?.boundary_forecast_count || 0);
     if (!unmappedForecastControl) {
         unmappedForecastControl = L.control({ position: 'bottomleft' });
         unmappedForecastControl.onAdd = function () {
             const container = L.DomUtil.create('div', 'leaflet-bar');
-            container.style.cssText = 'display:none;max-width:300px;padding:10px 12px;background:#fff;border-left:4px solid #f59e0b;border-radius:8px;box-shadow:0 4px 18px rgba(15,23,42,.18);font:12px/1.4 system-ui,sans-serif;color:#334155;';
+            container.style.cssText = 'display:none;width:min(300px,calc(100vw - 90px));max-height:32vh;overflow:auto;padding:10px 12px;background:#fff;border-left:4px solid #f59e0b;border-radius:8px;box-shadow:0 4px 18px rgba(15,23,42,.18);font:12px/1.5 system-ui,sans-serif;color:#334155;';
             L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
             this._container = container;
             return container;
         };
@@ -11588,18 +11616,30 @@ function renderUnmappedForecastStatus(meta = {}) {
 
     const container = unmappedForecastControl._container;
     if (!container) return;
-    if (count < 1) {
+    if (count < 1 && boundaryCount < 1) {
         container.style.display = 'none';
         container.innerHTML = '';
         return;
     }
 
     const records = Array.isArray(meta?.unmapped_forecasts) ? meta.unmapped_forecasts : [];
-    const examples = records.slice(0, 3).map((item) => escapeHtml(item?.barangay_name || 'Unknown barangay')).join(', ');
-    const remainder = Math.max(0, count - 3);
-    container.innerHTML = `<strong>${count} saved forecast${count === 1 ? '' : 's'} not mapped</strong><br>`
-        + `No precise heatmap point is shown until approved geolocated evidence exists${examples ? ` for ${examples}${remainder ? ` and ${remainder} more` : ''}` : ''}.`;
-    container.title = records[0]?.message || 'Saved forecasts without reliable geographic evidence are intentionally not placed on the map.';
+    const barangayCount = new Set(records.map(item => item.barangay_id || item.barangay_name)).size;
+    const reasonLabels = {
+        outside_station_coverage: 'Outside station coverage',
+        missing_barangay: 'Barangay record missing',
+        missing_boundary_and_evidence: 'Boundary and location evidence missing',
+        invalid_boundary_and_no_evidence: 'Boundary needs repair; no location evidence',
+        no_geolocated_approved_evidence: 'No qualifying location evidence',
+        outside_station_coverage_or_missing_barangay: 'Review barangay and station coverage',
+    };
+    const rows = records.map(item => {
+        const period = item.overlay_type === 'next_month_forecast' ? 'Next month' : 'Current month';
+        return `<li style="padding:9px 0;border-bottom:1px solid #e2e8f0;"><strong>${escapeHtml(item.barangay_name || 'Unknown barangay')}</strong> · ${period}<br><span>${escapeHtml(reasonLabels[item.reason] || 'Location needs review')}</span><p style="margin:4px 0 0;color:#64748b;">${escapeHtml(item.message || 'Review this forecast location before placing it on the map.')}</p></li>`;
+    }).join('');
+    container.innerHTML = (boundaryCount > 0
+        ? `<div style="margin-bottom:8px;"><strong>${boundaryCount} barangay-level forecast${boundaryCount === 1 ? '' : 's'}</strong><br>Dashed, lightly shaded areas show the barangay forecast scope—not precise hotspots. Use the current/next-month layers to compare periods.</div>` : '')
+        + (count > 0 ? `<details><summary style="cursor:pointer;min-height:44px;padding:6px 0;"><strong>${count} forecast entries need location review</strong></summary><p style="margin:6px 0;">${barangayCount} distinct barangay record${barangayCount === 1 ? '' : 's'}. Current and next month count separately. Saved forecasts have not been deleted.</p><ul style="list-style:none;margin:0;padding:0;">${rows}</ul></details>` : '');
+    container.title = 'Barangay-level shading and precise evidence-based hotspots represent different levels of location detail.';
     container.style.display = 'block';
 }
 
@@ -11664,7 +11704,7 @@ async function loadFireRiskAreas() {
                     return;
                 }
 
-                layer.bindTooltip(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk`, {
+                layer.bindTooltip(escapeHtml(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk${area.geometry_precision === 'barangay_boundary' ? ' · Barangay-level, not a hotspot' : ''}`), {
                     permanent: false,
                     direction: 'top',
                     sticky: true,
@@ -11674,6 +11714,14 @@ async function loadFireRiskAreas() {
                     maxWidth: 320,
                     className: 'fire-risk-area-popup-shell'
                 });
+                if (area.geometry_precision === 'barangay_boundary') {
+                    layer.eachLayer(child => {
+                        child.on('mouseover', () => child.setStyle({ fillOpacity: 0.22 }));
+                        child.on('mouseout', () => { if (!child.isPopupOpen()) child.setStyle({ fillOpacity: 0.1 }); });
+                        child.on('popupopen', () => child.setStyle({ fillOpacity: 0.22 }));
+                        child.on('popupclose', () => child.setStyle({ fillOpacity: 0.1 }));
+                    });
+                }
                 layer.addTo(targetGroup || fireRiskAreaLayerGroup);
                 addFireRiskEvidencePoints(area, targetGroup || fireRiskAreaLayerGroup);
             } catch (error) {
@@ -12345,9 +12393,10 @@ function initAfterMapReady() {
                 "Fire Stations": stationFeatureGroup,
                 "Incidents": incidentFeatureGroup,
                 "Fire Hydrants": hydrantFeatureGroup,
+                "Risk & Hazard Reports": riskHazardFeatureGroup,
                 "Other Markers": otherFeatureGroup,
                 "Water Reference": waterReference,
-                "Shapes": shapeFeatureGroup
+                "Barangay Boundaries": shapeFeatureGroup
             }
         : isChiefCommandMap
             ? {

@@ -160,6 +160,7 @@ Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllL
     // Route::get('/', [LandingPageController::class, 'index'])->name('landing');
     Route::get('/api/stations', [LandingPageController::class, 'getStations'])->name('api.stations');
     Route::get('/api/hydrants', [LandingPageController::class, 'getHydrants'])->name('api.hydrants');
+    Route::get('/api/public-map-resources', [LandingPageController::class, 'getPublicMapResources'])->name('api.public-map-resources');
     Route::middleware(['auth', 'prevent.back.history', 'role:firefighter'])->get('/ff', function (){
         return view('firefighters.dashboard');
     });

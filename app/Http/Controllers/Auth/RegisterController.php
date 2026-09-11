@@ -468,8 +468,9 @@ public function sendOTP(Request $request)
         $otpCode = $this->generateOtpCode();
         $requestId = 'email-otp-' . uniqid();
 
-        Mail::raw(
-            "Your PyroSense verification code is {$otpCode}. This code will expire in 10 minutes.",
+        Mail::send(
+            ['html' => 'emails.verification-code', 'text' => 'emails.verification-code-text'],
+            ['otpCode' => $otpCode, 'purpose' => 'registration'],
             function ($message) use ($email) {
                 $message->to($email)
                     ->subject('PyroSense Email Verification Code');
@@ -893,8 +894,9 @@ public function resendOTP(Request $request)
             $otpCode = $this->generateOtpCode();
             $requestId = 'email-otp-' . uniqid();
 
-            Mail::raw(
-                "Your PyroSense verification code is {$otpCode}. This code will expire in 10 minutes.",
+            Mail::send(
+                ['html' => 'emails.verification-code', 'text' => 'emails.verification-code-text'],
+                ['otpCode' => $otpCode, 'purpose' => 'registration'],
                 function ($message) use ($request) {
                     $message->to($request->email)
                         ->subject('PyroSense Email Verification Code');

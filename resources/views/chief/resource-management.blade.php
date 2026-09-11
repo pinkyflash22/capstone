@@ -1774,10 +1774,9 @@
                         Station Resource Desk
                     </span>
                     <h1 class="chief-theme-hero__title">Resource Management</h1>
-                    <p class="chief-theme-hero__copy">Review deployable crews and apparatus first, then manage inventory, community coverage, and account records.</p>
+                    <p class="chief-theme-hero__copy">Manage your personnel, schedules, equipment, and community coverage.</p>
                     <div class="chief-theme-badges">
                         <span class="chief-theme-badge"><i class="fa-regular fa-calendar"></i> {{ now()->format('d M Y · H:i') }} hrs</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-circle-info"></i> Multi-station resource registry</span>
                     </div>
                 </div>
                 <div class="chief-theme-summary-grid">
@@ -1800,24 +1799,15 @@
             </section>
 
             <nav class="resource-priority-map" aria-label="Resource management priorities">
-                <a href="#personnelResourceSection"><span>01</span><i class="fa-solid fa-bolt"></i><div><strong>Response readiness</strong><small>Personnel, roster, teams, apparatus</small></div></a>
-                <a href="#equipmentResourceSection"><span>02</span><i class="fa-solid fa-boxes-stacked"></i><div><strong>Inventory</strong><small>Equipment catalogue and availability</small></div></a>
-                <a href="#boundaryResourceSection"><span>03</span><i class="fa-solid fa-map-location-dot"></i><div><strong>Community coverage</strong><small>Boundaries and barangay officers</small></div></a>
-                <a href="#usersResourceSection"><span>04</span><i class="fa-solid fa-address-book"></i><div><strong>Account records</strong><small>Users, roles, and verification</small></div></a>
+                <a href="#personnelResourceSection"><i class="fa-solid fa-bolt" aria-hidden="true"></i><strong>Personnel</strong></a>
+                <a href="#dutyRosterApp"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><strong>Duty roster</strong></a>
+                <a href="#teamsResourceSection"><i class="fa-solid fa-people-group" aria-hidden="true"></i><strong>Teams</strong></a>
+                <a href="#apparatusResourceSection"><i class="fa-solid fa-truck" aria-hidden="true"></i><strong>Apparatus</strong></a>
+                <a href="#equipmentResourceSection"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><strong>Equipment</strong></a>
+                <a href="#boundaryResourceSection"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><strong>Coverage</strong></a>
+                <a href="#barangayOfficerResourceSection"><i class="fa-solid fa-user-shield" aria-hidden="true"></i><strong>Barangay officers</strong></a>
+                <a href="#usersResourceSection"><i class="fa-solid fa-address-book" aria-hidden="true"></i><strong>Accounts</strong></a>
             </nav>
-
-            <header class="resource-tier-heading resource-tier-heading--operations">
-                <span>Priority 01</span><div><h2>Response readiness</h2><p>Resources that determine whether the station can respond now.</p></div>
-            </header>
-            <header class="resource-tier-heading resource-tier-heading--inventory">
-                <span>Priority 02</span><div><h2>Inventory control</h2><p>Maintain concise equipment records after operational staffing is confirmed.</p></div>
-            </header>
-            <header class="resource-tier-heading resource-tier-heading--community">
-                <span>Priority 03</span><div><h2>Community coverage</h2><p>Manage station jurisdiction, synchronized boundaries, and local officers.</p></div>
-            </header>
-            <header class="resource-tier-heading resource-tier-heading--records">
-                <span>Priority 04</span><div><h2>Account records</h2><p>Administrative identities and access records appear last.</p></div>
-            </header>
 
             @php
                 $syncedBoundaryCount = $boundaryBarangays->where('boundary_status', 'synced')->count();

@@ -247,7 +247,7 @@
         .detail-fact strong { display:block; margin-top:5px; color:#1e293b; font-size:.76rem; line-height:1.35; overflow-wrap:anywhere; }
         .detail-disclosures { display:flex; flex-direction:column; gap:8px; }
         .detail-disclosure { border:1px solid #e2e8f0; border-radius:16px; background:#fff; overflow:hidden; }
-        .detail-disclosure > summary { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; min-height:54px; padding:10px 14px; cursor:pointer; list-style:none; }
+        .detail-disclosure > .detail-disclosure__heading { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:10px; min-height:54px; padding:10px 14px; }
         .detail-disclosure > summary::-webkit-details-marker { display:none; }
         .detail-disclosure__icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; color:#c2410c; background:#ffedd5; }
         .detail-disclosure__label strong { display:block; color:#1e293b; font-size:.78rem; }
@@ -519,6 +519,7 @@
         }
     </style>
     @include('chief.partials.workflow-presentation')
+    @include('chief.partials.mitigation-presentation')
 </head>
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
@@ -586,12 +587,12 @@
                                 Mitigation Control
                             </span>
                             <h2 class="mitigation-banner__title chief-theme-hero__title">Turn forecasts into preventive action.</h2>
-                            <p class="mitigation-banner__copy chief-theme-hero__copy">Review AI drafts, assign responsibility, track implementation, and evaluate results.</p>
+                            <p class="mitigation-banner__copy chief-theme-hero__copy">Review plans, assign responsibility, and track prevention work across {{ $managedBarangays->count() }} barangays.</p>
                         </div>
                         <div class="mitigation-banner__meta chief-theme-summary-grid">
                             <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">Coverage</div>
-                                <div class="mitigation-banner__meta-value">{{ $managedBarangays->count() }} barangays</div>
+                                <div class="mitigation-banner__meta-label">High Priority</div>
+                                <div class="mitigation-banner__meta-value">{{ $summary['high_priority'] }}</div>
                             </div>
                             <div class="mitigation-banner__meta-card">
                                 <div class="mitigation-banner__meta-label">Awaiting Approval</div>
@@ -602,8 +603,8 @@
                                 <div class="mitigation-banner__meta-value">{{ $summary['in_progress'] }}</div>
                             </div>
                             <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">Overdue</div>
-                                <div class="mitigation-banner__meta-value">{{ $summary['overdue'] }}</div>
+                                <div class="mitigation-banner__meta-label">Completed</div>
+                                <div class="mitigation-banner__meta-value">{{ $summary['completed'] }}</div>
                             </div>
                         </div>
                     </section>
@@ -812,13 +813,6 @@
                             @endif
                         </section>
 
-                        <section class="summary-grid mitigation-summary">
-                            <article class="card"><div class="card-label">Active Plans</div><div class="card-value">{{ $summary['in_progress'] }}</div><div class="card-copy">Approved and active work.</div></article>
-                            <article class="card"><div class="card-label">Pending Review</div><div class="card-value">{{ $summary['awaiting_approval'] }}</div><div class="card-copy">Draft and planned items.</div></article>
-                            <article class="card"><div class="card-label">High Priority</div><div class="card-value">{{ $summary['high_priority'] }}</div><div class="card-copy">High or critical severity.</div></article>
-                            <article class="card"><div class="card-label">Completed</div><div class="card-value">{{ $summary['completed'] }}</div><div class="card-copy">Finished and logged.</div></article>
-                        </section>
-
                         <nav class="chip-row mitigation-attention" aria-label="Mitigation attention views" style="margin:0 0 14px;">
                             <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'overdue' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}" title="Overdue: {{ $summary['overdue'] }}" aria-label="Show overdue mitigations: {{ $summary['overdue'] }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
                             <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'blocked' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}" title="Blocked: {{ $summary['blocked'] }}" aria-label="Show blocked mitigations: {{ $summary['blocked'] }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
@@ -839,8 +833,7 @@
                                 </div>
                             </div>
 
-                            <details class="filter-disclosure" @if($hasActiveFilters) open @endif>
-                                <summary><i class="fa-solid fa-sliders"></i> Filters @if($hasActiveFilters)<span class="chip">Active</span>@endif</summary>
+                            <section class="mitigation-filter-region" aria-label="Filter mitigations">
                             <form id="mitigationFilters" method="GET" action="{{ route('station-admin.mitigations') }}" class="panel" style="padding:14px; box-shadow:none;">
                                 <input type="hidden" name="sort" value="{{ $filters['sort'] ?? 'priority' }}" data-mitigation-sort-value>
                                 <div class="filters-grid">
@@ -915,7 +908,7 @@
                                     </div>
                                 </div>
                             </form>
-                            </details>
+                            </section>
 
                             <div id="mitigationTableData" aria-live="polite">
                             @if($mitigationActions->isEmpty())
@@ -1551,8 +1544,8 @@
                     <div class="detail-fact"><span>Progress</span><strong>${escapeHtml(payload.progress_percent || 0)}%</strong></div>
                 </div>
                 <div class="detail-disclosures">
-                    <details class="detail-disclosure" open>
-                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-magnifying-glass-chart"></i></span><span class="detail-disclosure__label"><strong>Evidence and rationale</strong><span>Risk factors, recommendation, and source links</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                    <section class="detail-disclosure">
+                        <div class="detail-disclosure__heading"><span class="detail-disclosure__icon"><i class="fa-solid fa-magnifying-glass-chart"></i></span><span class="detail-disclosure__label"><strong>Evidence and rationale</strong><span>Risk factors, recommendation, and source links</span></span></div>
                         <div class="detail-disclosure__content"><div class="detail-content-grid">
                             <div class="detail-content-item is-wide"><span>Contributing factors</span><div>${renderList(payload.factors, 'No contributing factors attached.')}</div></div>
                             <div class="detail-content-item is-wide"><span>Recommendation</span><div>${escapeHtml(payload.recommendation || 'No linked recommendation recorded.')}</div></div>
@@ -1560,9 +1553,9 @@
                             <div class="detail-content-item"><span>AI checklist</span><div>${escapeHtml(payload.checklist_label || 'No linked AI checklist')}</div></div>
                             <div class="detail-content-item is-wide"><span>Traceability</span><div>${renderList(payload.source_references, 'No source references attached.')}</div></div>
                         </div></div>
-                    </details>
-                    <details class="detail-disclosure">
-                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-list-check"></i></span><span class="detail-disclosure__label"><strong>Execution and checklist</strong><span>Ownership, tasks, approval, and current updates</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                    </section>
+                    <section class="detail-disclosure">
+                        <div class="detail-disclosure__heading"><span class="detail-disclosure__icon"><i class="fa-solid fa-list-check"></i></span><span class="detail-disclosure__label"><strong>Execution and checklist</strong><span>Ownership, tasks, approval, and current updates</span></span></div>
                         <div class="detail-disclosure__content"><div class="detail-content-grid">
                             <div class="detail-content-item"><span>Responsible team</span><div>${escapeHtml(payload.responsible_team_label || 'Not assigned')}</div></div>
                             <div class="detail-content-item"><span>Responsible person</span><div>${escapeHtml(payload.responsible_user_label || 'Not assigned')}</div></div>
@@ -1573,9 +1566,9 @@
                             <div class="detail-content-item is-wide"><span>Blocked reason</span><div>${escapeHtml(payload.blocked_reason || 'Not blocked')}</div></div>
                             <div class="detail-content-item is-wide"><span>Planning remarks</span><div>${escapeHtml(payload.remarks || 'No planning remarks recorded.')}</div></div>
                         </div></div>
-                    </details>
-                    <details class="detail-disclosure">
-                        <summary><span class="detail-disclosure__icon"><i class="fa-solid fa-file-shield"></i></span><span class="detail-disclosure__label"><strong>Results and documentation</strong><span>Proof files, completion notes, and follow-up</span></span><i class="fa-solid fa-chevron-down detail-disclosure__chevron"></i></summary>
+                    </section>
+                    <section class="detail-disclosure">
+                        <div class="detail-disclosure__heading"><span class="detail-disclosure__icon"><i class="fa-solid fa-file-shield"></i></span><span class="detail-disclosure__label"><strong>Results and documentation</strong><span>Proof files, completion notes, and follow-up</span></span></div>
                         <div class="detail-disclosure__content"><div class="detail-content-grid">
                             <div class="detail-content-item is-wide"><span>Attachments</span><div>${renderAttachments(payload.attachments)}</div></div>
                             <div class="detail-content-item is-wide"><span>Condition before work</span><div>${escapeHtml(payload.baseline_condition || 'No baseline recorded.')}</div></div>
@@ -1588,7 +1581,7 @@
                             <div class="detail-content-item"><span>Follow-up date</span><div>${escapeHtml(payload.follow_up_date_label || 'Not scheduled')}</div></div>
                             <div class="detail-content-item is-wide"><span>Follow-up notes</span><div>${escapeHtml(payload.follow_up_notes || 'No follow-up notes recorded.')}</div></div>
                         </div></div>
-                    </details>
+                    </section>
                 </div>
             `;
 

@@ -15,6 +15,7 @@
     
     @vite(['resources/css/landing/styles.css'])
     @include('partials.pwa-head')
+    @include('partials.help-center-styles')
 </head>
 <body>
     <section class="mobile-entry-page">
@@ -414,13 +415,26 @@
                     <ul class="footer-links">
                         <li><a href="#map"><i class="fa-solid fa-map"></i> Resource map</a></li>
                         <li><a href="{{ route('auth.login') }}"><i class="fa-solid fa-right-to-bracket"></i> Sign in</a></li>
-                        <li><a href="#" onclick="openAboutModal('faq'); return false;"><i class="fa-solid fa-question-circle"></i> FAQ</a></li>
+                        <li><a href="#" onclick="openAboutModal('faq'); return false;"><i class="fa-solid fa-question-circle"></i> FAQ & support</a></li>
+                        <li><a href="#" onclick="openAboutModal('terms'); return false;">Terms of Service</a></li>
+                        <li><a href="#" onclick="openAboutModal('privacy'); return false;">Privacy Policy</a></li>
                     </ul>
                 </div>
 
                 <div class="footer-col">
-                    <h4>Data shown</h4>
-                    <p class="footer-copy">Counts come from PyroSense records. The public map shows current station and hydrant entries without exposing protected operational layers.</p>
+                    <h4>Connect with us</h4>
+                    <ul class="footer-links footer-social-links">
+                        @foreach(config('landing-footer.socials', []) as $network => $social)
+                            @php($socialUrl = filter_var($social['url'] ?? '', FILTER_VALIDATE_URL) && parse_url($social['url'], PHP_URL_SCHEME) === 'https' ? $social['url'] : null)
+                            <li>
+                                @if($socialUrl)
+                                    <a href="{{ $socialUrl }}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-{{ $social['icon'] }}" aria-hidden="true"></i> {{ $network }}</a>
+                                @else
+                                    <span class="footer-social-pending"><i class="fa-brands fa-{{ $social['icon'] }}" aria-hidden="true"></i> {{ $network }} <small>Coming soon</small></span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
 
                 <div class="footer-col">
@@ -433,12 +447,20 @@
             </div>
 
             <div class="footer-bottom">
+                <div class="footer-partner">
+                    @php($partnerLogo = config('landing-footer.partner_logo'))
+                    @if($partnerLogo && !str_contains($partnerLogo, '..') && !str_contains($partnerLogo, ':') && is_file(public_path($partnerLogo)))
+                        <img src="{{ asset($partnerLogo) }}" alt="Bureau of Fire Protection logo" width="64" height="64" loading="lazy">
+                    @endif
+                    <div><span>Partnered with</span><strong>Bureau of Fire Protection Philippines</strong><small>Urbiztondo Fire Station · Pangasinan</small></div>
+                </div>
                 <p>&copy; {{ date('Y') }} PyroSense Emergency Response System. Data reflects the latest records available to the platform.</p>
             </div>
         </div>
     </footer>
     </div>
 
+    @include('partials.help-center')
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>

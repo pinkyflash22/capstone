@@ -871,12 +871,25 @@ async function loadMobilePreviewResources() {
 
     mobilePreviewResourcesLoading = true;
 
-    // Public station and hydrant feeds are loaded by loadStations/loadHydrants.
-    // Detailed incident, boundary, and risk layers remain behind role-based auth.
-    mobilePreviewResourcesLoaded = true;
-    mobilePreviewResourcesLoading = false;
-    renderLandingMapResources();
-    renderMobilePreviewMarkers();
+    try {
+        const response = await fetch('/api/public-map-resources', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        landingBoundaryShapes = Array.isArray(payload.boundaries) ? payload.boundaries : [];
+        const publicMarkers = Array.isArray(payload.markers) ? payload.markers : [];
+        landingResourceMarkers = [
+            ...landingResourceMarkers.filter(marker => ['station', 'hydrant'].includes(normalizeLandingCategory(marker))),
+            ...publicMarkers,
+        ];
+        mobilePreviewResourcesLoaded = true;
+    } catch (error) {
+        console.warn('Public map resources are unavailable:', error);
+        showLandingToast('Some map resources could not load. Refresh to try again.', true, 4200);
+    } finally {
+        mobilePreviewResourcesLoading = false;
+        renderLandingMapResources();
+        renderMobilePreviewMarkers();
+    }
 }
 
 function normalizeLandingResourcePayload(payload) {
@@ -1138,6 +1151,17 @@ function landingRiskAreaStyle(area = {}) {
     };
 }
 
+function enableLandingBoundaryHighlight(layer) {
+    layer.eachLayer(child => {
+        const highlight = () => child.setStyle({ fillOpacity: 0.18, weight: 2.5 });
+        const reset = () => child.setStyle({ fillOpacity: 0, weight: 1.5 });
+        child.on('mouseover', highlight);
+        child.on('mouseout', () => { if (!child.isPopupOpen()) reset(); });
+        child.on('popupopen', highlight);
+        child.on('popupclose', reset);
+    });
+}
+
 function renderLandingMapResources() {
     if (!map || !landingMapMarkerLayer || !landingMapBoundaryLayer || !landingMapRiskLayer) {
         return;
@@ -1158,13 +1182,14 @@ function renderLandingMapResources() {
                 style: {
                     color: '#2563eb',
                     fillColor: '#93c5fd',
-                    fillOpacity: 0.08,
+                    fillOpacity: 0,
                     opacity: 0.72,
                     weight: 1.5,
                 },
                 interactive: true,
             }).bindPopup(`<strong>${escapeLandingHtml(shape.name || 'Boundary')}</strong>`);
 
+            enableLandingBoundaryHighlight(layer);
             layer.addTo(landingMapBoundaryLayer);
             layer.eachLayer((child) => {
                 const childBounds = child.getBounds?.();
@@ -1260,13 +1285,14 @@ function renderMobilePreviewMarkers() {
                 style: {
                     color: '#2563eb',
                     fillColor: '#93c5fd',
-                    fillOpacity: 0.08,
+                    fillOpacity: 0,
                     opacity: 0.72,
                     weight: 1.5,
                 },
                 interactive: true,
             }).bindPopup(`<strong>${escapeLandingHtml(shape.name || 'Boundary')}</strong>`);
 
+            enableLandingBoundaryHighlight(layer);
             layer.addTo(mobilePreviewBoundaryLayer);
             layer.eachLayer((child) => {
                 const childBounds = child.getBounds?.();
@@ -2082,309 +2108,77 @@ function hideLoading(element) {
     if (el) el.style.display = 'none';
 }
 
-// About Us modals data
-const aboutContent = {
-    aboutBfpUrbiztondo: {
-        title: 'About BFP Urbiztondo',
-        content: `
-            <div class="about-doc">
-                <div class="about-doc-hero">
-                    <span class="about-doc-badge"><i class="fa-solid fa-fire-extinguisher"></i> Bureau of Fire Protection</span>
-                    <h3>Urbiztondo Fire Station, Pangasinan</h3>
-                    <p>
-                        Based on the official BFP Region 1 station listings, Urbiztondo Fire Station forms part of the
-                        Pangasinan provincial fire service network under the Bureau of Fire Protection, supporting
-                        municipal fire prevention, suppression, and emergency response operations in Urbiztondo and nearby areas.
-                    </p>
-                </div>
-
-                <div class="about-doc-grid">
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-bullseye"></i> Mandate</h4>
-                        <p>
-                            The Bureau of Fire Protection was created by Republic Act No. 6975 and is tasked to prevent and suppress
-                            destructive fires, enforce fire-related laws, investigate fire causes, and maintain fire stations with
-                            adequate personnel and equipment in cities and municipalities subject to DILG standards.
-                        </p>
-                    </div>
-
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-shield-heart"></i> Service Role</h4>
-                        <p>
-                            For a municipality like Urbiztondo, this means maintaining readiness for structural fires, rescue support,
-                            community fire safety education, inspections, and coordination during emergencies that affect homes,
-                            businesses, transport assets, and public spaces.
-                        </p>
-                    </div>
-
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-eye"></i> Vision</h4>
-                        <p>
-                            The official BFP Citizens Charter presents the agency vision as
-                            <strong>“A modern fire service fully capable of ensuring a fire safe nation by 2034.”</strong>
-                        </p>
-                    </div>
-
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-handshake-angle"></i> Mission</h4>
-                        <p>
-                            BFP’s published mission centers on preventing and suppressing destructive fires, investigating their causes,
-                            providing emergency medical and rescue services, and enforcing fire-related laws with active community involvement.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="about-doc-section">
-                    <h4><i class="fa-solid fa-phone-volume"></i> Public Contact Reference</h4>
-                    <p>
-                        The BFP Region 1 Contact Us page lists <strong>Urbiztondo FS</strong> with mobile contact
-                        <strong>0917-189-1611</strong>. This gives residents and nearby users a direct station reference point
-                        for inquiries and station coordination.
-                    </p>
-                </div>
-
-                <div class="about-doc-section">
-                    <h4><i class="fa-solid fa-people-group"></i> Why It Matters in PyroSense</h4>
-                    <p>
-                        In this system, the Urbiztondo station profile supports the same real-world responsibilities reflected in the official
-                        BFP mandate: improving visibility of response assets, guiding citizens to the right emergency resources, and helping
-                        local responders act faster through mapped stations, incidents, hydrants, and operational records.
-                    </p>
-                </div>
-
-                <div class="about-doc-sources">
-                    <h4><i class="fa-solid fa-link"></i> Sources</h4>
-                    <ul>
-                        <li><a href="https://region1.bfp.gov.ph/contact-us/" target="_blank" rel="noopener noreferrer">BFP Region 1 Contact Us</a></li>
-                        <li><a href="https://region1.bfp.gov.ph/powers-and-functions-of-the-bfp/" target="_blank" rel="noopener noreferrer">BFP Region 1 Legal Mandates, Powers and Functions</a></li>
-                        <li><a href="https://www.bfp.gov.ph/wp-content/uploads/2020/12/3-BFP-Citizens-Charter-Handbook-for-Printing.pdf" target="_blank" rel="noopener noreferrer">BFP Citizens Charter</a></li>
-                        <li><a href="https://bfp.gov.ph/overview-2014/" target="_blank" rel="noopener noreferrer">BFP Overview</a></li>
-                    </ul>
-                    <p class="about-doc-note">
-                        The station-specific summary above combines official BFP mandate and contact references with a clear operational description for Urbiztondo.
-                    </p>
-                </div>
-            </div>
-        `
-    },
-    history: {
-        title: 'Our History',
-        content: `
-            <div class="timeline-item">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <h4>2018 - Founded</h4>
-                    <p>PyroSense was established to modernize fire emergency response in Pangasinan.</p>
-                </div>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <h4>2020 - First 5 Stations</h4>
-                    <p>Launched with 5 fire stations, reducing average response time by 30%.</p>
-                </div>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <h4>2022 - Expansion</h4>
-                    <p>Expanded to 15 stations across the province.</p>
-                </div>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <h4>2024 - Innovation Award</h4>
-                    <p>Received National Excellence in Emergency Response Award.</p>
-                </div>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <h4>2026 - Today</h4>
-                    <p>Serving 25+ municipalities with 150+ personnel.</p>
-                </div>
-            </div>
-        `
-    },
-    mission: {
-        title: 'Mission & Vision',
-        content: `
-            <h3 style="color: #dc2626; margin-bottom: 0.5rem;">Our Mission</h3>
-            <p style="margin-bottom: 1.5rem;">To protect lives and property through rapid response, innovative technology, and community education.</p>
-            
-            <h3 style="color: #dc2626; margin-bottom: 0.5rem;">Our Vision</h3>
-            <p>To be the leading emergency response system in the Philippines, achieving zero preventable fire-related casualties through prevention and quick response.</p>
-            
-            <h3 style="color: #dc2626; margin: 1.5rem 0 0.5rem;">Core Values</h3>
-            <ul style="list-style: none;">
-                <li style="margin-bottom: 0.5rem;">✓ Speed - Every second counts</li>
-                <li style="margin-bottom: 0.5rem;">✓ Safety - Protecting lives first</li>
-                <li style="margin-bottom: 0.5rem;">✓ Service - Community first approach</li>
-                <li style="margin-bottom: 0.5rem;">✓ Innovation - Always improving</li>
-            </ul>
-        `
-    },
-    leadership: {
-        title: 'Leadership Team',
-        content: `
-            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 60px; height: 60px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #dc2626; font-size: 1.5rem;">
-                    <i class="fa-solid fa-user-tie"></i>
-                </div>
-                <div>
-                    <strong>Chief Juan Dela Cruz</strong><br>
-                    <small style="color: #6b7280;">Fire Director, 25 years experience</small>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 60px; height: 60px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #dc2626; font-size: 1.5rem;">
-                    <i class="fa-solid fa-user-tie"></i>
-                </div>
-                <div>
-                    <strong>Sr. Insp. Maria Santos</strong><br>
-                    <small style="color: #6b7280;">Operations Chief, 18 years experience</small>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 60px; height: 60px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #dc2626; font-size: 1.5rem;">
-                    <i class="fa-solid fa-microchip"></i>
-                </div>
-                <div>
-                    <strong>Engr. Robert Lim</strong><br>
-                    <small style="color: #6b7280;">Technology Director</small>
-                </div>
-            </div>
-        `
-    },
-    careers: {
-        title: 'Join Our Team',
-        content: `
-            <p style="margin-bottom: 1.5rem;">Current openings at PyroSense:</p>
-            
-            <div style="margin-bottom: 1rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
-                <strong>Firefighter</strong><br>
-                <small>Multiple positions · Pangasinan</small>
-                <p style="margin-top: 0.5rem;">Requirements: Passed firefighter exam, physically fit</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
-                <strong>Emergency Dispatcher</strong><br>
-                <small>Full-time · Lingayen HQ</small>
-                <p style="margin-top: 0.5rem;">Requirements: Good communication skills, computer literate</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
-                <strong>Equipment Technician</strong><br>
-                <small>Full-time · Various locations</small>
-                <p style="margin-top: 0.5rem;">Requirements: Mechanical/technical background</p>
-            </div>
-            
-            <button onclick="window.location.href='mailto:careers@pyrosense.gov'" 
-                    style="background: #dc2626; color: white; border: none; padding: 0.75rem; border-radius: 8px; width: 100%; margin-top: 1rem; cursor: pointer;">
-                <i class="fa-solid fa-envelope"></i> Send Application
-            </button>
-        `
-    },
-    faq: {
-        title: 'Frequently Asked Questions',
-        content: `
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">How do I report a fire?</strong>
-                <p>Call 911 for an active emergency. You can also use Report Anonymously to submit a mapped report to PyroSense.</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">How can I find the nearest fire station?</strong>
-                <p>Use our interactive map above or enable location services to find stations near you.</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">Where does the map data come from?</strong>
-                <p>Station and hydrant entries are loaded from current PyroSense marker records. Public map tiles are provided by OpenStreetMap.</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">How can I request fire safety training?</strong>
-                <p>Contact your local fire station directly. The BFP Region 1 directory linked on this page is the official public contact reference.</p>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: #dc2626;">What should I do while waiting for firefighters?</strong>
-                <p>Evacuate the building immediately, stay low to avoid smoke, and wait at the designated meeting point.</p>
-            </div>
-        `
-    },
-    contact: {
-        title: 'Contact BFP Urbiztondo',
-        content: `
-            <div class="about-doc">
-                <div class="about-doc-hero">
-                    <span class="about-doc-badge"><i class="fa-solid fa-phone-volume"></i> Public Contact</span>
-                    <h3>Reach the Fire Station or Emergency Services</h3>
-                    <p>
-                        For emergencies, use the national emergency hotline first. For station-level coordination and local
-                        fire safety concerns, the public may also refer to the listed BFP Region 1 contact details for Urbiztondo.
-                    </p>
-                </div>
-
-                <div class="about-doc-grid">
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-phone"></i> Emergency Hotline</h4>
-                        <p><strong>911</strong></p>
-                        <p>Use this for immediate emergency response and dispatch coordination.</p>
-                    </div>
-
-                    <div class="about-doc-card">
-                        <h4><i class="fa-solid fa-mobile-screen-button"></i> Urbiztondo FS</h4>
-                        <p><strong>0917-189-1611</strong></p>
-                        <p>Listed on the BFP Region 1 contact directory for Urbiztondo Fire Station.</p>
-                    </div>
-                </div>
-
-                <div class="about-doc-section">
-                    <h4><i class="fa-solid fa-circle-info"></i> Best Use of This Contact</h4>
-                    <p>
-                        Use station contact channels for follow-up coordination, local inquiries, community fire safety concerns,
-                        and non-emergency station communication. For active emergencies, always prioritize 911 or the fastest
-                        official emergency dispatch channel available in your area.
-                    </p>
-                </div>
-            </div>
-        `
-    }
-};
-
-// Open about us modal
+// Shared Blade templates keep public help and registration policies consistent.
+let helpReturnFocus = null;
 window.openAboutModal = function(type) {
-    const content = aboutContent[type];
-    if (!content) return;
-    
+    const template = document.getElementById('help-content-' + type)
+        || document.getElementById('help-content-aboutBfpUrbiztondo');
+    if (!template) return;
     let modal = document.getElementById('aboutModal');
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'aboutModal';
         modal.className = 'modal';
         document.body.appendChild(modal);
+        modal.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                closeModal('aboutModal');
+            }
+            if (event.key !== 'Tab') return;
+            const controls = [...modal.querySelectorAll('button, a[href], input, select, textarea, summary')]
+                .filter(el => !el.disabled && el.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        });
+        new MutationObserver(() => {
+            if (!modal.classList.contains('active') && helpReturnFocus?.isConnected) {
+                helpReturnFocus.focus();
+            }
+        }).observe(modal, { attributes: true, attributeFilter: ['class'] });
     }
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>${content.title}</h2>
-                <button class="modal-close" onclick="closeModal('aboutModal')">
-                    <i class="fa-solid fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                ${content.content}
-            </div>
-        </div>
-    `;
-    
+    if (!modal.classList.contains('active')) helpReturnFocus = document.activeElement;
+    modal.innerHTML = '<div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle"><div class="modal-header"><h2 id="helpModalTitle"></h2><button type="button" class="modal-close" aria-label="Close help"><i class="fa-solid fa-times" aria-hidden="true"></i></button></div><div class="modal-body"></div></div>';
+    modal.querySelector('h2').textContent = template.dataset.title;
+    modal.querySelector('.modal-body').appendChild(template.content.cloneNode(true));
+    modal.querySelector('.modal-close').addEventListener('click', () => closeModal('aboutModal'));
+    const search = modal.querySelector('#helpSearch');
+    search?.addEventListener('input', () => {
+        const query = search.value.trim().toLowerCase();
+        let matches = 0;
+        modal.querySelectorAll('[data-help-faq] details').forEach(item => {
+            item.hidden = !item.textContent.toLowerCase().includes(query);
+            if (!item.hidden) matches++;
+        });
+        modal.querySelector('[data-help-empty]').hidden = matches > 0;
+    });
+    modal.querySelector('[data-support-form]')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const question = form.elements.question.value.trim();
+        const status = form.querySelector('[data-support-status]');
+        if (question.length < 10) { status.textContent = 'Please describe your question in at least 10 characters.'; return; }
+        const subject = 'PyroSense support: ' + form.elements.topic.value;
+        const message = subject + '\n\n' + question;
+        if (form.dataset.supportEmail) {
+            window.location.href = 'mailto:' + encodeURIComponent(form.dataset.supportEmail)
+                + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(question);
+            status.textContent = 'Email draft requested. Send it from your email app; PyroSense has not sent a message.';
+        } else {
+            try {
+                await navigator.clipboard.writeText(message);
+                status.textContent = 'Question copied. Share it with your administrator; no message has been sent.';
+            } catch {
+                form.elements.question.focus();
+                form.elements.question.select();
+                status.textContent = 'Copy is unavailable. Your question is selected so you can copy it manually. Nothing has been sent.';
+            }
+        }
+    });
     openModal('aboutModal');
+    requestAnimationFrame(() => modal.querySelector('.modal-close').focus());
 }
 
 function initScrollAnimations() {

@@ -8,6 +8,8 @@ use App\Models\Incident;
 
 class HistoricalFireIncidentSynchronizer
 {
+    private const LOCATION_REVIEW_NOTE = '[Location review required] Confirm the fire incident barangay from its actual location. The reporter home address is not used.';
+
     public static function trySyncForIncidentId(?int $incidentId): bool
     {
         try {
@@ -31,7 +33,6 @@ class HistoricalFireIncidentSynchronizer
 
         $incident = Incident::with([
             'marker',
-            'reporter.address',
             'context',
             'spotInvestigationReport.progressInvestigation.finalInvestigation',
         ])->find($incidentId);
@@ -55,10 +56,25 @@ class HistoricalFireIncidentSynchronizer
             'incident_id' => $incident->incident_id,
         ]);
 
+        // The incident jurisdiction describes the fire location, not where the
+        // reporter lives. A linked barangay fire record is the only fallback
+        // source for a newly synchronized assignment.
+        $incidentBarangayId = (int) ($incident->barangay_id ?? 0);
+        $recordBarangayId = (int) ($barangayFireRecord?->barangayHall?->barangay_id ?? 0);
+        $resolvedBarangayId = $incidentBarangayId > 0
+            ? $incidentBarangayId
+            : ($recordBarangayId > 0 ? $recordBarangayId : null);
+        $needsLocationReview = $resolvedBarangayId === null;
+        $existingNotes = str_replace(self::LOCATION_REVIEW_NOTE, '', (string) $historical->notes);
+        $notes = static::buildNotes($barangayFireRecord?->notes, $spotReport, $progressReport, trim($existingNotes) ?: null);
+        if ($needsLocationReview) {
+            $notes = trim(($notes ? $notes . "\n" : '') . self::LOCATION_REVIEW_NOTE);
+        }
+
         $historical->fill([
-            'barangay_id' => $barangayFireRecord?->barangayHall?->barangay_id
-                ?? $incident->reporter?->address?->barangay_id
-                ?? $historical->barangay_id,
+            // Preserve a previous assignment for review rather than erasing it.
+            // An unresolved record is explicitly unverified below.
+            'barangay_id' => $resolvedBarangayId ?? $historical->barangay_id,
             'incident_date' => $incident->occurred_at?->toDateString()
                 ?? $spotReport?->fire_started?->toDateString()
                 ?? $barangayFireRecord?->incident_date?->toDateString()
@@ -116,10 +132,10 @@ class HistoricalFireIncidentSynchronizer
                 ?? $context?->weather_code,
             'weather_condition' => $historical->weather_condition
                 ?? $context?->weather_condition,
-            'notes' => static::buildNotes($barangayFireRecord?->notes, $spotReport, $progressReport, $historical->notes),
+            'notes' => $notes,
         ]);
 
-        if (! $historical->exists) {
+        if (! $historical->exists || $needsLocationReview) {
             $historical->is_verified = false;
         }
 

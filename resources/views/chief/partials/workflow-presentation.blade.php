@@ -42,13 +42,6 @@
     .mitigation-stack :is(.panel, article), .mitigation-banner .mitigation-banner__meta-card, .checklist-workspace :is(.checklist-metric, .checklist-register) { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
     .mitigation-stack :is(.panel, article):focus-within, .checklist-workspace .checklist-register:focus-within { border-color: #fb923c; box-shadow: 0 0 0 3px #fb923c20; }
     .mitigation-stack :is(button, a, input, select, summary):focus-visible, .checklist-workspace :is(button, a, input, select):focus-visible { outline: 3px solid #f59e0b; outline-offset: 3px; }
-    .workflow-collapse-toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; min-height: 40px; padding: 8px 12px; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-    .workflow-collapse-toggle i { transition: transform .2s ease; }
-    .workflow-collapse-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
-    .workflow-collapse-body[hidden] { display: none !important; }
-    .workflow-collapse-body:not([hidden]) { animation: workflow-reveal .22s ease-out; }
-    .workflow-is-collapsed > .panel-head { margin-bottom: 0; border-bottom: 0; }
-    .workflow-is-collapsed > .panel-head .suggestion-scan-help { display: none; }
     .checklist-workspace[aria-busy="true"] .checklist-register__head::after { content: 'Updating checklists…'; color: #9a3412; font-size: 11px; padding: 6px 10px; border-radius: 7px; background: linear-gradient(100deg, #fff7ed, #fed7aa, #fff7ed); background-size: 200% 100%; animation: workflow-loading 1.6s linear infinite; }
     .checklist-workspace[aria-busy="true"] .checklist-table-wrap { opacity: .6; transition: opacity .2s ease; }
     @keyframes workflow-reveal { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -82,35 +75,3 @@
         .mitigation-stack *, .mitigation-banner *, .checklist-workspace *, .checklist-container .forecast-hero * { animation: none !important; transition: none !important; }
     }
 </style>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.mitigation-ai-saved, .mitigation-ai-recommendations').forEach((card, index) => {
-        const head = card.querySelector(':scope > .panel-head');
-        if (!head) return;
-        const title = head.querySelector('h3')?.textContent.trim() || 'Supporting details';
-        const body = document.createElement('div');
-        body.className = 'workflow-collapse-body';
-        body.id = `workflowSupportingBody${index}`;
-        body.hidden = true;
-        while (head.nextSibling) body.appendChild(head.nextSibling);
-        card.appendChild(body);
-        card.classList.add('workflow-is-collapsed');
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'workflow-collapse-toggle';
-        toggle.setAttribute('aria-controls', body.id);
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.setAttribute('aria-label', `Expand ${title}`);
-        toggle.innerHTML = '<span>Expand</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
-        head.appendChild(toggle);
-        toggle.addEventListener('click', () => {
-            const open = body.hidden;
-            body.hidden = !open;
-            card.classList.toggle('workflow-is-collapsed', !open);
-            toggle.setAttribute('aria-expanded', String(open));
-            toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${title}`);
-            toggle.querySelector('span').textContent = open ? 'Collapse' : 'Expand';
-        });
-    });
-});
-</script>

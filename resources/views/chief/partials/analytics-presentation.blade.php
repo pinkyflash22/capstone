@@ -156,7 +156,10 @@
     @media (display-mode: standalone) {
         .chief-theme-shell { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
     }
-    .analytics-collapse-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .analytics-collapse-toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 12px 14px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
+    .analytics-collapse-toggle span { min-width: 0; overflow-wrap: anywhere; }
+    .analytics-collapse-toggle:focus-visible { outline: 3px solid #f59e0b; outline-offset: 3px; }
+    .analytics-collapsible > .analytics-section__head > div { width: 100%; min-width: 0; }
     .analytics-collapse-toggle i { transition: transform .2s ease; }
     .analytics-collapse-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
     .analytics-collapsible.is-collapsed > .analytics-section__head { margin-bottom: 0; }
@@ -178,11 +181,16 @@
 
         // Move existing nodes rather than recreating them so chart canvases,
         // loaded data, control IDs and attached handlers are preserved.
+        const factorsCard = document.getElementById('predictionFactorsPanel')?.closest('.analytics-shell-card');
         stack.querySelectorAll('.analytics-shell-card').forEach((card, index) => {
-            if (card.matches('.forecast-tools, .forecast-priorities, .prediction-summary-section')) return;
+            // Only Prediction Factors and the cards after it are disclosures.
+            // Summary, priorities, historical data and trend cards stay visible.
+            if (!factorsCard || (card !== factorsCard && !(factorsCard.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING))) return;
             const head = card.querySelector(':scope > .analytics-section__head');
             if (!head) return;
-            const title = head.querySelector('.analytics-section__title')?.textContent.trim() || 'Section';
+            const titleElement = head.querySelector('.analytics-section__title');
+            if (!titleElement) return;
+            const title = titleElement.textContent.trim() || 'Section';
             const body = document.createElement('div');
             body.id = `analyticsCollapsibleBody${index}`;
             body.className = 'analytics-collapsible-body';
@@ -196,15 +204,15 @@
             toggle.setAttribute('aria-controls', body.id);
             toggle.setAttribute('aria-expanded', 'false');
             toggle.setAttribute('aria-label', `Expand ${title}`);
-            toggle.innerHTML = '<span>Expand</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
-            head.appendChild(toggle);
+            toggle.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+            toggle.querySelector('span').textContent = title;
+            titleElement.replaceWith(toggle);
             toggle.addEventListener('click', () => {
                 const open = body.hidden;
                 body.hidden = !open;
                 card.classList.toggle('is-collapsed', !open);
                 toggle.setAttribute('aria-expanded', String(open));
                 toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${title}`);
-                toggle.querySelector('span').textContent = open ? 'Collapse' : 'Expand';
                 if (open) requestAnimationFrame(() => {
                     body.querySelectorAll('canvas').forEach(canvas => window.Chart?.getChart?.(canvas)?.resize());
                 });

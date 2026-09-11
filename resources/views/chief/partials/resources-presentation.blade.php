@@ -37,15 +37,7 @@
     .management-container :is(.resource-tier, .chief-theme-summary-card, .resource-priority-map a) { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
     .management-container :is(.resource-tier, .chief-theme-summary-card):focus-within { border-color: #fb923c; box-shadow: 0 0 0 3px #fb923c20; }
     .management-container :is(button, a, input, select):focus-visible { outline: 3px solid #f59e0b; outline-offset: 3px; }
-    .resource-collapse-toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; min-height: 40px; padding: 8px 12px; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; }
-    .resource-collapse-toggle i { transition: transform .2s ease; }
-    .resource-collapse-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
-    .resource-collapse-body[hidden] { display: none !important; }
-    .management-container .resource-is-collapsed > :is(.section-header, .boundary-control-header) { border-bottom: 0; margin-bottom: 0; }
-    .management-container .resource-is-collapsed > .boundary-control-header p { display: none; }
-    .resource-collapse-body:not([hidden]) { animation: resource-reveal .22s ease-out; }
     .management-container .resource-tier[aria-busy="true"] > :is(.section-header, .boundary-control-header)::after { content: 'Updating records…'; color: #9a3412; font-size: 11px; padding: 6px 10px; border-radius: 7px; background: linear-gradient(100deg, #fff7ed 25%, #fed7aa 50%, #fff7ed 75%); background-size: 200% 100%; animation: resource-loading 1.6s linear infinite; }
-    .management-container .resource-tier[aria-busy="true"] .resource-collapse-body { opacity: .6; }
     @keyframes resource-loading { from { background-position: 200% 0; } to { background-position: -200% 0; } }
     @keyframes resource-reveal { from { opacity: .35; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @media (hover: hover) and (pointer: fine) {
@@ -73,64 +65,51 @@
         .management-container .tab-navigation { max-width: 100%; overflow-x: auto; }
     }
     @media (prefers-reduced-motion: reduce) {
-        .management-container *, .resource-collapse-body { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+        .management-container * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+    /* Match the checklist workspace: summary row, compact navigation, open registers. */
+    .management-container.chief-theme-shell { width: 100%; max-width: 1280px; margin-inline: auto; gap: 12px; }
+    .management-container .resource-order-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .management-container .chief-theme-summary-grid { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .management-container .chief-theme-summary-card { border-top: 1px solid #e2e8f0; }
+    .management-container .chief-theme-hero__title { font-size: clamp(23px, 2.5vw, 30px); }
+    .management-container .resource-priority-map { display: flex; flex-wrap: wrap; gap: 6px; padding: 5px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; }
+    .management-container .resource-priority-map a { flex: 1 1 160px; gap: 8px; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 8px; }
+    .management-container .resource-priority-map strong { white-space: normal; font-size: 11px; }
+    .management-container .resource-priority-map a:hover { background: #fff1e8; transform: none; box-shadow: none; }
+    .management-container .resource-tier { border-top: 3px solid #dc2626; margin: 0; }
+    .management-container :is(.section-header, .boundary-control-header) h3 { font-size: 17px; font-weight: 800; }
+    .management-container :is(.station-table, .boundary-table) :is(th, td) { padding: 12px 13px; }
+    .management-container .resource-tier[aria-busy="true"] :is(.table-responsive, .boundary-table-wrap) { opacity: .6; }
+    .management-container :is(.btn-icon, .btn-edit, .btn-delete) { min-width: 40px; min-height: 40px; }
+    @media (max-width: 767px), (display-mode: standalone) and (max-width: 1024px) {
+        .management-container.chief-theme-shell { min-width: 0; padding-inline: 10px; padding-bottom: calc(106px + env(safe-area-inset-bottom, 0px)); }
+        .management-container .chief-theme-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .management-container .chief-theme-summary-card:last-child { grid-column: 1 / -1; }
+        .management-container .resource-priority-map a { flex-basis: calc(50% - 6px); }
+        .management-container :is(.section-header, .boundary-control-header) { padding: 13px; align-items: flex-start; }
+        .management-container :is(.section-header, .boundary-control-header) h3 { font-size: 16px; }
+        .management-container :is(.filter-controls, .filter-actions) { display: flex; flex-wrap: wrap; width: 100%; }
+        .management-container :is(.filter-controls, .filter-actions) > * { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+        .management-container :is(input, select, textarea) { min-width: 0; max-width: 100%; font-size: 16px; }
+        .management-container :is(button, .btn-add, .btn-filter, .btn-icon) { min-height: 44px; }
+        .management-container :is(.table-responsive, .boundary-table-wrap) { overflow: visible; }
+        .management-container :is(.station-table, .boundary-table) { display: block; min-width: 0; width: 100%; }
+        .management-container :is(.station-table, .boundary-table) thead { display: none; }
+        .management-container :is(.station-table, .boundary-table) tbody { display: grid; gap: 10px; padding: 12px; }
+        .management-container :is(.station-table, .boundary-table) tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin: 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; box-shadow: none; }
+        .management-container :is(.station-table, .boundary-table) tbody td { display: block; width: auto !important; min-width: 0; padding: 0; border: 0; white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+        .resource-management-page .management-container .resource-table-compact .station-table td { padding: 0 !important; }
+        .resource-management-page .management-container .resource-table-compact .station-table td:not(.actions),
+        .resource-management-page .management-container .resource-table-compact .station-table td:not(.actions) > :is(strong, small) { max-width: none; white-space: normal; overflow-wrap: anywhere; overflow: visible; display: block; -webkit-line-clamp: unset; }
+        .management-container :is(.station-table, .boundary-table) td::before { content: attr(data-label); display: block; margin-bottom: 5px; font-size: 10px; color: #64748b; letter-spacing: .05em; text-transform: uppercase; font-weight: 700; }
+        .management-container :is(.station-table, .boundary-table) td:first-child,
+        .management-container :is(.station-table, .boundary-table) td.actions,
+        .management-container :is(.station-table, .boundary-table) td[colspan] { grid-column: 1 / -1; }
+        .management-container :is(.station-table, .boundary-table) td.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+        .management-container :is(.station-table, .boundary-table) td.actions::before { flex-basis: 100%; }
+        .management-container :is(.station-table, .boundary-table) td[colspan]::before { display: none; }
+        .management-container :is(.station-table, .boundary-table) td :is(select, button, a) { max-width: 100%; }
+        .management-container :is(.boundary-summary, .duty-roster__actions) { flex-wrap: wrap; }
     }
 </style>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const shell = document.querySelector('.management-container');
-    if (!shell) return;
-    const expanders = new Map();
-    const openStates = new Map();
-    const enhanceCard = (card, index) => {
-        if (card.querySelector(':scope > .resource-collapse-body')) return;
-        const head = card.querySelector(':scope > .section-header, :scope > .boundary-control-header');
-        if (!head) return;
-        const title = head.querySelector('h3')?.textContent.trim() || 'Resources';
-        const body = document.createElement('div');
-        body.className = 'resource-collapse-body';
-        body.id = `resourceCollapseBody${index}`;
-        while (head.nextSibling) body.appendChild(head.nextSibling);
-        card.appendChild(body);
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'resource-collapse-toggle';
-        toggle.setAttribute('aria-controls', body.id);
-        toggle.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
-        const setOpen = open => {
-            openStates.set(card.id, open);
-            body.hidden = !open;
-            card.classList.toggle('resource-is-collapsed', !open);
-            toggle.setAttribute('aria-expanded', String(open));
-            toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${title}`);
-            toggle.querySelector('span').textContent = open ? 'Collapse' : 'Expand';
-        };
-        // Keep operational readiness visible, and preserve visibility on paginated visits.
-        const paginated = Array.from(new URLSearchParams(location.search).keys()).some(key => key.includes('page'));
-        setOpen(openStates.get(card.id) ?? (paginated || card.matches('.resource-tier--operations, .resource-tier--teams, .resource-tier--apparatus')));
-        head.appendChild(toggle);
-        toggle.addEventListener('click', () => setOpen(body.hidden));
-        expanders.set(card.id, () => setOpen(true));
-    };
-    shell.querySelectorAll('.station-grid.resource-tier, .boundary-control-card.resource-tier').forEach((card, index) => {
-        enhanceCard(card, index);
-        // Existing AJAX handlers replace each card's innerHTML. Reattach only
-        // presentation controls, preserving its open state and the fresh rows.
-        new MutationObserver(() => enhanceCard(card, index)).observe(card, { childList: true });
-    });
-    const revealHash = () => {
-        const expand = expanders.get(location.hash.slice(1));
-        if (expand) { expand(); document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' }); }
-    };
-    shell.querySelectorAll('.resource-priority-map a[href^="#"]').forEach(link => {
-        link.addEventListener('click', () => expanders.get(link.hash.slice(1))?.());
-    });
-    window.addEventListener('hashchange', revealHash);
-    if (location.hash) requestAnimationFrame(revealHash);
-    // Searches still use the existing filtering handlers; expose their results.
-    shell.querySelector('#searchInput')?.addEventListener('input', event => {
-        if (event.target.value.trim()) expanders.forEach(expand => expand());
-    });
-    shell.querySelector('#statusFilter')?.addEventListener('change', () => expanders.forEach(expand => expand()));
-});
-</script>

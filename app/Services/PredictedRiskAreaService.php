@@ -36,6 +36,7 @@ class PredictedRiskAreaService
             ]);
 
         $locations = $this->forecastBarangayLocations($stationId);
+        $knownBarangayIds = DB::table('barangays')->pluck('barangay_id')->mapWithKeys(fn ($id) => [(int) $id => true]);
         $forecastEvidenceByBarangay = $this->riskEvidencePoints($stationId)
             ->concat($this->historicalIncidentEvidencePoints($stationId))
             ->filter(fn (array $point) => ! empty($point['barangay_id']))
@@ -62,7 +63,8 @@ class PredictedRiskAreaService
 
                 $location = $locations->get($barangayId);
                 if (! $location) {
-                    $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, 'outside_station_coverage_or_missing_barangay'));
+                    $reason = $knownBarangayIds->has($barangayId) ? 'outside_station_coverage' : 'missing_barangay';
+                    $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, $reason));
                     continue;
                 }
 
@@ -105,9 +107,20 @@ class PredictedRiskAreaService
 
                 $forecastEvidence = collect($forecastEvidenceByBarangay->get($barangayId, []))->values();
                 if ($forecastEvidence->isEmpty()) {
-                    // Neither a barangay boundary nor its hall is evidence of where
-                    // fire risk is concentrated. Do not invent a geographic hotspot.
-                    $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, 'no_geolocated_approved_evidence'));
+                    // A boundary represents the forecast's administrative scope,
+                    // never an inferred hotspot or an invented point location.
+                    $boundary = $this->forecastBoundaryGeometry($location->geojson);
+                    if ($boundary) {
+                        $area['geometry_type'] = 'polygon';
+                        $area['geometry_precision'] = 'barangay_boundary';
+                        $area['geojson'] = $boundary;
+                        $area['location_basis'] = 'barangay_level_forecast_only';
+                        $area['metrics']['support_points'] = 0;
+                        $areas->push($area);
+                    } else {
+                        $reason = empty($location->geojson) ? 'missing_boundary_and_evidence' : 'invalid_boundary_and_no_evidence';
+                        $unmapped->push($this->unmappedForecast($analysis, $prediction, $overlayType, $reason));
+                    }
                     continue;
                 }
 
@@ -368,10 +381,47 @@ class PredictedRiskAreaService
             'overlay_type' => $overlayType,
             'risk_level' => $this->normalizeForecastRiskLevel($prediction['risk_level'] ?? $analysis->risk_level ?? 'low'),
             'reason' => $reason,
-            'message' => $reason === 'no_geolocated_approved_evidence'
-                ? 'Forecast saved, but it has no geolocated approved risk report or linked historical fire to place on the heatmap.'
-                : 'Forecast saved, but its barangay is missing or outside the selected station coverage.',
+            'message' => match ($reason) {
+                'outside_station_coverage' => 'This barangay is outside the selected station coverage. Review the station assignment.',
+                'missing_barangay' => 'The saved forecast refers to a barangay record that no longer exists. Review the forecast location.',
+                'missing_boundary_and_evidence' => 'No saved barangay boundary or qualifying location evidence is available. Add a boundary for area-level shading.',
+                'invalid_boundary_and_no_evidence' => 'The saved boundary cannot be drawn and no qualifying location evidence is available. Review or resync the boundary.',
+                default => 'No qualifying location evidence is available for a precise hotspot.',
+            },
         ];
+    }
+
+    protected function forecastBoundaryGeometry(array $geojson): ?array
+    {
+        $type = $geojson['type'] ?? '';
+        if ($type === 'Feature') {
+            return $this->forecastBoundaryGeometry((array) ($geojson['geometry'] ?? []));
+        }
+        if ($type === 'FeatureCollection') {
+            $features = [];
+            foreach ($geojson['features'] ?? [] as $feature) {
+                $geometry = $this->forecastBoundaryGeometry((array) $feature);
+                if (!$geometry) return null;
+                $features[] = ['type' => 'Feature', 'properties' => (object) [], 'geometry' => $geometry];
+            }
+            return $features ? ['type' => 'FeatureCollection', 'features' => $features] : null;
+        }
+        if (!in_array($type, ['Polygon', 'MultiPolygon'], true)) return null;
+        $coordinates = $geojson['coordinates'] ?? [];
+        $polygons = $type === 'Polygon' ? [$coordinates] : $coordinates;
+        if (!is_array($polygons) || !$polygons) return null;
+        foreach ($polygons as $polygon) {
+            if (!is_array($polygon) || !$polygon) return null;
+            foreach ($polygon as $ring) {
+                if (!is_array($ring) || count($ring) < 4 || reset($ring) != end($ring)) return null;
+                foreach ($ring as $point) {
+                    if (!is_array($point) || !isset($point[0], $point[1]) || !is_numeric($point[0]) || !is_numeric($point[1])
+                        || !is_finite((float) $point[0]) || !is_finite((float) $point[1])
+                        || abs((float) $point[0]) > 180 || abs((float) $point[1]) > 90) return null;
+                }
+            }
+        }
+        return ['type' => $type, 'coordinates' => $coordinates];
     }
 
     protected function decodeJsonArray(mixed $value): array

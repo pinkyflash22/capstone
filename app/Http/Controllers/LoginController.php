@@ -314,8 +314,9 @@ class LoginController extends Controller
             $otpCode = $this->generateOtpCode();
             $requestId = 'password-reset-otp-' . uniqid();
 
-            Mail::raw(
-                "Your PyroSense password reset code is {$otpCode}. This code will expire in 10 minutes. If you did not request this, you can ignore this email.",
+            Mail::send(
+                ['html' => 'emails.verification-code', 'text' => 'emails.verification-code-text'],
+                ['otpCode' => $otpCode, 'purpose' => 'password-reset'],
                 function ($message) use ($user) {
                     $message->to($user->email)
                         ->subject('PyroSense Password Reset Code');
@@ -1127,8 +1128,9 @@ class LoginController extends Controller
         $otpCode = $this->generateOtpCode();
         $requestId = 'google-email-otp-' . uniqid();
 
-        Mail::raw(
-            "Your PyroSense verification code is {$otpCode}. This code will expire in 10 minutes.",
+        Mail::send(
+            ['html' => 'emails.verification-code', 'text' => 'emails.verification-code-text'],
+            ['otpCode' => $otpCode, 'purpose' => 'sign-in'],
             function ($message) use ($user) {
                 $message->to($user->email)
                     ->subject('PyroSense Google Sign-In Verification Code');
