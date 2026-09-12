@@ -70,6 +70,7 @@ export default defineConfig({
                 'resources/js/user.js',
                 'resources/js/voice-calls.js',
                 'resources/js/duty-roster.js',
+                'resources/js/dynamic-actions.js',
             ],
             refresh: true,
         }),

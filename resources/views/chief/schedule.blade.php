@@ -229,6 +229,12 @@
             padding: 18px;
             background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
         }
+        .request-item.is-removing {
+            opacity: 0;
+            transform: translateY(-8px) scale(.985);
+            transition: opacity .2s ease, transform .2s ease;
+            pointer-events: none;
+        }
         .request-item h4 {
             margin: 0;
             color: #0f172a;
@@ -276,6 +282,14 @@
             padding: 12px 14px;
             color: #0f172a;
             background: white;
+        }
+        .request-field-error {
+            display: block;
+            margin-top: 7px;
+            color: #b91c1c;
+            font-size: .76rem;
+            font-weight: 700;
+            line-height: 1.4;
         }
         .request-reject-form {
             margin-top: 12px;
@@ -1256,10 +1270,13 @@
                                 @csrf
                                 <label>
                                     <span>Rejection note</span>
-                                    <textarea name="review_notes" rows="3" placeholder="Tell the requester why this cannot be scheduled now."></textarea>
+                                    <textarea name="review_notes" rows="3" maxlength="1000" required aria-required="true" placeholder="Tell the requester why this cannot be scheduled now.">{{ old('review_notes') }}</textarea>
+                                    @error('review_notes')
+                                        <small class="request-field-error" role="alert">{{ $message }}</small>
+                                    @enderror
                                 </label>
                                 <div class="request-actions">
-                                    <button type="submit" class="request-btn reject">Reject request</button>
+                                    <button type="submit" class="request-btn reject"><i class="fa-solid fa-ban" aria-hidden="true"></i> Reject request</button>
                                 </div>
                             </form>
                         </article>
@@ -2042,6 +2059,55 @@
             });
             requestReviewModal?.addEventListener('click', function (event) {
                 if (event.target === requestReviewModal) setModalVisibility(requestReviewModal, false);
+            });
+            requestReviewModal?.addEventListener('submit', async function (event) {
+                const form = event.target.closest('form[action*="community-activity-requests"]');
+                if (!form) return;
+
+                event.preventDefault();
+                const submitButton = event.submitter || form.querySelector('button[type="submit"]');
+                const originalLabel = submitButton?.innerHTML || '';
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Saving...';
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: new FormData(form),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+
+                    if (!response.ok || payload.success === false) {
+                        const validationMessage = Object.values(payload.errors || {}).flat().find(Boolean);
+                        throw new Error(validationMessage || payload.message || 'Unable to review the activity request.');
+                    }
+
+                    if (payload.data?.event) {
+                        replaceEventInSeed(payload.data.event);
+                        renderUpcoming();
+                        renderCalendar();
+                        renderSelectedDay();
+                    }
+
+                    const card = form.closest('.request-item');
+                    card?.classList.add('is-removing');
+                    window.setTimeout(() => card?.remove(), 220);
+                    showScheduleToast(payload.message || 'Activity request updated.');
+                } catch (error) {
+                    showScheduleToast(error.message || 'Unable to review the activity request.', true);
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalLabel;
+                    }
+                }
             });
             scheduleEventDate?.addEventListener('change', function () {
                 refreshTimeSelectors(scheduleEventDate.value || state.selectedDateKey);

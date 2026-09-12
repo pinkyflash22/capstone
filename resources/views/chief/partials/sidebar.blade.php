@@ -1,6 +1,7 @@
 @include('partials.unified-notifications')
 @include('partials.voice-call-config')
 @vite('resources/js/chief/form-safety.js')
+@vite('resources/js/dynamic-actions.js')
 
 @php
     $active = $active ?? '';

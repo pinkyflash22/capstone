@@ -56,8 +56,8 @@ services:
         value: database
 
       - key: CACHE_STORE
-        # Keep the local file cache as the primary store, but do not turn a
-        # transient Render filesystem failure into an HTTP 500 response.
+        # Use shared Redis first and process memory only as an emergency
+        # fallback. Render's ephemeral file cache can disappear at runtime.
         value: failover
 
       - key: REDIS_URL

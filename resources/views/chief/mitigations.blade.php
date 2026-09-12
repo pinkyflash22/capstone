@@ -1867,6 +1867,10 @@
                 loadMitigationTable(link.href);
             });
             bindMitigationTableActions();
+            window.addEventListener('pyro:mitigations-mutated', () => {
+                [createModal, editModal, deleteModal, detailsModal].forEach(closeModal);
+                loadMitigationTable(window.location.href);
+            });
             const requestedMitigationId = new URLSearchParams(window.location.search).get('mitigation_action_id');
             if (requestedMitigationId) {
                 document.querySelector(`#mitigation-row-${CSS.escape(requestedMitigationId)} [data-open-details-modal]`)?.click();

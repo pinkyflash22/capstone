@@ -1944,7 +1944,7 @@
             'lng' => $station->marker?->lng,
             ])->values(),
     ])
-    @vite(['resources/css/app.css', 'resources/css/citizen/dashboard.css', 'resources/js/user.js'])
+    @vite(['resources/css/app.css', 'resources/css/citizen/dashboard.css', 'resources/js/user.js', 'resources/js/dynamic-actions.js'])
 
     <script>
     document.addEventListener('DOMContentLoaded', function(){

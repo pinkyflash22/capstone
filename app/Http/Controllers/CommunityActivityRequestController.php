@@ -9,6 +9,7 @@ use App\Models\Station;
 use App\Models\StationOfficer;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,12 +18,15 @@ use Illuminate\Validation\Rule;
 
 class CommunityActivityRequestController extends Controller
 {
-    public function storeCitizen(Request $request): RedirectResponse
+    public function storeCitizen(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
 
         if (! CommunityActivityRequest::isAvailable()) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Community activity requests are not available on this server yet.'], 422);
+            }
             return redirect()
                 ->route('citizen.dashboard', ['section' => 'announcements'])
                 ->with('error', 'Community activity requests are not available on this server yet.');
@@ -33,17 +37,24 @@ class CommunityActivityRequestController extends Controller
 
         UserActivityLogger::log('submitted community activity request', $user->user_id, $request);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Your orientation or seminar request was sent to the assigned station for review.']);
+        }
+
         return redirect()
             ->route('citizen.dashboard', ['section' => 'announcements'])
             ->with('success', 'Your orientation or seminar request was sent to the assigned station for review.');
     }
 
-    public function storeBarangay(Request $request): RedirectResponse
+    public function storeBarangay(Request $request): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
 
         if (! CommunityActivityRequest::isAvailable()) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Community activity requests are not available on this server yet.'], 422);
+            }
             return redirect()
                 ->route('barangay.awareness')
                 ->with('error', 'Community activity requests are not available on this server yet.');
@@ -52,6 +63,9 @@ class CommunityActivityRequestController extends Controller
         $barangay = $this->resolveBarangayForBarangayUser($user);
 
         if (! $barangay) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'No barangay is linked to this account yet, so the request could not be submitted.'], 422);
+            }
             return redirect()
                 ->route('barangay.awareness')
                 ->with('error', 'No barangay is linked to this account yet, so the request could not be submitted.');
@@ -61,12 +75,16 @@ class CommunityActivityRequestController extends Controller
 
         UserActivityLogger::log('submitted barangay community activity request', $user->user_id, $request);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Community activity request sent to the assigned station for review.']);
+        }
+
         return redirect()
             ->route('barangay.awareness')
             ->with('success', 'Community activity request sent to the assigned station for review.');
     }
 
-    public function updateCitizen(Request $request, int $requestId): RedirectResponse
+    public function updateCitizen(Request $request, int $requestId): RedirectResponse|JsonResponse
     {
         $user = $request->user();
         abort_unless($user, 403);
@@ -78,6 +96,9 @@ class CommunityActivityRequestController extends Controller
             ->findOrFail($requestId);
 
         if (! $activityRequest->canCitizenEdit()) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'BFP has already reviewed this request. It can no longer be edited.'], 422);
+            }
             return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
                 ->with('error', 'BFP has already reviewed this request. It can no longer be edited.');
         }
@@ -106,44 +127,44 @@ class CommunityActivityRequestController extends Controller
             ->update($validated);
 
         if (! $updated) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'This request could not be updated. Refresh to check whether BFP has reviewed it.'], 409);
+            }
             return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
                 ->with('error', 'This request could not be updated. Refresh to check whether BFP has reviewed it.');
         }
 
         UserActivityLogger::log('updated pending community activity request', $user->user_id, $request);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Your changes were saved. The request is still awaiting BFP review.']);
+        }
+
         return redirect()->route('citizen.dashboard', ['section' => 'announcements'])
             ->with('success', 'Your changes were saved. The request is still awaiting BFP review.');
     }
 
-    public function approve(Request $request, int $requestId): RedirectResponse
+    public function approve(Request $request, int $requestId): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
+        $scheduleRoute = $this->scheduleRouteFor($user);
 
         if (! CommunityActivityRequest::isAvailable()) {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'Community activity requests are not available on this server yet.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'Community activity requests are not available on this server yet.');
         }
-
-        $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-        $stationId = $stationOfficer?->station_id;
 
         $activityRequest = CommunityActivityRequest::query()
             ->with(['barangay', 'requester'])
             ->findOrFail($requestId);
+        $stationId = $this->reviewStationIdFor($user, $activityRequest);
 
         if (! $stationId || (int) ($activityRequest->station_id ?? 0) !== (int) $stationId) {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'You are not allowed to approve this request.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'You are not allowed to approve this request.');
         }
 
         if (($activityRequest->status ?? 'pending') !== 'pending') {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'This request has already been reviewed.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'This request has already been reviewed.');
         }
 
         $validated = $request->validate([
@@ -165,9 +186,7 @@ class CommunityActivityRequestController extends Controller
             ->exists();
 
         if ($hasConflict) {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'The selected schedule window is already occupied for this station.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'The selected schedule window is already occupied for this station.');
         }
 
         $scheduleLabel = Carbon::createFromFormat('H:i', $validated['start_time'])->format('g:i A')
@@ -204,55 +223,100 @@ class CommunityActivityRequestController extends Controller
 
         UserActivityLogger::log('approved community activity request', $user->user_id, $request);
 
-        return redirect()
-            ->route('station-admin.schedule')
-            ->with('success', 'Community activity request approved and added to the official schedule.');
+        return $this->reviewResponse(
+            $request,
+            $scheduleRoute,
+            true,
+            'Community activity request approved and added to the official schedule.',
+            ['event' => $event]
+        );
     }
 
-    public function reject(Request $request, int $requestId): RedirectResponse
+    public function reject(Request $request, int $requestId): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
+        $scheduleRoute = $this->scheduleRouteFor($user);
 
         if (! CommunityActivityRequest::isAvailable()) {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'Community activity requests are not available on this server yet.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'Community activity requests are not available on this server yet.');
         }
 
-        $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
-        $stationId = $stationOfficer?->station_id;
-
         $activityRequest = CommunityActivityRequest::query()->findOrFail($requestId);
+        $stationId = $this->reviewStationIdFor($user, $activityRequest);
 
         if (! $stationId || (int) ($activityRequest->station_id ?? 0) !== (int) $stationId) {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'You are not allowed to reject this request.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'You are not allowed to reject this request.');
         }
 
         if (($activityRequest->status ?? 'pending') !== 'pending') {
-            return redirect()
-                ->route('station-admin.schedule')
-                ->with('error', 'This request has already been reviewed.');
+            return $this->reviewResponse($request, $scheduleRoute, false, 'This request has already been reviewed.');
         }
 
         $validated = $request->validate([
             'review_notes' => ['required', 'string', 'max:1000'],
         ]);
 
-        $activityRequest->update([
-            'status' => 'rejected',
-            'review_notes' => $validated['review_notes'],
-            'reviewed_by' => $user->user_id,
-            'reviewed_at' => now(),
-        ]);
+        $updated = CommunityActivityRequest::query()
+            ->whereKey($activityRequest->getKey())
+            ->where('station_id', $stationId)
+            ->where('status', 'pending')
+            ->whereNull('reviewed_at')
+            ->update([
+                'status' => 'rejected',
+                'review_notes' => trim($validated['review_notes']),
+                'reviewed_by' => $user->user_id,
+                'reviewed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return $this->reviewResponse($request, $scheduleRoute, false, 'This request was already reviewed. The schedule has been refreshed.');
+        }
 
         UserActivityLogger::log('rejected community activity request', $user->user_id, $request);
 
+        return $this->reviewResponse($request, $scheduleRoute, true, 'Community activity request rejected.');
+    }
+
+    private function reviewResponse(
+        Request $request,
+        string $scheduleRoute,
+        bool $success,
+        string $message,
+        array $data = []
+    ): RedirectResponse|JsonResponse {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => $success,
+                'message' => $message,
+                'data' => $data,
+            ], $success ? 200 : 422);
+        }
+
         return redirect()
-            ->route('station-admin.schedule')
-            ->with('success', 'Community activity request rejected.');
+            ->route($scheduleRoute)
+            ->with($success ? 'success' : 'error', $message);
+    }
+
+    private function reviewStationIdFor($user, CommunityActivityRequest $activityRequest): ?int
+    {
+        if (strtolower(trim((string) $user->role?->role)) === 'provincial admin') {
+            return $activityRequest->station_id ? (int) $activityRequest->station_id : null;
+        }
+
+        $stationId = StationOfficer::query()
+            ->where('user_id', $user->user_id)
+            ->value('station_id');
+
+        return $stationId ? (int) $stationId : null;
+    }
+
+    private function scheduleRouteFor($user): string
+    {
+        return strtolower(trim((string) $user->role?->role)) === 'provincial admin'
+            ? 'admin.schedule'
+            : 'station-admin.schedule';
     }
 
     private function createRequest(Request $request, $user, ?Barangay $barangay, string $submittedFrom): void

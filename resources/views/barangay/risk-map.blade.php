@@ -905,7 +905,7 @@
         <section class="barangay-risk-feed-grid">
         @include('barangay.partials.risk-map-submission-modal')
 
-        <article class="panel-card barangay-risk-feed-card">
+        <article class="panel-card barangay-risk-feed-card" data-risk-feed-root="risks">
             <div class="barangay-risk-feed-card__header">
                 <div>
                     <div class="panel-eyebrow">Risk Markers</div>
@@ -998,7 +998,7 @@
             @endif
         </article>
 
-        <article class="panel-card barangay-risk-feed-card">
+        <article class="panel-card barangay-risk-feed-card" data-risk-feed-root="markers">
             <div class="barangay-risk-feed-card__header">
                 <div>
                     <div class="panel-eyebrow">Map Records</div>

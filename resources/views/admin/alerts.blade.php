@@ -2040,10 +2040,19 @@ async function cancelReport(incidentId, markerId) {
             });
         }
         
-        alert('Report cancelled successfully!');
-        
-        // Reload the page to refresh the list
-        location.reload();
+        const incidentIndex = incidentsData.findIndex((incident) => Number(incident.incident_id) === Number(incidentId));
+        if (incidentIndex >= 0) incidentsData.splice(incidentIndex, 1);
+
+        buttons.forEach((button) => {
+            const row = button.closest('tr');
+            if (!row) return;
+            row.style.transition = 'opacity .2s ease, transform .2s ease';
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(-6px)';
+            window.setTimeout(() => row.remove(), 210);
+        });
+        closeDetailsModal();
+        window.PyroNotify?.notify('Report cancelled successfully.', 'success');
         
     } catch (error) {
         console.error('Error cancelling report:', error);

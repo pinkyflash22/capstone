@@ -873,6 +873,49 @@
         attachCurrentLocation('create_useCurrentLocationBtn', 'create_lat', 'create_lng');
         attachCurrentLocation('edit_useCurrentLocationBtn', 'edit_lat', 'edit_lng');
 
+        document.querySelectorAll('.fire-report-form, #deleteFireReportForm').forEach((form) => {
+            form.addEventListener('submit', async (event) => {
+                if (!window.navigator.onLine) return;
+                event.preventDefault();
+
+                const submitButton = event.submitter || form.querySelector('button[type="submit"]');
+                const originalLabel = submitButton?.innerHTML || '';
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new FormData(form),
+                        credentials: 'same-origin',
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok || payload.success === false) {
+                        const validationMessage = Object.values(payload.errors || {}).flat().find(Boolean);
+                        throw new Error(validationMessage || payload.message || 'Unable to save the fire report.');
+                    }
+
+                    closeModal(form.closest('.fire-report-modal'));
+                    if (form !== editForm && form !== deleteForm) form.reset();
+                    await loadRecords(1);
+                    window.PyroNotify?.notify(payload.message || 'Fire report saved.', 'success');
+                } catch (error) {
+                    window.PyroNotify?.notify(error.message || 'Unable to save the fire report.', 'error');
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalLabel;
+                    }
+                }
+            });
+        });
+
         @if ($errors->any())
             openModal(createModal);
         @endif

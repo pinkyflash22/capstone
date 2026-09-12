@@ -18,24 +18,11 @@ class EquipmentCategoryController extends Controller
      */
     public function index()
     {
-          $equipmentcategory = EquipmentCategory::all();
-        $equipments = Equipment::all();
-        $activeStations = Station::with('person','coordinate.marker') ->get();
-        $personnels = Personnel::with('station') ->get();
+        $routeName = request()->routeIs('admin.*')
+            ? 'admin.resource-management.index'
+            : 'station-admin.resource-management.index';
 
-        // $countId = $personnels->stationBelong;
-    //   foreach ($personnels as $person) {
-    //      $countId =  $person->stationBelong;
-        
-    //     }
-    //      $countperson = Personnel::with('station')
-    //     ->where('stationBelong', $countId)
-    //     ->get();
-
-
-
-        return view('admin.resource-management', compact('equipmentcategory',
-        'equipments','activeStations','personnels'));
+        return redirect()->route($routeName);
     }
 
     /**
@@ -66,7 +53,6 @@ class EquipmentCategoryController extends Controller
             'category_name' => $equipmentCategories->category_name,
         ]);
 
-        return view('admin.resource-management');
     }
 
     /**

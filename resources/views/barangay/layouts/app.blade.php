@@ -8,7 +8,7 @@
     <meta name="user-id" content="{{ auth()->user()->user_id ?? '' }}">
     <title>PyroSense · @yield('page_title', 'Barangay Portal')</title>
 
-    @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/js/location-accuracy.js'])
+    @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/js/location-accuracy.js', 'resources/js/dynamic-actions.js'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />

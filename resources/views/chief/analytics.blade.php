@@ -808,6 +808,16 @@
                 "GRAD" 0,
                 "opsz" 24;
         }
+        .analytics-inline-svg svg {
+            display: block;
+            width: 1em;
+            height: 1em;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
         .analytics-forecast-modal--details {
             width: min(92vw, 600px) !important;
             max-width: 600px !important;
@@ -8078,7 +8088,6 @@
                 'fa-clipboard-list': 'assignment',
                 'fa-clock': 'schedule',
                 'fa-clock-rotate-left': 'history',
-                'fa-crosshairs': 'my_location',
                 'fa-database': 'database',
                 'fa-file-certificate': 'workspace_premium',
                 'fa-fire': 'local_fire_department',
@@ -8124,8 +8133,11 @@
             icons.forEach((icon) => {
                 const iconClass = Array.from(icon.classList).find((cls) => cls.startsWith('fa-') && !ignored.includes(cls));
                 const materialSymbol = iconClass ? getChiefAnalyticsMaterialSymbol(iconClass) : null;
+                const inlineSvg = iconClass === 'fa-crosshairs'
+                    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="1.5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>'
+                    : null;
 
-                if (!materialSymbol) {
+                if (!materialSymbol && !inlineSvg) {
                     icon.setAttribute('data-chief-inline-fa-processed', '1');
                     return;
                 }
@@ -8134,7 +8146,7 @@
                 replacement.className = Array.from(icon.classList)
                     .filter((cls) => !['fas', 'far', 'fab', 'fa-solid', 'fa-regular', 'fa-brands', 'fa-pulse', 'fa-spin', iconClass].includes(cls))
                     .join(' ');
-                replacement.className = `${replacement.className} inline-fa-icon analytics-google-symbol`.trim();
+                replacement.className = `${replacement.className} inline-fa-icon ${inlineSvg ? 'analytics-inline-svg' : 'analytics-google-symbol'}`.trim();
 
                 if (['fa-spinner', 'fa-arrows-spin', 'fa-rotate'].includes(iconClass)) {
                     replacement.classList.add('icon-spin');
@@ -8147,7 +8159,11 @@
                     replacement.setAttribute('style', style);
                 }
 
-                replacement.textContent = materialSymbol;
+                if (inlineSvg) {
+                    replacement.innerHTML = inlineSvg;
+                } else {
+                    replacement.textContent = materialSymbol;
+                }
                 icon.setAttribute('data-chief-inline-fa-processed', '1');
                 icon.replaceWith(replacement);
             });

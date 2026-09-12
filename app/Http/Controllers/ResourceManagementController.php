@@ -24,21 +24,11 @@ class ResourceManagementController extends Controller
      */
     public function index()
     {
-        $equipmentcategory  = EquipmentCategory::all();
-        $equipments = Equipment::all();
-        $stationOfficers = StationOfficer::with('user','station')->get();
+        $routeName = request()->routeIs('admin.*')
+            ? 'admin.resource-management.index'
+            : 'station-admin.resource-management.index';
 
-        $activeStations = Station::all();
-        $citizenRoleId = Role::where('role', 'citizen')->value('role_id');
-        $allTeam = Team::with('commander', 'pumpers', 'teamLeader', 'officer1', 'officer2', 'officer3', 'rescueRadio')->get();
-        $users = User::where('role_id', '!=', $citizenRoleId)->get();
-        $allusers = User::all();
-        $roles = Role::all();
-        $provinces = Province::orderBy('province_name')->get();
-        $boundaryBarangays = $this->buildBoundaryBarangayList();
-        
-        
-        return view('admin.resource-management', compact('equipmentcategory','allusers','provinces','roles','equipments','activeStations','users','stationOfficers','allTeam', 'boundaryBarangays'));
+        return redirect()->route($routeName);
     }
 
     protected function buildBoundaryBarangayList()

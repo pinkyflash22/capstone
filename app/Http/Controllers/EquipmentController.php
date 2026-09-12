@@ -23,8 +23,11 @@ class EquipmentController extends Controller
 
     public function index()
     {
-        // $equipments = Equipment::with('category')->paginate(15);
-        // return view('admin.equipment.index', compact('equipments'));
+        $routeName = request()->routeIs('admin.*')
+            ? 'admin.resource-management.index'
+            : 'station-admin.resource-management.index';
+
+        return redirect()->route($routeName);
     }
 
     public function create()

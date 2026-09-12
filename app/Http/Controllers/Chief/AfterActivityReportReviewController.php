@@ -96,7 +96,15 @@ class AfterActivityReportReviewController extends Controller
             UserActivityLogger::log($approved ? 'approved after activity report' : 'requested changes to after activity report', $user->user_id, $request);
         });
 
-        return back()->with('success', $validated['decision'] === 'approve' ? 'AAR approved and digitally signed.' : 'The AAR was returned for changes.');
+        $message = $validated['decision'] === 'approve'
+            ? 'AAR approved and digitally signed.'
+            : 'The AAR was returned for changes.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function authorizeReport(Request $request, AfterActivityReport $report): void

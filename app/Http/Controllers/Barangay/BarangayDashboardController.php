@@ -1695,6 +1695,18 @@ class BarangayDashboardController extends Controller
         });
         $this->safelyAutoAssignFireIncident($incident, $autoAssignmentService);
 
+        if ($request->expectsJson()) {
+            $record = BarangayFireRecord::with(['incident.marker'])
+                ->where('incident_id', $incident->incident_id)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Fire report submitted successfully and forwarded into the system incident flow.',
+                'data' => $record ? $this->serializeFireReportRecord($record) : null,
+            ]);
+        }
+
         return redirect()
             ->route('barangay.reports')
             ->with('success', 'Fire report submitted successfully and forwarded into the system incident flow.');
@@ -1761,6 +1773,16 @@ class BarangayDashboardController extends Controller
             UserActivityLogger::log('updated fire report record', Auth::user()?->user_id, $request);
         });
 
+        if ($request->expectsJson()) {
+            $record->refresh()->load(['incident.marker']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Fire record updated successfully.',
+                'data' => $this->serializeFireReportRecord($record),
+            ]);
+        }
+
         return redirect()
             ->route('barangay.reports')
             ->with('success', 'Fire record updated successfully.');
@@ -1805,6 +1827,14 @@ class BarangayDashboardController extends Controller
 
             UserActivityLogger::log('deleted fire report record', Auth::user()?->user_id, $request);
         });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Fire record deleted successfully.',
+                'data' => ['id' => $recordId],
+            ]);
+        }
 
         return redirect()
             ->route('barangay.reports')

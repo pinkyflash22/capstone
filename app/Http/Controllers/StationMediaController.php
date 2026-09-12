@@ -48,12 +48,20 @@ class StationMediaController extends Controller
             'supabase'
         );
 
-        StationMedia::create([
+        $media = StationMedia::create([
             'station_id' => $station->station_id,
             'path' => $path,
             'kind' => 'profile',
             'uploaded_by_user_id' => Auth::user()?->user_id,
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Station profile image updated successfully.',
+                'data' => ['id' => $media->getKey(), 'url' => MediaPath::url($media->path), 'kind' => 'profile'],
+            ]);
+        }
 
         return back()->with('success', 'Station profile image updated successfully.');
     }
@@ -72,13 +80,14 @@ class StationMediaController extends Controller
             ->where('kind', 'gallery')
             ->max('sort_order');
 
+        $createdMedia = [];
         foreach ($validated['gallery_images'] as $index => $image) {
             $path = MediaPath::storeForDisk(
                 $image->store('station-media/gallery', 'supabase'),
                 'supabase'
             );
 
-            StationMedia::create([
+            $media = StationMedia::create([
                 'station_id' => $station->station_id,
                 'path' => $path,
                 'kind' => 'gallery',
@@ -86,18 +95,36 @@ class StationMediaController extends Controller
                 'sort_order' => $baseSort + $index + 1,
                 'uploaded_by_user_id' => Auth::user()?->user_id,
             ]);
+            $createdMedia[] = [
+                'id' => $media->getKey(),
+                'url' => MediaPath::url($media->path),
+                'caption' => $media->caption,
+                'file_name' => basename((string) $media->path),
+            ];
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Station gallery updated successfully.',
+                'data' => $createdMedia,
+            ]);
         }
 
         return back()->with('success', 'Station gallery updated successfully.');
     }
 
-    public function destroy(StationMedia $stationMedia)
+    public function destroy(Request $request, StationMedia $stationMedia)
     {
         $station = $stationMedia->station;
         abort_unless($station && $this->canManageStation($station), 403);
 
         MediaPath::delete($stationMedia->path);
         $stationMedia->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Station image removed successfully.']);
+        }
 
         return back()->with('success', 'Station image removed successfully.');
     }
@@ -114,6 +141,14 @@ class StationMediaController extends Controller
         $stationMedia->update([
             'caption' => $validated['caption'] ?? null,
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Station image details updated successfully.',
+                'data' => ['id' => $stationMedia->getKey(), 'caption' => $stationMedia->caption],
+            ]);
+        }
 
         return back()->with('success', 'Station image details updated successfully.');
     }

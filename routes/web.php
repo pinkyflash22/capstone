@@ -48,7 +48,6 @@ use App\Http\Controllers\FsicRequestController;
 use App\Http\Controllers\MarkerCategoryController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LandingMediaController;
-use App\Http\Controllers\ResourceManagementController;
 use App\Http\Controllers\RiskAreaReviewController;
 
 
@@ -418,9 +417,6 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
             Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
             Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
         });
-        // Route::get('/resource', function(){
-        //     return view('admin.resource-management');
-        // });
         Route::resource('equipment-category', EquipmentCategoryController::class);
         // Route::post('equipment-category', [EquipmentCategoryController::class, 'store']);
 
@@ -579,9 +575,6 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
             Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
             Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
         });
-        // Route::get('/resource', function(){
-        //     return view('admin.resource-management');
-        // });
         Route::resource('equipment-category', EquipmentCategoryController::class);
         // Route::post('equipment-category', [EquipmentCategoryController::class, 'store']);
 

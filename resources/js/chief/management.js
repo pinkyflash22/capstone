@@ -317,7 +317,8 @@ class ManagementPage {
                 window.currentStationData = data.data || window.currentStationData;
                 this.showToast(data.message || 'Station information updated successfully.', 'success');
                 this.closeModal('editStationModal');
-                window.location.reload();
+                await this.loadCurrentTab();
+                window.dispatchEvent(new CustomEvent('pyro:station-updated', { detail: data.data || {} }));
             } catch (error) {
                 console.error('Error updating station:', error);
                 this.showToast(error.message || 'Failed to update station information.', 'error');

@@ -12,12 +12,11 @@ class EquipmentCategoryController extends Controller
 {
     public function index()
     {
-        // $categories = EquipmentCategory::withCount('equipments')->paginate(15);
-        // $equipmentcategory  = EquipmentCategory::all();
-        // $equipments = Equipment::all();
-        // $activeStations = Station::all();
+        $routeName = request()->routeIs('admin.*')
+            ? 'admin.resource-management.index'
+            : 'station-admin.resource-management.index';
 
-        // return view('admin.resource-management', compact('equipmentcategory','equipments','activeStations'));
+        return redirect()->route($routeName);
     }
 
     public function create()

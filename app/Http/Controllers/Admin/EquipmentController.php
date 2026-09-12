@@ -15,9 +15,11 @@ class EquipmentController extends Controller
      */
     public function index()
     {
-        
-        // $equips = Equipment::all();
-        // return view('admin.resource-management', compact('equips'));
+        $routeName = request()->routeIs('admin.*')
+            ? 'admin.resource-management.index'
+            : 'station-admin.resource-management.index';
+
+        return redirect()->route($routeName);
     }
 
     /**
@@ -51,7 +53,6 @@ class EquipmentController extends Controller
             'equipmentsaved' => $equipments->name,
         ]);
 
-        return view('admin.resource-management');
     }
 
     /**

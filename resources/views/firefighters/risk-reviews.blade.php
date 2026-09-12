@@ -11,7 +11,7 @@
     @if (($mode ?? 'firefighter') === 'chief')
         @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/firefighters/portal.css'])
     @else
-        @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css'])
+    @vite(['resources/css/app.css', 'resources/css/firefighters/portal.css', 'resources/js/dynamic-actions.js'])
     @endif
     @include('partials.pwa-head')
 
@@ -2524,6 +2524,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fetchReviewSection(window.location.href, false);
         });
 
+        window.addEventListener('pyro:risk-reviews-mutated', rebindDynamicUi);
         rebindDynamicUi();
 });
     </script>

@@ -4592,13 +4592,19 @@ class AnalyticController extends Controller
         $rawScore = 0;
         $maximumScore = 65;
         $factors = [];
-        $historicalYears = (int) data_get($data, 'chart_context.historical_window_meta.year_count', 0);
+        $historicalYearValues = data_get($data, 'chart_context.historical_window_meta.years')
+            ?? data_get($data, 'chart_context.monthly_pattern.comparison_years', []);
+        $historicalYears = (int) (data_get($data, 'chart_context.historical_window_meta.year_count')
+            ?? count(is_array($historicalYearValues) ? $historicalYearValues : []));
         if ($historicalYears > 0) {
             $points = min(15, $historicalYears * 5);
             $rawScore += $points;
             $factors[] = "{$historicalYears} historical comparison year(s) (+{$points})";
         } else {
-            $factors[] = 'No historical comparison years (+0)';
+            $targetMonth = data_get($data, 'prediction_context.target_month_label', 'the selected forecast month');
+            $scopeName = data_get($data, 'selected_barangay_prediction.barangay_name')
+                ?: data_get($data, 'location_name', 'the current station scope');
+            $factors[] = "No matching historical comparison years for {$targetMonth} in {$scopeName} (+0)";
         }
 
         $incidentCount = (int) ($data['total_incidents'] ?? 0);
@@ -4907,6 +4913,15 @@ class AnalyticController extends Controller
                 ->map(function (Analysis $analysis) {
                     $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
                     $rawData = $analysisData['raw_data'] ?? [];
+                    $confidenceInput = array_merge($rawData, [
+                        'station_id' => $analysis->station_id,
+                        'location_name' => $analysis->sector,
+                        'total_incidents' => (int) ($analysis->incident_count ?? 0),
+                    ]);
+                    $confidence = $this->calculateAnalysisConfidence(
+                        $confidenceInput,
+                        (bool) ($analysisData['analysis_summary']['ai_source'] ?? $analysisData['ai_source'] ?? false)
+                    );
 
                     return (object) [
                         'analysis_id' => $analysis->analysis_id,
@@ -4914,7 +4929,7 @@ class AnalyticController extends Controller
                         'sector' => $analysis->sector,
                         'period' => $analysis->period,
                         'risk_level' => $analysis->risk_level,
-                        'confidence_data' => $analysis->confidence_data,
+                        'confidence_data' => $confidence['score'],
                         'incident_count' => $analysis->incident_count,
                         'station_id' => $analysis->station_id,
                         'created_at' => optional($analysis->created_at)?->toISOString(),
@@ -5056,6 +5071,17 @@ class AnalyticController extends Controller
             $liveModelPrediction = $liveScopedRawData['model_prediction'] ?? ($rawData['model_prediction'] ?? null);
             $livePredictionContext = $liveScopedRawData['prediction_context'] ?? ($rawData['prediction_context'] ?? null);
             $locationName = $liveScopedRawData['location_name'] ?? $latestAnalysis->sector;
+            $liveConfidenceInput = array_merge($liveScopedRawData, [
+                'chart_context' => $liveChartContext,
+                'barangay_predictions' => $liveBarangayPredictions,
+                'selected_barangay_prediction' => $liveSelectedPrediction,
+                'prediction_context' => $livePredictionContext,
+                'location_name' => $locationName,
+            ]);
+            $liveConfidence = $this->calculateAnalysisConfidence(
+                $liveConfidenceInput,
+                (bool) ($analysisSummary['ai_source'] ?? $analysisData['ai_source'] ?? false)
+            );
 
             $payload = array_merge($analysisSummary, [
                 'analysis_id' => $latestAnalysis->analysis_id,
@@ -5092,9 +5118,8 @@ class AnalyticController extends Controller
                 'recommendations' => is_array($latestAnalysis->recommendations) ? $latestAnalysis->recommendations : [],
                 'predictions' => is_array($latestAnalysis->predictions) ? $latestAnalysis->predictions : null,
                 'risk_level' => $liveScopedRawData['risk_level'] ?? ($latestAnalysis->risk_level ?? ($analysisSummary['risk_level'] ?? null)),
-                'confidence_score' => is_numeric($latestAnalysis->confidence_data)
-                    ? (int) $latestAnalysis->confidence_data
-                    : $latestAnalysis->confidence_data,
+                'confidence_score' => $liveConfidence['score'],
+                'confidence_context' => $liveConfidence,
                 'total_incidents' => $liveScopedRawData['total_incidents'] ?? ($latestAnalysis->incident_count ?? ($analysisSummary['total_incidents'] ?? 0)),
                 'fire_incidents' => $liveScopedRawData['fire_incidents'] ?? ($analysisSummary['fire_incidents'] ?? 0),
                 'incidents_by_type' => $liveScopedRawData['incidents_by_type'] ?? ($analysisSummary['incidents_by_type'] ?? []),
@@ -7126,6 +7151,7 @@ class AnalyticController extends Controller
             'day_of_week_pattern' => $patternContext['day_of_week_pattern'],
             'time_of_day_pattern' => $patternContext['time_of_day_pattern'],
             'weather_pattern' => $patternContext['weather_pattern'],
+            'historical_window_meta' => $patternContext['historical_window_meta'],
             'historical_vs_predicted' => $patternContext['historical_vs_predicted'],
             'prediction_factors' => $patternContext['prediction_factors'],
         ];

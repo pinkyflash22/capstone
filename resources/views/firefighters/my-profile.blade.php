@@ -2444,12 +2444,55 @@
             });
 
             document.querySelectorAll('form[data-profile-form]').forEach((form) => {
-                form.addEventListener('submit', () => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
                     form.dataset.submitted = 'true';
                     const submitButton = form.querySelector('button[type="submit"]');
+                    const originalLabel = submitButton?.textContent || '';
                     if (submitButton) {
                         submitButton.disabled = true;
                         submitButton.textContent = submitButton.dataset.loadingLabel || 'Saving...';
+                    }
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            body: new FormData(form),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (!response.ok || payload.success === false) {
+                            throw new Error(Object.values(payload.errors || {}).flat()[0] || payload.message || 'Unable to save your profile.');
+                        }
+
+                        if (payload.data?.name) {
+                            const summaryTitle = document.getElementById('profileSummaryTitle');
+                            if (summaryTitle) summaryTitle.textContent = payload.data.name;
+                        }
+                        if (payload.data?.email) {
+                            document.querySelectorAll('a[href^="mailto:"]').forEach((link) => {
+                                link.href = `mailto:${payload.data.email}`;
+                                const text = link.querySelector('span') || link;
+                                text.lastChild.textContent = payload.data.email;
+                            });
+                        }
+                        if (payload.data?.contact_number) {
+                            document.querySelectorAll('a[href^="tel:"]').forEach((link) => {
+                                link.href = `tel:${payload.data.contact_number}`;
+                            });
+                        }
+
+                        if (form.hasAttribute('data-clear-passwords')) form.reset();
+                        closeModal(form.closest('.profile-modal'), { force: true });
+                        showProfileToast(payload.message || 'Profile updated.');
+                    } catch (error) {
+                        showProfileToast(error.message || 'Unable to save your profile.', 'error');
+                    } finally {
+                        form.dataset.submitted = 'false';
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.textContent = originalLabel;
+                        }
                     }
                 });
             });

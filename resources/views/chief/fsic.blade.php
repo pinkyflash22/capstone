@@ -3407,7 +3407,7 @@
                 if (data.success) {
                     alert(data.message);
                     closeReviewModal();
-                    location.reload();
+                    await refreshFsicWorkspace();
                 } else {
                     alert(data.message || 'Failed to submit review');
                 }
@@ -3483,7 +3483,7 @@
                 if (data.success) {
                     alert(data.message);
                     closeInspectionModal();
-                    location.reload();
+                    await refreshFsicWorkspace();
                 } else {
                     alert(data.message || 'Failed to submit inspection');
                 }
@@ -3543,7 +3543,7 @@
                 if (data.success) {
                     alert(data.message);
                     closeApprovalModal();
-                    location.reload();
+                    await refreshFsicWorkspace();
                 } else {
                     alert(data.message || 'Failed to approve request');
                 }
@@ -3804,6 +3804,31 @@
             });
         }
 
+        async function refreshFsicWorkspace() {
+            const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'pending';
+            const response = await fetch(window.location.href, {
+                headers: {
+                    'Accept': 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error('The FSIC queue could not be refreshed.');
+            }
+
+            const nextDocument = new DOMParser().parseFromString(await response.text(), 'text/html');
+            ['.chief-theme-hero', '.tabs', '.tabs-container'].forEach((selector) => {
+                const current = document.querySelector(selector);
+                const incoming = nextDocument.querySelector(selector);
+                if (current && incoming) current.replaceWith(incoming);
+            });
+
+            initTabs();
+            document.querySelector(`.tab-btn[data-tab="${activeTab}"]`)?.click();
+        }
+
         function formatDisplayDateShort(value) {
             if (!value) return '';
             const date = new Date(value);
@@ -3881,7 +3906,7 @@
                 if (data.success) {
                     alert(data.message);
                     closeViewModal();
-                    location.reload();
+                    await refreshFsicWorkspace();
                 } else {
                     alert(data.message || 'Failed to reject request');
                 }
@@ -4022,7 +4047,7 @@
                 if (result.success) {
                     alert('FSIC request submitted successfully!');
                     closeNewRequestModal();
-                    location.reload();
+                    await refreshFsicWorkspace();
                 } else {
                     alert(result.message || 'Failed to submit request');
                 }

@@ -2998,6 +2998,7 @@
             });
 
             initializeManagedForms(document);
+            window.addEventListener('pyro:risk-reviews-mutated', () => initializeManagedForms(document.getElementById('riskReviewResults') || document));
             showNotice(pageNotice);
 
             if (shouldOpenCreateModal && createRiskAreaModal) {

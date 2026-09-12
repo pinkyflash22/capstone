@@ -1919,6 +1919,17 @@ public function updateMyProfile(Request $request)
     $user->update($validated);
     UserActivityLogger::log('updated profile', Auth::user()?->user_id, $request);
 
+    if ($request->expectsJson()) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated.',
+            'data' => [
+                'name' => trim(implode(' ', array_filter([$user->first_name, $user->middle_name, $user->last_name]))),
+                'contact_number' => $user->contact_number,
+            ],
+        ]);
+    }
+
     return redirect()
         ->route('firefighter.my-profile')
         ->with('success', 'Profile updated.');
@@ -1974,6 +1985,14 @@ public function updateMyProfileEmail(Request $request)
 
     UserActivityLogger::log('updated profile email', Auth::user()?->user_id, $request);
 
+    if ($request->expectsJson()) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Email address updated.',
+            'data' => ['email' => $user->email],
+        ]);
+    }
+
     return redirect()
         ->route('firefighter.my-profile')
         ->with('success', 'Email address updated.');
@@ -1996,6 +2015,10 @@ public function updateMyProfilePassword(Request $request)
     ])->save();
 
     UserActivityLogger::log('updated profile password', Auth::user()?->user_id, $request);
+
+    if ($request->expectsJson()) {
+        return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
+    }
 
     return redirect()
         ->route('firefighter.my-profile')

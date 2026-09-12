@@ -4021,6 +4021,10 @@
                         const succeeded = request.status >= 200 && request.status < 400;
 
                         if (succeeded) {
+                            const payload = (() => {
+                                try { return JSON.parse(request.responseText || '{}'); }
+                                catch (error) { return {}; }
+                            })();
                             if (progressFill) {
                                 progressFill.style.width = '100%';
                             }
@@ -4028,12 +4032,44 @@
                                 percentText.textContent = '100%';
                             }
                             if (progressCopy) {
-                                progressCopy.textContent = `${uploadLabel} uploaded successfully. Refreshing the page...`;
+                                progressCopy.textContent = `${uploadLabel} uploaded successfully.`;
                             }
 
-                            window.setTimeout(() => {
-                                window.location.reload();
-                            }, 450);
+                            if (payload.data?.url) {
+                                const profile = document.querySelector('.station-media-profile');
+                                if (profile) profile.innerHTML = `<img src="${payload.data.url}" alt="Station profile">`;
+                            }
+                            if (Array.isArray(payload.data) && payload.data.length) {
+                                const gallery = document.querySelector('.station-gallery-grid');
+                                const empty = document.querySelector('.station-photo-empty');
+                                empty?.remove();
+                                payload.data.forEach((item) => {
+                                    const image = document.createElement('button');
+                                    image.type = 'button';
+                                    image.className = 'station-gallery-trigger';
+                                    image.dataset.galleryOpen = '';
+                                    image.dataset.galleryImage = item.url || '';
+                                    image.dataset.galleryCaption = item.caption || 'No caption added.';
+                                    image.dataset.galleryName = item.file_name || 'Station photo';
+                                    image.innerHTML = `<img src="${item.url || ''}" alt="${item.caption || 'Station photo'}">`;
+                                    image.addEventListener('click', function () {
+                                        if (galleryPreviewImage) galleryPreviewImage.src = this.dataset.galleryImage || '';
+                                        if (galleryPreviewName) galleryPreviewName.textContent = this.dataset.galleryName || 'Station photo';
+                                        if (galleryPreviewCaption) galleryPreviewCaption.textContent = this.dataset.galleryCaption || 'No caption added.';
+                                        openModalElement(galleryPreviewModal);
+                                    });
+                                    (gallery || document.querySelector('.station-gallery-library'))?.appendChild(image);
+                                });
+                                const count = document.querySelector('.station-gallery-count');
+                                if (count) count.textContent = String(Number(count.textContent || 0) + payload.data.length);
+                            }
+                            form.reset();
+                            if (submitBtn) {
+                                submitBtn.classList.remove('is-loading');
+                                submitBtn.disabled = false;
+                            }
+                            if (submitLabel) submitLabel.textContent = originalLabel;
+                            renderInlineToast(payload.message || `${uploadLabel} uploaded successfully.`, 'success');
                             return;
                         }
 
@@ -4179,6 +4215,49 @@
 
             document.querySelectorAll('[data-gallery-delete-close]').forEach((button) => {
                 button.addEventListener('click', () => closeModalElement(galleryDeleteModal));
+            });
+
+            [galleryEditForm, galleryDeleteForm].forEach((form) => {
+                form?.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    const submit = event.submitter || form.querySelector('button[type="submit"]');
+                    if (submit) submit.disabled = true;
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            body: new FormData(form),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (!response.ok || payload.success === false) {
+                            throw new Error(Object.values(payload.errors || {}).flat()[0] || payload.message || 'Unable to update the station gallery.');
+                        }
+
+                        const mediaId = form.action.split('/').filter(Boolean).pop();
+                        if (form === galleryDeleteForm) {
+                            document.querySelector(`[data-gallery-delete][data-gallery-id="${CSS.escape(mediaId)}"]`)?.closest('.station-gallery-item')?.remove();
+                            const count = document.querySelector('.station-gallery-count');
+                            if (count) count.textContent = String(Math.max(0, Number(count.textContent || 0) - 1));
+                            closeModalElement(galleryDeleteModal);
+                        } else {
+                            const caption = payload.data?.caption || 'No caption added.';
+                            const editButton = document.querySelector(`[data-gallery-edit][data-gallery-id="${CSS.escape(mediaId)}"]`);
+                            const item = editButton?.closest('.station-gallery-item');
+                            if (editButton) editButton.dataset.galleryCaption = payload.data?.caption || '';
+                            const trigger = item?.querySelector('[data-gallery-open]');
+                            if (trigger) trigger.dataset.galleryCaption = caption;
+                            const title = item?.querySelector('.station-gallery-meta-title');
+                            if (title) title.textContent = payload.data?.caption || title.textContent;
+                            closeModalElement(galleryEditModal);
+                        }
+                        renderInlineToast(payload.message || 'Station gallery updated.', 'success');
+                    } catch (error) {
+                        renderInlineToast(error.message || 'Unable to update the station gallery.', 'error');
+                    } finally {
+                        if (submit) submit.disabled = false;
+                    }
+                });
             });
 
             [galleryPreviewModal, galleryEditModal, galleryDeleteModal].forEach((modal) => {
