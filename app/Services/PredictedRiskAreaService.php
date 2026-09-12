@@ -360,12 +360,28 @@ class PredictedRiskAreaService
             return collect();
         }
 
-        return DB::table('station_barangay_coverage')
+        $explicitCoverage = DB::table('station_barangay_coverage')
             ->where('station_id', $stationId)
             ->where(function ($query) {
                 $query->whereNull('is_active')->orWhere('is_active', true);
             })
             ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $stationCityId = DB::table('stations')
+            ->join('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
+            ->join('barangays', 'full_addresses.barangay_id', '=', 'barangays.barangay_id')
+            ->where('stations.station_id', $stationId)
+            ->value('barangays.city_id');
+
+        $cityCoverage = $stationCityId
+            ? DB::table('barangays')->where('city_id', $stationCityId)->pluck('barangay_id')
+            : collect();
+
+        return $explicitCoverage
+            ->merge($cityCoverage)
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->unique()

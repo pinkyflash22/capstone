@@ -58,7 +58,11 @@ class DutyRosterController extends Controller
             'server_time' => now()->toIso8601String(),
             'timezone' => config('app.timezone'),
             'station_id' => $stationId,
-            'teams' => Team::query()->where('station_id', $stationId)->orderBy('team_id')->get(),
+            'teams' => $this->teamsForStation($stationId)
+                ->orderBy('team_id')
+                ->get()
+                ->map(fn (Team $team) => $this->serializeRosterTeam($team, $stationId))
+                ->values(),
             'officers' => $officers->map(fn ($officer) => $this->serializeOfficer($officer))->values(),
             'shifts' => $shifts->map(fn ($shift) => $this->serializeShift($shift))->values(),
             'exceptions' => $exceptions->map(fn ($exception) => $this->serializeException($exception))->values(),
@@ -80,7 +84,7 @@ class DutyRosterController extends Controller
     {
         $stationId = $this->managedStationId($request);
         $data = $this->validateShift($request);
-        $team = Team::query()->where('station_id', $stationId)->findOrFail($data['team_id']);
+        $team = $this->teamsForStation($stationId)->findOrFail($data['team_id']);
         [$startsAt, $endsAt] = $this->window($data['starts_at'], $data['ends_at']);
         if (in_array($data['schedule_template'] ?? 'single', ['two_team_12', 'two_team_24', 'three_team_24'], true)) {
             return $this->storeTeamRotation($data, $stationId, $startsAt, $endsAt, $service, $recurrence);
@@ -140,7 +144,7 @@ class DutyRosterController extends Controller
         abort_if($dutyShift->team?->status === 'responding' && (int) $dutyShift->team?->active_duty_shift_id === (int) $dutyShift->duty_shift_id, 409, 'A responding team cannot be changed until it returns.');
         $previousTeam = $dutyShift->team;
         $data = $this->validateShift($request);
-        $team = Team::query()->where('station_id', $stationId)->findOrFail($data['team_id']);
+        $team = $this->teamsForStation($stationId)->findOrFail($data['team_id']);
         [$startsAt, $endsAt] = $this->window($data['starts_at'], $data['ends_at']);
 
         if (($data['edit_scope'] ?? 'this') === 'future' && $dutyShift->duty_roster_template_id) {
@@ -310,7 +314,7 @@ class DutyRosterController extends Controller
             throw ValidationException::withMessages(['recurrence_until' => 'The end date can be up to one year away.']);
         }
 
-        $teams = Team::query()->where('station_id', $stationId)->whereIn('team_id', $teamIds)->get()->keyBy('team_id');
+        $teams = $this->teamsForStation($stationId)->whereIn('team_id', $teamIds)->get()->keyBy('team_id');
         if ($teams->count() !== $neededTeams) {
             throw ValidationException::withMessages(['rotation_team_ids' => 'Choose teams from this station.']);
         }
@@ -524,6 +528,50 @@ class DutyRosterController extends Controller
         $stationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
         abort_unless($stationId, 403, 'Your account is not assigned to a station.');
         return (int) $stationId;
+    }
+
+    private function teamsForStation(int $stationId)
+    {
+        $officerIds = StationOfficer::query()
+            ->where('station_id', $stationId)
+            ->pluck('station_officer_id')
+            ->all();
+
+        return Team::query()->where(function ($query) use ($stationId, $officerIds) {
+            $query->where('station_id', $stationId);
+            if ($officerIds === []) {
+                return;
+            }
+            foreach (DutyRosterService::DEPLOYABLE_ROLES as $role) {
+                $query->orWhereIn($role, $officerIds);
+            }
+        });
+    }
+
+    private function serializeRosterTeam(Team $team, int $stationId): array
+    {
+        $memberCount = collect(DutyRosterService::DEPLOYABLE_ROLES)
+            ->map(fn (string $role) => $team->{$role})
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->count();
+        $missingMembers = max(0, 2 - $memberCount);
+        $status = strtolower(trim((string) $team->status));
+        $reason = $missingMembers > 0
+            ? 'Needs '.$missingMembers.' more saved '.($missingMembers === 1 ? 'firefighter' : 'firefighters').' for a rotating run.'
+            : match ($status) {
+                'responding' => 'Currently responding. Choose a shift that starts after the active response.',
+                'off' => 'Currently off duty. The team activates when its scheduled shift begins.',
+                default => 'Ready for shift planning.',
+            };
+
+        return array_merge($team->toArray(), [
+            'station_link_source' => (int) $team->station_id === $stationId ? 'direct' : 'team_members',
+            'saved_member_count' => $memberCount,
+            'schedule_ready' => $missingMembers === 0,
+            'schedule_reason' => $reason,
+        ]);
     }
 
     private function templatePrototype(array $data, Team $team, int $stationId, Carbon $startsAt, Carbon $endsAt, Carbon $until): DutyRosterTemplate

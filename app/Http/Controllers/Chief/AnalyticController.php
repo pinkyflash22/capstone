@@ -2166,13 +2166,7 @@ class AnalyticController extends Controller
             ->orderBy('barangays.barangay_name')
             ->get();
 
-        if ($coverageBarangays->isNotEmpty()) {
-            return $coverageBarangays
-                ->unique('barangay_id')
-                ->values();
-        }
-
-        $barangays = collect();
+        $barangays = $coverageBarangays;
 
         $stationAddressBarangays = DB::table('stations')
             ->leftJoin('full_addresses', 'stations.address_id', '=', 'full_addresses.address_id')
@@ -7192,6 +7186,16 @@ class AnalyticController extends Controller
         if ($predictedProbability === null && is_array($modelPrediction)) {
             $predictedProbability = data_get($modelPrediction, 'output.probability_percent');
         }
+
+        if ($predictedIncidentCount === null || $predictedProbability === null) {
+            $savedForecast = $this->resolveLatestSavedForecastForScope(
+                $stationId,
+                $selectedBarangayId,
+                $targetMonthStart
+            );
+            $predictedIncidentCount ??= $savedForecast['predicted_incident_count'] ?? null;
+            $predictedProbability ??= $savedForecast['probability_percent'] ?? null;
+        }
         $forecastLabel = $comparisonContext['current_label'];
 
         $highestRiskBarangay = collect($barangayPredictions)
@@ -7249,9 +7253,9 @@ class AnalyticController extends Controller
                 ),
                 'forecast_label' => $forecastLabel,
                 'missing' => [
-                    'actual_incidents' => empty(array_filter($comparisonContext['historical_vs_forecast_historical'], fn ($value) => $value !== null)),
-                    'historical_baseline' => empty(array_filter($comparisonContext['historical_vs_forecast_baseline'], fn ($value) => $value !== null)),
-                    'current_actual' => empty(array_filter($comparisonContext['historical_vs_forecast_current'], fn ($value) => $value !== null)),
+                    'actual_incidents' => array_sum(array_filter($comparisonContext['historical_vs_forecast_historical'], 'is_numeric')) <= 0,
+                    'historical_baseline' => array_sum(array_filter($comparisonContext['historical_vs_forecast_baseline'], 'is_numeric')) <= 0,
+                    'current_actual' => array_sum(array_filter($comparisonContext['historical_vs_forecast_current'], 'is_numeric')) <= 0,
                     'forecast_incidents' => $predictedIncidentCount === null,
                     'forecast_probability' => $predictedProbability === null,
                 ],
@@ -7268,6 +7272,52 @@ class AnalyticController extends Controller
                 ],
             ],
         ];
+    }
+
+    private function resolveLatestSavedForecastForScope(int $stationId, ?int $selectedBarangayId, Carbon $targetMonthStart): ?array
+    {
+        $targetLabel = $targetMonthStart->format('F Y');
+
+        foreach (Analysis::query()->where('station_id', $stationId)->latest('created_at')->limit(30)->get() as $analysis) {
+            $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+            $rawData = is_array($analysisData['raw_data'] ?? null) ? $analysisData['raw_data'] : [];
+            $signature = $this->scopeSignatureFromRawData($rawData);
+
+            if (
+                $signature['target_month_label'] !== $targetLabel
+                || $signature['barangay_id'] !== $selectedBarangayId
+            ) {
+                continue;
+            }
+
+            $scopedPrediction = $selectedBarangayId
+                ? $this->resolveScopedPredictionFromAnalysis($analysis, $selectedBarangayId)
+                : null;
+            $predictedIncidentCount = $selectedBarangayId
+                ? ($scopedPrediction['predicted_fire_incidents'] ?? $scopedPrediction['predicted_incident_count'] ?? null)
+                : (data_get($rawData, 'model_prediction.output.expected_month_total_fire_incidents')
+                    ?? data_get($rawData, 'model_prediction.output.predicted_incident_count')
+                    ?? data_get($analysis->predictions, 'predicted_fire_incidents')
+                    ?? data_get($analysis->predictions, 'predicted_incident_count'));
+            $probability = $selectedBarangayId
+                ? ($scopedPrediction['probability_percent'] ?? null)
+                : (data_get($rawData, 'model_prediction.output.probability_percent')
+                    ?? data_get($analysis->predictions, 'probability_percent'));
+
+            if ($predictedIncidentCount !== null || $probability !== null) {
+                return [
+                    'analysis_id' => (int) $analysis->analysis_id,
+                    'predicted_incident_count' => is_numeric($predictedIncidentCount)
+                        ? (int) round((float) $predictedIncidentCount)
+                        : null,
+                    'probability_percent' => is_numeric($probability)
+                        ? round((float) $probability, 1)
+                        : null,
+                ];
+            }
+        }
+
+        return null;
     }
 
     private function buildCalendarAlignedComparisonContext(
@@ -7336,8 +7386,8 @@ class AnalyticController extends Controller
                 ? $targetMonthStart->format('M').' 1-'.$periodDayLimit.', '.$targetMonthStart->year
                 : $targetMonthStart->format('F Y'),
             'missing' => [
-                'current_actual' => empty(array_filter($currentDailySeries)),
-                'historical_average' => empty(array_filter($historicalAverageDaily, fn ($value) => $value !== null)),
+                'current_actual' => array_sum($currentDailySeries) <= 0,
+                'historical_average' => array_sum(array_filter($historicalAverageDaily, 'is_numeric')) <= 0,
             ],
         ];
 
@@ -7353,8 +7403,8 @@ class AnalyticController extends Controller
                 ->all(),
             'comparison_years' => $historicalYears,
             'missing' => [
-                'current_actual' => empty(array_filter($currentYearMonthlyActual, fn ($value) => $value !== null)),
-                'historical_average' => empty(array_filter($previousYearAveragesByMonth, fn ($value) => $value !== null)),
+                'current_actual' => array_sum(array_filter($currentYearMonthlyActual, 'is_numeric')) <= 0,
+                'historical_average' => array_sum(array_filter($previousYearAveragesByMonth, 'is_numeric')) <= 0,
             ],
         ];
 
@@ -7366,8 +7416,8 @@ class AnalyticController extends Controller
             'historical_average' => $historicalSeasonAverages,
             'current_season' => $this->deriveSeasonFromMonth($targetMonthStart->month),
             'missing' => [
-                'current_actual' => empty(array_filter($currentSeasonActual, fn ($value) => $value !== null)),
-                'historical_average' => empty(array_filter($historicalSeasonAverages, fn ($value) => $value !== null)),
+                'current_actual' => array_sum(array_filter($currentSeasonActual, 'is_numeric')) <= 0,
+                'historical_average' => array_sum(array_filter($historicalSeasonAverages, 'is_numeric')) <= 0,
             ],
         ];
 
@@ -7386,8 +7436,8 @@ class AnalyticController extends Controller
             'current_actual' => $currentWeekday,
             'historical_average' => $historicalWeekdayAverage,
             'missing' => [
-                'current_actual' => empty(array_filter($currentWeekday)),
-                'historical_average' => empty(array_filter($historicalWeekdayAverage, fn ($value) => $value !== null)),
+                'current_actual' => array_sum($currentWeekday) <= 0,
+                'historical_average' => array_sum(array_filter($historicalWeekdayAverage, 'is_numeric')) <= 0,
             ],
         ];
 
@@ -7405,21 +7455,31 @@ class AnalyticController extends Controller
             'historical_baseline' => $historicalHourlyAverage,
             'current_actual' => $currentHourly,
             'missing' => [
-                'historical_baseline' => empty(array_filter($historicalHourlyAverage, fn ($value) => $value !== null)),
-                'current_actual' => empty(array_filter($currentHourly)),
+                'historical_baseline' => array_sum(array_filter($historicalHourlyAverage, 'is_numeric')) <= 0,
+                'current_actual' => array_sum($currentHourly) <= 0,
             ],
         ];
 
-        $weatherComparisonRows = $historicalPeriods->map(function (array $period) {
+        $weatherComparisonYears = $this->resolveHistoricalWeatherYears(
+            $stationId,
+            $targetMonthStart,
+            $selectedBarangayId,
+            $historicalWindow
+        );
+        $weatherComparisonRows = collect($weatherComparisonYears)->map(function (int $year) use ($stationId, $targetMonthStart, $periodDayLimit, $selectedBarangayId) {
+            $periodStart = Carbon::create($year, $targetMonthStart->month, 1)->startOfDay();
+            $periodEnd = Carbon::create($year, $targetMonthStart->month, min($periodDayLimit, $periodStart->daysInMonth))->endOfDay();
+            $weatherRows = $this->fetchHistoricalWeatherRows($stationId, $periodStart, $periodEnd, $selectedBarangayId);
+
             return [
-                'label' => (string) $period['year'],
-                'incident_count' => HistoricalFireRecordSemantics::incidentCount($period['rows']),
-                'temperature_2m' => $this->averageWeatherField($period['rows'], 'temperature_2m', 'temperature'),
-                'relative_humidity_2m' => $this->averageWeatherField($period['rows'], 'relative_humidity_2m', 'humidity'),
-                'wind_speed_10m' => $this->averageWeatherField($period['rows'], 'wind_speed_10m', 'wind_speed'),
-                'wind_gusts_10m' => $this->averageWeatherField($period['rows'], 'wind_gusts_10m', 'wind_gusts'),
-                'precipitation' => $this->averageWeatherField($period['rows'], 'precipitation'),
-                'rain' => $this->averageWeatherField($period['rows'], 'rain'),
+                'label' => (string) $year,
+                'incident_count' => HistoricalFireRecordSemantics::incidentCount($weatherRows),
+                'temperature_2m' => $this->averageWeatherField($weatherRows, 'temperature_2m', 'temperature'),
+                'relative_humidity_2m' => $this->averageWeatherField($weatherRows, 'relative_humidity_2m', 'humidity'),
+                'wind_speed_10m' => $this->averageWeatherField($weatherRows, 'wind_speed_10m', 'wind_speed'),
+                'wind_gusts_10m' => $this->averageWeatherField($weatherRows, 'wind_gusts_10m', 'wind_gusts'),
+                'precipitation' => $this->averageWeatherField($weatherRows, 'precipitation'),
+                'rain' => $this->averageWeatherField($weatherRows, 'rain'),
             ];
         })->values();
         $weatherComparisonRows->push([
@@ -7812,23 +7872,10 @@ class AnalyticController extends Controller
 
         $historicalQuery = DB::table('historical_fire_incidents')
             ->whereMonth('incident_date', $targetMonthStart->month)
-            ->whereYear('incident_date', '<', $targetMonthStart->year);
+            ->whereYear('incident_date', '<', $targetMonthStart->year)
+            ->where('incident_count', '>', 0);
 
-        if ($selectedBarangayId) {
-            $historicalQuery->where('barangay_id', $selectedBarangayId);
-        } else {
-            $barangayIds = $this->resolveStationBarangays($stationId)
-                ->pluck('barangay_id')
-                ->filter()
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-
-            if (! empty($barangayIds)) {
-                $historicalQuery->whereIn('barangay_id', $barangayIds);
-            }
-        }
+        $this->scopeHistoricalQueryToStation($historicalQuery, $stationId, $selectedBarangayId);
 
         $years = $years->merge(
             $historicalQuery
@@ -7850,6 +7897,40 @@ class AnalyticController extends Controller
         }
 
         return $resolvedYears->all();
+    }
+
+    private function resolveHistoricalWeatherYears(int $stationId, Carbon $targetMonthStart, ?int $selectedBarangayId = null, $historicalWindow = '3'): array
+    {
+        $query = DB::table('historical_fire_incidents')
+            ->whereMonth('incident_date', $targetMonthStart->month)
+            ->whereYear('incident_date', '<', $targetMonthStart->year)
+            ->where(function ($weather) {
+                $weather->whereNotNull('temperature_2m')
+                    ->orWhereNotNull('temperature')
+                    ->orWhereNotNull('relative_humidity_2m')
+                    ->orWhereNotNull('humidity')
+                    ->orWhereNotNull('wind_speed_10m')
+                    ->orWhereNotNull('wind_speed')
+                    ->orWhereNotNull('precipitation')
+                    ->orWhereNotNull('rain')
+                    ->orWhereNotNull('weather_code')
+                    ->orWhereNotNull('weather_condition');
+            });
+
+        $this->scopeHistoricalQueryToStation($query, $stationId, $selectedBarangayId);
+
+        $years = $query
+            ->selectRaw('DISTINCT EXTRACT(YEAR FROM incident_date) as year_value')
+            ->orderByDesc('year_value')
+            ->pluck('year_value')
+            ->map(fn ($value) => (int) $value)
+            ->filter(fn ($year) => $year > 0)
+            ->unique()
+            ->values();
+
+        $limit = $this->normalizeHistoricalWindowLimit($historicalWindow);
+
+        return ($limit !== null ? $years->take($limit) : $years)->all();
     }
 
     private function resolveHistoricalArchivePeriods(int $stationId, int $barangayId): array
@@ -8197,23 +8278,10 @@ class AnalyticController extends Controller
     private function fetchHistoricalIncidentRows(int $stationId, Carbon $start, Carbon $end, ?int $selectedBarangayId = null)
     {
         $query = DB::table('historical_fire_incidents')
-            ->whereBetween('incident_date', [$start->toDateString(), $end->toDateString()]);
+            ->whereBetween('incident_date', [$start->toDateString(), $end->toDateString()])
+            ->where('incident_count', '>', 0);
 
-        if ($selectedBarangayId) {
-            $query->where('barangay_id', $selectedBarangayId);
-        } else {
-            $barangayIds = $this->resolveStationBarangays($stationId)
-                ->pluck('barangay_id')
-                ->filter()
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-
-            if (! empty($barangayIds)) {
-                $query->whereIn('barangay_id', $barangayIds);
-            }
-        }
+        $this->scopeHistoricalQueryToStation($query, $stationId, $selectedBarangayId);
 
         return $query->get([
             'incident_date',
@@ -8225,6 +8293,55 @@ class AnalyticController extends Controller
             'wind_direction',
             'weather_condition',
         ]);
+    }
+
+    private function fetchHistoricalWeatherRows(int $stationId, Carbon $start, Carbon $end, ?int $selectedBarangayId = null)
+    {
+        $query = DB::table('historical_fire_incidents')
+            ->whereBetween('incident_date', [$start->toDateString(), $end->toDateString()]);
+
+        $this->scopeHistoricalQueryToStation($query, $stationId, $selectedBarangayId);
+
+        return $query->get([
+            'incident_date',
+            'incident_count',
+            'temperature',
+            'temperature_2m',
+            'humidity',
+            'relative_humidity_2m',
+            'precipitation',
+            'rain',
+            'wind_speed',
+            'wind_speed_10m',
+            'wind_gusts',
+            'wind_gusts_10m',
+            'weather_condition',
+        ]);
+    }
+
+    private function scopeHistoricalQueryToStation($query, int $stationId, ?int $selectedBarangayId = null): void
+    {
+        if ($selectedBarangayId) {
+            $query->where('barangay_id', $selectedBarangayId);
+
+            return;
+        }
+
+        $barangayIds = $this->resolveStationBarangays($stationId)
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($barangayIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('barangay_id', $barangayIds);
     }
 
     private function resolveWeatherFieldValue(object $row, string $preferredField, ?string $fallbackField = null): mixed
@@ -8291,6 +8408,7 @@ class AnalyticController extends Controller
         $monthlyBuckets = array_fill(1, 12, []);
 
         $rows = DB::table('historical_fire_incidents')
+            ->where('incident_count', '>', 0)
             ->when($selectedBarangayId, function ($query) use ($selectedBarangayId) {
                 $query->where('barangay_id', $selectedBarangayId);
             }, function ($query) use ($stationId) {
@@ -8372,6 +8490,7 @@ class AnalyticController extends Controller
         $seasonBuckets = ['dry' => [], 'wet' => []];
 
         $rows = DB::table('historical_fire_incidents')
+            ->where('incident_count', '>', 0)
             ->when($selectedBarangayId, function ($query) use ($selectedBarangayId) {
                 $query->where('barangay_id', $selectedBarangayId);
             }, function ($query) use ($stationId) {
@@ -8489,6 +8608,7 @@ class AnalyticController extends Controller
 
             $historicalRows = DB::table('historical_fire_incidents')
                 ->where('barangay_id', $barangayId)
+                ->where('incident_count', '>', 0)
                 ->whereMonth('incident_date', $targetMonthStart->month)
                 ->whereIn(DB::raw('EXTRACT(YEAR FROM incident_date)'), $comparisonYears)
                 ->get(['incident_date', 'incident_count']);

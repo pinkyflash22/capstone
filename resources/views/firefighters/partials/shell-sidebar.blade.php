@@ -853,6 +853,7 @@
                 <button type="button" class="ff-mobile-dock__item" data-ff-open-notifications aria-label="Notifications">
                     <span class="ff-mobile-icon" aria-hidden="true">notifications</span>
                     <span class="ff-mobile-dock__label">Alerts</span>
+                    <span class="command-notification-mobile-badge" data-command-notification-mobile-badge hidden>0</span>
                 </button>
             </div>
             <button type="button" class="ff-mobile-dock__center {{ $mobileDockIsOpsActive ? 'active' : '' }}" data-ff-dashboard-fab aria-label="Dashboard">
@@ -887,6 +888,7 @@
             </button>
         </div>
         <div class="ff-mobile-panel__list">
+            <div data-command-notification-mobile></div>
             @php
                 // Production stores notifications.data as TEXT, so filter by the
                 // notification class instead of applying JSON operators to data.
@@ -950,6 +952,14 @@
         </div>
     </div>
 </div>
+
+@include('partials.command-notification-center', [
+    'commandNotificationUrls' => [
+        'index' => route('firefighter.notifications.index'),
+        'read_all' => route('firefighter.notifications.read-all'),
+        'read' => route('firefighter.notifications.read', ['notificationId' => '__ID__']),
+    ],
+])
 
 <div class="ff-mobile-panel md:hidden" data-ff-settings-panel aria-hidden="true">
     <div class="ff-mobile-panel__backdrop" data-ff-close-panel></div>

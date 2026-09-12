@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Incident;
 use App\Models\Station;
 use App\Models\StationOfficer;
+use App\Models\Team;
+use App\Notifications\IncidentAssignmentNotification;
 use App\Notifications\IncidentDispatchUnavailableNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -116,6 +118,10 @@ class IncidentAutoAssignmentService
                 }
                 $lockedIncident->updated_at = now();
                 $lockedIncident->save();
+
+                $incidentId = (int) $lockedIncident->incident_id;
+                $teamId = (int) $team->team_id;
+                DB::afterCommit(fn () => $this->notifyIncidentAssignment($incidentId, $stationId, $teamId));
 
                 return [
                     'incident_id' => $lockedIncident->incident_id,
@@ -369,6 +375,60 @@ class IncidentAutoAssignmentService
             Log::error('Unable to notify station command about unavailable incident resources.', [
                 'incident_id' => $incidentId,
                 'station_id' => $stationId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function notifyIncidentAssignment(int $incidentId, int $stationId, int $teamId): void
+    {
+        try {
+            $team = Team::query()->find($teamId);
+            if (! $team) {
+                return;
+            }
+
+            $memberIds = collect(DutyRosterService::DEPLOYABLE_ROLES)
+                ->map(fn (string $role) => $team->{$role})
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $responders = StationOfficer::query()
+                ->with('user')
+                ->whereIn('station_officer_id', $memberIds)
+                ->get()
+                ->pluck('user')
+                ->filter()
+                ->unique('user_id');
+            $responderUserIds = $responders->pluck('user_id')->map(fn ($id) => (int) $id);
+
+            foreach ($responders as $responder) {
+                $responder->notify(new IncidentAssignmentNotification($incidentId, $stationId, $teamId, true));
+            }
+
+            $stationCommand = StationOfficer::query()
+                ->with('user.role')
+                ->where('station_id', $stationId)
+                ->get()
+                ->pluck('user')
+                ->filter(function ($user) {
+                    $role = strtolower(trim((string) $user?->role?->role));
+
+                    return in_array($role, ['chief', 'station admin', 'chief station admin'], true);
+                })
+                ->reject(fn ($user) => $responderUserIds->contains((int) $user->user_id))
+                ->unique('user_id');
+
+            foreach ($stationCommand as $recipient) {
+                $recipient->notify(new IncidentAssignmentNotification($incidentId, $stationId, $teamId));
+            }
+        } catch (Throwable $exception) {
+            Log::error('Unable to notify responders and station command of incident assignment.', [
+                'incident_id' => $incidentId,
+                'station_id' => $stationId,
+                'team_id' => $teamId,
                 'error' => $exception->getMessage(),
             ]);
         }

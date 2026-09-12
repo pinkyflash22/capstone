@@ -74,7 +74,16 @@ class IncidentController extends Controller
         return $this->normalizeStatusName($incident?->status);
     }
 
-    private function findRecentDuplicateIncident(float $lat, float $lng, int $minutes = 10, float $distanceThresholdMeters = 200): ?Incident
+    /**
+     * @return array{incident: Incident, distance_meters: float, automatically_duplicate: bool}|null
+     */
+    private function findRecentDuplicateIncident(
+        float $lat,
+        float $lng,
+        int $minutes = 10,
+        float $automaticDuplicateMeters = 100,
+        float $possibleDuplicateMeters = 200
+    ): ?array
     {
         $recentIncidents = Incident::with(['marker'])
             ->where('created_at', '>=', now()->subMinutes($minutes))
@@ -83,9 +92,14 @@ class IncidentController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $closestMatch = null;
+
         foreach ($recentIncidents as $recentIncident) {
             $marker = $recentIncident->marker;
-            if (! $marker || $marker->lat === null || $marker->lng === null) {
+            if (! $marker
+                || strtolower(trim((string) $marker->category)) !== 'fire'
+                || $marker->lat === null
+                || $marker->lng === null) {
                 continue;
             }
 
@@ -96,12 +110,17 @@ class IncidentController extends Controller
                 (float) $marker->lng
             );
 
-            if ($distanceMeters <= $distanceThresholdMeters) {
-                return $recentIncident;
+            if ($distanceMeters <= $possibleDuplicateMeters
+                && ($closestMatch === null || $distanceMeters < $closestMatch['distance_meters'])) {
+                $closestMatch = [
+                    'incident' => $recentIncident,
+                    'distance_meters' => $distanceMeters,
+                    'automatically_duplicate' => $distanceMeters <= $automaticDuplicateMeters,
+                ];
             }
         }
 
-        return null;
+        return $closestMatch;
     }
 
     private function normalizeStatusName(?string $statusName): string
@@ -676,12 +695,13 @@ class IncidentController extends Controller
                 $lat = (float) $validated['lat'];
                 $lng = (float) $validated['lng'];
 
-                $duplicateIncident = $this->findRecentDuplicateIncident($lat, $lng);
-                if ($duplicateIncident) {
+                $duplicateMatch = $this->findRecentDuplicateIncident($lat, $lng);
+                $duplicateIncident = $duplicateMatch['incident'] ?? null;
+                $automaticallyDuplicate = (bool) ($duplicateMatch['automatically_duplicate'] ?? false);
+
+                if ($automaticallyDuplicate && $duplicateIncident) {
                     if (Schema::hasColumn('incidents', 'duplicate_of_incident_id')) {
-                        $validated['marker_id'] = $duplicateIncident->marker_id;
                         $validated['duplicate_of_incident_id'] = $duplicateIncident->incident_id;
-                        $markerId = $duplicateIncident->marker_id;
                     } else {
                         throw new HttpResponseException(response()->json([
                             'success' => false,
@@ -689,25 +709,29 @@ class IncidentController extends Controller
                             'duplicate_incident_id' => $duplicateIncident->incident_id,
                         ], 422));
                     }
-                } else {
-                    $markerDescription = $validated['description'] ?? 'Citizen-submitted fire emergency.';
-                    if (isset($validated['location_accuracy'], $validated['location_captured_at'])) {
-                        $accuracyMeters = (int) round((float) $validated['location_accuracy']);
-                        $capturedAt = \Illuminate\Support\Carbon::parse($validated['location_captured_at'])->toIso8601String();
-                        $markerDescription .= " GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.";
-                    }
-
-                    $createdMarker = Marker::create([
-                        'title' => $validated['title'] ?? 'Citizen Fire Emergency',
-                        'description' => $markerDescription,
-                        'lat' => $lat,
-                        'lng' => $lng,
-                        'status' => 'inactive',
-                        'category' => 'fire',
-                    ]);
-
-                    $validated['marker_id'] = $createdMarker->marker_id;
                 }
+
+                $markerDescription = $validated['description'] ?? 'Citizen-submitted fire emergency.';
+                if ($duplicateIncident && ! $automaticallyDuplicate) {
+                    $distanceMeters = (int) round((float) $duplicateMatch['distance_meters']);
+                    $markerDescription .= " Possible related report to active incident #{$duplicateIncident->incident_id} at approximately {$distanceMeters} m; pending BFP verification.";
+                }
+                if (isset($validated['location_accuracy'], $validated['location_captured_at'])) {
+                    $accuracyMeters = (int) round((float) $validated['location_accuracy']);
+                    $capturedAt = \Illuminate\Support\Carbon::parse($validated['location_captured_at'])->toIso8601String();
+                    $markerDescription .= " GPS accuracy ±{$accuracyMeters} m; captured {$capturedAt}.";
+                }
+
+                $createdMarker = Marker::create([
+                    'title' => $validated['title'] ?? 'Citizen Fire Emergency',
+                    'description' => $markerDescription,
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'status' => 'inactive',
+                    'category' => 'fire',
+                ]);
+
+                $validated['marker_id'] = $createdMarker->marker_id;
             } else {
                 $validated['marker_id'] = $markerId;
             }

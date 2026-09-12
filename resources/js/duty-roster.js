@@ -60,13 +60,15 @@ if (app) {
         const firefighters = state.data.officers.filter(officer => String(officer.role).toLowerCase() === 'firefighter');
         const command = state.data.officers.filter(officer => ['chief', 'station admin', 'chief station admin'].includes(String(officer.role).toLowerCase()));
         const teamSelect = $('#dutyShiftForm [name="team_id"]');
-        teamSelect.innerHTML = state.data.teams.map(team => `<option value="${team.team_id}">Team ${team.team_id}</option>`).join('');
+        teamSelect.innerHTML = state.data.teams.length
+            ? state.data.teams.map(team => `<option value="${team.team_id}" title="${escapeHtml(team.schedule_reason || '')}">Team ${team.team_id} — ${escapeHtml(team.schedule_reason || 'Ready for shift planning.')}</option>`).join('')
+            : '<option value="">No teams are linked to this station</option>';
         $('[data-rotation-teams]').innerHTML = state.data.teams.map(team => {
-            const memberCount = new Set(roles.map(([key]) => Number(team[key] || 0)).filter(Boolean)).size;
+            const memberCount = Number(team.saved_member_count ?? new Set(roles.map(([key]) => Number(team[key] || 0)).filter(Boolean)).size);
             const missing = Math.max(0, 2 - memberCount);
-            const ready = missing === 0;
-            const note = ready ? 'Ready' : `Needs ${missing} ${missing === 1 ? 'member' : 'members'}`;
-            return `<label class="${ready ? '' : 'is-not-ready'}"><input type="checkbox" name="rotation_team_ids[]" value="${team.team_id}" data-team-ready="${ready ? 'true' : 'false'}" ${ready ? '' : 'disabled'}><span>Team ${team.team_id}</span><small>${note}</small></label>`;
+            const ready = team.schedule_ready ?? missing === 0;
+            const note = team.schedule_reason || (ready ? 'Ready for shift planning.' : `Needs ${missing} ${missing === 1 ? 'member' : 'members'}`);
+            return `<label class="${ready ? '' : 'is-not-ready'}"><input type="checkbox" name="rotation_team_ids[]" value="${team.team_id}" data-team-ready="${ready ? 'true' : 'false'}" ${ready ? '' : 'disabled'}><span>Team ${team.team_id}</span><small>${escapeHtml(note)}</small></label>`;
         }).join('');
         $('#dutyAssignments').innerHTML = roles.map(([key, label, required]) => `<label>${label}<select name="${key}" ${required ? 'required' : ''}>${options(firefighters, required ? 'Select firefighter' : 'Optional')}</select></label>`).join('');
         $('#dutyShiftForm [name="station_duty"]').innerHTML = options(command, 'Select chief/admin');

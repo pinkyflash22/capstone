@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260906-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260912-1';
 // Offline screen revision: 2026-09-11. Reinstall the updated shell while
 // retaining the existing caches for saved pages, maps, and reports.
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
@@ -174,7 +174,23 @@ self.addEventListener('push', (event) => {
         payload = { body: event.data?.text?.() || '' };
     }
 
-    if (payload.type !== 'PYRO_VOICE_CALL' && !payload.callId && !payload.data?.callId) return;
+    const payloadType = payload.type || payload.data?.type;
+    if (payloadType === 'PYRO_FIRE_INCIDENT') {
+        const incidentId = Number(payload.incidentId || payload.data?.incidentId || 0);
+        const url = payload.url || payload.data?.url || '/citizen/dashboard#section-map';
+        event.waitUntil(self.registration.showNotification(payload.title || 'PyroSense fire alert', {
+            body: payload.body || payload.message || 'A new fire incident requires attention.',
+            tag: payload.tag || `incident-${incidentId || 'alert'}`,
+            icon: '/icon-192x192.png',
+            badge: '/icon-72x72.png',
+            vibrate: [220, 120, 220],
+            renotify: true,
+            data: { type: 'PYRO_FIRE_INCIDENT', incidentId, url },
+        }));
+        return;
+    }
+
+    if (payloadType !== 'PYRO_VOICE_CALL' && !payload.callId && !payload.data?.callId) return;
     const callId = Number(payload.callId || payload.data?.callId);
     const url = payload.url || payload.data?.url || `/#voice-call-${callId}`;
     event.waitUntil(self.registration.showNotification(payload.title || 'Incoming PyroSense voice call', {
@@ -187,7 +203,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
     const data = event.notification?.data || {};
-    if (data.type !== 'PYRO_VOICE_CALL') return;
+    if (!['PYRO_VOICE_CALL', 'PYRO_FIRE_INCIDENT'].includes(data.type)) return;
     event.notification.close();
 
     event.waitUntil((async () => {
@@ -197,7 +213,11 @@ self.addEventListener('notificationclick', (event) => {
 
         if (existing) {
             await existing.focus();
-            existing.postMessage({ type: 'PYRO_OPEN_VOICE_CALL', callId: data.callId });
+            if (data.type === 'PYRO_VOICE_CALL') {
+                existing.postMessage({ type: 'PYRO_OPEN_VOICE_CALL', callId: data.callId });
+            } else {
+                existing.postMessage({ type: 'PYRO_OPEN_FIRE_INCIDENT', incidentId: data.incidentId });
+            }
             return;
         }
 

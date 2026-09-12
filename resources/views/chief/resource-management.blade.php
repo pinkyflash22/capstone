@@ -396,6 +396,15 @@
             border: 1px solid rgba(245, 158, 11, 0.16);
         }
 
+        .coverage-diagnostic { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0 0 18px; }
+        .coverage-diagnostic__item { display:flex; gap:11px; align-items:flex-start; min-width:0; padding:13px 14px; border:1px solid #e2e8f0; border-radius:16px; background:rgba(255,255,255,.82); }
+        .coverage-diagnostic__item > i { display:grid; place-items:center; flex:0 0 32px; height:32px; border-radius:10px; color:#c2410c; background:#ffedd5; }
+        .coverage-diagnostic__item strong,.coverage-diagnostic__item small { display:block; }
+        .coverage-diagnostic__item strong { color:#0f172a; font-size:.82rem; line-height:1.3; }
+        .coverage-diagnostic__item small { margin-top:3px; color:#64748b; font-size:.72rem; line-height:1.4; }
+        .coverage-diagnostic__item.is-warning { border-color:#fcd34d; background:#fffbeb; }
+        .coverage-diagnostic__item.is-warning > i { color:#92400e; background:#fef3c7; }
+
         .boundary-table-wrap {
             overflow-x: auto;
         }
@@ -1204,6 +1213,12 @@
                 gap: 6px;
             }
 
+            .coverage-diagnostic { grid-template-columns:1fr; gap:7px; margin-bottom:12px; }
+            .coverage-diagnostic__item { padding:10px 11px; border-radius:13px; }
+            .coverage-diagnostic__item > i { flex-basis:28px; height:28px; }
+            .coverage-diagnostic__item strong { font-size:.72rem; }
+            .coverage-diagnostic__item small { font-size:.64rem; }
+
             .boundary-table th,
             .boundary-table td {
                 padding: 8px 8px;
@@ -1813,6 +1828,19 @@
                 $syncedBoundaryCount = $boundaryBarangays->where('boundary_status', 'synced')->count();
                 $invalidBoundaryCount = $boundaryBarangays->where('boundary_status', 'invalid')->count();
                 $missingBoundaryCount = $boundaryBarangays->where('boundary_status', 'missing')->count();
+                $stationAddressBarangay = $currentStation?->address?->barangay;
+                $stationMunicipality = $stationAddressBarangay?->city?->city_name;
+                $stationProvince = $stationAddressBarangay?->city?->province?->province_name;
+                $coverageRelationshipIssue = !$currentStation
+                    ? 'Select a station to inspect its relationships.'
+                    : (!$currentStation->address_id
+                        ? 'Station address is not assigned.'
+                        : (!$stationAddressBarangay
+                            ? 'Station address has no barangay relationship.'
+                            : (!$stationAddressBarangay->city_id ? 'Station barangay has no municipality relationship.' : null)));
+                $municipalityCoverageCount = $stationAddressBarangay?->city_id
+                    ? $boundaryBarangays->filter(fn ($item) => (int) ($item['city_id'] ?? 0) === (int) $stationAddressBarangay->city_id)->count()
+                    : 0;
             @endphp
 
             <section class="boundary-control-card resource-tier resource-tier--community" id="boundaryResourceSection">
@@ -1826,6 +1854,21 @@
                         <span class="boundary-summary-pill"><i class="fa-solid fa-circle-check"></i> {{ $syncedBoundaryCount }} synced</span>
                         <span class="boundary-summary-pill"><i class="fa-solid fa-triangle-exclamation"></i> {{ $invalidBoundaryCount }} invalid</span>
                         <span class="boundary-summary-pill"><i class="fa-solid fa-clock-rotate-left"></i> {{ $missingBoundaryCount }} pending</span>
+                    </div>
+                </div>
+
+                <div class="coverage-diagnostic" aria-label="Station coverage relationship diagnostic">
+                    <div class="coverage-diagnostic__item {{ $coverageRelationshipIssue ? 'is-warning' : '' }}">
+                        <i class="fa-solid {{ $coverageRelationshipIssue ? 'fa-triangle-exclamation' : 'fa-circle-check' }}" aria-hidden="true"></i>
+                        <div><strong>{{ $coverageRelationshipIssue ? 'Relationship needs attention' : 'Address relationships connected' }}</strong><small>{{ $coverageRelationshipIssue ?? 'Station → barangay → municipality is complete.' }}</small></div>
+                    </div>
+                    <div class="coverage-diagnostic__item {{ $stationMunicipality ? '' : 'is-warning' }}">
+                        <i class="fa-solid fa-city" aria-hidden="true"></i>
+                        <div><strong>{{ $stationMunicipality ?? 'Municipality unavailable' }}</strong><small>{{ $stationProvince ? $stationProvince.' · ' : '' }}Barangays with this city ID are treated as municipality coverage.</small></div>
+                    </div>
+                    <div class="coverage-diagnostic__item">
+                        <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+                        <div><strong>{{ $municipalityCoverageCount }} municipality barangays</strong><small>{{ $boundaryBarangays->count() }} total active or inferred coverage records shown.</small></div>
                     </div>
                 </div>
 

@@ -1,9 +1,14 @@
 <div id="section-notifications" class="content-section">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Notifications</h1>
-        <button id="citizenNotificationsMarkRead" class="text-sm text-gray-500 hover:text-gray-700">
-            <i class="fa-regular fa-circle-check mr-1"></i> Mark all as read
-        </button>
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="window.testPyroIncidentAlert?.()" class="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100">
+                <i class="fa-solid fa-volume-high mr-1"></i> Test fire alert
+            </button>
+            <button id="citizenNotificationsMarkRead" class="text-sm text-gray-500 hover:text-gray-700">
+                <i class="fa-regular fa-circle-check mr-1"></i> Mark all as read
+            </button>
+        </div>
     </div>
 
     <div class="flex gap-2 mb-4 border-b border-gray-200">

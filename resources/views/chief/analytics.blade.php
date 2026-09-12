@@ -1762,6 +1762,24 @@
             position: relative;
             min-height: 320px;
         }
+        .analytics-chart-canvas canvas { transition: opacity .22s ease; }
+        .analytics-chart-canvas.is-evidence-empty canvas { opacity: .08; }
+        .analytics-chart-evidence-empty {
+            position: absolute;
+            z-index: 4;
+            inset: 0;
+            display: grid;
+            place-content: center;
+            gap: 9px;
+            padding: 28px;
+            color: #64748b;
+            background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(248,250,252,.97));
+            text-align: center;
+        }
+        .analytics-chart-evidence-empty[hidden] { display: none; }
+        .analytics-chart-evidence-empty i { color: #ea580c; font-size: 1.55rem; }
+        .analytics-chart-evidence-empty strong { color: #0f172a; font-size: .95rem; }
+        .analytics-chart-evidence-empty span { max-width: 46ch; font-size: .78rem; line-height: 1.55; }
         .analytics-insight-list {
             margin-top: 14px;
             display: grid;
@@ -6448,6 +6466,25 @@
             return result;
         }
 
+        function setChartEvidenceState(canvasId, isEmpty, message) {
+            const canvas = document.getElementById(canvasId);
+            const stage = canvas?.closest('.analytics-chart-canvas');
+            if (!canvas || !stage) return;
+
+            let emptyState = stage.querySelector('.analytics-chart-evidence-empty');
+            if (!emptyState) {
+                emptyState = document.createElement('div');
+                emptyState.className = 'analytics-chart-evidence-empty';
+                emptyState.innerHTML = '<i class="fa-solid fa-chart-line" aria-hidden="true"></i><strong>No incident evidence available</strong><span></span>';
+                stage.appendChild(emptyState);
+            }
+
+            stage.classList.toggle('is-evidence-empty', Boolean(isEmpty));
+            emptyState.hidden = !isEmpty;
+            emptyState.querySelector('span').textContent = message;
+            canvas.setAttribute('aria-hidden', isEmpty ? 'true' : 'false');
+        }
+
         function renderCharts(analysisData) {
             const chartContext = analysisData.chart_context || {};
             const daily = chartContext.daily || {};
@@ -6774,6 +6811,7 @@
                             pointRadius: chartPointRadius,
                             tension: 0.35,
                             borderDash: [8, 6],
+                            spanGaps: true,
                             fill: false
                         },
                         {
@@ -6785,6 +6823,7 @@
                             pointRadius: compactChart ? 2 : 3,
                             tension: 0.3,
                             yAxisID: 'confidenceAxis',
+                            spanGaps: true,
                             fill: false
                         }
                     ]
@@ -7098,6 +7137,52 @@
                     }
                 }
             });
+
+            const incidentEvidenceMessage = 'No verified incident counts exist for this station and selection. Weather-only archive records remain available in the Weather and Fire Pattern chart.';
+            const hasVisibleForecast = [
+                ...(historicalVsPredicted.forecast_incidents || []),
+                ...(historicalVsPredicted.forecast_probability || []),
+            ].some((value) => value !== null && Number(value) > 0);
+            setChartEvidenceState(
+                'historicalTrendChart',
+                Boolean(historicalTrend?.missing?.current_actual && historicalTrend?.missing?.historical_average),
+                incidentEvidenceMessage
+            );
+            setChartEvidenceState(
+                'seasonalPatternChart',
+                Boolean(seasonalPattern?.missing?.current_actual && seasonalPattern?.missing?.historical_average),
+                incidentEvidenceMessage
+            );
+            setChartEvidenceState(
+                'monthlyPatternChart',
+                Boolean(monthlyPattern?.missing?.current_actual && monthlyPattern?.missing?.historical_average),
+                incidentEvidenceMessage
+            );
+            setChartEvidenceState(
+                'dayOfWeekPatternChart',
+                Boolean(dayOfWeekPattern?.missing?.current_actual && dayOfWeekPattern?.missing?.historical_average),
+                incidentEvidenceMessage
+            );
+            setChartEvidenceState(
+                'dailyChart',
+                Boolean(daily?.missing?.previous_period && daily?.missing?.current_period && daily?.missing?.predicted_probability),
+                'No recent actual incidents or forecast probability are available for this selection.'
+            );
+            setChartEvidenceState(
+                'hourlyChart',
+                Boolean(hourly?.missing?.historical_baseline && hourly?.missing?.current_period && hourly?.missing?.predicted_probability),
+                incidentEvidenceMessage
+            );
+            setChartEvidenceState(
+                'forecastCompareChart',
+                Boolean(
+                    historicalVsPredicted?.missing?.actual_incidents
+                    && historicalVsPredicted?.missing?.historical_baseline
+                    && historicalVsPredicted?.missing?.current_actual
+                    && !hasVisibleForecast
+                ),
+                'No matching historical incidents or saved forecast exist for this station, barangay, and target month.'
+            );
 
             const chartInsights = Array.isArray(chartContext.insights) ? chartContext.insights : [];
             const historicalTotals = Array.isArray(historicalTrend.current_actual) ? historicalTrend.current_actual : [];

@@ -1,6 +1,6 @@
 @php
     $notificationRoutePrefix = $notificationRoutePrefix ?? 'station-admin';
-    $commandNotificationUrls = [
+    $commandNotificationUrls = $commandNotificationUrls ?? [
         'index' => route($notificationRoutePrefix.'.command-notifications.index'),
         'read_all' => route($notificationRoutePrefix.'.command-notifications.read-all'),
         'read' => route($notificationRoutePrefix.'.command-notifications.read', ['notificationId' => '__ID__']),
@@ -22,6 +22,8 @@
     .command-notification-center__panel header small { color:#9a3412; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     .command-notification-center__panel header strong { color:#0f172a; font-size:15px; }
     .command-notification-center__panel header button { border:0; background:transparent; color:#c2410c; font-size:11px; font-weight:800; cursor:pointer; }
+    .command-notification-center__actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .command-notification-center__actions button[data-command-notification-test] { padding:6px 9px; border:1px solid #fed7aa; border-radius:999px; background:#fff; }
     .command-notification-center__list { max-height:390px; overflow-y:auto; }
     .command-notification-center__item { display:block; padding:14px 16px; border-bottom:1px solid #f1f5f9; color:#334155; text-decoration:none; transition:background .18s ease; }
     .command-notification-center__item:hover { background:#f8fafc; }
@@ -66,7 +68,7 @@
                     <span class="command-notification-center__badge" data-command-notification-badge hidden>0</span>
                 </button>
                 <section class="command-notification-center__panel" data-command-notification-panel hidden>
-                    <header><div><small>Notification center</small><strong>All notifications</strong></div><button type="button" data-command-notification-read-all>Mark all read</button></header>
+                    <header><div><small>Notification center</small><strong>All notifications</strong></div><span class="command-notification-center__actions"><button type="button" data-command-notification-test>Enable / test alert</button><button type="button" data-command-notification-read-all>Mark all read</button></span></header>
                     <div class="command-notification-center__list" data-command-notification-list><p class="command-notification-center__empty">Loading notifications…</p></div>
                 </section>`;
         }
@@ -79,6 +81,7 @@
         const list = headerHost?.querySelector('[data-command-notification-list]');
         const badge = headerHost?.querySelector('[data-command-notification-badge]');
         const readAll = headerHost?.querySelector('[data-command-notification-read-all]');
+        const testAlert = headerHost?.querySelector('[data-command-notification-test]');
         const mobileLists = document.querySelectorAll('[data-command-notification-mobile]');
         const mobileBadges = document.querySelectorAll('[data-command-notification-mobile-badge]');
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
@@ -93,6 +96,68 @@
         };
         let databaseNotifications = [];
         let databaseUnreadCount = 0;
+        let knownDatabaseIds = new Set();
+        let hasLoadedDatabaseNotifications = false;
+        const audibleCategories = new Set(['incident_assignment', 'incident_reported', 'dispatch_unavailable', 'fire_nearby', 'fire-nearby']);
+        let localAlertAudioContext = null;
+
+        const unlockLocalAlertAudio = () => {
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                localAlertAudioContext ||= new AudioContextClass();
+                localAlertAudioContext.resume?.();
+            } catch (error) {}
+        };
+        document.addEventListener('pointerdown', unlockLocalAlertAudio, { once:true, capture:true });
+
+        const signalEmergencyAlert = async (item, requestPermission = false) => {
+            if (typeof window.triggerPyroNotificationAlert === 'function' && !requestPermission) {
+                window.triggerPyroNotificationAlert(item);
+                return;
+            }
+            if (requestPermission && 'Notification' in window && Notification.permission === 'default') {
+                await Notification.requestPermission().catch(() => 'default');
+            }
+            unlockLocalAlertAudio();
+            if (localAlertAudioContext) {
+                const now = localAlertAudioContext.currentTime;
+                [880, 660, 880].forEach((frequency, index) => {
+                    const oscillator = localAlertAudioContext.createOscillator();
+                    const gain = localAlertAudioContext.createGain();
+                    const startAt = now + (index * .18);
+                    oscillator.frequency.value = frequency;
+                    gain.gain.setValueAtTime(.0001, startAt);
+                    gain.gain.exponentialRampToValueAtTime(.16, startAt + .03);
+                    gain.gain.exponentialRampToValueAtTime(.0001, startAt + .16);
+                    oscillator.connect(gain);
+                    gain.connect(localAlertAudioContext.destination);
+                    oscillator.start(startAt);
+                    oscillator.stop(startAt + .17);
+                });
+            }
+            navigator.vibrate?.([240, 120, 240]);
+            window.PyroNotify?.notify(item.message, { type:'warning', title:item.title, duration:5500 });
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const options = {
+                    body:item.message,
+                    tag:item.tag || 'pyrosense-emergency-alert',
+                    icon:'/icon-192x192.png',
+                    badge:'/icon-72x72.png',
+                    vibrate:[220,120,220],
+                    renotify:true,
+                    data:{ type:'PYRO_FIRE_INCIDENT', incidentId:Number(item.incident_id || 0), url:item.url || window.location.href }
+                };
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.getRegistration('/');
+                    if (registration) {
+                        await registration.showNotification(item.title, options).catch(() => {});
+                        return;
+                    }
+                }
+                new Notification(item.title, options);
+            }
+        };
 
         const incidentNotifications = () => {
             if (typeof window.getIncidentAlertNotifications !== 'function') return [];
@@ -138,7 +203,22 @@
                 const response = await fetch(urls.index, { headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin' });
                 if (!response.ok) throw new Error('Notification refresh failed.');
                 const payload = await response.json();
-                databaseNotifications = (Array.isArray(payload.notifications) ? payload.notifications : []).map((item) => ({ ...item, source:'database' }));
+                const incomingNotifications = (Array.isArray(payload.notifications) ? payload.notifications : []).map((item) => ({ ...item, source:'database' }));
+                if (hasLoadedDatabaseNotifications) {
+                    incomingNotifications
+                        .filter((item) => !knownDatabaseIds.has(String(item.id)) && !item.is_read && audibleCategories.has(String(item.category || '').toLowerCase()))
+                        .slice(0, 1)
+                        .forEach((item) => signalEmergencyAlert({
+                            incident_id: Number(item.meta?.incident_id || 0),
+                            title: item.title || 'PyroSense emergency alert',
+                            message: item.message || 'A new incident notification requires attention.',
+                            url: item.url || window.location.href,
+                            tag: `notification-${item.id}`,
+                        }));
+                }
+                databaseNotifications = incomingNotifications;
+                knownDatabaseIds = new Set(incomingNotifications.map((item) => String(item.id)));
+                hasLoadedDatabaseNotifications = true;
                 databaseUnreadCount = Number(payload.unread_count || 0);
                 render();
             } catch (error) {
@@ -171,6 +251,19 @@
             window.markAllIncidentAlertsRead?.();
             await post(urls.read_all);
             await refresh();
+        });
+        testAlert?.addEventListener('click', async () => {
+            if (typeof window.testPyroIncidentAlert === 'function') {
+                await window.testPyroIncidentAlert();
+                return;
+            }
+            await signalEmergencyAlert({
+                incident_id:0,
+                title:'PyroSense fire alert test',
+                message:'Sound, vibration, and emergency notifications are ready.',
+                url:window.location.href,
+                tag:`pyrosense-alert-test-${Date.now()}`
+            }, true);
         });
         document.addEventListener('click', (event) => {
             if (panel && headerHost && !headerHost.contains(event.target)) { panel.hidden = true; trigger?.setAttribute('aria-expanded','false'); }

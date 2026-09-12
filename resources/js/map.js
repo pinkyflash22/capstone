@@ -3465,18 +3465,41 @@ function showIncidentAlertToast(entry) {
     });
 }
 
-function sendBrowserIncidentNotification(entry) {
+async function sendBrowserIncidentNotification(entry) {
     if (!('Notification' in window) || Notification.permission !== 'granted') {
         return;
     }
 
+    const incidentId = Number(entry?.incident_id || 0);
+    const defaultUrl = roleName === 'firefighter'
+        ? `/firefighter/incidents?focus_incident_id=${incidentId}`
+        : (roleName === 'citizen'
+            ? '/citizen/dashboard#section-map'
+            : `/station-admin/maps?focus_incident_id=${incidentId}`);
+    const options = {
+        body: entry.message,
+        tag: entry.tag || `incident-${incidentId || 'alert'}`,
+        icon: '/icon-192x192.png',
+        badge: '/icon-72x72.png',
+        vibrate: [220, 120, 220],
+        renotify: true,
+        data: {
+            type: 'PYRO_FIRE_INCIDENT',
+            incidentId,
+            url: entry.url || defaultUrl,
+        },
+    };
+
     try {
-        new Notification(entry.title, {
-            body: entry.message,
-            tag: `incident-${entry.incident_id}`,
-            vibrate: [220, 120, 220],
-            renotify: true
-        });
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration('/');
+            if (registration) {
+                await registration.showNotification(entry.title, options);
+                return;
+            }
+        }
+
+        new Notification(entry.title, options);
     } catch (error) {
         console.warn('Unable to send browser notification:', error);
     }
@@ -3515,6 +3538,33 @@ function triggerIncidentAlert(entry) {
     showIncidentAlertToast(entry);
     sendBrowserIncidentNotification(entry);
 }
+
+window.enablePyroIncidentAlerts = async () => {
+    ensureIncidentAlertAudioUnlocked();
+    if (!('Notification' in window)) {
+        return 'unsupported';
+    }
+    if (Notification.permission === 'default') {
+        incidentAlertPermissionRequested = true;
+        return Notification.requestPermission();
+    }
+    return Notification.permission;
+};
+
+window.triggerPyroNotificationAlert = triggerIncidentAlert;
+window.testPyroIncidentAlert = async () => {
+    const permission = await window.enablePyroIncidentAlerts();
+    triggerIncidentAlert({
+        incident_id: 0,
+        title: 'PyroSense fire alert test',
+        message: permission === 'denied'
+            ? 'Sound and vibration test complete. Browser notifications are blocked in your settings.'
+            : 'Sound, vibration, and emergency notifications are ready.',
+        tag: `pyrosense-alert-test-${Date.now()}`,
+        url: window.location.href,
+    });
+    return permission;
+};
 
 function shouldNotifyForIncident(incident, options = {}) {
     const normalizedStatus = normalizeIncidentStatus(

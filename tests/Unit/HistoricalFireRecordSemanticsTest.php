@@ -51,4 +51,19 @@ class HistoricalFireRecordSemanticsTest extends TestCase
         $this->assertStringNotContainsString('historical_fire_incidents.incident_count', $riskEvidenceMethod);
         $this->assertStringContainsString('historical_fire_incidents.incident_count', $historicalEvidenceMethod);
     }
+
+    #[Test]
+    public function analytics_charts_separate_weather_placeholders_and_explain_missing_incident_evidence(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/Chief/AnalyticController.php'));
+        $view = file_get_contents(resource_path('views/chief/analytics.blade.php'));
+
+        $this->assertStringContainsString("->where('incident_count', '>', 0)", $controller);
+        $this->assertStringContainsString('resolveHistoricalWeatherYears', $controller);
+        $this->assertStringContainsString('fetchHistoricalWeatherRows', $controller);
+        $this->assertStringContainsString('resolveLatestSavedForecastForScope', $controller);
+        $this->assertStringContainsString('No incident evidence available', $view);
+        $this->assertStringContainsString('setChartEvidenceState', $view);
+        $this->assertGreaterThanOrEqual(2, substr_count($view, 'spanGaps: true'));
+    }
 }

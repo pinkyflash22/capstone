@@ -391,6 +391,7 @@ class ResourceManagementController extends Controller
                     return [
                         'barangay_id' => $barangay->barangay_id,
                         'barangay_name' => $barangay->barangay_name,
+                        'city_id' => $barangay->city_id,
                         'city_name' => $barangay->city?->city_name,
                         'has_boundary' => $boundaryState['has_boundary'],
                         'boundary_is_valid' => $boundaryState['is_valid'],
@@ -424,12 +425,13 @@ class ResourceManagementController extends Controller
             $barangays = $barangays->filter(fn (Barangay $barangay) => (int) $barangay->city_id === (int) $cityId);
         }
 
-        if ((! $barangays || $barangays->isEmpty()) && $cityId) {
-            $barangays = Barangay::query()
+        if ($cityId) {
+            $municipalityBarangays = Barangay::query()
                 ->with($supportsBarangayBoundaries ? ['city', 'boundaryLocations'] : ['city'])
                 ->where('city_id', $cityId)
                 ->orderBy('barangay_name')
                 ->get();
+            $barangays = collect($barangays)->merge($municipalityBarangays)->unique('barangay_id')->values();
         }
 
         $barangays ??= collect();
@@ -452,6 +454,7 @@ class ResourceManagementController extends Controller
                 return [
                     'barangay_id' => $barangay->barangay_id,
                     'barangay_name' => $barangay->barangay_name,
+                    'city_id' => $barangay->city_id,
                     'city_name' => $barangay->city?->city_name,
                     'has_boundary' => $boundaryState['has_boundary'],
                     'boundary_is_valid' => $boundaryState['is_valid'],

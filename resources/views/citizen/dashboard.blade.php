@@ -5714,15 +5714,40 @@ function getCitizenNearbyAlertKey(incident = {}) {
     );
 }
 
-window.requestCitizenEmergencyNotificationPermission = function() {
-    if (!('Notification' in window) || Notification.permission !== 'default') {
-        return;
-    }
+let citizenEmergencyAudioContext = null;
 
-    Notification.requestPermission().catch(() => {});
+function playCitizenEmergencyAlertTone() {
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        citizenEmergencyAudioContext ||= new AudioContextClass();
+        citizenEmergencyAudioContext.resume?.();
+        const now = citizenEmergencyAudioContext.currentTime;
+        [880, 660, 880].forEach((frequency, index) => {
+            const oscillator = citizenEmergencyAudioContext.createOscillator();
+            const gain = citizenEmergencyAudioContext.createGain();
+            const startAt = now + (index * 0.18);
+            oscillator.frequency.value = frequency;
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(0.16, startAt + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.16);
+            oscillator.connect(gain);
+            gain.connect(citizenEmergencyAudioContext.destination);
+            oscillator.start(startAt);
+            oscillator.stop(startAt + 0.17);
+        });
+    } catch (error) {
+        console.warn('Unable to play citizen emergency alert tone:', error);
+    }
+}
+
+window.requestCitizenEmergencyNotificationPermission = async function() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'default') return Notification.requestPermission();
+    return Notification.permission;
 };
 
-function sendCitizenNearbyBrowserNotification(incident = {}) {
+async function sendCitizenNearbyBrowserNotification(incident = {}) {
     if (!('Notification' in window) || Notification.permission !== 'granted') {
         return;
     }
@@ -5733,14 +5758,27 @@ function sendCitizenNearbyBrowserNotification(incident = {}) {
     const statusLabel = incident.incident_status || incident.status || 'Reported';
 
     try {
-        new Notification('PyroSense nearby fire alert', {
+        const options = {
             body: `Fire incident ${distanceLabel}. Status: ${statusLabel}.`,
             tag: `pyrosense-citizen-alert-${getCitizenNearbyAlertKey(incident)}`,
             renotify: true,
             vibrate: [220, 120, 220],
-            icon: '/logo.png',
-            badge: '/logo.png'
-        });
+            icon: '/icon-192x192.png',
+            badge: '/icon-72x72.png',
+            data: {
+                type: 'PYRO_FIRE_INCIDENT',
+                incidentId: Number(incident.incident_id || incident.id || 0),
+                url: '/citizen/dashboard#section-map'
+            }
+        };
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration('/');
+            if (registration) {
+                await registration.showNotification('PyroSense nearby fire alert', options);
+                return;
+            }
+        }
+        new Notification('PyroSense nearby fire alert', options);
     } catch (error) {
         console.warn('Unable to show citizen nearby browser notification:', error);
     }
@@ -5768,10 +5806,31 @@ function notifyNewCitizenNearbyAlerts(nearbyIncidents = [], options = {}) {
             ? ` about ${Math.round(incident.distance_meters)}m away`
             : '';
         window.showCitizenToast?.(`Nearby fire alert${distanceLabel}. Tap the bell to view details.`, false, 6500);
+        playCitizenEmergencyAlertTone();
+        navigator.vibrate?.([240, 120, 240]);
         sendCitizenNearbyBrowserNotification(incident);
         markCitizenNearbyAlertSeen(key);
     });
 }
+
+window.testPyroIncidentAlert ??= async function() {
+    const permission = await window.requestCitizenEmergencyNotificationPermission();
+    playCitizenEmergencyAlertTone();
+    navigator.vibrate?.([240, 120, 240]);
+    window.showCitizenToast?.(
+        permission === 'denied'
+            ? 'Sound test complete. Browser notifications are blocked in your settings.'
+            : 'Fire alert sound, vibration, and notifications are ready.',
+        false,
+        5000
+    );
+    await sendCitizenNearbyBrowserNotification({
+        incident_id: 'test',
+        distance_meters: 0,
+        incident_status: 'Test alert'
+    });
+    return permission;
+};
 
 window.renderCitizenWeeklyActivity = function(activityData = null) {
     const barsContainer = document.getElementById('citizenWeeklyActivityBars');
@@ -6284,7 +6343,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (window.refreshCitizenOverviewData) {
             citizenOverviewInterval = window.setInterval(() => {
-                if (!citizenDashboardIsVisible()) return;
                 window.refreshCitizenOverviewData();
             }, CITIZEN_OVERVIEW_INTERVAL_MS);
         }
@@ -6303,7 +6361,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         window.clearCitizenDashboardLocationIntervals?.();
-        clearCitizenDashboardDataIntervals();
     });
 });
         // Report incident triggers

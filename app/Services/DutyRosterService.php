@@ -23,7 +23,18 @@ class DutyRosterService
         $at ??= now();
         $teams = Team::query()
             ->where('roster_managed', true)
-            ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+            ->when($stationId, function ($query) use ($stationId) {
+                $officerIds = StationOfficer::query()
+                    ->where('station_id', $stationId)
+                    ->pluck('station_officer_id')
+                    ->all();
+                $query->where(function ($stationQuery) use ($stationId, $officerIds) {
+                    $stationQuery->where('station_id', $stationId);
+                    foreach (self::DEPLOYABLE_ROLES as $role) {
+                        $stationQuery->orWhereIn($role, $officerIds);
+                    }
+                });
+            })
             ->get();
         $summary = ['checked' => $teams->count(), 'activated' => 0, 'off_duty' => 0, 'deferred' => 0];
 
