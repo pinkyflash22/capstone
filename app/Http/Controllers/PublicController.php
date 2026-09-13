@@ -482,7 +482,14 @@ class PublicController extends Controller
         $activeNearbyIncidents = $nearbyIncidents->filter(function ($incident) {
             $status = strtolower(trim($incident->status ?? ''));
 
-            return in_array($status, ['reported', 'responding', 'on scene'], true);
+            return in_array($status, [
+                'reported',
+                'responding',
+                'en-route',
+                'en route',
+                'on scene',
+                'on-scene',
+            ], true);
         })->values();
 
         // A citizen can always see their own reports. Reports from other

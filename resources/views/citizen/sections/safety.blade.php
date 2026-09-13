@@ -60,7 +60,7 @@
         <div class="md:col-span-2 space-y-6" id="main-content-area">
             <!-- Fire Safety Card (Default) -->
             <div id="fire-guide" class="guide-content bg-white rounded-xl shadow overflow-hidden">
-                <img src="https://images.unsplash.com/photo-1582131504859-5d3e9232b3a9?w=400" alt="Fire Safety" class="w-full h-48 object-cover">
+                <img src="{{ asset('assets/images/pyrosense-logo.png') }}" alt="PyroSense fire safety" class="w-full h-48 object-contain bg-orange-50 p-8">
                 <div class="p-5">
                     <h2 class="text-xl font-bold text-gray-800 mb-3">🔥 Fire Safety at Home</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">

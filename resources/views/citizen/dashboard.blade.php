@@ -2855,7 +2855,7 @@
                             <div class="flex items-center justify-between gap-3">
                                 <div>
                                     <p class="font-semibold text-slate-900">Incident location</p>
-                                    <p class="mt-0.5 text-xs text-slate-500">Use GPS or pick within 100m.</p>
+                                    <p class="mt-0.5 text-xs text-slate-500">Use GPS or choose the incident point on the map.</p>
                                 </div>
                                 <span class="shrink-0 rounded-full bg-orange-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-orange-700">100m</span>
                             </div>
@@ -2867,7 +2867,7 @@
                                 </button>
                                 <button type="button" id="firePickOnMapButton" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700">
                                     <span class="material-symbols-rounded text-[18px]" aria-hidden="true">place</span>
-                                    Pick within 100m
+                                    Choose on map
                                 </button>
                             </div>
 
@@ -3241,6 +3241,12 @@
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
+                    window.PyroLocation?.rememberLocation?.({
+                        lat: position?.coords?.latitude,
+                        lng: position?.coords?.longitude,
+                        accuracy: position?.coords?.accuracy,
+                        timestamp: position?.timestamp,
+                    });
                     if (!citizenPositionIsReliable(position)) {
                         console.warn('[CitizenLocation] ignored inaccurate or stale interval fix', {
                             accuracy: position?.coords?.accuracy,
@@ -3399,6 +3405,12 @@
                 window.__citizenLocationRequest = new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(
                         function(position) {
+                            window.PyroLocation?.rememberLocation?.({
+                                lat: position?.coords?.latitude,
+                                lng: position?.coords?.longitude,
+                                accuracy: position?.coords?.accuracy,
+                                timestamp: position?.timestamp,
+                            });
                             if (!citizenPositionIsReliable(position)) {
                                 reject(new Error(`Location accuracy is only ±${Math.round(Number(position?.coords?.accuracy) || 0)} m.`));
                                 return;
@@ -3473,6 +3485,12 @@ if (navigator.geolocation) {
 
     navigator.geolocation.getCurrentPosition(
         function(position) {
+            window.PyroLocation?.rememberLocation?.({
+                lat: position?.coords?.latitude,
+                lng: position?.coords?.longitude,
+                accuracy: position?.coords?.accuracy,
+                timestamp: position?.timestamp,
+            });
             if (!citizenPositionIsReliable(position)) {
                 console.warn('[CitizenLocation] ignored inaccurate or stale initial fix', {
                     accuracy: position?.coords?.accuracy,
@@ -4119,15 +4137,21 @@ initializeCitizenLocationIfGranted();
 
             const shouldOpenIncidentModal = @json((bool) session('open_incident_modal'));
             const shouldOpenIncidentFromQuery = new URLSearchParams(window.location.search).get('report') === '1';
+            const shouldPickIncidentFromMap = new URLSearchParams(window.location.search).get('pick') === 'map';
             if (shouldOpenIncidentModal || shouldOpenIncidentFromQuery) {
                 window.setTimeout(function() {
                     document.getElementById('latitude').value = window.userCoords?.currentLatitude ?? '';
                     document.getElementById('longitude').value = window.userCoords?.currentLongitude ?? '';
-                    openFireIncidentModal();
+                    if (shouldPickIncidentFromMap) {
+                        startCitizenFireMapPick();
+                    } else {
+                        openFireIncidentModal();
+                    }
 
                     if (shouldOpenIncidentFromQuery) {
                         const currentUrl = new URL(window.location.href);
                         currentUrl.searchParams.delete('report');
+                        currentUrl.searchParams.delete('pick');
                         window.history.replaceState(window.history.state, '', currentUrl.toString());
                     }
                 }, 250);
@@ -4464,16 +4488,23 @@ initializeCitizenLocationIfGranted();
             }
 
             if (citizenFireDraft.picking) {
-                statusNode.textContent = 'Tap within 100m on the map.';
+                statusNode.textContent = window.userCoords?.ready
+                    ? 'Tap within 100m on the map.'
+                    : 'Tap the map to choose the fire location.';
                 return;
             }
 
             if (citizenFireDraft.mode === 'picked' && citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
-                statusNode.textContent = 'Fire point selected.';
+                statusNode.textContent = 'Fire point selected manually on the map.';
                 return;
             }
 
-            statusNode.textContent = 'Current location ready.';
+            const accuracy = Number(window.userCoords.accuracy);
+            const accuracyClass = window.PyroLocation?.classifyLocationAccuracy?.(accuracy) || 'unknown';
+            const sourceLabel = window.userCoords.source === 'cached' ? 'Cached' : 'Current';
+            statusNode.textContent = Number.isFinite(accuracy) && accuracy > 0
+                ? `${sourceLabel} location · ${accuracyClass} accuracy (±${Math.round(accuracy)} m).`
+                : `${sourceLabel} location ready.`;
         }
 
         function setCitizenHazardCurrentLocation() {
@@ -4607,11 +4638,6 @@ initializeCitizenLocationIfGranted();
         }
 
         function startCitizenFireMapPick() {
-            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
-                window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
-                return;
-            }
-
             citizenFireDraft.mode = 'picked';
             citizenFireDraft.picking = true;
 
@@ -4630,19 +4656,27 @@ initializeCitizenLocationIfGranted();
                 citizenFireDraft.mode = 'picked';
                 citizenFireDraft.picking = true;
 
-                const originLat = Number(window.userCoords.currentLatitude);
-                const originLng = Number(window.userCoords.currentLongitude);
+                const hasOrigin = Boolean(
+                    window.userCoords?.ready
+                    && Number.isFinite(Number(window.userCoords.currentLatitude))
+                    && Number.isFinite(Number(window.userCoords.currentLongitude))
+                );
+                const mapCenter = window.usermap.getCenter();
+                const originLat = hasOrigin ? Number(window.userCoords.currentLatitude) : Number(mapCenter.lat);
+                const originLng = hasOrigin ? Number(window.userCoords.currentLongitude) : Number(mapCenter.lng);
 
                 window.usermap.invalidateSize();
                 window.usermap.setView([originLat, originLng], Math.max(window.usermap.getZoom() || 15, 17), { animate: true });
 
-                citizenFireDraft.circle = L.circle([originLat, originLng], {
-                    radius: 100,
-                    color: '#16a34a',
-                    fillColor: '#22c55e',
-                    fillOpacity: 0.14,
-                    weight: 2,
-                }).addTo(window.usermap);
+                if (hasOrigin) {
+                    citizenFireDraft.circle = L.circle([originLat, originLng], {
+                        radius: 100,
+                        color: '#16a34a',
+                        fillColor: '#22c55e',
+                        fillOpacity: 0.14,
+                        weight: 2,
+                    }).addTo(window.usermap);
+                }
 
                 if (citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
                     citizenFireDraft.marker = L.marker([citizenFireDraft.selectedLat, citizenFireDraft.selectedLng]).addTo(window.usermap);
@@ -4653,7 +4687,7 @@ initializeCitizenLocationIfGranted();
                     const targetLng = Number(event.latlng.lng);
                     const distance = getCitizenDistanceMeters(originLat, originLng, targetLat, targetLng);
 
-                    if (distance > 100) {
+                    if (hasOrigin && distance > 100) {
                         window.showCitizenToast?.('Please pick the fire point within 100 meters of your current location.', true);
                         return;
                     }
@@ -4680,7 +4714,13 @@ initializeCitizenLocationIfGranted();
 
                 window.usermap.on('click', citizenFireDraft.clickHandler);
                 updateCitizenFireLocationUi();
-                window.showCitizenToast?.('Tap the map within 100 meters of your current location to place the fire incident point.', false, 4200);
+                window.showCitizenToast?.(
+                    hasOrigin
+                        ? 'Tap the map within 100 meters of your current location to place the fire incident point.'
+                        : 'GPS is unavailable. Tap the map to choose the fire incident location manually.',
+                    false,
+                    5200
+                );
             }, 200);
         }
 
@@ -4713,7 +4753,10 @@ initializeCitizenLocationIfGranted();
         function openFireIncidentModal() {
             const fireModal = document.getElementById('fireIncidentModal');
 
-            if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null) {
+            if (citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
+                // Keep an explicit map selection; opening the modal must not
+                // silently replace it with a later GPS result.
+            } else if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude) {
                 citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
             } else {
@@ -5278,8 +5321,70 @@ function refreshConcernPhotoUploadState() {
     }, 60);
 }
 
+function applyCitizenFireLocationFix(fix) {
+    window.updateUserLocation?.(window.currentUserId, fix.lat, fix.lng, {
+        accuracy: fix.accuracy,
+        timestamp: fix.timestamp,
+    });
+    window.userCoords.currentLatitude = Number(fix.lat);
+    window.userCoords.currentLongitude = Number(fix.lng);
+    window.userCoords.accuracy = Number(fix.accuracy);
+    window.userCoords.timestamp = Number(fix.timestamp) || Date.now();
+    window.userCoords.source = fix.source || 'fresh';
+    window.userCoords.ready = true;
+
+    if (citizenFireDraft.mode === 'current') {
+        citizenFireDraft.selectedLat = Number(fix.lat);
+        citizenFireDraft.selectedLng = Number(fix.lng);
+    }
+    updateCitizenFireLocationUi();
+}
+
+async function resolveCitizenFireReportLocation(showIncidentToast) {
+    while (true) {
+        let candidate = null;
+
+        try {
+            candidate = await window.PyroLocation.getReliableLocationFix({
+                acceptBestAvailable: true,
+                promptOnError: false,
+                timeoutMs: 8000,
+            });
+        } catch (error) {
+            candidate = window.PyroLocation.getLatestKnownLocation?.({
+                maxAgeMs: 5 * 60 * 1000,
+                maxAccuracyMeters: 1000,
+            }) || null;
+
+            if (!candidate) {
+                showIncidentToast?.('GPS is unavailable and no recent saved location is safe to use. Choose the fire location on the map.', true, 5200);
+                startCitizenFireMapPick();
+                return null;
+            }
+        }
+
+        const needsConfirmation = candidate.source === 'cached' || Number(candidate.accuracy) > 100;
+        if (!needsConfirmation) {
+            return candidate;
+        }
+
+        const choice = typeof window.PyroLocation.confirmApproximateLocation === 'function'
+            ? await window.PyroLocation.confirmApproximateLocation(candidate)
+            : 'use';
+
+        if (choice === 'use') return candidate;
+        if (choice === 'map') {
+            applyCitizenFireLocationFix(candidate);
+            startCitizenFireMapPick();
+            return null;
+        }
+
+        showIncidentToast?.('Trying briefly for a more accurate GPS location...', false, 2600);
+    }
+}
+
 async function submitCitizenQuickReport(reportKind) {
-    const description = '';
+    let description = '';
     const incidentTypeId = 1;
     const reporter = document.getElementById('reported_by').value;
     const concernType = document.getElementById('concernTypeSelect')?.value || 'unsure';
@@ -5303,12 +5408,50 @@ async function submitCitizenQuickReport(reportKind) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
-        showIncidentToast?.('Accurate location service is still loading. Please try again.', true);
+        if (reportKind === 'fire') {
+            showIncidentToast?.('Location service is still loading. Choose the fire location on the map.', true);
+            startCitizenFireMapPick();
+        } else {
+            showIncidentToast?.('Location service is still loading. Please try again.', true);
+        }
         return;
     }
 
-    showIncidentToast?.('Getting a fresh, accurate GPS fix...', false, 3200);
     let freshLocationFix;
+    const hasManualFireLocation = reportKind === 'fire'
+        && citizenFireDraft.mode === 'picked'
+        && citizenFireDraft.selectedLat !== null
+        && citizenFireDraft.selectedLng !== null;
+
+    if (hasManualFireLocation) {
+        freshLocationFix = {
+            lat: Number(citizenFireDraft.selectedLat),
+            lng: Number(citizenFireDraft.selectedLng),
+            accuracy: null,
+            timestamp: Date.now(),
+            source: 'manual',
+        };
+        description = 'Citizen-submitted fire emergency. Incident location selected manually on the map.';
+    } else if (reportKind === 'fire') {
+        showIncidentToast?.('Getting a fresh GPS location...', false, 3200);
+        freshLocationFix = await resolveCitizenFireReportLocation(showIncidentToast);
+        if (!freshLocationFix) return;
+
+        applyCitizenFireLocationFix(freshLocationFix);
+        const accuracy = Math.round(Number(freshLocationFix.accuracy));
+        const accuracyClass = window.PyroLocation.classifyLocationAccuracy?.(freshLocationFix.accuracy) || 'unknown';
+        description = freshLocationFix.source === 'cached'
+            ? `Citizen-submitted fire emergency. Cached approximate location (${accuracyClass} accuracy, ±${accuracy} m).`
+            : `Citizen-submitted fire emergency. ${accuracyClass} GPS accuracy (±${accuracy} m).`;
+        showIncidentToast?.(
+            freshLocationFix.source === 'cached'
+                ? `Using the confirmed recent saved location (±${accuracy} m).`
+                : `Location ready with ${accuracyClass} accuracy (±${accuracy} m).`,
+            false,
+            3200
+        );
+    } else {
+    showIncidentToast?.('Getting a fresh, accurate GPS fix...', false, 3200);
     try {
         freshLocationFix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
         window.updateUserLocation?.(window.currentUserId, freshLocationFix.lat, freshLocationFix.lng, {
@@ -5331,9 +5474,10 @@ async function submitCitizenQuickReport(reportKind) {
         showIncidentToast?.(error.message || 'Unable to get an accurate current location.', true, 5200);
         return;
     }
+    }
 
-    // Check if location is ready
-    if (!window.userCoords.ready || !window.userCoords.currentLatitude) {
+    // A manually selected fire point remains valid even when GPS is unavailable.
+    if (!hasManualFireLocation && (!window.userCoords.ready || !window.userCoords.currentLatitude)) {
         showIncidentToast?.('Getting your location. Please wait and try again.', true);
         return;
     }
@@ -5548,8 +5692,12 @@ async function submitCitizenQuickReport(reportKind) {
             if (reportKind === 'fire') {
                 document.getElementById('fireIncidentForm')?.reset();
                 citizenFireDraft.mode = 'current';
-                citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
-                citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                citizenFireDraft.selectedLat = window.userCoords?.ready
+                    ? Number(window.userCoords.currentLatitude)
+                    : null;
+                citizenFireDraft.selectedLng = window.userCoords?.ready
+                    ? Number(window.userCoords.currentLongitude)
+                    : null;
                 stopCitizenFireMapPick();
                 updateCitizenFireLocationUi();
             } else {
@@ -5573,7 +5721,7 @@ async function submitCitizenQuickReport(reportKind) {
                 });
             }
             if (typeof window.refreshCitizenOverviewData === 'function') {
-                window.refreshCitizenOverviewData().catch((refreshError) => {
+                window.refreshCitizenOverviewData({ force: true }).catch((refreshError) => {
                     console.error('Citizen dashboard refresh failed after report submit:', refreshError);
                 });
             }
@@ -5953,10 +6101,10 @@ window.applyCitizenOverviewData = function(data = {}, options = {}) {
         if (status === 'reported' || status === 'pending sync') {
             return { dotClass: 'dot-yellow', badgeClass: 'sbadge-yellow', label: statusValue || 'Pending sync' };
         }
-        if (status === 'responding') {
+        if (['responding', 'en-route', 'en route'].includes(status)) {
             return { dotClass: 'dot-blue', badgeClass: 'sbadge-blue', label: 'Responding' };
         }
-        if (status === 'on scene') {
+        if (['on scene', 'on-scene'].includes(status)) {
             return { dotClass: 'dot-purple', badgeClass: 'sbadge-purple', label: 'On scene' };
         }
 
@@ -6097,18 +6245,21 @@ window.persistCitizenOverviewOfflineData = function(data = {}) {
     });
 };
 
-window.refreshCitizenOverviewData = async function() {
+window.refreshCitizenOverviewData = async function(options = {}) {
     if (!window.userCoords?.ready || !window.userCoords?.currentLatitude || !window.userCoords?.currentLongitude) {
+        return;
+    }
+
+    if (window.citizenOverviewRequest) {
+        if (options.force) {
+            window.citizenOverviewRefreshQueued = true;
+        }
+        await window.citizenOverviewRequest;
         return;
     }
 
     let timeoutId = null;
     try {
-        if (window.citizenOverviewRequest) {
-            await window.citizenOverviewRequest;
-            return;
-        }
-
         const params = new URLSearchParams({
             lat: String(window.userCoords.currentLatitude),
             lng: String(window.userCoords.currentLongitude)
@@ -6305,6 +6456,10 @@ window.refreshCitizenOverviewData = async function() {
             window.clearTimeout(timeoutId);
         }
         window.citizenOverviewRequest = null;
+        if (window.citizenOverviewRefreshQueued) {
+            window.citizenOverviewRefreshQueued = false;
+            window.queueMicrotask(() => window.refreshCitizenOverviewData());
+        }
     }
 };
 
@@ -6321,7 +6476,7 @@ document.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('pyrosense:report-synced', function() {
     window.showCitizenToast?.('Queued report synced successfully.', false, 2800);
     if (typeof window.refreshCitizenOverviewData === 'function' && window.userCoords?.ready) {
-        window.refreshCitizenOverviewData();
+        window.refreshCitizenOverviewData({ force: true });
     }
 });
 

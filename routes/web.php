@@ -139,6 +139,9 @@ Route::get('/api/default-postal/{cityId}', [RegisterController::class, 'getDefau
 Route::post('/voice-calls/anonymous/session', [VoiceCallController::class, 'bootstrapAnonymousSession'])
     ->middleware('throttle:20,1')
     ->name('voice-calls.anonymous-session');
+Route::post('/anonymous/incidents', [IncidentController::class, 'storeAnonymous'])
+    ->middleware('throttle:5,1')
+    ->name('anonymous.incidents.store');
 
 Route::middleware(['auth', 'prevent.back.history', 'role:station admin,chief,provincial admin'])
     ->prefix('landing-content')

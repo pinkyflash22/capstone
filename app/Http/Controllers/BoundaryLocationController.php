@@ -36,7 +36,7 @@ class BoundaryLocationController extends Controller
 
         $user = $request->user();
         $requestedStationId = isset($validated['station_id']) ? (int) $validated['station_id'] : null;
-        $stationId = $this->operationalScope->authorizeRequestedStation($user, $requestedStationId);
+        $stationId = $this->resolveVisibleStationScope($user, $requestedStationId);
         $scopeKey = implode(':', [
             $this->operationalScope->role($user) ?: 'guest',
             $user?->getAuthIdentifier() ?: 'guest',
@@ -67,7 +67,7 @@ class BoundaryLocationController extends Controller
 
     public function latest(Request $request): JsonResponse
     {
-        $stationId = $this->operationalScope->authorizeRequestedStation(
+        $stationId = $this->resolveVisibleStationScope(
             $request->user(),
             $request->filled('station_id') ? (int) $request->input('station_id') : null,
         );
@@ -331,6 +331,23 @@ class BoundaryLocationController extends Controller
         return $barangayIds->isEmpty()
             ? $query->whereRaw('1 = 0')
             : $query->whereIn('barangay_id', $barangayIds->all());
+    }
+
+    private function resolveVisibleStationScope($user, ?int $requestedStationId = null): ?int
+    {
+        if (! $user) {
+            return null;
+        }
+
+        if (! $this->operationalScope->hasProvinceWideAccess($user)
+            && ! $this->operationalScope->isStationResponder($user)) {
+            // Citizens and barangay users are already restricted by
+            // visibleBoundaryQuery(); they do not need a station assignment
+            // merely to view their own barangay boundary.
+            return null;
+        }
+
+        return $this->operationalScope->authorizeRequestedStation($user, $requestedStationId);
     }
 
     protected function visibleBarangayIds($user): ?array

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260912-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260913-1';
 // Offline screen revision: 2026-09-11. Reinstall the updated shell while
 // retaining the existing caches for saved pages, maps, and reports.
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
@@ -305,19 +305,34 @@ self.addEventListener('fetch', (event) => {
     if (isApiRequest && !isAuthRequest) {
         // Authenticated operational responses must never fall back to a cache
         // populated by another account on the same browser profile.
-        event.respondWith(fetch(request, { cache: 'no-store', credentials: 'same-origin' }));
+        event.respondWith(fetchWithoutUnhandledRejection(request, { cache: 'no-store', credentials: 'same-origin' }));
         return;
     }
 
     if (isSameOrigin) {
         if (isProtectedHtmlRoute || isAuthRequest) {
-            event.respondWith(fetch(request));
+            event.respondWith(fetchWithoutUnhandledRejection(request));
             return;
         }
 
         event.respondWith(networkFirst(request, DYNAMIC_CACHE));
     }
 });
+
+async function fetchWithoutUnhandledRejection(request, options = {}) {
+    try {
+        return await fetch(request, options);
+    } catch (error) {
+        return new Response(JSON.stringify({
+            success: false,
+            message: 'No internet connection. This live request could not be completed.',
+        }), {
+            status: 503,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+}
 
 async function handleNoCacheNavigationRequest(request) {
     try {

@@ -1748,7 +1748,7 @@ function queueOfflineEmergencyIncident(coords, cachedLocation) {
     const createdAt = new Date().toISOString();
     const queueItem = window.pyroPwa.enqueueOfflineReport({
         type: OFFLINE_EMERGENCY_QUEUE_TYPE,
-        url: '/api/incidents',
+        url: '/anonymous/incidents',
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1795,57 +1795,41 @@ function getFreshVisitorLocation() {
     });
 }
 
-async function createAnonymousIncidentMarker(lat, lng) {
+async function createAnonymousIncident(coords) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const response = await fetch('/api/markers', {
+    const capturedAt = Number.isFinite(Number(coords.timestamp))
+        ? new Date(Number(coords.timestamp)).toISOString()
+        : new Date().toISOString();
+    const clientReportId = window.crypto?.randomUUID?.();
+    const report = {
+        title: 'Anonymous Fire Emergency',
+        description: 'Fire emergency reported anonymously.',
+        lat: coords.lat,
+        lng: coords.lng,
+        status: 'reported',
+        location_captured_at: capturedAt,
+    };
+
+    if (Number.isFinite(Number(coords.accuracy))) {
+        report.location_accuracy = Number(coords.accuracy);
+    }
+    if (clientReportId) {
+        report.client_report_id = clientReportId;
+    }
+
+    const response = await fetch('/anonymous/incidents', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-CSRF-TOKEN': csrfToken,
         },
-        body: JSON.stringify({
-            title: 'Anonymous Fire Emergency',
-            description: 'Fire emergency reported anonymously.',
-            lat,
-            lng,
-            status: 'active',
-            category: 'fire',
-        }),
+        body: JSON.stringify(report),
     });
 
     if (!response.ok) {
-        throw new Error('Failed to save the anonymous report marker.');
-    }
-
-    const payload = await response.json();
-    const markerId = payload?.data?.marker_id || payload?.marker_id || null;
-
-    if (!markerId) {
-        throw new Error('The system did not return a marker ID for the anonymous report.');
-    }
-
-    return Number(markerId);
-}
-
-async function createAnonymousIncident(markerId, anonymousUserId) {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const response = await fetch('/api/incidents', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-        body: JSON.stringify({
-            marker_id: markerId,
-            reported_by: anonymousUserId,
-            status: 'reported',
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to submit the anonymous fire report.');
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Failed to submit the anonymous fire report.');
     }
 
     return response.json();
@@ -1870,8 +1854,7 @@ async function submitAnonymousIncidentReport() {
 
         const coords = await getFreshVisitorLocation();
         showLandingToast('Sending anonymous fire report...', false, 2600);
-        const markerId = await createAnonymousIncidentMarker(coords.lat, coords.lng);
-        await createAnonymousIncident(markerId, anonymousUserId);
+        await createAnonymousIncident(coords);
 
         showLandingToast('Anonymous fire report sent.', false, 4200);
     } catch (error) {

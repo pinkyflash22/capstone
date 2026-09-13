@@ -4,6 +4,9 @@ const ACCURACY_WARNING_METERS = 100;
 const DEFAULT_TARGET_ACCURACY_METERS = 35;
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_FIX_AGE_MS = 15000;
+const LATEST_LOCATION_CACHE_KEY = 'pyrosense:latest-known-location:v1';
+const DEFAULT_CACHED_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
+const DEFAULT_CACHED_LOCATION_MAX_ACCURACY_METERS = 1000;
 
 let activeReliableFixRequest = null;
 let activeReliableFixAcceptsBestAvailable = false;
@@ -24,6 +27,71 @@ function normalizePosition(position) {
     }
 
     return { lat, lng, accuracy, timestamp };
+}
+
+export function classifyLocationAccuracy(accuracyValue) {
+    const accuracy = Number(accuracyValue);
+    if (!Number.isFinite(accuracy) || accuracy <= 0) return 'unknown';
+    if (accuracy <= 20) return 'high';
+    if (accuracy <= 50) return 'moderate';
+    if (accuracy <= 100) return 'low';
+    return 'approximate';
+}
+
+export function cacheLatestKnownLocation(fix) {
+    if (!fix || !Number.isFinite(Number(fix.lat)) || !Number.isFinite(Number(fix.lng))) return;
+
+    const accuracy = Number(fix.accuracy);
+    const timestamp = Number(fix.timestamp) || Date.now();
+    if (!Number.isFinite(accuracy) || accuracy <= 0) return;
+
+    try {
+        window.localStorage.setItem(LATEST_LOCATION_CACHE_KEY, JSON.stringify({
+            latitude: Number(fix.lat),
+            longitude: Number(fix.lng),
+            accuracy,
+            captured_at: new Date(timestamp).toISOString(),
+        }));
+    } catch (error) {
+        console.warn('[PyroLocation] Unable to save latest known location:', error);
+    }
+}
+
+export function getLatestKnownLocation(options = {}) {
+    const maxAgeMs = Number(options.maxAgeMs) || DEFAULT_CACHED_LOCATION_MAX_AGE_MS;
+    const maxAccuracyMeters = Number(options.maxAccuracyMeters) || DEFAULT_CACHED_LOCATION_MAX_ACCURACY_METERS;
+
+    try {
+        const raw = window.localStorage.getItem(LATEST_LOCATION_CACHE_KEY);
+        const cached = raw ? JSON.parse(raw) : null;
+        const lat = Number(cached?.latitude);
+        const lng = Number(cached?.longitude);
+        const accuracy = Number(cached?.accuracy);
+        const timestamp = Date.parse(cached?.captured_at || '');
+        const ageMs = Date.now() - timestamp;
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)
+            || !Number.isFinite(accuracy) || accuracy <= 0
+            || !Number.isFinite(timestamp) || ageMs < 0
+            || ageMs > maxAgeMs || accuracy > maxAccuracyMeters) {
+            return null;
+        }
+
+        return {
+            lat,
+            lng,
+            accuracy,
+            timestamp,
+            captured_at: new Date(timestamp).toISOString(),
+            ageMs,
+            source: 'cached',
+            accuracyClass: classifyLocationAccuracy(accuracy),
+            accuracyWarning: true,
+        };
+    } catch (error) {
+        console.warn('[PyroLocation] Unable to read latest known location:', error);
+        return null;
+    }
 }
 
 function deviceInstructions() {
@@ -71,6 +139,7 @@ function ensureDialogElements() {
         .pyro-location-permission__button{min-height:46px;border:0;border-radius:15px;padding:0 17px;font-size:.88rem;font-weight:800;cursor:pointer}
         .pyro-location-permission__button--primary{flex:1;background:linear-gradient(135deg,#ea580c,#dc2626);color:#fff;box-shadow:0 12px 24px rgba(220,38,38,.2)}
         .pyro-location-permission__button--secondary{background:#f1f5f9;color:#475569}
+        .pyro-location-permission__button--map{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
         @media(max-width:520px){.pyro-location-permission{align-items:flex-end;padding:12px}.pyro-location-permission__card{border-radius:26px 26px 20px 20px;padding:21px}.pyro-location-permission__actions{flex-direction:column-reverse}.pyro-location-permission__button{width:100%}}
     `;
     document.head.appendChild(style);
@@ -79,6 +148,7 @@ function ensureDialogElements() {
     dialog.id = 'pyroLocationPermissionDialog';
     dialog.className = 'pyro-location-permission';
     dialog.setAttribute('aria-hidden', 'true');
+    dialog.inert = true;
     dialog.innerHTML = `
         <section class="pyro-location-permission__card" role="dialog" aria-modal="true" aria-labelledby="pyroLocationPermissionTitle">
             <div class="pyro-location-permission__icon" aria-hidden="true">&#9673;</div>
@@ -88,6 +158,7 @@ function ensureDialogElements() {
             <ol class="pyro-location-permission__steps" data-pyro-location-steps hidden></ol>
             <div class="pyro-location-permission__actions">
                 <button type="button" class="pyro-location-permission__button pyro-location-permission__button--secondary" data-pyro-location-cancel>Not now</button>
+                <button type="button" class="pyro-location-permission__button pyro-location-permission__button--map" data-pyro-location-map hidden>Choose Location on Map</button>
                 <button type="button" class="pyro-location-permission__button pyro-location-permission__button--primary" data-pyro-location-confirm>Enable Location</button>
             </div>
         </section>
@@ -105,6 +176,7 @@ function showLocationDialog(mode = 'request', detail = '') {
     const steps = dialog.querySelector('[data-pyro-location-steps]');
     const confirm = dialog.querySelector('[data-pyro-location-confirm]');
     const cancel = dialog.querySelector('[data-pyro-location-cancel]');
+    const mapButton = dialog.querySelector('[data-pyro-location-map]');
 
     const content = {
         request: {
@@ -141,6 +213,7 @@ function showLocationDialog(mode = 'request', detail = '') {
     message.textContent = content.message;
     confirm.textContent = content.confirm;
     cancel.textContent = content.cancel;
+    mapButton.hidden = true;
     steps.hidden = !content.showSteps;
     steps.innerHTML = '';
     if (content.showSteps) {
@@ -152,15 +225,19 @@ function showLocationDialog(mode = 'request', detail = '') {
     }
 
     dialog.classList.add('is-visible');
+    dialog.inert = false;
     dialog.setAttribute('aria-hidden', 'false');
     window.setTimeout(() => confirm.focus(), 0);
 
     activePermissionDialog = new Promise((resolve) => {
         const close = (accepted) => {
+            if (dialog.contains(document.activeElement)) document.activeElement.blur();
+            dialog.inert = true;
             dialog.classList.remove('is-visible');
             dialog.setAttribute('aria-hidden', 'true');
             confirm.onclick = null;
             cancel.onclick = null;
+            mapButton.onclick = null;
             dialog.onclick = null;
             activePermissionDialog = null;
             resolve(accepted);
@@ -170,6 +247,61 @@ function showLocationDialog(mode = 'request', detail = '') {
         cancel.onclick = () => close(false);
         dialog.onclick = (event) => {
             if (event.target === dialog) close(false);
+        };
+    });
+
+    return activePermissionDialog;
+}
+
+export function confirmApproximateLocation(fix) {
+    if (activePermissionDialog) return activePermissionDialog;
+
+    const dialog = ensureDialogElements();
+    const title = dialog.querySelector('#pyroLocationPermissionTitle');
+    const message = dialog.querySelector('[data-pyro-location-message]');
+    const steps = dialog.querySelector('[data-pyro-location-steps]');
+    const confirm = dialog.querySelector('[data-pyro-location-confirm]');
+    const cancel = dialog.querySelector('[data-pyro-location-cancel]');
+    const mapButton = dialog.querySelector('[data-pyro-location-map]');
+    const accuracy = Math.round(Number(fix?.accuracy) || 0);
+    const isCached = fix?.source === 'cached';
+    const ageMinutes = Math.max(1, Math.ceil((Number(fix?.ageMs) || 0) / 60000));
+
+    title.textContent = isCached ? 'Use recent saved location?' : 'Location accuracy is low';
+    message.textContent = isCached
+        ? `A fresh GPS fix was unavailable. The saved location is about ${ageMinutes} minute(s) old and accurate to approximately ±${accuracy} m. You can still report now and responders will be informed that it is cached and approximate.`
+        : `Your current location is accurate to approximately ±${accuracy} m. You can still report the fire now. Responders will be informed that the location is approximate.`;
+    steps.hidden = true;
+    steps.innerHTML = '';
+    confirm.textContent = 'Use Current Location & Report';
+    cancel.textContent = 'Improve Location';
+    mapButton.textContent = 'Choose Location on Map';
+    mapButton.hidden = false;
+
+    dialog.classList.add('is-visible');
+    dialog.inert = false;
+    dialog.setAttribute('aria-hidden', 'false');
+    window.setTimeout(() => confirm.focus(), 0);
+
+    activePermissionDialog = new Promise((resolve) => {
+        const close = (choice) => {
+            if (dialog.contains(document.activeElement)) document.activeElement.blur();
+            dialog.inert = true;
+            dialog.classList.remove('is-visible');
+            dialog.setAttribute('aria-hidden', 'true');
+            confirm.onclick = null;
+            cancel.onclick = null;
+            mapButton.onclick = null;
+            dialog.onclick = null;
+            activePermissionDialog = null;
+            resolve(choice);
+        };
+
+        confirm.onclick = () => close('use');
+        cancel.onclick = () => close('improve');
+        mapButton.onclick = () => close('map');
+        dialog.onclick = (event) => {
+            if (event.target === dialog) close('improve');
         };
     });
 
@@ -266,7 +398,7 @@ async function requestReliableLocationFix(options = {}) {
     try {
         return await collectReliableFix(options);
     } catch (error) {
-        if (error?.locationReason && error.locationReason !== 'cancelled') {
+        if (options.promptOnError !== false && error?.locationReason && error.locationReason !== 'cancelled') {
             const retry = await showLocationDialog(error.locationReason, error.message);
             if (retry) return requestReliableLocationFix(options);
         }
@@ -280,13 +412,31 @@ export function getReliableLocationFix(options = {}) {
         // An emergency report must not inherit a stricter background map request
         // that would reject the best fix and block submission.
         if (acceptsBestAvailable && !activeReliableFixAcceptsBestAvailable) {
-            return requestReliableLocationFix(options);
+            return requestReliableLocationFix(options).then((fix) => {
+                const normalizedFix = {
+                    ...fix,
+                    source: 'fresh',
+                    captured_at: new Date(Number(fix.timestamp) || Date.now()).toISOString(),
+                    accuracyClass: classifyLocationAccuracy(fix.accuracy),
+                };
+                cacheLatestKnownLocation(normalizedFix);
+                return normalizedFix;
+            });
         }
 
         return activeReliableFixRequest;
     }
 
-    const request = requestReliableLocationFix(options).finally(() => {
+    const request = requestReliableLocationFix(options).then((fix) => {
+        const normalizedFix = {
+            ...fix,
+            source: 'fresh',
+            captured_at: new Date(Number(fix.timestamp) || Date.now()).toISOString(),
+            accuracyClass: classifyLocationAccuracy(fix.accuracy),
+        };
+        cacheLatestKnownLocation(normalizedFix);
+        return normalizedFix;
+    }).finally(() => {
         if (activeReliableFixRequest === request) {
             activeReliableFixRequest = null;
             activeReliableFixAcceptsBestAvailable = false;
@@ -301,5 +451,9 @@ export function getReliableLocationFix(options = {}) {
 window.PyroLocation = {
     ...(window.PyroLocation || {}),
     getReliableLocationFix,
+    getLatestKnownLocation,
+    rememberLocation: cacheLatestKnownLocation,
+    classifyLocationAccuracy,
+    confirmApproximateLocation,
     showPermissionHelp: () => showLocationDialog('blocked'),
 };

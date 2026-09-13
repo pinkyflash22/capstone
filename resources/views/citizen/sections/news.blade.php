@@ -3,7 +3,7 @@
     
     <!-- Featured Article -->
     <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
-        <img src="https://images.unsplash.com/photo-1582131504859-5d3e9232b3a9?w=800" alt="Firefighters training" class="w-full h-64 object-cover">
+        <img src="{{ asset('assets/images/pyrosense-logo.png') }}" alt="PyroSense fire safety update" class="w-full h-64 object-contain bg-orange-50 p-10">
         <div class="p-6">
             <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-medium">BREAKING NEWS</span>
             <h2 class="text-2xl font-bold text-gray-800 mt-3 mb-2">New Wildfire Prevention Measures Announced</h2>

@@ -82,7 +82,8 @@ class IncidentController extends Controller
         float $lng,
         int $minutes = 10,
         float $automaticDuplicateMeters = 100,
-        float $possibleDuplicateMeters = 200
+        float $possibleDuplicateMeters = 200,
+        bool $allowAutomaticDuplicate = true
     ): ?array
     {
         $recentIncidents = Incident::with(['marker'])
@@ -115,7 +116,8 @@ class IncidentController extends Controller
                 $closestMatch = [
                     'incident' => $recentIncident,
                     'distance_meters' => $distanceMeters,
-                    'automatically_duplicate' => $distanceMeters <= $automaticDuplicateMeters,
+                    'automatically_duplicate' => $allowAutomaticDuplicate
+                        && $distanceMeters <= $automaticDuplicateMeters,
                 ];
             }
         }
@@ -620,6 +622,31 @@ class IncidentController extends Controller
             'incidentTypes', 'teams', 'reporters'));
     }
 
+    public function storeAnonymous(
+        Request $request,
+        IncidentJurisdictionService $jurisdictionService,
+        OperationalMapScope $operationalScope,
+        IncidentAutoAssignmentService $autoAssignmentService
+    ) {
+        $anonymousUserId = User::resolveAnonymousUserId();
+        $anonymousUser = $anonymousUserId
+            ? User::query()->with('role')->find($anonymousUserId)
+            : null;
+
+        abort_unless($anonymousUser, 503, 'Anonymous reporting is not configured.');
+
+        // Authenticate only this request through its user resolver. This keeps
+        // the visitor anonymous while reusing the existing incident workflow.
+        $request->setUserResolver(fn () => $anonymousUser);
+
+        return $this->store(
+            $request,
+            $jurisdictionService,
+            $operationalScope,
+            $autoAssignmentService
+        );
+    }
+
     public function store(
         Request $request,
         IncidentJurisdictionService $jurisdictionService,
@@ -669,12 +696,14 @@ class IncidentController extends Controller
         }
         $role = $operationalScope->role($request->user());
         $isPublicReporter = in_array($role, [
+            'anonymous',
             'citizen',
             'barangay',
             'barangay captain',
             'barangay officer',
             'barangay_officer',
         ], true);
+        $requiresTrustedDuplicateAccuracy = in_array($role, ['anonymous', 'citizen'], true);
 
         if ($isPublicReporter) {
             abort_unless(
@@ -706,14 +735,22 @@ class IncidentController extends Controller
 
         $markerId = $validated['marker_id'] ?? null;
 
-        $data = DB::transaction(function () use ($validated, $markerId, $jurisdictionService) {
+        $data = DB::transaction(function () use ($validated, $markerId, $jurisdictionService, $requiresTrustedDuplicateAccuracy) {
             $createdMarker = null;
 
             if (! $markerId) {
                 $lat = (float) $validated['lat'];
                 $lng = (float) $validated['lng'];
 
-                $duplicateMatch = $this->findRecentDuplicateIncident($lat, $lng);
+                // Public coordinates with unknown or low accuracy remain a
+                // possible related report for verification, never an automatic merge.
+                $allowAutomaticDuplicate = ! $requiresTrustedDuplicateAccuracy
+                    || (isset($validated['location_accuracy']) && (float) $validated['location_accuracy'] <= 50);
+                $duplicateMatch = $this->findRecentDuplicateIncident(
+                    $lat,
+                    $lng,
+                    allowAutomaticDuplicate: $allowAutomaticDuplicate
+                );
                 $duplicateIncident = $duplicateMatch['incident'] ?? null;
                 $automaticallyDuplicate = (bool) ($duplicateMatch['automatically_duplicate'] ?? false);
 

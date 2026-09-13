@@ -1,4 +1,9 @@
-import { getReliableLocationFix } from './location-accuracy.js';
+import {
+    classifyLocationAccuracy,
+    confirmApproximateLocation,
+    getLatestKnownLocation,
+    getReliableLocationFix,
+} from './location-accuracy.js';
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const currentUserId = Number(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || 0);
@@ -406,10 +411,39 @@ function getDistanceMeters(lat1, lng1, lat2, lng2) {
 }
 
 async function getFreshCoords() {
-    const coords = await getReliableLocationFix({ acceptBestAvailable: true });
-    writeCachedCoords(coords.lat, coords.lng);
-    refreshLocationContext(coords.lat, coords.lng);
-    return coords;
+    while (true) {
+        let coords = null;
+        try {
+            coords = await getReliableLocationFix({
+                acceptBestAvailable: true,
+                promptOnError: false,
+                timeoutMs: 8000,
+            });
+        } catch (error) {
+            coords = getLatestKnownLocation({
+                maxAgeMs: 5 * 60 * 1000,
+                maxAccuracyMeters: 1000,
+            });
+        }
+
+        if (!coords) {
+            window.location.href = '/citizen/dashboard?report=1&pick=map';
+            throw Object.assign(new Error('Choose the fire location on the map.'), { locationReason: 'manual' });
+        }
+
+        if (coords.source === 'cached' || Number(coords.accuracy) > 100) {
+            const choice = await confirmApproximateLocation(coords);
+            if (choice === 'improve') continue;
+            if (choice === 'map') {
+                window.location.href = '/citizen/dashboard?report=1&pick=map';
+                throw Object.assign(new Error('Choose the fire location on the map.'), { locationReason: 'manual' });
+            }
+        }
+
+        writeCachedCoords(coords.lat, coords.lng);
+        refreshLocationContext(coords.lat, coords.lng);
+        return coords;
+    }
 }
 
 function normalizeResponder(responder) {
@@ -531,11 +565,15 @@ function scheduleResponderPrefetch(lat, lng) {
 
 async function createIncident(coords, clientReportId) {
     const capturedAt = new Date(coords.timestamp).toISOString();
+    const accuracyClass = classifyLocationAccuracy(coords.accuracy);
+    const locationNote = coords.source === 'cached'
+        ? `Cached approximate location (${accuracyClass} accuracy, ±${Math.round(coords.accuracy)} m).`
+        : `${accuracyClass} GPS accuracy (±${Math.round(coords.accuracy)} m).`;
     const body = {
         lat: coords.lat,
         lng: coords.lng,
         title: 'Citizen Fire Emergency',
-        description: 'One-tap fire emergency report from the mobile hub.',
+        description: `One-tap fire emergency report from the mobile hub. ${locationNote}`,
         status: 'reported',
         reported_by: currentUserId,
         occurred_at: capturedAt,
@@ -594,6 +632,10 @@ async function submitMobileHubIncidentReport() {
             return false;
         }
         const capturedAt = new Date(coords.timestamp).toISOString();
+        const accuracyClass = classifyLocationAccuracy(coords.accuracy);
+        const locationNote = coords.source === 'cached'
+            ? `Cached approximate location (${accuracyClass} accuracy, ±${Math.round(coords.accuracy)} m).`
+            : `${accuracyClass} GPS accuracy (±${Math.round(coords.accuracy)} m).`;
         window.pyroPwa.enqueueOfflineReport({
             url: '/citizen/incident',
             method: 'POST',
@@ -606,7 +648,7 @@ async function submitMobileHubIncidentReport() {
                 lat: coords.lat,
                 lng: coords.lng,
                 title: 'Citizen Fire Emergency',
-                description: 'One-tap fire emergency report queued from the mobile hub.',
+                description: `One-tap fire emergency report queued from the mobile hub. ${locationNote}`,
                 status: 'reported',
                 reported_by: currentUserId,
                 occurred_at: capturedAt,
@@ -672,6 +714,9 @@ async function submitMobileHubIncidentReport() {
             }
         );
     } catch (error) {
+        if (error?.locationReason === 'manual') {
+            return;
+        }
         console.error('Mobile hub report failed:', error);
         if ((!window.navigator.onLine || error instanceof TypeError) && queueReport(reportCoords)) {
             showHubStatus('The connection failed, so the fire report was saved offline and will sync automatically.', 'success');
