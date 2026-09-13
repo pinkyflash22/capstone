@@ -72,6 +72,7 @@ class StationOfficerController extends Controller
         $stationOfficer->status = $validated['status'];
         $stationOfficer->save();
         UserActivityLogger::log('updated pers status', Auth::user()?->user_id, $request);
+        app(\App\Services\DutyRosterService::class)->sync((int) $stationOfficer->station_id);
 
         return response()->json(['success' => true, 'message' => 'Station Officer status updated successfully']);
     }
@@ -197,6 +198,7 @@ public function updateStationOfficer(Request $request, string $id)
     if (isset($validated['station_id'])) $stationOfficer->station_id = $validated['station_id'];
     $stationOfficer->save();
     UserActivityLogger::log('updated personnel', Auth::user()?->user_id, $request);
+    app(\App\Services\DutyRosterService::class)->sync((int) $stationOfficer->station_id);
     return response()->json(['success' => true, 'message' => 'Station Officer updated successfully']);
 
 }

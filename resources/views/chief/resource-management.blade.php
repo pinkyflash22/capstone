@@ -2139,8 +2139,15 @@
                             <label><input type="radio" name="edit_scope" value="future"> This and next days</label>
                             <small>Completed shifts remain unchanged.</small>
                         </div>
-                        <h5 data-deployable-title>Deployable firefighters</h5>
-                        <div class="duty-roster__assignment-grid" id="dutyAssignments" data-deployable-fields></div>
+                        <h5 data-deployable-title>Team members</h5>
+                        <section data-deployable-fields>
+                            <p data-crew-summary aria-live="polite"></p>
+                            <details data-crew-editor>
+                                <summary>Change members (optional)</summary>
+                                <p>The selected team's members are included automatically. Changes here apply to this shift.</p>
+                                <div class="duty-roster__assignment-grid" id="dutyAssignments"></div>
+                            </details>
+                        </section>
                         <h5>Must remain at the station</h5>
                         <div class="duty-roster__form-grid">
                             <label>Chief / station admin<select name="station_duty" required></select></label>
@@ -5722,6 +5729,12 @@ function validateTeamMembers(formData) {
                 document.querySelectorAll('.modal.active').forEach(modal => closeModal(modal.id));
                 return loadResourceTables(window.location.href);
             };
+            const liveTeamTimer = window.setInterval(() => {
+                if (document.hidden || document.querySelector('.modal.active, [aria-busy="true"]')) return;
+                if (resourceSectionIds.some(id => document.getElementById(id)?.contains(document.activeElement))) return;
+                loadResourceTables(window.location.href);
+            }, 30000);
+            window.addEventListener('pagehide', () => window.clearInterval(liveTeamTimer), { once: true });
 
             if (search) search.addEventListener('input', () => {
                 clearTimeout(resourceFilterTimer);

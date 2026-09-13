@@ -49,6 +49,7 @@ class ResourceManagementController extends Controller
             foreach (['equipment', 'officers', 'stations', 'teams', 'users', 'boundaries'] as $part) Cache::forget("{$key}:{$part}");
         }
         if ($this->isProvincialAdmin()) {
+            app(DutyRosterService::class)->sync();
             $cacheKey = 'resource-management:provincial:v4';
             $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
             $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->orderBy('station_id')->orderBy('unit_number')->get();

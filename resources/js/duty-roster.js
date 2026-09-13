@@ -5,8 +5,8 @@ if (app) {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const state = { data: null, timer: null, editingShift: null, deletingShift: null };
     const roles = [
-        ['team_leader', 'Team leader', true],
-        ['commander_driver', 'Driver', true],
+        ['team_leader', 'Team leader', false],
+        ['commander_driver', 'Driver', false],
         ['pumper', 'Pumper', false],
         ['firefighter_officer_1', 'Officer 1', false],
         ['firefighter_officer_2', 'Officer 2', false],
@@ -100,6 +100,28 @@ if (app) {
             });
             select.setCustomValidity(select.value ? reasonFor(select.value) : '');
         });
+        renderCrewSummary(form);
+    }
+
+    function useTeamRoster(form) {
+        const team = state.data.teams.find(item => Number(item.team_id) === Number(form.elements.team_id.value));
+        roles.forEach(([key]) => { form.elements[key].value = team?.[key] || ''; });
+        if (!state.editingShift) form.elements.label.value = team ? `Team ${team.team_id} shift` : '';
+        const command = [...form.elements.station_duty.options].filter(option => option.value);
+        if (!form.elements.station_duty.value && command.length === 1) form.elements.station_duty.value = command[0].value;
+        form.querySelector('[data-crew-editor]').open = false;
+        syncAssignmentAvailability();
+    }
+
+    function renderCrewSummary(form) {
+        const summary = form.querySelector('[data-crew-summary]');
+        if (!summary) return;
+        const selected = roles.filter(([key]) => form.elements[key].value);
+        summary.textContent = selected.length
+            ? selected.map(([key, label]) => `${officerById(form.elements[key].value)?.name || 'Personnel'} (${label})`).join(' · ')
+            : 'This team currently has no members. Open Change members to assign its crew for this shift.';
+        const conflict = selected.some(([key]) => form.elements[key].validationMessage);
+        if (conflict || selected.length < 2) form.querySelector('[data-crew-editor]').open = true;
     }
 
     function availabilityReason(id, startValue, endValue, command = false) {
@@ -195,7 +217,7 @@ if (app) {
             const row = document.querySelector(`.team-row[data-team-id="${team.team_id}"]`);
             if (!row || !team.roster_managed) return;
             const shift = active.find(item => Number(item.id) === Number(team.active_duty_shift_id)) || active.find(item => Number(item.team_id) === Number(team.team_id));
-            const byRole = Object.fromEntries((shift?.assignments || []).filter(item => item.team_role !== 'station_duty' && !exceptions.some(exception => Number(exception.station_officer_id) === Number(item.station_officer_id))).map(item => [item.team_role, item.officer]));
+            const byRole = Object.fromEntries(roles.map(([role]) => [role, officerById(team[role])]));
             const labels = { team_leader: 'Team Leader', commander_driver: 'Driver', pumper: 'Pumper', firefighter_officer_1: 'Officer 1', firefighter_officer_2: 'Officer 2', firefighter_officer_3: 'Officer 3', rescue_radio: 'Rescue/Radio' };
             Object.entries(labels).forEach(([role, label]) => {
                 const cell = [...row.querySelectorAll('td')].find(td => td.dataset.label === label);
@@ -275,10 +297,18 @@ if (app) {
                 const selected = previous[name] ?? String(team?.[key] || '');
                 return `<label>${label}<select name="${name}" data-run-team="${teamId}" data-run-role="${key}" ${required ? 'required' : ''}><option value="">${required ? 'Select available firefighter' : 'Optional'}</option>${firefighters.map(officer => {
                     const reason = availabilityReason(officer.id, start, end);
-                    return `<option value="${officer.id}" ${String(officer.id) === selected ? 'selected' : ''} ${reason ? 'disabled' : ''}>${escapeHtml(officer.name)}${reason ? ' — unavailable / recovery' : ''}</option>`;
+                    return `<option value="${officer.id}" ${String(officer.id) === selected ? 'selected' : ''} ${reason && String(officer.id) !== selected ? 'disabled' : ''}>${escapeHtml(officer.name)}${reason ? ' — unavailable / recovery' : ''}</option>`;
                 }).join('')}</select></label>`;
             }).join('')}</div></fieldset>`;
         }).join('');
+        list.querySelectorAll('select[data-run-team]').forEach(select => {
+            const index = teamIds.indexOf(Number(select.dataset.runTeam));
+            const start = new Date(base);
+            if (plan === 'two_team_12') start.setHours(start.getHours() + index * 12);
+            else start.setDate(start.getDate() + index);
+            const end = new Date(start); end.setHours(end.getHours() + hours);
+            select.setCustomValidity(select.value ? availabilityReason(select.value, start, end) : '');
+        });
     }
 
     function toggleScheduleTemplate(form) {
@@ -300,7 +330,7 @@ if (app) {
         if (rotating) {
             form.elements.recurrence.value = plan === 'two_team_12' ? 'daily' : 'rotation';
             form.elements.rotation_interval_days.value = plan === 'three_team_24' ? '3' : plan === 'two_team_24' ? '2' : '';
-            form.querySelector('[data-rotation-help]').textContent = `Choose ${neededTeams} teams, then assign available firefighters to each run below. Saved members are suggestions; rest and leave are checked before saving.`;
+            form.querySelector('[data-rotation-help]').textContent = `Choose ${neededTeams} teams. Their existing members are filled automatically; change them only when needed. Rest, leave and recovery are checked before saving.`;
             setPlanEndTime(form);
         } else {
             form.elements.rotation_interval_days.value ||= '2';
@@ -331,7 +361,7 @@ if (app) {
             form.elements.recurrence.value = 'rotation';
             form.elements.rotation_interval_days.value = '2';
             toggleRecurrenceFields(form);
-            syncAssignmentAvailability();
+            useTeamRoster(form);
         } else {
             dialog.querySelector('[name="starts_at"]').value = localInput(start);
             dialog.querySelector('[name="ends_at"]').value = localInput(end);
@@ -436,11 +466,17 @@ if (app) {
         renderTurnPreview(event.currentTarget.form);
     });
     $('#dutyShiftForm').addEventListener('change', event => {
+        if (event.target.name === 'team_id') useTeamRoster(event.currentTarget);
         if (event.target.name === 'shift_duration') setPlanEndTime(event.currentTarget);
         if (event.target.name === 'ends_at') event.currentTarget.elements.shift_duration.value = 'custom';
         if (event.target.matches('select[name], [name="starts_at"], [name="ends_at"]')) syncAssignmentAvailability();
-        if (event.target.matches('[name="rotation_team_ids[]"]')) renderTurnPreview(event.currentTarget);
+        if (event.target.matches('[name="rotation_team_ids[]"], [data-run-team], [name="shift_duration"]')) renderTurnPreview(event.currentTarget);
     });
+
+    $('#dutyShiftForm').addEventListener('invalid', event => {
+        const editor = event.target.closest('[data-crew-editor]');
+        if (editor) editor.open = true;
+    }, true);
 
     $('#dutyShiftForm').addEventListener('submit', async event => {
         event.preventDefault();
@@ -458,6 +494,11 @@ if (app) {
             return;
         }
         const assignments = roles.map(([key]) => ({ team_role: key, station_officer_id: data.get(key) })).filter(item => item.station_officer_id);
+        if (!neededTeams && assignments.length < 2) {
+            form.querySelector('[data-crew-editor]').open = true;
+            form.querySelector('[data-form-error]').textContent = 'This shift needs at least two firefighters. Add the missing members under Change members.';
+            return;
+        }
         assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty') });
         if (data.get('station_duty_backup')) assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty_backup') });
         const editing = state.editingShift;

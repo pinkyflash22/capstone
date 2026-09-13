@@ -349,7 +349,7 @@ class DutyRosterController extends Controller
                 $teamAssignments = $data['rotation_assignments'][$teamId];
             }
             if (count($teamAssignments) < 2) {
-                throw ValidationException::withMessages(['rotation_team_ids' => "Team {$teamId} needs at least two saved members."]);
+                throw ValidationException::withMessages(['rotation_team_ids' => "Assign at least two firefighters to Team {$teamId} for this shift."]);
             }
 
             $assignments = [...$teamAssignments, ...$commandAssignments];
@@ -481,21 +481,8 @@ class DutyRosterController extends Controller
 
     private function assertExceptionKeepsCommandCoverage(StationOfficer $officer, Carbon $startsAt, Carbon $endsAt): void
     {
-        $overlappingShifts = DutyShift::query()->where('station_id', $officer->station_id)->where('status', 'scheduled')
-            ->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)
-            ->whereHas('assignments', fn ($query) => $query->where('station_officer_id', $officer->station_officer_id))
-            ->with('assignments')->get();
-        foreach ($overlappingShifts as $shift) {
-            $assignment = $shift->assignments->firstWhere('station_officer_id', $officer->station_officer_id);
-            if ($assignment?->team_role === 'station_duty') continue;
-            $remaining = $shift->assignments->whereIn('team_role', DutyRosterService::DEPLOYABLE_ROLES)
-                ->where('station_officer_id', '!=', $officer->station_officer_id)
-                ->reject(fn ($candidate) => DutyException::query()->where('station_officer_id', $candidate->station_officer_id)
-                    ->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)->exists());
-            if ($remaining->count() < 2) {
-                throw ValidationException::withMessages(['station_officer_id' => "{$shift->label} needs at least two deployable firefighters after this rest/leave period."]);
-            }
-        }
+        // Personnel leave may consolidate the two runs. The live roster service
+        // supplies available replacements or marks an understaffed run off duty.
 
         $commandShifts = DutyShift::query()->where('station_id', $officer->station_id)->where('status', 'scheduled')->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)
             ->whereHas('assignments', fn ($query) => $query->where('station_officer_id', $officer->station_officer_id)->where('team_role', 'station_duty'))->with('assignments')->get();
@@ -559,7 +546,7 @@ class DutyRosterController extends Controller
         $missingMembers = max(0, 2 - $memberCount);
         $status = strtolower(trim((string) $team->status));
         $reason = $missingMembers > 0
-            ? 'Needs '.$missingMembers.' more saved '.($missingMembers === 1 ? 'firefighter' : 'firefighters').' for a rotating run.'
+            ? 'Select this team and add '.$missingMembers.' '.($missingMembers === 1 ? 'firefighter' : 'firefighters').' when planning its shift.'
             : match ($status) {
                 'responding' => 'Currently responding. Choose a shift that starts after the active response.',
                 'off' => 'Currently off duty. The team activates when its scheduled shift begins.',
@@ -569,7 +556,7 @@ class DutyRosterController extends Controller
         return array_merge($team->toArray(), [
             'station_link_source' => (int) $team->station_id === $stationId ? 'direct' : 'team_members',
             'saved_member_count' => $memberCount,
-            'schedule_ready' => $missingMembers === 0,
+            'schedule_ready' => true,
             'schedule_reason' => $reason,
         ]);
     }
