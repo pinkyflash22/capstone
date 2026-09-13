@@ -286,12 +286,15 @@ class DutyRosterController extends Controller
             'recurrence' => ['nullable', Rule::in(['none', 'daily', 'weekly', 'weekdays', 'rotation'])],
             'recurrence_until' => ['nullable', 'required_if:recurrence,daily,weekly,weekdays,rotation', 'required_if:schedule_template,two_team_12,two_team_24,three_team_24', 'date'],
             'rotation_interval_days' => ['nullable', 'required_if:recurrence,rotation', 'integer', 'between:2,31'],
-            'weekdays' => ['nullable', 'required_if:recurrence,weekdays', 'array', 'min:1'],
+            'weekdays' => ['exclude_unless:recurrence,weekdays', 'required', 'array', 'min:1'],
             'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
             'edit_scope' => ['nullable', Rule::in(['this', 'future'])],
             'assignments' => ['required', 'array', 'min:1'],
             'assignments.*.station_officer_id' => ['required', 'integer', 'distinct', 'exists:station_officers,station_officer_id'],
             'assignments.*.team_role' => ['required', 'string', Rule::in(DutyRosterService::ALL_ROLES)],
+        ], [
+            'weekdays.required' => 'Choose at least one day when using Selected weekdays.',
+            'weekdays.min' => 'Choose at least one day when using Selected weekdays.',
         ]);
     }
 

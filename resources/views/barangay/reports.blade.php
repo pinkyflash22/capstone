@@ -111,8 +111,6 @@
                                 <td data-label="Actions" data-mobile-actions>
                                     <div class="fire-report-actions">
                                         <button type="button" data-view-fire-report="{{ $record['id'] }}" aria-label="View report"><i class="fa-solid fa-eye"></i></button>
-                                        <button type="button" data-open-edit-fire-report="{{ $record['id'] }}" aria-label="Edit report"><i class="fa-solid fa-pen"></i></button>
-                                        <button type="button" class="delete" data-delete-fire-report="{{ $record['id'] }}" aria-label="Delete report"><i class="fa-solid fa-trash"></i></button>
                                     </div>
                                 </td>
                             </tr>
@@ -722,8 +720,6 @@
                     <td data-label="Status"><span class="fire-report-status">${escapeHtml(record.status)}</span></td>
                     <td data-label="Actions" data-mobile-actions><div class="fire-report-actions">
                         <button type="button" data-view-fire-report="${Number(record.id)}" aria-label="View report"><i class="fa-solid fa-eye"></i></button>
-                        <button type="button" data-open-edit-fire-report="${Number(record.id)}" aria-label="Edit report"><i class="fa-solid fa-pen"></i></button>
-                        <button type="button" class="delete" data-delete-fire-report="${Number(record.id)}" aria-label="Delete report"><i class="fa-solid fa-trash"></i></button>
                     </div></td>
                 </tr>
             `).join('');
@@ -799,14 +795,6 @@
         document.addEventListener('click', (event) => {
             const viewButton = event.target.closest('[data-view-fire-report]');
             if (viewButton) return showRecord(records.get(Number(viewButton.dataset.viewFireReport)));
-            const editButton = event.target.closest('[data-open-edit-fire-report]');
-            if (editButton) return fillEditForm(records.get(Number(editButton.dataset.openEditFireReport)));
-            const deleteButton = event.target.closest('[data-delete-fire-report]');
-            if (deleteButton && deleteForm && deleteModal) {
-                deleteForm.action = "{{ url('/barangay/reports/fire') }}/" + deleteButton.dataset.deleteFireReport;
-                openModal(deleteModal);
-                return;
-            }
             const pageButton = event.target.closest('[data-report-page]');
             if (pageButton && !pageButton.disabled) loadRecords(Number(pageButton.dataset.reportPage || 1));
         });

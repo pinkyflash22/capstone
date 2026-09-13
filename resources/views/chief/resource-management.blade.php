@@ -2384,7 +2384,41 @@
              <!-- Equipment Inventory Table -->
             <div class="station-grid resource-tier resource-tier--inventory resource-table-compact" id="equipmentResourceSection">
                 <div class="section-header">
-                    <h3><i class="fa-solid fa-kit-medical"></i> Equipment Items</h3>
+                    <h3><i class="fa-solid fa-warehouse" aria-hidden="true"></i> Station Equipment</h3>
+                    <span class="stat-badge">{{ $stationEquipmentAssignments->count() }} assigned items</span>
+                </div>
+                <p style="margin:0 0 16px;color:#64748b;font-size:.875rem;line-height:1.6;">Equipment assigned to {{ $isProvincialResourceAdmin ? 'each station' : 'your station' }}, with its recorded availability and condition.</p>
+                <div class="table-responsive mobile-card-table">
+                    <table class="station-table" aria-label="Equipment assigned to stations">
+                        <thead>
+                            <tr>
+                                <th scope="col">Equipment</th>
+                                @if($isProvincialResourceAdmin)<th scope="col">Station</th>@endif
+                                <th scope="col">Category</th>
+                                <th scope="col">Available</th>
+                                <th scope="col">Damaged</th>
+                                <th scope="col">Under Maintenance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($stationEquipmentAssignments as $assignment)
+                                <tr class="station-equipment-row" data-station-id="{{ $assignment->station_id }}">
+                                    <td data-label="Equipment"><strong>{{ $assignment->equipment?->equipment_name ?? '--' }}</strong></td>
+                                    @if($isProvincialResourceAdmin)<td data-label="Station">{{ $assignment->station?->station_name ?? '--' }}</td>@endif
+                                    <td data-label="Category">{{ $assignment->equipment?->category ? \Illuminate\Support\Str::headline($assignment->equipment->category) : '--' }}</td>
+                                    <td data-label="Available"><strong>{{ $assignment->available_quantity === null ? '--' : number_format((int) $assignment->available_quantity) }}</strong></td>
+                                    <td data-label="Damaged">{{ $assignment->damaged_quantity === null ? '--' : number_format((int) $assignment->damaged_quantity) }}</td>
+                                    <td data-label="Under Maintenance">{{ $assignment->maintenance_quantity === null ? '--' : number_format((int) $assignment->maintenance_quantity) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="{{ $isProvincialResourceAdmin ? 6 : 5 }}" style="padding:24px;text-align:center;color:#64748b;">No equipment has been assigned yet. Use <strong>Add Equipment Station</strong> in the actions menu to assign inventory.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div style="height:1px;background:#e2e8f0;margin:24px 0;" aria-hidden="true"></div>
+                <div class="section-header">
+                    <h3><i class="fa-solid fa-kit-medical"></i> Equipment Catalog</h3>
                     <span class="stat-badge" id="equipmentCount">{{ $equipments->count() }} items</span>
                 </div>
                 <div class="table-responsive mobile-card-table">

@@ -3134,7 +3134,7 @@
         ];
     });
 @endphp
-<body class="chief-legacy-layout">
+<body class="chief-legacy-layout station-management-page">
     @include('chief.partials.sidebar', ['active' => 'management'])
     <aside class="sidebar legacy-chief-sidebar" style="display:none;">
         <div class="sidebar-header">

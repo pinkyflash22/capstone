@@ -503,6 +503,15 @@ if (app) {
         if (data.get('station_duty_backup')) assignments.push({ team_role: 'station_duty', station_officer_id: data.get('station_duty_backup') });
         const editing = state.editingShift;
         const payload = { schedule_template: scheduleTemplate, rotation_team_ids: rotationTeamIds, team_id: data.get('team_id') || rotationTeamIds[0], label: data.get('label'), starts_at: data.get('starts_at'), ends_at: data.get('ends_at'), notes: data.get('notes'), recurrence: data.get('recurrence') || (editing?.is_recurring ? (editing.recurrence_type || 'weekly') : 'none'), recurrence_until: data.get('recurrence_until'), rotation_interval_days: data.get('rotation_interval_days') || editing?.rotation_interval_days, weekdays: data.getAll('weekdays[]').map(Number), edit_scope: data.get('edit_scope') || 'this', assignments };
+        if (payload.recurrence !== 'weekdays') {
+            // Hidden weekday controls do not apply to ordinary or rotating shifts.
+            // Omitting the field also avoids min:1 failures on older servers.
+            delete payload.weekdays;
+        } else if (!payload.weekdays.length) {
+            form.querySelector('[data-form-error]').textContent = 'Choose at least one day when using Selected weekdays.';
+            form.querySelector('[name="weekdays[]"]')?.focus();
+            return;
+        }
         if (neededTeams) {
             payload.rotation_assignments = Object.fromEntries(rotationTeamIds.map(teamId => [teamId,
                 roles.map(([role]) => ({ team_role: role, station_officer_id: data.get(`run_${teamId}_${role}`) })).filter(item => item.station_officer_id)

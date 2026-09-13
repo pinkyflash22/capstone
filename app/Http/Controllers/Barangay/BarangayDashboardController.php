@@ -1712,133 +1712,14 @@ class BarangayDashboardController extends Controller
             ->with('success', 'Fire report submitted successfully and forwarded into the system incident flow.');
     }
 
-    public function updateFireReport(
-        Request $request,
-        string $recordId,
-        IncidentJurisdictionService $jurisdictionService
-    )
+    public function updateFireReport(Request $request, string $recordId)
     {
-        $validated = $request->validate($this->fireReportValidationRules(true));
-
-        $context = $this->resolveBarangayContext();
-        $hall = $context['hall'];
-
-        if (! $hall) {
-            return redirect()
-                ->route('barangay.reports')
-                ->withErrors(['fire_record' => 'Your barangay account is not linked to a barangay hall yet.']);
-        }
-
-        $record = BarangayFireRecord::with(['incident.marker'])
-            ->where('barangay_hall_id', $hall->barangay_hall_id)
-            ->findOrFail($recordId);
-
-        $jurisdiction = $jurisdictionService->resolve(
-            (float) $validated['lat'],
-            (float) $validated['lng'],
-            null,
-            [(int) $hall->barangay_id]
-        );
-        if (! $jurisdiction['barangay_id'] || (int) $jurisdiction['barangay_id'] !== (int) $hall->barangay_id) {
-            throw ValidationException::withMessages([
-                'lat' => 'Place the fire incident marker inside your assigned barangay boundary.',
-            ]);
-        }
-
-        DB::transaction(function () use ($record, $validated, $request, $jurisdiction) {
-            $record->incident?->marker?->update([
-                'title' => $validated['title'],
-                'description' => $validated['location_description'],
-                'lat' => $validated['lat'],
-                'lng' => $validated['lng'],
-            ]);
-
-            $record->update([
-                'incident_date' => $validated['incident_date'],
-                'incident_count' => $validated['incident_count'] ?? 1,
-                'fire_classification' => $validated['fire_classification'],
-                'fire_cause' => $validated['fire_cause'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-            ]);
-
-            $record->incident?->forceFill([
-                'barangay_id' => $jurisdiction['barangay_id'],
-                'station_id' => $jurisdiction['station_id'],
-                'barangay_resolution_status' => 'matched',
-                'barangay_resolution_source' => 'barangay_report_update:'.$jurisdiction['resolution_source'],
-                'barangay_resolved_at' => now(),
-            ])->save();
-
-            HistoricalFireIncidentSynchronizer::syncForIncidentId((int) $record->incident_id);
-            UserActivityLogger::log('updated fire report record', Auth::user()?->user_id, $request);
-        });
-
-        if ($request->expectsJson()) {
-            $record->refresh()->load(['incident.marker']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Fire record updated successfully.',
-                'data' => $this->serializeFireReportRecord($record),
-            ]);
-        }
-
-        return redirect()
-            ->route('barangay.reports')
-            ->with('success', 'Fire record updated successfully.');
+        abort(403, 'Barangay accounts cannot edit fire incident reports.');
     }
 
     public function destroyFireReport(Request $request, string $recordId)
     {
-        $context = $this->resolveBarangayContext();
-        $hall = $context['hall'];
-
-        if (! $hall) {
-            return redirect()
-                ->route('barangay.reports')
-                ->withErrors(['fire_record' => 'Your barangay account is not linked to a barangay hall yet.']);
-        }
-
-        $record = BarangayFireRecord::with(['incident.marker'])
-            ->where('barangay_hall_id', $hall->barangay_hall_id)
-            ->findOrFail($recordId);
-
-        DB::transaction(function () use ($record, $request) {
-            $incident = $record->incident;
-            $marker = $incident?->marker;
-            $incidentId = $record->incident_id;
-
-            $record->delete();
-
-            HistoricalFireIncident::query()
-                ->where('incident_id', $incidentId)
-                ->delete();
-
-            if ($incident) {
-                IncidentContext::query()
-                    ->where('incident_id', $incident->incident_id)
-                    ->delete();
-                $incident->delete();
-            }
-
-            if ($marker) {
-                $marker->delete();
-            }
-
-            UserActivityLogger::log('deleted fire report record', Auth::user()?->user_id, $request);
-        });
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Fire record deleted successfully.',
-                'data' => ['id' => $recordId],
-            ]);
-        }
-
-        return redirect()
-            ->route('barangay.reports')
-            ->with('success', 'Fire record deleted successfully.');
+        abort(403, 'Barangay accounts cannot delete fire incident reports.');
     }
 
     public function storeQuickFireReport(

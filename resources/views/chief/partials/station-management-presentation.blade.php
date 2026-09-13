@@ -60,7 +60,7 @@
     .station-management-workspace .table-responsive { max-width:100%; overflow-x:auto; }
     .station-management-workspace .data-table th { background:#f8fafc; color:#64748b; font-size:10px; letter-spacing:.06em; }
     .station-management-workspace :is(button,input,select,a):focus-visible { outline:3px solid #f59e0b; outline-offset:3px; }
-    #galleryPreviewModal .modal-content { width:min(960px,calc(100vw - 32px)) !important; max-width:960px !important; max-height:90dvh !important; overflow:auto; }
+    /* Gallery dialog sizing and scrolling use the shared modal stylesheet. */
     #galleryPreviewModal .station-gallery-preview { display:grid; grid-template-columns:minmax(0,2fr) minmax(200px,1fr); gap:18px; }
     #galleryPreviewModal .station-gallery-preview-frame { min-width:0; background:#f1f5f9; border-radius:12px; }
     #galleryPreviewModal .station-gallery-preview-frame img { width:100%; height:auto; max-height:65dvh; object-fit:contain; }

@@ -172,6 +172,8 @@ let markerFeedFetchSequence = 0;
 let riskAreaFetchController = null;
 let riskAreaFetchSequence = 0;
 let unmappedForecastControl = null;
+let latestForecastMapMeta = {};
+let forecastPeriodInitialized = false;
 let dynamicMapRefreshPromise = null;
 let dynamicMapRefreshQueued = false;
 let mapPollingVisibilityHandler = null;
@@ -11424,8 +11426,12 @@ function createFireRiskHeatLayer(points = []) {
 function getFireRiskAreaStyle(area = {}) {
     const level = String(area.risk_level || '').toLowerCase();
     if (area.geometry_precision === 'barangay_boundary') {
-        const color = level === 'high' ? '#b91c1c' : level === 'low' ? '#15803d' : '#d97706';
-        return { color, fillColor: color, fillOpacity: 0.1, opacity: 0.8, weight: 2, dashArray: '6 5', pane: 'overlayPane' };
+        const color = level === 'high' ? '#ef4444' : level === 'low' ? '#22c55e' : '#f59e0b';
+        const rawProbability = area.probability_percent ?? area.risk_score;
+        const probability = rawProbability !== null && rawProbability !== undefined && Number.isFinite(Number(rawProbability))
+            ? Math.min(1, Math.max(0, Number(rawProbability) / 100))
+            : level === 'high' ? 0.85 : level === 'low' ? 0.2 : 0.55;
+        return { color, fillColor: color, fillOpacity: 0.3 + probability * 0.3, opacity: 0.85, weight: 1.5, dashArray: null, pane: 'overlayPane' };
     }
     const overlayType = String(area.overlay_type || 'verified_evidence').toLowerCase();
     const timelineStyle = overlayType === 'next_month_forecast'
@@ -11483,7 +11489,7 @@ function buildFireRiskAreaPopup(area = {}) {
     const precisionLabel = area.geometry_precision === 'barangay_hall_reference'
         ? 'Barangay hall reference only; no geographic risk footprint is implied'
         : area.geometry_precision === 'barangay_boundary'
-            ? 'Barangay-level forecast only — not a precise hotspot or a prediction for every location inside this boundary'
+            ? 'Area heatmap: the saved risk applies to this barangay as a whole, not to an exact fire location.'
             : area.geometry_precision === 'original_evidence_points'
                 ? 'Heat intensity at original report and incident positions'
                 : area.geometry_precision === 'supporting_evidence_positions'
@@ -11656,6 +11662,7 @@ function addFireRiskEvidencePoints(area = {}, targetGroup = null) {
 
 function renderUnmappedForecastStatus(meta = {}) {
     if (!window.map || typeof L === 'undefined') return;
+    latestForecastMapMeta = meta;
 
     const count = Number(meta?.unmapped_count || 0);
     const boundaryCount = Number(meta?.boundary_forecast_count || 0);
@@ -11695,9 +11702,30 @@ function renderUnmappedForecastStatus(meta = {}) {
         return `<li style="padding:9px 0;border-bottom:1px solid #e2e8f0;"><strong>${escapeHtml(item.barangay_name || 'Unknown barangay')}</strong> · ${period}<br><span>${escapeHtml(reasonLabels[item.reason] || 'Location needs review')}</span><p style="margin:4px 0 0;color:#64748b;">${escapeHtml(item.message || 'Review this forecast location before placing it on the map.')}</p></li>`;
     }).join('');
     container.innerHTML = (boundaryCount > 0
-        ? `<div style="margin-bottom:8px;"><strong>${boundaryCount} barangay-level forecast${boundaryCount === 1 ? '' : 's'}</strong><br>Dashed, lightly shaded areas show the barangay forecast scope—not precise hotspots. Use the current/next-month layers to compare periods.</div>` : '')
+        ? `<div style="margin-bottom:8px;"><strong>AI forecast · Area heatmap</strong>
+            <div style="display:flex;gap:6px;margin:8px 0;">${[['current', 'Current month', currentRiskAnalysisLayerGroup], ['next', 'Next month', nextMonthForecastLayerGroup]].map(([key, label, group]) => `<button type="button" data-forecast-period="${key}" aria-pressed="${window.map.hasLayer(group)}" style="flex:1;min-height:44px;padding:6px;border:1px solid #fed7aa;border-radius:8px;cursor:pointer;background:${window.map.hasLayer(group) ? '#fff0dc' : '#fff'};color:#7c2d12;font:inherit;font-weight:600;">${label}</button>`).join('')}</div>
+            <div style="height:8px;border-radius:8px;background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444);"></div>
+            <div style="display:flex;justify-content:space-between;margin:4px 0 8px;"><span>Low</span><span>Medium</span><span>High</span></div>
+            <div style="margin-bottom:8px;font-weight:600;">${window.map.hasLayer(currentRiskAnalysisLayerGroup) ? `${Number(meta.current_count || 0)} current-month forecast areas` : window.map.hasLayer(nextMonthForecastLayerGroup) ? `${Number(meta.next_count || 0)} next-month forecast areas` : 'Forecast layer hidden — choose a month above'}</div>
+            Color shows each barangay’s saved fire-risk level. Darker shading shows higher forecast probability. Tap an area for its forecast details.
+            <button type="button" data-fit-forecast style="display:block;width:100%;min-height:44px;margin-top:8px;border:1px solid #fed7aa;border-radius:8px;background:#fff;color:#9a3412;font:inherit;cursor:pointer;">View forecast areas</button>
+            <div style="margin-top:6px;color:#64748b;">These are barangay-wide estimates, not exact fire locations.</div></div>` : '')
         + (count > 0 ? `<details><summary style="cursor:pointer;min-height:44px;padding:6px 0;"><strong>${count} forecast entries need location review</strong></summary><p style="margin:6px 0;">${barangayCount} distinct barangay record${barangayCount === 1 ? '' : 's'}. Current and next month count separately. Saved forecasts have not been deleted.</p><ul style="list-style:none;margin:0;padding:0;">${rows}</ul></details>` : '');
-    container.title = 'Barangay-level shading and precise evidence-based hotspots represent different levels of location detail.';
+    container.querySelectorAll('[data-forecast-period]').forEach(button => {
+        button.addEventListener('click', () => {
+            const key = button.dataset.forecastPeriod;
+            const chosen = key === 'next' ? nextMonthForecastLayerGroup : currentRiskAnalysisLayerGroup;
+            chosen?.addTo(window.map);
+            container.querySelector(`[data-forecast-period="${key}"]`)?.focus({ preventScroll: true });
+        });
+    });
+    container.title = 'Saved AI risk by barangay. Evidence-based heat spots use recorded locations.';
+    container.querySelector('[data-fit-forecast]')?.addEventListener('click', () => {
+        const group = window.map.hasLayer(nextMonthForecastLayerGroup) ? nextMonthForecastLayerGroup
+            : window.map.hasLayer(currentRiskAnalysisLayerGroup) ? currentRiskAnalysisLayerGroup : null;
+        const bounds = group?.getBounds?.();
+        if (bounds?.isValid()) window.map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+    });
     container.style.display = 'block';
 }
 
@@ -11734,7 +11762,13 @@ async function loadFireRiskAreas() {
             return;
         }
         const areas = Array.isArray(payload?.data) ? payload.data : [];
-        renderUnmappedForecastStatus(payload?.meta || {});
+        const currentCount = areas.filter(area => area.overlay_type === 'current_analysis').length;
+        const nextCount = areas.filter(area => area.overlay_type === 'next_month_forecast').length;
+        if (!forecastPeriodInitialized && areas.length) {
+            if (!currentCount && nextCount) nextMonthForecastLayerGroup?.addTo(window.map);
+            forecastPeriodInitialized = true;
+        }
+        renderUnmappedForecastStatus({ ...(payload?.meta || {}), current_count: currentCount, next_count: nextCount });
         fireRiskAreaLayerGroup.clearLayers();
         currentRiskAnalysisLayerGroup?.clearLayers();
         nextMonthForecastLayerGroup?.clearLayers();
@@ -11762,7 +11796,7 @@ async function loadFireRiskAreas() {
                     return;
                 }
 
-                layer.bindTooltip(escapeHtml(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk${area.geometry_precision === 'barangay_boundary' ? ' · Barangay-level, not a hotspot' : ''}`), {
+                layer.bindTooltip(escapeHtml(`${area.name || 'Barangay'} · ${String(area.risk_level || '').toUpperCase()} fire risk${area.geometry_precision === 'barangay_boundary' ? ' · Area forecast' : ''}`), {
                     permanent: false,
                     direction: 'top',
                     sticky: true,
@@ -11773,11 +11807,13 @@ async function loadFireRiskAreas() {
                     className: 'fire-risk-area-popup-shell'
                 });
                 if (area.geometry_precision === 'barangay_boundary') {
+                    const baseStyle = getFireRiskAreaStyle(area);
+                    const highlightStyle = { fillOpacity: Math.min(0.75, baseStyle.fillOpacity + 0.12), weight: 3 };
                     layer.eachLayer(child => {
-                        child.on('mouseover', () => child.setStyle({ fillOpacity: 0.22 }));
-                        child.on('mouseout', () => { if (!child.isPopupOpen()) child.setStyle({ fillOpacity: 0.1 }); });
-                        child.on('popupopen', () => child.setStyle({ fillOpacity: 0.22 }));
-                        child.on('popupclose', () => child.setStyle({ fillOpacity: 0.1 }));
+                        child.on('mouseover', () => child.setStyle(highlightStyle));
+                        child.on('mouseout', () => { if (!child.isPopupOpen()) child.setStyle(baseStyle); });
+                        child.on('popupopen', () => child.setStyle(highlightStyle));
+                        child.on('popupclose', () => child.setStyle(baseStyle));
                     });
                 }
                 layer.addTo(targetGroup || fireRiskAreaLayerGroup);
@@ -12395,7 +12431,20 @@ function initAfterMapReady() {
     // risk/hazard evidence is displayed by riskHazardFeatureGroup as markers.
     fireRiskAreaLayerGroup = L.featureGroup();
     currentRiskAnalysisLayerGroup = L.featureGroup().addTo(window.map);
-    nextMonthForecastLayerGroup = L.featureGroup().addTo(window.map);
+    nextMonthForecastLayerGroup = L.featureGroup();
+    // Show one forecast period at a time so overlapping fills do not hide or
+    // exaggerate the risk in the same barangay. Applies to all layer controls.
+    window.map.on('layeradd', event => {
+        if (event.layer !== currentRiskAnalysisLayerGroup && event.layer !== nextMonthForecastLayerGroup) return;
+        const other = event.layer === currentRiskAnalysisLayerGroup ? nextMonthForecastLayerGroup : currentRiskAnalysisLayerGroup;
+        if (window.map.hasLayer(other)) window.map.removeLayer(other);
+        renderUnmappedForecastStatus(latestForecastMapMeta);
+    });
+    window.map.on('layerremove', event => {
+        if (event.layer === currentRiskAnalysisLayerGroup || event.layer === nextMonthForecastLayerGroup) {
+            renderUnmappedForecastStatus(latestForecastMapMeta);
+        }
+    });
     
     const configuredInstanceKey = window.mapInstanceConfig?.instanceKey || window.activeMapInstanceKey || 'default';
     const isFirefighterDashboardMap = configuredInstanceKey === 'firefighterDashboard';

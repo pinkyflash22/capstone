@@ -54,7 +54,15 @@
                 <div class="weather-timeline__notice"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ $liveForecastWarning }}@if($liveForecastFetchedAt) Last updated {{ \Carbon\Carbon::parse($liveForecastFetchedAt)->timezone('Asia/Manila')->format('M j, g:i A') }}.@endif</span></div>
             @endif
             @if($liveForecast->isNotEmpty())
-                <p style="padding:0 18px 12px;font-size:12px;color:#64748b;">Forecast data: <a href="{{ $liveForecastProviderUrl }}" target="_blank" rel="noopener noreferrer" style="color:#b91c1c;text-decoration:underline;">{{ $liveForecastProvider }}</a>@if($liveForecastProvider === 'MET Norway') · Norwegian Meteorological Institute · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · Daily summaries calculated by PyroSense@endif. @if($liveForecastFetchedAt)Retrieved {{ \Carbon\Carbon::parse($liveForecastFetchedAt)->timezone('Asia/Manila')->format('M j, g:i A') }}.@endif</p>
+                <p style="padding:0 18px 12px;font-size:12px;color:#64748b;">
+                    Forecast data: <a href="{{ $liveForecastProviderUrl }}" target="_blank" rel="noopener noreferrer" style="color:#b91c1c;text-decoration:underline;">{{ $liveForecastProvider }}</a>
+                    @if($liveForecastProvider === 'MET Norway')
+                        · Norwegian Meteorological Institute · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · Daily summaries calculated by PyroSense.
+                    @endif
+                    @if($liveForecastFetchedAt)
+                        Retrieved {{ \Carbon\Carbon::parse($liveForecastFetchedAt)->timezone('Asia/Manila')->format('M j, g:i A') }}.
+                    @endif
+                </p>
             @endif
             @if($liveForecast->isEmpty())
                 <div class="weather-timeline__empty"><i class="fa-solid fa-cloud-bolt"></i> {{ $liveForecastError ?? 'Live forecast is temporarily unavailable.' }}</div>

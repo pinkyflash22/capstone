@@ -1,5 +1,39 @@
 /* Shared presentation for resource forms, detail views and duty dialogs. */
-body.resource-management-page .modal {
+/* Station IDs override older compact sizing rules in the station template. */
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #ecatModal, #galleryEditModal, #galleryPreviewModal, #deleteModal, #galleryDeleteModal) .modal-content {
+    width: min(100%, 720px);
+    max-width: 720px !important;
+    height: auto;
+    max-height: var(--resource-modal-height);
+    margin: 0;
+    padding: 0 !important;
+    border-radius: 22px;
+}
+body.station-management-page :is(#deleteModal, #galleryDeleteModal) .modal-content { max-width: 440px !important; }
+body.station-management-page #galleryPreviewModal .modal-content { max-width: 900px !important; width: min(100%, 900px); }
+body.station-management-page .modal .modal-content::before { display: none; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-header { padding: 20px 24px; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-header h2 { font-size: 1.125rem; line-height: 1.4; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-close { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-body { padding: 24px; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-footer { padding: 16px 24px; background: #fff; }
+body.station-management-page #editStationModal .form-label { font-size: .8125rem; margin-bottom: 7px; }
+body.station-management-page #editStationModal .form-input { font-size: .875rem; padding: 10px 12px; border-radius: 10px; }
+body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal).modal { align-items: center; padding: 24px; }
+body.station-management-page #galleryPreviewModal .station-gallery-preview-frame { height: auto; min-height: 0; padding: 0; background: #f8fafc; border-radius: 12px; overflow: hidden; }
+body.station-management-page #galleryPreviewImage { display: block; width: 100%; height: auto; max-height: 55dvh; object-fit: contain; }
+body.station-management-page #galleryPreviewCaption { overflow-wrap: anywhere; line-height: 1.6; }
+
+@media (max-width: 640px) {
+    body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal).modal { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+    body.station-management-page :is(#viewModal, #formModal, #editStationModal, #ecatModal, #galleryEditModal, #galleryPreviewModal, #deleteModal, #galleryDeleteModal) .modal-content { width: 100%; height: auto; max-height: var(--resource-modal-height); border-radius: 18px; }
+    body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) :is(.modal-header, .modal-body) { padding: 16px; }
+    body.station-management-page :is(#viewModal, #formModal, #editStationModal, #deleteModal) .modal-footer { padding: 12px 16px; }
+    body.station-management-page #editStationModal .form-input { font-size: 16px; }
+    body.station-management-page #editStationModal .modal-footer .btn-primary { width: auto; }
+}
+
+body:is(.resource-management-page, .station-management-page) .modal {
     --resource-modal-height: calc(100dvh - 48px);
     z-index: 12000;
     align-items: center;
@@ -10,14 +44,14 @@ body.resource-management-page .modal {
 }
 
 /* These legacy IDs set their own dimensions, including important inline overrides. */
-body.resource-management-page :is(#registerUserModal, #editUserModal, #teamModal, #editOfficerModal, #equipmentCategoryModal, #equipmentItemModal, #stationEquipmentModal, #editEquipmentModal, #viewUserModal, #viewOfficerModal, #viewTeamModal, #editTeamModal, #deleteOfficerModal, #deleteUserModal) .modal-content {
+body:is(.resource-management-page, .station-management-page) :is(#registerUserModal, #editUserModal, #teamModal, #editOfficerModal, #equipmentCategoryModal, #equipmentItemModal, #stationEquipmentModal, #editEquipmentModal, #viewUserModal, #viewOfficerModal, #viewTeamModal, #editTeamModal, #deleteOfficerModal, #deleteUserModal) .modal-content {
     max-height: var(--resource-modal-height);
     width: min(100%, 720px);
     max-width: 720px !important;
 }
-body.resource-management-page :is(#deleteOfficerModal, #deleteUserModal) .modal-content { max-width: 440px !important; }
+body:is(.resource-management-page, .station-management-page) :is(#deleteOfficerModal, #deleteUserModal) .modal-content { max-width: 440px !important; }
 
-body.resource-management-page .modal .modal-content {
+body:is(.resource-management-page, .station-management-page) .modal .modal-content {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -31,7 +65,7 @@ body.resource-management-page .modal .modal-content {
     box-shadow: 0 24px 80px rgb(15 23 42 / 24%);
 }
 
-body.resource-management-page .modal-content > form {
+body:is(.resource-management-page, .station-management-page) .modal-content > form {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
@@ -39,8 +73,8 @@ body.resource-management-page .modal-content > form {
     overflow: hidden;
 }
 
-body.resource-management-page .modal .modal-header,
-body.resource-management-page .duty-roster__dialog .duty-roster__dialog-head {
+body:is(.resource-management-page, .station-management-page) .modal .modal-header,
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog .duty-roster__dialog-head {
     flex: 0 0 auto;
     align-items: center;
     gap: 16px;
@@ -53,8 +87,8 @@ body.resource-management-page .duty-roster__dialog .duty-roster__dialog-head {
     color: #293447;
 }
 
-body.resource-management-page .modal-header h2,
-body.resource-management-page .duty-roster__dialog-head h4 {
+body:is(.resource-management-page, .station-management-page) .modal-header h2,
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog-head h4 {
     min-width: 0;
     margin: 0;
     font-size: 1.125rem;
@@ -63,10 +97,10 @@ body.resource-management-page .duty-roster__dialog-head h4 {
     overflow-wrap: anywhere;
 }
 
-body.resource-management-page .modal-header h2 > i { margin-right: 8px; color: #c44b20; }
+body:is(.resource-management-page, .station-management-page) .modal-header h2 > i { margin-right: 8px; color: #c44b20; }
 
-body.resource-management-page .modal .modal-close,
-body.resource-management-page .duty-roster__dialog-head button {
+body:is(.resource-management-page, .station-management-page) .modal .modal-close,
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog-head button {
     display: grid;
     flex: 0 0 40px;
     place-items: center;
@@ -80,7 +114,7 @@ body.resource-management-page .duty-roster__dialog-head button {
     cursor: pointer;
 }
 
-body.resource-management-page .modal .modal-body {
+body:is(.resource-management-page, .station-management-page) .modal .modal-body {
     flex: 1 1 auto;
     min-height: 0;
     padding: 24px;
@@ -89,8 +123,8 @@ body.resource-management-page .modal .modal-body {
     scrollbar-gutter: stable;
 }
 
-body.resource-management-page .modal .modal-footer,
-body.resource-management-page .duty-roster__dialog .duty-roster__dialog-actions {
+body:is(.resource-management-page, .station-management-page) .modal .modal-footer,
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog .duty-roster__dialog-actions {
     flex: 0 0 auto;
     gap: 10px;
     margin: 0;
@@ -100,18 +134,18 @@ body.resource-management-page .duty-roster__dialog .duty-roster__dialog-actions 
     box-shadow: 0 -6px 18px rgb(15 23 42 / 3%);
 }
 
-body.resource-management-page .modal :is(.form-grid, .resource-detail-grid) {
+body:is(.resource-management-page, .station-management-page) .modal :is(.form-grid, .resource-detail-grid) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
 }
 
-body.resource-management-page .modal .form-group { min-width: 0; margin-bottom: 18px; }
-body.resource-management-page .modal .form-grid > .form-group { margin-bottom: 0; }
-body.resource-management-page .modal .full-width { grid-column: 1 / -1; }
-body.resource-management-page .modal .form-label { margin-bottom: 7px; color: #475467; font-size: .8125rem; }
-body.resource-management-page .modal :is(.form-input, .form-select),
-body.resource-management-page .duty-roster__dialog :is(input:not([type=checkbox], [type=radio]), select, textarea) {
+body:is(.resource-management-page, .station-management-page) .modal .form-group { min-width: 0; margin-bottom: 18px; }
+body:is(.resource-management-page, .station-management-page) .modal .form-grid > .form-group { margin-bottom: 0; }
+body:is(.resource-management-page, .station-management-page) .modal .full-width { grid-column: 1 / -1; }
+body:is(.resource-management-page, .station-management-page) .modal .form-label { margin-bottom: 7px; color: #475467; font-size: .8125rem; }
+body:is(.resource-management-page, .station-management-page) .modal :is(.form-input, .form-select, .form-textarea),
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog :is(input:not([type=checkbox], [type=radio]), select, textarea) {
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
@@ -125,26 +159,26 @@ body.resource-management-page .duty-roster__dialog :is(input:not([type=checkbox]
     line-height: 1.5;
 }
 
-body.resource-management-page :is(.modal, .duty-roster__dialog) :is(input, select, textarea, button, summary):focus-visible {
+body:is(.resource-management-page, .station-management-page) :is(.modal, .duty-roster__dialog) :is(input, select, textarea, button, summary):focus-visible {
     outline: 3px solid rgb(226 119 31 / 35%);
     outline-offset: 2px;
 }
 
-body.resource-management-page .modal :is(.resource-profile-card, .resource-edit-card) {
+body:is(.resource-management-page, .station-management-page) .modal :is(.resource-profile-card, .resource-edit-card) {
     min-width: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
     box-shadow: none;
 }
-body.resource-management-page .modal .resource-edit-card { padding: 0; }
-body.resource-management-page .modal .resource-profile-hero { padding: 18px; border-radius: 14px; background: #fff7ed; }
-body.resource-management-page .modal .resource-detail-section { margin-top: 20px; padding: 0; }
-body.resource-management-page .modal :is(.resource-profile-name, .resource-profile-meta, .resource-detail-value) { overflow-wrap: anywhere; }
-body.resource-management-page .modal-footer button,
-body.resource-management-page .duty-roster__dialog-actions button { min-height: 44px; border-radius: 11px; }
+body:is(.resource-management-page, .station-management-page) .modal .resource-edit-card { padding: 0; }
+body:is(.resource-management-page, .station-management-page) .modal .resource-profile-hero { padding: 18px; border-radius: 14px; background: #fff7ed; }
+body:is(.resource-management-page, .station-management-page) .modal .resource-detail-section { margin-top: 20px; padding: 0; }
+body:is(.resource-management-page, .station-management-page) .modal :is(.resource-profile-name, .resource-profile-meta, .resource-detail-value) { overflow-wrap: anywhere; }
+body:is(.resource-management-page, .station-management-page) .modal-footer button,
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog-actions button { min-height: 44px; border-radius: 11px; }
 
-body.resource-management-page .duty-roster__dialog {
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog {
     width: min(760px, calc(100vw - 48px));
     max-width: 760px;
     max-height: calc(100dvh - 48px);
@@ -152,52 +186,52 @@ body.resource-management-page .duty-roster__dialog {
     border-radius: 22px;
     background: #fff;
 }
-body.resource-management-page .duty-roster__dialog form { max-height: calc(100dvh - 48px); scrollbar-gutter: stable; }
-body.resource-management-page .duty-roster__dialog form > :is(.duty-roster__form-grid, .duty-roster__edit-scope, h5, .duty-roster__notes, .duty-roster__form-error, fieldset, section) {
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog form { max-height: calc(100dvh - 48px); scrollbar-gutter: stable; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog form > :is(.duty-roster__form-grid, .duty-roster__edit-scope, h5, .duty-roster__notes, .duty-roster__form-error, fieldset, section) {
     flex-shrink: 0;
     margin-left: 24px;
     margin-right: 24px;
 }
-body.resource-management-page .duty-roster__dialog :is(.duty-roster__form-grid, .duty-roster__assignment-grid) { gap: 16px; }
-body.resource-management-page .duty-roster__dialog :is(section, fieldset) :is(.duty-roster__form-grid, .duty-roster__assignment-grid, h5) { margin-left: 0; margin-right: 0; }
-body.resource-management-page .duty-roster__dialog label { min-width: 0; font-size: .8125rem; }
-body.resource-management-page .duty-roster__dialog label small { color: #667085; line-height: 1.5; }
-body.resource-management-page .duty-roster__dialog [data-crew-summary] { padding: 14px; border: 1px solid #f1dfce; border-radius: 12px; background: #fff9f2; color: #57463a; font-size: .875rem; line-height: 1.7; overflow-wrap: anywhere; }
-body.resource-management-page .duty-roster__dialog [data-crew-editor] { margin-top: 12px; border: 1px solid #e4e7ec; border-radius: 12px; padding: 14px; }
-body.resource-management-page .duty-roster__dialog summary { color: #a83e1d; font-size: .875rem; font-weight: 650; cursor: pointer; }
-body.resource-management-page .duty-roster__dialog [data-crew-editor] > p { margin: 12px 0; color: #667085; font-size: .8125rem; line-height: 1.6; }
-body.resource-management-page .duty-roster__dialog [hidden] { display: none !important; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog :is(.duty-roster__form-grid, .duty-roster__assignment-grid) { gap: 16px; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog :is(section, fieldset) :is(.duty-roster__form-grid, .duty-roster__assignment-grid, h5) { margin-left: 0; margin-right: 0; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog label { min-width: 0; font-size: .8125rem; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog label small { color: #667085; line-height: 1.5; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog [data-crew-summary] { padding: 14px; border: 1px solid #f1dfce; border-radius: 12px; background: #fff9f2; color: #57463a; font-size: .875rem; line-height: 1.7; overflow-wrap: anywhere; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog [data-crew-editor] { margin-top: 12px; border: 1px solid #e4e7ec; border-radius: 12px; padding: 14px; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog summary { color: #a83e1d; font-size: .875rem; font-weight: 650; cursor: pointer; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog [data-crew-editor] > p { margin: 12px 0; color: #667085; font-size: .8125rem; line-height: 1.6; }
+body:is(.resource-management-page, .station-management-page) .duty-roster__dialog [hidden] { display: none !important; }
 
 @keyframes resource-dialog-enter {
     from { opacity: 0; transform: translateY(12px) scale(.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @media (prefers-reduced-motion: no-preference) {
-    body.resource-management-page .modal.active .modal-content,
-    body.resource-management-page .duty-roster__dialog[open] { animation: resource-dialog-enter 180ms ease-out both; }
+    body:is(.resource-management-page, .station-management-page) .modal.active .modal-content,
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog[open] { animation: resource-dialog-enter 180ms ease-out both; }
 }
 
 @media (max-width: 640px) {
-    body.resource-management-page .modal { --resource-modal-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); align-items: center; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
-    body.resource-management-page .modal .modal-content,
-    body.resource-management-page .duty-roster__dialog {
+    body:is(.resource-management-page, .station-management-page) .modal { --resource-modal-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); align-items: center; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+    body:is(.resource-management-page, .station-management-page) .modal .modal-content,
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog {
         inset: 0;
         width: calc(100vw - 20px);
         max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         margin: auto;
         border-radius: 18px;
     }
-    body.resource-management-page .duty-roster__dialog form { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-    body.resource-management-page .modal .modal-header,
-    body.resource-management-page .modal .modal-body,
-    body.resource-management-page .duty-roster__dialog .duty-roster__dialog-head { padding: 16px; }
-    body.resource-management-page .modal .modal-footer,
-    body.resource-management-page .duty-roster__dialog .duty-roster__dialog-actions { padding: 12px 16px; flex-wrap: wrap; }
-    body.resource-management-page .modal-footer button,
-    body.resource-management-page .duty-roster__dialog-actions button { flex: 1 1 120px; }
-    body.resource-management-page .modal :is(.form-grid, .resource-detail-grid),
-    body.resource-management-page .duty-roster__dialog :is(.duty-roster__form-grid, .duty-roster__assignment-grid) { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-    body.resource-management-page .duty-roster__dialog form > :is(.duty-roster__form-grid, .duty-roster__edit-scope, h5, .duty-roster__notes, .duty-roster__form-error, fieldset, section) { margin-left: 16px; margin-right: 16px; }
-    body.resource-management-page .modal :is(.form-input, .form-select),
-    body.resource-management-page .duty-roster__dialog :is(input:not([type=checkbox], [type=radio]), select, textarea) { font-size: 16px; }
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog form { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+    body:is(.resource-management-page, .station-management-page) .modal .modal-header,
+    body:is(.resource-management-page, .station-management-page) .modal .modal-body,
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog .duty-roster__dialog-head { padding: 16px; }
+    body:is(.resource-management-page, .station-management-page) .modal .modal-footer,
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog .duty-roster__dialog-actions { padding: 12px 16px; flex-wrap: wrap; }
+    body:is(.resource-management-page, .station-management-page) .modal-footer button,
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog-actions button { flex: 1 1 120px; }
+    body:is(.resource-management-page, .station-management-page) .modal :is(.form-grid, .resource-detail-grid),
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog :is(.duty-roster__form-grid, .duty-roster__assignment-grid) { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog form > :is(.duty-roster__form-grid, .duty-roster__edit-scope, h5, .duty-roster__notes, .duty-roster__form-error, fieldset, section) { margin-left: 16px; margin-right: 16px; }
+    body:is(.resource-management-page, .station-management-page) .modal :is(.form-input, .form-select, .form-textarea),
+    body:is(.resource-management-page, .station-management-page) .duty-roster__dialog :is(input:not([type=checkbox], [type=radio]), select, textarea) { font-size: 16px; }
 }
