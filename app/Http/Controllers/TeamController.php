@@ -97,6 +97,12 @@ class TeamController extends Controller
 
     public function store(Request $request)
 {
+    if (! $this->isProvincialAdmin()) {
+        $managedStationId = $this->managedStationId();
+        abort_unless($managedStationId, 403, 'Your account is not assigned to a station.');
+        $request->merge(['station_id' => $managedStationId]);
+    }
+
     $validated = $request->validate([
         'station_id' => 'required|exists:stations,station_id',
         'commander_driver' => 'required|exists:station_officers,station_officer_id',
@@ -147,6 +153,12 @@ class TeamController extends Controller
         $team = Team::findOrFail($id);
         $originalStationId = (int) ($team->station_id ?: $team->teamLeader?->station_id);
         $this->assertStationAccess($originalStationId);
+
+        if (! $this->isProvincialAdmin()) {
+            $managedStationId = $this->managedStationId();
+            abort_unless($managedStationId, 403, 'Your account is not assigned to a station.');
+            $request->merge(['station_id' => $managedStationId]);
+        }
         
         $validated = $request->validate([
             'commander_driver' => 'sometimes|required|exists:station_officers,station_officer_id',

@@ -286,7 +286,7 @@ class DailyWeatherContextService
 
     private function fetchBackupForecast(float $latitude, float $longitude, int $days): ?array
     {
-        $key = 'weather:forecast:met-norway:v1:'.number_format($latitude, 3, '.', '').':'.number_format($longitude, 3, '.', '').':'.$days;
+        $key = 'weather:forecast:met-norway:v2:'.number_format($latitude, 3, '.', '').':'.number_format($longitude, 3, '.', '').':'.$days;
         $cached = $this->readForecastCache($key.':fresh');
         if ($this->isUsableForecast($cached)) {
             return array_merge($cached, ['cache_status' => 'backup-fresh', 'is_stale' => false]);

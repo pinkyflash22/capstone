@@ -126,7 +126,10 @@ Schedule::command('boundaries:sync-covered')
     ->dailyAt('02:00')
     ->withoutOverlapping();
 
-Artisan::command('weather:collect-daily {--date=} {--station=} {--catch-up=0}', function (DailyWeatherContextService $service) {
+Artisan::command('weather:collect-daily {--date=} {--station=} {--catch-up=0}', function (
+    DailyWeatherContextService $service,
+    StationBarangayCoverageService $coverageService
+) {
     $date = $this->option('date')
         ? Carbon::parse((string) $this->option('date'), 'Asia/Manila')
         : Carbon::now('Asia/Manila')->subDay();
@@ -134,6 +137,11 @@ Artisan::command('weather:collect-daily {--date=} {--station=} {--catch-up=0}', 
     $stationId = $station !== null && $station !== '' ? (int) $station : null;
 
     try {
+        $coverage = $coverageService->syncAll($stationId);
+        foreach ($coverage['unresolved'] as $unresolved) {
+            $this->warn("Station {$unresolved['station_id']} coverage was not synchronized: {$unresolved['reason']}");
+        }
+
         $catchUpDays = max(0, min(31, (int) $this->option('catch-up')));
         $summary = $catchUpDays > 0
             ? $service->collectMissingRecentDays($catchUpDays, $stationId)

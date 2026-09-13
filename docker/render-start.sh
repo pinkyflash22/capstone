@@ -97,6 +97,18 @@ if [ "${RUN_NOTIFICATION_QUEUE_WORKER:-true}" = "true" ]; then
     ) &
 fi
 
+# Team-shift scheduling is intentionally disabled. This lightweight worker only
+# expires unanswered incident assignments and assigns waiting incidents to the
+# currently available station teams.
+if [ "${RUN_INCIDENT_DISPATCH_WORKER:-true}" = "true" ]; then
+    (
+        while true; do
+            php artisan incidents:dispatch-queue --timeout=2 || true
+            sleep 60
+        done
+    ) &
+fi
+
 # Render free web services do not run Laravel's scheduler, and a separate
 # Render Cron service has a monthly charge. Keep this weather-only worker
 # isolated from every other scheduled command. It catches up yesterday on
@@ -113,7 +125,7 @@ if [ "${RUN_DAILY_WEATHER_WORKER:-true}" = "true" ]; then
                 WEATHER_DELAY=60
             fi
             sleep "$WEATHER_DELAY"
-            php artisan weather:collect-daily || true
+            php artisan weather:collect-daily --catch-up=7 || true
         done
     ) &
 fi

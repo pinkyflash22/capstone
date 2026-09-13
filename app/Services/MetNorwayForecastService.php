@@ -41,20 +41,18 @@ class MetNorwayForecastService
         $cards = [];
         foreach ($groups as $date => $points) {
             $points = collect($points);
-            $symbols = strtolower($points->pluck('symbol')->implode(' '));
-            [$condition, $code] = match (true) {
-                str_contains($symbols, 'thunder') => ['Thunderstorm', 95],
-                str_contains($symbols, 'snow'), str_contains($symbols, 'sleet') => ['Snow or sleet', 73],
-                str_contains($symbols, 'rain') => ['Rain', 63],
-                str_contains($symbols, 'fog') => ['Fog', 45],
-                str_contains($symbols, 'cloudy') => ['Cloudy', 3],
-                str_contains($symbols, 'fair') => ['Mainly clear', 1],
-                str_contains($symbols, 'clearsky') => ['Clear sky', 0],
-                default => ['Unavailable', null],
-            };
+            $conditions = $points
+                ->map(fn (array $point) => $this->conditionFromSymbol((string) ($point['symbol'] ?? '')))
+                ->filter(fn (array $weather) => $weather['code'] !== null)
+                ->groupBy('key')
+                ->sortByDesc(fn ($matches) => $matches->count());
+            $dominantWeather = $conditions->first()?->first() ?? [
+                'condition' => 'Unavailable',
+                'code' => null,
+            ];
             $cards[] = [
                 'date' => $date, 'day' => Carbon::parse($date)->format('D'), 'date_label' => Carbon::parse($date)->format('M j'),
-                'condition' => $condition, 'weather_code' => $code,
+                'condition' => $dominantWeather['condition'], 'weather_code' => $dominantWeather['code'],
                 'min_temp_c' => $points->min('temperature'), 'max_temp_c' => $points->max('temperature'),
                 'humidity_percent' => $points->whereNotNull('humidity')->isEmpty() ? null : round($points->avg('humidity'), 1),
                 'wind_kph' => $points->whereNotNull('wind')->isEmpty() ? null : $points->max('wind'),
@@ -71,5 +69,22 @@ class MetNorwayForecastService
             'fetched_at' => now('Asia/Manila')->toIso8601String(),
             'warning' => 'Open-Meteo is unavailable. Showing MET Norway forecast samples; temperature ranges and humidity are calculated from available time points. Daily rain totals and probabilities are unavailable.',
         ];
+    }
+
+    private function conditionFromSymbol(string $symbol): array
+    {
+        $symbol = strtolower($symbol);
+
+        return match (true) {
+            str_contains($symbol, 'thunder') => ['key' => 'storm', 'condition' => 'Thunderstorm', 'code' => 95],
+            str_contains($symbol, 'snow'), str_contains($symbol, 'sleet') => ['key' => 'snow', 'condition' => 'Snow or sleet', 'code' => 73],
+            str_contains($symbol, 'rain') => ['key' => 'rain', 'condition' => 'Rain', 'code' => 63],
+            str_contains($symbol, 'fog') => ['key' => 'fog', 'condition' => 'Fog', 'code' => 45],
+            str_contains($symbol, 'partlycloudy') => ['key' => 'partly', 'condition' => 'Partly cloudy', 'code' => 2],
+            str_contains($symbol, 'cloudy') => ['key' => 'cloud', 'condition' => 'Cloudy', 'code' => 3],
+            str_contains($symbol, 'fair') => ['key' => 'clear', 'condition' => 'Mainly clear', 'code' => 1],
+            str_contains($symbol, 'clearsky') => ['key' => 'clear', 'condition' => 'Clear sky', 'code' => 0],
+            default => ['key' => 'unavailable', 'condition' => 'Unavailable', 'code' => null],
+        };
     }
 }

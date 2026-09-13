@@ -172,6 +172,11 @@ services:
         # web container, avoiding a separately billed Render Cron service.
         value: "true"
 
+      - key: RUN_INCIDENT_DISPATCH_WORKER
+        # Runs incident assignment/reassignment only; it does not enable team
+        # shifts, rest-day scheduling, or the duty-roster scheduler.
+        value: "true"
+
       # OpenRouter
       - key: OPENROUTER_MODEL
         sync: false
