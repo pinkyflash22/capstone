@@ -2,8 +2,6 @@
 
 use App\Jobs\SyncBarangayBoundaryJob;
 use App\Models\Incident;
-use App\Services\DutyRosterRecurrenceService;
-use App\Services\DutyRosterService;
 use App\Services\DailyWeatherContextService;
 use App\Services\ForecastArtifactStore;
 use App\Services\IncidentAutoAssignmentService;
@@ -165,21 +163,6 @@ Schedule::command('weather:collect-daily')
     ->dailyAt('00:30')
     ->timezone('Asia/Manila')
     ->withoutOverlapping();
-
-Artisan::command('duty-roster:sync {--station=}', function (DutyRosterService $service, DutyRosterRecurrenceService $recurrence) {
-    $station = $this->option('station');
-    $stationId = $station !== null && $station !== '' ? (int) $station : null;
-    $generated = $recurrence->generate($stationId);
-    $summary = $service->sync($stationId);
-    if ($generated > 0) {
-        $this->info("Generated {$generated} recurring shift occurrence(s).");
-    }
-    $this->info("Checked {$summary['checked']} roster-managed team(s): {$summary['activated']} active, {$summary['off_duty']} off duty, {$summary['deferred']} deferred while responding.");
-
-    return 0;
-})->purpose('Activate scheduled duty rosters and apply shift handoffs.');
-
-Schedule::command('duty-roster:sync')->everyMinute()->withoutOverlapping();
 
 Artisan::command('incidents:dispatch-queue {--timeout=2}', function (IncidentAutoAssignmentService $assignments) {
     $timeout = max(1, (int) $this->option('timeout'));

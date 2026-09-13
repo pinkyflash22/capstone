@@ -63,14 +63,13 @@ class IncidentResourceDispatchService
             }
 
             throw ValidationException::withMessages([
-                'backup' => 'No backup unit currently has both an available firetruck and at least two available firefighters.',
+                'backup' => 'No backup unit currently has both an available firetruck and an available response team.',
             ]);
         });
     }
 
     public function findAvailableTeamForStation(int $stationId, Collection|array $excludedTeamIds = []): ?Team
     {
-        app(DutyRosterService::class)->sync($stationId);
         $excluded = collect($excludedTeamIds)->filter()->map(fn ($id) => (int) $id)->all();
         $teams = Team::query()->where('station_id', $stationId)->where('status', 'available')
             ->when($excluded, fn ($query) => $query->whereNotIn('team_id', $excluded))
@@ -79,10 +78,7 @@ class IncidentResourceDispatchService
 
         foreach ($teams as $team) {
             $memberIds = $this->teamMemberIds($team);
-            if ($memberIds->count() < 2) continue;
-            $availableMembers = StationOfficer::query()->whereIn('station_officer_id', $memberIds)
-                ->where('station_id', $stationId)->where('status', 'available')->count();
-            if ($availableMembers >= 2) return $team;
+            if ($memberIds->count() >= 2) return $team;
         }
         return null;
     }
@@ -115,8 +111,6 @@ class IncidentResourceDispatchService
 
     public function teamCanAcceptIncident(Team $team, Incident $incident): bool
     {
-        app(DutyRosterService::class)->sync((int) $team->station_id);
-        $team->refresh();
         if (strtolower((string) $team->status) !== 'available') return false;
 
         $hasAnotherPendingIncident = $team->incidents()
@@ -127,12 +121,6 @@ class IncidentResourceDispatchService
 
         $memberIds = $this->teamMemberIds($team);
         if ($memberIds->count() < 2) return false;
-        $availableMembers = StationOfficer::query()
-            ->where('station_id', $team->station_id)
-            ->whereIn('station_officer_id', $memberIds)
-            ->where('status', 'available')
-            ->count();
-        if ($availableMembers < 2) return false;
 
         return ! $this->incidentRequiresFiretruck($incident)
             || $this->stationHasFiretruckCapacityForPendingAssignment(
@@ -305,7 +293,6 @@ class IncidentResourceDispatchService
                 Cache::forget("firefighter:assigned:{$userId}");
                 Cache::forget("firefighter:dashboard:widgets:{$userId}");
             }
-            if ($team->roster_managed) app(DutyRosterService::class)->syncTeam($team->fresh());
         }
         return $released;
     }

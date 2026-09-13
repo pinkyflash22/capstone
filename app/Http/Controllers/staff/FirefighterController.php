@@ -1,6 +1,9 @@
 <?php
 
 namespace App\Http\Controllers\staff;
+
+use App\Models\DutyException;
+use App\Models\DutyShift;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
@@ -22,9 +25,6 @@ use App\Models\FinalInvestigationReport;
 use App\Models\AfterActivityReport;
 use App\Models\Role;
 use App\Models\EventActivity;
-use App\Models\DutyException;
-use App\Models\DutyShift;
-use App\Services\DutyRosterRecurrenceService;
 use App\Services\IncidentResourceDispatchService;
 use App\Services\IncidentResponderSnapshotService;
 use App\Support\MediaPath;
@@ -2475,24 +2475,6 @@ public function getAssignedIncidents(string $id){
             ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId));
 
         $dutyEvents = collect();
-        if ($stationId && $stationOfficer) {
-            $from = now()->subMonths(6)->startOfDay();
-            $to = now()->addYear()->endOfDay();
-            app(DutyRosterRecurrenceService::class)->generate((int) $stationId, $from, $to);
-            $exceptions = DutyException::query()
-                ->where('station_officer_id', $stationOfficer->station_officer_id)
-                ->where('starts_at', '<', $to)->where('ends_at', '>', $from)->get();
-            $dutyEvents = DutyShift::query()
-                ->with(['assignments' => fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id), 'team.station', 'template'])
-                ->where('station_id', $stationId)->where('status', 'scheduled')
-                ->where('starts_at', '<', $to)->where('ends_at', '>', $from)
-                ->whereHas('assignments', fn ($query) => $query->where('station_officer_id', $stationOfficer->station_officer_id))
-                ->orderBy('starts_at')->get()
-                ->map(function (DutyShift $shift) use ($stationOfficer, $exceptions) {
-                    $exception = $exceptions->first(fn (DutyException $item) => $item->starts_at->lt($shift->ends_at) && $item->ends_at->gt($shift->starts_at));
-                    return $this->serializeDutyShift($shift, (int) $stationOfficer->station_officer_id, $exception);
-                });
-        }
 
         return [
             'station_id' => $stationId,

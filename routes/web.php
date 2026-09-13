@@ -30,7 +30,6 @@ use App\Http\Controllers\StationOfficerController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\UserLogController;
 use App\Http\Controllers\VoiceCallController;
-use App\Http\Controllers\DutyRosterController;
 use App\Http\Controllers\FirefighterIncidentResponseController;
 use App\Http\Controllers\IncidentCommandDispatchController;
 
@@ -412,14 +411,6 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
         Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
-        Route::prefix('duty-roster')->name('duty-roster.')->group(function () {
-            Route::get('/', [DutyRosterController::class, 'index'])->name('index');
-            Route::post('/shifts', [DutyRosterController::class, 'storeShift'])->name('shifts.store');
-            Route::put('/shifts/{dutyShift}', [DutyRosterController::class, 'updateShift'])->name('shifts.update');
-            Route::delete('/shifts/{dutyShift}', [DutyRosterController::class, 'destroyShift'])->name('shifts.destroy');
-            Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
-            Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
-        });
         Route::resource('equipment-category', EquipmentCategoryController::class);
         // Route::post('equipment-category', [EquipmentCategoryController::class, 'store']);
 
@@ -570,14 +561,6 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
         Route::put('/teams/{id}', [TeamController::class, 'update'])->name('teams.update');
         Route::patch('/teams/{id}/status', [TeamController::class, 'updateStatus'])->name('teams.status.update');
-        Route::prefix('duty-roster')->name('duty-roster.')->group(function () {
-            Route::get('/', [DutyRosterController::class, 'index'])->name('index');
-            Route::post('/shifts', [DutyRosterController::class, 'storeShift'])->name('shifts.store');
-            Route::put('/shifts/{dutyShift}', [DutyRosterController::class, 'updateShift'])->name('shifts.update');
-            Route::delete('/shifts/{dutyShift}', [DutyRosterController::class, 'destroyShift'])->name('shifts.destroy');
-            Route::post('/exceptions', [DutyRosterController::class, 'storeException'])->name('exceptions.store');
-            Route::delete('/exceptions/{dutyException}', [DutyRosterController::class, 'destroyException'])->name('exceptions.destroy');
-        });
         Route::resource('equipment-category', EquipmentCategoryController::class);
         // Route::post('equipment-category', [EquipmentCategoryController::class, 'store']);
 

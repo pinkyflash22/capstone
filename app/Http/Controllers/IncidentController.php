@@ -311,11 +311,6 @@ class IncidentController extends Controller
             'updated_at' => now()
         ]);
 
-        if (in_array($statusId, [self::STATUS_CONTROLLED, self::STATUS_CLOSED], true) && $team->roster_managed) {
-            app(\App\Services\DutyRosterService::class)->syncTeam($team->fresh());
-            $team->refresh();
-        }
-
         $teamMemberStationOfficerIds = $this->getTeamMemberStationOfficerIds($team);
         if ($stationOfficerStatus && $teamMemberStationOfficerIds->isNotEmpty()) {
             StationOfficer::whereIn('station_officer_id', $teamMemberStationOfficerIds->all())

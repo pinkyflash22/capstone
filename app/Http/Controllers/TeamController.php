@@ -78,17 +78,14 @@ class TeamController extends Controller
       public function updateStatus(Request $request,string $id){
           $team = Team::findOrFail($id);
           $this->assertStationAccess((int) ($team->station_id ?: $team->teamLeader?->station_id));
-          if ($team->roster_managed) {
-              return response()->json([
-                  'success' => false,
-                  'message' => 'This team is controlled by the duty roster. Change its schedule instead of overriding the live status.',
-              ], 409);
-          }
           $validated = $request->validate([
             'status' => 'required|in:available,responding,off',
         ]);
 
        $team->status = $validated['status'];
+        $team->roster_managed = false;
+        $team->active_duty_shift_id = null;
+        $team->pending_duty_shift_id = null;
         $team->save();
         $this->clearResourceCache((int) ($team->station_id ?: $team->teamLeader?->station_id));
         UserActivityLogger::log('updated team status', auth()->user()?->user_id, $request);
@@ -150,7 +147,6 @@ class TeamController extends Controller
         $team = Team::findOrFail($id);
         $originalStationId = (int) ($team->station_id ?: $team->teamLeader?->station_id);
         $this->assertStationAccess($originalStationId);
-        abort_if($team->roster_managed, 409, 'This team is controlled by the duty roster. Edit its scheduled shift instead.');
         
         $validated = $request->validate([
             'commander_driver' => 'sometimes|required|exists:station_officers,station_officer_id',
@@ -168,7 +164,10 @@ class TeamController extends Controller
         $this->assertStationAccess($stationId);
         $validated['station_id'] = $stationId;
         $this->validateTeamRoster($validated, $stationId, $team);
-        $team->update($validated);
+        $validated['roster_managed'] = false;
+        $validated['active_duty_shift_id'] = null;
+        $validated['pending_duty_shift_id'] = null;
+        $team->forceFill($validated)->save();
         $this->clearResourceCache($stationId);
         UserActivityLogger::log('updated team', auth()->user()?->user_id, $request);
 
@@ -263,9 +262,11 @@ class TeamController extends Controller
 
     private function clearResourceCache(int $stationId): void
     {
-        foreach (['equipment', 'officers', 'stations', 'teams', 'users', 'boundaries'] as $section) {
-            Cache::forget("resource-management:station:{$stationId}:v3:{$section}");
-            Cache::forget("resource-management:provincial:v3:{$section}");
+        foreach (['v3', 'v4'] as $version) {
+            foreach (['equipment', 'officers', 'stations', 'teams', 'users', 'boundaries'] as $section) {
+                Cache::forget("resource-management:station:{$stationId}:{$version}:{$section}");
+                Cache::forget("resource-management:provincial:{$version}:{$section}");
+            }
         }
     }
 }

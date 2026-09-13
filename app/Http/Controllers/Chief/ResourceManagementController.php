@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use App\Services\DutyRosterService;
 
 
 
@@ -49,7 +48,6 @@ class ResourceManagementController extends Controller
             foreach (['equipment', 'officers', 'stations', 'teams', 'users', 'boundaries'] as $part) Cache::forget("{$key}:{$part}");
         }
         if ($this->isProvincialAdmin()) {
-            app(DutyRosterService::class)->sync();
             $cacheKey = 'resource-management:provincial:v4';
             $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());
             $apparatusRecords = Apparatus::with(['station', 'equipment', 'loadout.stationAssignment.equipment'])->orderBy('station_id')->orderBy('unit_number')->get();
@@ -115,10 +113,6 @@ class ResourceManagementController extends Controller
         $thisStation = StationOfficer::where('user_id', $thisUser)->first();
         //ito na ung station nya mismo
         $stationExact = $thisStation?->station_id;
-        if ($stationExact) {
-            app(DutyRosterService::class)->sync((int) $stationExact);
-        }
-
        
         $cacheKey = "resource-management:station:{$stationExact}:v4";
         $equipments = Cache::remember("{$cacheKey}:equipment", now()->addSeconds(60), fn () => Equipment::orderBy('equipment_name')->get());

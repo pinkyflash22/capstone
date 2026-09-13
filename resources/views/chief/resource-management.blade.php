@@ -19,7 +19,6 @@
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/resource-management.css'])
     @vite(['resources/js/admin/resource-management.js'])
     @vite(['resources/js/admin/resources.js'])
-    @vite(['resources/css/duty-roster.css', 'resources/js/duty-roster.js'])
 
     <style>
         * {
@@ -1815,7 +1814,6 @@
 
             <nav class="resource-priority-map" aria-label="Resource management priorities">
                 <a href="#personnelResourceSection"><i class="fa-solid fa-bolt" aria-hidden="true"></i><strong>Personnel</strong></a>
-                <a href="#dutyRosterApp"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><strong>Duty roster</strong></a>
                 <a href="#teamsResourceSection"><i class="fa-solid fa-people-group" aria-hidden="true"></i><strong>Teams</strong></a>
                 <a href="#apparatusResourceSection"><i class="fa-solid fa-truck" aria-hidden="true"></i><strong>Apparatus</strong></a>
                 <a href="#equipmentResourceSection"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><strong>Equipment</strong></a>
@@ -2041,6 +2039,8 @@
                 <div class="resource-pagination">{{ $personnelPage->onEachSide(1)->links() }}</div>
             </div>
 
+            {{-- Shift and rest-day scheduling is disabled. Team availability is managed directly. --}}
+            @if(false)
             @php
                 $dutyRosterRole = strtolower(trim((string) (auth()->user()?->role?->role ?? '')));
                 $isProvincialRosterAdmin = $dutyRosterRole === 'provincial admin';
@@ -2193,6 +2193,7 @@
                 </dialog>
                 <script type="application/json" id="dutyRosterConfig">{!! json_encode(['baseUrl' => url($isProvincialRosterAdmin ? '/admin/duty-roster' : '/station-admin/duty-roster'), 'timezone' => config('app.timezone'), 'stationId' => $dutyRosterStationId, 'isProvincialAdmin' => $isProvincialRosterAdmin], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
             </section>
+            @endif
             @endif
 
             <!-- Teams Table -->
