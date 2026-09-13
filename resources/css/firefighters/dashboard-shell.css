@@ -5,6 +5,17 @@
         }
 
 .firefighter-map-stage .map-container { position: relative; }
+.ff-self-location-card { position:absolute; left:14px; top:14px; z-index:820; max-width:min(300px,calc(100% - 92px)); min-height:48px; display:grid; grid-template-columns:34px minmax(0,1fr) 34px; align-items:center; gap:9px; padding:7px 8px; border:1px solid rgba(226,232,240,.94); border-radius:15px; background:rgba(255,255,255,.96); color:#0f172a; box-shadow:0 12px 28px rgba(15,23,42,.14); backdrop-filter:blur(10px); }
+.ff-self-location-card__icon { width:34px; height:34px; display:grid; place-items:center; border-radius:11px; color:#2563eb; background:#eff6ff; }
+.ff-self-location-card__copy { min-width:0; display:grid; gap:2px; }
+.ff-self-location-card__copy strong { font-size:11px; line-height:1.2; font-weight:900; }
+.ff-self-location-card__copy small { overflow:hidden; color:#64748b; font-size:10px; line-height:1.25; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.ff-self-location-card button { width:34px; height:34px; display:grid; place-items:center; border:0; border-radius:11px; background:#fff7ed; color:#c2410c; cursor:pointer; }
+.ff-self-location-card[data-state="ready"] .ff-self-location-card__icon { color:#047857; background:#ecfdf5; }
+.ff-self-location-card[data-state="error"] .ff-self-location-card__icon { color:#b91c1c; background:#fef2f2; }
+.pyro-firefighter-self-marker { width:28px; height:28px; display:grid; place-items:center; border:3px solid #fff; border-radius:999px; background:#2563eb; color:#fff; box-shadow:0 0 0 6px rgba(37,99,235,.16),0 7px 16px rgba(15,23,42,.24); font-size:11px; animation:ff-self-location-pulse 2s ease-in-out infinite; }
+@keyframes ff-self-location-pulse { 0%,100%{box-shadow:0 0 0 4px rgba(37,99,235,.12),0 7px 16px rgba(15,23,42,.24)} 50%{box-shadow:0 0 0 9px rgba(37,99,235,.04),0 7px 16px rgba(15,23,42,.24)} }
+@media(max-width:768px){body.firefighter-dashboard-page .ff-self-location-card{top:auto;bottom:calc(108px + env(safe-area-inset-bottom,0px));left:14px;max-width:calc(100vw - 88px);min-height:46px;grid-template-columns:32px minmax(0,1fr) 32px;border-radius:14px}body.firefighter-dashboard-page .ff-self-location-card__icon,body.firefighter-dashboard-page .ff-self-location-card button{width:32px;height:32px}}
 .ff-response-units { position:static; width:100%; overflow:hidden; border:1px solid rgba(148,163,184,.26); border-radius:15px; color:#1e293b; background:#fff; box-shadow:none; }
 .ff-response-units--integrated { margin:0 0 12px; }
 .ff-response-units__head { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; color:#7f1d1d; background:#fff7f5; font-size:11px; font-weight:850; letter-spacing:.04em; }

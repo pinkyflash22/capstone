@@ -30,7 +30,9 @@ class ApparatusLocationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Apparatus location updated.',
+            'message' => $updated->status === 'on_scene'
+                ? 'Arrival detected. Incident updated to On Scene.'
+                : 'Apparatus location updated.',
             'unit' => $resources->serializeUnit($updated),
         ]);
     }

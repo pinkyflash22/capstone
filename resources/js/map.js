@@ -85,6 +85,8 @@ let latestIncidentsCache = {
 const incidentDetailsCache = new Map();
 const incidentDetailsRequestCache = new Map();
 const TRUCK_REALTIME_REFRESH_MS = 2000;
+const LIVE_INCIDENT_ARRIVAL_RADIUS_METERS = 150;
+const DEMO_ROUTE_COMPLETION_RADIUS_METERS = 50;
 
 // Shape management variables
 let manageShapesMode = false;
@@ -838,6 +840,12 @@ function updateTruckTraveledPath(truck, lat, lng) {
     }
 }
 
+function getRouteArrivalRadiusMeters(truck) {
+    return !isDemoRouteSource(truck?.routeSource) && truck?.movementMode === 'response'
+        ? LIVE_INCIDENT_ARRIVAL_RADIUS_METERS
+        : DEMO_ROUTE_COMPLETION_RADIUS_METERS;
+}
+
 function updateTruckMarkerFromRealtimeLocation(routeId, location) {
     const truck = activeTrucks.get(routeId);
     if (!truck || !truck.animatedVehicle || !location) {
@@ -876,7 +884,7 @@ function updateTruckMarkerFromRealtimeLocation(routeId, location) {
     // Do not queue another "moving" write once the GPS position is already
     // within the arrival radius. That late write could otherwise race the
     // completion request and make the route appear active again.
-    if (truck.persisted !== false && distanceToIncident <= 50) {
+    if (truck.persisted !== false && distanceToIncident <= getRouteArrivalRadiusMeters(truck)) {
         finalizeTruckArrival(routeId, location.lat, location.lng).catch((error) => {
             console.error('Failed to sync realtime truck arrival status:', error);
         });
@@ -9195,8 +9203,9 @@ async function syncTruckArrivalStatus(routeId, lat, lng) {
         truck.routeDestination.lng
     );
 
-    // Consider the truck "arrived/near target" within 50 meters.
-    if (distanceToIncident <= 50) {
+    // Live incident response coordinates can be approximate; accept the
+    // operational arrival radius while demo playback keeps its old threshold.
+    if (distanceToIncident <= getRouteArrivalRadiusMeters(truck)) {
         await finalizeTruckArrival(routeId, lat, lng);
     }
 }

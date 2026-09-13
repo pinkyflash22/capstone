@@ -520,10 +520,10 @@
             position: absolute;
             inset: 50% auto auto 50%;
             transform: translate(-50%, -50%);
-            width: min(1040px, calc(100vw - 40px));
-            max-height: calc(100vh - 56px);
+            width: min(720px, calc(100vw - 32px));
+            max-height: min(82vh, 760px);
             background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
-            border-radius: 28px;
+            border-radius: 22px;
             border: 1px solid rgba(226, 232, 240, 0.95);
             box-shadow: 0 32px 70px rgba(15, 23, 42, 0.22);
             overflow: hidden;
@@ -536,7 +536,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            padding: 18px 22px;
+            padding: 14px 16px;
             border-bottom: 1px solid rgba(226, 232, 240, 0.92);
         }
 
@@ -559,15 +559,15 @@
         .firefighter-assigned-queue-modal__title {
             margin: 0;
             color: #0f172a;
-            font-size: 1.45rem;
+            font-size: 1.18rem;
             line-height: 1.08;
             font-weight: 900;
         }
 
         .firefighter-assigned-queue-modal__refresh,
         .firefighter-assigned-queue-modal__close {
-            width: 42px;
-            height: 42px;
+            width: 36px;
+            height: 36px;
             border: none;
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.92);
@@ -579,8 +579,9 @@
         }
 
         .firefighter-assigned-queue-modal__content {
-            padding: 20px 22px 22px;
+            padding: 12px 16px 16px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .firefighter-assigned-queue-modal__content [data-ff-insights-source] {
@@ -598,6 +599,53 @@
 
         .firefighter-assigned-queue-modal__content .assigned-incidents-container.is-in-modal .section-header {
             display: none !important;
+        }
+
+        .firefighter-assigned-queue-modal__content .assigned-incidents-container {
+            width: 100%;
+            min-width: 0;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-response-units--integrated {
+            margin-bottom: 8px;
+            border-radius: 12px;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incident-row {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 0.45rem;
+            padding: 0.62rem 0;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__main {
+            grid-template-columns: 48px minmax(0, 1fr);
+            gap: 0.62rem;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__media {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            min-height: 48px;
+            border-radius: 0.75rem;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__actions {
+            justify-content: flex-start;
+            padding-left: 58px;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__action {
+            min-height: 30px;
+            padding: 0 0.64rem;
+            font-size: 0.66rem;
         }
 
         @media (max-width: 768px) {
@@ -645,8 +693,8 @@
                 inset: auto 10px calc(10px + env(safe-area-inset-bottom, 0px)) 10px;
                 transform: none;
                 width: auto;
-                max-height: min(76svh, 760px);
-                border-radius: 24px;
+                max-height: min(82svh, 720px);
+                border-radius: 20px;
             }
 
             .firefighter-assigned-queue-modal__header {
@@ -750,11 +798,11 @@
             }
 
             .firefighter-assigned-queue-modal__content .ff-assigned-incident-row__actions {
-                padding-left: 0;
-                justify-content: flex-end;
+                padding-left: 52px;
+                justify-content: flex-start;
                 align-self: center;
                 gap: 0.3rem;
-                flex-wrap: nowrap;
+                flex-wrap: wrap;
                 max-width: 100%;
             }
 
@@ -1485,6 +1533,16 @@
             </div>
             <div class="map-container overflow-hidden rounded-2xl border border-slate-200">
                 <div id="firefighterDashboardMap" class="bg-gray-200" style="height: 500px;"></div>
+                <div class="ff-self-location-card" id="firefighterLocationCard" data-state="locating" aria-live="polite">
+                    <span class="ff-self-location-card__icon" aria-hidden="true"><i class="fas fa-location-crosshairs"></i></span>
+                    <span class="ff-self-location-card__copy">
+                        <strong>Your location</strong>
+                        <small id="firefighterLocationStatus">Locating your device...</small>
+                    </span>
+                    <button type="button" id="firefighterLocateMe" aria-label="Center map on your location" title="Center map on your location">
+                        <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <button type="button" class="ff-mobile-map-layers-button" data-ff-mobile-map-layers-button aria-label="Open map layers">
                     <i class="fas fa-layer-group" aria-hidden="true"></i>
                     <span data-ff-mobile-map-layers-count hidden>0</span>
@@ -1509,7 +1567,7 @@
             </div>
             <div id="activeResponseUnitsPanel" class="ff-response-units ff-response-units--integrated" aria-live="polite" aria-label="Active response tracking">
                 <div class="ff-response-units__head"><span><i class="fas fa-truck-fast"></i> Assigned response tracking</span><strong id="activeResponseUnitsCount">0</strong></div>
-                <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span><button type="button" id="apparatusTrackingInstall" hidden><i class="fas fa-download"></i> Install app</button></div>
+                <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span></div>
             </div>
             <div id="assignedIncidentsList" class="incident-list">
                 <div class="empty-incidents">
@@ -1866,7 +1924,7 @@
         <span class="firefighter-mobile-assigned-fab__count" id="firefighterMobileAssignedFabCount">0</span>
     </button>
 
-    <div class="firefighter-assigned-queue-modal" id="firefighterAssignedQueueModal" aria-hidden="true">
+    <div class="firefighter-assigned-queue-modal" id="firefighterAssignedQueueModal" aria-hidden="true" inert>
         <div class="firefighter-assigned-queue-modal__backdrop" data-ff-assigned-queue-close></div>
         <div class="firefighter-assigned-queue-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="firefighterAssignedQueueTitle">
             <div class="firefighter-assigned-queue-modal__header">

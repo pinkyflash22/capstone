@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 class IncidentResourceDispatchService
 {
     private const ACTIVE_UNIT_STATUSES = ['reserved', 'en_route', 'on_scene'];
+    private const LIVE_INCIDENT_ARRIVAL_RADIUS_METERS = 150;
+    private const MAX_AUTOMATIC_ARRIVAL_GPS_ACCURACY_METERS = 150;
 
     public function reservePrimary(Incident $incident, Team $team, int $stationId, ?float $distanceMeters = null, ?int $requestedBy = null): ?IncidentResponseUnit
     {
@@ -382,6 +384,18 @@ class IncidentResourceDispatchService
                     'distance_meters' => $remaining,
                     'estimated_arrival_at' => now()->addMinutes($etaMinutes),
                 ]);
+
+                $accuracy = isset($telemetry['accuracy']) ? (float) $telemetry['accuracy'] : null;
+                $hasReliableArrivalFix = $accuracy !== null
+                    && $accuracy > 0
+                    && $accuracy <= self::MAX_AUTOMATIC_ARRIVAL_GPS_ACCURACY_METERS;
+                $incident = $lockedUnit->incident;
+                if ($hasReliableArrivalFix
+                    && $remaining <= self::LIVE_INCIDENT_ARRIVAL_RADIUS_METERS
+                    && strtolower(trim((string) $incident?->status)) === 'responding') {
+                    $incident->forceFill(['status' => 'On Scene'])->save();
+                    $this->markIncidentUnitsOnScene($incident);
+                }
             }
 
             return $lockedUnit->fresh();

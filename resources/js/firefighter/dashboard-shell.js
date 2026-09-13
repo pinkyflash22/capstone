@@ -97,6 +97,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             accuracy: fix.accuracy,
             timestamp: fix.timestamp,
         });
+        updateFirefighterLocationDisplay('ready', fix);
         if (sendUserLocation) sendUserLocationToServer(fix.lat, fix.lng);
         if (paintLocation) paintCurrentUserLocation(fix.lat, fix.lng, fix.accuracy);
         if (window.userMarker) window.userMarker.setLatLng([fix.lat, fix.lng]);
@@ -139,9 +140,12 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         apparatusLocationWatchId = navigator.geolocation.watchPosition(
             position => {
                 if (!firefighterDashboardIsVisible() && !firefighterPwaIsStandalone()) return;
-                applyApparatusGpsPosition(position);
+                applyApparatusGpsPosition(position, { paintLocation: true });
             },
-            error => console.warn('Live apparatus GPS watch unavailable:', error),
+            error => {
+                if (!lastAcceptedApparatusFix) updateFirefighterLocationDisplay('error', null, geolocationErrorMessage(error));
+                console.warn('Live firefighter GPS watch unavailable:', error);
+            },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
         );
     }
@@ -155,7 +159,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    applyApparatusGpsPosition(position, { sendUserLocation: true });
+                    applyApparatusGpsPosition(position, { sendUserLocation: true, paintLocation: true });
                 },
                 function(error) {
                     console.error("Location update error:", error);
@@ -1579,8 +1583,13 @@ async function publishDriverApparatusLocation(position) {
                 throw requestError;
             }
             const index = activeResponseUnitsData.findIndex(item => Number(item.id) === Number(unit.id));
+            const arrivedNow = payload.unit?.status === 'on_scene' && activeResponseUnitsData[index]?.status !== 'on_scene';
             if (index >= 0 && payload.unit) activeResponseUnitsData[index] = { ...activeResponseUnitsData[index], ...payload.unit };
             renderActiveResponseUnits(activeResponseUnitsData);
+            if (arrivedNow) {
+                showToast(payload.message || 'Arrival detected. Incident updated to On Scene.', 'success');
+                await Promise.allSettled([fetchAssignedIncidents(true), refreshFirefighterLiveMap()]);
+            }
         } catch (error) {
             console.warn('Apparatus telemetry update failed:', error);
             if (!navigator.onLine || error.canQueue || error instanceof TypeError) {
@@ -1631,7 +1640,6 @@ function currentUserIsActiveApparatusDriver() {
 async function updateApparatusTrackingState() {
     const state = document.getElementById('apparatusTrackingState');
     const wrapper = state?.closest('.ff-apparatus-tracking');
-    const install = document.getElementById('apparatusTrackingInstall');
     if (!state || !wrapper) return;
     const isDriver = currentUserIsActiveApparatusDriver();
     const queued = getQueuedApparatusTelemetry().length;
@@ -1640,8 +1648,6 @@ async function updateApparatusTrackingState() {
     state.innerHTML = queued > 0
         ? `<i class="fas fa-cloud-arrow-up"></i> ${queued} GPS update${queued === 1 ? '' : 's'} queued offline`
         : (isDriver ? `<i class="fas fa-satellite-dish"></i> Live apparatus GPS active${apparatusWakeLock ? ' / screen awake' : ''}` : '<i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run');
-    const standalone = firefighterPwaIsStandalone();
-    if (install) install.hidden = standalone || !window.laravelPwaInstall?.canInstall?.();
     if (isDriver && document.visibilityState === 'visible' && 'wakeLock' in navigator && !apparatusWakeLock) {
         try {
             apparatusWakeLock = await navigator.wakeLock.request('screen');
@@ -1653,9 +1659,7 @@ async function updateApparatusTrackingState() {
     }
 }
 
-document.getElementById('apparatusTrackingInstall')?.addEventListener('click', () => window.laravelPwaInstall?.showPrompt?.());
 window.addEventListener('online', flushQueuedApparatusTelemetry);
-window.addEventListener('pwa-installable', updateApparatusTrackingState);
 
 window.refreshActiveResponseUnits = refreshActiveResponseUnits;
 
@@ -1756,54 +1760,75 @@ function showFalseAlarmConfirmationToast() {
         });
     }
     
+    function geolocationErrorMessage(error) {
+        if (error?.code === 1) return 'Location permission is off';
+        if (error?.code === 2) return 'GPS signal is unavailable';
+        if (error?.code === 3) return 'Location request timed out';
+        return 'Location is unavailable';
+    }
+
+    function updateFirefighterLocationDisplay(state, fix = null, message = '') {
+        const card = document.getElementById('firefighterLocationCard');
+        const status = document.getElementById('firefighterLocationStatus');
+        if (!card || !status) return;
+
+        card.dataset.state = state;
+        if (state === 'ready' && fix) {
+            const accuracy = Number.isFinite(Number(fix.accuracy)) ? ` / +/-${Math.round(Number(fix.accuracy))} m` : '';
+            status.textContent = `${Number(fix.lat).toFixed(5)}, ${Number(fix.lng).toFixed(5)}${accuracy}`;
+            return;
+        }
+
+        status.textContent = message || (state === 'locating' ? 'Locating your device...' : 'Location is unavailable');
+    }
+
     function paintCurrentUserLocation(lat, lng, accuracy = 50) {
         if (!window.map || typeof L === 'undefined') {
             return;
         }
 
-        if (window.userMarker) {
-            window.map.removeLayer(window.userMarker);
+        if (!window.userMarker && window.firefighterMarkers?.[window.currentUserId]) {
+            window.userMarker = window.firefighterMarkers[window.currentUserId];
         }
 
-        window.userMarker = L.marker([lat, lng], {
-            icon: L.divIcon({
-                className: 'user-location-marker',
-                html: `<div style="
-                    width: 24px;
-                    height: 24px;
-                    background-color: #3b82f6;
-                    border: 3px solid white;
-                    border-radius: 50%;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                    animation: pulse 2s infinite;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">
-                    <i class="fas fa-user" style="color: white; font-size: 12px;"></i>
-                </div>`,
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            })
-        }).bindPopup("You are here").addTo(window.map);
+        if (window.userMarker) {
+            window.userMarker.setLatLng([lat, lng]);
+        } else {
+            window.userMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'user-location-marker',
+                    html: '<div class="pyro-firefighter-self-marker"><i class="fas fa-user"></i></div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                })
+            }).bindPopup('Your live location').addTo(window.map);
+        }
+        window.firefighterMarkers = window.firefighterMarkers || {};
+        window.firefighterMarkers[window.currentUserId] = window.userMarker;
 
         if (window.userAccuracyCircle) {
-            window.map.removeLayer(window.userAccuracyCircle);
+            window.userAccuracyCircle
+                .setLatLng([lat, lng])
+                .setRadius(Math.max(10, Number(accuracy) || 50));
+        } else {
+            window.userAccuracyCircle = L.circle([lat, lng], {
+                color: '#3b82f6',
+                weight: 1,
+                fillColor: '#3b82f6',
+                fillOpacity: 0.08,
+                radius: Math.max(10, Number(accuracy) || 50)
+            }).addTo(window.map);
         }
-
-        window.userAccuracyCircle = L.circle([lat, lng], {
-            color: '#3b82f6',
-            fillColor: '#3b82f6',
-            fillOpacity: 0.1,
-            radius: Math.max(10, Math.min(MAX_LIVE_GPS_ACCURACY_METERS, Number(accuracy) || 50))
-        }).addTo(window.map);
     }
 
     function initializeFirefighterGeolocation() {
         if (!navigator.geolocation) {
+            updateFirefighterLocationDisplay('error', null, 'Location is not supported on this device');
             console.warn("Geolocation not supported");
             return;
         }
+
+        updateFirefighterLocationDisplay('locating');
 
         navigator.geolocation.getCurrentPosition(
             function(position) {
@@ -1812,11 +1837,22 @@ function showFalseAlarmConfirmationToast() {
                 }
             },
             function(error) {
+                updateFirefighterLocationDisplay('error', null, geolocationErrorMessage(error));
                 console.error("Location error:", error);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
+
+    document.getElementById('firefighterLocateMe')?.addEventListener('click', function () {
+        if (lastAcceptedApparatusFix && window.map) {
+            paintCurrentUserLocation(lastAcceptedApparatusFix.lat, lastAcceptedApparatusFix.lng, lastAcceptedApparatusFix.accuracy);
+            window.map.setView([lastAcceptedApparatusFix.lat, lastAcceptedApparatusFix.lng], Math.max(window.map.getZoom(), 16), { animate: true });
+            return;
+        }
+
+        initializeFirefighterGeolocation();
+    });
 
     function hydrateDashboardFromCache() {
         const cachedWidgets = readDashboardCache(FF_WIDGET_CACHE_KEY, null);
@@ -2545,6 +2581,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const assignedQueueCloseButtons = document.querySelectorAll('[data-ff-assigned-queue-close]');
     const assignedQueueSection = document.querySelector('.assigned-incidents-container[data-ff-insights-section="assigned"]');
     let assignedQueuePlaceholder = null;
+    let assignedQueuePreviousFocus = null;
 
     function moveAssignedQueueIntoModal() {
         if (!assignedQueueSection || !assignedQueueModalContent) {
@@ -2585,8 +2622,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         moveAssignedQueueIntoModal();
+        assignedQueuePreviousFocus = document.activeElement;
+        assignedQueueModal.removeAttribute('inert');
         assignedQueueModal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('menu-open');
+        window.requestAnimationFrame(() => assignedQueueModal.querySelector('.firefighter-assigned-queue-modal__close')?.focus());
     }
 
     function closeAssignedQueueModal() {
@@ -2594,9 +2634,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const focusTarget = assignedQueuePreviousFocus?.isConnected ? assignedQueuePreviousFocus : assignedFab;
+        focusTarget?.focus?.();
         restoreAssignedQueueFromModal();
         assignedQueueModal.setAttribute('aria-hidden', 'true');
+        assignedQueueModal.setAttribute('inert', '');
         document.body.classList.remove('menu-open');
+        assignedQueuePreviousFocus = null;
     }
 
     window.openFirefighterAssignedQueueModal = openAssignedQueueModal;
