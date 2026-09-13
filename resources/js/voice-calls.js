@@ -1030,7 +1030,11 @@ function renderIncoming(payload) {
     const missedCalls = payload.missed_calls || [];
     const recentContacts = payload.recent_contacts || [];
     if (responderPanelOpen) void markMissedCallsSeen(missedCalls);
-    const unseenMissedCalls = missedCalls.filter((call) => !call.is_seen);
+    const unseenMissedCalls = missedCalls.filter((call) => {
+        if (call.is_seen || call.is_notification_recent === false) return false;
+        const occurredAt = new Date(call.ended_at || call.created_at || 0).getTime();
+        return Number.isFinite(occurredAt) && occurredAt > Date.now() - (30 * 60 * 1000);
+    });
     const activeCalls = payload.active_calls || (payload.active_call ? [payload.active_call] : []);
     const outgoingCalls = payload.outgoing_calls || [];
     const liveCalls = [...activeCalls, ...outgoingCalls];

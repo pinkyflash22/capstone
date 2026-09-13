@@ -730,8 +730,9 @@ class VoiceCallController extends Controller
             ] : null,
             'is_flagged_prank' => filled($call->flagged_at),
             'is_seen' => $viewer && $this->isStationResponder($viewer)
-                ? ($seen ?? $this->hasSeenCall($viewer, $call))
+                ? ($this->missedNotificationExpired($call) || ($seen ?? $this->hasSeenCall($viewer, $call)))
                 : false,
+            'is_notification_recent' => ! $this->missedNotificationExpired($call),
             'flag_reason' => $call->flag_reason,
             'created_at' => $call->created_at?->toIso8601String(),
             'queued_at' => $call->queued_at?->toIso8601String(),
@@ -936,23 +937,45 @@ class VoiceCallController extends Controller
 
     private function seenCallIds(User $user, $calls): array
     {
-        $keysById = collect($calls)->mapWithKeys(
+        $calls = collect($calls);
+        $expiredIds = $calls
+            ->filter(fn (VoiceCall $call) => $this->missedNotificationExpired($call))
+            ->mapWithKeys(fn (VoiceCall $call) => [(int) $call->id => true]);
+        $keysById = $calls
+            ->reject(fn (VoiceCall $call) => $this->missedNotificationExpired($call))
+            ->mapWithKeys(
             fn (VoiceCall $call) => [(int) $call->id => $this->seenCacheKey($user, $call)]
         );
         if ($keysById->isEmpty()) {
-            return [];
+            return $expiredIds->all();
         }
 
         try {
             $values = Cache::many($keysById->values()->all());
 
-            return $keysById
+            return $expiredIds->union($keysById
                 ->filter(fn (string $key) => (bool) ($values[$key] ?? false))
                 ->mapWithKeys(fn (string $key, int $callId) => [$callId => true])
-                ->all();
+            )->all();
         } catch (\Throwable) {
-            return [];
+            return $expiredIds->all();
         }
+    }
+
+    private function missedNotificationExpired(VoiceCall $call): bool
+    {
+        if ($call->status !== VoiceCall::STATUS_MISSED) {
+            return false;
+        }
+
+        $occurredAt = $call->ended_at ?? $call->created_at;
+        if (! $occurredAt) {
+            return true;
+        }
+
+        $minutes = max(1, (int) config('services.voice_calls.missed_notification_window_minutes', 30));
+
+        return $occurredAt->lte(now()->subMinutes($minutes));
     }
 
     private function authorizeCallVisibility(VoiceCall $call, User $user): void
