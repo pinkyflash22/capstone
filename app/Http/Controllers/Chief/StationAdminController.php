@@ -1829,9 +1829,9 @@ class StationAdminController extends Controller
             ->filter()
             ->values();
 
-        $reportType = in_array($request->string('type')->toString(), ['spot', 'progress', 'final'], true)
+        $reportType = in_array($request->string('type')->toString(), ['all', 'spot', 'progress', 'final'], true)
             ? $request->string('type')->toString()
-            : 'spot';
+            : 'all';
         $search = trim($request->string('search')->toString());
         $status = trim($request->string('status')->toString());
         $dateFrom = $request->date('date_from')?->toDateString();
@@ -1885,7 +1885,7 @@ class StationAdminController extends Controller
                             });
                     });
                 }),
-            default => SpotInvestigationReport::query()
+            'spot' => SpotInvestigationReport::query()
                 ->with([
                     'incident.marker',
                     'investigator.user',
@@ -1907,25 +1907,40 @@ class StationAdminController extends Controller
                 ->when(in_array($status, ['residential', 'commercial', 'industrial'], true), fn ($query) => $query->whereRaw('LOWER(occupancy) = ?', [$status]))
                 ->when($status === 'filed', fn ($query) => $query->whereDoesntHave('progressInvestigation'))
                 ->when($status === 'progressed', fn ($query) => $query->whereHas('progressInvestigation')),
+            default => null,
         };
 
-        $reportQuery
-            ->when($dateFrom, fn ($query, $value) => $query->whereDate('created_at', '>=', $value))
-            ->when($dateTo, fn ($query, $value) => $query->whereDate('created_at', '<=', $value));
-
-        if (in_array($sort, ['damage_high', 'damage_low'], true) && in_array($reportType, ['spot', 'final'], true)) {
-            $damageColumn = $reportType === 'spot' ? 'estimated_damage' : 'total_damage';
-            $reportQuery->orderBy($damageColumn, $sort === 'damage_high' ? 'desc' : 'asc');
+        if ($reportType === 'all') {
+            $reportRows = $this->paginateAllExecutiveReports(
+                $request,
+                $stationOfficerIds->all(),
+                $stationId,
+                $search,
+                $status,
+                $dateFrom,
+                $dateTo,
+                $sort,
+                $perPage,
+            );
         } else {
-            $reportQuery->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc');
-        }
+            $reportQuery
+                ->when($dateFrom, fn ($query, $value) => $query->whereDate('created_at', '>=', $value))
+                ->when($dateTo, fn ($query, $value) => $query->whereDate('created_at', '<=', $value));
 
-        $reportRows = $reportQuery
-            ->paginate($perPage, ['*'], 'reports_page')
-            ->withQueryString();
-        $reportRows->setCollection(
-            $reportRows->getCollection()->map(fn ($report) => $this->serializeExecutiveReportRecord($report, $reportType, $stationId))
-        );
+            if (in_array($sort, ['damage_high', 'damage_low'], true) && in_array($reportType, ['spot', 'final'], true)) {
+                $damageColumn = $reportType === 'spot' ? 'estimated_damage' : 'total_damage';
+                $reportQuery->orderBy($damageColumn, $sort === 'damage_high' ? 'desc' : 'asc');
+            } else {
+                $reportQuery->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc');
+            }
+
+            $reportRows = $reportQuery
+                ->paginate($perPage, ['*'], 'reports_page')
+                ->withQueryString();
+            $reportRows->setCollection(
+                $reportRows->getCollection()->map(fn ($report) => $this->serializeExecutiveReportRecord($report, $reportType, $stationId))
+            );
+        }
 
         $reportCounts = [
             'spot' => SpotInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
@@ -2833,6 +2848,83 @@ class StationAdminController extends Controller
         ];
     }
 
+    private function paginateAllExecutiveReports(
+        Request $request,
+        array $stationOfficerIds,
+        int $stationId,
+        string $search,
+        string $status,
+        ?string $dateFrom,
+        ?string $dateTo,
+        string $sort,
+        int $perPage,
+    ): \Illuminate\Pagination\LengthAwarePaginator {
+        $rows = collect()
+            ->concat(
+                SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation'])
+                    ->whereIn('station_officer_id', $stationOfficerIds)
+                    ->get()
+                    ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'spot', $stationId))
+            )
+            ->concat(
+                ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'fireOrigin', 'finalInvestigation'])
+                    ->whereIn('station_officer_id', $stationOfficerIds)
+                    ->get()
+                    ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'progress', $stationId))
+            )
+            ->concat(
+                FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation.investigator.user'])
+                    ->whereIn('station_officer_id', $stationOfficerIds)
+                    ->get()
+                    ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'final', $stationId))
+            );
+
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $rows = $rows->filter(function (array $row) use ($needle) {
+                $searchable = collect($row)
+                    ->except(['fields'])
+                    ->map(fn ($value) => is_scalar($value) ? (string) $value : '')
+                    ->implode(' ');
+
+                return str_contains(mb_strtolower($searchable), $needle);
+            });
+        }
+
+        if ($status !== '') {
+            $rows = $rows->filter(fn (array $row) => ($row['status'] ?? '') === $status
+                || mb_strtolower((string) ($row['occupancy'] ?? '')) === $status);
+        }
+
+        $rows = $rows
+            ->when($dateFrom, fn ($items, $value) => $items->filter(
+                fn (array $row) => optional($row['created_at'])->toDateString() >= $value
+            ))
+            ->when($dateTo, fn ($items, $value) => $items->filter(
+                fn (array $row) => optional($row['created_at'])->toDateString() <= $value
+            ))
+            ->sortBy(
+                fn (array $row) => optional($row['created_at'])->getTimestamp() ?? 0,
+                SORT_REGULAR,
+                $sort !== 'oldest'
+            )
+            ->values();
+
+        $page = max(1, $request->integer('reports_page', 1));
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'pageName' => 'reports_page',
+                'query' => $request->query(),
+            ],
+        );
+    }
+
     private function serializeExecutiveReportRecord($report, string $reportType, int $stationId): array
     {
         if ($reportType === 'progress') {
@@ -2842,7 +2934,7 @@ class StationAdminController extends Controller
                 'id' => $report->progress_investigation_report_id,
                 'type' => 'progress',
                 'incident_id' => $incident?->incident_id,
-                'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+                'incident_title' => $incident?->marker?->title ?: 'Fire incident',
                 'investigator' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
                 'station_id' => $stationId,
                 'station_name' => $report->investigator?->station?->station_name,
@@ -2852,6 +2944,10 @@ class StationAdminController extends Controller
                 'responsible_arson' => $report->responsible_arson ?: 'Not recorded',
                 'created_at' => $report->created_at,
                 'completed_at' => $report->report_completed_at,
+                'fields' => $report->only([
+                    'memorandum_for', 'mission_order_number', 'mission_order_date', 'responsible_arson',
+                    'fire_cause', 'facts_of_case', 'disposition', 'report_completed_at',
+                ]),
             ];
         }
 
@@ -2863,7 +2959,7 @@ class StationAdminController extends Controller
                 'id' => $report->final_investigation_report_id,
                 'type' => 'final',
                 'incident_id' => $incident?->incident_id,
-                'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+                'incident_title' => $incident?->marker?->title ?: 'Fire incident',
                 'investigator' => trim(($investigator?->first_name ?? '').' '.($investigator?->last_name ?? '')) ?: 'Unassigned investigator',
                 'station_id' => $stationId,
                 'station_name' => $report->investigator?->station?->station_name,
@@ -2873,6 +2969,11 @@ class StationAdminController extends Controller
                 'cause_of_fire' => $report->cause_of_fire ?: 'Not recorded',
                 'created_at' => $report->created_at,
                 'completed_at' => $report->report_completed_at,
+                'fields' => $report->only([
+                    'memorandum_for', 'office_address', 'alarm_at', 'establishment_burned', 'fire_victims',
+                    'origin_of_fire', 'cause_of_fire', 'exact_address', 'total_damage', 'facts_of_case',
+                    'discussion', 'findings', 'recommendation', 'report_completed_at',
+                ]),
             ];
         }
 
@@ -2882,7 +2983,7 @@ class StationAdminController extends Controller
             'id' => $report->spot_investigation_report_id,
             'type' => 'spot',
             'incident_id' => $incident?->incident_id,
-            'incident_title' => $incident?->marker?->title ?: ('Incident #'.($incident?->incident_id ?? 'N/A')),
+            'incident_title' => $incident?->marker?->title ?: 'Fire incident',
             'investigator' => trim(($report->investigator?->user?->first_name ?? '').' '.($report->investigator?->user?->last_name ?? '')) ?: 'Unassigned investigator',
             'station_id' => $stationId,
             'station_name' => $report->investigator?->station?->station_name,
@@ -2896,6 +2997,12 @@ class StationAdminController extends Controller
             'fire_out' => $report->fire_out,
             'created_at' => $report->created_at,
             'completed_at' => $report->report_completed_at,
+            'fields' => $report->only([
+                'memorandum_for', 'place_of_occurrence', 'involved_structure', 'establishment_name',
+                'occupant', 'owner', 'occupancy', 'estimated_damage', 'estimated_area', 'dead', 'injured',
+                'highest_alarm_level', 'affected_establishments_count', 'description', 'fatality_details',
+                'details_of_investigation', 'disposition', 'fire_started', 'fire_out',
+            ]),
         ];
     }
 
