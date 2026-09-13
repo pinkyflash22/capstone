@@ -11,36 +11,45 @@ class ProgressNarrativeDraftService
 
     public function __construct()
     {
-        $this->apiKey = env('OPENROUTER_API_KEY');
+        $this->apiKey = config('services.openrouter.api_key');
     }
 
     public function draftProgressNarrative(array $context): string
     {
         if (! $this->apiKey) {
-            throw new \RuntimeException('OpenRouter API key is not configured.');
+            Log::warning('Progress narrative used the local fallback because OpenRouter is not configured.');
+
+            return $this->draftLocalFallback($context);
         }
 
         $errors = [];
 
         foreach ($this->getModelCandidates() as $model) {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->connectTimeout(10)->timeout(35)->post('https://openrouter.ai/api/v1/chat/completions', [
-                'model' => $model,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a Bureau of Fire Protection report-writing assistant. Rewrite mixed Tagalog and English investigation notes into a clear, formal Progress Investigation Report narrative for the Facts of the Case section. Keep only facts provided by the user or linked report context, and do not invent, assume, estimate, or embellish missing facts. Return plain narrative paragraphs only with no bullets, headings, labels, markdown, or quotation marks. Prefer 2 to 3 paragraphs: first for the investigation authority and incident context, second for established facts and witness or scene findings, third for responsibility, cause, laboratory or follow-up findings when present. Separate paragraphs with one blank line. Omit any missing item instead of guessing.',
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ])->connectTimeout((int) config('services.openrouter.connect_timeout', 8))
+                    ->timeout((int) config('services.openrouter.timeout', 90))
+                    ->post('https://openrouter.ai/api/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'You are a Bureau of Fire Protection report-writing assistant. Rewrite mixed Tagalog and English investigation notes into a clear, formal Progress Investigation Report narrative for the Facts of the Case section. Keep only facts provided by the user or linked report context, and do not invent, assume, estimate, or embellish missing facts. Return plain narrative paragraphs only with no bullets, headings, labels, markdown, or quotation marks. Prefer 2 to 3 paragraphs: first for the investigation authority and incident context, second for established facts and witness or scene findings, third for responsibility, cause, laboratory or follow-up findings when present. Separate paragraphs with one blank line. Omit any missing item instead of guessing.',
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $this->buildPrompt($context),
+                        ],
                     ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildPrompt($context),
-                    ],
-                ],
-                'temperature' => 0.2,
-                'max_tokens' => 700,
-            ]);
+                    'temperature' => 0.2,
+                    'max_tokens' => max(700, (int) config('services.openrouter.max_tokens', 700)),
+                ]);
+            } catch (\Throwable $exception) {
+                $errors[] = "{$model}: {$exception->getMessage()}";
+                continue;
+            }
 
             if (! $response->successful()) {
                 $errors[] = "{$model}: HTTP {$response->status()}";
@@ -58,7 +67,7 @@ class ProgressNarrativeDraftService
 
         Log::warning('Progress narrative draft failed for all models.', ['errors' => $errors]);
 
-        throw new \RuntimeException('Narrative drafting is temporarily unavailable.');
+        return $this->draftLocalFallback($context);
     }
 
     private function buildPrompt(array $context): string
@@ -129,12 +138,54 @@ class ProgressNarrativeDraftService
     private function getModelCandidates(): array
     {
         $models = array_filter([
-            env('OPENROUTER_MODEL'),
-            'openai/gpt-4.1-mini',
-            'openai/gpt-4o-mini',
-            'deepseek/deepseek-r1-distill-llama-70b',
+            config('services.openrouter.model'),
+            ...((array) config('services.openrouter.fallback_models', [])),
         ]);
 
         return array_values(array_unique($models));
+    }
+
+    private function draftLocalFallback(array $context): string
+    {
+        $existing = trim((string) ($context['facts_of_case'] ?? ''));
+        if ($existing !== '') {
+            return $this->cleanNarrative($existing);
+        }
+
+        $location = $this->firstNonEmpty($context, ['place_of_occurrence', 'incident_location']);
+        $first = $location !== ''
+            ? "This progress investigation concerns the reported fire incident at {$location}."
+            : 'This progress investigation concerns the linked reported fire incident.';
+        $linkedFacts = $this->firstNonEmpty($context, ['spot_details_of_investigation', 'spot_description']);
+        if ($linkedFacts !== '') {
+            $first .= ' '.$linkedFacts;
+        }
+
+        $findings = [];
+        foreach ([
+            'Fire origin' => $context['fire_origin'] ?? null,
+            'Fire cause' => $context['fire_cause'] ?? null,
+            'Responsible person or subject' => $context['responsible_arson'] ?? null,
+            'Disposition' => $context['disposition'] ?? null,
+        ] as $label => $value) {
+            $value = trim((string) $value);
+            if ($value !== '') {
+                $findings[] = "{$label}: {$value}.";
+            }
+        }
+
+        return trim($first.(count($findings) ? "\n\n".implode(' ', $findings) : ''));
+    }
+
+    private function firstNonEmpty(array $context, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = trim((string) ($context[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }

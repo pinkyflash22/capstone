@@ -3379,6 +3379,9 @@
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span id="analysisRevisionBadge" class="analytics-empty-pill">Revision --</span>
+                                    <button type="button" class="analytics-empty-pill" onclick="exportPredictionAnalysis()" style="cursor:pointer;border:1px solid #fed7aa;background:#fff;">
+                                        <i class="fa-solid fa-file-pdf"></i> Export analysis
+                                    </button>
                                     <span id="mlTrendRunCount" class="analytics-empty-pill">0 saved model run(s)</span>
                                     <button type="button" id="revisionHistoryBtn" class="analytics-empty-pill" onclick="openRevisionHistoryModal()" disabled style="cursor:pointer; border:1px solid #fed7aa; background:#fff7ed;">
                                         <i class="fa-solid fa-clock-rotate-left"></i> History
@@ -5738,6 +5741,18 @@
             const barangayId = document.getElementById('barangaySelect')?.value || '';
             if (barangayId && barangayId !== 'all') params.set('barangay_id', barangayId);
             window.location.assign(`${prefix}/analytics/accuracy.${format}?${params.toString()}`);
+        }
+
+        function exportPredictionAnalysis() {
+            if (!currentAnalysisId) {
+                if (typeof showNotification === 'function') showNotification('Run or load a saved analysis before exporting.', 'warning');
+                else window.alert('Run or load a saved analysis before exporting.');
+                return;
+            }
+
+            const prefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '/station-admin';
+            const params = new URLSearchParams({ analysis_id: String(currentAnalysisId) });
+            window.location.assign(`${prefix}/analytics/analysis.pdf?${params.toString()}`);
         }
 
         function setChartEmptyNote(containerId, message = '') {

@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Services\DutyRosterService;
 use App\Services\IncidentAutoAssignmentService;
 use App\Services\IncidentResourceDispatchService;
+use App\Support\UserActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -62,6 +63,7 @@ class FirefighterIncidentResponseController extends Controller
         if (count($queue['queued']) > 0) {
             $message .= ' Incidents without another available team remain queued for station escalation.';
         }
+        UserActivityLogger::log("responded to incident #{$incident->incident_id}", Auth::id(), request());
 
         return response()->json([
             'success' => true,
@@ -93,6 +95,7 @@ class FirefighterIncidentResponseController extends Controller
             $locked->forceFill(['status' => 'On Scene'])->save();
             $resources->markIncidentUnitsOnScene($locked);
         });
+        UserActivityLogger::log("marked incident #{$incident->incident_id} on scene", Auth::id(), request());
 
         return response()->json(['success' => true, 'message' => 'Arrival confirmed. Incident updated to On Scene.']);
     }
@@ -110,6 +113,7 @@ class FirefighterIncidentResponseController extends Controller
         });
 
         $resources->releaseIncidentUnits($completed);
+        UserActivityLogger::log("marked incident #{$incident->incident_id} controlled", Auth::id(), request());
 
         return response()->json(['success' => true, 'message' => 'Incident completed. Team, personnel, and apparatus are available again.']);
     }
@@ -135,6 +139,7 @@ class FirefighterIncidentResponseController extends Controller
         });
 
         $resources->releaseIncidentUnits($closed);
+        UserActivityLogger::log("closed incident #{$incident->incident_id} as false alarm", Auth::id(), request());
 
         return response()->json(['success' => true, 'message' => 'Incident marked as a false alarm and closed.']);
     }
@@ -142,12 +147,16 @@ class FirefighterIncidentResponseController extends Controller
     public function close(Incident $incident): JsonResponse
     {
         DB::transaction(function () use ($incident) {
-            $locked = Incident::query()->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
+            $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
             $officer = $this->currentOfficer();
             abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident.');
             abort_unless(strtolower(trim((string) $locked->status)) === 'controlled', 409, 'Complete the incident before closing the case.');
             $locked->forceFill(['status' => 'Closed'])->save();
+            if ($locked->marker) {
+                $locked->marker->forceFill(['status' => 'inactive'])->save();
+            }
         });
+        UserActivityLogger::log("closed incident #{$incident->incident_id}", Auth::id(), request());
 
         return response()->json(['success' => true, 'message' => 'Incident case closed.']);
     }

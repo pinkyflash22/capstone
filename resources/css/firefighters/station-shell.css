@@ -1936,6 +1936,7 @@ body.crew-member-modal-open {
 body.firefighter-portal-shell #spotReportModal .report-modal-panel,
 body.firefighter-portal-shell #progressReportModal .report-modal-panel,
 body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+body.firefighter-portal-shell #aarReportModal .report-modal-panel,
 body.firefighter-portal-shell #manageReportModal .report-modal-panel {
     position: relative !important;
     z-index: 12001 !important;
@@ -2085,6 +2086,7 @@ body.firefighter-portal-shell #manageReportModal .report-modal-panel {
     body.firefighter-portal-shell #spotReportModal.report-modal,
     body.firefighter-portal-shell #progressReportModal.report-modal,
     body.firefighter-portal-shell #finalReportModal.report-modal,
+    body.firefighter-portal-shell #aarReportModal.report-modal,
     body.firefighter-portal-shell #manageReportModal.report-modal {
         inset: 0 !important;
         padding: 8px 0 0 !important;
@@ -2097,6 +2099,7 @@ body.firefighter-portal-shell #manageReportModal .report-modal-panel {
     body.firefighter-portal-shell #spotReportModal .report-modal-panel,
     body.firefighter-portal-shell #progressReportModal .report-modal-panel,
     body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+    body.firefighter-portal-shell #aarReportModal .report-modal-panel,
     body.firefighter-portal-shell #manageReportModal .report-modal-panel {
         width: 100dvw !important;
         max-width: 100dvw !important;
@@ -2921,6 +2924,7 @@ body.report-modal-open {
 body.firefighter-portal-shell #spotReportModal.report-modal,
 body.firefighter-portal-shell #progressReportModal.report-modal,
 body.firefighter-portal-shell #finalReportModal.report-modal,
+body.firefighter-portal-shell #aarReportModal.report-modal,
 body.firefighter-portal-shell #manageReportModal.report-modal {
     position: fixed !important;
     inset: 0 !important;
@@ -2942,6 +2946,7 @@ body.firefighter-portal-shell #manageReportModal.report-modal {
 body.firefighter-portal-shell #spotReportModal.report-modal.active,
 body.firefighter-portal-shell #progressReportModal.report-modal.active,
 body.firefighter-portal-shell #finalReportModal.report-modal.active,
+body.firefighter-portal-shell #aarReportModal.report-modal.active,
 body.firefighter-portal-shell #manageReportModal.report-modal.active {
     display: flex !important;
 }
@@ -2949,6 +2954,7 @@ body.firefighter-portal-shell #manageReportModal.report-modal.active {
 body.firefighter-portal-shell #spotReportModal .report-modal-panel,
 body.firefighter-portal-shell #progressReportModal .report-modal-panel,
 body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+body.firefighter-portal-shell #aarReportModal .report-modal-panel,
 body.firefighter-portal-shell #manageReportModal .report-modal-panel {
     display: flex !important;
     flex-direction: column !important;
@@ -3084,6 +3090,7 @@ body.firefighter-portal-shell .report-modal-footer .btn {
     body.firefighter-portal-shell #spotReportModal.report-modal,
     body.firefighter-portal-shell #progressReportModal.report-modal,
     body.firefighter-portal-shell #finalReportModal.report-modal,
+    body.firefighter-portal-shell #aarReportModal.report-modal,
     body.firefighter-portal-shell #manageReportModal.report-modal {
         width: 100% !important;
         background: rgba(15, 23, 42, 0.48) !important;
@@ -3092,6 +3099,7 @@ body.firefighter-portal-shell .report-modal-footer .btn {
     body.firefighter-portal-shell #spotReportModal .report-modal-panel,
     body.firefighter-portal-shell #progressReportModal .report-modal-panel,
     body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+    body.firefighter-portal-shell #aarReportModal .report-modal-panel,
     body.firefighter-portal-shell #manageReportModal .report-modal-panel {
         min-width: 0 !important;
         border-width: 1px 0 0 !important;
@@ -3167,6 +3175,7 @@ body.firefighter-portal-shell .report-modal-footer .btn {
     body.firefighter-portal-shell #spotReportModal .report-modal-panel,
     body.firefighter-portal-shell #progressReportModal .report-modal-panel,
     body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+    body.firefighter-portal-shell #aarReportModal .report-modal-panel,
     body.firefighter-portal-shell #manageReportModal .report-modal-panel {
         background:
             radial-gradient(circle at 88% 6%, rgba(245, 158, 11, 0.13), transparent 30%),
@@ -3601,6 +3610,7 @@ body.report-picker-open {
     body.firefighter-portal-shell #spotReportModal.report-modal,
     body.firefighter-portal-shell #progressReportModal.report-modal,
     body.firefighter-portal-shell #finalReportModal.report-modal,
+    body.firefighter-portal-shell #aarReportModal.report-modal,
     body.firefighter-portal-shell #manageReportModal.report-modal {
         position: fixed !important;
         inset: 0 !important;
@@ -3614,6 +3624,7 @@ body.report-picker-open {
     body.firefighter-portal-shell #spotReportModal .report-modal-panel,
     body.firefighter-portal-shell #progressReportModal .report-modal-panel,
     body.firefighter-portal-shell #finalReportModal .report-modal-panel,
+    body.firefighter-portal-shell #aarReportModal .report-modal-panel,
     body.firefighter-portal-shell #manageReportModal .report-modal-panel {
         width: 100dvw !important;
         max-width: 100dvw !important;

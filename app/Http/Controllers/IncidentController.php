@@ -1251,6 +1251,13 @@ class IncidentController extends Controller
         $incident->status = $this->resolveDatabaseStatusName($this->mapStatusIdToName((int) $statusId));
         $incident->updated_at = now();
         $incident->save();
+
+        if ((int) $statusId === self::STATUS_CLOSED && $incident->marker_id) {
+            Marker::where('marker_id', $incident->marker_id)->update([
+                'status' => 'inactive',
+                'updated_at' => now(),
+            ]);
+        }
         
         $this->syncTeamAndStationOfficerStatuses($incident, (int) $statusId);
         UserActivityLogger::log('updated inc status', Auth::user()?->user_id, $request);

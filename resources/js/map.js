@@ -11145,8 +11145,10 @@ async function loadShapes(options = {}) {
                     try { geojson = JSON.parse(geojson); } catch (e) { console.error('Error parsing geojson:', e); return; }
                 }
                 try {
+                    if (!geojson) return;
+                    const boundaryColor = isCitizenDashboardMapContext() ? '#c2410c' : colors[index % colors.length];
                     const layer = L.geoJSON(geojson, {
-                        style: { color: colors[index % colors.length], weight: 3, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: colors[index % colors.length] },
+                        style: { color: boundaryColor, opacity: 0.9, weight: isCitizenDashboardMapContext() ? 2 : 3, dashArray: isCitizenDashboardMapContext() ? '7 5' : null, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: boundaryColor },
                         interactive: true, pane: 'overlayPane'
                     });
                     enableCitizenBoundaryHighlight(layer);
@@ -11194,8 +11196,10 @@ async function loadShapes(options = {}) {
                 try { geojson = JSON.parse(geojson); } catch (e) { console.error('Error parsing geojson:', e); return; }
             }
             try {
+                if (!geojson) return;
+                const boundaryColor = isCitizenDashboardMapContext() ? '#c2410c' : colors[index % colors.length];
                 const layer = L.geoJSON(geojson, {
-                    style: { color: colors[index % colors.length], weight: 3, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: colors[index % colors.length] },
+                    style: { color: boundaryColor, opacity: 0.9, weight: isCitizenDashboardMapContext() ? 2 : 3, dashArray: isCitizenDashboardMapContext() ? '7 5' : null, fillOpacity: isCitizenDashboardMapContext() ? 0 : 0.2, fillColor: boundaryColor },
                     interactive: true, pane: 'overlayPane'
                 });
                 enableCitizenBoundaryHighlight(layer);
@@ -11235,8 +11239,8 @@ function enableCitizenBoundaryHighlight(layer) {
             label.textContent = layer.shapeName || 'Barangay boundary';
             return label;
         });
-        const highlight = () => child.setStyle({ fillOpacity: 0.18 });
-        const reset = () => child.setStyle({ fillOpacity: 0 });
+        const highlight = () => child.setStyle({ color: '#ea580c', weight: 3, fillColor: '#fb923c', fillOpacity: 0.2 });
+        const reset = () => child.setStyle({ color: '#c2410c', weight: 2, dashArray: '7 5', fillOpacity: 0 });
         child.on('mouseover', highlight);
         child.on('mouseout', () => { if (!child.isPopupOpen()) reset(); });
         child.on('popupopen', highlight);

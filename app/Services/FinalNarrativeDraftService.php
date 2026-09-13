@@ -11,22 +11,27 @@ class FinalNarrativeDraftService
 
     public function __construct()
     {
-        $this->apiKey = env('OPENROUTER_API_KEY');
+        $this->apiKey = config('services.openrouter.api_key');
     }
 
     public function draftFinalNarrativeSections(array $context): array
     {
         if (! $this->apiKey) {
-            throw new \RuntimeException('OpenRouter API key is not configured.');
+            Log::warning('Final narrative used the local fallback because OpenRouter is not configured.');
+
+            return $this->draftLocalFallback($context);
         }
 
         $errors = [];
 
         foreach ($this->getModelCandidates() as $model) {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->connectTimeout(10)->timeout(45)->post('https://openrouter.ai/api/v1/chat/completions', [
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ])->connectTimeout((int) config('services.openrouter.connect_timeout', 8))
+                    ->timeout((int) config('services.openrouter.timeout', 90))
+                    ->post('https://openrouter.ai/api/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [
                     [
@@ -39,8 +44,12 @@ class FinalNarrativeDraftService
                     ],
                 ],
                 'temperature' => 0.2,
-                'max_tokens' => 1200,
-            ]);
+                    'max_tokens' => max(1200, (int) config('services.openrouter.max_tokens', 1200)),
+                ]);
+            } catch (\Throwable $exception) {
+                $errors[] = "{$model}: {$exception->getMessage()}";
+                continue;
+            }
 
             if (! $response->successful()) {
                 $errors[] = "{$model}: HTTP {$response->status()}";
@@ -63,7 +72,7 @@ class FinalNarrativeDraftService
 
         Log::warning('Final narrative draft failed for all models.', ['errors' => $errors]);
 
-        throw new \RuntimeException('Narrative drafting is temporarily unavailable.');
+        return $this->draftLocalFallback($context);
     }
 
     private function buildPrompt(array $context): string
@@ -125,6 +134,9 @@ class FinalNarrativeDraftService
         $content = trim(preg_replace('/\s*```$/', '', $content) ?? $content);
 
         $decoded = json_decode($content, true);
+        if (! is_array($decoded) && preg_match('/\{.*\}/s', $content, $match)) {
+            $decoded = json_decode($match[0], true);
+        }
         if (! is_array($decoded)) {
             return null;
         }
@@ -154,12 +166,54 @@ class FinalNarrativeDraftService
     private function getModelCandidates(): array
     {
         $models = array_filter([
-            env('OPENROUTER_MODEL'),
-            'openai/gpt-4.1-mini',
-            'openai/gpt-4o-mini',
-            'deepseek/deepseek-r1-distill-llama-70b',
+            config('services.openrouter.model'),
+            ...((array) config('services.openrouter.fallback_models', [])),
         ]);
 
         return array_values(array_unique($models));
+    }
+
+    private function draftLocalFallback(array $context): array
+    {
+        $facts = $this->firstNonEmpty($context, ['facts_of_case', 'progress_facts_of_case', 'spot_details_of_investigation', 'spot_description']);
+        $origin = $this->firstNonEmpty($context, ['origin_of_fire', 'progress_fire_origin']);
+        $cause = $this->firstNonEmpty($context, ['cause_of_fire', 'progress_fire_cause']);
+        $discussion = trim((string) ($context['discussion'] ?? ''));
+        if ($discussion === '') {
+            $parts = array_filter([
+                $origin !== '' ? "The recorded origin of the fire is {$origin}." : null,
+                $cause !== '' ? "The recorded cause of the fire is {$cause}." : null,
+            ]);
+            $discussion = implode(' ', $parts);
+        }
+
+        $findings = trim((string) ($context['findings'] ?? ''));
+        if ($findings === '') {
+            $parts = array_filter([
+                trim((string) ($context['establishment_burned'] ?? '')) !== '' ? 'Establishment involved: '.trim((string) $context['establishment_burned']).'.' : null,
+                trim((string) ($context['fire_victims'] ?? '')) !== '' ? 'Recorded fire victims: '.trim((string) $context['fire_victims']).'.' : null,
+                trim((string) ($context['total_damage'] ?? '')) !== '' ? 'Recorded total damage: '.trim((string) $context['total_damage']).'.' : null,
+            ]);
+            $findings = implode(' ', $parts);
+        }
+
+        return [
+            'facts_of_case' => $facts,
+            'discussion' => $discussion,
+            'findings' => $findings,
+            'recommendation' => trim((string) ($context['recommendation'] ?? '')),
+        ];
+    }
+
+    private function firstNonEmpty(array $context, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = trim((string) ($context[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }

@@ -38,6 +38,15 @@ class FinalInvestigationFirExportController extends Controller
         $userId = $request->user()?->user_id;
         abort_unless($userId, 403);
 
+        if (strtolower(trim((string) ($request->user()?->role?->role ?? ''))) === 'provincial admin') {
+            return FinalInvestigationReport::query()->with([
+                'progressInvestigation.spotInvestigation.incident.marker',
+                'progressInvestigation.spotInvestigation.incident.barangay.city.province',
+                'progressInvestigation.spotInvestigation.investigator.user', 'progressInvestigation.fireOrigin',
+                'investigator.user', 'investigator.station.address.barangay.city.province', 'notedBy.user', 'approvedBy.user',
+            ])->findOrFail($finalReportId);
+        }
+
         $stationOfficer = StationOfficer::query()
             ->where('user_id', $userId)
             ->firstOrFail();

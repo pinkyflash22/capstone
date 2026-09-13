@@ -38,6 +38,14 @@ class ProgressInvestigationPirExportController extends Controller
         $userId = $request->user()?->user_id;
         abort_unless($userId, 403);
 
+        if (strtolower(trim((string) ($request->user()?->role?->role ?? ''))) === 'provincial admin') {
+            return ProgressInvestigationReport::query()->with([
+                'spotInvestigation.incident.marker', 'spotInvestigation.incident.barangay.city.province',
+                'spotInvestigation.investigator.user', 'investigator.user', 'investigator.station.address.barangay.city.province',
+                'fireOrigin', 'notedBy.user', 'approvedBy.user',
+            ])->findOrFail($progressReportId);
+        }
+
         $stationOfficer = StationOfficer::query()
             ->where('user_id', $userId)
             ->firstOrFail();

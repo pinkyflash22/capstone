@@ -321,6 +321,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
+        Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
+        Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
+        Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
         Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
         Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
@@ -356,6 +359,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
         Route::get('/analytics/accuracy.csv', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyCsv'])->name('analytics.accuracy.csv');
         Route::get('/analytics/accuracy.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyPdf'])->name('analytics.accuracy.pdf');
+        Route::get('/analytics/analysis.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAnalysisPdf'])->name('analytics.analysis.pdf');
         Route::get('/api/command-notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('command-notifications.index');
         Route::post('/api/command-notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('command-notifications.read-all');
         Route::post('/api/command-notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('command-notifications.read');
@@ -449,6 +453,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/maps', [StationAdminController::class, 'maps'])->name('maps');
         Route::get('/alerts',[StationAdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
+        Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
+        Route::get('/progress-reports/{progressReportId}/pir.docx', [ProgressInvestigationPirExportController::class, 'downloadWord'])->name('progress-reports.pir.word');
+        Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
         Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
         Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
@@ -504,6 +511,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/analytics', [App\Http\Controllers\Chief\AnalyticController::class, 'index'])->name('analytics');
         Route::get('/analytics/accuracy.csv', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyCsv'])->name('analytics.accuracy.csv');
         Route::get('/analytics/accuracy.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAccuracyPdf'])->name('analytics.accuracy.pdf');
+        Route::get('/analytics/analysis.pdf', [App\Http\Controllers\Chief\AnalyticController::class, 'exportAnalysisPdf'])->name('analytics.analysis.pdf');
         Route::get('/api/command-notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('command-notifications.index');
         Route::post('/api/command-notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('command-notifications.read-all');
         Route::post('/api/command-notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('command-notifications.read');
@@ -747,6 +755,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::patch('/checklists/{checklistId}/items/{itemId}', [BarangayDashboardController::class, 'updateChecklistItem'])->name('checklists.items.update');
         Route::patch('/checklists/visits/{visitId}/sign-off', [App\Http\Controllers\Barangay\ChecklistVisitController::class, 'signOff'])->name('checklists.visits.sign-off');
         Route::patch('/mitigations/{mitigationActionId}', [BarangayDashboardController::class, 'updateMitigation'])->name('mitigations.update');
+        Route::delete('/mitigations/{mitigationActionId}', [BarangayDashboardController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/notifications', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/notifications/{notificationId}/read', [App\Http\Controllers\Barangay\BarangayNotificationController::class, 'markAsRead'])->name('notifications.read');

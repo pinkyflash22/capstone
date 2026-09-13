@@ -14,6 +14,9 @@
             <form method="POST" action="{{ route('barangay.mitigations.update', $action->getKey()) }}" enctype="multipart/form-data" class="barangay-record-update-form">
                 @csrf
                 @method('PATCH')
+                <label class="full">Plan title<input type="text" name="title" maxlength="255" value="{{ $action->title }}" required></label>
+                <label class="full">Description<textarea name="description" maxlength="5000" rows="3">{{ $action->description }}</textarea></label>
+                <label>Target date<input type="date" name="target_date" value="{{ $action->target_date?->format('Y-m-d') }}"></label>
                 <label>Status
                     <select name="status" required>
                         <option value="planned" @selected($action->status === 'planned')>Planned</option>
@@ -39,6 +42,12 @@
                 <label class="full">Proof files<input type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"></label>
                 <small class="full">Requesting completion requires outcome details, effectiveness, and at least one proof file.</small>
                 <button type="submit"><i class="bi bi-save-fill"></i> Save mitigation</button>
+            </form>
+            <form method="POST" action="{{ route('barangay.mitigations.destroy', $action->getKey()) }}" class="barangay-record-update-form" onsubmit="return confirm('Delete this mitigation plan? This cannot be undone.');">
+                @csrf
+                @method('DELETE')
+                <small class="full">Delete is unavailable after completion or while chief approval is pending.</small>
+                <button type="submit" style="background:#b91c1c"><i class="bi bi-trash-fill"></i> Delete mitigation</button>
             </form>
         </div>
     @elseif($action->completion_approval_status === 'pending')

@@ -90,6 +90,7 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
+        $this->normalizeRegistrationNames($request);
         $currentRole = strtolower(trim((string) Auth::user()?->role?->role));
         $isManagedRegistration = Auth::check() && in_array($currentRole, ['provincial admin', 'admin', 'station admin', 'chief'], true);
         if (! $isManagedRegistration) {
@@ -101,9 +102,9 @@ class RegisterController extends Controller
         }
 
         $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
-            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
-            'last_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'first_name' => ['required', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
+            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
+            'last_name' => ['required', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
             'contact_number' => 'required|string|regex:/^[0-9]{11}$/|unique:users,contact_number',
             'email' => ['required', 'email', 'max:255', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/', 'unique:users,email'],
             'role_id' => 'required|exists:roles,role_id',
@@ -446,6 +447,7 @@ class RegisterController extends Controller
 public function sendOTP(Request $request)
 {
     try {
+        $this->normalizeRegistrationNames($request);
         if (! $request->filled('role_id')) {
             $request->merge(['role_id' => $this->getCitizenRoleId()]);
         }
@@ -935,9 +937,9 @@ public function resendOTP(Request $request)
     private function otpRegistrationRules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
-            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
-            'last_name' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z]+$/'],
+            'first_name' => ['required', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
+            'middle_name' => ['nullable', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
+            'last_name' => ['required', 'string', 'max:255', 'regex:/^[\pL]+(?:[ .\'-][\pL]+)*$/u'],
             'contact_number' => 'required|string|regex:/^[0-9]{11}$/|unique:users,contact_number',
             'email' => ['required', 'email', 'max:255', 'regex:/^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/', 'unique:users,email'],
             'role_id' => 'required|exists:roles,role_id',
@@ -950,6 +952,21 @@ public function resendOTP(Request $request)
             'terms' => 'required',
             'emergency_agreement' => 'required',
         ];
+    }
+
+    private function normalizeRegistrationNames(Request $request): void
+    {
+        $normalized = [];
+        foreach (['first_name', 'middle_name', 'last_name'] as $field) {
+            if (! $request->exists($field)) {
+                continue;
+            }
+
+            $value = preg_replace('/\s+/u', ' ', trim((string) $request->input($field)));
+            $normalized[$field] = $value === '' ? null : $value;
+        }
+
+        $request->merge($normalized);
     }
 
     private function generateOtpCode(): string

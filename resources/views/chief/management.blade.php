@@ -3103,6 +3103,27 @@
                 justify-content: center;
             }
         }
+        /* Report details use the same calm, usable viewport as investigation forms. */
+        #viewModal:has(.report-detail-container) .modal-content {
+            width: min(720px, calc(100vw - 48px));
+            max-width: 720px;
+            max-height: min(calc(100dvh - 48px), 760px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #viewModal:has(.report-detail-container) .modal-body { min-height: 0; overflow-y: auto; }
+        @media (max-width: 640px) {
+            #viewModal:has(.report-detail-container) { padding: max(6px, env(safe-area-inset-top)) 0 0; }
+            #viewModal:has(.report-detail-container) .modal-content {
+                width: 100dvw;
+                max-width: 100dvw !important;
+                height: min(86dvh, calc(100dvh - max(6px, env(safe-area-inset-top))));
+                max-height: min(86dvh, calc(100dvh - max(6px, env(safe-area-inset-top))));
+                margin: 0;
+                border-radius: 22px 22px 0 0;
+            }
+        }
         </style>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
     @vite(['resources/css/admin/resource-management.css'])

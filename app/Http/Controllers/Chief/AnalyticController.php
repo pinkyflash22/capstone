@@ -142,6 +142,34 @@ class AnalyticController extends Controller
             ->download($filename);
     }
 
+    public function exportAnalysisPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'analysis_id' => ['required', 'integer', 'exists:analysis,analysis_id'],
+        ]);
+        $analysis = Analysis::query()->with('station')->findOrFail($validated['analysis_id']);
+        $role = strtolower(trim((string) (Auth::user()?->role?->role ?? '')));
+
+        if ($role !== 'provincial admin') {
+            $stationId = (int) StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
+            abort_unless($stationId > 0 && $stationId === (int) $analysis->station_id, 403);
+        }
+
+        $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+        $rawData = is_array($analysisData['raw_data'] ?? null) ? $analysisData['raw_data'] : [];
+        $predictions = is_array($analysis->predictions) ? $analysis->predictions : [];
+        $recommendations = collect(is_array($analysis->recommendations) ? $analysis->recommendations : [])
+            ->map(fn ($item) => is_array($item) ? $item : ['title' => (string) $item])
+            ->values();
+        $barangays = collect($rawData['barangay_predictions'] ?? [])->sortByDesc('probability_percent')->values();
+
+        $filename = 'fire-risk-analysis-'.Str::slug($analysis->station?->station_name ?: 'station').'-'.$analysis->analysis_id.'.pdf';
+
+        return Pdf::loadView('chief.exports.fire-risk-analysis', compact(
+            'analysis', 'analysisData', 'rawData', 'predictions', 'recommendations', 'barangays'
+        ))->setPaper('a4', 'portrait')->download($filename);
+    }
+
     public function checklistIndex(Request $request)
     {
         $stationOfficer = StationOfficer::where('user_id', Auth::id())->first();
@@ -205,6 +233,15 @@ class AnalyticController extends Controller
         $view = in_array($request->input('view'), ['my_tasks', 'needs_review', 'overdue', 'unassigned'], true)
             ? $request->input('view')
             : null;
+        if (! $status && ! $view && ! $request->integer('checklist')) {
+            // Keep completed submissions out of the operational priority queue.
+            // They remain available through the Submitted status filter and direct links.
+            $query->where('status', '!=', 'submitted')
+                ->where(function ($builder) {
+                    $builder->whereDoesntHave('items')
+                        ->orWhereHas('items', fn ($items) => $items->where('status', '!=', 'followed'));
+                });
+        }
         $query
             ->when($view === 'my_tasks', fn ($builder) => $builder->where('assigned_to', Auth::id()))
             ->when($view === 'needs_review', fn ($builder) => $builder->where(function ($scope) {
@@ -3607,12 +3644,36 @@ class AnalyticController extends Controller
             'medium' => 30,
             default => 45,
         };
-        $items = [
-            "Validate the {$condition} evidence in {$location}, {$barangayName}.",
-            "Assign a barangay focal person and response team for {$barangayName}.",
-            "Apply and document the required control for {$condition}.",
-            "Verify completion with dated field evidence and update the {$barangayName} risk record.",
-        ];
+        $recommendationText = trim((string) ($recommendation['description'] ?? ''));
+        $findingNotes = trim((string) ($finding['notes'] ?? ''));
+        $leadingDriver = trim((string) ($driverSummary ?? ''));
+        $evidenceTarget = $location === 'barangay-wide priority areas'
+            ? $barangayName
+            : "{$location}, {$barangayName}";
+
+        // Preserve the model recommendation and the verified local evidence in the
+        // saved checklist instead of replacing both with a generic four-step template.
+        $items = collect([
+            $recommendationText !== ''
+                ? "Implement the recommended control in {$evidenceTarget}: ".rtrim($recommendationText, '.').'.'
+                : "Inspect and document the {$condition} identified in {$evidenceTarget}.",
+            $findingNotes !== ''
+                ? "Resolve the recorded field condition in {$evidenceTarget}: ".rtrim($findingNotes, '.').'.'
+                : null,
+            $leadingDriver !== ''
+                ? "Address the forecast driver for {$barangayName}: ".rtrim($leadingDriver, '.').'.'
+                : null,
+            $verifiedHazardCount > 0
+                ? "Reinspect the {$verifiedHazardCount} verified hazard record(s) in {$barangayName} and attach dated before-and-after evidence."
+                : null,
+            $verifiedRiskCount > 0
+                ? "Apply controls to the {$verifiedRiskCount} verified risk record(s) in {$barangayName} and record the responsible person and completion date."
+                : null,
+            $historicalIncidentCount > 0 || $currentMonthFireCount > 0
+                ? "Compare the completed control against {$historicalIncidentCount} historical and {$currentMonthFireCount} current-month fire record(s) for {$barangayName}."
+                : null,
+            "Verify the control in the field, attach dated evidence, and update the {$barangayName} risk record with the measured result.",
+        ])->filter()->unique()->take(5)->values()->all();
 
         $localizedRecommendation = array_merge($recommendation, [
             'title' => $title,

@@ -161,6 +161,8 @@ Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])-
     Route::put('/incidents/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateIncident']);
     Route::put('/personnel/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updatePersonnel']);
     Route::put('/equipment/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateEquipment']);
+    Route::put('/reports/{kind}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateInvestigationReport']);
+    Route::delete('/reports/{kind}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'destroyInvestigationReport']);
     Route::delete('/{type}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'destroy']);
 });
 // Get incidents for spot investigation (completed, not yet in spot_investigation)

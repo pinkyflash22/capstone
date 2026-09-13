@@ -712,6 +712,7 @@ class BarangayDashboardController extends Controller
                     'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',
                 ])
                 ->where('barangay_id', $barangay?->barangay_id)
+                ->whereNotIn('status', ['draft', 'pending'])
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1
@@ -1393,6 +1394,9 @@ class BarangayDashboardController extends Controller
             && Schema::hasColumn('mitigation_actions', 'follow_up_date');
         $hasProofTable = Schema::hasTable('mitigation_action_attachments');
         $validated = $request->validate([
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'target_date' => ['sometimes', 'nullable', 'date'],
             'status' => ['required', Rule::in(['planned', 'in_progress', 'blocked', 'completed'])],
             'implementation_notes' => ['required', 'string', 'max:3000'],
             'blocked_reason' => array_values(array_filter([
@@ -1438,6 +1442,9 @@ class BarangayDashboardController extends Controller
             $completionRequested = $validated['status'] === 'completed';
             $newStatus = $completionRequested ? 'in_progress' : $validated['status'];
             $updates = [
+                'title' => $validated['title'] ?? $action->title,
+                'description' => array_key_exists('description', $validated) ? $validated['description'] : $action->description,
+                'target_date' => array_key_exists('target_date', $validated) ? $validated['target_date'] : $action->target_date,
                 'status' => $newStatus,
                 'implementation_notes' => $validated['implementation_notes'],
                 'completion_notes' => $validated['completion_notes'] ?? null,
@@ -1493,6 +1500,38 @@ class BarangayDashboardController extends Controller
             ->with('success', $validated['status'] === 'completed'
                 ? 'Completion was submitted to the chief for approval.'
                 : 'Mitigation progress updated successfully.');
+    }
+
+    public function destroyMitigation(Request $request, int $mitigationActionId)
+    {
+        $barangayId = (int) ($this->resolveBarangayContext()['barangay']?->barangay_id ?? 0);
+        abort_if($barangayId <= 0, 403, 'Your account is not linked to a barangay.');
+
+        $action = MitigationAction::query()
+            ->where('barangay_id', $barangayId)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($query) {
+                $query->whereNull('completion_approval_status')->orWhere('completion_approval_status', '!=', 'pending');
+            })
+            ->findOrFail($mitigationActionId);
+
+        DB::transaction(function () use ($action, $request): void {
+            foreach ($action->attachments as $attachment) {
+                if ($attachment->file_path) {
+                    MediaPath::delete($attachment->file_path);
+                }
+            }
+            $action->attachments()->delete();
+            $action->activities()->delete();
+            $action->delete();
+            UserActivityLogger::log("deleted assigned barangay mitigation #{$action->getKey()}", Auth::id(), $request);
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Mitigation plan deleted successfully.']);
+        }
+
+        return redirect()->route('barangay.checklists')->with('success', 'Mitigation plan deleted successfully.');
     }
 
     public function reports(Request $request)

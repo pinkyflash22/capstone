@@ -24,9 +24,10 @@ class LandingPageController extends Controller
         $boundaries = \App\Models\BoundaryLocation::query()
             ->where('boundary_type', 'barangay')
             ->whereNotNull('barangay_id')
-            ->get(['id', 'name', 'geojson'])
+            ->get(['id', 'barangay_id', 'name', 'geojson'])
             ->map(fn ($boundary) => [
                 'id' => $boundary->id,
+                'barangay_id' => $boundary->barangay_id,
                 'name' => $boundary->name,
                 'geojson' => $this->publicBoundaryGeometry($boundary->geojson),
                 'boundary_type' => 'barangay',

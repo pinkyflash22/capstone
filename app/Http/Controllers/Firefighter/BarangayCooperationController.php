@@ -55,7 +55,7 @@ class BarangayCooperationController extends Controller
                 'barangay:barangay_id,barangay_name',
                 'creator:user_id,first_name,middle_name,last_name',
                 'responsibleUser:user_id,first_name,middle_name,last_name',
-                'responsibleTeam:team_id,team_name',
+                'responsibleTeam:team_id',
                 'aiActionPlanChecklist:ai_action_plan_checklist_id,station_id,barangay_id,plan_title',
                 'checklist:barangay_prediction_checklist_id,title',
                 'attachments:mitigation_action_attachment_id,mitigation_action_id,file_path,file_name',

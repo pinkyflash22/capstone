@@ -33,6 +33,7 @@ use Illuminate\Validation\Rule;
 use App\Support\UserActivityLogger;
 use App\Services\IncidentResponderSnapshotService;
 use App\Services\StationBarangayCoverageService;
+use App\Services\InvestigationReportImageService;
 use Carbon\Carbon;
 
 class ManagementController extends Controller
@@ -72,6 +73,54 @@ class ManagementController extends Controller
     protected function isProvincialAdmin(): bool
     {
         return $this->currentRole() === 'provincial admin';
+    }
+
+    public function updateInvestigationReport(Request $request, string $kind, int $id, InvestigationReportImageService $imageService)
+    {
+        $this->resolveManagedInvestigationReport($kind, $id);
+
+        return match ($kind) {
+            'spot' => app(\App\Http\Controllers\SpotInvestigationReportController::class)->update($request, (string) $id, $imageService),
+            'progress' => app(\App\Http\Controllers\ProgressInvestigationReportController::class)->update($request, (string) $id, $imageService),
+            'final' => app(\App\Http\Controllers\FinalInvestigationReportController::class)->update($request, (string) $id, $imageService),
+            default => abort(404),
+        };
+    }
+
+    public function destroyInvestigationReport(Request $request, string $kind, int $id)
+    {
+        $report = $this->resolveManagedInvestigationReport($kind, $id);
+
+        return match ($kind) {
+            'spot' => app(\App\Http\Controllers\SpotInvestigationReportController::class)->destroy((string) $id),
+            'progress' => app(\App\Http\Controllers\ProgressInvestigationReportController::class)->destroy($report),
+            'final' => app(\App\Http\Controllers\FinalInvestigationReportController::class)->destroy($report),
+            default => abort(404),
+        };
+    }
+
+    private function resolveManagedInvestigationReport(string $kind, int $id)
+    {
+        $model = match ($kind) {
+            'spot' => SpotInvestigationReport::query(),
+            'progress' => ProgressInvestigationReport::query(),
+            'final' => FinalInvestigationReport::query(),
+            default => abort(404),
+        };
+        $report = $model->findOrFail($id);
+        if ($this->isProvincialAdmin()) {
+            return $report;
+        }
+
+        $stationId = (int) ($this->currentStationOfficer()?->station_id ?? 0);
+        abort_unless($stationId > 0, 403);
+        $belongsToStation = StationOfficer::query()
+            ->whereKey($report->station_officer_id)
+            ->where('station_id', $stationId)
+            ->exists();
+        abort_unless($belongsToStation, 404);
+
+        return $report;
     }
     /**
      * Display a listing of the resource.
@@ -1325,6 +1374,7 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => $report->progressInvestigation ? 'progressed' : 'filed',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->incident?->marker?->description,
+                    'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
 
@@ -1348,6 +1398,7 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => $report->finalInvestigation ? 'finalized' : 'conducting',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->fire_cause,
+                    'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
 
@@ -1372,6 +1423,7 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => 'completed',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->exact_address,
+                    'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
 

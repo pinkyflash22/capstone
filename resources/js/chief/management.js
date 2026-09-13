@@ -836,6 +836,8 @@ class ManagementPage {
                 <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
+                        <button class="action-btn edit" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                        <button class="action-btn delete" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                         <span class="${statusClass}">${this.escapeHtml(report.report_kind || 'report')}</span>
                     </div>
                 </td>
@@ -1127,7 +1129,7 @@ class ManagementPage {
         };
 
         if (this.currentTab === 'reports') {
-            this.showToast('Investigation reports are view-only in this registry.', 'info');
+            this.showToast('Create investigation reports from the firefighter reporting workflow.', 'info');
             return;
         }
 
@@ -1284,6 +1286,28 @@ class ManagementPage {
                 </div>
             </form>
         `;
+    }
+
+    renderReportEditForm(report) {
+        const allowed = report.report_kind === 'spot'
+            ? ['memorandum_for','place_of_occurrence','involved_structure','establishment_name','occupant','owner','occupancy','estimated_damage','estimated_area','dead','injured','highest_alarm_level','affected_establishments_count','description','fatality_details','details_of_investigation','disposition']
+            : report.report_kind === 'progress'
+                ? ['memorandum_for','mission_order_number','mission_order_date','responsible_arson','fire_cause','facts_of_case','disposition','report_completed_at']
+                : ['memorandum_for','office_address','alarm_at','establishment_burned','fire_victims','origin_of_fire','cause_of_fire','exact_address','total_damage','facts_of_case','discussion','findings','recommendation','report_completed_at'];
+        const longFields = new Set(['description','fatality_details','details_of_investigation','disposition','facts_of_case','discussion','findings','recommendation','fire_victims']);
+        const dateFields = new Set(['mission_order_date','alarm_at','report_completed_at']);
+        const numericFields = new Set(['estimated_damage','estimated_area','dead','injured','affected_establishments_count','total_damage']);
+        const required = new Set(report.report_kind === 'spot' ? ['occupancy','estimated_damage','estimated_area'] : report.report_kind === 'progress' ? ['fire_cause'] : ['exact_address','total_damage']);
+        const controls = allowed.map((field) => {
+            const label = field.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+            const raw = report.fields?.[field] ?? '';
+            const value = dateFields.has(field) && raw ? String(raw).slice(0, 16).replace(' ', 'T') : raw;
+            if (field === 'occupancy') return `<div class="form-group"><label class="form-label">${label}</label><select class="form-select" name="${field}" required>${['residential','commercial','industrial'].map(v => `<option value="${v}" ${String(value) === v ? 'selected' : ''}>${v[0].toUpperCase()+v.slice(1)}</option>`).join('')}</select></div>`;
+            if (longFields.has(field)) return `<div class="form-group"><label class="form-label">${label}${required.has(field) ? ' *' : ''}</label><textarea class="form-textarea" name="${field}" rows="3" ${required.has(field) ? 'required' : ''}>${this.escapeHtml(value)}</textarea></div>`;
+            const type = dateFields.has(field) ? (field === 'mission_order_date' ? 'date' : 'datetime-local') : numericFields.has(field) ? 'number' : 'text';
+            return `<div class="form-group"><label class="form-label">${label}${required.has(field) ? ' *' : ''}</label><input class="form-input" type="${type}" name="${field}" value="${this.escapeHtml(value)}" ${numericFields.has(field) ? 'min="0" step="0.01"' : ''} ${required.has(field) ? 'required' : ''}></div>`;
+        }).join('');
+        return `<form id="dataForm" class="edit-form"><div class="form-grid">${controls}</div></form>`;
     }
 
     renderReportAddForm() {
@@ -1493,7 +1517,12 @@ class ManagementPage {
         }
 
         if (this.currentTab === 'reports') {
-            this.showToast('Investigation reports are view-only in this registry.', 'info');
+            this.currentEditId = id;
+            this.currentItem = item;
+            document.getElementById('modalTitle').textContent = `Edit ${item.type || 'Investigation Report'}`;
+            document.querySelector('#formModal .modal-body').innerHTML = this.renderReportEditForm(item);
+            document.getElementById('formModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
             return;
         }
 
@@ -1701,7 +1730,7 @@ class ManagementPage {
         `;
     }
 
-    renderReportEditForm(report) {
+    renderLegacyReportEditForm(report) {
         return `
             <form id="dataForm" class="edit-form">
                 <div class="form-group">
@@ -2042,6 +2071,20 @@ class ManagementPage {
     }
 
     renderReportDetail(report, viewContent, formatDate) {
+        const prefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '/station-admin';
+        const wordPath = report.report_kind === 'progress'
+            ? `${prefix}/progress-reports/${encodeURIComponent(report.report_id)}/pir.docx`
+            : report.report_kind === 'final'
+                ? `${prefix}/final-reports/${encodeURIComponent(report.report_id)}/fir.docx`
+                : `${prefix}/spot-reports/${encodeURIComponent(report.report_id)}/sir.docx`;
+        const hiddenFields = new Set(['spot_investigation_report_id', 'progress_investigation_report_id', 'final_investigation_report_id', 'station_officer_id']);
+        const fieldRows = Object.entries(report.fields || {})
+            .filter(([key, value]) => !hiddenFields.has(key) && value !== null && value !== '')
+            .map(([key, value]) => {
+                const label = key.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+                const display = Array.isArray(value) || (value && typeof value === 'object') ? JSON.stringify(value) : String(value);
+                return `<div class="info-row"><span class="info-label">${this.escapeHtml(label)}</span><span class="info-value">${this.escapeHtml(display)}</span></div>`;
+            }).join('');
         viewContent.innerHTML = `
             <div class="detail-container">
                 <div class="detail-header">
@@ -2085,6 +2128,13 @@ class ManagementPage {
                 <div class="info-card">
                     <div class="card-title"><i class="fa-solid fa-align-left"></i><h3>Description</h3></div>
                     <div class="card-content"><p>${this.escapeHtml(report.description || 'No description provided.')}</p></div>
+                </div>
+                <div class="info-card">
+                    <div class="card-title"><i class="fa-solid fa-clipboard-list"></i><h3>Complete report information</h3></div>
+                    <div class="card-content">${fieldRows || '<p>No additional fields were recorded.</p>'}</div>
+                </div>
+                <div class="modal-actions" style="margin-top:14px;display:flex;justify-content:flex-end;">
+                    <a class="btn-primary" href="${wordPath}"><i class="fa-solid fa-file-word"></i> Download Word report</a>
                 </div>
             </div>
         `;
@@ -2140,7 +2190,7 @@ class ManagementPage {
         const statusClass = `status-${status.replace(/_/g, '-')}`;
 
         viewContent.innerHTML = `
-            <div class="detail-container">
+            <div class="detail-container report-detail-container">
                 <div class="detail-header">
                     <div>
                         <h2 class="personnel-title">${this.escapeHtml(name)}</h2>
@@ -2289,10 +2339,6 @@ class ManagementPage {
 
     // Delete item
     deleteItem(id) {
-        if (this.currentTab === 'reports') {
-            this.showToast('Investigation reports are view-only in this registry.', 'info');
-            return;
-        }
         this.currentDeleteId = id;
         document.getElementById('deleteModal').classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -2312,8 +2358,12 @@ class ManagementPage {
             }
             
             // For incidents, personnel, equipment we call backend; others are frontend-only
-            if (['incidents', 'personnel', 'equipment'].includes(this.currentTab)) {
-                const response = await fetch(`/api/managements/${this.currentTab}/${this.currentDeleteId}`, {
+            if (['incidents', 'personnel', 'equipment', 'reports'].includes(this.currentTab)) {
+                const report = this.currentTab === 'reports' ? this.data.reports.find(item => this.getItemIdentifier(item) == this.currentDeleteId) : null;
+                const deleteUrl = report
+                    ? `/api/managements/reports/${encodeURIComponent(report.report_kind)}/${encodeURIComponent(report.report_id)}`
+                    : `/api/managements/${this.currentTab}/${this.currentDeleteId}`;
+                const response = await fetch(deleteUrl, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': this.csrfToken,
@@ -2358,11 +2408,14 @@ class ManagementPage {
             this.showToast('Saving...', 'info');
             
             // For incidents, personnel, equipment: call backend; others: frontend-only
-            if (['incidents', 'personnel', 'equipment'].includes(this.currentTab)) {
+            if (['incidents', 'personnel', 'equipment', 'reports'].includes(this.currentTab)) {
                 let url = '';
                 let method = '';
                 
-                if (this.currentEditId) {
+                if (this.currentTab === 'reports') {
+                    url = `/api/managements/reports/${encodeURIComponent(this.currentItem.report_kind)}/${encodeURIComponent(this.currentItem.report_id)}`;
+                    method = 'PUT';
+                } else if (this.currentEditId) {
                     // Update existing
                     url = `/api/managements/${this.currentTab}/${this.currentEditId}`;
                     method = 'PUT';
@@ -2375,7 +2428,9 @@ class ManagementPage {
                 // Prepare data based on tab type
                 let payload = {};
                 
-                if (this.currentTab === 'personnel') {
+                if (this.currentTab === 'reports') {
+                    payload = data;
+                } else if (this.currentTab === 'personnel') {
                     // Map frontend fields to backend expected fields
                     payload = {
                         first_name: data.first_name,
@@ -2460,7 +2515,9 @@ class ManagementPage {
                 const result = await response.json();
                 console.log('Save result:', result); // Debug log
                 
-                if (this.currentEditId) {
+                if (this.currentTab === 'reports') {
+                    await this.loadCurrentTab();
+                } else if (this.currentEditId) {
                     // Update local data
                     const index = this.data[this.currentTab].findIndex(i => {
                         const itemId = this.getItemIdentifier(i);

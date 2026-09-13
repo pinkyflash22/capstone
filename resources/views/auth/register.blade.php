@@ -1110,9 +1110,8 @@
                                     <input type="text" id="first_name" name="first_name" class="form-input" 
                                         placeholder="Enter your first name"
                                         value="{{ old('first_name', $googlePrefill['first_name'] ?? '') }}"
-                                        pattern="[A-Za-z]+"
-                                        title="First name must contain letters only."
-                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
+                                        pattern="[\p{L}]+(?:[ .'-][\p{L}]+)*"
+                                        title="Use letters with optional spaces, apostrophes, periods, or hyphens."
                                         required autofocus>
                                 </div>
                             </div>
@@ -1128,9 +1127,8 @@
                                     <input type="text" id="middle_name" name="middle_name" class="form-input" 
                                         placeholder="Enter your middle name (optional)"
                                         value="{{ old('middle_name', $googlePrefill['middle_name'] ?? '') }}"
-                                        pattern="[A-Za-z]+"
-                                        title="Middle name must contain letters only."
-                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')">
+                                        pattern="[\p{L}]+(?:[ .'-][\p{L}]+)*"
+                                        title="Use letters with optional spaces, apostrophes, periods, or hyphens.">
                                 </div>
                             </div>
 
@@ -1145,9 +1143,8 @@
                                     <input type="text" id="last_name" name="last_name" class="form-input" 
                                         placeholder="Enter your last name"
                                         value="{{ old('last_name', $googlePrefill['last_name'] ?? '') }}"
-                                        pattern="[A-Za-z]+"
-                                        title="Last name must contain letters only."
-                                        oninput="this.value = this.value.replace(/[^A-Za-z]/g, '')"
+                                        pattern="[\p{L}]+(?:[ .'-][\p{L}]+)*"
+                                        title="Use letters with optional spaces, apostrophes, periods, or hyphens."
                                         required>
                                 </div>
                             </div>
@@ -1618,28 +1615,31 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     }
     
     // Validate form first
-    const firstName = document.getElementById('first_name').value;
-    const middleName = document.getElementById('middle_name').value;
-    const lastName = document.getElementById('last_name').value;
+    const firstName = document.getElementById('first_name').value.trim().replace(/\s+/g, ' ');
+    const middleName = document.getElementById('middle_name').value.trim().replace(/\s+/g, ' ');
+    const lastName = document.getElementById('last_name').value.trim().replace(/\s+/g, ' ');
+    document.getElementById('first_name').value = firstName;
+    document.getElementById('middle_name').value = middleName;
+    document.getElementById('last_name').value = lastName;
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('password_confirmation').value;
-    const nameRegex = /^[A-Za-z]+$/;
+    const nameRegex = /^\p{L}+(?:[ .'-]\p{L}+)*$/u;
     const emailRegex = /^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/;
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@*.\-]{8,}$/;
 
     if (!nameRegex.test(firstName)) {
-        alert('First name must contain letters only.');
+        alert('First name may contain letters, spaces, apostrophes, periods, or hyphens.');
         return;
     }
 
     if (middleName && !nameRegex.test(middleName)) {
-        alert('Middle name must contain letters only.');
+        alert('Middle name may contain letters, spaces, apostrophes, periods, or hyphens.');
         return;
     }
 
     if (!nameRegex.test(lastName)) {
-        alert('Last name must contain letters only.');
+        alert('Last name may contain letters, spaces, apostrophes, periods, or hyphens.');
         return;
     }
 
