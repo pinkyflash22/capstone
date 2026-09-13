@@ -4,7 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PublicController;
 // use App\Http\Controllers\MapController;
-// use App\Http\Controllers\IconController;
+use App\Http\Controllers\IconController;
 use App\Http\Controllers\IncidentController;
 // use App\Http\Controllers\ShapeController;
 // use App\Http\Controllers\MarkController;
@@ -541,7 +541,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         // });
         // Route::post('/markers', [AdminController::class, 'store'])->name('admin.markers.store');
         Route::get('/marker-categories', [MarkerCategoryController::class, 'index']);
-        // Route::get('/geticons', [IconController::class, 'getIcons'])->name('geticon');
+        Route::get('/geticons', [IconController::class, 'getIcons'])->name('geticon');
         Route::get('/announcements', [StationAdminController::class, 'announcement'])->name('announcements');
         Route::get('/posts/get', [PostController::class, 'getPosts'])->name('posts.get');
         Route::post('/posts/store', [PostController::class, 'store'])->name('posts.store');

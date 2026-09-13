@@ -1426,8 +1426,8 @@
                         <div class="schedule-form-field">
                             <label for="scheduleBarangay">Barangay / Location</label>
                             <select id="scheduleBarangay" name="barangay">
-                                <option value="">Select Urbiztondo barangay</option>
-                                @foreach(($urbiztondoBarangays ?? collect()) as $barangayOption)
+                                <option value="">Select covered barangay</option>
+                                @foreach(($stationBarangays ?? collect()) as $barangayOption)
                                     <option value="{{ $barangayOption->barangay_name }}">{{ $barangayOption->barangay_name }}</option>
                                 @endforeach
                             </select>

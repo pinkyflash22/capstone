@@ -5812,7 +5812,7 @@ async function updateMarker(markerId) {
             const stationContact = document.getElementById('editStationContact')?.value;
             const stationEmail = document.getElementById('editStationEmail')?.value;
             
-            await fetch(`/api/station/marker/${markerId}`, {
+            const stationResponse = await fetch(`/api/station/marker/${markerId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -5826,11 +5826,15 @@ async function updateMarker(markerId) {
                     email: stationEmail
                 })
             });
+            if (!stationResponse.ok) {
+                const stationError = await stationResponse.json().catch(() => ({}));
+                throw new Error(stationError.message || stationError.error || 'Failed to update the station details.');
+            }
         } else if (categoryName.toLowerCase().includes('hydrant')) {
             const hydrantCode = document.getElementById('editHydrantCode')?.value;
             const hydrantStationId = document.getElementById('editHydrantStation')?.value;
             
-            await fetch(`/api/hydrant/marker/${markerId}`, {
+            const hydrantResponse = await fetch(`/api/hydrant/marker/${markerId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -5842,6 +5846,10 @@ async function updateMarker(markerId) {
                     station_id: hydrantStationId
                 })
             });
+            if (!hydrantResponse.ok) {
+                const hydrantError = await hydrantResponse.json().catch(() => ({}));
+                throw new Error(hydrantError.message || hydrantError.error || 'Failed to update the hydrant details.');
+            }
         }
         
         closeModal();

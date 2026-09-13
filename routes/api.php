@@ -350,7 +350,7 @@ Route::resource('station', StationController::class)
 Route::put('/markers/{markerId}', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
 
 Route::get('/station/marker/{markerId}', [StationController::class, 'getByMarker'])->middleware(['web', 'auth']);
-Route::put('/station/marker/{markerId}', [StationController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:provincial admin']);
+Route::put('/station/marker/{markerId}', [StationController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
 
 // Route::resource('personnels', PersonnelController::class);
 

@@ -581,22 +581,40 @@ class IncidentController extends Controller
         });
     }
 
-    public function index()
+    public function index(Request $request, OperationalMapScope $operationalScope)
     {
-        $incidents = Incident::with($this->getIncidentRelations())->get();
+        $incidents = $operationalScope
+            ->constrainIncidentQuery(Incident::with($this->getIncidentRelations()), $request->user())
+            ->get();
             // ->orderBy('created_at', 'desc')
             // ->paginate(15);
         return view('firefighters.incidents', compact('incidents'));
     }
 
 
-    public function create()
+    public function create(Request $request, OperationalMapScope $operationalScope)
     {
-        $markers = Marker::all();
+        $user = $request->user();
+        $stationIds = $operationalScope->stationIds($user);
+        $hasProvinceWideAccess = $operationalScope->hasProvinceWideAccess($user);
+
+        $markers = Marker::query()
+            ->when(! $hasProvinceWideAccess, function ($query) use ($operationalScope, $stationIds, $user) {
+                $query->where(function ($scope) use ($operationalScope, $stationIds, $user) {
+                    $scope->whereHas('incidents', function ($incidents) use ($operationalScope, $user) {
+                        $operationalScope->constrainIncidentQuery($incidents, $user);
+                    })->orWhereHas('stations', fn ($stations) => $stations->whereIn('stations.station_id', $stationIds->all()));
+                });
+            })
+            ->get();
         $incidentStatuses = $this->supportsLegacyIncidentStatus() ? IncidentStatus::all() : collect();
         $incidentTypes = $this->supportsLegacyIncidentType() ? IncidentType::all() : collect();
-        $teams = Team::all();
-        $reporters = User::all();
+        $teams = Team::query()
+            ->when(! $hasProvinceWideAccess, fn ($query) => $query->whereIn('station_id', $stationIds->all()))
+            ->get();
+        $reporters = User::query()
+            ->when(! $hasProvinceWideAccess, fn ($query) => $query->whereHas('stations', fn ($stations) => $stations->whereIn('stations.station_id', $stationIds->all())))
+            ->get();
         
         return view('admin.incidents.create', compact('markers', 'incidentStatuses', 
             'incidentTypes', 'teams', 'reporters'));
@@ -1057,13 +1075,27 @@ class IncidentController extends Controller
         );
     }
 
-    public function edit(Incident $incident)
+    public function edit(Incident $incident, Request $request, OperationalMapScope $operationalScope)
     {
-        $markers = Marker::all();
+        $visible = $operationalScope
+            ->constrainIncidentQuery(Incident::query(), $request->user())
+            ->whereKey($incident->getKey())
+            ->exists();
+        abort_unless($visible, 403, 'This incident is outside your operational coverage.');
+
+        $stationIds = $operationalScope->stationIds($request->user());
+        $hasProvinceWideAccess = $operationalScope->hasProvinceWideAccess($request->user());
+        $markers = Marker::query()
+            ->when(! $hasProvinceWideAccess, fn ($query) => $query->whereKey($incident->marker_id))
+            ->get();
         $incidentStatuses = $this->supportsLegacyIncidentStatus() ? IncidentStatus::all() : collect();
         $incidentTypes = $this->supportsLegacyIncidentType() ? IncidentType::all() : collect();
-        $teams = Team::all();
-        $reporters = User::all();
+        $teams = Team::query()
+            ->when(! $hasProvinceWideAccess, fn ($query) => $query->whereIn('station_id', $stationIds->all()))
+            ->get();
+        $reporters = User::query()
+            ->when(! $hasProvinceWideAccess, fn ($query) => $query->whereHas('stations', fn ($stations) => $stations->whereIn('stations.station_id', $stationIds->all())))
+            ->get();
         
         return view('admin.incidents.edit', compact('incident', 'markers', 
             'incidentStatuses', 'incidentTypes', 'teams', 'reporters'));
@@ -1298,15 +1330,25 @@ class IncidentController extends Controller
     
     
 
-    public function destroy(Incident $incident)
+    public function destroy(Incident $incident, Request $request, OperationalMapScope $operationalScope)
     {
+        $visible = $operationalScope
+            ->constrainIncidentQuery(Incident::query(), $request->user())
+            ->whereKey($incident->getKey())
+            ->exists();
+        abort_unless($visible, 403, 'This incident is outside your operational coverage.');
+
         if ($incident->weather || $incident->spotInvestigationReport) {
             return back()->with('error', 'Cannot delete incident with existing related records.');
         }
 
         $incident->delete();
 
-        return redirect()->route('incidents.index')
+        $indexRoute = $request->routeIs('station-admin.*')
+            ? 'station-admin.incidents.index'
+            : 'admin.incidents.index';
+
+        return redirect()->route($indexRoute)
             ->with('success', 'Incident deleted successfully.');
     }
     

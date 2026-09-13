@@ -31,6 +31,7 @@ use App\Models\UserLog;
 use App\Services\PredictedRiskAreaService;
 use App\Services\ProfileImageService;
 use App\Services\ChecklistMitigationDraftService;
+use App\Services\BoundaryManagementScope;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
 use Carbon\Carbon;
@@ -84,6 +85,21 @@ class StationAdminController extends Controller
             'barangay' => ['nullable', 'string', 'max:255', Rule::in($validBarangayNames)],
             'notes' => ['nullable', 'string'],
         ]);
+    }
+
+    protected function scheduleBarangays(): \Illuminate\Support\Collection
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return collect();
+        }
+
+        $barangayIds = app(BoundaryManagementScope::class)->coveredBarangayIds($user);
+
+        return Barangay::query()
+            ->whereIn('barangay_id', $barangayIds->all())
+            ->orderBy('barangay_name')
+            ->get(['barangay_id', 'barangay_name']);
     }
 
     protected function assertValidScheduleWindow(array $validated): ?\Illuminate\Http\JsonResponse
@@ -1388,12 +1404,7 @@ class StationAdminController extends Controller
         $stationOfficer = $this->getAuthenticatedStationOfficer();
         $stationId = $stationOfficer?->station_id;
         $stationName = $stationOfficer?->station?->station_name;
-        $urbiztondoBarangays = Barangay::query()
-            ->whereHas('city', function ($query) {
-                $query->whereRaw('LOWER(city_name) = ?', ['urbiztondo']);
-            })
-            ->orderBy('barangay_name')
-            ->get(['barangay_id', 'barangay_name']);
+        $stationBarangays = $this->scheduleBarangays();
 
         $scheduleEvents = collect();
 
@@ -1443,7 +1454,7 @@ class StationAdminController extends Controller
             'scheduleEvents' => $scheduleEvents,
             'stationId' => $stationId,
             'stationName' => $stationName,
-            'urbiztondoBarangays' => $urbiztondoBarangays,
+            'stationBarangays' => $stationBarangays,
             'pendingCommunityActivityRequests' => $pendingCommunityActivityRequests,
             'reviewedCommunityActivityRequests' => $reviewedCommunityActivityRequests,
         ]);
@@ -1461,12 +1472,7 @@ class StationAdminController extends Controller
             ], 422);
         }
 
-        $validBarangayNames = Barangay::query()
-            ->whereHas('city', function ($query) {
-                $query->whereRaw('LOWER(city_name) = ?', ['urbiztondo']);
-            })
-            ->pluck('barangay_name')
-            ->all();
+        $validBarangayNames = $this->scheduleBarangays()->pluck('barangay_name')->all();
 
         $validated = $this->validateSchedulePayload($request, $validBarangayNames);
         $windowError = $this->assertValidScheduleWindow($validated);
@@ -1523,12 +1529,7 @@ class StationAdminController extends Controller
             ], 403);
         }
 
-        $validBarangayNames = Barangay::query()
-            ->whereHas('city', function ($query) {
-                $query->whereRaw('LOWER(city_name) = ?', ['urbiztondo']);
-            })
-            ->pluck('barangay_name')
-            ->all();
+        $validBarangayNames = $this->scheduleBarangays()->pluck('barangay_name')->all();
 
         $validated = $this->validateSchedulePayload($request, $validBarangayNames);
         $windowError = $this->assertValidScheduleWindow($validated);
@@ -2701,16 +2702,30 @@ class StationAdminController extends Controller
             ->with('success', 'Mitigation action deleted successfully.');
     }
 
-    public function alerts()
+    public function alerts(Request $request, \App\Services\OperationalMapScope $operationalScope)
     {
-        $incidents = Incident::all();
+        $incidents = $operationalScope
+            ->constrainIncidentQuery(Incident::with('marker'), $request->user())
+            ->get();
 
         return view('chief.alerts', compact('incidents'));
     }
 
-    public function maps()
+    public function maps(Request $request, \App\Services\OperationalMapScope $operationalScope)
     {
-        $mapmarker = Marker::all();
+        $user = $request->user();
+        $stationIds = $operationalScope->stationIds($user);
+        $mapmarker = Marker::query()
+            ->when(! $operationalScope->hasProvinceWideAccess($user), function ($query) use ($operationalScope, $stationIds, $user) {
+                $query->where(function ($scope) use ($operationalScope, $stationIds, $user) {
+                    $scope->whereHas('incidents', function ($incidents) use ($operationalScope, $user) {
+                        $operationalScope->constrainIncidentQuery($incidents, $user);
+                    })
+                        ->orWhereHas('stations', fn ($stations) => $stations->whereIn('stations.station_id', $stationIds->all()))
+                        ->orWhereHas('hydrants', fn ($hydrants) => $hydrants->whereIn('station_id', $stationIds->all()));
+                });
+            })
+            ->get();
 
         return view('chief.incidentmap', compact('mapmarker'));
     }

@@ -2013,17 +2013,14 @@ async function cancelReport(incidentId, markerId) {
         });
         
         // First, update incident status to cancelled/resolved (or delete)
-        const incidentResponse = await fetch(`/api/incidents/${incidentId}`, {
+        const incidentResponse = await fetch(`/api/incidents/${incidentId}/5`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({
-                incident_status_id: 3, // Resolved/Cancelled
-                status: 'cancelled'
-            })
+            body: JSON.stringify({ status: 'closed' })
         });
         
         if (!incidentResponse.ok) {

@@ -74,7 +74,7 @@
        async function fetchIcons() {
         try {
             // Using your getIcons() method
-            const response = await fetch('/admin/geticons'); // Adjust URL as needed
+            const response = await fetch('{{ route('station-admin.geticon') }}');
             const result = await response.json();
             
             if (result.success) {

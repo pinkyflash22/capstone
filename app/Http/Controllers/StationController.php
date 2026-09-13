@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Station;
 use App\Models\FullAddress;
 use App\Models\Marker;
+use App\Services\OperationalMapScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
@@ -88,12 +89,14 @@ public function getByMarker($markerId)
     return response()->json($station);
 }
 
-public function updateByMarker(Request $request, $markerId)
+public function updateByMarker(Request $request, $markerId, OperationalMapScope $operationalScope)
 {
     $station = Station::where('marker_id', $markerId)->first();
     if (!$station) {
         return response()->json(['error' => 'Station not found'], 404);
     }
+
+    $operationalScope->authorizeRequestedStation($request->user(), (int) $station->station_id);
     
     $station->update($request->only(['station_name', 'station_code', 'contact_number', 'email']));
     Cache::forget('map:stations:index:v2');

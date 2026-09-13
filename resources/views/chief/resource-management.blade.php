@@ -3212,7 +3212,7 @@
                 <h2><i class="fa-solid fa-user-plus"></i> Add Officer to Station</h2>
                 <button class="modal-close" onclick="closeModal('officerModal')"><i class="fa-solid fa-times"></i></button>
             </div>
-            <form id="connectionForm" action="{{ route('admin.station-officers.store') }}" method="POST">
+            <form id="connectionForm" action="{{ route($resourceRoutePrefix.'.station-officers.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
@@ -3641,7 +3641,7 @@ if (officerForm) {
         }
         
         // Submit via AJAX only
-        fetch('/admin/station-officers', {
+        fetch(`${resourceAdminBaseUrl}/station-officers`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': csrfToken,
