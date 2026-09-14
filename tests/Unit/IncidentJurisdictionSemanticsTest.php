@@ -16,6 +16,8 @@ class IncidentJurisdictionSemanticsTest extends TestCase
         $this->assertStringContainsString('locateNearbyBarangayBoundary(', $service);
         $this->assertStringContainsString("->whereNull('is_active')->orWhere('is_active', true)", $service);
         $this->assertStringContainsString("'saved_boundary_vicinity'", $service);
+        $this->assertStringContainsString("'barangay_hall_vicinity'", $service);
+        $this->assertStringContainsString('locateNearbyBarangayHall(', $service);
         $this->assertStringContainsString("WHEN 'primary' THEN 1", $service);
         $this->assertStringContainsString('$this->jurisdictionService->apply($lockedIncident)', $assignment);
         $this->assertStringContainsString('safelyAutoAssignFireIncident', $barangay);

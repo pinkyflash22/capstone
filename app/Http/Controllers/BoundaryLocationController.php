@@ -328,9 +328,21 @@ class BoundaryLocationController extends Controller
         }
 
         $barangayIds = $this->operationalScope->barangayIds($user);
-        return $barangayIds->isEmpty()
-            ? $query->whereRaw('1 = 0')
-            : $query->whereIn('barangay_id', $barangayIds->all());
+        if ($barangayIds->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $cityIds = Barangay::query()
+            ->whereIn('barangay_id', $barangayIds->all())
+            ->pluck('city_id')
+            ->filter()
+            ->map(fn ($cityId) => (int) $cityId)
+            ->unique()
+            ->values();
+
+        return $cityIds->isEmpty()
+            ? $query->whereIn('barangay_id', $barangayIds->all())
+            : $query->whereHas('barangay', fn ($barangays) => $barangays->whereIn('city_id', $cityIds->all()));
     }
 
     private function resolveVisibleStationScope($user, ?int $requestedStationId = null): ?int
